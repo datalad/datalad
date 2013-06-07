@@ -1,0 +1,434 @@
+#!/usr/bin/python
+#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+#ex: set sts=4 ts=4 sw=4 noet:
+#------------------------- =+- Python script -+= -------------------------
+"""
+ @file      fetch_url.py
+ @date      Wed May 22 15:31:19 2013
+ @brief
+
+
+  Yaroslav Halchenko                                            Dartmouth
+  web:     http://www.onerussian.com                              College
+  e-mail:  yoh@onerussian.com                              ICQ#: 60653192
+
+ DESCRIPTION (NOTES):
+
+ COPYRIGHT: Yaroslav Halchenko 2013
+
+ LICENSE: MIT
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+"""
+#-----------------\____________________________________/------------------
+
+__author__ = 'Yaroslav Halchenko'
+__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
+__license__ = 'MIT'
+__version__ = "0.0.0.dev"
+
+import commands
+import urllib2
+from urlparse import urljoin, urlsplit
+
+url = 'http://human.brain-map.org/api/v2/well_known_file_download/178238387'
+urlz = 'http://gzip.datagit.org/zeros100'
+urlzgz = 'http://gzip.datagit.org/zeros100.gz'
+
+from StringIO import StringIO
+import gzip
+
+import re
+import urllib2
+import shutil
+import urlparse
+import os
+
+from ConfigParser import ConfigParser
+
+from BeautifulSoup import BeautifulSoup
+
+def dry(s, dry):
+    if dry:
+        return "DRY " + s
+    return s
+
+def getstatusoutput(cmd, dry_run):
+    lgr.debug(dry("Running: %s" % (cmd,)), dry_run)
+    if not dry_run:
+        status, output = commands.getstatusoutput(cmd)
+        if status != 0:
+            msg = "Failed to run %r. Exit code=%d output=%s" % (cmd, status, output)
+            lgr.error(msg)
+            raise RuntimeError(msg)
+        else:
+            return status, output
+    return None, None
+
+
+def getFileName(url, response):
+    if 'Content-Disposition' in response.info():
+        # If the response has Content-Disposition, try to get filename from it
+        cd = dict(map(
+            lambda x: x.strip().split('=') if '=' in x else (x.strip(),''),
+            response.info()['Content-Disposition'].split(';')))
+        if 'filename' in cd:
+            filename = cd['filename'].strip("\"'")
+            if filename: return filename
+    # if no filename was found above, parse it out of the final URL.
+    return os.path.basename(urlparse.urlsplit(response.url)[2])
+
+
+def download(url, filename=None, filename_only=False):
+    # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
+    request = urllib2.Request(url)
+    request.add_header('Accept-encoding', 'gzip,deflate')
+    r = urllib2.urlopen(request)
+    try:
+        filename = filename or getFileName(url, r)
+        if not filename_only:
+            with open(filename, 'wb') as f:
+                if r.info().get('Content-Encoding') == 'gzip':
+                    buf = StringIO( r.read())
+                    src = gzip.GzipFile(fileobj=buf)
+                else:
+                    src = r
+                shutil.copyfileobj(src, f)
+    finally:
+        r.close()
+    return filename
+
+
+class RegexpType(object):
+    """Factory for creating regular expression types for argparse
+
+    DEPRECATED AFAIK -- now things are in the config file...
+    but we might provide a mode where we operate solely from cmdline
+    """
+    def __call__(self, string):
+        if string:
+            return re.compile(string)
+        else:
+            return None
+
+def fetch_page(url):
+    lgr.debug("Fetching %s" % url)
+    page = urllib2.urlopen(url).read()
+    lgr.info("Fetched %d bytes page from %s" % (len(page), url))
+    return page
+
+def parse_urls(page):
+    lgr.debug("Parsing out urls")
+    soup = BeautifulSoup(page)
+    return [(link.get('href'), link.text)
+            for link in soup.findAll('a')]
+
+def filter_urls(urls,
+                include_href=None,
+                exclude_href=None,
+                include_href_a=None,
+                exclude_href_a=None):
+
+    if (not include_href) and not (include_href_a):
+        include_href = '.*'               # include all
+
+    # First do all includes explicitly and then excludes
+    return [(url, a)
+             for url, a in urls
+                if url
+                   and
+                   ((include_href and re.search(include_href, url))
+                     or (include_href_a and re.search(include_href_a, a))) \
+                   and not
+                   ((exclude_href and re.search(exclude_href, url))
+                     or (exclude_href_a and re.search(exclude_href_a, a)))]
+
+
+def download_url(href, incoming, url_timestamps, dry_run=False):
+    url_filename = os.path.basename(urllib2.urlparse.urlsplit(href).path)
+
+    if dry_run:
+        # we can only try to deduce from the href...
+        filename = url_filename
+    else:
+        filename = download(href, filename_only=True)
+        if url_filename != url_filename:
+            lgr.warning("Filename in url %s differs from the load %s" % (url_filename, filename))
+
+    full_filename = os.path.join(incoming, filename)
+    if os.path.exists(full_filename):
+        lgr.info("Skipping %s -- already exists under %s" % (filename, full_filename))
+        return
+
+    lgr.debug(dry("Downloading %s -> %s" % (href, full_filename), dry_run))
+
+    if not dry_run:
+        print "DOWNLOADING ", filename
+
+    return filename, full_filename, None                 # TODO
+
+def init_annex(path, description="", dry_run=False):
+    cmd = "cd %s && git init && git annex init" % path
+
+    lgr.info(dry("Initializing git annex repository under %s: %s"
+            % (path, description), dry_run))
+
+    if not dry_run:
+        status, output = getstatusoutput(cmd, dry_run)
+        lgr.debug("Successfully initialized")
+        # dump description
+        with open(os.path.join(path, '.git', 'description'), 'w') as f:
+            f.write(description + '\n')
+
+def annex_url(href, incoming_filename, annex_filename, addurl_opts=None, dry_run=False):
+
+    lgr.info("Annexing %s originating from url=%s present locally under %s"
+             % (annex_filename, href, incoming_filename))
+    pass
+
+def pprint_indent(l, indent="", fmt='%s'):
+    return indent + ('\n%s' % indent).join([fmt % x for x in l])
+
+# Some rudimentary tests
+from nose.tools import assert_equal
+
+def test_filter_urls():
+    urls = [('/x.nii.gz', 'bogus'),
+            ('x.tar.gz', None),
+            ('y', None)]
+    assert_equal(filter_urls(urls, "^x\..*"), [urls[1]])
+    assert_equal(filter_urls(urls, "^[xy]"), urls[1:])
+    assert_equal(filter_urls(urls, "\.gz", "\.nii"),
+           [urls[1]])
+    assert_equal(filter_urls(urls, exclude_href="x"),
+           [urls[2]])
+    assert_equal(filter_urls(urls, "^[xy]"), urls[1:])
+
+if __name__ == '__main__':
+
+    # setup cmdline args parser
+    # main parser
+    import argparse
+    import logging
+    import os
+    import sys
+
+    lgr = logging.getLogger('page2annex')
+
+    parser = argparse.ArgumentParser(
+        fromfile_prefix_chars='@',
+        description="""
+    Fetch web page's linked content into git-annex repository.
+
+    """,
+        epilog='',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=True,
+        version=__version__
+    )
+
+    # common options
+    parser.add_argument(
+        "-a", "--addurl-opts", default="",
+        help="Additional options to pass to 'git annex addurl', e.g. --fast")
+#    parser.add_argument(
+#        "-i", "--include", type=RegexpType(),
+#        help="Include links which match regular expression (by HREF). "
+#             "Otherwise all are considered")
+#    parser.add_argument(
+#        "-e", "--exclude", type=RegexpType(),
+#        help="Exclude links which match regular expression (by HREF)")
+#     parser.add_argument(
+#         "--use-a", action="store_true",
+#         help="Use name provided in the link, not filename given by the server")
+    parser.add_argument(
+        "-n", "--dry-run", action="store_true",
+        help="No git-annex is invoked, commands are only printed to the screen")
+
+    if __debug__:
+        # borrowed from Michael's bigmess
+        parser.add_argument(
+            '--dbg', action='store_true', dest='common_debug',
+            help="do not catch exceptions and show exception traceback")
+
+    parser.add_argument(
+        '-l', '--log-level',
+        choices=('critical', 'error', 'warning', 'info', 'debug'),
+        default='warning',
+        help="""level of verbosity""")
+
+    parser.add_argument("config", metavar='file', nargs='+',
+                        help="Configuration file(s) defining the structure of the 'project'")
+
+    args = parser.parse_args() #['-n', '-l', 'debug', 'allen-genetic.cfg'])
+
+    # Basic logging setup
+    console = logging.StreamHandler(sys.stdout)
+    console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
+    lgr.addHandler(console)
+    lgr.setLevel(getattr(logging, args.log_level.upper()))
+
+    lgr.debug("Command line arguments: %r" % args)
+
+    lgr.info("Running tests")
+    test_filter_urls()
+
+    try:
+
+        # Load configuration
+        cfg = ConfigParser(defaults=dict(
+            keep_orig='True',
+            meta_info='True',
+            directory="%(__name__)s",
+            extract='\.(zip|tar\.gz)$',
+            incoming="repos/incoming/EXAMPLE",
+            public="repos/public/EXAMPLE",
+            include_href='',
+            include_href_a='',
+            exclude_href='',
+            exclude_href_a='',
+            filename='&(filename)s',
+            limit='0',                     # no limits
+            annex='.*',                    # 
+            ))
+        cfg_read = cfg.read(args.config)
+        assert(cfg_read == args.config)
+
+        dry_str = "DRY: " if args.dry_run else ""
+
+        incoming = cfg.get('DEFAULT', 'incoming')
+        public = cfg.get('DEFAULT', 'public')
+
+        if not (os.path.exists(incoming) and os.path.exists(public)):
+            lgr.debug("%sCreating directories for incoming (%s) and public (%s) annexes"
+                      % (dry_str, incoming, public))
+
+            if not args.dry_run:
+                os.makedirs(incoming)
+                os.makedirs(public)           #TODO might be the same
+
+        if not os.path.exists(os.path.join(public, '.git', 'annex')):
+            init_annex(public, cfg.get('DEFAULT', 'description'), args.dry_run)
+
+        # TODO: look what is in incoming for this "repository", so if
+        # some urls are gone or changed so previous file is not there
+        # we would clean-up upon exit
+
+        # each section defines a separate download setup
+        for section in cfg.sections():
+            lgr.info("Section: %s" % section)
+
+            section_dir = cfg.get(section, 'directory')
+
+            incoming_section = os.path.join(incoming, section_dir)
+            public_section = os.path.join(public, section_dir)
+
+            if not (os.path.exists(incoming) and os.path.exists(public)):
+                lgr.debug("%sCreating directories for section's incoming (%s) and public (%s) annexes"
+                          % (dry_str, incoming_section, public_section))
+                if not args.dry_run:
+                    os.makedirs(incoming_section)
+                    os.makedirs(public_section)           #TODO might be the same
+
+            # TODO: load previous status info
+            """We need
+
+            url_timestamps -- to track their time.  URLs might or might not provide Last-Modified,
+              so if not provided, would correspond to None and only look by url change pretty much
+
+            annex_pairs -- to have clear correspondence between annex_filename and url.
+                           annex_filename might correspond to a directory where we would
+                           extract things, so we can't just geturl on it
+            """
+            status_info = dict(url_timestamps={},   # url -> timestamp
+                               annex_pairs={})      # annex_filename -> url
+
+            url_timestamps = status_info['url_timestamps']
+            annex_pairs = status_info['annex_pairs']
+
+            scfg = dict(cfg.items(section))
+            page = fetch_page(scfg['url'])
+
+            # Parse out all URLs, as a tuple (url, a(text))
+            urls_all = parse_urls(page)
+            lgr.info("Got total %d urls" % len(urls_all))
+            lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))
+
+            # Filter them out
+            urls = filter_urls(urls_all, **dict(
+                [(k,scfg[k]) for k in
+                 ('include_href', 'exclude_href', 'include_href_a', 'exclude_href_a')]))
+            lgr.info("%d out of %d urls survived filtering" % (len(urls), len(urls_all)))
+            if scfg['limit']:
+                limit = int(scfg['limit'])
+                if limit:
+                    if len(urls) > limit:
+                        raise RuntimeError("Cannot process section since we expected only %d urls"
+                                           % limit)
+            for href, href_a in urls:
+                # bring them into the full urls
+                href = urljoin(scfg['url'], href)
+                lgr.debug("Working on [%s](%s)" % (href, href_a))
+
+                # Will adjust url_timestamps in-place
+                filename, full_filename, href_updated = \
+                  download_url(href, incoming_section, url_timestamps=url_timestamps, dry_run=args.dry_run)
+
+                # figure out what should it be
+                annex_filename = scfg['filename'].replace('&', '%') % locals()   # interpolate
+                annex_full_filename = os.path.join(public_section, annex_filename)
+
+                if href_updated or not annex_filename in annex_pairs:
+                    # Place them under git-annex, if they do not exist already
+                    annex_url(
+                        href,
+                        incoming_filename=full_filename,
+                        annex_filename=annex_full_filename,
+                        addurl_opts=args.addurl_opts,
+                        dry_run=args.dry_run)
+                    annex_pairs[annex_filename] = href
+                else:
+                    # TODO: shouldn't we actually check???
+                    lgr.debug("Skipping annexing %s since it must be there already (TODO)" % annex_filename)
+
+                # TODO: update status_info
+                # TODO: save status_info
+
+    except Exception as exc:
+        lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
+        if __debug__ and args.common_debug:
+            import pdb
+            pdb.post_mortem()
+        raise
+
+
+"""
+request = urllib2.Request(url)
+request.add_header('Accept-encoding', 'gzip,deflate')
+response = urllib2.urlopen(request)
+print response.info()
+if response.info().get('Content-Encoding') == 'gzip':
+    buf = StringIO( response.read())
+    f = gzip.GzipFile(fileobj=buf)
+    data = f.read()
+
+u = urllib2.urlopen(url)
+uinfo = u.info()
+# "Content-Disposition"  attachment; filename="normalized_microarray_donor9861.zip"
+"""
