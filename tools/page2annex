@@ -67,25 +67,28 @@ from BeautifulSoup import BeautifulSoup
 # All this should be replaced with a use of patoolib, but
 # after figure out why
 # https://github.com/wummel/patool/issues/2
+# Fixed in 1.2 release, but there is no __version__ to assess reliably (yet)
 import patoolib
 
 DECOMPRESSORS = {
-    '(tar.bz|tbz)' : 'tar -xjvf %(file)s -C %(dir)s',
-    '(tar.xz)' : 'tar -xJvf %(file)s -C %(dir)s',
-    '(tar.gz|tgz)' : 'tar -xzvf %(file)s -C %(dir)s',
-    '(zip)' : 'unzip %(file)s -d %(dir)s',
+    '\.(tar\.bz|tbz)$' : 'tar -xjvf %(file)s -C %(dir)s',
+    '\.(tar\.xz)$' : 'tar -xJvf %(file)s -C %(dir)s',
+    '\.(tar\.gz|tgz)$' : 'tar -xzvf %(file)s -C %(dir)s',
+    '\.(zip)$' : 'unzip %(file)s -d %(dir)s',
     }
 
 
 def decompress_file(file, dir):
     fullcmd = None
     for ptr, cmd in DECOMPRESSORS.iteritems():
-        if re.match('.*%s$' % ptr, file):
+        if re.search(ptr, file):
             fullcmd = cmd % locals()
             break
     if fullcmd is not None:
-        #lgr.debug("Extracting file: %s" % fullcmd)
+        lgr.debug("Extracting file: %s" % fullcmd)
         status, output = getstatusoutput(fullcmd)
+        if status:
+            lgr.debug("Failed to extract: status %d output %s" % (status, output))
     else:
         lgr.debug("Have no clue how to extract %s -- using patool" % file)
         patoolib.extract_archive(file, outdir=dir)
@@ -206,7 +209,7 @@ def filter_urls(urls,
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
 
 
-def download_url(href, incoming, url_stamps=None, dry_run=False):
+def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False):
 
     updated = False
     # so we could check and remove it to keep it clean
@@ -290,6 +293,10 @@ def download_url(href, incoming, url_stamps=None, dry_run=False):
             if not (full_filename in url_stamps) and not os.path.exists(full_filename):
                 lgr.debug("File %s is not known and doesn't exist" % filename)
                 download = True
+
+            if fast_mode:
+                lgr.info("Not downloading -- fast mode")
+                raise ReturnSooner
 
             if not download:
                 raise ReturnSooner
@@ -377,66 +384,126 @@ def download_url(href, incoming, url_stamps=None, dry_run=False):
     return filename, full_filename, updated
 
 
-def annex_init(path, description="", dry_run=False):
-    cmd = "cd %s && git init && git annex init" % path
+class AnnexRepo(object):
 
-    lgr.info(dry("Initializing git annex repository under %s: %s"
-            % (path, description), dry_run))
+    def __init__(self, path, dry_run=False):
+        self.path = path
+        self.dry_run = dry_run
 
-    if not dry_run:
-        status, output = getstatusoutput(cmd, dry_run)
+    def run(self, cmd):
+        cmdfull = "cd %s && git annex %s" % (self.path, cmd)
+        return getstatusoutput(cmdfull, self.dry_run)
+
+    def dry(self, s):
+        return dry(s, self.dry_run)
+
+    def init(self,  description=""):
+
+        lgr.info(self.dry(
+            "Initializing git annex repository under %s: %s"
+            % (self.path, description)))
+
+        status, output = getstatusoutput(
+            "cd %s && git init && git annex init" % self.path, self.dry_run)
         lgr.debug("Successfully initialized")
-        # dump description
-        with open(os.path.join(path, '.git', 'description'), 'w') as f:
-            f.write(description + '\n')
+
+        if not self.dry_run:
+            # dump description
+            with open(os.path.join(self.path, '.git', 'description'), 'w') as f:
+                f.write(description + '\n')
 
 
-def annex_add(href, incoming_filename, annex_filename,
-              uncomp_strip_leading_dir=True, #  False; would strip only if 1 directory
-              addurl_opts=None, dry_run=False):
+    def add_file(self, annex_filename, href=None, add_mode='auto',
+                       annex_opts=""):
+        """
+        If add_mode=='auto' we assume that if file doesn't exist already --
+        it should be '--fast' added
+        """
+        # We delay actual committing to git-annex until later
+        annex_opts = annex_opts + ' -c annex.alwayscommit=false'
+        if add_mode == 'auto':
+            if os.path.exists(annex_filename):
+                add_mode = "download"
+            else:
+                if href is None:
+                    raise ValueError("No file and no href -- can't add to annex")
+                fast_mode = "fast"
 
+        if href:
+            annex_cmd = "addurl %s --file %s %s %s" \
+              % (annex_opts, os.path.basename(annex_filename),
+                 {'download': '', 'fast': '--fast'}[add_mode],
+                 href)
+        else:
+            annex_cmd = "add %s %s" % (annex_opts, os.path.basename(annex_filename),)
+
+        return self.run(annex_cmd)
+
+
+def annex_file(href,
+               incoming_filename, annex_filename,
+               incoming_annex, public_annex,
+               archives_destiny=None,
+               archives_re=None,
+               add_mode='auto',
+               uncomp_strip_leading_dir=True, #  False; would strip only if 1 directory
+               addurl_opts=None,
+               dry_run=False
+               ):
     lgr.info("Annexing %s originating from url=%s present locally under %s"
              % (annex_filename, href, incoming_filename))
 
-    # Figure out if anything needs to be done to it
-    annex_cmd = "addurl --file %s %s" \
-        % (os.path.basename(annex_filename), href)
+    # it might be that we would like to move it
+    # or extract it
+    is_archive = False
+    if archives_re:
+        res = re.search(archives_re, annex_filename)
+        if res:
+            is_archive = True
+            annex_dir = annex_filename[:res.start()]
+            if res.end() < len(res.string):
+                annex_dir += annex_filename[res.end:]
+            annex_filename = annex_dir   # TODO: "merge" the two
 
-    if incoming_filename == annex_filename:
-        # I guess not!
-        pass
-    else:
-        # it might be that we would like to move it
-        # or extract it
-        is_directory = annex_filename.endswith('/')
-        if is_directory:
-            # figure out output directory name
-            #annex_dir = os.path.dirname(annex_filename)+"TODO"
-            annex_dir = annex_filename.rstrip('/')+"_TODO"
-            annex_filename = annex_dir
+    if is_archive:
+        #import pydb; pydb.debugger()
+        # what if the directory exist already?
+        # option? yeah -- for now we will just REMOVE and recreate with new files
+        temp_annex_dir = annex_dir + ".extract"
+        os.makedirs(temp_annex_dir)
+        decompress_file(incoming_filename, temp_annex_dir)
+        if os.path.exists(annex_dir):
+            lgr.debug("Removing previously present %s" % annex_dir)
+            shutil.rmtree(annex_dir)
+        os.rename(temp_annex_dir, annex_dir)
+        # TODO: some files might need to go to GIT directly
+        public_annex.add_file(annex_dir)
 
-            #import pydb; pydb.debugger()
-            # what if the directory exist already?
-            # option? yeah -- for now we will just REMOVE and recreate with new files
-            temp_annex_dir = annex_dir + ".extract"
-            os.makedirs(temp_annex_dir)
-            decompress_file(incoming_filename, temp_annex_dir)
-            if os.path.exists(annex_dir):
-                lgr.debug("Removing previously present %s" % annex_dir)
-                shutil.rmtree(annex_dir)
-            os.rename(temp_annex_dir, annex_dir)
-            annex_cmd = "add %s" % (os.path.basename(annex_filename),)
+        # what do we do with the "incoming" archive
+        if archives_destiny == 'rm':
+            shutil.rmtree(incoming_filename, True)
+        elif archives_destiny in ('annex', 'drop'):
+            incoming_annex.add_file(incoming_filename, href=href)
+            if archives_destiny == 'drop':
+                incoming_annex.run("drop %s" % annex_filename)
+        elif archives_destiny == 'keep':
+            pass # do nothing more
         else:
-            pass
-            #annex_cmd = "addurl --file %s %s" \
-            #  % (os.path.basename(annex_filename), href)
+            raise ValueError("Unknown value of archives_destiny=%r"
+                             % archives_destiny)
+    else:
+        # Figure out if anything needs to be done to it
+        # TODO: some files might need to go to GIT directly
+        incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode)
+        # copy via linking (TODO -- option to move, copy?)
 
-    # So let's add file/or directory to annex? ;-)
-    # TODO: --fast mode for arjlover
-    cmd = "cd %s && git annex %s" \
-      % (os.path.dirname(annex_filename), annex_cmd)
-
-    status, output = getstatusoutput(cmd, dry_run)
+        if incoming_annex is not public_annex:
+            if os.path.exists(incoming_filename):
+                os.link(incoming_filename, annex_filename)
+            else:
+                # assuming --fast mode
+                pass
+            pubic_annex.add_file(annex_filename, href=href, add_mode=add_mode)
 
 
 def git_commit(path, files=None, msg=None, dry_run=False):
@@ -463,79 +530,211 @@ def pprint_indent(l, indent="", fmt='%s'):
     return indent + ('\n%s' % indent).join([fmt % x for x in l])
 
 # Some rudimentary tests
-from nose.tools import assert_equal, assert_raises
+from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
+    make_decorator, ok_, eq_
+import tempfile
+tempfile.template = 'tmp-page2annex'
+
+import stat, os
+def rmtree(path, *args, **kwargs):
+    """To remove git-annex .git it is needed to make all files and directories writable again first
+    """
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            fullf = os.path.join(root, f)
+            os.chmod(fullf, os.stat(fullf).st_mode | stat.S_IWRITE | stat.S_IREAD)
+        os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
+    shutil.rmtree(path, *args, **kwargs)
+
+def _create_tree(path, tree):
+    """Given a list of tuples (name, load) create such a tree
+
+    if load is a tuple itself -- that would create either a subtree or an archive
+    with that content and place it into the tree if name ends with .tar.gz
+    """
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+    for name, load in tree:
+        full_name = os.path.join(path, name)
+        if isinstance(load, tuple):
+            if name.endswith('.tar.gz'):
+                dirname = name[:-7]
+                full_dirname = os.path.join(path, dirname)
+                os.makedirs(full_dirname)
+                _create_tree(full_dirname, load)
+                # create archive
+                status, output = getstatusoutput(
+                    'cd %(path)s && tar -czvf %(name)s %(dirname)s' % locals())
+                # remove original tree
+                shutil.rmtree(full_dirname)
+            else:
+                _create_tree(full_name, load)
+        else:
+            with open(full_name, 'w') as f:
+                f.write(load)
+
+def with_tree(tree, **tkwargs):
+    def decorate(func):
+        def newfunc(*arg, **kw):
+            d = tempfile.mkdtemp(**tkwargs)
+            _create_tree(d, tree)
+            try:
+                func(*(arg + (d,)), **kw)
+            finally:
+                #print "TODO: REMOVE tree ", d
+                shutil.rmtree(d)
+
+        newfunc = make_decorator(func)(newfunc)
+        return newfunc
+    return decorate
+
+
+# GRRR -- this one is crippled since path where HTTPServer is serving
+# from can't be changed without pain. 
+
+import SimpleHTTPServer
+import SocketServer
+from threading import Thread
+
+def serve_path_via_http(*args, **tkwargs):
+    def decorate(func):
+        def newfunc(path, *arg, **kw):
+            port = 8006
+            print "Starting to serve path ", path
+            # TODO: ATM we are relying on path being local so we could
+            # start HTTP server in the same directory.  FIX IT!
+            httpd = SocketServer.TCPServer(("", port),
+                        SimpleHTTPServer.SimpleHTTPRequestHandler)
+            server_thread = Thread(target=httpd.serve_forever)
+            server_thread.start()
+            #time.sleep(1)               # just give it few ticks
+            try:
+                func(*(('http://localhost:%d/%s/' % (port, path),)+arg), **kw)
+            finally:
+                #print "Stopping server"
+                httpd.shutdown()
+                #print "Waiting for thread to stop"
+                server_thread.join()
+        newfunc = make_decorator(func)(newfunc)
+        return newfunc
+    return decorate
+
 
 def test_filter_urls():
     urls = [('/x.nii.gz', 'bogus'),
             ('x.tar.gz', None),
             ('y', None)]
-    assert_equal(filter_urls(urls, "^x\..*"), [urls[1]])
-    assert_equal(filter_urls(urls, "^[xy]"), urls[1:])
-    assert_equal(filter_urls(urls, "\.gz", "\.nii"),
+    eq_(filter_urls(urls, "^x\..*"), [urls[1]])
+    eq_(filter_urls(urls, "^[xy]"), urls[1:])
+    eq_(filter_urls(urls, "\.gz", "\.nii"),
            [urls[1]])
-    assert_equal(filter_urls(urls, exclude_href="x"),
+    eq_(filter_urls(urls, exclude_href="x"),
            [urls[2]])
-    assert_equal(filter_urls(urls, "^[xy]"), urls[1:])
+    eq_(filter_urls(urls, "^[xy]"), urls[1:])
 
 def test_get_response_stamp():
     r = get_response_stamp({'Content-length': '101',
                                 'Last-modified': 'Wed, 01 May 2013 03:02:00 GMT'})
-    assert_equal(r['size'], 101)
-    assert_equal(r['mtime'], 1367377320)
+    eq_(r['size'], 101)
+    eq_(r['mtime'], 1367377320)
 
 
 def test_download_url():
     # let's simulate the whole scenario
-    import tempfile
-    fd, fname = tempfile.mkstemp(prefix='tmp-page2annex')
+    fd, fname = tempfile.mkstemp()
     dout = fname + '-d'
+    # TODO move tempfile/tempdir setup/cleanup into fixture(s)
     os.mkdir(dout)
     os.write(fd, "How do I know what to say?\n")
     os.close(fd)
 
     filename, full_filename, updated = download_url("file://%s" % fname, dout)
-    assert(updated)
+    ok_(updated)
     # check if stats are the same
     s, s_ = os.stat(fname), os.stat(full_filename)
-    assert_equal(s.st_size, s_.st_size)
+    eq_(s.st_size, s_.st_size)
     # at least to a second
-    assert_equal(int(s.st_mtime), int(s_.st_mtime))
+    eq_(int(s.st_mtime), int(s_.st_mtime))
 
     # and if again -- should not be updated
     filename, full_filename, updated = download_url("file://%s" % fname, dout)
-    assert(not updated)
+    ok_(not updated)
 
     # but it should if we remove it
     os.unlink(full_filename)
     filename, full_filename, updated = download_url("file://%s" % fname, dout)
-    assert(updated)
+    ok_(updated)
     # check if stats are the same
     s_ = os.stat(full_filename)
-    assert_equal(s.st_size, s_.st_size)
-    assert_equal(int(s.st_mtime), int(s_.st_mtime))
+    eq_(s.st_size, s_.st_size)
+    eq_(int(s.st_mtime), int(s_.st_mtime))
 
     # and what if we maintain url_stamps
     url_stamps = {}
     os.unlink(full_filename)
     filename, full_filename, updated = download_url("file://%s" % fname, dout, url_stamps)
-    assert(updated)
-    assert(full_filename in url_stamps)
+    ok_(updated)
+    ok_(full_filename in url_stamps)
     s_ = os.stat(full_filename)
-    assert_equal(int(s.st_mtime), int(s_.st_mtime))
-    assert_equal(int(s.st_mtime), url_stamps[full_filename]['mtime'])
+    eq_(int(s.st_mtime), int(s_.st_mtime))
+    eq_(int(s.st_mtime), url_stamps[full_filename]['mtime'])
     print filename, full_filename, url_stamps,
 
     # and if we remove it but maintain information that we think it
     # exists -- we should skip it ATM
     os.unlink(full_filename)
     filename, full_filename, updated = download_url("file://%s" % fname, dout, url_stamps)
-    assert(not updated)
-    assert(full_filename in url_stamps)
+    ok_(not updated)
+    ok_(full_filename in url_stamps)
     assert_raises(OSError, os.stat, full_filename)
 
     os.unlink(fname)
-    shutil.rmtree(dout, True)
+    rmtree(dout, True)
 
+
+@with_tree((('test.txt', 'abracadabra'),
+            ('1.tar.gz', (
+               ('1f.txt', '1f load'),
+               ('d', (('1d', ''),
+                      )),
+               ))),
+           dir=os.curdir,
+           prefix='.tmp-page2annex-')
+@serve_path_via_http()
+def test_parse_urls_recurse(url):
+    dout = tempfile.mkdtemp()
+    page = fetch_page(url)
+    urls = parse_urls(page)
+
+    cfg = get_default_config(dict(
+        DEFAULT=dict(
+            incoming=dout,
+            public=dout,
+            description="test",
+            ),
+        files=dict(
+            directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
+            url=url)))
+
+    stats1 = rock_and_roll(cfg, dry_run=False)
+    assert_greater(stats1['annex_updates'], 0)   # TODO: more specific
+    eq_(stats1['downloads'], 2)
+
+    # Let's repeat -- there should be no downloads/updates
+    stats2 = rock_and_roll(cfg, dry_run=False)
+    eq_(stats2['annex_updates'], 0)
+    eq_(stats2['downloads'], 0)
+
+    # TODO: verify that the structure as it should be
+
+    #print dout, "URLS: ", urls
+    rmtree(dout, True)
+    #print dout
+
+#
+# DB
+#
 def load_db(path):
     with open(path) as f:
         return json.load(f)
@@ -545,15 +744,26 @@ def save_db(db, path):
         json.dump(db, f, indent=2)
 
 
-def load_config(configs):
-    # Load configuration
+#
+# Configuration
+#
+def get_default_config(sections={}):
     cfg = ConfigParser(defaults=dict(
         mode='download',                 # TODO -- check, use
-        keep_orig='True',                 # TODO -- now we don't use it
+        orig='auto',                 # TODO -- now we don't use it
         meta_info='True',                 # TODO -- now we just use it
         directory="%(__name__)s",
-        # for now going with filename/ convention
-        # extract='\.(zip|tar\.gz)$',       # unused
+        archives_re='(%s)' % ('|'.join(DECOMPRESSORS.keys())),
+        # 'keep'  -- just keep original without annexing it etc
+        # 'annex' -- git annex addurl ...
+        # 'drop'  -- 'annex' and then 'annex drop' upon extract
+        # 'rm'    -- remove upon extraction
+        # 'auto':
+        # if incoming == public:
+        #  'auto' == 'rm'
+        # else:
+        #  'auto' == 'annex'
+        archives_destiny="auto",
         incoming="repos/incoming/EXAMPLE",
         public="repos/public/EXAMPLE",
         include_href='',
@@ -570,6 +780,16 @@ def load_config(configs):
         # TODO
         #annex='.*',                    # 
         ))
+    for section, options in sections.iteritems():
+        if section != 'DEFAULT':
+            cfg.add_section(section)
+        for opt, value in options.iteritems():
+            cfg.set(section, opt, value)
+    return cfg
+
+def load_config(configs):
+    # Load configuration
+    cfg = get_default_config()
     cfg_read = cfg.read(configs)
     assert(cfg_read == configs)
     return cfg
@@ -577,9 +797,13 @@ def load_config(configs):
 #
 # Main loop
 #
-def rock_and_roll(cfg, dry_run=False):
+def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
+    """Given a configuration fetch/update git-annex "clone"
+    """
+
     # Let's output summary stats at the end
-    stats = dict([(k, 0) for k in ['sections', 'urls', 'downloads', 'size']])
+    stats = dict([(k, 0) for k in
+                  ['sections', 'urls', 'downloads', 'annex_updates', 'size']])
     pages_cache = {}
 
     dry_str = "DRY: " if dry_run else ""
@@ -601,7 +825,14 @@ def rock_and_roll(cfg, dry_run=False):
                 os.makedirs(public)           #TODO might be the same
 
     if not os.path.exists(os.path.join(public, '.git', 'annex')):
-        annex_init(public, cfg.get('DEFAULT', 'description'), dry_run)
+        public_annex = AnnexRepo(public, dry_run=dry_run)
+        description = cfg.get('DEFAULT', 'description')
+        public_annex.init(description)
+        if public != incoming:
+            incoming_annex = AnnexRepo(incoming, dry_run=dry_run)
+            incoming_annex.init(description + ' (incoming)')
+        else:
+            incoming_annex = public_annex
 
     # TODO: load previous status info
     """We need
@@ -614,7 +845,6 @@ def rock_and_roll(cfg, dry_run=False):
                    extract things, so we can't just geturl on it
     """
 
-    db_name = '.page2annex'
     db_path = os.path.join(incoming, db_name)
     if os.path.exists(db_path):
         status_info = load_db(db_path)
@@ -631,13 +861,13 @@ def rock_and_roll(cfg, dry_run=False):
     # we would clean-up upon exit
 
     # each section defines a separate download setup
-    import pydb; pydb.debugger()
     for section in cfg.sections():
         lgr.info("Section: %s" % section)
         stats['sections'] += 1
 
         # some checks
-        assert(cfg.get(section, 'mode') in ['download', 'fast'])
+        add_mode = cfg.get(section, 'mode')
+        assert(add_mode in ['download', 'fast'])
 
         section_dir = cfg.get(section, 'directory')
 
@@ -652,6 +882,10 @@ def rock_and_roll(cfg, dry_run=False):
                 os.makedirs(public_section)           #TODO might be the same
 
         scfg = dict(cfg.items(section))
+
+        archives_destiny = scfg.get('archives_destiny')
+        if archives_destiny == 'auto':
+            archives_destiny = 'rm' if incoming == public else 'annex'
 
         # Fetching the page (possibly again! TODO: cache)
         url = scfg['url']
@@ -689,7 +923,8 @@ def rock_and_roll(cfg, dry_run=False):
 
             # Will adjust url_stamps in-place
             filename, full_filename, href_updated = \
-              download_url(href, incoming_section, url_stamps=url_stamps, dry_run=dry_run)
+              download_url(href, incoming_section, url_stamps=url_stamps, dry_run=dry_run,
+                           fast_mode=add_mode=='fast')
 
             if href_updated:
                 stats['downloads'] += 1
@@ -710,15 +945,22 @@ def rock_and_roll(cfg, dry_run=False):
                 # and what will be the extracted directory name
 
                 # Place them under git-annex, if they do not exist already
-                annex_add(
+                annex_file(
                     href,
                     incoming_filename=full_filename,
                     annex_filename=annex_full_filename,
-                    addurl_opts=addurl_opts,
-                    dry_run=dry_run)
+                    incoming_annex=incoming_annex,
+                    public_annex=public_annex,
+                    archives_destiny=archives_destiny,
+                    archives_re=scfg.get('archives_re'),
+                    add_mode=add_mode,
+                    addurl_opts=scfg.get('addurl_opts', None),
+                    dry_run=dry_run,
+                    )
 
                 annex_pairs[annex_filename] = href
                 annex_updated = True
+                stats['annex_updates'] += 1
             else:
                 # TODO: shouldn't we actually check???
                 lgr.debug("Skipping annexing %s since it must be there already (TODO)" % annex_filename)
@@ -733,7 +975,8 @@ def rock_and_roll(cfg, dry_run=False):
         git_commit(public)
 
     lgr.info("Processed %(sections)d sections, %(urls)d urls, "
-             "%(downloads)d downloads with %(size)d bytes" % stats)
+             "%(downloads)d downloads with %(size)d bytes. Made %(annex_updates)s git/annex additions/updates" % stats)
+    return stats
 
 
 if __name__ == '__main__':
@@ -784,6 +1027,10 @@ if __name__ == '__main__':
         help="No git-annex is invoked, commands are only printed to the screen")
 
     parser.add_argument(
+        "--tests-only", action="store_true",
+        help="Do not do anything but run tests")
+
+    parser.add_argument(
         '-l', '--log-level',
         choices=('critical', 'error', 'warning', 'info', 'debug'),
         default='warning',
@@ -810,9 +1057,12 @@ if __name__ == '__main__':
     lgr.debug("Command line arguments: %r" % args)
 
     lgr.info("Running tests")
+    test_parse_urls_recurse()
     test_filter_urls()
     test_get_response_stamp()
     test_download_url()
+    if args.tests_only:
+        raise SystemExit(0)
 
     try:
         lgr.info("Reading configs")
