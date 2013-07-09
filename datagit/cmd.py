@@ -43,20 +43,31 @@ def dry(s, dry_):
         return "DRY " + s
     return s
 
-def getstatusoutput(cmd, dry_run=False):
-    """A wrapper around commands.getstatusoutput
-
-    Also logs result and raise Exception
+class getstatusoutput_wrapper(object):
+    """Helper for dry_run -- would also collect all the commands to spit out at once at the end
     """
-    lgr.debug(dry("Running: %s" % (cmd,), dry_run))
-    if not dry_run:
-        status, output = commands.getstatusoutput(cmd)
-        if status != 0:
-            msg = "Failed to run %r. Exit code=%d output=%s" \
-                  % (cmd, status, output)
-            lgr.error(msg)
-            raise RuntimeError(msg)
-        else:
-            return status, output
-    return None, None
 
+    def __init__(self):
+        self.commands = []
+
+    def __call__(self, cmd, dry_run=False):
+    #def getstatusoutput(cmd, dry_run=False):
+        """A wrapper around commands.getstatusoutput
+
+        Also logs result and raise Exception
+        """
+        lgr.debug(dry("Running: %s" % (cmd,), dry_run))
+        if not dry_run:
+            status, output = commands.getstatusoutput(cmd)
+            if status != 0:
+                msg = "Failed to run %r. Exit code=%d output=%s" \
+                      % (cmd, status, output)
+                lgr.error(msg)
+                raise RuntimeError(msg)
+            else:
+                return status, output
+        else:
+            self.commands.append(cmd)
+        return None, None
+
+getstatusoutput = getstatusoutput_wrapper()

@@ -145,6 +145,7 @@ if __name__ == '__main__':
     if args.tests:
         lgr.info("Running tests")
         import nose
+        # TODO fix it so it works ;-)
         nose.runmodule('datagit', exit=True)
 
     try:

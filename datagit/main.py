@@ -69,15 +69,16 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
             if not os.path.exists(public):
                 os.makedirs(public)           #TODO might be the same
 
+    public_annex = AnnexRepo(public, dry_run=dry_run)
     if not os.path.exists(os.path.join(public, '.git', 'annex')):
-        public_annex = AnnexRepo(public, dry_run=dry_run)
         description = cfg.get('DEFAULT', 'description')
         public_annex.init(description)
-        if public != incoming:
-            incoming_annex = AnnexRepo(incoming, dry_run=dry_run)
-            incoming_annex.init(description + ' (incoming)')
-        else:
-            incoming_annex = public_annex
+
+    if public != incoming:
+        incoming_annex = AnnexRepo(incoming, dry_run=dry_run)
+        incoming_annex.init(description + ' (incoming)')
+    else:
+        incoming_annex = public_annex
 
     # TODO: load previous status info
     """We need
@@ -112,7 +113,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
 
         # some checks
         add_mode = cfg.get(section, 'mode')
-        assert(add_mode in ['download', 'fast'])
+        assert(add_mode in ['download', 'fast', 'relaxed'])
 
         section_dir = cfg.get(section, 'directory')
 
@@ -168,8 +169,9 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
 
             # Will adjust url_stamps in-place
             filename, full_filename, href_updated = \
-              download_url(href, incoming_section, url_stamps=url_stamps, dry_run=dry_run,
-                           fast_mode=add_mode=='fast')
+              download_url(href, incoming_section,
+                           url_stamps=url_stamps, dry_run=dry_run,
+                           fast_mode=add_mode in ['fast', 'relaxed'])
 
             if href_updated:
                 stats['downloads'] += 1
@@ -188,12 +190,19 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                 # TODO: here figure it out either it will be a
                 # directory or not and either it needs to be extracted,
                 # and what will be the extracted directory name
+                def strippath(f, p):
+                    """Helper to deal with our mess -- strip path from front of filename f"""
+                    assert(f.startswith(p))
+                    f = f[len(p):]
+                    if f.startswith(os.path.sep):
+                        f = f[1:]
+                    return f
 
                 # Place them under git-annex, if they do not exist already
                 annex_file(
                     href,
-                    incoming_filename=full_filename,
-                    annex_filename=annex_full_filename,
+                    incoming_filename=strippath(full_filename, incoming_annex.path),
+                    annex_filename=annex_filename, # annex_full_filename,
                     incoming_annex=incoming_annex,
                     public_annex=public_annex,
                     archives_destiny=archives_destiny,
@@ -216,10 +225,14 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
 
             stats['urls'] += 1
 
-    git_commit(incoming, files=[db_name])
+    git_commit(incoming, files=[db_name], dry_run=dry_run)
     if incoming != public:
-        git_commit(public)
+        git_commit(public, dry_run=dry_run)
 
     lgr.info("Processed %(sections)d sections, %(urls)d urls, "
              "%(downloads)d downloads with %(size)d bytes. Made %(annex_updates)s git/annex additions/updates" % stats)
+    if dry_run:
+        # print all accumulated commands
+        for cmd in getstatusoutput.commands:
+            lgr.info("DRY: %s" % cmd)
     return stats

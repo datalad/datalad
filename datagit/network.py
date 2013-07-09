@@ -47,6 +47,8 @@ from urlparse import urljoin, urlsplit
 import logging
 lgr = logging.getLogger('page2annex.network')
 
+from joblib import Memory
+memory = Memory(cachedir="/tmp/datagit", verbose=1)
 
 def get_response_filename(url, response_info):
     if 'Content-Disposition' in response_info:
@@ -69,7 +71,6 @@ def get_response_stamp(response_info):
             response_info['Last-modified']))
     return dict(size=size, mtime=mtime)
 
-
 def __download(url, filename=None, filename_only=False):
     # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
     request = urllib2.Request(url)
@@ -89,7 +90,7 @@ def __download(url, filename=None, filename_only=False):
         r.close()
     return filename
 
-
+@memory.cache
 def fetch_page(url):
     lgr.debug("Fetching %s" % url)
     page = urllib2.urlopen(url).read()
@@ -97,6 +98,8 @@ def fetch_page(url):
     return page
 
 
+# takes long -- so let's cache it
+@memory.cache
 def parse_urls(page):
     lgr.debug("Parsing out urls")
     soup = BeautifulSoup(page)
@@ -126,7 +129,6 @@ def filter_urls(urls,
 
 
 def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False):
-
     updated = False
     # so we could check and remove it to keep it clean
     temp_full_filename = None
@@ -148,12 +150,17 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
             lgr.debug("Nothing else could be done for download in dry mode")
             raise ReturnSooner
 
+        # TODO: add mode alike to 'relaxed' where we would not
+        # care about content-deposition filename
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
         request = urllib2.Request(href)
 
         # No traffic compression since we do not know how to identify
         # exactly either it has to be decompressed
         # request.add_header('Accept-encoding', 'gzip,deflate')
+        #
+        # TODO: think about stamping etc -- we seems to be redoing
+        # what git-annex does for us already
         r = urllib2.urlopen(request)
         try:
             r_info = r.info()
@@ -202,7 +209,7 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
                 # Verify time stamps etc
                 file_stat = os.stat(full_filename)
                 ex_stamp = dict(size=file_stat.st_size,
-                                    mtime=file_stat.st_mtime)
+                                mtime=file_stat.st_mtime)
 
                 download |= _compare_stamps(ex_stamp, r_stamp, "file stats")
 

@@ -77,6 +77,8 @@ class AnnexRepo(object):
         If add_mode=='auto' we assume that if file doesn't exist already --
         it should be '--fast' added
         """
+        #import pydb; pydb.debugger()
+        # strip the directory off
         # We delay actual committing to git-annex until later
         annex_opts = annex_opts + ' -c annex.alwayscommit=false'
         if add_mode == 'auto':
@@ -89,11 +91,13 @@ class AnnexRepo(object):
 
         if href:
             annex_cmd = "addurl %s --file %s %s %s" \
-              % (annex_opts, os.path.basename(annex_filename),
-                 {'download': '', 'fast': '--fast'}[add_mode],
+              % (annex_opts, annex_filename,
+                 {'download': '',
+                  'fast': '--fast',
+                  'relaxed': '--relaxed'}[add_mode],
                  href)
         else:
-            annex_cmd = "add %s %s" % (annex_opts, os.path.basename(annex_filename),)
+            annex_cmd = "add %s %s" % (annex_opts, annex_filename,)
 
         return self.run(annex_cmd)
 
@@ -110,8 +114,10 @@ def annex_file(href,
                ):
     """Annex file, might require download, copying, extraction etc
     """
-    lgr.info("Annexing %s originating from url=%s present locally under %s"
-             % (annex_filename, href, incoming_filename))
+    lgr.info("Annexing %s//%s originating from url=%s present locally under %s//%s"
+             % (public_annex.path, annex_filename,
+                href,
+                incoming_annex.path, incoming_filename))
 
     # it might be that we would like to move it
     # or extract it
@@ -125,13 +131,16 @@ def annex_file(href,
                 annex_dir += annex_filename[res.end:]
             annex_filename = annex_dir   # TODO: "merge" the two
 
+    full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
+    full_annex_filename = os.path.join(public_annex.path, annex_filename)
+
     if is_archive:
         #import pydb; pydb.debugger()
         # what if the directory exist already?
         # option? yeah -- for now we will just REMOVE and recreate with new files
         temp_annex_dir = annex_dir + ".extract"
         os.makedirs(temp_annex_dir)
-        decompress_file(incoming_filename, temp_annex_dir)
+        decompress_file(full_incoming_filename, temp_annex_dir)
         if os.path.exists(annex_dir):
             lgr.debug("Removing previously present %s" % annex_dir)
             shutil.rmtree(annex_dir)
@@ -141,7 +150,7 @@ def annex_file(href,
 
         # what do we do with the "incoming" archive
         if archives_destiny == 'rm':
-            shutil.rmtree(incoming_filename, True)
+            shutil.rmtree(full_incoming_filename, True)
         elif archives_destiny in ('annex', 'drop'):
             incoming_annex.add_file(incoming_filename, href=href)
             if archives_destiny == 'drop':
@@ -158,8 +167,8 @@ def annex_file(href,
         # copy via linking (TODO -- option to move, copy?)
 
         if incoming_annex is not public_annex:
-            if os.path.exists(incoming_filename):
-                os.link(incoming_filename, annex_filename)
+            if os.path.exists(full_incoming_filename):
+                os.link(full_incoming_filename, full_annex_filename)
             else:
                 # assuming --fast mode
                 pass
@@ -170,6 +179,11 @@ def git_commit(path, files=None, msg=None, dry_run=False):
     if msg is None:
         msg = 'page2annex: Committing staged changes as of %s' \
                % time.strftime('%Y/%m/%d %H:%M:%S')
+    if dry_run:
+        # Just record this event for logging
+        getstatusoutput("GIT COMMIT VIA GIT MODULE PATH=%s FILES=%s"
+                        % (path, files), dry_run=dry_run)
+        return
 
     repo = git.Repo(path)
 
