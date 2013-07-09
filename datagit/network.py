@@ -128,7 +128,11 @@ def filter_urls(urls,
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
 
 
-def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False):
+def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
+                 fast_mode=False):
+    # TODO: relaxed mode? so no size/mtime stamps are collected, mere
+    # presence is enough... uff -- too much of annex duplication? ;)
+    # yeah -- but this is just a degenerate example
     updated = False
     # so we could check and remove it to keep it clean
     temp_full_filename = None
@@ -145,7 +149,8 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
         if dry_run:
             # we can only try to deduce from the href...
             filename = url_filename
-            full_filename = os.path.join(incoming, filename)
+            repo_filename = os.path.join(subdir, filename)
+            full_filename = os.path.join(incoming, repo_filename)
             # and not really do much
             lgr.debug("Nothing else could be done for download in dry mode")
             raise ReturnSooner
@@ -167,9 +172,11 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
 
             r_stamp = get_response_stamp(r_info)
             filename = get_response_filename(href, r_info) or url_filename
-            full_filename = os.path.join(incoming, filename)
+            repo_filename = os.path.join(subdir, filename)
+            full_filename = os.path.join(incoming, repo_filename)
+
             if r_stamp['size']:
-                lgr.debug("File %s is of size %d" % (filename, r_stamp['size']))
+                lgr.debug("File %s is of size %d" % (repo_filename, r_stamp['size']))
 
             if url_filename != filename:
                 lgr.debug("Filename in url %s differs from the load %s" % (url_filename, filename))
@@ -193,38 +200,44 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
                             download = True
                 return download
 
-            if full_filename in url_stamps:
+            if repo_filename in url_stamps:
                 # if it is listed and has no stamps?
                 # no -- it should have stamps -- we will place them there if none
                 # was provided in HTML response. and we will redownload only
                 # if any of those returned in HTTP header non-None and differ.
                 # Otherwise we would assume that we have it
                 # TODO: think if it is not too fragile
-                download |= _compare_stamps(url_stamps.get(full_filename),
+                download |= _compare_stamps(url_stamps.get(repo_filename),
                                             r_stamp, "previous")
-
-            if os.path.exists(full_filename):
-                lgr.debug("File %s already exists under %s" % (filename, full_filename))
+            elif os.path.exists(full_filename):
+                lgr.debug("File %s already exists under %s but no known stamps for it"
+                          % (repo_filename, full_filename))
 
                 # Verify time stamps etc
+                # TODO: IF IT IS UNDER git-annex -- we can't do this
                 file_stat = os.stat(full_filename)
                 ex_stamp = dict(size=file_stat.st_size,
                                 mtime=file_stat.st_mtime)
 
                 download |= _compare_stamps(ex_stamp, r_stamp, "file stats")
 
-            if not (full_filename in url_stamps) and not os.path.exists(full_filename):
-                lgr.debug("File %s is not known and doesn't exist" % filename)
+            if not (repo_filename in url_stamps) and not os.path.exists(full_filename):
+                lgr.debug("File %s is not known and doesn't exist" % repo_filename)
                 download = True
 
+            mtime = r_stamp['mtime']
+            size = r_stamp['size']
+            url_stamps[repo_filename] = dict(mtime=mtime, size=size)
+
             if fast_mode:
-                lgr.info("Not downloading -- fast mode")
+                lgr.debug("Not downloading -- fast mode")
                 raise ReturnSooner
 
             if not download:
+                lgr.debug("Not downloading for the reasons above stated")
                 raise ReturnSooner
 
-            lgr.info("Need to download file %s into %s" % (filename, full_filename))
+            lgr.info("Need to download file %s under %s" % (repo_filename, incoming))
 
             if os.path.exists(full_filename):
                 lgr.debug("Removing previously existing file")
@@ -258,9 +271,6 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
                     os.unlink(temp_full_filename)
                 raise
 
-            mtime = r_stamp['mtime']
-            size = r_stamp['size']
-
             if mtime:
                 lgr.debug("Setting downloaded file's mtime to %s obtained from HTTP header"
                           % r_stamp['mtime'])
@@ -290,7 +300,6 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
                 # TODO: we might like to git annex drop previously existed file etc
                 os.rename(temp_full_filename, full_filename)
 
-                url_stamps[full_filename] = dict(mtime=mtime, size=size)
             else:
                 pass
         finally:
@@ -304,5 +313,5 @@ def download_url(href, incoming, url_stamps=None, dry_run=False, fast_mode=False
         # We have handled things already, just need to return
         pass
 
-    return filename, full_filename, updated
+    return repo_filename, updated
 

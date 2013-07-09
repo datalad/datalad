@@ -37,5 +37,7 @@ def load_db(path):
         return json.load(f)
 
 def save_db(db, path):
+    if not 'version' in db:
+        db['version'] = '0.0.1'
     with open(path, 'w') as f:
         json.dump(db, f, indent=2)

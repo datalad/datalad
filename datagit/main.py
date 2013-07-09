@@ -39,6 +39,17 @@ from .network import fetch_page, parse_urls, filter_urls, \
 def pprint_indent(l, indent="", fmt='%s'):
     return indent + ('\n%s' % indent).join([fmt % x for x in l])
 
+# TODO: here figure it out either it will be a
+# directory or not and either it needs to be extracted,
+# and what will be the extracted directory name
+def strippath(f, p):
+    """Helper to deal with our mess -- strip path from front of filename f"""
+    assert(f.startswith(p))
+    f = f[len(p):]
+    if f.startswith(os.path.sep):
+        f = f[1:]
+    return f
+
 #
 # Main loop
 #
@@ -83,7 +94,8 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
     # TODO: load previous status info
     """We need
 
-    url_stamps -- to track their time.  URLs might or might not provide Last-Modified,
+    url_stamps -- to track their mtime/size.
+      URLs might or might not provide Last-Modified,
       so if not provided, would correspond to None and only look by url change pretty much
 
     annex_pairs -- to have clear correspondence between annex_filename and url.
@@ -115,17 +127,17 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
         add_mode = cfg.get(section, 'mode')
         assert(add_mode in ['download', 'fast', 'relaxed'])
 
-        section_dir = cfg.get(section, 'directory')
+        repo_sectiondir = cfg.get(section, 'directory')
 
-        incoming_section = os.path.join(incoming, section_dir)
-        public_section = os.path.join(public, section_dir)
+        full_incoming_sectiondir = os.path.join(incoming, repo_sectiondir)
+        full_public_sectiondir = os.path.join(public, repo_sectiondir)
 
         if not (os.path.exists(incoming) and os.path.exists(public)):
             lgr.debug("%sCreating directories for section's incoming (%s) and public (%s) annexes"
-                      % (dry_str, incoming_section, public_section))
+                      % (dry_str, full_incoming_sectiondir, full_public_sectiondir))
             if not dry_run:
-                os.makedirs(incoming_section)
-                os.makedirs(public_section)           #TODO might be the same
+                os.makedirs(full_incoming_sectiondir)
+                os.makedirs(full_public_sectiondir)           #TODO might be the same
 
         scfg = dict(cfg.items(section))
 
@@ -147,18 +159,21 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
         # Filter them out
         urls = filter_urls(urls_all, **dict(
             [(k,scfg[k]) for k in
-             ('include_href', 'exclude_href', 'include_href_a', 'exclude_href_a')]))
-        lgr.info("%d out of %d urls survived filtering" % (len(urls), len(urls_all)))
+             ('include_href', 'exclude_href',
+              'include_href_a', 'exclude_href_a')]))
+        lgr.info("%d out of %d urls survived filtering"
+                 % (len(urls), len(urls_all)))
         if len(set(urls)) < len(urls):
             urls = sorted(set(urls))
             lgr.info("%d unique urls" % (len(urls),))
-        lgr.debug("%d urls:\n%s" % (len(urls), pprint_indent(urls, "    ", "[%s](%s)"))) 
+        lgr.debug("%d urls:\n%s"
+                  % (len(urls), pprint_indent(urls, "    ", "[%s](%s)")))
         if scfg.get('check_url_limit', None):
             limit = int(scfg['check_url_limit'])
-            if limit:
-                if len(urls) > limit:
-                    raise RuntimeError("Cannot process section since we expected only %d urls"
-                                       % limit)
+            if limit and len(urls) > limit:
+                raise RuntimeError(
+                    "Cannot process section since we expected only %d urls"
+                    % limit)
 
         #
         # Process urls
@@ -168,11 +183,12 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
             lgr.debug("Working on [%s](%s)" % (href, href_a))
 
             # Will adjust url_stamps in-place
-            filename, full_filename, href_updated = \
-              download_url(href, incoming_section,
+            repo_filename, href_updated = \
+              download_url(href, incoming, repo_sectiondir,
                            url_stamps=url_stamps, dry_run=dry_run,
                            fast_mode=add_mode in ['fast', 'relaxed'])
 
+            full_filename = os.path.join(incoming, repo_filename)
             if href_updated:
                 stats['downloads'] += 1
                 stats['size'] += os.stat(full_filename).st_size
@@ -180,29 +196,23 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                     save_db(status_info, db_path)
                 pass
 
+            # TODO: should _filename become _incoming_filename and
+            # annex_filename -> public_filename?
+            #
             # figure out what should it be -- interpolate
+            filename = os.path.basename(repo_filename)
             annex_filename = scfg['filename'].replace('&', '%') % locals()
-            annex_full_filename = os.path.join(public_section, annex_filename)
+            repo_annex_filename = os.path.join(repo_sectiondir, annex_filename)
+            full_annex_filename = os.path.join(full_public_sectiondir, annex_filename)
 
             annex_updated = False
             if href_updated or (not annex_filename in annex_pairs):
 
-                # TODO: here figure it out either it will be a
-                # directory or not and either it needs to be extracted,
-                # and what will be the extracted directory name
-                def strippath(f, p):
-                    """Helper to deal with our mess -- strip path from front of filename f"""
-                    assert(f.startswith(p))
-                    f = f[len(p):]
-                    if f.startswith(os.path.sep):
-                        f = f[1:]
-                    return f
-
                 # Place them under git-annex, if they do not exist already
                 annex_file(
                     href,
-                    incoming_filename=strippath(full_filename, incoming_annex.path),
-                    annex_filename=annex_filename, # annex_full_filename,
+                    incoming_filename=repo_filename,
+                    annex_filename=annex_filename, # full_annex_filename,
                     incoming_annex=incoming_annex,
                     public_annex=public_annex,
                     archives_destiny=archives_destiny,
@@ -212,7 +222,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                     dry_run=dry_run,
                     )
 
-                annex_pairs[annex_filename] = href
+                annex_pairs[repo_annex_filename] = repo_filename
                 annex_updated = True
                 stats['annex_updates'] += 1
             else:
@@ -231,8 +241,13 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
 
     lgr.info("Processed %(sections)d sections, %(urls)d urls, "
              "%(downloads)d downloads with %(size)d bytes. Made %(annex_updates)s git/annex additions/updates" % stats)
+
     if dry_run:
         # print all accumulated commands
         for cmd in getstatusoutput.commands:
             lgr.info("DRY: %s" % cmd)
+    else:
+        # Once again save the DB -- status_info might have been changed anyways
+        save_db(status_info, db_path)
+
     return stats
