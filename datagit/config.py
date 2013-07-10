@@ -55,6 +55,11 @@ def get_default_config(sections={}):
         # else:
         #  'auto' == 'annex'
         archives_destiny="auto",
+        # TODO:
+        # maintain - preserve the ones in the archive and place them
+        #            at the same level as the archive file (TODO)
+        # strip - would remove leading extracted directory if a single one
+        archives_directories="strip",
         incoming="repos/incoming/EXAMPLE",
         public="repos/public/EXAMPLE",
         include_href='',

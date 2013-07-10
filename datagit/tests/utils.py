@@ -46,7 +46,9 @@ def rmtree(path, *args, **kwargs):
     for root, dirs, files in os.walk(path):
         for f in files:
             fullf = os.path.join(root, f)
-            os.chmod(fullf, os.stat(fullf).st_mode | stat.S_IWRITE | stat.S_IREAD)
+            # might be the "broken" symlink which would fail to stat etc
+            if os.path.exists(fullf):
+                os.chmod(fullf, os.stat(fullf).st_mode | stat.S_IWRITE | stat.S_IREAD)
         os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
     shutil.rmtree(path, *args, **kwargs)
 
@@ -78,7 +80,7 @@ def create_tree(path, tree):
             with open(full_name, 'w') as f:
                 f.write(load)
 
-def with_tree(tree, **tkwargs):
+def with_tree(tree=None, **tkwargs):
     def decorate(func):
         def newfunc(*arg, **kw):
             d = tempfile.mkdtemp(**tkwargs)
@@ -88,7 +90,6 @@ def with_tree(tree, **tkwargs):
             finally:
                 #print "TODO: REMOVE tree ", d
                 shutil.rmtree(d)
-
         newfunc = make_decorator(func)(newfunc)
         return newfunc
     return decorate
@@ -101,6 +102,12 @@ import SimpleHTTPServer
 import SocketServer
 from threading import Thread
 
+class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+    """A little adapter to silence the handler
+    """
+    def log_message(self, format, *args):
+        return
+
 def serve_path_via_http(*args, **tkwargs):
     def decorate(func):
         def newfunc(path, *arg, **kw):
@@ -109,8 +116,7 @@ def serve_path_via_http(*args, **tkwargs):
             # TODO: ATM we are relying on path being local so we could
             # start HTTP server in the same directory.  FIX IT!
             SocketServer.TCPServer.allow_reuse_address = True
-            httpd = SocketServer.TCPServer(("", port),
-                        SimpleHTTPServer.SimpleHTTPRequestHandler)
+            httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
             server_thread = Thread(target=httpd.serve_forever)
             server_thread.start()
             #time.sleep(1)               # just give it few ticks
@@ -124,3 +130,10 @@ def serve_path_via_http(*args, **tkwargs):
         newfunc = make_decorator(func)(newfunc)
         return newfunc
     return decorate
+
+def sorted_files(dout):
+    """Return a (sorted) list of files under dout
+    """
+    return sorted(sum([[os.path.join(r, f)[len(dout)+1:] for f in files]
+                       for r,d,files in os.walk(dout)
+                       if not '.git' in r], []))

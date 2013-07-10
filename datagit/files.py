@@ -29,12 +29,15 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
+import os
 # All this should be replaced with a use of patoolib, but
 # after figure out why
 # https://github.com/wummel/patool/issues/2
 # Fixed in 1.2 release, but there is no __version__ to assess reliably (yet)
 import patoolib
 import re
+
+from os.path import join
 
 from .cmd import getstatusoutput
 
@@ -49,20 +52,28 @@ DECOMPRESSORS = {
     }
 
 
-def decompress_file(file, dir):
+def decompress_file(file, dir, directories='strip'):
     fullcmd = None
     for ptr, cmd in DECOMPRESSORS.iteritems():
         if re.search(ptr, file):
             fullcmd = cmd % locals()
             break
-    if fullcmd is not None:
-        lgr.debug("Extracting file: %s" % fullcmd)
-        status, output = getstatusoutput(fullcmd)
-        if status:
-            lgr.debug("Failed to extract: status %d output %s" % (status, output))
+#    if fullcmd is not None:
+#        lgr.debug("Extracting file: %s" % fullcmd)
+#        status, output = getstatusoutput(fullcmd)
+#        if status:
+#            lgr.debug("Failed to extract: status %d output %s" % (status, output))
+#    else:
+    #lgr.debug("Have no clue how to extract %s -- using patool" % file)
+    patoolib.extract_archive(file, outdir=dir)
+    if directories == 'strip':
+        _, dirs, files = os.walk(dir).next()
+        if not len(files) and len(dirs) == 1:
+            # move all the content under dirs[0] up 1 level
+            subdir, subdirs_, files_ = os.walk(join(dir, dirs[0])).next()
+            for f in subdirs_ + files_:
+                os.rename(join(subdir, f), join(dir, f))
     else:
-        lgr.debug("Have no clue how to extract %s -- using patool" % file)
-        patoolib.extract_archive(file, outdir=dir)
-    # TODO: either remove leading directory,
-    #       or may be remove containing directory
+        raise NotImplementedError("Not supported %s" % directories)
+    # TODO: (re)move containing directory
 

@@ -81,8 +81,8 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                 os.makedirs(public)           #TODO might be the same
 
     public_annex = AnnexRepo(public, dry_run=dry_run)
+    description = cfg.get('DEFAULT', 'description')
     if not os.path.exists(os.path.join(public, '.git', 'annex')):
-        description = cfg.get('DEFAULT', 'description')
         public_annex.init(description)
 
     if public != incoming:
@@ -194,25 +194,26 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                 stats['size'] += os.stat(full_filename).st_size
                 if not dry_run:
                     save_db(status_info, db_path)
-                pass
 
             # TODO: should _filename become _incoming_filename and
             # annex_filename -> public_filename?
             #
             # figure out what should it be -- interpolate
-            filename = os.path.basename(repo_filename)
-            annex_filename = scfg['filename'].replace('&', '%') % locals()
-            repo_annex_filename = os.path.join(repo_sectiondir, annex_filename)
-            full_annex_filename = os.path.join(full_public_sectiondir, annex_filename)
+            # repo_filename will be our "filename"
+            filename = repo_filename      # conventionally available for interpolations
+            repo_annex_filename = scfg['filename'].replace('&', '%') % locals()
 
             annex_updated = False
-            if href_updated or (not annex_filename in annex_pairs):
+            if href_updated or (not repo_annex_filename in annex_pairs):
 
                 # Place them under git-annex, if they do not exist already
-                annex_file(
+                #if href.endswith('gz'):
+                #    import pydb; pydb.debugger()
+
+                repo_public_filename = annex_file(
                     href,
                     incoming_filename=repo_filename,
-                    annex_filename=annex_filename, # full_annex_filename,
+                    annex_filename=repo_annex_filename, # full_annex_filename,
                     incoming_annex=incoming_annex,
                     public_annex=public_annex,
                     archives_destiny=archives_destiny,
@@ -222,13 +223,13 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                     dry_run=dry_run,
                     )
 
-                annex_pairs[repo_annex_filename] = repo_filename
+                annex_pairs[repo_annex_filename] = repo_public_filename
                 annex_updated = True
                 stats['annex_updates'] += 1
             else:
                 # TODO: shouldn't we actually check???
                 lgr.debug("Skipping annexing %s since it must be there already"
-                          % annex_filename)
+                          % repo_annex_filename)
 
             if not dry_run and (annex_updated or href_updated):
                 save_db(status_info, db_path)

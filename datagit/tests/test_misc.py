@@ -30,6 +30,8 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
+from os.path import join
+
 from .utils import *
 
 from ..api import *
@@ -67,21 +69,23 @@ def test_download_url():
     os.write(fd, "How do I know what to say?\n")
     os.close(fd)
 
-    filename, full_filename, updated = download_url("file://%s" % fname, dout)
+    # Let's assume absent subdirectory
+    repo_filename, updated = download_url("file://%s" % fname, dout)
     ok_(updated)
     # check if stats are the same
-    s, s_ = os.stat(fname), os.stat(full_filename)
+    s, s_ = os.stat(fname), os.stat(join(dout, repo_filename))
     eq_(s.st_size, s_.st_size)
     # at least to a second
     eq_(int(s.st_mtime), int(s_.st_mtime))
 
     # and if again -- should not be updated
-    filename, full_filename, updated = download_url("file://%s" % fname, dout)
+    repo_filename, updated = download_url("file://%s" % fname, dout)
     ok_(not updated)
 
     # but it should if we remove it
-    os.unlink(full_filename)
-    filename, full_filename, updated = download_url("file://%s" % fname, dout)
+    os.unlink(join(dout, repo_filename))
+    repo_filename, updated = download_url("file://%s" % fname, dout)
+    full_filename = join(dout, repo_filename)
     ok_(updated)
     # check if stats are the same
     s_ = os.stat(full_filename)
@@ -91,36 +95,41 @@ def test_download_url():
     # and what if we maintain url_stamps
     url_stamps = {}
     os.unlink(full_filename)
-    filename, full_filename, updated = download_url("file://%s" % fname, dout, url_stamps)
+    repo_filename, updated = download_url("file://%s" % fname, dout,
+                                          url_stamps=url_stamps)
+    full_filename = join(dout, repo_filename)
     ok_(updated)
-    ok_(full_filename in url_stamps)
+    ok_(repo_filename in url_stamps,
+        "url_stamps should have the %s. Got %s" % (repo_filename, str(url_stamps)))
     s_ = os.stat(full_filename)
     eq_(int(s.st_mtime), int(s_.st_mtime))
-    eq_(int(s.st_mtime), url_stamps[full_filename]['mtime'])
-    print filename, full_filename, url_stamps,
+    eq_(int(s.st_mtime), url_stamps[repo_filename]['mtime'])
 
     # and if we remove it but maintain information that we think it
     # exists -- we should skip it ATM
     os.unlink(full_filename)
-    filename, full_filename, updated = download_url("file://%s" % fname, dout, url_stamps)
+    repo_filename, updated = download_url("file://%s" % fname, dout,
+                                          url_stamps=url_stamps)
+    full_filename = join(dout, repo_filename)
     ok_(not updated)
-    ok_(full_filename in url_stamps)
+    ok_(repo_filename in url_stamps)
     assert_raises(OSError, os.stat, full_filename)
 
     os.unlink(fname)
     rmtree(dout, True)
 
+tree1args=dict(
+    tree=(
+        ('test.txt', 'abracadabra'),
+        ('1.tar.gz', (
+            ('1f.txt', '1f load'),
+            ('d', (('1d', ''),)), ))),
+    dir=os.curdir,
+    prefix='.tmp-page2annex-')
 
-@with_tree((('test.txt', 'abracadabra'),
-            ('1.tar.gz', (
-               ('1f.txt', '1f load'),
-               ('d', (('1d', ''),
-                      )),
-               ))),
-           dir=os.curdir,
-           prefix='.tmp-page2annex-')
+@with_tree(**tree1args)
 @serve_path_via_http()
-def test_parse_urls_recurse(url):
+def test_rock_and_roll_same_incoming_and_public(url):
     dout = tempfile.mkdtemp()
     page = fetch_page(url)
     urls = parse_urls(page)
@@ -136,18 +145,64 @@ def test_parse_urls_recurse(url):
             url=url)))
 
     stats1 = rock_and_roll(cfg, dry_run=False)
-    assert_greater(stats1['annex_updates'], 0)   # TODO: more specific
+    eq_(stats1['annex_updates'], 2)
     eq_(stats1['downloads'], 2)
+    eq_(stats1['sections'], 1)
+    assert_greater(stats1['size'], 100)   # should be more than 100b
 
     # Let's repeat -- there should be no downloads/updates
     stats2 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats2['annex_updates'], 0)
     eq_(stats2['downloads'], 0)
+    eq_(stats2['annex_updates'], 0)
+    eq_(stats2['size'], 0)
 
-    # TODO: verify that the structure as it should be
+    ok_(os.path.exists(os.path.join(dout, '.git')))
+    ok_(os.path.exists(os.path.join(dout, '.git', 'annex')))
 
-    #print dout, "URLS: ", urls
+    eq_(sorted_files(dout),
+        ['.page2annex',
+         # there should be no 1/1
+         'files/1/1f.txt',
+         'files/1/d/1d',
+         'files/test.txt',
+        ])
     rmtree(dout, True)
-    #print dout
 
 
+
+@with_tree(**tree1args)
+@serve_path_via_http()
+def test_rock_and_roll_separate_public(url):
+    din = tempfile.mkdtemp()
+    dout = tempfile.mkdtemp()
+    page = fetch_page(url)
+    urls = parse_urls(page)
+
+    cfg = get_default_config(dict(
+        DEFAULT=dict(incoming=din, public=dout, description="test"),
+        files=dict(directory='files', archives_destiny='annex', url=url)))
+
+    stats1 = rock_and_roll(cfg, dry_run=False)
+    eq_(stats1['annex_updates'], 2)
+    eq_(stats1['downloads'], 2)
+    eq_(stats1['sections'], 1)
+    assert_greater(stats1['size'], 100)   # should be more than 100b
+
+    # Let's repeat -- there should be no downloads/updates
+    stats2 = rock_and_roll(cfg, dry_run=False)
+    eq_(stats2['downloads'], 0)
+    eq_(stats2['annex_updates'], 0)
+    eq_(stats2['size'], 0)
+
+    ok_(os.path.exists(os.path.join(din, '.git')))
+    ok_(os.path.exists(os.path.join(din, '.git', 'annex')))
+    eq_(sorted_files(din),
+        ['.page2annex', 'files/1.tar.gz', 'files/test.txt'])
+
+    ok_(os.path.exists(os.path.join(dout, '.git')))
+    ok_(os.path.exists(os.path.join(dout, '.git', 'annex')))
+    eq_(sorted_files(dout),
+        ['files/1/1f.txt', 'files/1/d/1d', 'files/test.txt'])
+
+    rmtree(dout, True)
+    rmtree(din, True)

@@ -87,7 +87,7 @@ class AnnexRepo(object):
             else:
                 if href is None:
                     raise ValueError("No file and no href -- can't add to annex")
-                fast_mode = "fast"
+                add_mode = "fast"
 
         if href:
             annex_cmd = "addurl %s --file %s %s %s" \
@@ -107,12 +107,17 @@ def annex_file(href,
                incoming_annex, public_annex,
                archives_destiny=None,
                archives_re=None,
+               archives_directories="strip",
                add_mode='auto',
                uncomp_strip_leading_dir=True, #  False; would strip only if 1 directory
                addurl_opts=None,
                dry_run=False
                ):
     """Annex file, might require download, copying, extraction etc
+
+    Returns
+    -------
+    Resulting filename under the public_annex
     """
     lgr.info("Annexing %s//%s originating from url=%s present locally under %s//%s"
              % (public_annex.path, annex_filename,
@@ -129,28 +134,34 @@ def annex_file(href,
             annex_dir = annex_filename[:res.start()]
             if res.end() < len(res.string):
                 annex_dir += annex_filename[res.end:]
+            full_annex_dir = os.path.join(public_annex.path, annex_dir)
             annex_filename = annex_dir   # TODO: "merge" the two
 
     full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
     full_annex_filename = os.path.join(public_annex.path, annex_filename)
 
     if is_archive:
-        #import pydb; pydb.debugger()
-        # what if the directory exist already?
-        # option? yeah -- for now we will just REMOVE and recreate with new files
-        temp_annex_dir = annex_dir + ".extract"
+        # TODO: what if the directory exist already?  option? yeah --
+        # for now we will just REMOVE and recreate with new files
+        # otherwise we might like to track in our DB ALL the files
+        # extracted from any given archive, so we know which ones to
+        # remove selectively 
+        temp_annex_dir = full_annex_dir + ".extract"
         os.makedirs(temp_annex_dir)
-        decompress_file(full_incoming_filename, temp_annex_dir)
-        if os.path.exists(annex_dir):
-            lgr.debug("Removing previously present %s" % annex_dir)
-            shutil.rmtree(annex_dir)
-        os.rename(temp_annex_dir, annex_dir)
+        decompress_file(full_incoming_filename, temp_annex_dir,
+                        directories=archives_directories)
+        if os.path.exists(full_annex_dir):
+            # TODO: it might be under git/git-annex and require a special treat here
+            lgr.debug("Removing previously present %s" % full_annex_dir)
+            shutil.rmtree(full_annex_dir)
+        os.rename(temp_annex_dir, full_annex_dir)
+
         # TODO: some files might need to go to GIT directly
         public_annex.add_file(annex_dir)
 
         # what do we do with the "incoming" archive
         if archives_destiny == 'rm':
-            shutil.rmtree(full_incoming_filename, True)
+            os.unlink(full_incoming_filename)
         elif archives_destiny in ('annex', 'drop'):
             incoming_annex.add_file(incoming_filename, href=href)
             if archives_destiny == 'drop':
@@ -173,6 +184,7 @@ def annex_file(href,
                 # assuming --fast mode
                 pass
             public_annex.add_file(annex_filename, href=href, add_mode=add_mode)
+    return annex_filename
 
 
 def git_commit(path, files=None, msg=None, dry_run=False):
