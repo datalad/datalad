@@ -62,14 +62,14 @@ def get_response_filename(url, response_info):
     return None
 
 
-def get_response_stamp(response_info):
+def get_response_stamp(url, response_info):
     size, mtime = None, None
     if 'Content-length' in response_info:
         size = int(response_info['Content-length'])
     if 'Last-modified' in response_info:
         mtime = calendar.timegm(email.utils.parsedate(
             response_info['Last-modified']))
-    return dict(size=size, mtime=mtime)
+    return dict(size=size, mtime=mtime, url=url)
 
 def __download(url, filename=None, filename_only=False):
     # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
@@ -128,7 +128,7 @@ def filter_urls(urls,
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
 
 
-def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
+def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
                  fast_mode=False):
     # TODO: relaxed mode? so no size/mtime stamps are collected, mere
     # presence is enough... uff -- too much of annex duplication? ;)
@@ -137,17 +137,17 @@ def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
     # so we could check and remove it to keep it clean
     temp_full_filename = None
 
-    if url_stamps is None:
-        url_stamps = {}
+    if db_incoming is None:
+        db_incoming = {}
 
-    url_filename = os.path.basename(urlsplit(href).path)
+    url_filename = os.path.basename(urlsplit(url).path)
 
     class ReturnSooner(Exception):
         pass
 
     try: # might RF -- this is just to not repeat the same return
         if dry_run:
-            # we can only try to deduce from the href...
+            # we can only try to deduce from the url...
             filename = url_filename
             repo_filename = os.path.join(subdir, filename)
             full_filename = os.path.join(incoming, repo_filename)
@@ -158,7 +158,7 @@ def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
         # TODO: add mode alike to 'relaxed' where we would not
         # care about content-deposition filename
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
-        request = urllib2.Request(href)
+        request = urllib2.Request(url)
 
         # No traffic compression since we do not know how to identify
         # exactly either it has to be decompressed
@@ -170,8 +170,8 @@ def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
         try:
             r_info = r.info()
 
-            r_stamp = get_response_stamp(r_info)
-            filename = get_response_filename(href, r_info) or url_filename
+            r_stamp = get_response_stamp(url, r_info)
+            filename = get_response_filename(url, r_info) or url_filename
             repo_filename = os.path.join(subdir, filename)
             full_filename = os.path.join(incoming, repo_filename)
 
@@ -183,7 +183,7 @@ def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
 
             # So we have filename -- time to figure out either we need to re-download it
 
-            # url_stamps might maintain information even if file is not present, e.g.
+            # db_incoming might maintain information even if file is not present, e.g.
             # if originally we haven't kept originals
             download = False
 
@@ -200,14 +200,14 @@ def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
                             download = True
                 return download
 
-            if repo_filename in url_stamps:
+            if repo_filename in db_incoming:
                 # if it is listed and has no stamps?
                 # no -- it should have stamps -- we will place them there if none
                 # was provided in HTML response. and we will redownload only
                 # if any of those returned in HTTP header non-None and differ.
                 # Otherwise we would assume that we have it
                 # TODO: think if it is not too fragile
-                download |= _compare_stamps(url_stamps.get(repo_filename),
+                download |= _compare_stamps(db_incoming.get(repo_filename),
                                             r_stamp, "previous")
             elif os.path.exists(full_filename):
                 lgr.debug("File %s already exists under %s but no known stamps for it"
@@ -221,13 +221,13 @@ def download_url(href, incoming, subdir='', url_stamps=None, dry_run=False,
 
                 download |= _compare_stamps(ex_stamp, r_stamp, "file stats")
 
-            if not (repo_filename in url_stamps) and not os.path.exists(full_filename):
+            if not (repo_filename in db_incoming) and not os.path.exists(full_filename):
                 lgr.debug("File %s is not known and doesn't exist" % repo_filename)
                 download = True
 
             mtime = r_stamp['mtime']
             size = r_stamp['size']
-            url_stamps[repo_filename] = dict(mtime=mtime, size=size)
+            db_incoming[repo_filename] = dict(mtime=mtime, size=size, url=url)
 
             if fast_mode:
                 lgr.debug("Not downloading -- fast mode")

@@ -32,12 +32,21 @@ __license__ = 'MIT'
 
 import json
 
-def load_db(path):
+__db_version__ = '0.0.2'
+
+def load_db(path, allow_unsupported=False):
     with open(path) as f:
-        return json.load(f)
+        db = json.load(f)
+    if not allow_unsupported and db.get('version') != __db_version__:
+        raise ValueError("Loaded db from %s is of unsupported version %s. "
+                         "Currently supported: %s"
+                         % (path, db.get('version'), __db_version__))
+    return db
 
 def save_db(db, path):
     if not 'version' in db:
-        db['version'] = '0.0.1'
+        db['version'] = __db_version__
+    assert(sorted(db.keys()) == ['version', 'incoming', 'public_incoming'],
+           "Got following db keys %s" % db.keys())
     with open(path, 'w') as f:
         json.dump(db, f, indent=2, sort_keys=True, separators=(',', ': '))

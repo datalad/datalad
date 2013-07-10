@@ -54,10 +54,12 @@ def test_filter_urls():
     eq_(filter_urls(urls, "^[xy]"), urls[1:])
 
 def test_get_response_stamp():
-    r = get_response_stamp({'Content-length': '101',
+    r = get_response_stamp("http://www.example.com/1.dat",
+                           {'Content-length': '101',
                             'Last-modified': 'Wed, 01 May 2013 03:02:00 GMT'})
     eq_(r['size'], 101)
     eq_(r['mtime'], 1367377320)
+    eq_(r['url'], "http://www.example.com/1.dat")
 
 
 def test_download_url():
@@ -92,27 +94,27 @@ def test_download_url():
     eq_(s.st_size, s_.st_size)
     eq_(int(s.st_mtime), int(s_.st_mtime))
 
-    # and what if we maintain url_stamps
-    url_stamps = {}
+    # and what if we maintain db_incoming
+    db_incoming = {}
     os.unlink(full_filename)
     repo_filename, updated = download_url("file://%s" % fname, dout,
-                                          url_stamps=url_stamps)
+                                          db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(updated)
-    ok_(repo_filename in url_stamps,
-        "url_stamps should have the %s. Got %s" % (repo_filename, str(url_stamps)))
+    ok_(repo_filename in db_incoming,
+        "db_incoming should have the %s. Got %s" % (repo_filename, str(db_incoming)))
     s_ = os.stat(full_filename)
     eq_(int(s.st_mtime), int(s_.st_mtime))
-    eq_(int(s.st_mtime), url_stamps[repo_filename]['mtime'])
+    eq_(int(s.st_mtime), db_incoming[repo_filename]['mtime'])
 
     # and if we remove it but maintain information that we think it
     # exists -- we should skip it ATM
     os.unlink(full_filename)
     repo_filename, updated = download_url("file://%s" % fname, dout,
-                                          url_stamps=url_stamps)
+                                          db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(not updated)
-    ok_(repo_filename in url_stamps)
+    ok_(repo_filename in db_incoming)
     assert_raises(OSError, os.stat, full_filename)
 
     os.unlink(fname)

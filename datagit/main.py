@@ -94,25 +94,27 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
     # TODO: load previous status info
     """We need
 
-    url_stamps -- to track their mtime/size.
+    incoming -- to track their mtime/size and urls.
       URLs might or might not provide Last-Modified,
       so if not provided, would correspond to None and only look by url change pretty much
+      keeping urls would allow for a 'quick' check mode where we would only check
+      if file is known
 
-    annex_pairs -- to have clear correspondence between annex_filename and url.
+    public_incoming -- to have clear correspondence between annex_filename and incoming (which in turn with url).
                    annex_filename might correspond to a directory where we would
                    extract things, so we can't just geturl on it
     """
 
     db_path = os.path.join(incoming, db_name)
     if os.path.exists(db_path):
-        status_info = load_db(db_path)
+        db = load_db(db_path)
     else:
         # create fresh
-        status_info = dict(url_stamps={},   # url -> (mtime, size (AKA Content-Length, os.stat().st_size ))
-                           annex_pairs={})      # annex_filename -> url
+        db = dict(incoming={},   # incoming_filename -> (url, mtime, size (AKA Content-Length, os.stat().st_size ))
+                  public_incoming={}) # annex_filename -> incoming_filename
 
-    url_stamps = status_info['url_stamps']
-    annex_pairs = status_info['annex_pairs']
+    db_incoming = db['incoming']
+    db_public_incoming = db['public_incoming']
 
     # TODO: look what is in incoming for this "repository", so if
     # some urls are gone or changed so previous file is not there
@@ -183,10 +185,10 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
             href = urljoin(scfg['url'], href)
             lgr.debug("Working on [%s](%s)" % (href, href_a))
 
-            # Will adjust url_stamps in-place
+            # Will adjust db_incoming in-place
             repo_filename, href_updated = \
               download_url(href, incoming, repo_sectiondir,
-                           url_stamps=url_stamps, dry_run=dry_run,
+                           db_incoming=db_incoming, dry_run=dry_run,
                            fast_mode=add_mode in ['fast', 'relaxed'])
 
             full_filename = os.path.join(incoming, repo_filename)
@@ -194,7 +196,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                 stats['downloads'] += 1
                 stats['size'] += os.stat(full_filename).st_size
                 if not dry_run:
-                    save_db(status_info, db_path)
+                    save_db(db, db_path)
 
             # TODO: should _filename become _incoming_filename and
             # annex_filename -> public_filename?
@@ -205,7 +207,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
             repo_annex_filename = scfg['filename'].replace('&', '%') % locals()
 
             annex_updated = False
-            if href_updated or (not repo_annex_filename in annex_pairs):
+            if href_updated or (not repo_annex_filename in db_public_incoming):
 
                 # Place them under git-annex, if they do not exist already
                 #if href.endswith('gz'):
@@ -224,7 +226,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                     dry_run=dry_run,
                     )
 
-                annex_pairs[repo_annex_filename] = repo_public_filename
+                db_public_incoming[repo_annex_filename] = repo_public_filename
                 annex_updated = True
                 stats['annex_updates'] += 1
             else:
@@ -233,7 +235,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                           % repo_annex_filename)
 
             if not dry_run and (annex_updated or href_updated):
-                save_db(status_info, db_path)
+                save_db(db, db_path)
 
             stats['urls'] += 1
 
@@ -253,7 +255,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
         for cmd in getstatusoutput.commands:
             lgr.info("DRY: %s" % cmd)
     else:
-        # Once again save the DB -- status_info might have been changed anyways
-        save_db(status_info, db_path)
+        # Once again save the DB -- db might have been changed anyways
+        save_db(db, db_path)
 
     return stats
