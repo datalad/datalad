@@ -59,7 +59,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
 
     # Let's output summary stats at the end
     stats = dict([(k, 0) for k in
-                  ['sections', 'urls', 'downloads', 'annex_updates', 'size']])
+                  ['sections', 'urls', 'allurls', 'downloads', 'annex_updates', 'size']])
     pages_cache = {}
 
     dry_str = "DRY: " if dry_run else ""
@@ -177,6 +177,7 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
 
         #
         # Process urls
+        stats['allurls'] += len(urls)
         for href, href_a in urls:
             # bring them into the full urls
             href = urljoin(scfg['url'], href)
@@ -236,12 +237,16 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
 
             stats['urls'] += 1
 
-    git_commit(incoming, files=[db_name], dry_run=dry_run)
-    if incoming != public:
-        git_commit(public, dry_run=dry_run)
+    stats_str = "Processed %(sections)d sections, %(urls)d (out of %(allurls)d) urls, " \
+                "%(downloads)d downloads with %(size)d bytes. " \
+                "Made %(annex_updates)s git/annex additions/updates" % stats
 
-    lgr.info("Processed %(sections)d sections, %(urls)d urls, "
-             "%(downloads)d downloads with %(size)d bytes. Made %(annex_updates)s git/annex additions/updates" % stats)
+    git_commit(incoming, files=[db_name], dry_run=dry_run,
+               msg="page2annex(incoming): " + stats_str)
+    if incoming != public:
+        git_commit(public, dry_run=dry_run, msg="page2annex(public): " + stats_str)
+
+    lgr.info(stats_str)
 
     if dry_run:
         # print all accumulated commands
