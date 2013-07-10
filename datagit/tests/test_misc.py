@@ -35,11 +35,7 @@ from os.path import join
 from .utils import *
 
 from ..api import *
-from ..cmd import getstatusoutput
-from ..network import filter_urls, get_response_stamp, download_url, \
-     fetch_page, parse_urls
-from ..config import get_default_config
-from ..main import rock_and_roll
+from ..network import filter_urls, get_response_stamp, download_url
 
 def test_filter_urls():
     urls = [('/x.nii.gz', 'bogus'),
@@ -119,92 +115,3 @@ def test_download_url():
 
     os.unlink(fname)
     rmtree(dout, True)
-
-tree1args=dict(
-    tree=(
-        ('test.txt', 'abracadabra'),
-        ('1.tar.gz', (
-            ('1f.txt', '1f load'),
-            ('d', (('1d', ''),)), ))),
-    dir=os.curdir,
-    prefix='.tmp-page2annex-')
-
-@with_tree(**tree1args)
-@serve_path_via_http()
-def test_rock_and_roll_same_incoming_and_public(url):
-    dout = tempfile.mkdtemp()
-    page = fetch_page(url)
-    urls = parse_urls(page)
-
-    cfg = get_default_config(dict(
-        DEFAULT=dict(
-            incoming=dout,
-            public=dout,
-            description="test",
-            ),
-        files=dict(
-            directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
-            url=url)))
-
-    stats1 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats1['annex_updates'], 2)
-    eq_(stats1['downloads'], 2)
-    eq_(stats1['sections'], 1)
-    assert_greater(stats1['size'], 100)   # should be more than 100b
-
-    # Let's repeat -- there should be no downloads/updates
-    stats2 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats2['downloads'], 0)
-    eq_(stats2['annex_updates'], 0)
-    eq_(stats2['size'], 0)
-
-    ok_(os.path.exists(os.path.join(dout, '.git')))
-    ok_(os.path.exists(os.path.join(dout, '.git', 'annex')))
-
-    eq_(sorted_files(dout),
-        ['.page2annex',
-         # there should be no 1/1
-         'files/1/1f.txt',
-         'files/1/d/1d',
-         'files/test.txt',
-        ])
-    rmtree(dout, True)
-
-
-
-@with_tree(**tree1args)
-@serve_path_via_http()
-def test_rock_and_roll_separate_public(url):
-    din = tempfile.mkdtemp()
-    dout = tempfile.mkdtemp()
-    page = fetch_page(url)
-    urls = parse_urls(page)
-
-    cfg = get_default_config(dict(
-        DEFAULT=dict(incoming=din, public=dout, description="test"),
-        files=dict(directory='files', archives_destiny='annex', url=url)))
-
-    stats1 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats1['annex_updates'], 2)
-    eq_(stats1['downloads'], 2)
-    eq_(stats1['sections'], 1)
-    assert_greater(stats1['size'], 100)   # should be more than 100b
-
-    # Let's repeat -- there should be no downloads/updates
-    stats2 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats2['downloads'], 0)
-    eq_(stats2['annex_updates'], 0)
-    eq_(stats2['size'], 0)
-
-    ok_(os.path.exists(os.path.join(din, '.git')))
-    ok_(os.path.exists(os.path.join(din, '.git', 'annex')))
-    eq_(sorted_files(din),
-        ['.page2annex', 'files/1.tar.gz', 'files/test.txt'])
-
-    ok_(os.path.exists(os.path.join(dout, '.git')))
-    ok_(os.path.exists(os.path.join(dout, '.git', 'annex')))
-    eq_(sorted_files(dout),
-        ['files/1/1f.txt', 'files/1/d/1d', 'files/test.txt'])
-
-    rmtree(dout, True)
-    rmtree(din, True)
