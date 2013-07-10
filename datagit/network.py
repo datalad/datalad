@@ -91,9 +91,17 @@ def __download(url, filename=None, filename_only=False):
     return filename
 
 @memory.cache
-def fetch_page(url):
+def fetch_page(url, retries=3):
     lgr.debug("Fetching %s" % url)
-    page = urllib2.urlopen(url).read()
+    for t in xrange(retries):
+        try:
+            page = urllib2.urlopen(url).read()
+            break
+        except urllib2.URLError, e:
+            lgr.warn("Received exception while reading %s: %s" % (url, e))
+            if t == retries - 1:
+                # if we have reached allowed number of retries -- reraise
+                raise
     lgr.info("Fetched %d bytes page from %s" % (len(page), url))
     return page
 

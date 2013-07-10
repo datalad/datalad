@@ -30,6 +30,8 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
+from urlparse import urlparse
+
 from .repos import *
 from .db import load_db, save_db
 from .network import fetch_page, parse_urls, filter_urls, \
@@ -49,6 +51,61 @@ def strippath(f, p):
     if f.startswith(os.path.sep):
         f = f[1:]
     return f
+
+# TODO : add "memo" to avoid possible circular websites
+def collect_urls(url, recurse=None, pages_cache=None):
+    """Collects urls starting from url
+    """
+    page = (pages_cache and pages_cache.get(url, None)) or fetch_page(url)
+    if pages_cache is not None:
+        pages_cache[url] = page
+
+    url_rec = urlparse(url)
+    #
+    # Parse out all URLs, as a tuple (url, a(text))
+    urls_all = parse_urls(page)
+
+    # Now we need to dump or recurse into some of them, e.g. for
+    # directories etc
+    urls = []
+    if recurse:
+        recurse_re = re.compile(recurse)
+    for url_ in urls_all:
+        # separate tuple out
+        u, a = url_
+        if u.endswith('/'):             # must be a directory
+            if u in ('../', './'):
+                lgr.debug("Skipping %s -- we are not going to parents" % u)
+                continue
+            if not recurse:
+                lgr.debug("Skipping %s since no recursion" % u)
+                continue
+            if recurse_re.search(u):
+                # then we should fetch the one as well
+                u_rec = urlparse(u)
+                u_full = urljoin(url, u)
+                if u_rec.scheme:
+                    if not (url_rec.netloc == u_rec.netloc and u_rec.path.startswith(rl_rec.path)):
+                        # so we are going to a new page?
+                        lgr.debug("Skipping %s since it jumps to another site from original %s" % (u, url))
+                        #raise NotImplementedError("Cannot jump to other websites yet")
+                        continue
+                    # so we are staying on current website -- let it go
+                lgr.debug("Recursing into %s, full: %s" % (u, u_full))
+                new_urls = collect_urls(
+                    u_full, recurse=recurse, pages_cache=pages_cache)
+                # and add to their "hrefs" appropriate prefix
+                urls.extend([(os.path.join(u, url__[0]),) + url__[1:]
+                             for url__ in new_urls])
+            else:
+                lgr.debug("Skipping %s since doesn't match recurse" % u)
+        else:
+            urls.append(url_)
+
+    lgr.info("Considering %d out of %d urls from %s"
+             % (len(urls), len(urls_all), url))
+
+    return urls
 
 #
 # Main loop
@@ -150,15 +207,14 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
         if archives_destiny == 'auto':
             archives_destiny = 'rm' if incoming == public else 'annex'
 
-        # Fetching the page (possibly again! TODO: cache)
-        url = scfg['url']
-        page = pages_cache.get(url, None) or fetch_page(url)
-        pages_cache[url] = page
+        # Fetching the page (possibly again! thus a dummy pages_cache)
+        top_url = scfg['url'].replace('/./', '/')
+        if '..' in top_url:
+            raise ValueError("Some logic would fail with relative paths in urls, "
+                             "please adjust %s" % scfg['url'])
+        urls_all = collect_urls(top_url, recurse=scfg['recurse'], pages_cache=pages_cache)
 
-        #
-        # Parse out all URLs, as a tuple (url, a(text))
-        urls_all = parse_urls(page)
-        lgr.info("Got total %d urls" % len(urls_all))
+
         #lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))
 
         # Filter them out
@@ -184,18 +240,28 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
         # Process urls
         stats['allurls'] += len(urls)
         for href, href_a in urls:
-            # bring them into the full urls
-            href = urljoin(scfg['url'], href)
-            lgr.debug("Working on [%s](%s)" % (href, href_a))
+            # bring them into the full urls, href might have been a full url on its own
+            href_full = urljoin(top_url, href)
+            lgr.debug("Working on [%s](%s)" % (href_full, href_a))
 
-            if href in db_incoming_urls:
+            if href_full in db_incoming_urls:
+                # might need to go around download_url, so we might
+                # still add it to annex happen download was done but annexing not
                 if existing == 'skip':
                     lgr.debug("Skipping since known to db already and existing='skip'")
                     continue
 
-            # Will adjust db_incoming in-place
+            # We need to decide either some portion of href path
+            # should be "maintained", e.g. in cases where we recurse
+            # TODO: make stripping/directories optional/configurable
+            # so we are simply deeper on the same site
+            href_dir = os.path.dirname(href_full[len(top_url):].lstrip(os.path.sep)) \
+                if href_full.startswith(top_url) else ''
+
+            # It will adjust db_incoming in-place
             repo_filename, href_updated = \
-              download_url(href, incoming, repo_sectiondir,
+              download_url(href_full, incoming,
+                           os.path.join(repo_sectiondir, href_dir),
                            db_incoming=db_incoming, dry_run=dry_run,
                            fast_mode=add_mode in ['fast', 'relaxed'])
 
@@ -209,10 +275,12 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
             # TODO: should _filename become _incoming_filename and
             # annex_filename -> public_filename?
             #
-            # figure out what should it be -- interpolate
-            # repo_filename will be our "filename"
-            filename = repo_filename      # conventionally available for interpolations
-            repo_annex_filename = scfg['filename'].replace('&', '%') % locals()
+            try:
+                repo_annex_filename = eval(scfg['filename'], {},
+                                           dict(filename=repo_filename,
+                                                ))
+            except:
+                raise ValueError("Failed to evaluate %r" % scfg['filename'])
 
             annex_updated = False
             if href_updated or (not repo_annex_filename in db_public_incoming):
@@ -222,7 +290,7 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
                 #    import pydb; pydb.debugger()
 
                 repo_public_filename = annex_file(
-                    href,
+                    href_full,
                     incoming_filename=repo_filename,
                     annex_filename=repo_annex_filename, # full_annex_filename,
                     incoming_annex=incoming_annex,

@@ -31,13 +31,14 @@ __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
 import os, tempfile
-from os.path import join, exists
+from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, rmtree
 
 from ..config import get_default_config
 from ..main import rock_and_roll
+from ..db import load_db
 
 tree1args = dict(
     tree=(
@@ -47,6 +48,23 @@ tree1args = dict(
             ('d', (('1d', ''),)), ))),
     dir=os.curdir,
     prefix='.tmp-page2annex-')
+
+def verify_files_content(d, files):
+    for f in files:
+        f_ = join(d, f)
+        ok_(lexists(f_), f_)      # if a link exists at all
+        ok_(exists(f_), f_)       # and if it is not broken
+        if f_.endswith('/test.txt'):
+            eq_(open(f_).read(), 'abracadabra', f_)
+        if f_.endswith('/d'):
+            ok_(isdir(f_), f_)
+        if f == '.page2annex':
+            # verify all it loads ok
+            ok_(load_db(f_))
+
+def verify_files(d, target_files):
+    eq_(sorted_files(d), target_files)
+    verify_files_content(d, target_files)
 
 @with_tree(**tree1args)
 @serve_path_via_http()
@@ -113,13 +131,48 @@ def test_rock_and_roll_separate_public(url):
 
     ok_(exists(join(din, '.git')))
     ok_(exists(join(din, '.git', 'annex')))
-    eq_(sorted_files(din),
+    verify_files(din,
         ['.page2annex', 'files/1.tar.gz', 'files/test.txt'])
 
     ok_(exists(join(dout, '.git')))
     ok_(exists(join(dout, '.git', 'annex')))
-    eq_(sorted_files(dout),
+    verify_files(dout,
         ['files/1/1f.txt', 'files/1/d/1d', 'files/test.txt'])
+
+    rmtree(dout, True)
+    rmtree(din, True)
+
+# now with some recursive structure of directories
+tree2args = dict(
+    tree=(
+        ('test.txt', 'abracadabra'),
+        ('2', (
+            ('1f.txt', '1f load'),
+            ('d', (('1d', ''),)),
+            ('f', (('1d', ''),)),
+            )),
+        ('1.tar.gz', (
+            ('1f.txt', '1f load'),
+            ('d', (('1d', ''),)), ))),
+    dir=os.curdir,
+    prefix='.tmp-page2annex-')
+
+@with_tree(**tree2args)
+@serve_path_via_http()
+def test_rock_and_roll_recurse(url):
+    din = tempfile.mkdtemp()
+    dout = tempfile.mkdtemp()
+
+    cfg = get_default_config(dict(
+        DEFAULT=dict(incoming=din, public=dout, description="test", recurse='/$'),
+        files=dict(directory='', archives_destiny='annex', url=url)))
+
+    stats1 = rock_and_roll(cfg, dry_run=False)
+
+    verify_files(din,
+        ['.page2annex', '1.tar.gz', '2/1f.txt', '2/d/1d', '2/f/1d', 'test.txt'])
+    verify_files(dout,
+        ['1/1f.txt', '1/d/1d', '2/1f.txt', '2/d/1d', '2/f/1d', 'test.txt'])
 
     rmtree(dout, True)
     rmtree(din, True)

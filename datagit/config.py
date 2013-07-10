@@ -66,7 +66,7 @@ def get_default_config(sections={}):
         include_href_a='',
         exclude_href='',
         exclude_href_a='',
-        filename='&(filename)s',
+        filename='filename',
         # Checks!
         check_url_limit='0',                     # no limits
         # unused... we might like to enable it indeed and then be
@@ -74,7 +74,8 @@ def get_default_config(sections={}):
         # directories which might contain those files, so some might
         # need to be annexed and some directly into .git
         # TODO
-        #annex='.*',                    # 
+        #annex='.*',                    #
+        recurse=None,                     # do not recurse by default, otherwise regex on urls to assume being for directories
         ))
     for section, options in sections.iteritems():
         if section != 'DEFAULT':

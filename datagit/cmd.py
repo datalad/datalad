@@ -31,6 +31,7 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
+import os
 import commands
 
 import logging
@@ -47,8 +48,9 @@ class getstatusoutput_wrapper(object):
     """Helper for dry_run -- would also collect all the commands to spit out at once at the end
     """
 
-    def __init__(self):
+    def __init__(self, dry=False):
         self.commands = []
+        self.dry = dry                    # TODO: make use of it
 
     def __call__(self, cmd, dry_run=False):
     #def getstatusoutput(cmd, dry_run=False):
@@ -71,3 +73,11 @@ class getstatusoutput_wrapper(object):
         return None, None
 
 getstatusoutput = getstatusoutput_wrapper()
+
+def link_file_load(src, dst, dry_run=False):
+    """Just a little helper to hardlink files's load
+    """
+    dst_dir = os.path.dirname(dst)
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+    os.link(os.path.realpath(src), dst)

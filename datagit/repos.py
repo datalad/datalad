@@ -36,7 +36,9 @@ import re
 import shutil
 import time
 
-from .cmd import getstatusoutput, dry
+from os.path import join, exists, lexists
+
+from .cmd import getstatusoutput, dry, link_file_load
 from .files import decompress_file
 
 import logging
@@ -67,7 +69,7 @@ class AnnexRepo(object):
 
         if not self.dry_run:
             # dump description
-            with open(os.path.join(self.path, '.git', 'description'), 'w') as f:
+            with open(join(self.path, '.git', 'description'), 'w') as f:
                 f.write(description + '\n')
 
 
@@ -82,7 +84,7 @@ class AnnexRepo(object):
         # We delay actual committing to git-annex until later
         annex_opts = annex_opts + ' -c annex.alwayscommit=false'
         if add_mode == 'auto':
-            if os.path.exists(annex_filename):
+            if exists(join(self.path, annex_filename)):
                 add_mode = "download"
             else:
                 if href is None:
@@ -134,11 +136,11 @@ def annex_file(href,
             annex_dir = annex_filename[:res.start()]
             if res.end() < len(res.string):
                 annex_dir += annex_filename[res.end:]
-            full_annex_dir = os.path.join(public_annex.path, annex_dir)
+            full_annex_dir = join(public_annex.path, annex_dir)
             annex_filename = annex_dir   # TODO: "merge" the two
 
-    full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
-    full_annex_filename = os.path.join(public_annex.path, annex_filename)
+    full_incoming_filename = join(incoming_annex.path, incoming_filename)
+    full_annex_filename = join(public_annex.path, annex_filename)
 
     if is_archive:
         # TODO: what if the directory exist already?  option? yeah --
@@ -150,7 +152,7 @@ def annex_file(href,
         os.makedirs(temp_annex_dir)
         decompress_file(full_incoming_filename, temp_annex_dir,
                         directories=archives_directories)
-        if os.path.exists(full_annex_dir):
+        if exists(full_annex_dir):
             # TODO: it might be under git/git-annex and require a special treat here
             lgr.debug("Removing previously present %s" % full_annex_dir)
             shutil.rmtree(full_annex_dir)
@@ -178,8 +180,11 @@ def annex_file(href,
         # copy via linking (TODO -- option to move, copy?)
 
         if incoming_annex is not public_annex:
-            if os.path.exists(full_incoming_filename):
-                os.link(full_incoming_filename, full_annex_filename)
+            if exists(full_incoming_filename):
+                link_file_load(full_incoming_filename, full_annex_filename)
+            elif lexists(full_incoming_filename):
+                raise ValueError("Link %s exists but broken -- should have not happened"
+                                 % full_incoming_filename)
             else:
                 # assuming --fast mode
                 pass
@@ -187,7 +192,7 @@ def annex_file(href,
     return annex_filename
 
 
-def git_commit(path, files=None, msg=None, dry_run=False):
+def git_commit(path, files=None, msg="", dry_run=False):
     if msg is None:
         msg = 'page2annex: Committing staged changes as of %s' \
                % time.strftime('%Y/%m/%d %H:%M:%S')
