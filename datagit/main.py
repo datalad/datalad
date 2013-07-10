@@ -53,7 +53,8 @@ def strippath(f, p):
 #
 # Main loop
 #
-def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
+# TODO: formalize existing argument into option (+cmdline option?)
+def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
     """Given a configuration fetch/update git-annex "clone"
     """
 
@@ -114,6 +115,8 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
                   public_incoming={}) # annex_filename -> incoming_filename
 
     db_incoming = db['incoming']
+    # reverse map: url -> incoming
+    db_incoming_urls = dict([(v['url'], i) for i,v in db_incoming.iteritems()])
     db_public_incoming = db['public_incoming']
 
     # TODO: look what is in incoming for this "repository", so if
@@ -184,6 +187,11 @@ def rock_and_roll(cfg, dry_run=False, db_name = '.page2annex'):
             # bring them into the full urls
             href = urljoin(scfg['url'], href)
             lgr.debug("Working on [%s](%s)" % (href, href_a))
+
+            if href in db_incoming_urls:
+                if existing == 'skip':
+                    lgr.debug("Skipping since known to db already and existing='skip'")
+                    continue
 
             # Will adjust db_incoming in-place
             repo_filename, href_updated = \

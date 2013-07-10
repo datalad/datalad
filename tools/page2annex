@@ -151,7 +151,7 @@ if __name__ == '__main__':
     try:
         lgr.info("Reading configs")
         cfg = load_config(args.configs)
-        rock_and_roll(cfg, args.dry_run)
+        rock_and_roll(cfg, dry_run=args.dry_run)
 
     except Exception as exc:
         lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
