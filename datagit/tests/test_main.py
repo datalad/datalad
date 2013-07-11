@@ -1,4 +1,4 @@
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
+#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 #ex: set sts=4 ts=4 sw=4 noet:
 #------------------------- =+- Python script -+= -------------------------
 """
@@ -44,7 +44,7 @@ tree1args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
         ('1.tar.gz', (
-            ('1f.txt', '1f load'),
+            ('1 f.txt', '1 f load'),
             ('d', (('1d', ''),)), ))),
     dir=os.curdir,
     prefix='.tmp-page2annex-')
@@ -63,7 +63,8 @@ def verify_files_content(d, files):
             ok_(load_db(f_))
 
 def verify_files(d, target_files):
-    eq_(sorted_files(d), target_files)
+    files = sorted_files(d)
+    eq_(files, target_files, "%s: %s != %s" % (d, files, target_files))
     verify_files_content(d, target_files)
 
 @with_tree(**tree1args)
@@ -99,7 +100,7 @@ def test_rock_and_roll_same_incoming_and_public(url):
     eq_(sorted_files(dout),
         ['.page2annex',
          # there should be no 1/1
-         'files/1/1f.txt',
+         'files/1/1 f.txt',
          'files/1/d/1d',
          'files/test.txt',
         ])
@@ -137,7 +138,7 @@ def test_rock_and_roll_separate_public(url):
     ok_(exists(join(dout, '.git')))
     ok_(exists(join(dout, '.git', 'annex')))
     verify_files(dout,
-        ['files/1/1f.txt', 'files/1/d/1d', 'files/test.txt'])
+        ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'])
 
     rmtree(dout, True)
     rmtree(din, True)
@@ -147,12 +148,13 @@ tree2args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
         ('2', (
-            ('1f.txt', '1f load'),
+            # this is yet to troubleshoot
+            #(u'юнякод.txt', u'и тут юнякод'),
             ('d', (('1d', ''),)),
             ('f', (('1d', ''),)),
             )),
         ('1.tar.gz', (
-            ('1f.txt', '1f load'),
+            ('1 f.txt', '1 f load'),
             ('d', (('1d', ''),)), ))),
     dir=os.curdir,
     prefix='.tmp-page2annex-')
@@ -170,9 +172,11 @@ def test_rock_and_roll_recurse(url):
     stats1 = rock_and_roll(cfg, dry_run=False)
 
     verify_files(din,
-        ['.page2annex', '1.tar.gz', '2/1f.txt', '2/d/1d', '2/f/1d', 'test.txt'])
+        ['.page2annex', '1.tar.gz', #u'2/юнякод.txt',
+                                    '2/d/1d', '2/f/1d', 'test.txt'])
     verify_files(dout,
-        ['1/1f.txt', '1/d/1d', '2/1f.txt', '2/d/1d', '2/f/1d', 'test.txt'])
+        ['1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
+                                    '2/d/1d', '2/f/1d', 'test.txt'])
 
     rmtree(dout, True)
     rmtree(din, True)

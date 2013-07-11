@@ -30,7 +30,7 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
-import shutil, stat, os
+import shutil, stat, os, sys
 
 from ..cmd import getstatusoutput
 
@@ -77,7 +77,12 @@ def create_tree(path, tree):
             else:
                 create_tree(full_name, load)
         else:
+            #encoding = sys.getfilesystemencoding()
+            #if isinstance(full_name, unicode):
+            #    import pydb; pydb.debugger()
             with open(full_name, 'w') as f:
+                if isinstance(load, unicode):
+                    load = load.encode('utf-8')
                 f.write(load)
 
 def with_tree(tree=None, **tkwargs):
