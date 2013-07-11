@@ -147,6 +147,7 @@ def test_rock_and_roll_separate_public(url):
 tree2args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
+        ("\"';a&b&cd|", ""),
         ('2', (
             # this is yet to troubleshoot
             #(u'юнякод.txt', u'и тут юнякод'),
@@ -162,6 +163,13 @@ tree2args = dict(
 @with_tree(**tree2args)
 @serve_path_via_http()
 def test_rock_and_roll_recurse(url):
+    ## import logging, sys
+    ## lgr = logging.getLogger('page2annex')
+    ## console = logging.StreamHandler(sys.stdout)
+    ## console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
+    ## lgr.addHandler(console)
+    ## lgr.setLevel(logging.DEBUG)
+
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
 
@@ -172,11 +180,11 @@ def test_rock_and_roll_recurse(url):
     stats1 = rock_and_roll(cfg, dry_run=False)
 
     verify_files(din,
-        ['.page2annex', '1.tar.gz', #u'2/юнякод.txt',
+        ["\"';a&b&cd|", '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
     verify_files(dout,
-        ['1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
+        ["\"';a&b&cd|", '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
 
-    rmtree(dout, True)
-    rmtree(din, True)
+    #rmtree(dout, True)
+    #rmtree(din, True)

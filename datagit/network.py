@@ -148,7 +148,8 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
     if db_incoming is None:
         db_incoming = {}
 
-    url_filename = os.path.basename(urlsplit(url).path)
+    # unquote path's portion of url first
+    url_filename = os.path.basename(urllib2.unquote(urlsplit(url).path))
 
     class ReturnSooner(Exception):
         pass

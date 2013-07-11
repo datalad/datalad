@@ -44,6 +44,13 @@ from .files import decompress_file
 import logging
 lgr = logging.getLogger('page2annex.git')
 
+def _esc(filename):
+    """Surround filename in "" and escape " in the filename
+    """
+    filename = filename.replace('"', r'\"')
+    filename = '"%s"' % filename
+    return filename
+
 class AnnexRepo(object):
 
     def __init__(self, path, dry_run=False):
@@ -92,14 +99,14 @@ class AnnexRepo(object):
                 add_mode = "fast"
 
         if href:
-            annex_cmd = "addurl %s --file %s %s %s" \
-              % (annex_opts, annex_filename,
+            annex_cmd = 'addurl %s --file %s %s %s' \
+              % (annex_opts, _esc(annex_filename),
                  {'download': '',
                   'fast': '--fast',
                   'relaxed': '--relaxed'}[add_mode],
                  href)
         else:
-            annex_cmd = "add %s %s" % (annex_opts, annex_filename,)
+            annex_cmd = 'add %s %s' % (annex_opts, _esc(annex_filename),)
 
         return self.run(annex_cmd)
 

@@ -12,6 +12,3 @@ import tempfile
 tempfile.template = os.path.join(tempfile.gettempdir(),
                                  'tmp-page2annex')
 
-#import logging
-#lgr = logging.getLogger('page2annex')
-#lgr.setLevel(logging.DEBUG)
