@@ -40,6 +40,14 @@ from ..config import get_default_config
 from ..main import rock_and_roll
 from ..db import load_db
 
+if False:
+    import logging, sys
+    lgr = logging.getLogger('page2annex')
+    console = logging.StreamHandler(sys.stdout)
+    console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
+    lgr.addHandler(console)
+    lgr.setLevel(logging.DEBUG)
+
 tree1args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
@@ -67,6 +75,12 @@ def verify_files(d, target_files):
     eq_(files, target_files, "%s: %s != %s" % (d, files, target_files))
     verify_files_content(d, target_files)
 
+def verify_nothing_was_done(stats):
+    eq_(stats['downloads'], 0)
+    eq_(stats['incoming_annex_updates'], 0)
+    eq_(stats['public_annex_updates'], 0)
+    eq_(stats['size'], 0)
+
 @with_tree(**tree1args)
 @serve_path_via_http()
 def test_rock_and_roll_same_incoming_and_public(url):
@@ -82,17 +96,20 @@ def test_rock_and_roll_same_incoming_and_public(url):
             directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
             url=url)))
 
+    stats1_dry = rock_and_roll(cfg, dry_run=True)
+    verify_nothing_was_done(stats1_dry)
+
     stats1 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats1['annex_updates'], 2)
+    # they both should match
+    eq_(stats1['incoming_annex_updates'], 2)
+    eq_(stats1['public_annex_updates'], 2)
     eq_(stats1['downloads'], 2)
     eq_(stats1['sections'], 1)
     assert_greater(stats1['size'], 100)   # should be more than 100b
 
     # Let's repeat -- there should be no downloads/updates
     stats2 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats2['downloads'], 0)
-    eq_(stats2['annex_updates'], 0)
-    eq_(stats2['size'], 0)
+    verify_nothing_was_done(stats2)
 
     ok_(exists(join(dout, '.git')))
     ok_(exists(join(dout, '.git', 'annex')))
@@ -104,8 +121,11 @@ def test_rock_and_roll_same_incoming_and_public(url):
          'files/1/d/1d',
          'files/test.txt',
         ])
-    rmtree(dout, True)
 
+    stats2_dry = rock_and_roll(cfg, dry_run=True)
+    verify_nothing_was_done(stats2_dry)
+
+    rmtree(dout, True)
 
 
 @with_tree(**tree1args)
@@ -116,19 +136,25 @@ def test_rock_and_roll_separate_public(url):
 
     cfg = get_default_config(dict(
         DEFAULT=dict(incoming=din, public=dout, description="test"),
-        files=dict(directory='files', archives_destiny='annex', url=url)))
+        files=dict(directory='files', incoming_destiny='annex', url=url)))
+
+#    import pydb; pydb.debugger()
+    stats1_dry = rock_and_roll(cfg, dry_run=True)
+    verify_nothing_was_done(stats1_dry)
 
     stats1 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats1['annex_updates'], 2)
+    verify_files(dout,
+        ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'])
+    eq_(stats1['incoming_annex_updates'], 2)
+    eq_(stats1['public_annex_updates'], 2)
     eq_(stats1['downloads'], 2)
     eq_(stats1['sections'], 1)
     assert_greater(stats1['size'], 100)   # should be more than 100b
 
-    # Let's repeat -- there should be no downloads/updates
+    # Let's repeat -- there should be no downloads/updates of any kind
+    # since we had no original failures nor added anything
     stats2 = rock_and_roll(cfg, dry_run=False)
-    eq_(stats2['downloads'], 0)
-    eq_(stats2['annex_updates'], 0)
-    eq_(stats2['size'], 0)
+    verify_nothing_was_done(stats2)
 
     ok_(exists(join(din, '.git')))
     ok_(exists(join(din, '.git', 'annex')))
@@ -139,6 +165,9 @@ def test_rock_and_roll_separate_public(url):
     ok_(exists(join(dout, '.git', 'annex')))
     verify_files(dout,
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'])
+
+    stats2_dry = rock_and_roll(cfg, dry_run=True)
+    verify_nothing_was_done(stats2_dry)
 
     rmtree(dout, True)
     rmtree(din, True)
@@ -163,19 +192,13 @@ tree2args = dict(
 @with_tree(**tree2args)
 @serve_path_via_http()
 def test_rock_and_roll_recurse(url):
-    ## import logging, sys
-    ## lgr = logging.getLogger('page2annex')
-    ## console = logging.StreamHandler(sys.stdout)
-    ## console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
-    ## lgr.addHandler(console)
-    ## lgr.setLevel(logging.DEBUG)
 
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
 
     cfg = get_default_config(dict(
         DEFAULT=dict(incoming=din, public=dout, description="test", recurse='/$'),
-        files=dict(directory='', archives_destiny='annex', url=url)))
+        files=dict(directory='', incoming_destiny='annex', url=url)))
 
     stats1 = rock_and_roll(cfg, dry_run=False)
 

@@ -32,7 +32,7 @@ __license__ = 'MIT'
 
 import shutil, stat, os, sys
 
-from ..cmd import getstatusoutput
+from ..cmd import Runner
 
 from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
     make_decorator, ok_, eq_
@@ -70,7 +70,7 @@ def create_tree(path, tree):
                 os.makedirs(full_dirname)
                 create_tree(full_dirname, load)
                 # create archive
-                status, output = getstatusoutput(
+                status, output = Runner().getstatusoutput(
                     'cd %(path)s && tar -czvf %(name)s %(dirname)s' % locals())
                 # remove original tree
                 shutil.rmtree(full_dirname)

@@ -42,7 +42,7 @@ import urllib2
 
 from BeautifulSoup import BeautifulSoup
 from StringIO import StringIO
-from urlparse import urljoin, urlsplit
+from urlparse import urljoin, urlsplit, urlunsplit
 
 import logging
 lgr = logging.getLogger('page2annex.network')
@@ -105,14 +105,33 @@ def fetch_page(url, retries=3):
     lgr.info("Fetched %d bytes page from %s" % (len(page), url))
     return page
 
+def is_url_quoted(url):
+    """Return either URL looks being already quoted
+    """
+    try:
+        url_ = urllib2.unquote(url)
+        return url != url_
+    except: # problem with unquoting -- then it must be wasn't quoted (correctly)
+        return False
 
 # takes long -- so let's cache it
 @memory.cache
 def parse_urls(page):
     lgr.debug("Parsing out urls")
     soup = BeautifulSoup(page)
-    return [(link.get('href'), link.text)
-            for link in soup.findAll('a')]
+    urls = []
+    for link in soup.findAll('a'):
+        href = link.get('href')
+        if not href:
+            # skip empties
+            continue
+        # we better bring it to canonical quoted form for consistency
+        rec = urlsplit(href)
+        path_quoted = urllib2.quote(rec.path) if not is_url_quoted(rec.path) else rec.path
+        href = urlunsplit((rec.scheme, rec.netloc, path_quoted,
+                           rec.query, rec.fragment))
+        urls.append((href, link.text))
+    return urls
 
 
 def filter_urls(urls,
@@ -137,7 +156,7 @@ def filter_urls(urls,
 
 
 def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
-                 fast_mode=False):
+                 fast_mode=False, use_content_name=False):
     # TODO: relaxed mode? so no size/mtime stamps are collected, mere
     # presence is enough... uff -- too much of annex duplication? ;)
     # yeah -- but this is just a degenerate example
@@ -157,6 +176,9 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
     try: # might RF -- this is just to not repeat the same return
         if dry_run:
             # we can only try to deduce from the url...
+            # TODO: now that there is use_content_name  -- make dry_run run smarter and more detailed
+            #       just assume things haven't changed on the remote end and keep going without introducing
+            #       any factual changes
             filename = url_filename
             repo_filename = os.path.join(subdir, filename)
             full_filename = os.path.join(incoming, repo_filename)
@@ -180,7 +202,11 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
             r_info = r.info()
 
             r_stamp = get_response_stamp(url, r_info)
-            filename = get_response_filename(url, r_info) or url_filename
+            if use_content_name:
+                filename = get_response_filename(url, r_info) or url_filename
+            else:
+                filename = url_filename
+
             repo_filename = os.path.join(subdir, filename)
             full_filename = os.path.join(incoming, repo_filename)
 
@@ -236,6 +262,8 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
 
             mtime = r_stamp['mtime']
             size = r_stamp['size']
+
+            # might be too early to state -- what if download fails?
             db_incoming[repo_filename] = dict(mtime=mtime, size=size, url=url)
 
             if fast_mode:
@@ -260,6 +288,10 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
                 raise RuntimeError("File %s should not be there yet" % temp_full_filename)
 
             try:
+                # TODO -- download to .download temp file and rename upon success
+                # TODO -- think either we should download here at all or just leave it
+                #         up to git-annex to do... atm we allow for mode 'rm' so it
+                #         might not be possible since it would not be fetched first by annex
                 # we might need the directory
                 full_filename_dir = os.path.dirname(temp_full_filename)
                 if not os.path.exists(full_filename_dir):

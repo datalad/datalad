@@ -35,7 +35,11 @@ from os.path import join
 from .utils import *
 
 from ..api import *
-from ..network import filter_urls, get_response_stamp, download_url
+from ..network import filter_urls, get_response_stamp, download_url, is_url_quoted
+
+def test_is_url_quoted():
+    ok_(is_url_quoted('%22%27%3ba&b&cd|'))
+    ok_(not is_url_quoted('a b'))
 
 def test_filter_urls():
     urls = [('/x.nii.gz', 'bogus'),

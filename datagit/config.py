@@ -47,14 +47,14 @@ def get_default_config(sections={}):
         archives_re='(%s)' % ('|'.join(DECOMPRESSORS.keys())),
         # 'keep'  -- just keep original without annexing it etc
         # 'annex' -- git annex addurl ...
-        # 'drop'  -- 'annex' and then 'annex drop' upon extract
-        # 'rm'    -- remove upon extraction
+        # 'drop'  -- 'annex add(url)' and then 'annex drop' upon extract
+        # 'rm'    -- remove upon extraction if archive
         # 'auto':
         # if incoming == public:
-        #  'auto' == 'rm'
+        #  'auto' == 'rm' if is_archive and 'annex' if
         # else:
         #  'auto' == 'annex'
-        archives_destiny="auto",
+        incoming_destiny="auto",
         # TODO:
         # maintain - preserve the ones in the archive and place them
         #            at the same level as the archive file (TODO)

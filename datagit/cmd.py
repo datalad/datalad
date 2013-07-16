@@ -44,22 +44,25 @@ def dry(s, dry_):
         return "DRY " + s
     return s
 
-class getstatusoutput_wrapper(object):
-    """Helper for dry_run -- would also collect all the commands to spit out at once at the end
+class Runner(object):
+    """Helper to run commands and functions while allowing for dry_run and later reporting
     """
+
+    __slots__ = ['commands', 'dry']
 
     def __init__(self, dry=False):
         self.commands = []
         self.dry = dry                    # TODO: make use of it
 
-    def __call__(self, cmd, dry_run=False):
-    #def getstatusoutput(cmd, dry_run=False):
+    # TODO -- remove dry_run specification here -- use constructor parameter
+    #def __call__(self, cmd, dry_run=False):
+    def getstatusoutput(self, cmd, dry_run=None):
         """A wrapper around commands.getstatusoutput
 
         Also logs result and raise Exception
         """
-        lgr.debug(dry("Running: %s" % (cmd,), dry_run))
-        if not dry_run:
+        self.log("Running: %s" % (cmd,))
+        if not self.dry:
             status, output = commands.getstatusoutput(cmd)
             if status != 0:
                 msg = "Failed to run %r. Exit code=%d output=%s" \
@@ -72,7 +75,25 @@ class getstatusoutput_wrapper(object):
             self.commands.append(cmd)
         return None, None
 
-getstatusoutput = getstatusoutput_wrapper()
+    def drycall(self, f, *args, **kwargs):
+        """Helper to unify collection of logging all "dry" actions.
+
+        f : callable
+        *args, **kwargs:
+          Callable arguments
+        """
+        if self.dry:
+            self.commands.append("%s args=%s kwargs=%s" % (f, args, kwargs))
+        else:
+            f(*args, **kwargs)
+
+    def log(self, msg):
+        if self.dry:
+            lgr.info("DRY: %s" % msg)
+        else:
+            lgr.debug(msg)
+
+#getstatusoutput = Runner()
 
 def link_file_load(src, dst, dry_run=False):
     """Just a little helper to hardlink files's load

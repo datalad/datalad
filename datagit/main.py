@@ -111,14 +111,19 @@ def collect_urls(url, recurse=None, pages_cache=None):
 # Main loop
 #
 # TODO: formalize existing argument into option (+cmdline option?)
-def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
+def rock_and_roll(cfg, existing_urls='skip', dry_run=False, db_name = '.page2annex'):
     """Given a configuration fetch/update git-annex "clone"
     """
 
     # Let's output summary stats at the end
     stats = dict([(k, 0) for k in
-                  ['sections', 'urls', 'allurls', 'downloads', 'annex_updates', 'size']])
+                  ['sections', 'urls', 'allurls', 'downloads',
+                   'incoming_annex_updates', 'public_annex_updates', 'size']])
     pages_cache = {}
+
+    runner = Runner(dry=dry_run)
+    # convenience shortcuts
+    _call = runner.drycall
 
     dry_str = "DRY: " if dry_run else ""
 
@@ -129,25 +134,26 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
     # Initializing file structure
     #
     if not (os.path.exists(incoming) and os.path.exists(public)):
-        lgr.debug("%sCreating directories for incoming (%s) and public (%s) annexes"
-                  % (dry_str, incoming, public))
+        lgr.debug("Creating directories for incoming (%s) and public (%s) annexes"
+                  % (incoming, public))
 
-        if not dry_run:
-            if not os.path.exists(incoming):
-                os.makedirs(incoming)
-            if not os.path.exists(public):
-                os.makedirs(public)           #TODO might be the same
+        if not os.path.exists(incoming):
+            _call(os.makedirs, incoming)
+        if not os.path.exists(public):
+            _call(os.makedirs, public)           #TODO might be the same
 
-    public_annex = AnnexRepo(public, dry_run=dry_run)
     description = cfg.get('DEFAULT', 'description')
-    if not os.path.exists(os.path.join(public, '.git', 'annex')):
-        public_annex.init(description)
+    public_annex = AnnexRepo(public, runner=runner, description=description)
 
     if public != incoming:
-        incoming_annex = AnnexRepo(incoming, dry_run=dry_run)
-        incoming_annex.init(description + ' (incoming)')
+        incoming_annex = AnnexRepo(incoming, runner=runner,
+                                   description=description + ' (incoming)')
+        # TODO: git remote add public to incoming, so we could
+        # copy/get some objects between the two
     else:
         incoming_annex = public_annex
+
+    # TODO: provide AnnexRepo's with the "runner"
 
     # TODO: load previous status info
     """We need
@@ -158,8 +164,8 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
       keeping urls would allow for a 'quick' check mode where we would only check
       if file is known
 
-    public_incoming -- to have clear correspondence between annex_filename and incoming (which in turn with url).
-                   annex_filename might correspond to a directory where we would
+    public_incoming -- to have clear correspondence between public_filename and incoming (which in turn with url).
+                   public_filename might correspond to a directory where we would
                    extract things, so we can't just geturl on it
     """
 
@@ -169,7 +175,7 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
     else:
         # create fresh
         db = dict(incoming={},   # incoming_filename -> (url, mtime, size (AKA Content-Length, os.stat().st_size ))
-                  public_incoming={}) # annex_filename -> incoming_filename
+                  public_incoming={}) # public_filename -> incoming_filename
 
     db_incoming = db['incoming']
     # reverse map: url -> incoming
@@ -195,18 +201,14 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
         full_public_sectiondir = os.path.join(public, repo_sectiondir)
 
         if not (os.path.exists(incoming) and os.path.exists(public)):
-            lgr.debug("%sCreating directories for section's incoming (%s) and public (%s) annexes"
-                      % (dry_str, full_incoming_sectiondir, full_public_sectiondir))
-            if not dry_run:
-                os.makedirs(full_incoming_sectiondir)
-                os.makedirs(full_public_sectiondir)           #TODO might be the same
+            lgr.debug("Creating directories for section's incoming (%s) and public (%s) annexes"
+                      % (full_incoming_sectiondir, full_public_sectiondir))
+            _call(os.makedirs, full_incoming_sectiondir)
+            _call(os.makedirs, full_public_sectiondir)           #TODO might be the same
 
         scfg = dict(cfg.items(section))
 
-        archives_destiny = scfg.get('archives_destiny')
-        if archives_destiny == 'auto':
-            archives_destiny = 'rm' if incoming == public else 'annex'
-
+        incoming_destiny = scfg.get('incoming_destiny')
         # Fetching the page (possibly again! thus a dummy pages_cache)
         top_url = scfg['url'].replace('/./', '/')
         if '..' in top_url:
@@ -244,12 +246,7 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
             href_full = urljoin(top_url, href)
             lgr.debug("Working on [%s](%s)" % (href_full, href_a))
 
-            if href_full in db_incoming_urls:
-                # might need to go around download_url, so we might
-                # still add it to annex happen download was done but annexing not
-                if existing == 'skip':
-                    lgr.debug("Skipping since known to db already and existing='skip'")
-                    continue
+            incoming_updated = False
 
             # We need to decide either some portion of href path
             # should be "maintained", e.g. in cases where we recurse
@@ -258,77 +255,97 @@ def rock_and_roll(cfg, existing='skip', dry_run=False, db_name = '.page2annex'):
             href_dir = os.path.dirname(href_full[len(top_url):].lstrip(os.path.sep)) \
                 if href_full.startswith(top_url) else ''
 
+            # Download incoming and possibly get alternative filename from Deposit
             # It will adjust db_incoming in-place
-            repo_filename, href_updated = \
-              download_url(href_full, incoming,
-                           os.path.join(repo_sectiondir, href_dir),
-                           db_incoming=db_incoming, dry_run=dry_run,
-                           fast_mode=add_mode in ['fast', 'relaxed'])
+            if (href_full in db_incoming_urls
+                and (existing_urls and existing_urls == 'skip')):
+                lgr.debug("Skipping attempt to download since %s known to db "
+                          "already and existing='skip'" % href_full)
+                incoming_filename = db_incoming_urls[href_full]
+            else:
+                incoming_filename, incoming_updated = \
+                  download_url(href_full, incoming,
+                               os.path.join(repo_sectiondir, href_dir),
+                               db_incoming=db_incoming, dry_run=runner.dry, # TODO -- use runner?
+                               fast_mode=add_mode in ['fast', 'relaxed'])
 
-            full_filename = os.path.join(incoming, repo_filename)
-            if href_updated:
+            full_incoming_filename = os.path.join(incoming, incoming_filename)
+            if incoming_updated:
                 stats['downloads'] += 1
-                stats['size'] += os.stat(full_filename).st_size
+                stats['size'] += os.stat(full_incoming_filename).st_size
                 if not dry_run:
-                    save_db(db, db_path)
+                    _call(save_db, db, db_path)   # must go to 'finally'
 
-            # TODO: should _filename become _incoming_filename and
-            # annex_filename -> public_filename?
-            #
             try:
-                repo_annex_filename = eval(scfg['filename'], {},
-                                           dict(filename=repo_filename,
-                                                ))
+                public_filename = eval(scfg['filename'], {}, dict(filename=incoming_filename))
             except:
                 raise ValueError("Failed to evaluate %r" % scfg['filename'])
 
-            annex_updated = False
-            if href_updated or (not repo_annex_filename in db_public_incoming):
+            # Incoming might be an archives -- check and adjust public filename accordingly
+            is_archive, public_filename = pretreat_archive(
+                public_filename, archives_re=scfg.get('archives_re'))
 
-                # Place them under git-annex, if they do not exist already
+            annex_updated = False
+            # TODO: may be these checks are not needed and we should follow the logic all the time?
+            if incoming_updated \
+              or (not public_filename in db_public_incoming) \
+              or (not lexists(join(public_annex.path, public_filename))):
+                # Place the files under git-annex, if they do not exist already
                 #if href.endswith('gz'):
                 #    import pydb; pydb.debugger()
 
-                repo_public_filename = annex_file(
+                # TODO: we might want to get matching to db_incoming stamping into db_public,
+                #       so we could avoid relying on incoming_updated but rather comparison of the records
+                #  argument #2 -- now if incoming_updated, but upon initial run annex_file fails
+                #  for some reason -- we might be left in a state where "public_annex" is broken
+                #  upon subsequent run where incoming_updated would be False.  So we really should keep
+                #  stamps for both incoming and public to robustify tracking/updates
+                incoming_annex_updated, public_annex_updated = \
+                  annex_file(
                     href_full,
-                    incoming_filename=repo_filename,
-                    annex_filename=repo_annex_filename, # full_annex_filename,
+                    incoming_filename=incoming_filename,
                     incoming_annex=incoming_annex,
+                    incoming_updated=incoming_updated,
+                    is_archive=is_archive,
+                    public_filename=public_filename,
                     public_annex=public_annex,
-                    archives_destiny=archives_destiny,
-                    archives_re=scfg.get('archives_re'),
+                    incoming_destiny=incoming_destiny,
                     add_mode=add_mode,
                     addurl_opts=scfg.get('addurl_opts', None),
-                    dry_run=dry_run,
+                    runner=runner,
                     )
 
-                db_public_incoming[repo_annex_filename] = repo_public_filename
-                annex_updated = True
-                stats['annex_updates'] += 1
+                db_public_incoming[public_filename] = incoming_filename
+                annex_updated = incoming_annex_updated or public_annex_updated
+                stats['incoming_annex_updates'] += int(incoming_annex_updated)
+                stats['public_annex_updates'] += int(public_annex_updated)
             else:
                 # TODO: shouldn't we actually check???
-                lgr.debug("Skipping annexing %s since it must be there already"
-                          % repo_annex_filename)
+                lgr.debug("Skipping annexing %s since it must be there already and "
+                          "incoming was not updated" % public_filename)
 
-            if not dry_run and (annex_updated or href_updated):
-                save_db(db, db_path)
+            # TODO: make save_db a handler upon exit of the loop one way or another
+            if not dry_run and (annex_updated or incoming_updated):
+                _call(save_db, db, db_path)
 
             stats['urls'] += 1
 
     stats_str = "Processed %(sections)d sections, %(urls)d (out of %(allurls)d) urls, " \
                 "%(downloads)d downloads with %(size)d bytes. " \
-                "Made %(annex_updates)s git/annex additions/updates" % stats
+                "Made %(incoming_annex_updates)s incoming and %(public_annex_updates)s " \
+                "public git/annex additions/updates" % stats
 
-    git_commit(incoming, files=[db_name], dry_run=dry_run,
+    _call(git_commit,
+               incoming, files=[db_name], dry_run=dry_run,
                msg="page2annex(incoming): " + stats_str)
     if incoming != public:
-        git_commit(public, dry_run=dry_run, msg="page2annex(public): " + stats_str)
+        _call(git_commit, public, dry_run=dry_run, msg="page2annex(public): " + stats_str)
 
     lgr.info(stats_str)
 
     if dry_run:
         # print all accumulated commands
-        for cmd in getstatusoutput.commands:
+        for cmd in runner.commands:
             lgr.info("DRY: %s" % cmd)
     else:
         # Once again save the DB -- db might have been changed anyways

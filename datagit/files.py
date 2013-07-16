@@ -39,8 +39,6 @@ import re
 
 from os.path import join
 
-from .cmd import getstatusoutput
-
 import logging
 lgr = logging.getLogger('page2annex.files')
 
