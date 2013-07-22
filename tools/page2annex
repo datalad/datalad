@@ -74,7 +74,7 @@ if __name__ == '__main__':
     import sys
 
     import logging
-    lgr = logging.getLogger('page2annex')
+    lgr = logging.getLogger('datagit')
 
     parser = argparse.ArgumentParser(
         fromfile_prefix_chars='@',

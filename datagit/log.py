@@ -87,7 +87,7 @@ class ColorFormatter(logging.Formatter):
 
 
 # By default mimic previously talkative behavior
-log = logging.getLogger('page2annex')
+log = logging.getLogger('datagit')
 log.setLevel(getattr(logging, os.environ.get('DATAGIT_LOGLEVEL', 'WARNING').upper()))
 _log_handler = logging.StreamHandler(sys.stdout)
 

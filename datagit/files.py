@@ -40,7 +40,7 @@ import re
 from os.path import join
 
 import logging
-lgr = logging.getLogger('page2annex.files')
+lgr = logging.getLogger('datagit.files')
 
 DECOMPRESSORS = {
     '\.(tar\.bz|tbz)$' : 'tar -xjvf %(file)s -C %(dir)s',

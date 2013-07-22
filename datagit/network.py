@@ -45,7 +45,7 @@ from StringIO import StringIO
 from urlparse import urljoin, urlsplit, urlunsplit
 
 import logging
-lgr = logging.getLogger('page2annex.network')
+lgr = logging.getLogger('datagit.network')
 
 from joblib import Memory
 memory = Memory(cachedir="/tmp/datagit", verbose=1)

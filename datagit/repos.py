@@ -42,7 +42,7 @@ from .cmd import Runner, dry, link_file_load
 from .files import decompress_file
 
 import logging
-lgr = logging.getLogger('page2annex.git')
+lgr = logging.getLogger('datagit.git')
 
 def _esc(filename):
     """Surround filename in "" and escape " in the filename

@@ -42,7 +42,7 @@ from ..db import load_db
 
 if False:
     import logging, sys
-    lgr = logging.getLogger('page2annex')
+    lgr = logging.getLogger('datagit')
     console = logging.StreamHandler(sys.stdout)
     console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
     lgr.addHandler(console)

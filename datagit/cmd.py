@@ -35,7 +35,7 @@ import os
 import commands
 
 import logging
-lgr = logging.getLogger('page2annex.files')
+lgr = logging.getLogger('datagit.files')
 
 def dry(s, dry_):
     """Small helper for dry runs
