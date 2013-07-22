@@ -90,8 +90,9 @@ def __download(url, filename=None, filename_only=False):
         r.close()
     return filename
 
-@memory.cache
-def fetch_page(url, retries=3):
+# yoh: I haven't found a quick way to enable/disable memory. caching at runtime,
+# thus implementing simple decorators
+def _fetch_page(url, retries=3):
     lgr.debug("Fetching %s" % url)
     for t in xrange(retries):
         try:
@@ -105,6 +106,12 @@ def fetch_page(url, retries=3):
     lgr.info("Fetched %d bytes page from %s" % (len(page), url))
     return page
 
+def fetch_page(url, retries=3, cache=False):
+    if cache:
+        return memory.eval(_fetch_page, url, retries=retries)
+    else:
+        return _fetch_page(url, retries=retries)
+
 def is_url_quoted(url):
     """Return either URL looks being already quoted
     """
@@ -114,9 +121,8 @@ def is_url_quoted(url):
     except: # problem with unquoting -- then it must be wasn't quoted (correctly)
         return False
 
-# takes long -- so let's cache it
-@memory.cache
-def parse_urls(page):
+
+def _parse_urls(page):
     lgr.debug("Parsing out urls")
     soup = BeautifulSoup(page)
     urls = []
@@ -132,6 +138,12 @@ def parse_urls(page):
                            rec.query, rec.fragment))
         urls.append((href, link.text))
     return urls
+
+def parse_urls(page, cache=False):
+    if cache:
+        return memory.eval(_parse_urls, page)
+    else:
+        return _parse_urls(page)
 
 
 def filter_urls(urls,

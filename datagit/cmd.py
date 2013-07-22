@@ -89,7 +89,7 @@ class Runner(object):
 
     def log(self, msg):
         if self.dry:
-            lgr.info("DRY: %s" % msg)
+            lgr.debug("DRY: %s" % msg)
         else:
             lgr.debug(msg)
 

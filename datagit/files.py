@@ -63,7 +63,13 @@ def decompress_file(file, dir, directories='strip'):
 #            lgr.debug("Failed to extract: status %d output %s" % (status, output))
 #    else:
     #lgr.debug("Have no clue how to extract %s -- using patool" % file)
-    patoolib.extract_archive(file, outdir=dir)
+    verbosity = -1                        # silent by default
+    ef_level = lgr.getEffectiveLevel() 
+    if ef_level and lgr.getEffectiveLevel() <= logging.DEBUG:
+        verbosity = 1
+    #elif lgr.getEffectiveLevel() <= logging.INFO:
+    #    verbosity = 0
+    patoolib.extract_archive(file, outdir=dir, verbosity=verbosity)
     if directories == 'strip':
         _, dirs, files = os.walk(dir).next()
         if not len(files) and len(dirs) == 1:

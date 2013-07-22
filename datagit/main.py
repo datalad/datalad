@@ -53,17 +53,17 @@ def strippath(f, p):
     return f
 
 # TODO : add "memo" to avoid possible circular websites
-def collect_urls(url, recurse=None, pages_cache=None):
+def collect_urls(url, recurse=None, pages_cache=None, cache=False):
     """Collects urls starting from url
     """
-    page = (pages_cache and pages_cache.get(url, None)) or fetch_page(url)
+    page = (pages_cache and pages_cache.get(url, None)) or fetch_page(url, cache=cache)
     if pages_cache is not None:
         pages_cache[url] = page
 
     url_rec = urlparse(url)
     #
     # Parse out all URLs, as a tuple (url, a(text))
-    urls_all = parse_urls(page)
+    urls_all = parse_urls(page, cache=cache)
 
     # Now we need to dump or recurse into some of them, e.g. for
     # directories etc
@@ -93,7 +93,7 @@ def collect_urls(url, recurse=None, pages_cache=None):
                     # so we are staying on current website -- let it go
                 lgr.debug("Recursing into %s, full: %s" % (u, u_full))
                 new_urls = collect_urls(
-                    u_full, recurse=recurse, pages_cache=pages_cache)
+                    u_full, recurse=recurse, pages_cache=pages_cache, cache=cache)
                 # and add to their "hrefs" appropriate prefix
                 urls.extend([(os.path.join(u, url__[0]),) + url__[1:]
                              for url__ in new_urls])
@@ -102,8 +102,8 @@ def collect_urls(url, recurse=None, pages_cache=None):
         else:
             urls.append(url_)
 
-    lgr.info("Considering %d out of %d urls from %s"
-             % (len(urls), len(urls_all), url))
+    lgr.debug("Considering %d out of %d urls from %s"
+              % (len(urls), len(urls_all), url))
 
     return urls
 
@@ -111,7 +111,7 @@ def collect_urls(url, recurse=None, pages_cache=None):
 # Main loop
 #
 # TODO: formalize existing argument into option (+cmdline option?)
-def rock_and_roll(cfg, existing_urls='skip', dry_run=False, db_name = '.page2annex'):
+def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name = '.page2annex'):
     """Given a configuration fetch/update git-annex "clone"
     """
 
@@ -214,7 +214,7 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, db_name = '.page2ann
         if '..' in top_url:
             raise ValueError("Some logic would fail with relative paths in urls, "
                              "please adjust %s" % scfg['url'])
-        urls_all = collect_urls(top_url, recurse=scfg['recurse'], pages_cache=pages_cache)
+        urls_all = collect_urls(top_url, recurse=scfg['recurse'], pages_cache=pages_cache, cache=cache)
 
 
         #lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))
@@ -224,7 +224,7 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, db_name = '.page2ann
             [(k,scfg[k]) for k in
              ('include_href', 'exclude_href',
               'include_href_a', 'exclude_href_a')]))
-        lgr.info("%d out of %d urls survived filtering"
+        lgr.debug("%d out of %d urls survived filtering"
                  % (len(urls), len(urls_all)))
         if len(set(urls)) < len(urls):
             urls = sorted(set(urls))
@@ -345,8 +345,9 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, db_name = '.page2ann
 
     if dry_run:
         # print all accumulated commands
-        for cmd in runner.commands:
-            lgr.info("DRY: %s" % cmd)
+        ## for cmd in runner.commands:
+        ##     lgr.info("DRY: %s" % cmd)
+        pass
     else:
         # Once again save the DB -- db might have been changed anyways
         save_db(db, db_path)
