@@ -134,10 +134,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args() #['-n', '-l', 'debug', 'allen-genetic.cfg'])
 
-    # Basic logging setup
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
-    lgr.addHandler(console)
+    ## # Basic logging setup
+    ## console = logging.StreamHandler(sys.stdout)
+    ## console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
+    ## lgr.addHandler(console)
     lgr.setLevel(getattr(logging, args.log_level.upper()))
 
     lgr.debug("Command line arguments: %r" % args)

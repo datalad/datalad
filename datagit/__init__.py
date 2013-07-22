@@ -32,3 +32,5 @@ __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
 __version__ = "0.0.0.dev"
+
+import datagit.log
