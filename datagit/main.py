@@ -118,7 +118,7 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name
     # Let's output summary stats at the end
     stats = dict([(k, 0) for k in
                   ['sections', 'urls', 'allurls', 'downloads',
-                   'incoming_annex_updates', 'public_annex_updates', 'size']])
+                   'incoming_annex_updates', 'public_annex_updates', 'downloaded']])
     pages_cache = {}
 
     runner = Runner(dry=dry_run)
@@ -194,6 +194,7 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name
         # some checks
         add_mode = cfg.get(section, 'mode')
         assert(add_mode in ['download', 'fast', 'relaxed'])
+        fast_mode = add_mode in ['fast', 'relaxed']
 
         repo_sectiondir = cfg.get(section, 'directory')
 
@@ -247,6 +248,7 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name
             lgr.debug("Working on [%s](%s)" % (href_full, href_a))
 
             incoming_updated = False
+            incoming_downloaded = False
 
             # We need to decide either some portion of href path
             # should be "maintained", e.g. in cases where we recurse
@@ -263,27 +265,42 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name
                           "already and existing='skip'" % href_full)
                 incoming_filename = db_incoming_urls[href_full]
             else:
-                incoming_filename, incoming_updated = \
+                incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
                   download_url(href_full, incoming,
                                os.path.join(repo_sectiondir, href_dir),
                                db_incoming=db_incoming, dry_run=runner.dry, # TODO -- use runner?
-                               fast_mode=add_mode in ['fast', 'relaxed'])
+                               fast_mode=fast_mode)
+                stats['downloaded'] += downloaded_size
 
             full_incoming_filename = os.path.join(incoming, incoming_filename)
-            if incoming_updated:
-                stats['downloads'] += 1
-                stats['size'] += os.stat(full_incoming_filename).st_size
-                if not dry_run:
-                    _call(save_db, db, db_path)   # must go to 'finally'
 
             try:
                 public_filename = eval(scfg['filename'], {}, dict(filename=incoming_filename))
             except:
                 raise ValueError("Failed to evaluate %r" % scfg['filename'])
 
-            # Incoming might be an archives -- check and adjust public filename accordingly
+            # Incoming might be an archive -- check and adjust public filename accordingly
             is_archive, public_filename = pretreat_archive(
                 public_filename, archives_re=scfg.get('archives_re'))
+
+            if incoming_updated and is_archive and fast_mode :
+                # there is no sense unless we download the beast
+                # thus redo now forcing the download
+                lgr.info("(Re)downloading %(href_full)s since points to an archive, thus "
+                         "pure fast mode doesn't make sense" % locals())
+                incoming_filename_, incoming_downloaded, incoming_updated_, downloaded_size = \
+                  download_url(href_full, incoming,
+                               os.path.join(repo_sectiondir, href_dir),
+                               db_incoming=db_incoming, dry_run=runner.dry,
+                               fast_mode=False, force_download=True)
+                assert(incoming_filename == incoming_filename_)
+                stats['downloaded'] += downloaded_size
+                incoming_updated = incoming_updated_ or incoming_updated
+
+            stats['downloads'] += int(incoming_downloaded)
+            if incoming_updated:
+                if not dry_run:
+                    _call(save_db, db, db_path)   # must go to 'finally'
 
             annex_updated = False
             # TODO: may be these checks are not needed and we should follow the logic all the time?
@@ -331,7 +348,7 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name
             stats['urls'] += 1
 
     stats_str = "Processed %(sections)d sections, %(urls)d (out of %(allurls)d) urls, " \
-                "%(downloads)d downloads with %(size)d bytes. " \
+                "%(downloads)d downloads with %(downloaded)d bytes. " \
                 "Made %(incoming_annex_updates)s incoming and %(public_annex_updates)s " \
                 "public git/annex additions/updates" % stats
 

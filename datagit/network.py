@@ -168,11 +168,11 @@ def filter_urls(urls,
 
 
 def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
-                 fast_mode=False, use_content_name=False):
+                 fast_mode=False, use_content_name=False, force_download=False):
     # TODO: relaxed mode? so no size/mtime stamps are collected, mere
     # presence is enough... uff -- too much of annex duplication? ;)
     # yeah -- but this is just a degenerate example
-    updated = False
+    downloaded, updated, downloaded_size = False, False, 0
     # so we could check and remove it to keep it clean
     temp_full_filename = None
 
@@ -232,7 +232,7 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
 
             # db_incoming might maintain information even if file is not present, e.g.
             # if originally we haven't kept originals
-            download = False
+            download = force_download
 
             def _compare_stamps(ofs, nfs, msg):
                 """ofs -- old stamps, nfs -- new ones
@@ -256,6 +256,9 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
                 # TODO: think if it is not too fragile
                 download |= _compare_stamps(db_incoming.get(repo_filename),
                                             r_stamp, "previous")
+                if not download:
+                    lgr.debug("Stamps seems to be the same as before")
+
             elif os.path.exists(full_filename):
                 lgr.debug("File %s already exists under %s but no known stamps for it"
                           % (repo_filename, full_filename))
@@ -279,7 +282,8 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
             db_incoming[repo_filename] = dict(mtime=mtime, size=size, url=url)
 
             if fast_mode:
-                lgr.debug("Not downloading -- fast mode")
+                lgr.debug("Not downloading (but marking updated) -- fast mode")
+                updated = True
                 raise ReturnSooner
 
             if not download:
@@ -317,6 +321,9 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
                     else:
                         src = r
                     shutil.copyfileobj(src, f)
+                    downloaded = True
+                downloaded_size = os.stat(temp_full_filename).st_size
+
             except Exception, e:
                 lgr.error("Failed to download: %s" % e)
                 if os.path.exists(temp_full_filename):
@@ -366,5 +373,5 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
         # We have handled things already, just need to return
         pass
 
-    return repo_filename, updated
+    return repo_filename, downloaded, updated, downloaded_size
 

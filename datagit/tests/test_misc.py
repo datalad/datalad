@@ -72,8 +72,11 @@ def test_download_url():
     os.close(fd)
 
     # Let's assume absent subdirectory
-    repo_filename, updated = download_url("file://%s" % fname, dout)
+    #repo_filename, downloaded, updated, downloaded_size
+    repo_filename, downloaded, updated, size \
+        = download_url("file://%s" % fname, dout)
     ok_(updated)
+    ok_(downloaded)
     # check if stats are the same
     s, s_ = os.stat(fname), os.stat(join(dout, repo_filename))
     eq_(s.st_size, s_.st_size)
@@ -81,26 +84,32 @@ def test_download_url():
     eq_(int(s.st_mtime), int(s_.st_mtime))
 
     # and if again -- should not be updated
-    repo_filename, updated = download_url("file://%s" % fname, dout)
+    repo_filename, downloaded, updated, size = \
+        download_url("file://%s" % fname, dout)
     ok_(not updated)
+    ok_(not downloaded)
 
     # but it should if we remove it
     os.unlink(join(dout, repo_filename))
-    repo_filename, updated = download_url("file://%s" % fname, dout)
+    repo_filename, downloaded, updated, size = \
+        download_url("file://%s" % fname, dout)
     full_filename = join(dout, repo_filename)
     ok_(updated)
+    ok_(downloaded)
     # check if stats are the same
     s_ = os.stat(full_filename)
     eq_(s.st_size, s_.st_size)
     eq_(int(s.st_mtime), int(s_.st_mtime))
+    eq_(s.st_size, size)
 
     # and what if we maintain db_incoming
     db_incoming = {}
     os.unlink(full_filename)
-    repo_filename, updated = download_url("file://%s" % fname, dout,
-                                          db_incoming=db_incoming)
+    repo_filename, downloaded, updated, size = \
+        download_url("file://%s" % fname, dout, db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(updated)
+    ok_(downloaded)
     ok_(repo_filename in db_incoming,
         "db_incoming should have the %s. Got %s" % (repo_filename, str(db_incoming)))
     s_ = os.stat(full_filename)
@@ -110,10 +119,11 @@ def test_download_url():
     # and if we remove it but maintain information that we think it
     # exists -- we should skip it ATM
     os.unlink(full_filename)
-    repo_filename, updated = download_url("file://%s" % fname, dout,
-                                          db_incoming=db_incoming)
+    repo_filename, downloaded, updated, size = \
+        download_url("file://%s" % fname, dout, db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(not updated)
+    ok_(not downloaded)
     ok_(repo_filename in db_incoming)
     assert_raises(OSError, os.stat, full_filename)
 

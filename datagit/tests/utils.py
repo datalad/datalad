@@ -91,7 +91,7 @@ def with_tree(tree=None, **tkwargs):
             d = tempfile.mkdtemp(**tkwargs)
             create_tree(d, tree)
             try:
-                func(*(arg + (d,)), **kw)
+                func(*((d,) + arg), **kw)
             finally:
                 #print "TODO: REMOVE tree ", d
                 shutil.rmtree(d)

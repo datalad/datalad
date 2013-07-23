@@ -98,8 +98,8 @@ class AnnexRepo(object):
                 add_mode = "download"
             elif self.runner.dry:
                 add_mode = "fast"
-                lgr.warn("Cannot deduce auto mode in 'dry' mode. So some actions "
-                         "might differ -- assuming 'fast' mode")
+                lgr.warning("Cannot deduce auto mode in 'dry' mode. So some actions "
+                            "might differ -- assuming 'fast' mode")
             else:
                 if href is None:
                     raise ValueError("No file and no href -- can't add to annex")
@@ -153,9 +153,10 @@ def annex_file(href,
     assert(runner)                        # must be provided
     # convenience shortcuts
     _call = runner.drycall
+    fast_mode = add_mode in ['fast', 'relaxed']
 
-    lgr.info("Annexing %s//%s originating from url=%s present locally under %s//%s"
-             % (public_annex.path, public_filename,
+    lgr.info("Annexing (mode=%s) %s//%s originating from url=%s present locally under %s//%s"
+             % (add_mode, public_annex.path, public_filename,
                 href,
                 incoming_annex.path, incoming_filename))
     incoming_annex_updated, public_annex_updated = False, False
@@ -168,11 +169,11 @@ def annex_file(href,
 
     # Deal with public part first!
     if update_public:
-        # TODO: WRONG! we might not have full_incoming_filename == e.g. in fast mode
-        if not exists(full_incoming_filename) and not runner.dry:
-            lgr.error("Cannot update public %s because incoming %s is N/A. Skipping."
-                      % (public_filename, incoming_filename))
-            return False, False         # TODO: or what?
+        ## # TODO: WRONG! we might not have full_incoming_filename == e.g. in fast mode
+        ## if not exists(full_incoming_filename) and not runner.dry:
+        ##     lgr.error("Cannot update public %s because incoming %s is N/A. Skipping."
+        ##               % (public_filename, incoming_filename))
+        ##     return False, False         # TODO: or what?
 
         if is_archive:
             # TODO: what if the directory exist already?  option? yeah --
@@ -180,6 +181,10 @@ def annex_file(href,
             # otherwise we might like to track in our DB ALL the files
             # extracted from any given archive, so we know which ones to
             # remove selectively
+            # TODO#2: what do we do with archives in add_mode==fast?
+            #if fast_mode:
+            #    raise NotImplementedError("Fast mode for archives is not supported ATM")
+            # DONE#2: they should have been downloaded, and check above verifies that
             temp_annex_dir = full_public_filename + ".extract"
             if exists(temp_annex_dir):
                 lgr.warn("Found stale temporary directory %s. Removing it first" % temp_annex_dir)
@@ -204,7 +209,7 @@ def annex_file(href,
             _call(os.rename, temp_annex_dir, full_public_filename)
 
             # TODO: some files might need to go to GIT directly
-            public_annex.add_file(public_filename)
+            public_annex.add_file(public_filename, add_mode='download')
             if not runner.dry:
                 public_annex_updated = True
 
@@ -229,10 +234,11 @@ def annex_file(href,
                 else:
                     # assuming --fast mode... ? dry_run?
                     pass
+
+            if (incoming_annex is not public_annex) or fast_mode:
                 public_annex.add_file(public_filename, href=href, add_mode=add_mode)
                 if not runner.dry:
                     public_annex_updated = True
-
 
     # And after all decide on the incoming destiny
     if incoming_destiny == 'auto':
@@ -241,11 +247,20 @@ def annex_file(href,
     if incoming_updated or os.path.lexists(full_incoming_filename):
         # what do we do with the "incoming" archive
         if incoming_destiny == 'rm':
-            _call(os.unlink, full_incoming_filename)
+            if is_archive or not fast_mode:
+                _call(os.unlink, full_incoming_filename)
+            else:
+                # Should not be there
+                assert(not lexists(full_incoming_filename))
         elif incoming_destiny in ('annex', 'drop'):
-            incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode)
-            if incoming_destiny == 'drop':
-                incoming_annex.run("drop %s" % public_filename)
+            if exists(full_incoming_filename) and fast_mode:
+                # git annex would drop the load in --fast mode, so let's not provide 'fast'
+                incoming_annex.add_file(incoming_filename, href=href)
+            else:
+                # normal
+                incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode)
+            if incoming_destiny == 'drop' and exists(full_incoming_filename):
+                incoming_annex.run("drop %s" % incoming_filename)
             if not runner.dry:
                 incoming_annex_updated = True
         elif incoming_destiny == 'keep':

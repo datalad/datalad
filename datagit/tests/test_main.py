@@ -40,13 +40,6 @@ from ..config import get_default_config
 from ..main import rock_and_roll
 from ..db import load_db
 
-if False:
-    import logging, sys
-    lgr = logging.getLogger('datagit')
-    console = logging.StreamHandler(sys.stdout)
-    console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
-    lgr.addHandler(console)
-    lgr.setLevel(logging.DEBUG)
 
 tree1args = dict(
     tree=(
@@ -57,40 +50,43 @@ tree1args = dict(
     dir=os.curdir,
     prefix='.tmp-page2annex-')
 
-def verify_files_content(d, files):
+def verify_files_content(d, files, broken=[]):
     for f in files:
         f_ = join(d, f)
         ok_(lexists(f_), f_)      # if a link exists at all
-        ok_(exists(f_), f_)       # and if it is not broken
-        if f_.endswith('/test.txt'):
-            eq_(open(f_).read(), 'abracadabra', f_)
-        if f_.endswith('/d'):
-            ok_(isdir(f_), f_)
-        if f == '.page2annex':
-            # verify all it loads ok
-            ok_(load_db(f_))
+        if f in broken:
+            ok_(not exists(f_), f_)       # and if it is not broken
+        else:
+            ok_(exists(f_), f_)       # and if it is not broken
+            if f_.endswith('/test.txt'):
+                eq_(open(f_).read(), 'abracadabra', f_)
+            if f_.endswith('/d'):
+                ok_(isdir(f_), f_)
+            if f == '.page2annex':
+                # verify all it loads ok
+                ok_(load_db(f_))
 
-def verify_files(d, target_files):
+def verify_files(d, target_files, broken=[]):
     files = sorted_files(d)
     eq_(files, target_files, "%s: %s != %s" % (d, files, target_files))
-    verify_files_content(d, target_files)
+    verify_files_content(d, target_files, broken=broken)
 
 def verify_nothing_was_done(stats):
     eq_(stats['downloads'], 0)
     eq_(stats['incoming_annex_updates'], 0)
     eq_(stats['public_annex_updates'], 0)
-    eq_(stats['size'], 0)
+    eq_(stats['downloaded'], 0)
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def test_rock_and_roll_same_incoming_and_public(url):
+def check_rock_and_roll_same_incoming_and_public(url, mode):
     dout = tempfile.mkdtemp()
-
     cfg = get_default_config(dict(
         DEFAULT=dict(
             incoming=dout,
             public=dout,
             description="test",
+            mode=mode,
             ),
         files=dict(
             directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
@@ -103,9 +99,10 @@ def test_rock_and_roll_same_incoming_and_public(url):
     # they both should match
     eq_(stats1['incoming_annex_updates'], 2)
     eq_(stats1['public_annex_updates'], 2)
-    eq_(stats1['downloads'], 2)
+    # in fast/relaxed mode we still need to fetch 1 archive
+    eq_(stats1['downloads'], 1 + int(mode=='download'))
     eq_(stats1['sections'], 1)
-    assert_greater(stats1['size'], 100)   # should be more than 100b
+    assert_greater(stats1['downloaded'], 100)   # should be more than 100b
 
     # Let's repeat -- there should be no downloads/updates
     stats2 = rock_and_roll(cfg, dry_run=False)
@@ -127,29 +124,40 @@ def test_rock_and_roll_same_incoming_and_public(url):
 
     rmtree(dout, True)
 
+def test_rock_and_roll_same_incoming_and_public():
+    for mode in ('download',
+                 'fast',
+                 'relaxed'
+                 ):
+        yield check_rock_and_roll_same_incoming_and_public, mode
+
+
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def test_rock_and_roll_separate_public(url):
+def check_rock_and_roll_separate_public(url, mode, incoming_destiny):
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
 
     cfg = get_default_config(dict(
-        DEFAULT=dict(incoming=din, public=dout, description="test"),
-        files=dict(directory='files', incoming_destiny='annex', url=url)))
+        DEFAULT=dict(incoming=din, public=dout, description="test", mode=mode),
+        files=dict(directory='files', incoming_destiny=incoming_destiny, url=url)))
 
 #    import pydb; pydb.debugger()
     stats1_dry = rock_and_roll(cfg, dry_run=True)
     verify_nothing_was_done(stats1_dry)
 
     stats1 = rock_and_roll(cfg, dry_run=False)
+    broken = ['files/test.txt'] if mode != 'download' else []
     verify_files(dout,
-        ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'])
-    eq_(stats1['incoming_annex_updates'], 2)
+        ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
+        broken=broken)
+    eq_(stats1['incoming_annex_updates'], 2 if incoming_destiny != 'rm' else 0)
     eq_(stats1['public_annex_updates'], 2)
-    eq_(stats1['downloads'], 2)
+    # in fast/relaxed mode we still need to fetch 1 archive
+    eq_(stats1['downloads'], 1 + int(mode=='download'))
     eq_(stats1['sections'], 1)
-    assert_greater(stats1['size'], 100)   # should be more than 100b
+    assert_greater(stats1['downloaded'], 100)   # should be more than 100b
 
     # Let's repeat -- there should be no downloads/updates of any kind
     # since we had no original failures nor added anything
@@ -158,19 +166,40 @@ def test_rock_and_roll_separate_public(url):
 
     ok_(exists(join(din, '.git')))
     ok_(exists(join(din, '.git', 'annex')))
-    verify_files(din,
-        ['.page2annex', 'files/1.tar.gz', 'files/test.txt'])
+
+    if incoming_destiny == 'annex':
+        verify_files(din,
+            ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
+            broken=broken)
+    elif incoming_destiny == 'drop':
+        verify_files(din,
+            ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
+            broken=broken + ['files/1.tar.gz', 'files/test.txt'])
+    else:                           # 'rm'
+        eq_(incoming_destiny, 'rm')
+        # incoming files will not be there at all
+        verify_files(din, ['.page2annex'], broken=broken)
 
     ok_(exists(join(dout, '.git')))
     ok_(exists(join(dout, '.git', 'annex')))
     verify_files(dout,
-        ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'])
+        ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
+        broken=broken)
 
     stats2_dry = rock_and_roll(cfg, dry_run=True)
     verify_nothing_was_done(stats2_dry)
 
     rmtree(dout, True)
     rmtree(din, True)
+
+def test_rock_and_roll_separate_public():
+    for mode in ('download',
+                 'fast',
+                 'relaxed'
+                 ):
+        for incoming_destiny in ('annex', 'drop', 'rm'):
+            yield check_rock_and_roll_separate_public, mode, incoming_destiny
+
 
 # now with some recursive structure of directories
 tree2args = dict(
