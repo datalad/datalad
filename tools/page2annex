@@ -117,6 +117,12 @@ if __name__ == '__main__':
         help="Either to cache fetching of pages and parsing out urls")
 
     parser.add_argument(
+        "--existing", choices=('check', 'skip'), default='check',
+        help="How to deal with files already known. 'skip' would entirely skip "
+        "file without checking if it was modified or not. 'check' would "
+        "proceed normally updating the file(s) if changed")
+
+    parser.add_argument(
         "--tests", action="store_true",
         help="Do not do anything but run tests")
 
@@ -155,7 +161,7 @@ if __name__ == '__main__':
     try:
         lgr.info("Reading configs")
         cfg = load_config(args.configs)
-        rock_and_roll(cfg, dry_run=args.dry_run, cache=args.cache)
+        rock_and_roll(cfg, existing=args.existing, dry_run=args.dry_run, cache=args.cache)
 
     except Exception as exc:
         lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))

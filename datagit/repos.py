@@ -60,9 +60,8 @@ class AnnexRepo(object):
         self.path = path
         self.runner = runner or Runner()   # if none provided -- have own
 
-        if not os.path.exists(os.path.join(path, '.git', 'annex')):
+        if not exists(join(path, '.git', 'annex')):
             self.init(description)
-
 
     def run(self, cmd):
         return self.runner.getstatusoutput(
@@ -84,6 +83,27 @@ class AnnexRepo(object):
             # dump description
             self.runner.drycall(self.write_description, description)
 
+    def rm_indexed_file(self, filename):
+        """Remove file if it is already under git-annex
+
+        """
+        full_filename = join(self.path, filename)
+        if not lexists(full_filename):
+            return
+
+        # TODO: since in dry_mode things might differ... ?
+        gitrepo = git.Repo(self.path)
+        index = gitrepo.index
+        # if belongs to index
+        if  filename in [x[0] for x in index.entries.keys()]:
+            # and no local changes
+            if not len(index.diff(None, paths=[filename])):
+                lgr.debug("Removing %s without local changes", filename)
+                self.runner.drycall(os.unlink, full_filename)
+            else:
+                lgr.debug("Did not remove %s since there were local changes",
+                          filename)
+
     def add_file(self, annex_filename, href=None, add_mode='auto',
                        annex_opts=""):
         """
@@ -93,8 +113,9 @@ class AnnexRepo(object):
         # strip the directory off
         # We delay actual committing to git-annex until later
         annex_opts = annex_opts + ' -c annex.alwayscommit=false'
+        full_annex_filename = join(self.path, annex_filename)
         if add_mode == 'auto':
-            if exists(join(self.path, annex_filename)):
+            if exists(full_annex_filename):
                 add_mode = "download"
             elif self.runner.dry:
                 add_mode = "fast"
@@ -228,14 +249,14 @@ def annex_file(href,
                 # MMV in dry mode
                 if exists(full_incoming_filename):
                     _call(link_file_load, full_incoming_filename, full_public_filename)
-                elif lexists(full_incoming_filename):
+                elif (not fast_mode and lexists(full_incoming_filename)):
                     raise ValueError("Link %s exists but broken -- should have not happened"
                                      % full_incoming_filename)
                 else:
-                    # assuming --fast mode... ? dry_run?
-                    pass
+                    assert(fast_mode or runner.dry)
 
             if (incoming_annex is not public_annex) or fast_mode:
+                public_annex.rm_indexed_file(public_filename)
                 public_annex.add_file(public_filename, href=href, add_mode=add_mode)
                 if not runner.dry:
                     public_annex_updated = True
@@ -253,6 +274,7 @@ def annex_file(href,
                 # Should not be there
                 assert(not lexists(full_incoming_filename))
         elif incoming_destiny in ('annex', 'drop'):
+            incoming_annex.rm_indexed_file(public_filename)
             if exists(full_incoming_filename) and fast_mode:
                 # git annex would drop the load in --fast mode, so let's not provide 'fast'
                 incoming_annex.add_file(incoming_filename, href=href)
@@ -279,15 +301,10 @@ def annex_file(href,
     return incoming_annex_updated, public_annex_updated
 
 
-def git_commit(path, files=None, msg="", dry_run=False):
+def git_commit(path, files=None, msg=""):
     if msg is None:
         msg = 'page2annex: Committing staged changes as of %s' \
                % time.strftime('%Y/%m/%d %H:%M:%S')
-    if dry_run:
-        # Just record this event for logging
-        getstatusoutput("GIT COMMIT VIA GIT MODULE PATH=%s FILES=%s"
-                        % (path, files), dry_run=dry_run)
-        return
 
     repo = git.Repo(path)
 

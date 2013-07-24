@@ -282,8 +282,9 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
             db_incoming[repo_filename] = dict(mtime=mtime, size=size, url=url)
 
             if fast_mode:
-                lgr.debug("Not downloading (but marking updated) -- fast mode")
-                updated = True
+                if download:
+                    lgr.debug("Fast mode: not downloading but marking updated")
+                updated = download
                 raise ReturnSooner
 
             if not download:

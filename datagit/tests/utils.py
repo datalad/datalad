@@ -102,16 +102,25 @@ def with_tree(tree=None, **tkwargs):
 
 # GRRR -- this one is crippled since path where HTTPServer is serving
 # from can't be changed without pain.
+import logging
 import random
 import SimpleHTTPServer
 import SocketServer
 from threading import Thread
 
+lgr = logging.getLogger('datagit')
+
 class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     """A little adapter to silence the handler
     """
+    def __init__(self, *args, **kwargs):
+        self._silent = lgr.getEffectiveLevel() > logging.DEBUG
+        SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
+
     def log_message(self, format, *args):
-        return
+        if self._silent:
+            return
+        lgr.debug("HTTP: " + format % args)
 
 def serve_path_via_http(*args, **tkwargs):
     def decorate(func):
@@ -123,6 +132,8 @@ def serve_path_via_http(*args, **tkwargs):
             SocketServer.TCPServer.allow_reuse_address = True
             httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
             server_thread = Thread(target=httpd.serve_forever)
+            url = 'http://localhost:%d/%s/' % (port, path)
+            lgr.debug("HTTP: serving %s under %s", path, url)
             server_thread.start()
             if 'path' in kw:
                 raise ValueError(
@@ -132,9 +143,9 @@ def serve_path_via_http(*args, **tkwargs):
 
             #time.sleep(1)               # just give it few ticks
             try:
-                func(*(('http://localhost:%d/%s/' % (port, path),)+arg), **kw_)
+                func(*((url,)+arg), **kw_)
             finally:
-                #print "Stopping server"
+                lgr.debug("HTTP: stopping server")
                 httpd.shutdown()
                 #print "Waiting for thread to stop"
                 server_thread.join()

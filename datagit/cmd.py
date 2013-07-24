@@ -95,10 +95,17 @@ class Runner(object):
 
 #getstatusoutput = Runner()
 
+# this one might get under Runner for better output/control
 def link_file_load(src, dst, dry_run=False):
     """Just a little helper to hardlink files's load
     """
     dst_dir = os.path.dirname(dst)
     if not os.path.exists(dst_dir):
         os.makedirs(dst_dir)
+    if os.path.lexists(dst):
+        lgr.debug("Destination file %(dst)s exists. Removing it first"
+                  % locals())
+        # TODO: how would it interact with git/git-annex
+        os.unlink(dst)
+    lgr.debug("Hardlinking %(src)s under %(dst)s" % locals())
     os.link(os.path.realpath(src), dst)

@@ -111,7 +111,8 @@ def collect_urls(url, recurse=None, pages_cache=None, cache=False):
 # Main loop
 #
 # TODO: formalize existing argument into option (+cmdline option?)
-def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name = '.page2annex'):
+def rock_and_roll(cfg, existing_urls='check',
+                  dry_run=False, cache=False, db_name = '.page2annex'):
     """Given a configuration fetch/update git-annex "clone"
     """
 
@@ -353,10 +354,10 @@ def rock_and_roll(cfg, existing_urls='skip', dry_run=False, cache=False, db_name
                 "public git/annex additions/updates" % stats
 
     _call(git_commit,
-               incoming, files=[db_name], dry_run=dry_run,
+               incoming, files=[db_name],
                msg="page2annex(incoming): " + stats_str)
     if incoming != public:
-        _call(git_commit, public, dry_run=dry_run, msg="page2annex(public): " + stats_str)
+        _call(git_commit, public, msg="page2annex(public): " + stats_str)
 
     lgr.info(stats_str)
 

@@ -30,7 +30,7 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
-import os, tempfile
+import os, tempfile, time
 from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
@@ -136,6 +136,7 @@ def test_rock_and_roll_same_incoming_and_public():
 @with_tree(**tree1args)
 @serve_path_via_http()
 def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
+    fast_mode = mode in ['fast', 'relaxed']
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
 
@@ -146,13 +147,17 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
 #    import pydb; pydb.debugger()
     stats1_dry = rock_and_roll(cfg, dry_run=True)
     verify_nothing_was_done(stats1_dry)
+    ok_(not exists(join(din, '.git')))
+    ok_(not exists(join(dout, '.git')))
 
     stats1 = rock_and_roll(cfg, dry_run=False)
+    # broken is just for broken/hanging symlinks
     broken = ['files/test.txt'] if mode != 'download' else []
     verify_files(dout,
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
         broken=broken)
-    eq_(stats1['incoming_annex_updates'], 2 if incoming_destiny != 'rm' else 0)
+    eq_(stats1['incoming_annex_updates'],
+        0 if incoming_destiny in ['rm', 'keep'] else 2)
     eq_(stats1['public_annex_updates'], 2)
     # in fast/relaxed mode we still need to fetch 1 archive
     eq_(stats1['downloads'], 1 + int(mode=='download'))
@@ -165,11 +170,19 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     verify_nothing_was_done(stats2)
 
     ok_(exists(join(din, '.git')))
+    # TODO: actually this one should not be there if 'keep'
     ok_(exists(join(din, '.git', 'annex')))
 
     if incoming_destiny == 'annex':
         verify_files(din,
             ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
+            broken=broken)
+    elif incoming_destiny == 'keep':
+        verify_files(din,
+            ['.page2annex', 'files/1.tar.gz']
+            # if mode is fast they will not be even downloaded to incoming,
+            # unless an archive
+            + ([] if fast_mode else ['files/test.txt']),
             broken=broken)
     elif incoming_destiny == 'drop':
         verify_files(din,
@@ -180,7 +193,6 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
         # incoming files will not be there at all
         verify_files(din, ['.page2annex'], broken=broken)
 
-    ok_(exists(join(dout, '.git')))
     ok_(exists(join(dout, '.git', 'annex')))
     verify_files(dout,
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
@@ -189,15 +201,57 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     stats2_dry = rock_and_roll(cfg, dry_run=True)
     verify_nothing_was_done(stats2_dry)
 
+    # now check for the updates in a file
+    # appending
+    # Twice 'w' so we do change the file although keeping the size
+    # (and even content) the same (but sleep for a second for
+    # freshier mtime). and last 'w' so change the size but unlikely mtime
+    for i, (m, load) in enumerate((('a', 'a'),
+                                   ('w', 'w'),
+                                   ('w', 'w'),
+                                   ('w', 'ww'))):
+        with open(join(path, 'test.txt'), m) as f:
+            f.write(load)
+        stats = rock_and_roll(cfg, dry_run=False)
+        eq_(stats['incoming_annex_updates'],
+            0 if incoming_destiny in ['rm', 'keep'] else 1)
+        eq_(stats['public_annex_updates'], 1)
+        eq_(stats['downloads'], int(mode=='download'))
+        # Load the file from incoming
+        target_load = 'abracadabra%s' % load if m=='a' else load
+        if incoming_destiny in ['annex', 'keep'] and mode == 'download':
+            with open(join(din, 'files', 'test.txt')) as f:
+                eq_(f.read(), target_load)
+        # Load the file from public
+        if mode == 'download':
+            with open(join(dout, 'files', 'test.txt')) as f:
+                eq_(f.read(), target_load)
+        else:
+            # it must be a hanging symlink
+            ok_(lexists(join(dout, 'files', 'test.txt')))
+            ok_(not exists(join(dout, 'files', 'test.txt')))
+
+        stats_dry = rock_and_roll(cfg, dry_run=True)
+        verify_nothing_was_done(stats_dry)
+        if i == 1:
+            # we need to sleep at least for a second so that
+            # time-stamp of URL changes
+            assert(m=='w')
+            time.sleep(1)
+
     rmtree(dout, True)
     rmtree(din, True)
 
 def test_rock_and_roll_separate_public():
     for mode in ('download',
                  'fast',
-                 'relaxed'
+                 'relaxed',
                  ):
-        for incoming_destiny in ('annex', 'drop', 'rm'):
+        for incoming_destiny in ('annex',
+                                 'drop',
+                                 'rm',
+                                 'keep',
+                                 ):
             yield check_rock_and_roll_separate_public, mode, incoming_destiny
 
 
