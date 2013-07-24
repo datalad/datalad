@@ -102,7 +102,7 @@ def with_tree(tree=None, **tkwargs):
 
 # GRRR -- this one is crippled since path where HTTPServer is serving
 # from can't be changed without pain.
-
+import random
 import SimpleHTTPServer
 import SocketServer
 from threading import Thread
@@ -116,7 +116,7 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 def serve_path_via_http(*args, **tkwargs):
     def decorate(func):
         def newfunc(path, *arg, **kw):
-            port = 8006
+            port = random.randint(8000, 8500)
             #print "Starting to serve path ", path
             # TODO: ATM we are relying on path being local so we could
             # start HTTP server in the same directory.  FIX IT!
@@ -124,9 +124,15 @@ def serve_path_via_http(*args, **tkwargs):
             httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
             server_thread = Thread(target=httpd.serve_forever)
             server_thread.start()
+            if 'path' in kw:
+                raise ValueError(
+                    "path kwarg to be provided by serve_path_via_http")
+            kw_ = {'path': path}
+            kw_.update(kw)
+
             #time.sleep(1)               # just give it few ticks
             try:
-                func(*(('http://localhost:%d/%s/' % (port, path),)+arg), **kw)
+                func(*(('http://localhost:%d/%s/' % (port, path),)+arg), **kw_)
             finally:
                 #print "Stopping server"
                 httpd.shutdown()

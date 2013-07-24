@@ -79,7 +79,7 @@ def verify_nothing_was_done(stats):
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_rock_and_roll_same_incoming_and_public(url, mode):
+def check_rock_and_roll_same_incoming_and_public(url, mode, path):
     dout = tempfile.mkdtemp()
     cfg = get_default_config(dict(
         DEFAULT=dict(
@@ -135,7 +135,7 @@ def test_rock_and_roll_same_incoming_and_public():
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_rock_and_roll_separate_public(url, mode, incoming_destiny):
+def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
 
@@ -220,7 +220,7 @@ tree2args = dict(
 
 @with_tree(**tree2args)
 @serve_path_via_http()
-def test_rock_and_roll_recurse(url):
+def test_rock_and_roll_recurse(url, path):
 
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
