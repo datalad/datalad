@@ -53,12 +53,20 @@ def strippath(f, p):
     return f
 
 # TODO : add "memo" to avoid possible circular websites
-def collect_urls(url, recurse=None, pages_cache=None, cache=False):
+def collect_urls(url, recurse=None, pages_cache=None, cache=False, memo=None):
     """Collects urls starting from url
     """
     page = (pages_cache and pages_cache.get(url, None)) or fetch_page(url, cache=cache)
     if pages_cache is not None:
         pages_cache[url] = page
+
+    if recurse:
+        if memo is None:
+            memo = set()
+        if url in memo:
+            lgr.debug("Not considering %s since was analyzed before", url)
+            return []
+        memo.add(url)
 
     url_rec = urlparse(url)
     #
@@ -70,36 +78,44 @@ def collect_urls(url, recurse=None, pages_cache=None, cache=False):
     urls = []
     if recurse:
         recurse_re = re.compile(recurse)
-    for url_ in urls_all:
+
+    lgr.debug("Got %d urls from %s", len(urls_all), url)
+
+    for iurl, url_ in enumerate(urls_all):
+        lgr.log(3, "#%d url=%s", iurl+1, url_)
+
         # separate tuple out
         u, a = url_
-        if u.endswith('/'):             # must be a directory
+        recurse_match = recurse and recurse_re.search(u)
+        if u.endswith('/') or recurse_match:     # must be a directory or smth we were told to recurse into
             if u in ('../', './'):
-                lgr.debug("Skipping %s -- we are not going to parents" % u)
+                lgr.log(8, "Skipping %s -- we are not going to parents" % u)
                 continue
             if not recurse:
-                lgr.debug("Skipping %s since no recursion" % u)
+                lgr.log(8, "Skipping %s since no recursion" % u)
                 continue
-            if recurse_re.search(u):
+            if recurse_match:
                 # then we should fetch the one as well
                 u_rec = urlparse(u)
                 u_full = urljoin(url, u)
                 if u_rec.scheme:
                     if not (url_rec.netloc == u_rec.netloc and u_rec.path.startswith(rl_rec.path)):
                         # so we are going to a new page?
-                        lgr.debug("Skipping %s since it jumps to another site from original %s" % (u, url))
+                        lgr.log(9, "Skipping %s since it jumps to another site from original %s" % (u, url))
                         #raise NotImplementedError("Cannot jump to other websites yet")
                         continue
                     # so we are staying on current website -- let it go
                 lgr.debug("Recursing into %s, full: %s" % (u, u_full))
                 new_urls = collect_urls(
-                    u_full, recurse=recurse, pages_cache=pages_cache, cache=cache)
+                    u_full, recurse=recurse, pages_cache=pages_cache, cache=cache,
+                    memo=memo)
                 # and add to their "hrefs" appropriate prefix
                 urls.extend([(os.path.join(u, url__[0]),) + url__[1:]
                              for url__ in new_urls])
             else:
-                lgr.debug("Skipping %s since doesn't match recurse" % u)
+                lgr.log(8, "Skipping %s since doesn't match recurse" % u)
         else:
+            lgr.log(4, "Adding %s", url_)
             urls.append(url_)
 
     lgr.debug("Considering %d out of %d urls from %s"
@@ -354,8 +370,8 @@ def rock_and_roll(cfg, existing='check',
                 "public git/annex additions/updates" % stats
 
     _call(git_commit,
-               incoming, files=[db_name],
-               msg="page2annex(incoming): " + stats_str)
+          incoming, files=[db_name] if os.path.exists(db_path) else [],
+          msg="page2annex(incoming): " + stats_str)
     if incoming != public:
         _call(git_commit, public, msg="page2annex(public): " + stats_str)
 

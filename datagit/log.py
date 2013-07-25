@@ -80,19 +80,47 @@ class ColorFormatter(logging.Formatter):
         levelname = record.levelname
         if self.use_color and levelname in self.COLORS:
             fore_color = 30 + self.COLORS[levelname]
-            levelname_color = self.COLOR_SEQ % fore_color + "%-6s" % levelname + self.RESET_SEQ
+            levelname_color = self.COLOR_SEQ % fore_color + "%-7s" % levelname + self.RESET_SEQ
             record.levelname = levelname_color
         record.msg = record.msg.replace("\n", "\n| ")
         return logging.Formatter.format(self, record)
 
 
-# By default mimic previously talkative behavior
-log = logging.getLogger('datagit')
-log.setLevel(getattr(logging, os.environ.get('DATAGIT_LOGLEVEL', 'WARNING').upper()))
-_log_handler = logging.StreamHandler(sys.stdout)
+def set_level(level=None, default='WARNING', lgr=None, name='datagit'):
+    """Helper to set loglevel for an arbitrary logger
 
-# But now improve with colors and useful information such as time
-_log_handler.setFormatter(ColorFormatter())
-#logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
-log.addHandler(_log_handler)
+    By default operates for 'datagit'.
+    TODO: deduce name from upper module name so it could be reused without changes
+    """
+    if level is None:
+        # see if nothing in the environment
+        level = os.environ.get(name.upper() + '_LOGLEVEL', None)
+    if level is None:
+        level = default
+
+    try:
+        # it might be a string which still represents an int
+        log_level = int(level)
+    except ValueError:
+        # or a string which corresponds to a constant;)
+        log_level = getattr(logging, level.upper())
+
+    if lgr is None:
+        lgr = logging.getLogger(name)
+    lgr.setLevel(log_level)
+
+
+def _init_datagit_logger():
+    # By default mimic previously talkative behavior
+    lgr = logging.getLogger('datagit')
+    log_handler = logging.StreamHandler(sys.stdout)
+
+    # But now improve with colors and useful information such as time
+    log_handler.setFormatter(ColorFormatter())
+    #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
+    lgr.addHandler(log_handler)
+    return lgr
+
+lgr = _init_datagit_logger()
+set_level(lgr=lgr)                           # will set the default
 

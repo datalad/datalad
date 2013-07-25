@@ -49,6 +49,7 @@ import re
 import shutil
 import time
 
+import datagit.log
 from datagit.api import *
 
 
@@ -128,9 +129,9 @@ if __name__ == '__main__':
 
     parser.add_argument(
         '-l', '--log-level',
-        choices=('critical', 'error', 'warning', 'info', 'debug'),
+        choices=['critical', 'error', 'warning', 'info', 'debug'] + [str(x) for x in range(1, 10)],
         default='warning',
-        help="""level of verbosity""")
+        help="""level of verbosity. Integers provide even more debugging information""")
 
     if __debug__:
         # borrowed from Michael's bigmess
@@ -144,11 +145,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args() #['-n', '-l', 'debug', 'allen-genetic.cfg'])
 
-    ## # Basic logging setup
-    ## console = logging.StreamHandler(sys.stdout)
-    ## console.setFormatter(logging.Formatter("%(levelname)-6s %(message)s"))
-    ## lgr.addHandler(console)
-    lgr.setLevel(getattr(logging, args.log_level.upper()))
+    # set our loglevel
+    datagit.log.set_level(args.log_level)
 
     lgr.debug("Command line arguments: %r" % args)
 

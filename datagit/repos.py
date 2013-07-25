@@ -274,13 +274,14 @@ def annex_file(href,
                 # Should not be there
                 assert(not lexists(full_incoming_filename))
         elif incoming_destiny in ('annex', 'drop'):
-            incoming_annex.rm_indexed_file(public_filename)
-            if exists(full_incoming_filename) and fast_mode:
-                # git annex would drop the load in --fast mode, so let's not provide 'fast'
-                incoming_annex.add_file(incoming_filename, href=href)
-            else:
-                # normal
-                incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode)
+            if (incoming_annex is not public_annex) or not fast_mode:
+                incoming_annex.rm_indexed_file(incoming_filename)
+                if exists(full_incoming_filename) and fast_mode:
+                    # git annex would drop the load in --fast mode, so let's not provide 'fast'
+                    incoming_annex.add_file(incoming_filename, href=href)
+                else:
+                    # normal
+                    incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode)
             if incoming_destiny == 'drop' and exists(full_incoming_filename):
                 incoming_annex.run("drop %s" % incoming_filename)
             if not runner.dry:
