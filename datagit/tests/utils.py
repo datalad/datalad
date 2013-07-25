@@ -52,6 +52,17 @@ def rmtree(path, *args, **kwargs):
         os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
     shutil.rmtree(path, *args, **kwargs)
 
+def create_archive(path, name, load):
+    dirname = name[:-7]
+    full_dirname = os.path.join(path, dirname)
+    os.makedirs(full_dirname)
+    create_tree(full_dirname, load)
+    # create archive
+    status, output = Runner().getstatusoutput(
+        'cd %(path)s && tar -czvf %(name)s %(dirname)s' % locals())
+    # remove original tree
+    shutil.rmtree(full_dirname)
+
 def create_tree(path, tree):
     """Given a list of tuples (name, load) create such a tree
 
@@ -65,15 +76,7 @@ def create_tree(path, tree):
         full_name = os.path.join(path, name)
         if isinstance(load, tuple):
             if name.endswith('.tar.gz'):
-                dirname = name[:-7]
-                full_dirname = os.path.join(path, dirname)
-                os.makedirs(full_dirname)
-                create_tree(full_dirname, load)
-                # create archive
-                status, output = Runner().getstatusoutput(
-                    'cd %(path)s && tar -czvf %(name)s %(dirname)s' % locals())
-                # remove original tree
-                shutil.rmtree(full_dirname)
+                create_archive(path, name, load)
             else:
                 create_tree(full_name, load)
         else:
@@ -99,6 +102,34 @@ def with_tree(tree=None, **tkwargs):
         return newfunc
     return decorate
 
+import md5
+def md5sum(filename):
+    with open(filename) as f:
+        return md5.md5(f.read()).hexdigest()
+
+
+import git
+from os.path import exists, join
+def ok_clean_git(path, annex=True, untracked=[]):
+    """Verify that under given path there is a clean git repository
+
+    it exists, .git exists, nothing is uncommitted/dirty/staged
+    """
+    ok_(exists(path))
+    ok_(exists(join(path, '.git')))
+    if annex:
+        ok_(exists(join(path, '.git', 'annex')))
+    repo = git.Repo(path)
+
+    ok_(repo.head.is_valid())
+
+    # get string representations of diffs with index to ease troubleshooting
+    index_diffs = [str(d) for d in repo.index.diff(None)]
+    head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+
+    eq_(sorted(repo.untracked_files), sorted(untracked))
+    eq_(index_diffs, [])
+    eq_(head_diffs, [])
 
 # GRRR -- this one is crippled since path where HTTPServer is serving
 # from can't be changed without pain.

@@ -34,7 +34,8 @@ import os, tempfile, time
 from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
-     with_tree, serve_path_via_http, sorted_files, rmtree
+     with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
+     md5sum, ok_clean_git
 
 from ..config import get_default_config
 from ..main import rock_and_roll
@@ -50,14 +51,14 @@ tree1args = dict(
     dir=os.curdir,
     prefix='.tmp-page2annex-')
 
-def verify_files_content(d, files, broken=[]):
+def verify_files_content(d, files, dangling=[]):
     for f in files:
         f_ = join(d, f)
         ok_(lexists(f_), f_)      # if a link exists at all
-        if f in broken:
-            ok_(not exists(f_), f_)       # and if it is not broken
+        if f in dangling:
+            ok_(not exists(f_), f_)       # and if it is not dangling
         else:
-            ok_(exists(f_), f_)       # and if it is not broken
+            ok_(exists(f_), f_)       # and if it is not dangling
             if f_.endswith('/test.txt'):
                 eq_(open(f_).read(), 'abracadabra', f_)
             if f_.endswith('/d'):
@@ -66,10 +67,11 @@ def verify_files_content(d, files, broken=[]):
                 # verify all it loads ok
                 ok_(load_db(f_))
 
-def verify_files(d, target_files, broken=[]):
+def verify_files(d, target_files, dangling=[], untracked=[]):
+    ok_clean_git(d, untracked=untracked)
     files = sorted_files(d)
     eq_(files, target_files, "%s: %s != %s" % (d, files, target_files))
-    verify_files_content(d, target_files, broken=broken)
+    verify_files_content(d, target_files, dangling=dangling)
 
 def verify_nothing_was_done(stats):
     eq_(stats['downloads'], 0)
@@ -103,10 +105,12 @@ def check_rock_and_roll_same_incoming_and_public(url, mode, path):
     eq_(stats1['downloads'], 1 + int(mode=='download'))
     eq_(stats1['sections'], 1)
     assert_greater(stats1['downloaded'], 100)   # should be more than 100b
+    ok_clean_git(dout)
 
     # Let's repeat -- there should be no downloads/updates
     stats2 = rock_and_roll(cfg, dry_run=False)
     verify_nothing_was_done(stats2)
+    ok_clean_git(dout)
 
     ok_(exists(join(dout, '.git')))
     ok_(exists(join(dout, '.git', 'annex')))
@@ -121,6 +125,7 @@ def check_rock_and_roll_same_incoming_and_public(url, mode, path):
 
     stats2_dry = rock_and_roll(cfg, dry_run=True)
     verify_nothing_was_done(stats2_dry)
+    ok_clean_git(dout)
 
     rmtree(dout, True)
 
@@ -144,18 +149,17 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
         DEFAULT=dict(incoming=din, public=dout, description="test", mode=mode),
         files=dict(directory='files', incoming_destiny=incoming_destiny, url=url)))
 
-#    import pydb; pydb.debugger()
     stats1_dry = rock_and_roll(cfg, dry_run=True)
     verify_nothing_was_done(stats1_dry)
     ok_(not exists(join(din, '.git')))
     ok_(not exists(join(dout, '.git')))
 
     stats1 = rock_and_roll(cfg, dry_run=False)
-    # broken is just for broken/hanging symlinks
-    broken = ['files/test.txt'] if mode != 'download' else []
+    # dangling is just for broken/hanging symlinks
+    dangling = ['files/test.txt'] if mode != 'download' else []
     verify_files(dout,
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
-        broken=broken)
+        dangling=dangling)
     eq_(stats1['incoming_annex_updates'],
         0 if incoming_destiny in ['rm', 'keep'] else 2)
     eq_(stats1['public_annex_updates'], 2)
@@ -163,40 +167,52 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     eq_(stats1['downloads'], 1 + int(mode=='download'))
     eq_(stats1['sections'], 1)
     assert_greater(stats1['downloaded'], 100)   # should be more than 100b
+    din_untracked = []
+    if incoming_destiny == 'keep':
+        din_untracked = ['files/1.tar.gz']
+        if mode == 'download':
+            # we download it but do not commit
+            din_untracked += ['files/test.txt']
+    ok_clean_git(din, untracked=din_untracked)
+    ok_clean_git(dout)
 
     # Let's repeat -- there should be no downloads/updates of any kind
     # since we had no original failures nor added anything
     stats2 = rock_and_roll(cfg, dry_run=False)
     verify_nothing_was_done(stats2)
+    ok_clean_git(din, untracked=din_untracked)
+    ok_clean_git(dout)
 
     ok_(exists(join(din, '.git')))
     # TODO: actually this one should not be there if 'keep'
+    # and only .git to track our .page2annex
     ok_(exists(join(din, '.git', 'annex')))
 
     if incoming_destiny == 'annex':
         verify_files(din,
             ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
-            broken=broken)
+            dangling=dangling)
     elif incoming_destiny == 'keep':
+        # if mode is fast they will not be even downloaded to incoming,
+        # unless an archive
+        nonfast_files = ([] if fast_mode else ['files/test.txt'])
         verify_files(din,
-            ['.page2annex', 'files/1.tar.gz']
-            # if mode is fast they will not be even downloaded to incoming,
-            # unless an archive
-            + ([] if fast_mode else ['files/test.txt']),
-            broken=broken)
+            ['.page2annex', 'files/1.tar.gz'] + nonfast_files,
+            dangling=dangling,
+            untracked=['files/1.tar.gz'] + nonfast_files)
     elif incoming_destiny == 'drop':
         verify_files(din,
             ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
-            broken=broken + ['files/1.tar.gz', 'files/test.txt'])
+            dangling=dangling + ['files/1.tar.gz', 'files/test.txt'])
     else:                           # 'rm'
         eq_(incoming_destiny, 'rm')
         # incoming files will not be there at all
-        verify_files(din, ['.page2annex'], broken=broken)
+        verify_files(din, ['.page2annex'], dangling=dangling)
 
     ok_(exists(join(dout, '.git', 'annex')))
     verify_files(dout,
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
-        broken=broken)
+        dangling=dangling)
 
     stats2_dry = rock_and_roll(cfg, dry_run=True)
     verify_nothing_was_done(stats2_dry)
@@ -213,6 +229,8 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
         with open(join(path, 'test.txt'), m) as f:
             f.write(load)
         stats = rock_and_roll(cfg, dry_run=False)
+        ok_clean_git(din, untracked=din_untracked)
+        ok_clean_git(dout)
         eq_(stats['incoming_annex_updates'],
             0 if incoming_destiny in ['rm', 'keep'] else 1)
         eq_(stats['public_annex_updates'], 1)
@@ -239,10 +257,58 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
             assert(m=='w')
             time.sleep(1)
 
+    # And now check updates in the archive
+
+    # Archive gets replaced with identical but freshly generated one:
+    # there should be no crashed or complaints and updates should
+    # still happen as far as the action is concerned
+    create_archive(path, '1.tar.gz',
+            (('1 f.txt', '1 f load'),
+             ('d', (('1d', ''),)),))
+    stats = rock_and_roll(cfg, dry_run=False)
+    eq_(stats['incoming_annex_updates'],
+        0 if incoming_destiny in ['rm', 'keep'] else 1)
+    eq_(stats['public_annex_updates'], 1)
+    eq_(stats['downloads'], 1)
+    ok_clean_git(din, untracked=din_untracked)
+    ok_clean_git(dout)
+
+    # Archive gets content in one of the files modified
+    target_load = '1 f load updated'
+    create_archive(path, '1.tar.gz',
+            (('1 f.txt', '1 f load updated'),
+             ('d', (('1d', ''),)),))
+    stats = rock_and_roll(cfg, dry_run=False)
+    ok_clean_git(din, untracked=din_untracked)
+    ok_clean_git(dout)
+    eq_(stats['incoming_annex_updates'],
+        0 if incoming_destiny in ['rm', 'keep'] else 1)
+    full_incoming_name = join(din, 'files', '1.tar.gz')
+    if incoming_destiny in ['annex', 'keep']:
+        # it must be the same as the incoming archive
+        eq_(md5sum(join(path, '1.tar.gz')),
+            md5sum(full_incoming_name))
+    else:
+        # it must be gone
+        ok_(not exists(full_incoming_name))
+    eq_(stats['public_annex_updates'], 1)
+    eq_(stats['downloads'], 1)            # needs to be downloaded!
+    # and now because file comes from an archive it must always be
+    # there
+    with open(join(dout, 'files', '1', '1 f.txt')) as f:
+        eq_(f.read(), target_load)
+
+    # TODO: directory within archive gets renamed
+    # yet to clarify how we treat those beasts
+
+    # TODO: "removal" mode, when files get removed"
+
     rmtree(dout, True)
     rmtree(din, True)
 
 def test_rock_and_roll_separate_public():
+    # separate lines for easy selection for debugging of a particular
+    # test
     for mode in ('download',
                  'fast',
                  'relaxed',
