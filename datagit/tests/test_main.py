@@ -70,7 +70,8 @@ def verify_files_content(d, files, dangling=[]):
 def verify_files(d, target_files, dangling=[], untracked=[]):
     ok_clean_git(d, untracked=untracked)
     files = sorted_files(d)
-    eq_(files, target_files, "%s: %s != %s" % (d, files, target_files))
+    target_files_all = set(target_files + dangling + untracked)
+    eq_(set(files), target_files_all, "%s: %s != %s" % (d, files, target_files_all))
     verify_files_content(d, target_files, dangling=dangling)
 
 def verify_nothing_was_done(stats):
@@ -167,12 +168,19 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     eq_(stats1['downloads'], 1 + int(mode=='download'))
     eq_(stats1['sections'], 1)
     assert_greater(stats1['downloaded'], 100)   # should be more than 100b
-    din_untracked = []
+
+    # Let's add a bogus local file in din and track that it would not
+    # get committed
+    with open(join(din, 'files', 'BOGUS.txt'), 'w') as f:
+        f.write("BOGUS")
+    # So which files should be present but not be committed
+    din_untracked = ['files/BOGUS.txt']
     if incoming_destiny == 'keep':
-        din_untracked = ['files/1.tar.gz']
+        din_untracked += ['files/1.tar.gz']
         if mode == 'download':
             # we download it but do not commit
             din_untracked += ['files/test.txt']
+
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
 
@@ -188,27 +196,33 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     # and only .git to track our .page2annex
     ok_(exists(join(din, '.git', 'annex')))
 
+    # Test the "incoming" appearance
     if incoming_destiny == 'annex':
         verify_files(din,
             ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
-            dangling=dangling)
+            dangling=dangling, untracked=din_untracked)
     elif incoming_destiny == 'keep':
         # if mode is fast they will not be even downloaded to incoming,
         # unless an archive
-        nonfast_files = ([] if fast_mode else ['files/test.txt'])
         verify_files(din,
-            ['.page2annex', 'files/1.tar.gz'] + nonfast_files,
-            dangling=dangling,
-            untracked=['files/1.tar.gz'] + nonfast_files)
+            ['.page2annex', 'files/1.tar.gz'],
+            # nothing to dangle -- we keep
+            #dangling=dangling,
+            untracked=din_untracked)
     elif incoming_destiny == 'drop':
         verify_files(din,
             ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
-            dangling=dangling + ['files/1.tar.gz', 'files/test.txt'])
+            dangling=dangling + ['files/1.tar.gz', 'files/test.txt'],
+            untracked=din_untracked)
     else:                           # 'rm'
         eq_(incoming_destiny, 'rm')
         # incoming files will not be there at all
-        verify_files(din, ['.page2annex'], dangling=dangling)
+        verify_files(din, ['.page2annex'],
+                     # nothing to dangle -- they are removed
+                     # dangling=dangling,
+                     untracked=din_untracked)
 
+    # Test the "public" appearance
     ok_(exists(join(dout, '.git', 'annex')))
     verify_files(dout,
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],

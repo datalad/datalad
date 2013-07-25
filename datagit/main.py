@@ -111,7 +111,7 @@ def collect_urls(url, recurse=None, pages_cache=None, cache=False):
 # Main loop
 #
 # TODO: formalize existing argument into option (+cmdline option?)
-def rock_and_roll(cfg, existing_urls='check',
+def rock_and_roll(cfg, existing='check',
                   dry_run=False, cache=False, db_name = '.page2annex'):
     """Given a configuration fetch/update git-annex "clone"
     """
@@ -261,7 +261,7 @@ def rock_and_roll(cfg, existing_urls='check',
             # Download incoming and possibly get alternative filename from Deposit
             # It will adjust db_incoming in-place
             if (href_full in db_incoming_urls
-                and (existing_urls and existing_urls == 'skip')):
+                and (existing and existing == 'skip')):
                 lgr.debug("Skipping attempt to download since %s known to db "
                           "already and existing='skip'" % href_full)
                 incoming_filename = db_incoming_urls[href_full]
