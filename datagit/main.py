@@ -30,104 +30,17 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
-from urlparse import urlparse
-
 from .repos import *
 from .db import load_db, save_db
-from .network import fetch_page, parse_urls, filter_urls, \
+from .network import collect_urls, filter_urls, \
       urljoin, download_url
-
-
-def pprint_indent(l, indent="", fmt='%s'):
-    return indent + ('\n%s' % indent).join([fmt % x for x in l])
-
-# TODO: here figure it out either it will be a
-# directory or not and either it needs to be extracted,
-# and what will be the extracted directory name
-def strippath(f, p):
-    """Helper to deal with our mess -- strip path from front of filename f"""
-    assert(f.startswith(p))
-    f = f[len(p):]
-    if f.startswith(os.path.sep):
-        f = f[1:]
-    return f
-
-# TODO : add "memo" to avoid possible circular websites
-def collect_urls(url, recurse=None, pages_cache=None, cache=False, memo=None):
-    """Collects urls starting from url
-    """
-    page = (pages_cache and pages_cache.get(url, None)) or fetch_page(url, cache=cache)
-    if pages_cache is not None:
-        pages_cache[url] = page
-
-    if recurse:
-        if memo is None:
-            memo = set()
-        if url in memo:
-            lgr.debug("Not considering %s since was analyzed before", url)
-            return []
-        memo.add(url)
-
-    url_rec = urlparse(url)
-    #
-    # Parse out all URLs, as a tuple (url, a(text))
-    urls_all = parse_urls(page, cache=cache)
-
-    # Now we need to dump or recurse into some of them, e.g. for
-    # directories etc
-    urls = []
-    if recurse:
-        recurse_re = re.compile(recurse)
-
-    lgr.debug("Got %d urls from %s", len(urls_all), url)
-
-    for iurl, url_ in enumerate(urls_all):
-        lgr.log(3, "#%d url=%s", iurl+1, url_)
-
-        # separate tuple out
-        u, a = url_
-        recurse_match = recurse and recurse_re.search(u)
-        if u.endswith('/') or recurse_match:     # must be a directory or smth we were told to recurse into
-            if u in ('../', './'):
-                lgr.log(8, "Skipping %s -- we are not going to parents" % u)
-                continue
-            if not recurse:
-                lgr.log(8, "Skipping %s since no recursion" % u)
-                continue
-            if recurse_match:
-                # then we should fetch the one as well
-                u_rec = urlparse(u)
-                u_full = urljoin(url, u)
-                if u_rec.scheme:
-                    if not (url_rec.netloc == u_rec.netloc and u_rec.path.startswith(rl_rec.path)):
-                        # so we are going to a new page?
-                        lgr.log(9, "Skipping %s since it jumps to another site from original %s" % (u, url))
-                        #raise NotImplementedError("Cannot jump to other websites yet")
-                        continue
-                    # so we are staying on current website -- let it go
-                lgr.debug("Recursing into %s, full: %s" % (u, u_full))
-                new_urls = collect_urls(
-                    u_full, recurse=recurse, pages_cache=pages_cache, cache=cache,
-                    memo=memo)
-                # and add to their "hrefs" appropriate prefix
-                urls.extend([(os.path.join(u, url__[0]),) + url__[1:]
-                             for url__ in new_urls])
-            else:
-                lgr.log(8, "Skipping %s since doesn't match recurse" % u)
-        else:
-            lgr.log(4, "Adding %s", url_)
-            urls.append(url_)
-
-    lgr.debug("Considering %d out of %d urls from %s"
-              % (len(urls), len(urls_all), url))
-
-    return urls
+from .utils import pprint_indent
 
 #
 # Main loop
 #
 # TODO: formalize existing argument into option (+cmdline option?)
-def rock_and_roll(cfg, existing='check',
+def page2annex(cfg, existing='check',
                   dry_run=False, cache=False, db_name = '.page2annex'):
     """Given a configuration fetch/update git-annex "clone"
     """
@@ -136,7 +49,7 @@ def rock_and_roll(cfg, existing='check',
     stats = dict([(k, 0) for k in
                   ['sections', 'urls', 'allurls', 'downloads',
                    'incoming_annex_updates', 'public_annex_updates', 'downloaded']])
-    pages_cache = {}
+    hot_cache = {}
 
     runner = Runner(dry=dry_run)
     # convenience shortcuts
@@ -227,12 +140,12 @@ def rock_and_roll(cfg, existing='check',
         scfg = dict(cfg.items(section))
 
         incoming_destiny = scfg.get('incoming_destiny')
-        # Fetching the page (possibly again! thus a dummy pages_cache)
+        # Fetching the page (possibly again! thus a dummy hot_cache)
         top_url = scfg['url'].replace('/./', '/')
         if '..' in top_url:
             raise ValueError("Some logic would fail with relative paths in urls, "
                              "please adjust %s" % scfg['url'])
-        urls_all = collect_urls(top_url, recurse=scfg['recurse'], pages_cache=pages_cache, cache=cache)
+        urls_all = collect_urls(top_url, recurse=scfg['recurse'], hot_cache=hot_cache, cache=cache)
 
 
         #lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))

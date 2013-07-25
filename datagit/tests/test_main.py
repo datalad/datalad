@@ -38,7 +38,7 @@ from .utils import eq_, ok_, assert_greater, \
      md5sum, ok_clean_git
 
 from ..config import get_default_config
-from ..main import rock_and_roll
+from ..main import page2annex
 from ..db import load_db
 
 
@@ -82,7 +82,7 @@ def verify_nothing_was_done(stats):
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_rock_and_roll_same_incoming_and_public(url, mode, path):
+def check_page2annex_same_incoming_and_public(url, mode, path):
     dout = tempfile.mkdtemp()
     cfg = get_default_config(dict(
         DEFAULT=dict(
@@ -95,10 +95,10 @@ def check_rock_and_roll_same_incoming_and_public(url, mode, path):
             directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
             url=url)))
 
-    stats1_dry = rock_and_roll(cfg, dry_run=True)
+    stats1_dry = page2annex(cfg, dry_run=True)
     verify_nothing_was_done(stats1_dry)
 
-    stats1 = rock_and_roll(cfg, dry_run=False)
+    stats1 = page2annex(cfg, dry_run=False)
     # they both should match
     eq_(stats1['incoming_annex_updates'], 2)
     eq_(stats1['public_annex_updates'], 2)
@@ -109,7 +109,7 @@ def check_rock_and_roll_same_incoming_and_public(url, mode, path):
     ok_clean_git(dout)
 
     # Let's repeat -- there should be no downloads/updates
-    stats2 = rock_and_roll(cfg, dry_run=False)
+    stats2 = page2annex(cfg, dry_run=False)
     verify_nothing_was_done(stats2)
     ok_clean_git(dout)
 
@@ -124,24 +124,24 @@ def check_rock_and_roll_same_incoming_and_public(url, mode, path):
          'files/test.txt',
         ])
 
-    stats2_dry = rock_and_roll(cfg, dry_run=True)
+    stats2_dry = page2annex(cfg, dry_run=True)
     verify_nothing_was_done(stats2_dry)
     ok_clean_git(dout)
 
     rmtree(dout, True)
 
-def test_rock_and_roll_same_incoming_and_public():
+def test_page2annex_same_incoming_and_public():
     for mode in ('download',
                  'fast',
                  'relaxed'
                  ):
-        yield check_rock_and_roll_same_incoming_and_public, mode
+        yield check_page2annex_same_incoming_and_public, mode
 
 
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
+def check_page2annex_separate_public(url, mode, incoming_destiny, path):
     fast_mode = mode in ['fast', 'relaxed']
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
@@ -150,12 +150,12 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
         DEFAULT=dict(incoming=din, public=dout, description="test", mode=mode),
         files=dict(directory='files', incoming_destiny=incoming_destiny, url=url)))
 
-    stats1_dry = rock_and_roll(cfg, dry_run=True)
+    stats1_dry = page2annex(cfg, dry_run=True)
     verify_nothing_was_done(stats1_dry)
     ok_(not exists(join(din, '.git')))
     ok_(not exists(join(dout, '.git')))
 
-    stats1 = rock_and_roll(cfg, dry_run=False)
+    stats1 = page2annex(cfg, dry_run=False)
     # dangling is just for broken/hanging symlinks
     dangling = ['files/test.txt'] if mode != 'download' else []
     verify_files(dout,
@@ -186,7 +186,7 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
 
     # Let's repeat -- there should be no downloads/updates of any kind
     # since we had no original failures nor added anything
-    stats2 = rock_and_roll(cfg, dry_run=False)
+    stats2 = page2annex(cfg, dry_run=False)
     verify_nothing_was_done(stats2)
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
@@ -228,7 +228,7 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
         dangling=dangling)
 
-    stats2_dry = rock_and_roll(cfg, dry_run=True)
+    stats2_dry = page2annex(cfg, dry_run=True)
     verify_nothing_was_done(stats2_dry)
 
     # now check for the updates in a file
@@ -242,7 +242,7 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
                                    ('w', 'ww'))):
         with open(join(path, 'test.txt'), m) as f:
             f.write(load)
-        stats = rock_and_roll(cfg, dry_run=False)
+        stats = page2annex(cfg, dry_run=False)
         ok_clean_git(din, untracked=din_untracked)
         ok_clean_git(dout)
         eq_(stats['incoming_annex_updates'],
@@ -263,7 +263,7 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
             ok_(lexists(join(dout, 'files', 'test.txt')))
             ok_(not exists(join(dout, 'files', 'test.txt')))
 
-        stats_dry = rock_and_roll(cfg, dry_run=True)
+        stats_dry = page2annex(cfg, dry_run=True)
         verify_nothing_was_done(stats_dry)
         if i == 1:
             # we need to sleep at least for a second so that
@@ -279,7 +279,7 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     create_archive(path, '1.tar.gz',
             (('1 f.txt', '1 f load'),
              ('d', (('1d', ''),)),))
-    stats = rock_and_roll(cfg, dry_run=False)
+    stats = page2annex(cfg, dry_run=False)
     eq_(stats['incoming_annex_updates'],
         0 if incoming_destiny in ['rm', 'keep'] else 1)
     eq_(stats['public_annex_updates'], 1)
@@ -292,7 +292,7 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     create_archive(path, '1.tar.gz',
             (('1 f.txt', '1 f load updated'),
              ('d', (('1d', ''),)),))
-    stats = rock_and_roll(cfg, dry_run=False)
+    stats = page2annex(cfg, dry_run=False)
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
     eq_(stats['incoming_annex_updates'],
@@ -320,7 +320,7 @@ def check_rock_and_roll_separate_public(url, mode, incoming_destiny, path):
     rmtree(dout, True)
     rmtree(din, True)
 
-def test_rock_and_roll_separate_public():
+def test_page2annex_separate_public():
     # separate lines for easy selection for debugging of a particular
     # test
     for mode in ('download',
@@ -332,7 +332,7 @@ def test_rock_and_roll_separate_public():
                                  'rm',
                                  'keep',
                                  ):
-            yield check_rock_and_roll_separate_public, mode, incoming_destiny
+            yield check_page2annex_separate_public, mode, incoming_destiny
 
 
 # now with some recursive structure of directories
@@ -354,7 +354,7 @@ tree2args = dict(
 
 @with_tree(**tree2args)
 @serve_path_via_http()
-def test_rock_and_roll_recurse(url, path):
+def test_page2annex_recurse(url, path):
 
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
@@ -363,7 +363,7 @@ def test_rock_and_roll_recurse(url, path):
         DEFAULT=dict(incoming=din, public=dout, description="test", recurse='/$'),
         files=dict(directory='', incoming_destiny='annex', url=url)))
 
-    stats1 = rock_and_roll(cfg, dry_run=False)
+    stats1 = page2annex(cfg, dry_run=False)
 
     verify_files(din,
         ["\"';a&b&cd|", '.page2annex', '1.tar.gz', #u'2/юнякод.txt',

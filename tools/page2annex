@@ -159,7 +159,7 @@ if __name__ == '__main__':
     try:
         lgr.info("Reading configs")
         cfg = load_config(args.configs)
-        rock_and_roll(cfg, existing=args.existing, dry_run=args.dry_run, cache=args.cache)
+        page2annex(cfg, existing=args.existing, dry_run=args.dry_run, cache=args.cache)
 
     except Exception as exc:
         lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))

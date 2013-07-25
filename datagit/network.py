@@ -42,7 +42,7 @@ import urllib2
 
 from BeautifulSoup import BeautifulSoup
 from StringIO import StringIO
-from urlparse import urljoin, urlsplit, urlunsplit
+from urlparse import urljoin, urlparse, urlsplit, urlunsplit
 
 import logging
 lgr = logging.getLogger('datagit.network')
@@ -144,6 +144,82 @@ def parse_urls(page, cache=False):
         return memory.eval(_parse_urls, page)
     else:
         return _parse_urls(page)
+
+
+def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
+    """Collects urls starting from url
+
+    Parameters
+    ----------
+    recurse : string
+      Regular expression to decide what to recurse into
+    """
+    page = (hot_cache and hot_cache.get(url, None)) or fetch_page(url, cache=cache)
+    if hot_cache is not None:
+        hot_cache[url] = page
+
+    if recurse:
+        if memo is None:
+            memo = set()
+        if url in memo:
+            lgr.debug("Not considering %s since was analyzed before", url)
+            return []
+        memo.add(url)
+
+    url_rec = urlparse(url)
+    #
+    # Parse out all URLs, as a tuple (url, a(text))
+    urls_all = parse_urls(page, cache=cache)
+
+    # Now we need to dump or recurse into some of them, e.g. for
+    # directories etc
+    urls = []
+    if recurse:
+        recurse_re = re.compile(recurse)
+
+    lgr.debug("Got %d urls from %s", len(urls_all), url)
+
+    for iurl, url_ in enumerate(urls_all):
+        lgr.log(3, "#%d url=%s", iurl+1, url_)
+
+        # separate tuple out
+        u, a = url_
+        recurse_match = recurse and recurse_re.search(u)
+        if u.endswith('/') or recurse_match:     # must be a directory or smth we were told to recurse into
+            if u in ('../', './'):
+                lgr.log(8, "Skipping %s -- we are not going to parents" % u)
+                continue
+            if not recurse:
+                lgr.log(8, "Skipping %s since no recursion" % u)
+                continue
+            if recurse_match:
+                # then we should fetch the one as well
+                u_rec = urlparse(u)
+                u_full = urljoin(url, u)
+                if u_rec.scheme:
+                    if not (url_rec.netloc == u_rec.netloc and u_rec.path.startswith(rl_rec.path)):
+                        # so we are going to a new page?
+                        lgr.log(9, "Skipping %s since it jumps to another site from original %s" % (u, url))
+                        #raise NotImplementedError("Cannot jump to other websites yet")
+                        continue
+                    # so we are staying on current website -- let it go
+                lgr.debug("Recursing into %s, full: %s" % (u, u_full))
+                new_urls = collect_urls(
+                    u_full, recurse=recurse, hot_cache=hot_cache, cache=cache,
+                    memo=memo)
+                # and add to their "hrefs" appropriate prefix
+                urls.extend([(os.path.join(u, url__[0]),) + url__[1:]
+                             for url__ in new_urls])
+            else:
+                lgr.log(8, "Skipping %s since doesn't match recurse" % u)
+        else:
+            lgr.log(4, "Adding %s", url_)
+            urls.append(url_)
+
+    lgr.debug("Considering %d out of %d urls from %s"
+              % (len(urls), len(urls_all), url))
+
+    return urls
 
 
 def filter_urls(urls,
