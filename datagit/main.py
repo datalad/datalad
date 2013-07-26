@@ -36,19 +36,26 @@ from .network import collect_urls, filter_urls, \
       urljoin, download_url
 from .utils import pprint_indent
 
+class DoubleAnnexRepo(object):
+
+    def __init__(self):
+        pass
+
 #
 # Main loop
 #
 # TODO: formalize existing argument into option (+cmdline option?)
 def page2annex(cfg, existing='check',
-                  dry_run=False, cache=False, db_name = '.page2annex'):
+               dry_run=False, cache=False, db_name = '.page2annex'):
     """Given a configuration fetch/update git-annex "clone"
     """
 
     # Let's output summary stats at the end
     stats = dict([(k, 0) for k in
-                  ['sections', 'urls', 'allurls', 'downloads',
-                   'incoming_annex_updates', 'public_annex_updates', 'downloaded']])
+                  ['sections', 'urls', 'allurls',
+                   'downloads', 'downloaded',
+                   'incoming_annex_updates', 'public_annex_updates',
+                  ]])
     hot_cache = {}
 
     runner = Runner(dry=dry_run)
@@ -57,26 +64,26 @@ def page2annex(cfg, existing='check',
 
     dry_str = "DRY: " if dry_run else ""
 
-    incoming = cfg.get('DEFAULT', 'incoming')
-    public = cfg.get('DEFAULT', 'public')
+    incoming_path = cfg.get('DEFAULT', 'incoming')
+    public_path = cfg.get('DEFAULT', 'public')
 
     #
     # Initializing file structure
     #
-    if not (os.path.exists(incoming) and os.path.exists(public)):
+    if not (os.path.exists(incoming_path) and os.path.exists(public_path)):
         lgr.debug("Creating directories for incoming (%s) and public (%s) annexes"
-                  % (incoming, public))
+                  % (incoming_path, public_path))
 
-        if not os.path.exists(incoming):
-            _call(os.makedirs, incoming)
-        if not os.path.exists(public):
-            _call(os.makedirs, public)           #TODO might be the same
+        if not os.path.exists(incoming_path):
+            _call(os.makedirs, incoming_path)
+        if not os.path.exists(public_path):
+            _call(os.makedirs, public_path)
 
     description = cfg.get('DEFAULT', 'description')
-    public_annex = AnnexRepo(public, runner=runner, description=description)
+    public_annex = AnnexRepo(public_path, runner=runner, description=description)
 
-    if public != incoming:
-        incoming_annex = AnnexRepo(incoming, runner=runner,
+    if public_path != incoming_path:
+        incoming_annex = AnnexRepo(incoming_path, runner=runner,
                                    description=description + ' (incoming)')
         # TODO: git remote add public to incoming, so we could
         # copy/get some objects between the two
@@ -99,7 +106,7 @@ def page2annex(cfg, existing='check',
                    extract things, so we can't just geturl on it
     """
 
-    db_path = os.path.join(incoming, db_name)
+    db_path = os.path.join(incoming_path, db_name)
     if os.path.exists(db_path):
         db = load_db(db_path)
     else:
@@ -128,10 +135,10 @@ def page2annex(cfg, existing='check',
 
         repo_sectiondir = cfg.get(section, 'directory')
 
-        full_incoming_sectiondir = os.path.join(incoming, repo_sectiondir)
-        full_public_sectiondir = os.path.join(public, repo_sectiondir)
+        full_incoming_sectiondir = os.path.join(incoming_annex.path, repo_sectiondir)
+        full_public_sectiondir = os.path.join(public_annex.path, repo_sectiondir)
 
-        if not (os.path.exists(incoming) and os.path.exists(public)):
+        if not (os.path.exists(incoming_annex.path) and os.path.exists(public_annex.path)):
             lgr.debug("Creating directories for section's incoming (%s) and public (%s) annexes"
                       % (full_incoming_sectiondir, full_public_sectiondir))
             _call(os.makedirs, full_incoming_sectiondir)
@@ -196,13 +203,13 @@ def page2annex(cfg, existing='check',
                 incoming_filename = db_incoming_urls[href_full]
             else:
                 incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
-                  download_url(href_full, incoming,
+                  download_url(href_full, incoming_annex.path,
                                os.path.join(repo_sectiondir, href_dir),
                                db_incoming=db_incoming, dry_run=runner.dry, # TODO -- use runner?
                                fast_mode=fast_mode)
                 stats['downloaded'] += downloaded_size
 
-            full_incoming_filename = os.path.join(incoming, incoming_filename)
+            full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
 
             try:
                 public_filename = eval(scfg['filename'], {}, dict(filename=incoming_filename))
@@ -219,7 +226,7 @@ def page2annex(cfg, existing='check',
                 lgr.info("(Re)downloading %(href_full)s since points to an archive, thus "
                          "pure fast mode doesn't make sense" % locals())
                 incoming_filename_, incoming_downloaded, incoming_updated_, downloaded_size = \
-                  download_url(href_full, incoming,
+                  download_url(href_full, incoming_annex.path,
                                os.path.join(repo_sectiondir, href_dir),
                                db_incoming=db_incoming, dry_run=runner.dry,
                                fast_mode=False, force_download=True)
@@ -283,10 +290,12 @@ def page2annex(cfg, existing='check',
                 "public git/annex additions/updates" % stats
 
     _call(git_commit,
-          incoming, files=[db_name] if os.path.exists(db_path) else [],
+          incoming_annex.path,
+          files=[db_name] if os.path.exists(db_path) else [],
           msg="page2annex(incoming): " + stats_str)
-    if incoming != public:
-        _call(git_commit, public, msg="page2annex(public): " + stats_str)
+    if incoming_annex is not public_annex:
+        _call(git_commit, public_annex.path,
+              msg="page2annex(public): " + stats_str)
 
     lgr.info(stats_str)
 
