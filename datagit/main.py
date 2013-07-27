@@ -206,7 +206,7 @@ def page2annex(cfg, existing='check',
                   download_url(href_full, incoming_annex.path,
                                os.path.join(repo_sectiondir, href_dir),
                                db_incoming=db_incoming, dry_run=runner.dry, # TODO -- use runner?
-                               fast_mode=fast_mode)
+                               add_mode=add_mode)
                 stats['downloaded'] += downloaded_size
 
             full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
@@ -229,7 +229,8 @@ def page2annex(cfg, existing='check',
                   download_url(href_full, incoming_annex.path,
                                os.path.join(repo_sectiondir, href_dir),
                                db_incoming=db_incoming, dry_run=runner.dry,
-                               fast_mode=False, force_download=True)
+                               add_mode='download',
+                               force_download=True)
                 assert(incoming_filename == incoming_filename_)
                 stats['downloaded'] += downloaded_size
                 incoming_updated = incoming_updated_ or incoming_updated

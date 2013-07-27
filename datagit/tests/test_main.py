@@ -141,10 +141,10 @@ def test_page2annex_same_incoming_and_public():
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_page2annex_separate_public(url, mode, incoming_destiny, path):
+def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path):
     fast_mode = mode in ['fast', 'relaxed']
     din = tempfile.mkdtemp()
-    dout = tempfile.mkdtemp()
+    dout = tempfile.mkdtemp() if separate else din
 
     cfg = get_default_config(dict(
         DEFAULT=dict(incoming=din, public=dout, description="test", mode=mode),
@@ -183,7 +183,6 @@ def check_page2annex_separate_public(url, mode, incoming_destiny, path):
 
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
-
     # Let's repeat -- there should be no downloads/updates of any kind
     # since we had no original failures nor added anything
     stats2 = page2annex(cfg, dry_run=False)
@@ -246,8 +245,8 @@ def check_page2annex_separate_public(url, mode, incoming_destiny, path):
         ok_clean_git(din, untracked=din_untracked)
         ok_clean_git(dout)
         eq_(stats['incoming_annex_updates'],
-            0 if incoming_destiny in ['rm', 'keep'] else 1)
-        eq_(stats['public_annex_updates'], 1)
+            0 if incoming_destiny in ['rm', 'keep'] or mode == 'relaxed' else 1)
+        eq_(stats['public_annex_updates'], 1 if mode != 'relaxed' else 0)
         eq_(stats['downloads'], int(mode=='download'))
         # Load the file from incoming
         target_load = 'abracadabra%s' % load if m=='a' else load
@@ -272,6 +271,7 @@ def check_page2annex_separate_public(url, mode, incoming_destiny, path):
             time.sleep(1)
 
     # And now check updates in the archive
+    old_md5sum = md5sum(join(path, '1.tar.gz'))
 
     # Archive gets replaced with identical but freshly generated one:
     # there should be no crashed or complaints and updates should
@@ -281,9 +281,9 @@ def check_page2annex_separate_public(url, mode, incoming_destiny, path):
              ('d', (('1d', ''),)),))
     stats = page2annex(cfg, dry_run=False)
     eq_(stats['incoming_annex_updates'],
-        0 if incoming_destiny in ['rm', 'keep'] else 1)
-    eq_(stats['public_annex_updates'], 1)
-    eq_(stats['downloads'], 1)
+        0 if incoming_destiny in ['rm', 'keep'] or mode == 'relaxed' else 1)
+    eq_(stats['public_annex_updates'], 1 if mode != 'relaxed' else 0)
+    eq_(stats['downloads'], 1 if mode != 'relaxed' else 0)
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
 
@@ -296,21 +296,28 @@ def check_page2annex_separate_public(url, mode, incoming_destiny, path):
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
     eq_(stats['incoming_annex_updates'],
-        0 if incoming_destiny in ['rm', 'keep'] else 1)
+        0 if incoming_destiny in ['rm', 'keep'] or mode == 'relaxed' else 1)
     full_incoming_name = join(din, 'files', '1.tar.gz')
     if incoming_destiny in ['annex', 'keep']:
-        # it must be the same as the incoming archive
-        eq_(md5sum(join(path, '1.tar.gz')),
-            md5sum(full_incoming_name))
+        if mode != 'relaxed':
+            # it must be the same as the incoming archive
+            eq_(md5sum(join(path, '1.tar.gz')),
+                md5sum(full_incoming_name))
+        else:
+            # we should have retained the old md5sum
+            eq_(old_md5sum,
+                md5sum(full_incoming_name))
+
     else:
         # it must be gone
         ok_(not exists(full_incoming_name))
-    eq_(stats['public_annex_updates'], 1)
-    eq_(stats['downloads'], 1)            # needs to be downloaded!
+    eq_(stats['public_annex_updates'], 1 if mode != 'relaxed' else 0)
+    eq_(stats['downloads'], 1 if mode != 'relaxed' else 0)            # needs to be downloaded!
     # and now because file comes from an archive it must always be
     # there
     with open(join(dout, 'files', '1', '1 f.txt')) as f:
-        eq_(f.read(), target_load)
+        if mode != 'relaxed':
+            eq_(f.read(), target_load)
 
     # TODO: directory within archive gets renamed
     # yet to clarify how we treat those beasts
@@ -323,16 +330,19 @@ def check_page2annex_separate_public(url, mode, incoming_destiny, path):
 def test_page2annex_separate_public():
     # separate lines for easy selection for debugging of a particular
     # test
-    for mode in ('download',
-                 'fast',
-                 'relaxed',
-                 ):
-        for incoming_destiny in ('annex',
-                                 'drop',
-                                 'rm',
-                                 'keep',
-                                 ):
-            yield check_page2annex_separate_public, mode, incoming_destiny
+    for separate in (#False,
+                     True,
+                     ):
+        for mode in ('download',
+                     'fast',
+                     'relaxed',
+                     ):
+            for incoming_destiny in ('annex',
+                                     'drop',
+                                     'rm',
+                                     'keep',
+                                     ):
+                yield check_page2annex_separate_public, separate, mode, incoming_destiny
 
 
 # now with some recursive structure of directories

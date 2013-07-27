@@ -90,13 +90,25 @@ def __download(url, filename=None, filename_only=False):
         r.close()
     return filename
 
+def retry_urlopen(url, retries=3):
+    for t in xrange(retries):
+        try:
+            return urllib2.urlopen(url)
+        except urllib2.URLError, e:
+            lgr.warn("Received exception while reading %s: %s" % (url, e))
+            if t == retries - 1:
+                # if we have reached allowed number of retries -- reraise
+                raise
+
+
 # yoh: I haven't found a quick way to enable/disable memory. caching at runtime,
 # thus implementing simple decorators
 def _fetch_page(url, retries=3):
     lgr.debug("Fetching %s" % url)
+    openurl = retry_urlopen(url, retries=retries)
     for t in xrange(retries):
         try:
-            page = urllib2.urlopen(url).read()
+            page = openurl.read()
             break
         except urllib2.URLError, e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
@@ -242,12 +254,9 @@ def filter_urls(urls,
                    ((exclude_href and re.search(exclude_href, url))
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
 
-
+# TODO: RF move db_incoming and modes logic outside?
 def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
-                 fast_mode=False, use_content_name=False, force_download=False):
-    # TODO: relaxed mode? so no size/mtime stamps are collected, mere
-    # presence is enough... uff -- too much of annex duplication? ;)
-    # yeah -- but this is just a degenerate example
+                 add_mode='download', use_content_name=False, force_download=False):
     downloaded, updated, downloaded_size = False, False, 0
     # so we could check and remove it to keep it clean
     temp_full_filename = None
@@ -262,7 +271,7 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
         pass
 
     try: # might RF -- this is just to not repeat the same return
-        if dry_run:
+        if dry_run or add_mode == 'relaxed':
             # we can only try to deduce from the url...
             # TODO: now that there is use_content_name  -- make dry_run run smarter and more detailed
             #       just assume things haven't changed on the remote end and keep going without introducing
@@ -271,8 +280,22 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
             repo_filename = os.path.join(subdir, filename)
             full_filename = os.path.join(incoming, repo_filename)
             # and not really do much
-            lgr.debug("Nothing else could be done for download in dry mode")
-            raise ReturnSooner
+            if dry_run:
+                lgr.debug("Nothing else could be done for download in dry mode")
+                raise ReturnSooner
+            elif add_mode == 'relaxed':
+                if os.path.lexists(full_filename):
+                    lgr.debug("File exists - nothing todo in 'relaxed' mode")
+                    raise ReturnSooner
+                if repo_filename in db_incoming:
+                    lgr.debug("File found in db_incoming and doesn't exists - assuming was rm'ed")
+                else:
+                    lgr.debug("File was not found in db_incoming and doesn't exists. Marking updated")
+                    db_incoming[repo_filename] = dict(url=url)
+                    updated = True
+                raise ReturnSooner
+            else:
+                raise RuntimeError("Should not get here")
 
         # TODO: add mode alike to 'relaxed' where we would not
         # care about content-deposition filename
@@ -285,7 +308,7 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
         #
         # TODO: think about stamping etc -- we seems to be redoing
         # what git-annex does for us already
-        r = urllib2.urlopen(request)
+        r = retry_urlopen(request)
         try:
             r_info = r.info()
 
@@ -357,9 +380,9 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
             # might be too early to state -- what if download fails?
             db_incoming[repo_filename] = dict(mtime=mtime, size=size, url=url)
 
-            if fast_mode:
+            if add_mode in ['fast', 'relaxed']:
                 if download:
-                    lgr.debug("Fast mode: not downloading but marking updated")
+                    lgr.debug("%r mode: not downloading but marking updated" % add_mode)
                 updated = download
                 raise ReturnSooner
 
