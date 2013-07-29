@@ -88,5 +88,6 @@ def load_config(configs):
     # Load configuration
     cfg = get_default_config()
     cfg_read = cfg.read(configs)
-    assert(cfg_read == configs)
+    assert cfg_read == configs, \
+           "Not all configs were read. Wanted: %s Read: %s" % (configs, cfg_read)
     return cfg

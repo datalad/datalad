@@ -47,7 +47,7 @@ lgr = logging.getLogger('datagit.git')
 def _esc(filename):
     """Surround filename in "" and escape " in the filename
     """
-    filename = filename.replace('"', r'\"')
+    filename = filename.replace('"', r'\"').replace('`', r'\`')
     filename = '"%s"' % filename
     return filename
 
@@ -132,7 +132,7 @@ class AnnexRepo(object):
                  {'download': '',
                   'fast': '--fast',
                   'relaxed': '--relaxed'}[add_mode],
-                 href)
+                 _esc(href))
         else:
             annex_cmd = 'add %s %s' % (annex_opts, _esc(annex_filename),)
 

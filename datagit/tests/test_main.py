@@ -349,7 +349,7 @@ def test_page2annex_separate_public():
 tree2args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
-        ("\"';a&b&cd|", ""),
+        ("\"';a&b&cd`|", ""),
         ('2', (
             # this is yet to troubleshoot
             #(u'юнякод.txt', u'и тут юнякод'),
@@ -376,10 +376,10 @@ def test_page2annex_recurse(url, path):
     stats1 = page2annex(cfg, dry_run=False)
 
     verify_files(din,
-        ["\"';a&b&cd|", '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
+        ["\"';a&b&cd`|", '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
     verify_files(dout,
-        ["\"';a&b&cd|", '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
+        ["\"';a&b&cd`|", '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
 
     #rmtree(dout, True)
