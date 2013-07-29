@@ -125,6 +125,9 @@ def page2annex(cfg, existing='check',
 
     # each section defines a separate download setup
     for section in cfg.sections():
+        if section in ('DEFAULT', 'INCLUDES'):
+            lgr.debug("Skipping 'housekeeping' section %r" % section)
+            continue
         lgr.info("Section: %s" % section)
         stats['sections'] += 1
 

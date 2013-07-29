@@ -24,6 +24,8 @@ __author__ = 'Yaroslav Halhenko'
 __copyright__ = 'Copyright (c) 2007 Yaroslav Halchenko'
 __license__ = 'GPL'
 
+# TODO: clarify license change with anyone who contributed to this file
+
 import logging, os, sys
 
 if sys.version_info >= (3,2): # pragma: no cover

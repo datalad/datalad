@@ -31,7 +31,7 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
-from ConfigParser import ConfigParser
+from configparserinc import SafeConfigParserWithIncludes
 
 from .files import DECOMPRESSORS
 
@@ -39,7 +39,7 @@ from .files import DECOMPRESSORS
 # Configuration
 #
 def get_default_config(sections={}):
-    cfg = ConfigParser(defaults=dict(
+    cfg = SafeConfigParserWithIncludes(defaults=dict(
         mode='download',                 # TODO -- check, use
         orig='auto',                 # TODO -- now we don't use it
         meta_info='True',                 # TODO -- now we just use it
@@ -88,6 +88,6 @@ def load_config(configs):
     # Load configuration
     cfg = get_default_config()
     cfg_read = cfg.read(configs)
-    assert cfg_read == configs, \
+    assert set(configs).issubset(cfg_read), \
            "Not all configs were read. Wanted: %s Read: %s" % (configs, cfg_read)
     return cfg
