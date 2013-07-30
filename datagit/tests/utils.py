@@ -102,6 +102,7 @@ def with_tree(tree=None, **tkwargs):
         return newfunc
     return decorate
 
+
 import md5
 def md5sum(filename):
     with open(filename) as f:
@@ -190,3 +191,62 @@ def sorted_files(dout):
     return sorted(sum([[os.path.join(r, f)[len(dout)+1:] for f in files]
                        for r,d,files in os.walk(dout)
                        if not '.git' in r], []))
+
+import glob
+def with_tempfile(*targs, **tkwargs):
+    """Decorator function to provide a temporary file name and remove it at the end.
+
+    All arguments are passed into the call to tempfile.mktemp(), and
+    resultant temporary filename is passed as the first argument into
+    the test.  If no 'prefix' argument is provided, it will be
+    constructed using module and function names ('.' replaced with
+    '_').
+
+    Example use::
+
+        @with_tempfile()
+        def test_write(tfile):
+            open(tfile, 'w').write('silly test')
+    """
+
+    def decorate(func):
+        def newfunc(*arg, **kw):
+            if len(targs)<2 and not 'prefix' in tkwargs:
+                try:
+                    tkwargs['prefix'] = 'tempfile_%s.%s' \
+                                        % (func.__module__, func.func_name)
+                except:
+                    # well -- if something wrong just proceed with defaults
+                    pass
+
+            filename = tempfile.mktemp(*targs, **tkwargs)
+            if __debug__:
+                lgr.debug('Running %s with temporary filename %s'
+                          % (func.__name__, filename))
+            try:
+                func(*(arg + (filename,)), **kw)
+            finally:
+                # glob here for all files with the same name (-suffix)
+                # would be useful whenever we requested .img filename,
+                # and function creates .hdr as well
+                lsuffix = len(tkwargs.get('suffix', ''))
+                filename_ = lsuffix and filename[:-lsuffix] or filename
+                filenames = glob.glob(filename_ + '*')
+                if len(filename_) < 3 or len(filenames) > 5:
+                    # For paranoid yoh who stepped into this already ones ;-)
+                    lgr.warning("It is unlikely that it was intended to remove all"
+                                " files matching %r. Skipping" % filename_)
+                    return
+                for f in filenames:
+                    try:
+                        # Can also be a directory
+                        if os.path.isdir(f):
+                            shutil.rmtree(f)
+                        else:
+                            os.unlink(f)
+                    except OSError:
+                        pass
+        newfunc = make_decorator(func)(newfunc)
+        return newfunc
+
+    return decorate
