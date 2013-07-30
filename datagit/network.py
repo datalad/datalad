@@ -199,6 +199,7 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
         recurse_match = recurse and recurse_re.search(u)
         if u.endswith('/') or recurse_match:     # must be a directory or smth we were told to recurse into
             if u in ('../', './'):
+                # TODO -- might be a full URL pointing to "Parent Directory"
                 lgr.log(8, "Skipping %s -- we are not going to parents" % u)
                 continue
             if not recurse:

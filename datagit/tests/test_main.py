@@ -37,7 +37,7 @@ from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
      md5sum, ok_clean_git
 
-from ..config import get_default_config
+from ..config import EnhancedConfigParser
 from ..main import page2annex
 from ..db import load_db
 
@@ -84,7 +84,7 @@ def verify_nothing_was_done(stats):
 @serve_path_via_http()
 def check_page2annex_same_incoming_and_public(url, mode, path):
     dout = tempfile.mkdtemp()
-    cfg = get_default_config(dict(
+    cfg = EnhancedConfigParser.get_default(dict(
         DEFAULT=dict(
             incoming=dout,
             public=dout,
@@ -146,7 +146,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp() if separate else din
 
-    cfg = get_default_config(dict(
+    cfg = EnhancedConfigParser.get_default(dict(
         DEFAULT=dict(incoming=din, public=dout, description="test", mode=mode),
         files=dict(directory='files', incoming_destiny=incoming_destiny, url=url)))
 
@@ -369,7 +369,7 @@ def test_page2annex_recurse(url, path):
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()
 
-    cfg = get_default_config(dict(
+    cfg = EnhancedConfigParser.get_default(dict(
         DEFAULT=dict(incoming=din, public=dout, description="test", recurse='/$'),
         files=dict(directory='', incoming_destiny='annex', url=url)))
 

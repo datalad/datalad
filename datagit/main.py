@@ -64,8 +64,9 @@ def page2annex(cfg, existing='check',
 
     dry_str = "DRY: " if dry_run else ""
 
-    incoming_path = cfg.get('DEFAULT', 'incoming')
-    public_path = cfg.get('DEFAULT', 'public')
+    dcfg = cfg.get_section('DEFAULT')
+    incoming_path = dcfg.get('incoming')
+    public_path = dcfg.get('public')
 
     #
     # Initializing file structure
@@ -79,7 +80,9 @@ def page2annex(cfg, existing='check',
         if not os.path.exists(public_path):
             _call(os.makedirs, public_path)
 
-    description = cfg.get('DEFAULT', 'description')
+    # TODO: description might need to be evaluated provided with some
+    #       page content
+    description = dcfg.get('description')
     public_annex = AnnexRepo(public_path, runner=runner, description=description)
 
     if public_path != incoming_path:
@@ -132,11 +135,13 @@ def page2annex(cfg, existing='check',
         stats['sections'] += 1
 
         # some checks
-        add_mode = cfg.get(section, 'mode')
+        scfg = cfg.get_section(section)
+
+        add_mode = scfg.get('mode')
         assert(add_mode in ['download', 'fast', 'relaxed'])
         fast_mode = add_mode in ['fast', 'relaxed']
 
-        repo_sectiondir = cfg.get(section, 'directory')
+        repo_sectiondir = scfg.get('directory')
 
         full_incoming_sectiondir = os.path.join(incoming_annex.path, repo_sectiondir)
         full_public_sectiondir = os.path.join(public_annex.path, repo_sectiondir)
@@ -146,8 +151,6 @@ def page2annex(cfg, existing='check',
                       % (full_incoming_sectiondir, full_public_sectiondir))
             _call(os.makedirs, full_incoming_sectiondir)
             _call(os.makedirs, full_public_sectiondir)           #TODO might be the same
-
-        scfg = dict(cfg.items(section))
 
         incoming_destiny = scfg.get('incoming_destiny')
         # Fetching the page (possibly again! thus a dummy hot_cache)
@@ -214,10 +217,8 @@ def page2annex(cfg, existing='check',
 
             full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
 
-            try:
-                public_filename = eval(scfg['filename'], {}, dict(filename=incoming_filename))
-            except:
-                raise ValueError("Failed to evaluate %r" % scfg['filename'])
+            public_filename = scfg.get('filename',
+                                       vars=dict(filename=incoming_filename))
 
             # Incoming might be an archive -- check and adjust public filename accordingly
             is_archive, public_filename = pretreat_archive(

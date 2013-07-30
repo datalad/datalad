@@ -26,12 +26,47 @@
   THE SOFTWARE.
 """
 
-
 __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
-from .config import load_config, EnhancedConfigParser
-from .db import load_db, save_db
-from .files import decompress_file
-from .main import page2annex
+from os.path import join
+
+from .utils import *
+
+from ..api import *
+
+@with_tempfile(suffix='.cfg')
+def test_eval_value(filename):
+    with open(filename, 'w') as f:
+        f.write("""
+[DEFAULT]
+v1 = 1+2
+# simple evaluation
+v2_e = str(1+2)
+# Simple string interpolations
+v4 = %(var)s
+
+[section1]
+# mixing both string interpolations and evaluation
+v5_e = "%%.2f(%(v1)s)" %% (var+1)
+var_e = "%%.2f" %% (var+2)
+""")
+
+# this one is a tricky one -- probably could still work via iterative refinement of vars
+# while catching InterpolationMissingOptionError
+# v3 = %(v2)s.bak
+
+    cfg = load_config([filename])
+    dcfg = cfg.get_section('DEFAULT')
+    eq_(dcfg.get('v1'), '1+2')
+    eq_(dcfg.get('v2_e'), '3')
+    eq_(dcfg.get('v2_e', raw=True), 'str(1+2)')
+    eq_(dcfg.get('v2'), '3')
+    eq_(dcfg.get('v4', vars=dict(var='1.3333')), '1.3333')
+
+    scfg1 = cfg.get_section('section1')
+    eq_(scfg1.get('v5', vars=dict(var=1.3333)), '2.33(1+2)')
+    eq_(scfg1.get('var', vars=dict(var=1.3333)), '3.33')
+
+    #eq_(scfg.get('v3'), '3.bak')
