@@ -174,7 +174,7 @@ def page2annex(cfg, existing='check',
             urls = sorted(set(urls))
             lgr.info("%d unique urls" % (len(urls),))
         lgr.debug("%d urls:\n%s"
-                  % (len(urls), pprint_indent(urls, "    ", "[%s](%s)")))
+                  % (len(urls), pprint_indent(urls, "    ", "[%s](%s): %s")))
         if scfg.get('check_url_limit', None):
             limit = int(scfg['check_url_limit'])
             if limit and len(urls) > limit:
@@ -185,7 +185,9 @@ def page2annex(cfg, existing='check',
         #
         # Process urls
         stats['allurls'] += len(urls)
-        for href, href_a in urls:
+        for href, href_a, link in urls:
+            evars = dict(href=href, link=link)
+
             # bring them into the full urls, href might have been a full url on its own
             href_full = urljoin(top_url, href)
             lgr.debug("Working on [%s](%s)" % (href_full, href_a))
@@ -217,12 +219,13 @@ def page2annex(cfg, existing='check',
 
             full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
 
-            public_filename = scfg.get('filename',
-                                       vars=dict(filename=incoming_filename))
+            evars['filename'] = incoming_filename
+            public_filename = scfg.get('filename', vars=evars)
+            evars['public_filename'] = public_filename
 
             # Incoming might be an archive -- check and adjust public filename accordingly
             is_archive, public_filename = pretreat_archive(
-                public_filename, archives_re=scfg.get('archives_re'))
+                public_filename, archives_re=scfg.get('archives_re', vars=evars))
 
             if incoming_updated and is_archive and fast_mode :
                 # there is no sense unless we download the beast
@@ -270,7 +273,7 @@ def page2annex(cfg, existing='check',
                     public_annex=public_annex,
                     incoming_destiny=incoming_destiny,
                     add_mode=add_mode,
-                    addurl_opts=scfg.get('addurl_opts', None),
+                    addurl_opts=scfg.get('addurl_opts', None, vars=evars),
                     runner=runner,
                     )
 

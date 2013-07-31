@@ -42,9 +42,9 @@ def test_is_url_quoted():
     ok_(not is_url_quoted('a b'))
 
 def test_filter_urls():
-    urls = [('/x.nii.gz', 'bogus'),
-            ('x.tar.gz', None),
-            ('y', None)]
+    urls = [('/x.nii.gz', 'bogus', None),
+            ('x.tar.gz', None, None),
+            ('y', None, None)]
     eq_(filter_urls(urls, "^x\..*"), [urls[1]])
     eq_(filter_urls(urls, "^[xy]"), urls[1:])
     eq_(filter_urls(urls, "\.gz", "\.nii"),

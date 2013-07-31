@@ -40,7 +40,7 @@ import shutil
 import time
 import urllib2
 
-from BeautifulSoup import BeautifulSoup
+from bs4 import BeautifulSoup
 from StringIO import StringIO
 from urlparse import urljoin, urlparse, urlsplit, urlunsplit
 
@@ -148,7 +148,7 @@ def _parse_urls(page):
         path_quoted = urllib2.quote(rec.path) if not is_url_quoted(rec.path) else rec.path
         href = urlunsplit((rec.scheme, rec.netloc, path_quoted,
                            rec.query, rec.fragment))
-        urls.append((href, link.text))
+        urls.append((href, link.text, link))
     return urls
 
 def parse_urls(page, cache=False):
@@ -195,7 +195,7 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
         lgr.log(3, "#%d url=%s", iurl+1, url_)
 
         # separate tuple out
-        u, a = url_
+        u, a, l = url_
         recurse_match = recurse and recurse_re.search(u)
         if u.endswith('/') or recurse_match:     # must be a directory or smth we were told to recurse into
             if u in ('../', './'):
@@ -245,8 +245,8 @@ def filter_urls(urls,
         include_href = '.*'               # include all
 
     # First do all includes explicitly and then excludes
-    return [(url, a)
-             for url, a in urls
+    return [(url, a, l)
+             for url, a, l in urls
                 if url
                    and
                    ((include_href and re.search(include_href, url))
