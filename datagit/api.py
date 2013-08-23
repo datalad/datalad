@@ -34,4 +34,4 @@ __license__ = 'MIT'
 from .config import load_config, EnhancedConfigParser
 from .db import load_db, save_db
 from .files import decompress_file
-from .main import page2annex
+from .main import DoubleAnnexRepo

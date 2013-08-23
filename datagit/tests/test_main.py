@@ -38,7 +38,7 @@ from .utils import eq_, ok_, assert_greater, \
      md5sum, ok_clean_git
 
 from ..config import EnhancedConfigParser
-from ..main import page2annex
+from ..main import DoubleAnnexRepo
 from ..db import load_db
 
 
@@ -95,10 +95,11 @@ def check_page2annex_same_incoming_and_public(url, mode, path):
             directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
             url=url)))
 
-    stats1_dry = page2annex(cfg, dry_run=True)
+    drepo = DoubleAnnexRepo(cfg)
+    stats1_dry = drepo.page2annex(dry_run=True)
     verify_nothing_was_done(stats1_dry)
 
-    stats1 = page2annex(cfg, dry_run=False)
+    stats1 = drepo.page2annex()
     # they both should match
     eq_(stats1['incoming_annex_updates'], 2)
     eq_(stats1['public_annex_updates'], 2)
@@ -109,7 +110,7 @@ def check_page2annex_same_incoming_and_public(url, mode, path):
     ok_clean_git(dout)
 
     # Let's repeat -- there should be no downloads/updates
-    stats2 = page2annex(cfg, dry_run=False)
+    stats2 = drepo.page2annex()
     verify_nothing_was_done(stats2)
     ok_clean_git(dout)
 
@@ -124,7 +125,7 @@ def check_page2annex_same_incoming_and_public(url, mode, path):
          'files/test.txt',
         ])
 
-    stats2_dry = page2annex(cfg, dry_run=True)
+    stats2_dry = drepo.page2annex(dry_run=True)
     verify_nothing_was_done(stats2_dry)
     ok_clean_git(dout)
 
@@ -150,12 +151,13 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
         DEFAULT=dict(incoming=din, public=dout, description="test", mode=mode),
         files=dict(directory='files', incoming_destiny=incoming_destiny, url=url)))
 
-    stats1_dry = page2annex(cfg, dry_run=True)
+    drepo = DoubleAnnexRepo(cfg)
+    stats1_dry = drepo.page2annex(dry_run=True)
     verify_nothing_was_done(stats1_dry)
     ok_(not exists(join(din, '.git')))
     ok_(not exists(join(dout, '.git')))
 
-    stats1 = page2annex(cfg, dry_run=False)
+    stats1 = drepo.page2annex()
     # dangling is just for broken/hanging symlinks
     dangling = ['files/test.txt'] if mode != 'download' else []
     verify_files(dout,
@@ -185,7 +187,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     ok_clean_git(dout)
     # Let's repeat -- there should be no downloads/updates of any kind
     # since we had no original failures nor added anything
-    stats2 = page2annex(cfg, dry_run=False)
+    stats2 = drepo.page2annex()
     verify_nothing_was_done(stats2)
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
@@ -227,7 +229,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
         dangling=dangling)
 
-    stats2_dry = page2annex(cfg, dry_run=True)
+    stats2_dry = drepo.page2annex(dry_run=True)
     verify_nothing_was_done(stats2_dry)
 
     # now check for the updates in a file
@@ -241,7 +243,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
                                    ('w', 'ww'))):
         with open(join(path, 'test.txt'), m) as f:
             f.write(load)
-        stats = page2annex(cfg, dry_run=False)
+        stats = drepo.page2annex()
         ok_clean_git(din, untracked=din_untracked)
         ok_clean_git(dout)
         eq_(stats['incoming_annex_updates'],
@@ -262,7 +264,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
             ok_(lexists(join(dout, 'files', 'test.txt')))
             ok_(not exists(join(dout, 'files', 'test.txt')))
 
-        stats_dry = page2annex(cfg, dry_run=True)
+        stats_dry = drepo.page2annex(dry_run=True)
         verify_nothing_was_done(stats_dry)
         if i == 1:
             # we need to sleep at least for a second so that
@@ -279,7 +281,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     create_archive(path, '1.tar.gz',
             (('1 f.txt', '1 f load'),
              ('d', (('1d', ''),)),))
-    stats = page2annex(cfg, dry_run=False)
+    stats = drepo.page2annex()
     eq_(stats['incoming_annex_updates'],
         0 if incoming_destiny in ['rm', 'keep'] or mode == 'relaxed' else 1)
     eq_(stats['public_annex_updates'], 1 if mode != 'relaxed' else 0)
@@ -292,7 +294,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     create_archive(path, '1.tar.gz',
             (('1 f.txt', '1 f load updated'),
              ('d', (('1d', ''),)),))
-    stats = page2annex(cfg, dry_run=False)
+    stats = drepo.page2annex()
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
     eq_(stats['incoming_annex_updates'],
@@ -373,7 +375,8 @@ def test_page2annex_recurse(url, path):
         DEFAULT=dict(incoming=din, public=dout, description="test", recurse='/$'),
         files=dict(directory='', incoming_destiny='annex', url=url)))
 
-    stats1 = page2annex(cfg, dry_run=False)
+    drepo = DoubleAnnexRepo(cfg)
+    stats1 = drepo.page2annex()
 
     verify_files(din,
         ["\"';a&b&cd`|", '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
