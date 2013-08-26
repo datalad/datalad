@@ -16,7 +16,6 @@ __docformat__ = 'restructuredtext'
 #    {<ArgusmentParser.add_arguments_kwargs>}
 #)
 
-from ..utils import get_filecache_dir
 from ..cmdline.helpers import HelpAction
 
 help = (

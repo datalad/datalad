@@ -1,0 +1,168 @@
+#!/usr/bin/python
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datagit package for the
+#   copyright and license terms.
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+""""""
+
+__docformat__ = 'restructuredtext'
+
+
+import argparse
+import logging
+import sys
+import textwrap
+
+import datagit
+from datagit import log
+from datagit.log import lgr
+
+import datagit.cmdline as mvcmd
+from datagit.cmdline import helpers
+
+
+def _license_info():
+    return """\
+Copyright (c) 2013 DataGit developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+Datagit is written by Yaroslav Halchenko with the help of numerous other
+contributors.
+
+Skeleton for datagit's cmdline handling is borrowed from testkraut, 2013
+(C) Michael Hanke, Expat license as well
+"""
+
+
+# setup cmdline args parser
+# main parser
+parser = argparse.ArgumentParser(
+                fromfile_prefix_chars='@',
+                # usage="%(prog)s ...",
+                description="""\
+DataGit is a project to expose (scientific) data available online from the convenience of git-annex repositories.
+
+datagit command line tool facilitates initial construction and update of harvested online datasets.  It supports following commands
+""",
+                epilog='"Geet My Data"',
+                formatter_class=argparse.RawDescriptionHelpFormatter,
+                add_help=False
+            )
+# common options
+helpers.parser_add_common_opt(parser, 'help')
+helpers.parser_add_common_opt(parser,
+                              'version',
+                              version='datagit %s\n\n%s' % (datagit.__version__,
+                                                          _license_info()))
+if __debug__:
+    parser.add_argument(
+        '--dbg', action='store_true', dest='common_debug',
+        help="do not catch exceptions and show exception traceback")
+
+# yoh: atm we only dump to console.  Might adopt the same separation later on
+#      and for consistency will call it --verbose-level as well for now
+# parser.add_argument('--log-level',
+#                     choices=('critical', 'error', 'warning', 'info', 'debug'),
+#                     dest='common_log_level',
+#                     help="""level of verbosity in log files. By default
+#                          everything, including debug messages is logged.""")
+parser.add_argument('-l', '--verbose-level',
+                    choices=('critical', 'error', 'warning', 'info', 'debug'),
+                    dest='common_verbose_level',
+                    help="""level of verbosity of console output. By default
+                         only warnings and errors are printed.""")
+
+
+# subparsers
+subparsers = parser.add_subparsers()
+# for all subcommand modules it can find
+cmd_short_description = []
+for cmd in sorted([c for c in dir(mvcmd) if c.startswith('cmd_')]):
+    cmd_name = cmd[4:]
+    subcmdmod = getattr(__import__('datagit.cmdline',
+                                   globals(), locals(),
+                                   [cmd], -1),
+                        cmd)
+    # deal with optional parser args
+    if 'parser_args' in subcmdmod.__dict__:
+        parser_args = subcmdmod.parser_args
+    else:
+        parser_args = dict()
+    # use module description, if no explicit description is available
+    if not 'description' in parser_args:
+        parser_args['description'] = subcmdmod.__doc__
+    # create subparser, use module suffix as cmd name
+    subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
+    # all subparser can report the version
+    helpers.parser_add_common_opt(
+            subparser, 'version',
+            version='datagit %s %s\n\n%s' % (cmd_name, datagit.__version__,
+                                             _license_info()))
+    # our own custom help for all commands
+    helpers.parser_add_common_opt(subparser, 'help')
+    # let module configure the parser
+    subcmdmod.setup_parser(subparser)
+    # logger for command
+
+    # configure 'run' function for this command
+    subparser.set_defaults(func=subcmdmod.run,
+                           logger=logging.getLogger('datagit.%s' % cmd))
+    # store short description for later
+    sdescr = getattr(subcmdmod, 'short_description',
+                     parser_args['description'].split('\n')[0])
+    cmd_short_description.append((cmd_name, sdescr))
+
+# create command summary
+cmd_summary = []
+for cd in cmd_short_description:
+    cmd_summary.append('%s\n%s\n\n' \
+                       % (cd[0],
+                          textwrap.fill(cd[1], 75,
+                              initial_indent=' ' * 4,
+                              subsequent_indent=' ' * 4)))
+parser.description = '%s\n%s\n\n%s' \
+        % (parser.description,
+           '\n'.join(cmd_summary),
+           textwrap.fill("""\
+Detailed usage information for individual commands is
+available via command-specific help options, i.e.:
+%s <command> --help""" % sys.argv[0],
+                            75, initial_indent='',
+                            subsequent_indent=''))
+
+# parse cmd args
+args = parser.parse_args()
+# default log levels
+# args.common_log_level = log_levels.get(args.common_log_level, logging.DEBUG)
+log.set_level(level=args.common_verbose_level, lgr=lgr)
+
+# run the function associated with the selected command
+try:
+    args.func(args)
+except Exception as exc:
+    lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
+    if args.common_debug:
+        import pdb
+        pdb.post_mortem()
+    sys.exit(1)

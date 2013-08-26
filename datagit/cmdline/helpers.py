@@ -16,6 +16,8 @@ import sys
 
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
+#        import pydb; pydb.debugger()
+
         if option_string == '--help':
             # lets use the manpage on mature systems ...
             try:
@@ -35,7 +37,8 @@ class HelpAction(argparse.Action):
             helpstr = parser.format_help()
         # better for help2man
         helpstr = re.sub(r'optional arguments:', 'options:', helpstr)
-        helpstr = re.sub(r'positional arguments:\n.*\n', '', helpstr)
+        # yoh: TODO for datagit + help2man
+        #helpstr = re.sub(r'positional arguments:\n.*\n', '', helpstr)
         # convert all heading to have the first character uppercase
         headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
         helpstr = re.subn(headpat,
@@ -75,3 +78,16 @@ def parser_add_common_opt(parser, opt, names=None, **kwargs):
         parser.add_argument(*opt_tmpl[1], **opt_kwargs)
     else:
         parser.add_argument(*names, **opt_kwargs)
+
+class RegexpType(object):
+    """Factory for creating regular expression types for argparse
+
+    DEPRECATED AFAIK -- now things are in the config file...
+    but we might provide a mode where we operate solely from cmdline
+    """
+    def __call__(self, string):
+        if string:
+            return re.compile(string)
+        else:
+            return None
+

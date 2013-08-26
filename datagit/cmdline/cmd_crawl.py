@@ -1,47 +1,36 @@
-#!/usr/bin/python
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-#ex: set sts=4 ts=4 sw=4 noet:
-#------------------------- =+- Python script -+= -------------------------
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datagit package for the
+#   copyright and license terms.
+#
+### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Crawl the website to collect/extract data and push it into a git-annex repository.
+
 """
- @file      fetch_url.py
- @date      Wed May 22 15:31:19 2013
- @brief
 
-
-  Yaroslav Halchenko                                            Dartmouth
-  web:     http://www.onerussian.com                              College
-  e-mail:  yoh@onerussian.com                              ICQ#: 60653192
-
- DESCRIPTION (NOTES):
-
- COPYRIGHT: Yaroslav Halchenko 2013
-
- LICENSE: MIT
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
+# For some reason argparse manages to remove all the formatting for me here.
 """
-#-----------------\____________________________________/------------------
+some more bits...
 
-__author__ = 'Yaroslav Halchenko'
+more TODO
+
+Examples:
+
+$ datagit crawl cfgs/openfmri.cfg
+
+TODO: See TODO.org
+
+"""
+
+__docformat__ = 'restructuredtext'
+
+# magic line for manpage summary
+# man: -*- % crawl the website to collect/extract data for git-annex
+
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
-__version__ = "0.0.0.dev"
 
 import calendar
 import os
@@ -49,45 +38,14 @@ import re
 import shutil
 import time
 
+import argparse
+import os
+import sys
+
 import datagit.log
-from datagit.api import *
 
 
-class RegexpType(object):
-    """Factory for creating regular expression types for argparse
-
-    DEPRECATED AFAIK -- now things are in the config file...
-    but we might provide a mode where we operate solely from cmdline
-    """
-    def __call__(self, string):
-        if string:
-            return re.compile(string)
-        else:
-            return None
-
-
-if __name__ == '__main__':
-
-    # setup cmdline args parser
-    # main parser
-    import argparse
-    import os
-    import sys
-
-    import logging
-    lgr = logging.getLogger('datagit')
-
-    parser = argparse.ArgumentParser(
-        fromfile_prefix_chars='@',
-        description="""
-    Fetch web page's linked content into git-annex repository.
-
-    """,
-        epilog='',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        add_help=True,
-        version=__version__
-    )
+def setup_parser(parser):
 
     # common options
 #    parser.add_argument(
@@ -123,48 +81,35 @@ if __name__ == '__main__':
         "file without checking if it was modified or not. 'check' would "
         "proceed normally updating the file(s) if changed")
 
-    parser.add_argument(
-        "--tests", action="store_true",
-        help="Do not do anything but run tests")
-
-    parser.add_argument(
-        '-l', '--log-level',
-        choices=['critical', 'error', 'warning', 'info', 'debug'] + [str(x) for x in range(1, 10)],
-        default='warning',
-        help="""level of verbosity. Integers provide even more debugging information""")
-
-    if __debug__:
-        # borrowed from Michael's bigmess
-        parser.add_argument(
-            '--dbg', action='store_true', dest='common_debug',
-            help="do not catch exceptions and show exception traceback")
-
+#    parser.add_argument(
+#        "--tests", action="store_true",
+#        help="Do not do anything but run tests")
+#
+#     parser.add_argument(
+#         '-l', '--log-level',
+#         choices=['critical', 'error', 'warning', 'info', 'debug'] + [str(x) for x in range(1, 10)],
+#         default='warning',
+#         help="""level of verbosity. Integers provide even more debugging information""")
+# 
+#     if __debug__:
+#         # borrowed from Michael's bigmess
+#         parser.add_argument(
+#             '--dbg', action='store_true', dest='common_debug',
+#             help="do not catch exceptions and show exception traceback")
 
     parser.add_argument("configs", metavar='file', nargs='+',
                         help="Configuration file(s) defining the structure of the 'project'")
 
-    args = parser.parse_args() #['-n', '-l', 'debug', 'allen-genetic.cfg'])
-
-    # set our loglevel
-    datagit.log.set_level(args.log_level)
+def run(args):
+    from datagit.api import DoubleAnnexRepo, load_config
+    from datagit.log import lgr
 
     lgr.debug("Command line arguments: %r" % args)
 
-    if args.tests:
-        lgr.info("Running tests")
-        import nose
-        # TODO fix it so it works ;-)
-        nose.runmodule('datagit', exit=True)
+    lgr.info("Reading configs")
+    cfg = load_config(args.configs)
 
-    try:
-        lgr.info("Reading configs")
-        cfg = load_config(args.configs)
-        page2annex(cfg, existing=args.existing, dry_run=args.dry_run, cache=args.cache)
+    drepo = DoubleAnnexRepo(cfg)
+    drepo.page2annex(existing=args.existing, dry_run=args.dry_run, cache=args.cache)
 
-    except Exception as exc:
-        lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
-        if __debug__ and args.common_debug:
-            import pdb
-            pdb.post_mortem()
-        raise
 
