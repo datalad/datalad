@@ -48,10 +48,9 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
 Datagit is written by Yaroslav Halchenko with the help of numerous other
-contributors.
-
-Skeleton for datagit's cmdline handling is borrowed from testkraut, 2013
-(C) Michael Hanke, Expat license as well
+contributors.  Skeleton for datagit's cmdline handling is borrowed from
+testkraut (https://github.com/neurodebian/testkraut) by Michael Hanke,
+Expat license as well.
 """
 
 
@@ -61,7 +60,7 @@ parser = argparse.ArgumentParser(
                 fromfile_prefix_chars='@',
                 # usage="%(prog)s ...",
                 description="""\
-DataGit is a project to expose (scientific) data available online from the convenience of git-annex repositories.
+DataGit aims to expose (scientific) data available online with the convenience of git-annex repositories.
 
 datagit command line tool facilitates initial construction and update of harvested online datasets.  It supports following commands
 """,
