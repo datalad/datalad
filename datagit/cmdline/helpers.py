@@ -55,6 +55,12 @@ class HelpAction(argparse.Action):
         print helpstr
         sys.exit(0)
 
+class LogLevelAction(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        from ..log import set_level, lgr
+        set_level(level=values, lgr=lgr)
+
+
 def parser_add_common_args(parser, pos=None, opt=None, **kwargs):
     from . import common_args
     for i, args in enumerate((pos, opt)):

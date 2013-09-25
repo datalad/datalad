@@ -70,6 +70,7 @@ datagit command line tool facilitates initial construction and update of harvest
             )
 # common options
 helpers.parser_add_common_opt(parser, 'help')
+helpers.parser_add_common_opt(parser, 'log_level')
 helpers.parser_add_common_opt(parser,
                               'version',
                               version='datagit %s\n\n%s' % (datagit.__version__,
@@ -81,16 +82,17 @@ if __debug__:
 
 # yoh: atm we only dump to console.  Might adopt the same separation later on
 #      and for consistency will call it --verbose-level as well for now
+# log-level is set via common_opts ATM
 # parser.add_argument('--log-level',
 #                     choices=('critical', 'error', 'warning', 'info', 'debug'),
 #                     dest='common_log_level',
 #                     help="""level of verbosity in log files. By default
 #                          everything, including debug messages is logged.""")
-parser.add_argument('-l', '--verbose-level',
-                    choices=('critical', 'error', 'warning', 'info', 'debug'),
-                    dest='common_verbose_level',
-                    help="""level of verbosity of console output. By default
-                         only warnings and errors are printed.""")
+#parser.add_argument('-l', '--verbose-level',
+#                    choices=('critical', 'error', 'warning', 'info', 'debug'),
+#                    dest='common_verbose_level',
+#                    help="""level of verbosity of console output. By default
+#                         only warnings and errors are printed.""")
 
 
 # subparsers
@@ -120,6 +122,7 @@ for cmd in sorted([c for c in dir(mvcmd) if c.startswith('cmd_')]):
                                              _license_info()))
     # our own custom help for all commands
     helpers.parser_add_common_opt(subparser, 'help')
+    helpers.parser_add_common_opt(subparser, 'log_level')
     # let module configure the parser
     subcmdmod.setup_parser(subparser)
     # logger for command
@@ -152,9 +155,6 @@ available via command-specific help options, i.e.:
 
 # parse cmd args
 args = parser.parse_args()
-# default log levels
-# args.common_log_level = log_levels.get(args.common_log_level, logging.DEBUG)
-log.set_level(level=args.common_verbose_level, lgr=lgr)
 
 # run the function associated with the selected command
 try:

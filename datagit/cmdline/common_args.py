@@ -16,7 +16,7 @@ __docformat__ = 'restructuredtext'
 #    {<ArgusmentParser.add_arguments_kwargs>}
 #)
 
-from ..cmdline.helpers import HelpAction
+from ..cmdline.helpers import HelpAction, LogLevelAction
 
 help = (
     'help', ('-h', '--help', '--help-np'),
@@ -31,4 +31,11 @@ version = (
          help="show program's version and license information and exit")
 )
 
+log_level = (
+    'log-level', ('-l', '--log-level'),
+    dict(action=LogLevelAction,
+         choices=['critical', 'error', 'warning', 'info', 'debug'] + [str(x) for x in range(1, 10)],
+         default='warning',
+         help="""level of verbosity. Integers provide even more debugging information""")
+)
 

@@ -43,7 +43,7 @@ import os
 import sys
 
 import datagit.log
-
+from .helpers import parser_add_common_args
 
 def setup_parser(parser):
 
@@ -101,7 +101,8 @@ def setup_parser(parser):
         "configs", metavar='file', nargs='+',
         help="Configuration file(s) defining the structure of the 'project'")
 
-
+    #parser_add_common_args(parser, opt=('log_level'))
+    
 def run(args):
     from datagit.api import DoubleAnnexRepo, load_config
     from datagit.log import lgr
