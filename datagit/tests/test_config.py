@@ -46,11 +46,28 @@ v1 = 1+2
 v2_e = str(1+2)
 # Simple string interpolations
 v4 = %(var)s
+# mixing both string interpolations and evaluation
+exec = import numpy as np
+       from math import e
+
+       func = lambda x: "fun^%%d" %% x
+# Function to be evaluated with some local variable substitution
+funccall_e = func(%(l)s)
+
 
 [section1]
-# mixing both string interpolations and evaluation
 v5_e = "%%.2f(%(v1)s)" %% (var+1)
 var_e = "%%.2f" %% (var+2)
+e_e = e
+v1_array_e = np.array([%(v1)s])
+l = 3
+
+[section2]
+l = 4
+
+[section3]
+l = 1
+exec = func = lambda x: "NEW"
 """)
 
 # this one is a tricky one -- probably could still work via iterative refinement of vars
@@ -68,5 +85,18 @@ var_e = "%%.2f" %% (var+2)
     scfg1 = cfg.get_section('section1')
     eq_(scfg1.get('v5', vars=dict(var=1.3333)), '2.33(1+2)')
     eq_(scfg1.get('var', vars=dict(var=1.3333)), '3.33')
+    # now check if exec worked correctly and enriched environment
+    # for those evaluations
+    import math
+    eq_(scfg1.get('e'), math.e)
+    eq_(scfg1.get('v1_array'), [ 3 ])
+    eq_(scfg1.get('funccall'), 'fun^3')
 
-    #eq_(scfg.get('v3'), '3.bak')
+    scfg2 = cfg.get_section('section2')
+    eq_(scfg2.get('funccall'), 'fun^4')
+
+    scfg3 = cfg.get_section('section3')
+    # exec was redefined
+    eq_(scfg3.get('funccall'), 'NEW')
+    eq_(scfg3.get('l'), '1')
+

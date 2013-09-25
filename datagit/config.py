@@ -107,6 +107,14 @@ class ConfigSection(object):
     def __init__(self, config, section):
         self._config = config
         self._section = section
+        self._env = {}
+        # If present -- execute the 'exec' option to populate the environment
+        if self._config.has_option(section, 'exec'):
+            exec_ = self._config.get(section, 'exec')
+            lgr.debug("Executing exec=%r in section %s to populate _env"
+                       % (exec_, section))
+            exec(exec_, self._env)
+
 
     def get(self, option, default=None, vars=None, raw=False, **kwargs):
         """get() with support of _e (evaluate) in `context`
@@ -136,14 +144,22 @@ class ConfigSection(object):
             return default
 
         option = options[0]
+        # what environment/variables would be available for
+        # interpolation/evaluation
+        vars_all = {}
+        if self._env:
+            vars_all.update(self._env)
+        if vars:
+            vars_all.update(vars)
+
         value = self._config.get(self._section,
                                  option,
-                                 vars={} if option.endswith('_e') else vars,
+                                 vars={} if option.endswith('_e') else vars_all,
                                  raw=raw,
                                  **kwargs)
 
         if option.endswith('_e') and not raw:
-            value_ = eval(value, vars)
+            value_ = eval(value, vars_all)
             return value_
         else:
             return value

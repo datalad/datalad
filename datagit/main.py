@@ -30,6 +30,8 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
+from os.path import dirname, exists, join, sep as pathsep
+
 from .repos import *
 from .db import load_db, save_db
 from .network import collect_urls, filter_urls, \
@@ -85,13 +87,13 @@ class DoubleAnnexRepo(object):
         #
         # Initializing file structure
         #
-        if not (os.path.exists(incoming_path) and os.path.exists(public_path)):
+        if not (exists(incoming_path) and exists(public_path)):
             lgr.debug("Creating directories for incoming (%s) and public (%s) annexes"
                       % (incoming_path, public_path))
 
-            if not os.path.exists(incoming_path):
+            if not exists(incoming_path):
                 _call(os.makedirs, incoming_path)
-            if not os.path.exists(public_path):
+            if not exists(public_path):
                 _call(os.makedirs, public_path)
 
         # TODO: description might need to be evaluated provided with some
@@ -123,8 +125,8 @@ class DoubleAnnexRepo(object):
                        extract things, so we can't just geturl on it
         """
 
-        db_path = os.path.join(incoming_annex.path, self.db_name)
-        if os.path.exists(db_path):
+        db_path = join(incoming_annex.path, self.db_name)
+        if exists(db_path):
             db = load_db(db_path)
         else:
             # create fresh
@@ -157,10 +159,10 @@ class DoubleAnnexRepo(object):
 
             repo_sectiondir = scfg.get('directory')
 
-            full_incoming_sectiondir = os.path.join(incoming_annex.path, repo_sectiondir)
-            full_public_sectiondir = os.path.join(public_annex.path, repo_sectiondir)
+            full_incoming_sectiondir = join(incoming_annex.path, repo_sectiondir)
+            full_public_sectiondir = join(public_annex.path, repo_sectiondir)
 
-            if not (os.path.exists(incoming_annex.path) and os.path.exists(public_annex.path)):
+            if not (exists(incoming_annex.path) and exists(public_annex.path)):
                 lgr.debug("Creating directories for section's incoming (%s) and public (%s) annexes"
                           % (full_incoming_sectiondir, full_public_sectiondir))
                 _call(os.makedirs, full_incoming_sectiondir)
@@ -200,6 +202,11 @@ class DoubleAnnexRepo(object):
             # Process urls
             stats['allurls'] += len(urls)
             for href, href_a, link in urls:
+                # Get a dict with all the options
+                # yoh: got disracted and lost a thought why this
+                #      wasn't finished and either it is needed at all
+                # evars = scfg.get_raw_options()
+                # evars.update(
                 evars = dict(href=href, link=link)
 
                 # bring them into the full urls, href might have been a full url on its own
@@ -213,25 +220,25 @@ class DoubleAnnexRepo(object):
                 # should be "maintained", e.g. in cases where we recurse
                 # TODO: make stripping/directories optional/configurable
                 # so we are simply deeper on the same site
-                href_dir = os.path.dirname(href_full[len(top_url):].lstrip(os.path.sep)) \
+                href_dir = dirname(href_full[len(top_url):].lstrip(pathsep)) \
                     if href_full.startswith(top_url) else ''
 
-                # Download incoming and possibly get alternative filename from Deposit
-                # It will adjust db_incoming in-place
+                # Download incoming and possibly get alternative
+                # filename from Deposit It will adjust db_incoming in-place
                 if (href_full in db_incoming_urls
                     and (existing and existing == 'skip')):
-                    lgr.debug("Skipping attempt to download since %s known to db "
-                              "already and existing='skip'" % href_full)
+                    lgr.debug("Skipping attempt to download since %s known to "
+                              "db already and existing='skip'" % href_full)
                     incoming_filename = db_incoming_urls[href_full]
                 else:
                     incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
                       download_url(href_full, incoming_annex.path,
-                                   os.path.join(repo_sectiondir, href_dir),
+                                   join(repo_sectiondir, href_dir),
                                    db_incoming=db_incoming, dry_run=self.runner.dry, # TODO -- use runner?
                                    add_mode=add_mode)
                     stats['downloaded'] += downloaded_size
 
-                full_incoming_filename = os.path.join(incoming_annex.path, incoming_filename)
+                full_incoming_filename = join(incoming_annex.path, incoming_filename)
 
                 evars['filename'] = incoming_filename
                 public_filename = scfg.get('filename', vars=evars)
@@ -248,7 +255,7 @@ class DoubleAnnexRepo(object):
                              "pure fast mode doesn't make sense" % locals())
                     incoming_filename_, incoming_downloaded, incoming_updated_, downloaded_size = \
                       download_url(href_full, incoming_annex.path,
-                                   os.path.join(repo_sectiondir, href_dir),
+                                   join(repo_sectiondir, href_dir),
                                    db_incoming=db_incoming, dry_run=self.runner.dry,
                                    add_mode='download',
                                    force_download=True)
@@ -313,7 +320,7 @@ class DoubleAnnexRepo(object):
 
         _call(git_commit,
               incoming_annex.path,
-              files=[self.db_name] if os.path.exists(db_path) else [],
+              files=[self.db_name] if exists(db_path) else [],
               msg="page2annex(incoming): " + stats_str)
         if incoming_annex is not public_annex:
             _call(git_commit, public_annex.path,

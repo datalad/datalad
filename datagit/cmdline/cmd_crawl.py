@@ -97,8 +97,10 @@ def setup_parser(parser):
 #             '--dbg', action='store_true', dest='common_debug',
 #             help="do not catch exceptions and show exception traceback")
 
-    parser.add_argument("configs", metavar='file', nargs='+',
-                        help="Configuration file(s) defining the structure of the 'project'")
+    parser.add_argument(
+        "configs", metavar='file', nargs='+',
+        help="Configuration file(s) defining the structure of the 'project'")
+
 
 def run(args):
     from datagit.api import DoubleAnnexRepo, load_config
@@ -110,6 +112,7 @@ def run(args):
     cfg = load_config(args.configs)
 
     drepo = DoubleAnnexRepo(cfg)
-    drepo.page2annex(existing=args.existing, dry_run=args.dry_run, cache=args.cache)
+    drepo.page2annex(existing=args.existing, dry_run=args.dry_run,
+                     cache=args.cache)
 
 
