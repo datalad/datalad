@@ -152,7 +152,9 @@ def _parse_urls(page):
     return urls
 
 def parse_urls(page, cache=False):
-    if cache:
+    if False: # cache:
+        # disabled until bs4 addresses Pickling issue
+        # https://bugs.launchpad.net/beautifulsoup/+bug/1231545
         return memory.eval(_parse_urls, page)
     else:
         return _parse_urls(page)
@@ -197,7 +199,12 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
         # separate tuple out
         u, a, l = url_
         recurse_match = recurse and recurse_re.search(u)
-        if u.endswith('/') or recurse_match:     # must be a directory or smth we were told to recurse into
+        u_rec = urlparse(u)
+        u_path = u_rec.path
+        u_is_directory = u_path.endswith('/')
+        u_dir = u_path if u_is_directory else os.path.dirname(u_path)
+
+        if u_is_directory or recurse_match:     # must be a directory or smth we were told to recurse into
             if u in ('../', './'):
                 # TODO -- might be a full URL pointing to "Parent Directory"
                 lgr.log(8, "Skipping %s -- we are not going to parents" % u)
@@ -207,7 +214,7 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
                 continue
             if recurse_match:
                 # then we should fetch the one as well
-                u_rec = urlparse(u)
+
                 u_full = urljoin(url, u)
                 if u_rec.scheme:
                     if not (url_rec.netloc == u_rec.netloc and u_rec.path.startswith(rl_rec.path)):
@@ -221,8 +228,11 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
                     u_full, recurse=recurse, hot_cache=hot_cache, cache=cache,
                     memo=memo)
                 # and add to their "hrefs" appropriate prefix
-                urls.extend([(os.path.join(u, url__[0]),) + url__[1:]
+
+                urls.extend([(os.path.join(u_dir, url__[0]),) + url__[1:]
                              for url__ in new_urls])
+                ## import pydb; pydb.debugger()
+                ## i = 1
             else:
                 lgr.log(8, "Skipping %s since doesn't match recurse" % u)
         else:
@@ -314,6 +324,12 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
             r_info = r.info()
 
             r_stamp = get_response_stamp(url, r_info)
+            if url != r.url:
+                # We were redirected (?) and might like to use actual url_filename
+                # from the redirected URL
+                # TODO: option!
+                url_filename = os.path.basename(urllib2.unquote(urlsplit(r.url).path))
+
             if use_content_name:
                 filename = get_response_filename(url, r_info) or url_filename
             else:
