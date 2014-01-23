@@ -35,8 +35,7 @@ import bs4
 import time
 
 def slugify(value):
-    """
-    Normalizes string, converts to removes non-alpha characters.
+    """Normalizes the string: removes non-alpha characters.
     """
     import unicodedata
     value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore')
@@ -47,19 +46,16 @@ def get_video_filename(link, filename):
     video_entry = list(link.parents)[3] # <div class="article">
     assert(isinstance(video_entry, bs4.element.Tag))
     bold_entries = video_entry.find_all('b')
-    assert(len(bold_entries) == 2)        # that is what we know atm
+    assert(len(bold_entries) == 2)      # that is what we know atm
     title = bold_entries[0].text
     date_ = bold_entries[1].text
     # Parse/convert the date
     date = time.strptime(date_, '%A, %B %d, %Y')
     date_str = time.strftime('%Y/%m-%d', date)
-    # TODO: sanitize the title
-    # TODO: it seems to readd upon every run -- shouldn't!
-    #import pydb; pydb.debugger()
-    # try to find extension in filename
+    # try to find extension in the filename
     ext = os.path.splitext(filename)[1]
     if not ext or len(ext) > 5:
-        # just hope that is a video extension...
+        # For now just hope that it is a video extension...
         # TODO -- check with mime ... etc?
         ext = '.avi'
     return "%s - %s%s" % (date_str, slugify(title), ext)
