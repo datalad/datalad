@@ -69,6 +69,7 @@ class DoubleAnnexRepo(object):
                        'incoming_annex_updates', 'public_annex_updates',
                       ]])
         hot_cache = {}
+        urls_errored = []
 
         if self.runner is None:
             self.runner = Runner()
@@ -231,11 +232,16 @@ class DoubleAnnexRepo(object):
                               "db already and existing='skip'" % href_full)
                     incoming_filename = db_incoming_urls[href_full]
                 else:
-                    incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
-                      download_url(href_full, incoming_annex.path,
-                                   join(repo_sectiondir, href_dir),
-                                   db_incoming=db_incoming, dry_run=self.runner.dry, # TODO -- use runner?
-                                   add_mode=add_mode)
+                    try:
+                        incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
+                          download_url(href_full, incoming_annex.path,
+                                       join(repo_sectiondir, href_dir),
+                                       db_incoming=db_incoming, dry_run=self.runner.dry, # TODO -- use runner?
+                                       add_mode=add_mode)
+                    except Exception, e:
+                        lgr.warning("Skipping %(href_full)s due to error: %(e)s" % locals())
+                        urls_errored.append(((href, href_a), e))
+                        continue
                     stats['downloaded'] += downloaded_size
 
                 full_incoming_filename = join(incoming_annex.path, incoming_filename)
@@ -243,7 +249,8 @@ class DoubleAnnexRepo(object):
                 evars['filename'] = incoming_filename
                 public_filename = scfg.get('filename', vars=evars)
                 evars['public_filename'] = public_filename
-
+                # TODO: seems if public == incoming, and would like custom filename_e then there is a problem
+                #       and file doesn't get a new name
                 # Incoming might be an archive -- check and adjust public filename accordingly
                 is_archive, public_filename = pretreat_archive(
                     public_filename, archives_re=scfg.get('archives_re', vars=evars))
@@ -327,6 +334,10 @@ class DoubleAnnexRepo(object):
                   msg="page2annex(public): " + stats_str)
 
         lgr.info(stats_str)
+        if len(urls_errored):
+            lgr.warning("Following urls failed to download")
+            for (href, href_a), error in urls_errored:
+                lgr.warning("| %s<%s>: %s" % (href_a, href, error))
 
         if dry_run:
             # print all accumulated commands

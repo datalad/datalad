@@ -43,4 +43,9 @@ for url in sys.argv[1:]:
     request.add_header('Accept-encoding', 'gzip,deflate')
     response = urllib2.urlopen(request)
     print "URL: ", url
+    if url != response.url:
+        print "REDIRECTED URL: ", response.url
     print response.info()
+    #import pydb;pydb.debugger()
+    #i = 1
+
