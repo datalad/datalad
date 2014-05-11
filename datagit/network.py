@@ -202,8 +202,11 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
         u_rec = urlparse(u)
         u_path = u_rec.path
         u_is_directory = u_path.endswith('/')
-        u_dir = u_path if u_is_directory else os.path.dirname(u_path)
-
+        u_dir, fjoin = (u_path, os.path.join) \
+                        if u_is_directory \
+                        else (os.path.dirname(u_path) + '/', urljoin)
+        # join function to use
+        # originally was just os.path.join but it would not be correct
         if u_is_directory or recurse_match:     # must be a directory or smth we were told to recurse into
             if u in ('../', './'):
                 # TODO -- might be a full URL pointing to "Parent Directory"
@@ -228,8 +231,7 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
                     u_full, recurse=recurse, hot_cache=hot_cache, cache=cache,
                     memo=memo)
                 # and add to their "hrefs" appropriate prefix
-
-                urls.extend([(os.path.join(u_dir, url__[0]),) + url__[1:]
+                urls.extend([(fjoin(u_dir, url__[0]),) + url__[1:]
                              for url__ in new_urls])
                 ## import pydb; pydb.debugger()
                 ## i = 1
