@@ -4,6 +4,19 @@ DataGit is a platform for harvesting data from online portals and
 expose collected data in a readily-usable form from [Git-annex]
 repositories, while fetching data load from the original data providers.
 
+# Status
+
+It is currently in a "prototype" state, i.e. **a mess**. It is functional for
+many use-cases but not widely used since its organization and configuration will
+be a subject for a considerable reorganization and standardization.  Primary
+purpose of the development is to catch major use-cases and try to address them
+to get a better understanding of the ultimate specs and design.
+
+# Tests
+
+Unfortunately there is not that much of unittests, but there are few
+"functionality" tests aiming to address main use-cases.
+
 # Dependencies
 
 On Debian-based systems:
