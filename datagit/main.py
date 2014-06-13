@@ -176,22 +176,24 @@ class DoubleAnnexRepo(object):
                 raise ValueError("Some logic would fail with relative paths in urls, "
                                  "please adjust %s" % scfg['url'])
             urls_all = collect_urls(top_url, recurse=scfg['recurse'], hot_cache=hot_cache, cache=cache)
-
+            import pdb; pdb.set_trace()
 
             #lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))
 
-            # Filter them out
+            # Filter them out; TODO: might better be done within collect_urls?
             urls = filter_urls(urls_all, **dict(
-                [(k,scfg[k]) for k in
+                [(k, scfg[k]) for k in
                  ('include_href', 'exclude_href',
                   'include_href_a', 'exclude_href_a')]))
             lgr.debug("%d out of %d urls survived filtering"
                      % (len(urls), len(urls_all)))
+
             if len(set(urls)) < len(urls):
                 urls = sorted(set(urls))
                 lgr.info("%d unique urls" % (len(urls),))
             lgr.debug("%d urls:\n%s"
                       % (len(urls), pprint_indent(urls, "    ", "[%s](%s): %s")))
+
             if scfg.get('check_url_limit', None):
                 limit = int(scfg['check_url_limit'])
                 if limit and len(urls) > limit:
@@ -333,19 +335,19 @@ class DoubleAnnexRepo(object):
             _call(git_commit, public_annex.path,
                   msg="page2annex(public): " + stats_str)
 
+
+        if dry_run and lgr.getEffectiveLevel() <= logging.INFO:
+            # print all accumulated commands
+            for cmd in self.runner.commands:
+                 lgr.info("DRY: %s" % cmd)
+        else:
+            # Once again save the DB -- db might have been changed anyways
+            save_db(db, db_path)
+
         lgr.info(stats_str)
         if len(urls_errored):
             lgr.warning("Following urls failed to download")
             for (href, href_a), error in urls_errored:
                 lgr.warning("| %s<%s>: %s" % (href_a, href, error))
-
-        if dry_run:
-            # print all accumulated commands
-            ## for cmd in self.runner.commands:
-            ##     lgr.info("DRY: %s" % cmd)
-            pass
-        else:
-            # Once again save the DB -- db might have been changed anyways
-            save_db(db, db_path)
 
         return stats

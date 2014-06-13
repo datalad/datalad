@@ -1,6 +1,6 @@
 #emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
 #ex: set sts=4 ts=4 sw=4 noet:
-#------------------------- =+- Python script -+= -------------------------
+#------------------------- =+- Python mscript -+= -------------------------
 """
 
  COPYRIGHT: Yaroslav Halchenko 2013
@@ -159,6 +159,37 @@ def parse_urls(page, cache=False):
     else:
         return _parse_urls(page)
 
+def same_website(url_rec, u_rec):
+    """Decide either a link leads to external site
+
+    Parameters
+    ----------
+    url_rec: ParseResult
+      record for original url
+    u_rec: ParseResult
+      record for new url
+    """
+    if isinstance(url_rec, basestring):
+        url_rec = urlparse(url_rec)
+    if isinstance(u_rec, basestring):
+        u_rec = urlparse(u_rec)
+    return (url_rec.netloc == u_rec.netloc)
+    # todo: collect more of sample cases.
+    # disabled below check while working on ratholeradio, since links
+    # could go to the parent and that is ok.  Figure out when it was
+    # desired not to go to the parent -- we might need explicit option
+    # and u_rec.path.startswith(url_rec.path)):
+
+def dgurljoin(u_path, url):
+    url_rec = urlparse(url) # probably duplicating parsing :-/ TODO
+    if url_rec.scheme:
+        # independent full url, so just return it
+        return url
+    if u_path.endswith('/'): # should here be also a scheme use?
+        return os.path.join(u_path, url)
+    # TODO: recall where all this dirname came from and bring into the test
+    return urljoin(os.path.dirname(u_path) + '/', url)
+
 
 def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
     """Collects urls starting from url
@@ -167,6 +198,10 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
     ----------
     recurse : string
       Regular expression to decide what to recurse into
+
+    Returns
+    -------
+    list of (url, label, bs4.element)
     """
     page = (hot_cache and hot_cache.get(url, None)) or fetch_page(url, cache=cache)
     if hot_cache is not None:
@@ -202,9 +237,7 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
         u_rec = urlparse(u)
         u_path = u_rec.path
         u_is_directory = u_path.endswith('/')
-        u_dir, fjoin = (u_path, os.path.join) \
-                        if u_is_directory \
-                        else (os.path.dirname(u_path) + '/', urljoin)
+
         # join function to use
         # originally was just os.path.join but it would not be correct
         if u_is_directory or recurse_match:     # must be a directory or smth we were told to recurse into
@@ -219,9 +252,11 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
                 # then we should fetch the one as well
 
                 u_full = urljoin(url, u)
+                if u_full in memo:
+                    lgr.debug("Not considering %s for recursion since was analyzed before", u_full)
+                    continue
                 if u_rec.scheme:
-                    if not (url_rec.netloc == u_rec.netloc and u_rec.path.startswith(rl_rec.path)):
-                        # so we are going to a new page?
+                    if not same_website(url_rec, u_rec):
                         lgr.log(9, "Skipping %s since it jumps to another site from original %s" % (u, url))
                         #raise NotImplementedError("Cannot jump to other websites yet")
                         continue
@@ -230,9 +265,11 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
                 new_urls = collect_urls(
                     u_full, recurse=recurse, hot_cache=hot_cache, cache=cache,
                     memo=memo)
+                new_fullurls = [(dgurljoin(u_path, url__[0]),) + url__[1:]
+                                 for url__ in new_urls]
                 # and add to their "hrefs" appropriate prefix
-                urls.extend([(fjoin(u_dir, url__[0]),) + url__[1:]
-                             for url__ in new_urls])
+                lgr.log(4, "Adding %d urls collected from %s" % (len(new_fullurls), u_full))
+                urls.extend(new_fullurls)
                 ## import pydb; pydb.debugger()
                 ## i = 1
             else:

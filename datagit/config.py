@@ -51,8 +51,8 @@ class EnhancedConfigParser(SafeConfigParserWithIncludes):
     def get_default(sections={}):
         cfg = EnhancedConfigParser(defaults=dict(
             mode='download',                 # TODO -- check, use
-            orig='auto',                 # TODO -- now we don't use it
-            meta_info='True',                 # TODO -- now we just use it
+            orig='auto',                     # TODO -- now we don't use it
+            meta_info='True',                # TODO -- now we just use it
             directory="%(__name__)s",
             archives_re='(%s)' % ('|'.join(DECOMPRESSORS.keys())),
             # 'keep'  -- just keep original without annexing it etc
