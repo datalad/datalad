@@ -35,7 +35,7 @@ from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
-     md5sum, ok_clean_git
+     md5sum, ok_clean_git, ok_file_under_git
 
 from ..config import EnhancedConfigParser
 from ..main import DoubleAnnexRepo
@@ -45,6 +45,7 @@ from ..db import load_db
 tree1args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
+        ('test.ascii', 'abracadabra'),
         ('1.tar.gz', (
             ('1 f.txt', '1 f load'),
             ('d', (('1d', ''),)), ))),
@@ -67,12 +68,19 @@ def verify_files_content(d, files, dangling=[]):
                 # verify all it loads ok
                 ok_(load_db(f_))
 
-def verify_files(d, target_files, dangling=[], untracked=[]):
+# TODO: move check ok_file_under_git here
+def verify_files(d,
+                 annex,
+                 git=[],
+                 dangling=[], untracked=[]):
     ok_clean_git(d, untracked=untracked)
     files = sorted_files(d)
-    target_files_all = set(target_files + dangling + untracked)
+    target_files_all = set(annex + git + dangling + untracked)
     eq_(set(files), target_files_all, "%s: %s != %s" % (d, files, target_files_all))
-    verify_files_content(d, target_files, dangling=dangling)
+    verify_files_content(d, annex + git, dangling=dangling)
+    for f in git:
+        ok_file_under_git(d, f)
+
 
 def verify_nothing_was_done(stats):
     eq_(stats['downloads'], 0)
@@ -93,7 +101,8 @@ def check_page2annex_same_incoming_and_public(url, mode, path):
             ),
         files=dict(
             directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
-            url=url)))
+            url=url,
+            git_add='(\.ascii)')))
 
     drepo = DoubleAnnexRepo(cfg)
     stats1_dry = drepo.page2annex(dry_run=True)
@@ -101,12 +110,16 @@ def check_page2annex_same_incoming_and_public(url, mode, path):
 
     stats1 = drepo.page2annex()
     # they both should match
-    eq_(stats1['incoming_annex_updates'], 2)
-    eq_(stats1['public_annex_updates'], 2)
-    # in fast/relaxed mode we still need to fetch 1 archive
-    eq_(stats1['downloads'], 1 + int(mode=='download'))
+    eq_(stats1['incoming_annex_updates'], 3)
+    eq_(stats1['public_annex_updates'], 3)
+    # in fast/relaxed mode we still need to fetch 1 archive, 1 for .ascii
+    eq_(stats1['downloads'], 1 + int(mode=='download') + 1)
     eq_(stats1['sections'], 1)
     assert_greater(stats1['downloaded'], 100)   # should be more than 100b
+    # verify that .ascii file was added directly to GIT
+    ok_file_under_git(dout, os.path.join('files', 'test.txt'), annexed=True)
+    ok_file_under_git(dout, os.path.join('files', 'test.ascii'), annexed=False)
+
     ok_clean_git(dout)
 
     # Let's repeat -- there should be no downloads/updates
@@ -122,6 +135,7 @@ def check_page2annex_same_incoming_and_public(url, mode, path):
          # there should be no 1/1
          'files/1/1 f.txt',
          'files/1/d/1d',
+         'files/test.ascii',
          'files/test.txt',
         ])
 
@@ -149,7 +163,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
 
     cfg = EnhancedConfigParser.get_default(dict(
         DEFAULT=dict(incoming=din, public=dout, description="test", mode=mode),
-        files=dict(directory='files', incoming_destiny=incoming_destiny, url=url)))
+        files=dict(directory='files', incoming_destiny=incoming_destiny, url=url, git_add='\.ascii')))
 
     drepo = DoubleAnnexRepo(cfg)
     stats1_dry = drepo.page2annex(dry_run=True)
@@ -161,13 +175,14 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     # dangling is just for broken/hanging symlinks
     dangling = ['files/test.txt'] if mode != 'download' else []
     verify_files(dout,
-        ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
+        annex=['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
+        git=['files/test.ascii'],
         dangling=dangling)
     eq_(stats1['incoming_annex_updates'],
-        0 if incoming_destiny in ['rm', 'keep'] else 2)
-    eq_(stats1['public_annex_updates'], 2)
-    # in fast/relaxed mode we still need to fetch 1 archive
-    eq_(stats1['downloads'], 1 + int(mode=='download'))
+        0 if incoming_destiny in ['rm', 'keep'] else 3)
+    eq_(stats1['public_annex_updates'], 3)
+    # in fast/relaxed mode we still need to fetch 1 archive, 1 for .ascii
+    eq_(stats1['downloads'], 1 + int(mode=='download') + 1)
     eq_(stats1['sections'], 1)
     assert_greater(stats1['downloaded'], 100)   # should be more than 100b
 
@@ -178,7 +193,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     # So which files should be present but not be committed
     din_untracked = ['files/BOGUS.txt']
     if incoming_destiny == 'keep':
-        din_untracked += ['files/1.tar.gz']
+        din_untracked += ['files/1.tar.gz', 'files/test.ascii']
         if mode == 'download':
             # we download it but do not commit
             din_untracked += ['files/test.txt']
@@ -201,6 +216,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     if incoming_destiny == 'annex':
         verify_files(din,
             ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
+            git=['files/test.ascii'],
             dangling=dangling, untracked=din_untracked)
     elif incoming_destiny == 'keep':
         # if mode is fast they will not be even downloaded to incoming,
@@ -213,6 +229,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     elif incoming_destiny == 'drop':
         verify_files(din,
             ['.page2annex', 'files/1.tar.gz', 'files/test.txt'],
+            git=['files/test.ascii'],
             dangling=dangling + ['files/1.tar.gz', 'files/test.txt'],
             untracked=din_untracked)
     else:                           # 'rm'
@@ -227,6 +244,7 @@ def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path
     ok_(exists(join(dout, '.git', 'annex')))
     verify_files(dout,
         ['files/1/1 f.txt', 'files/1/d/1d', 'files/test.txt'],
+        git=['files/test.ascii'],
         dangling=dangling)
 
     stats2_dry = drepo.page2annex(dry_run=True)

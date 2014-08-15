@@ -40,13 +40,15 @@ from .utils import pprint_indent
 
 
 class DoubleAnnexRepo(object):
+    """TODO: proper docs/motivation for this beast
+    """
 
     def __init__(self, cfg, db_name='.page2annex'):
         self.cfg = cfg
         self.db_name = db_name
 
-        self.incoming = None
-        self.public = None
+        #self.incoming = None
+        #self.public = None
         self.runner = None
 
         self.__init()
@@ -154,10 +156,7 @@ class DoubleAnnexRepo(object):
             # some checks
             scfg = self.cfg.get_section(section)
 
-            add_mode = scfg.get('mode')
-            assert(add_mode in ['download', 'fast', 'relaxed'])
-            fast_mode = add_mode in ['fast', 'relaxed']
-
+            git_add_re = re.compile(scfg.get('git_add')) if scfg.get('git_add') else None
             repo_sectiondir = scfg.get('directory')
 
             full_incoming_sectiondir = join(incoming_annex.path, repo_sectiondir)
@@ -176,7 +175,7 @@ class DoubleAnnexRepo(object):
                 raise ValueError("Some logic would fail with relative paths in urls, "
                                  "please adjust %s" % scfg['url'])
             urls_all = collect_urls(top_url, recurse=scfg['recurse'], hot_cache=hot_cache, cache=cache)
-            import pdb; pdb.set_trace()
+            #import pdb; pdb.set_trace()
 
             #lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))
 
@@ -226,6 +225,20 @@ class DoubleAnnexRepo(object):
                 href_dir = dirname(href_full[len(top_url):].lstrip(pathsep)) \
                     if href_full.startswith(top_url) else ''
 
+                add_mode = scfg.get('mode')
+                assert(add_mode in ['download', 'fast', 'relaxed'])
+
+                # If file name matches git_add, then mode needs to be forced to 'download'
+                # TODO: Unfortunately ATM (at least) incoming_filename is deduced later
+                # since might be different when fetched.  So for now
+                # use URL to judge either the file needs to be added to GIT.
+                # I will add below a check that if git_add_re and filename matches
+                # but wasn't git_add -- ERROR
+                git_add = git_add_re and git_add_re.search(href_full)
+                if git_add:
+                    add_mode = 'download'
+                fast_mode = add_mode in ['fast', 'relaxed']
+
                 # Download incoming and possibly get alternative
                 # filename from Deposit It will adjust db_incoming in-place
                 if (href_full in db_incoming_urls
@@ -246,6 +259,10 @@ class DoubleAnnexRepo(object):
                         continue
                     stats['downloaded'] += downloaded_size
 
+                if not git_add and git_add_re and git_add_re.search(incoming_filename):
+                    raise RuntimeError("For now git_add pretty much operates on URLs, not files."
+                        " But here we got a filename (%s) which matches git_add regexp while original"
+                        " url (%s) didn't. TODO" % (incoming_filename, href_full))
                 full_incoming_filename = join(incoming_annex.path, incoming_filename)
 
                 evars['filename'] = incoming_filename
@@ -305,6 +322,7 @@ class DoubleAnnexRepo(object):
                         add_mode=add_mode,
                         addurl_opts=scfg.get('addurl_opts', None, vars=evars),
                         runner=self.runner,
+                        git_add=git_add,
                         )
 
                     db_public_incoming[public_filename] = incoming_filename
@@ -320,6 +338,14 @@ class DoubleAnnexRepo(object):
                 if not dry_run and (annex_updated or incoming_updated):
                     _call(save_db, db, db_path)
 
+#                # TODO: for now we will just post-hoc treat git-annex
+#                # downloaded files which needed to be added directly
+#                # to git.  Ideally they should not even be added to
+#                # git-annex at any point, but code is a mess ATM.
+#                if git_add:
+#                    for filename in (incoming_filename, public_filename):
+#                        assert(os.path.exists(filename))
+#                        assert
                 stats['urls'] += 1
 
         stats_str = "Processed %(sections)d sections, %(urls)d (out of %(allurls)d) urls, " \

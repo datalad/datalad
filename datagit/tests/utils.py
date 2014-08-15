@@ -33,6 +33,7 @@ __license__ = 'MIT'
 import shutil, stat, os, sys
 
 from ..cmd import Runner
+from ..repos import AnnexRepo
 
 from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
     make_decorator, ok_, eq_
@@ -131,6 +132,12 @@ def ok_clean_git(path, annex=True, untracked=[]):
     eq_(sorted(repo.untracked_files), sorted(untracked))
     eq_(index_diffs, [])
     eq_(head_diffs, [])
+
+def ok_file_under_git(path, filename, annexed=False):
+    repo = AnnexRepo(path)
+    assert(filename in repo.get_indexed_files()) # file is known to Git
+    assert(annexed == os.path.islink(os.path.join(path, filename)))
+
 
 # GRRR -- this one is crippled since path where HTTPServer is serving
 # from can't be changed without pain.

@@ -38,7 +38,7 @@ import time
 
 from os.path import join, exists, lexists
 
-from .cmd import Runner, dry, link_file_load
+from .cmd import Runner, link_file_load
 from .files import decompress_file
 
 import logging
@@ -63,9 +63,9 @@ class AnnexRepo(object):
         if not exists(join(path, '.git', 'annex')):
             self.init(description)
 
-    def run(self, cmd):
+    def run(self, cmd, git_cmd="annex"):
         return self.runner.getstatusoutput(
-            "cd %s && git annex %s" % (self.path, cmd))
+            "cd %s && git %s %s" % (self.path, git_cmd, cmd))
 
     def write_description(self, description):
         with open(join(self.path, '.git', 'description'), 'w') as f:
@@ -83,6 +83,14 @@ class AnnexRepo(object):
             # dump description
             self.runner.drycall(self.write_description, description)
 
+    def get_indexed_files(self):
+        """Helper to spit out a list of indexed files
+        """
+        gitrepo = git.Repo(self.path)
+        index = gitrepo.index
+        # if belongs to index
+        return [x[0] for x in index.entries.keys()]
+
     def rm_indexed_file(self, filename):
         """Remove file if it is already under git-annex
 
@@ -90,13 +98,12 @@ class AnnexRepo(object):
         full_filename = join(self.path, filename)
         if not lexists(full_filename):
             return
-
         # TODO: since in dry_mode things might differ... ?
-        gitrepo = git.Repo(self.path)
-        index = gitrepo.index
         # if belongs to index
-        if  filename in [x[0] for x in index.entries.keys()]:
+        if  filename in self.get_indexed_files():
             # and no local changes
+            gitrepo = git.Repo(self.path)
+            index = gitrepo.index
             if not len(index.diff(None, paths=[filename])):
                 lgr.debug("Removing %s without local changes", filename)
                 self.runner.drycall(os.unlink, full_filename)
@@ -105,7 +112,7 @@ class AnnexRepo(object):
                           filename)
 
     def add_file(self, annex_filename, href=None, add_mode='auto',
-                       annex_opts=""):
+                       annex_opts="", git_add=False):
         """
         If add_mode=='auto' we assume that if file doesn't exist already --
         it should be '--fast' added
@@ -114,6 +121,13 @@ class AnnexRepo(object):
         # We delay actual committing to git-annex until later
         annex_opts = annex_opts + ' -c annex.alwayscommit=false'
         full_annex_filename = join(self.path, annex_filename)
+        if git_add:
+            # TODO: reflect in stats.  Now it would add to _annex_updates
+            if not self.runner.dry:
+                assert(os.path.exists(full_annex_filename))
+            return self.run(_esc(annex_filename), git_cmd="add")
+
+        # The rest for annex logic
         if add_mode == 'auto':
             if exists(full_annex_filename):
                 add_mode = "download"
@@ -164,6 +178,7 @@ def annex_file(href,
                # TODO!? uncomp_strip_leading_dir=True, #  False; would strip only if 1 directory
                addurl_opts=None,
                runner=None,
+               git_add=False,
                ):
     """Annex file, might require download, copying, extraction etc
 
@@ -229,8 +244,10 @@ def annex_file(href,
             lgr.debug("Moving %s under %s" % (temp_annex_dir, full_public_filename))
             _call(os.rename, temp_annex_dir, full_public_filename)
 
-            # TODO: some files might need to go to GIT directly
-            public_annex.add_file(public_filename, add_mode='download')
+            # TODO: some files might need to go to GIT directly, and currently
+            #       implemented git_add would not be in effect for content extracted
+            #       from archives
+            public_annex.add_file(public_filename, add_mode='download', git_add=git_add)
             if not runner.dry:
                 public_annex_updated = True
 
@@ -242,7 +259,7 @@ def annex_file(href,
             # TODO: git annex get (as an option) happen re-publication is needed
             # (e.g. separate out public from incoming)
             ## should come now later with incoming_destiny
-            ## incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode)
+            ## incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode, git_add=git_add)
             # copy via linking (TODO -- option to move, copy?)
 
             if incoming_annex is not public_annex:
@@ -257,7 +274,7 @@ def annex_file(href,
 
             if (incoming_annex is not public_annex) or fast_mode:
                 public_annex.rm_indexed_file(public_filename)
-                public_annex.add_file(public_filename, href=href, add_mode=add_mode)
+                public_annex.add_file(public_filename, href=href, add_mode=add_mode, git_add=git_add)
                 if not runner.dry:
                     public_annex_updated = True
 
@@ -278,10 +295,10 @@ def annex_file(href,
                 incoming_annex.rm_indexed_file(incoming_filename)
                 if exists(full_incoming_filename) and fast_mode:
                     # git annex would drop the load in --fast mode, so let's not provide 'fast'
-                    incoming_annex.add_file(incoming_filename, href=href)
+                    incoming_annex.add_file(incoming_filename, href=href, git_add=git_add)
                 else:
                     # normal
-                    incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode)
+                    incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode, git_add=git_add)
             if incoming_destiny == 'drop' and exists(full_incoming_filename):
                 incoming_annex.run("drop %s" % incoming_filename)
             if not runner.dry:

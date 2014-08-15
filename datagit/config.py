@@ -85,8 +85,16 @@ class EnhancedConfigParser(SafeConfigParserWithIncludes):
             # need to be annexed and some directly into .git
             # TODO
             #annex='.*',                    #
+            # Q: or should we utilize annex.largefiles syntax etc?
+            #    cons: for fast/relaxed mode etc we might not kow the size
+            # NOTE: that in rm, keep modes those will not be added either since
+            #       those modes set it up for handling archives
+            git_add=None,                 # which files (regexp) should be added to git directly. Implies that
+                                          # they need to be downloaded first
             recurse=None,                     # do not recurse by default, otherwise regex on urls to assume being for directories
             ))
+        # TODO: verify correct input config.  Currently would not fail if some
+        # unknown option (e.g. add_git) is used
         for section, options in sections.iteritems():
             if section != 'DEFAULT':
                 cfg.add_section(section)
