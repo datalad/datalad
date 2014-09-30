@@ -1,5 +1,5 @@
 Thoughts about redesign, well actually "design" since originally there
-were none, of datagit crawl.
+were none, of datalad crawl.
 
 Global portion of the config
 ============================
@@ -289,7 +289,7 @@ the load (possibly with some filtering/selection):
   A: upon such a first call, check if there is .../extracted_key/key/, if
      there is -- use.  If not -- extract and then use. use = hardlink
      into the target file.
-     Upon completion of `datagit get` (or some other command) verify
+     Upon completion of `datalad get` (or some other command) verify
      that all `/extracted/` are removed (and/or provide setting -- may
      be we could/should just keep those around)
 

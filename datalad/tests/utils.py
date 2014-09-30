@@ -147,7 +147,7 @@ import SimpleHTTPServer
 import SocketServer
 from threading import Thread
 
-lgr = logging.getLogger('datagit')
+lgr = logging.getLogger('datalad')
 
 class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     """A little adapter to silence the handler

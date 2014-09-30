@@ -2,7 +2,7 @@
 # ex: set sts=4 ts=4 sw=4 noet:
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
-#   See COPYING file distributed along with the datagit package for the
+#   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
@@ -18,7 +18,7 @@ more TODO
 
 Examples:
 
-$ datagit crawl cfgs/openfmri.cfg
+$ datalad crawl cfgs/openfmri.cfg
 
 TODO: See TODO.org
 
@@ -42,7 +42,7 @@ import argparse
 import os
 import sys
 
-import datagit.log
+import datalad.log
 from .helpers import parser_add_common_args
 
 def setup_parser(parser):
@@ -104,8 +104,8 @@ def setup_parser(parser):
     #parser_add_common_args(parser, opt=('log_level'))
     
 def run(args):
-    from datagit.api import DoubleAnnexRepo, load_config
-    from datagit.log import lgr
+    from datalad.api import DoubleAnnexRepo, load_config
+    from datalad.log import lgr
 
     lgr.debug("Command line arguments: %r" % args)
 

@@ -45,10 +45,10 @@ from StringIO import StringIO
 from urlparse import urljoin, urlparse, urlsplit, urlunsplit
 
 import logging
-lgr = logging.getLogger('datagit.network')
+lgr = logging.getLogger('datalad.network')
 
 from joblib import Memory
-memory = Memory(cachedir="/tmp/datagit", verbose=1)
+memory = Memory(cachedir="/tmp/datalad", verbose=1)
 
 def get_response_filename(url, response_info):
     if 'Content-Disposition' in response_info:

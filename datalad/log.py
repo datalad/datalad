@@ -84,10 +84,10 @@ class ColorFormatter(logging.Formatter):
         return logging.Formatter.format(self, record)
 
 
-def set_level(level=None, default='WARNING', lgr=None, name='datagit'):
+def set_level(level=None, default='WARNING', lgr=None, name='datalad'):
     """Helper to set loglevel for an arbitrary logger
 
-    By default operates for 'datagit'.
+    By default operates for 'datalad'.
     TODO: deduce name from upper module name so it could be reused without changes
     """
     if level is None:
@@ -108,9 +108,9 @@ def set_level(level=None, default='WARNING', lgr=None, name='datagit'):
     lgr.setLevel(log_level)
 
 
-def _init_datagit_logger():
+def _init_datalad_logger():
     # By default mimic previously talkative behavior
-    lgr = logging.getLogger('datagit')
+    lgr = logging.getLogger('datalad')
     log_handler = logging.StreamHandler(sys.stdout)
 
     # But now improve with colors and useful information such as time
@@ -119,6 +119,6 @@ def _init_datagit_logger():
     lgr.addHandler(log_handler)
     return lgr
 
-lgr = _init_datagit_logger()
+lgr = _init_datalad_logger()
 set_level(lgr=lgr)                           # will set the default
 

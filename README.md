@@ -1,7 +1,8 @@
-# DataGit
+# DataLad
 
-DataGit is a platform for harvesting data from online portals and
-expose collected data in a readily-usable form from [Git-annex]
+DataLad aims to deliver a data distribution.  Original motive was to provide
+a platform for harvesting data from online portals and
+exposing collected data in a readily-usable form from [Git-annex]
 repositories, while fetching data load from the original data providers.
 
 # Status

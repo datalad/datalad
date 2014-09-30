@@ -4,7 +4,7 @@ Config file format
 Includes
 --------
 
-:mod:`~datagit.config` enhances class:`~ConfigParser.SafeConfigParser`
+:mod:`~datalad.config` enhances class:`~ConfigParser.SafeConfigParser`
 to also support includes.  It makes it possible to specify within the
 `INCLUDES` section of the config file which other config file should
 be considered before or after a currently read config file::
@@ -58,4 +58,4 @@ recurse
   traversal while crawling the website
 
 TODO. Some additional documentation is currently within
-:meth:`datagit.config.EnhancedConfigParser.get_default`
+:meth:`datalad.config.EnhancedConfigParser.get_default`

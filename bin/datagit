@@ -3,7 +3,7 @@
 # ex: set sts=4 ts=4 sw=4 noet:
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
-#   See COPYING file distributed along with the datagit package for the
+#   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
@@ -17,17 +17,17 @@ import logging
 import sys
 import textwrap
 
-import datagit
-from datagit import log
-from datagit.log import lgr
+import datalad
+from datalad import log
+from datalad.log import lgr
 
-import datagit.cmdline as mvcmd
-from datagit.cmdline import helpers
+import datalad.cmdline as mvcmd
+from datalad.cmdline import helpers
 
 
 def _license_info():
     return """\
-Copyright (c) 2013 DataGit developers
+Copyright (c) 2013-2014 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -47,10 +47,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
-Datagit is written by Yaroslav Halchenko with the help of numerous other
-contributors.  Skeleton for datagit's cmdline handling is borrowed from
-testkraut (https://github.com/neurodebian/testkraut) by Michael Hanke,
-Expat license as well.
+DataLad (originally DataGit) is written by Yaroslav Halchenko with the help
+of numerous other contributors.  Skeleton for datalad's cmdline handling is
+borrowed from testkraut (https://github.com/neurodebian/testkraut)
+by Michael Hanke, Expat license as well.
 """
 
 
@@ -60,9 +60,9 @@ parser = argparse.ArgumentParser(
                 fromfile_prefix_chars='@',
                 # usage="%(prog)s ...",
                 description="""\
-DataGit aims to expose (scientific) data available online with the convenience of git-annex repositories.
+DataLad aims to expose (scientific) data available online as a unified data distribution with the convenience of git-annex repositories as a backend.
 
-datagit command line tool facilitates initial construction and update of harvested online datasets.  It supports following commands
+datalad command line tool facilitates initial construction and update of harvested online datasets.  It supports following commands
 """,
                 epilog='"Geet My Data"',
                 formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -73,7 +73,7 @@ helpers.parser_add_common_opt(parser, 'help')
 helpers.parser_add_common_opt(parser, 'log_level')
 helpers.parser_add_common_opt(parser,
                               'version',
-                              version='datagit %s\n\n%s' % (datagit.__version__,
+                              version='datalad %s\n\n%s' % (datalad.__version__,
                                                           _license_info()))
 if __debug__:
     parser.add_argument(
@@ -101,7 +101,7 @@ subparsers = parser.add_subparsers()
 cmd_short_description = []
 for cmd in sorted([c for c in dir(mvcmd) if c.startswith('cmd_')]):
     cmd_name = cmd[4:]
-    subcmdmod = getattr(__import__('datagit.cmdline',
+    subcmdmod = getattr(__import__('datalad.cmdline',
                                    globals(), locals(),
                                    [cmd], -1),
                         cmd)
@@ -118,7 +118,7 @@ for cmd in sorted([c for c in dir(mvcmd) if c.startswith('cmd_')]):
     # all subparser can report the version
     helpers.parser_add_common_opt(
             subparser, 'version',
-            version='datagit %s %s\n\n%s' % (cmd_name, datagit.__version__,
+            version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
                                              _license_info()))
     # our own custom help for all commands
     helpers.parser_add_common_opt(subparser, 'help')
@@ -129,7 +129,7 @@ for cmd in sorted([c for c in dir(mvcmd) if c.startswith('cmd_')]):
 
     # configure 'run' function for this command
     subparser.set_defaults(func=subcmdmod.run,
-                           logger=logging.getLogger('datagit.%s' % cmd))
+                           logger=logging.getLogger('datalad.%s' % cmd))
     # store short description for later
     sdescr = getattr(subcmdmod, 'short_description',
                      parser_args['description'].split('\n')[0])

@@ -33,4 +33,4 @@ __license__ = 'MIT'
 
 from .version import __version__
 
-import datagit.log
+import datalad.log

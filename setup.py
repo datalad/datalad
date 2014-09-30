@@ -4,15 +4,15 @@
 
 from setuptools import setup
 
-import datagit.version
+import datalad.version
 
 setup(
-    name="datagit",
+    name="datalad",
     author="Yaroslav Halchenko",
     author_email="debian@onerussian.com",
-    version=datagit.version.__version__,
+    version=datalad.version.__version__,
     description="get data from the web under control of git and git-annex",
-    py_modules=['datagit'],
+    py_modules=['datalad'],
     install_requires=[
         "GitPython", # 'git://github.com/gitpython-developers/GitPython'
         ],
@@ -20,6 +20,6 @@ setup(
     #entry_points="""
     #    [console_scripts]
     #"""
-    scripts = ['bin/datagit'],
+    scripts = ['bin/datalad'],
 )
 

@@ -40,7 +40,7 @@ import re
 from os.path import join
 
 import logging
-lgr = logging.getLogger('datagit.files')
+lgr = logging.getLogger('datalad.files')
 
 DECOMPRESSORS = {
     '\.(tar\.bz|tbz)$' : 'tar -xjvf %(file)s -C %(dir)s',

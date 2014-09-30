@@ -37,7 +37,7 @@ from configparserinc import SafeConfigParserWithIncludes
 from .files import DECOMPRESSORS
 
 import logging
-lgr = logging.getLogger('datagit.config')
+lgr = logging.getLogger('datalad.config')
 
 #
 # Configuration

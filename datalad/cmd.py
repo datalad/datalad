@@ -35,7 +35,7 @@ import os
 import commands
 
 import logging
-lgr = logging.getLogger('datagit.files')
+lgr = logging.getLogger('datalad.files')
 
 def dry(s, dry_):
     """Small helper for dry runs
