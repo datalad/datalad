@@ -310,7 +310,7 @@ Probably will just use patoolib (do not remember if has
 strip_path... seems not:
 https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=757483)
 
-URI:  dg:extract:UID
+URI:  dl:extract:UID
 
 and we keep information for what 'key' it came into what file (which
 might later get renamed, so extraction from the archive shouldn't
@@ -367,7 +367,7 @@ provenance -- i.e. so it could later be recreated automagically.
 For simple usecases (e.g. creation of lateralized atlas in HOX, some
 data curation, etc)
 
-URI:  dg:cmd:UID
+URI:  dl:cmd:UID
 
 while we keep a file providing the corresponding command for each UID,
 where ARGUMENTS will would point to the original files keys in the git
