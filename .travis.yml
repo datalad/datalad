@@ -9,6 +9,8 @@ python:
   - "2.7"
 
 before_install:
+  - echo 'deb http://ppa.launchpad.net/fmarier/git-annex/ubuntu precise main' | sudo tee /etc/apt/sources.list.d/annex.list
+  - sudo apt-key adv --recv-keys --keyserver hkp://pgp.mit.edu:80 90F7E9EB 
   - sudo apt-get update -qq
 
 install:
