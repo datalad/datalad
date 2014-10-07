@@ -1,0 +1,25 @@
+# vim ft=yaml
+# travis-ci.org definition for DataLad build
+language: python
+
+cache:
+  - apt
+
+python:
+  - "2.7"
+
+before_install:
+  - sudo apt-get update -qq
+
+install:
+  - sudo apt-get install git-annex
+  - git config --global user.email "test@travis.land"
+  - git config --global user.name "Travis Almighty"
+  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then cd ..; pip install -q coveralls; cd -; fi
+  - pip install -r requirements.txt
+
+script:
+  - DATALAD_LOGLEVEL=1 nosetests -s -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO
+
+after_success:
+  - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then coveralls; fi

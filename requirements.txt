@@ -1,0 +1,4 @@
+beautifulsoup4
+joblib
+patool
+https://github.com/gitpython-developers/GitPython/archive/0.3.zip
