@@ -59,19 +59,29 @@ class Runner(object):
     def getstatusoutput(self, cmd, dry_run=None):
         """A wrapper around commands.getstatusoutput
 
-        Also logs result and raise Exception
+        Provides improved logging for debugging purposes and raises
+        RuntimeError exception in case of non-0 return
         """
         self.log("Running: %s" % (cmd,))
         if not self.dry:
-            status, output = commands.getstatusoutput(cmd)
-            if status != 0:
+            # status, output = commands.getstatusoutput(cmd)
+            # doing manually for improved debugging
+            pipe = os.popen('{ ' + cmd + '; } 2>&1', 'r')
+            output = ''
+            for line in iter(pipe.readline, ''):
+                self.log("| " + line.rstrip('\n'), level=5)
+                output += line
+            if output[-1:] == '\n': output = output[:-1]
+            status = pipe.close() or 0
+
+            if not status in [0, None]:
                 msg = "Failed to run %r. Exit code=%d output=%s" \
                       % (cmd, status, output)
                 lgr.error(msg)
                 raise RuntimeError(msg)
             else:
-                self.log("Finished running %r with status %s and output %r" % (cmd, status, output),
-                         level=5)
+                self.log("Finished running %r with status %s" % (cmd, status),
+                         level=8)
                 return status, output
         else:
             self.commands.append(cmd)

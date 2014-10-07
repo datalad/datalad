@@ -75,12 +75,18 @@ class ColorFormatter(logging.Formatter):
         return fmt
 
     def format(self, record):
+        if record.msg.startswith('| '):
+            # If we already log smth which supposed to go without formatting, like
+            # output for running a command, just return the message and be done
+            return record.msg
+
         levelname = record.levelname
         if self.use_color and levelname in self.COLORS:
             fore_color = 30 + self.COLORS[levelname]
             levelname_color = self.COLOR_SEQ % fore_color + "%-7s" % levelname + self.RESET_SEQ
             record.levelname = levelname_color
         record.msg = record.msg.replace("\n", "\n| ")
+
         return logging.Formatter.format(self, record)
 
 
