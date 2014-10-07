@@ -38,7 +38,7 @@ import time
 
 from os.path import join, exists, lexists
 
-from .cmd import Runner, link_file_load
+from .cmd import Runner, link_file_load, lgr
 from .files import decompress_file
 
 import logging
@@ -59,7 +59,9 @@ class AnnexRepo(object):
         """
         self.path = path
         self.runner = runner or Runner()   # if none provided -- have own
-
+        self._default_annex_opts = " -c annex.alwayscommit=false"
+        if lgr.getEffectiveLevel() <= 5:
+            self._default_annex_opts += " --debug"
         if not exists(join(path, '.git', 'annex')):
             self.init(description)
 
@@ -119,7 +121,7 @@ class AnnexRepo(object):
         """
         # strip the directory off
         # We delay actual committing to git-annex until later
-        annex_opts = annex_opts + ' -c annex.alwayscommit=false'
+        annex_opts = self._default_annex_opts + annex_opts
         full_annex_filename = join(self.path, annex_filename)
         if git_add:
             # TODO: reflect in stats.  Now it would add to _annex_updates
