@@ -70,6 +70,8 @@ class Runner(object):
                 lgr.error(msg)
                 raise RuntimeError(msg)
             else:
+                self.log("Finished running %r with status %s and output %r" % (cmd, status, output),
+                         level=5)
                 return status, output
         else:
             self.commands.append(cmd)
@@ -87,7 +89,11 @@ class Runner(object):
         else:
             f(*args, **kwargs)
 
-    def log(self, msg):
+    def log(self, msg, level=None):
+        if level is None:
+            logf = lgr.debug
+        else:
+            logf = lambda msg: lgr.log(level, msg)
         if self.dry:
             lgr.debug("DRY: %s" % msg)
         else:
