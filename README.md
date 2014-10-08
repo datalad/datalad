@@ -13,6 +13,13 @@ be a subject for a considerable reorganization and standardization.  Primary
 purpose of the development is to catch major use-cases and try to address them
 to get a better understanding of the ultimate specs and design.
 
+## Code status:
+
+* [![tests status](https://secure.travis-ci.org/datalad/datalad.png?branch=master)](https://travis-ci.org/datalad/datalad) travis-ci.org (master branch)
+
+* [![Coverage Status](https://coveralls.io/repos/datalad/datalad/badge.png?branch=master)](https://coveralls.io/r/datalad/datalad)
+
+
 # Tests
 
 Unfortunately there is not that much of unittests, but there are few
