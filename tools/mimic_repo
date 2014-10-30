@@ -35,6 +35,7 @@ __license__ = 'MIT'
 
 import sys, os
 import commands
+import fileinput
 
 i = 0
 def run_command(cmd):
@@ -53,11 +54,9 @@ def init_git_annex(path):
 def populate_git_annex(list_, path='.'):
     count = 0
     i = 0
-    with open(list_, 'r') as f:
-        while True:
-            l = f.readline()
+    for l in fileinput.FileInput(list_, openhook=fileinput.hook_compressed):
             if not l: break
-            count += 1
+            i += 1
             items = l.split(None, 4)
             s3filename = items[-1]
             if s3filename.endswith('/'):
@@ -71,13 +70,13 @@ def populate_git_annex(list_, path='.'):
                 os.makedirs(dirname)
             with open(filename, 'w') as fout:
                 fout.write(filename)
-            i += 1
+            count += 1
             if not (i % 100):
                 sys.stdout.write('.')
                 sys.stdout.flush()#print("D: ran {cmd}. Got output {output}".format(**locals()))
              #run_command('cd {path}; git annex add {filename_}'.format(**locals()))
     print()
-    print("I: adding to annex")
+    print("I: adding to annex {count} files after processing {i} lines".format(**locals()))
     run_command('cd {path}; git annex add  *'.format(**locals()))
     print("I: committing")
     run_command('cd {path}; git commit -m "final commit"'.format(**locals()))
