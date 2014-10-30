@@ -1,0 +1,105 @@
+#!/usr/bin/python
+#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
+#ex: set sts=4 ts=4 sw=4 noet:
+"""
+ Simple script to simulate an annex repository given a list of files.
+
+ Not sure why I wrote it in Python, since in bash it would be more natural and shorter ;)
+
+ COPYRIGHT: Yaroslav Halchenko 2014
+
+ LICENSE: MIT
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in
+  all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  THE SOFTWARE.
+"""
+
+__author__ = 'Yaroslav Halchenko'
+__copyright__ = 'Copyright (c) 2014 Yaroslav Halchenko'
+__license__ = 'MIT'
+
+import sys, os
+import commands
+
+i = 0
+def run_command(cmd):
+    global i
+    st, output = commands.getstatusoutput(cmd)
+    if st != 0:
+        raise RuntimeError("E: run of {cmd} failed with status={st} output={output}".format(**locals()))
+    return st, output
+
+def init_git_annex(path):
+    if os.path.exists(path):
+        raise RuntimeError("path {path} exists already".format(**locals()))
+    run_command('mkdir -p {path}; cd {path}; git init; git annex init'.format(**locals()))
+    print("I: initialized in {}".format(path))
+
+def populate_git_annex(list_, path='.'):
+    count = 0
+    i = 0
+    with open(list_, 'r') as f:
+        while True:
+            l = f.readline()
+            if not l: break
+            count += 1
+            items = l.split(None, 4)
+            s3filename = items[-1]
+            if s3filename.endswith('/'):
+                continue
+            assert(s3filename.startswith('s3://'))
+            # create a dummy file with content being just a filename
+            filename_ = s3filename[5:]
+            filename = os.path.join(path, filename_)
+            dirname = os.path.dirname(filename)
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+            with open(filename, 'w') as fout:
+                fout.write(filename)
+            i += 1
+            if not (i % 100):
+                sys.stdout.write('.')
+                sys.stdout.flush()#print("D: ran {cmd}. Got output {output}".format(**locals()))
+             #run_command('cd {path}; git annex add {filename_}'.format(**locals()))
+    print()
+    print("I: adding to annex")
+    run_command('cd {path}; git annex add  *'.format(**locals()))
+    print("I: committing")
+    run_command('cd {path}; git commit -m "final commit"'.format(**locals()))
+    print "DONE. Created {} files".format(count)
+
+def git_repack(path):
+    print("Repacking {}".format(path))
+    run_command("cd {path}; git repack -a -d -f --window=100".format(path=path))
+
+def du(path):
+    st, output = commands.getstatusoutput('du -sk {path}'.format(path=path))
+    print "du for {path}: {output}".format(**locals())
+
+if __name__ == '__main__':
+    list_ = sys.argv[1]
+    path = sys.argv[2]
+    init_git_annex(path)
+    populate_git_annex(list_, path)
+    du(path)
+    git_repack(path)
+    du(path)
+
+    # let's now clone
+    run_command("git clone --no-hardlinks  {path} {path}.cloned".format(path=path))
+    du(path+".cloned")
