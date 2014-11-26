@@ -34,13 +34,3 @@ __license__ = 'MIT'
 def pprint_indent(l, indent="", fmt='%s'):
     return indent + ('\n%s' % indent).join([fmt % x for x in l])
 
-# TODO: here figure it out either it will be a
-# directory or not and either it needs to be extracted,
-# and what will be the extracted directory name
-def strippath(f, p):
-    """Helper to deal with our mess -- strip path from front of filename f"""
-    assert(f.startswith(p))
-    f = f[len(p):]
-    if f.startswith(os.path.sep):
-        f = f[1:]
-    return f

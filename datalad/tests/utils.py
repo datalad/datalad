@@ -33,7 +33,7 @@ __license__ = 'MIT'
 import shutil, stat, os, sys
 
 from ..cmd import Runner
-from ..repos import AnnexRepo
+from ..support.repos import AnnexRepo
 
 from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
     make_decorator, ok_, eq_

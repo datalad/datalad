@@ -38,8 +38,8 @@ import time
 
 from os.path import join, exists, lexists
 
-from .cmd import Runner, link_file_load, lgr
-from .files import decompress_file
+from ..cmd import Runner, link_file_load, lgr
+from .archives import decompress_file
 
 import logging
 lgr = logging.getLogger('datalad.git')

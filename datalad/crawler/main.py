@@ -32,11 +32,11 @@ __license__ = 'MIT'
 
 from os.path import dirname, exists, join, sep as pathsep
 
-from .repos import *
-from .db import load_db, save_db
-from .network import collect_urls, filter_urls, \
+from ..db import load_db, save_db
+from ..support.repos import *
+from ..support.network import collect_urls, filter_urls, \
       urljoin, download_url
-from .utils import pprint_indent
+from ..support.pprint import pprint_indent
 
 
 class DoubleAnnexRepo(object):

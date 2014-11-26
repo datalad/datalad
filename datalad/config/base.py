@@ -32,9 +32,9 @@ __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
 from ConfigParser import NoOptionError
-from configparserinc import SafeConfigParserWithIncludes
+from ..support.configparserinc import SafeConfigParserWithIncludes
 
-from .files import DECOMPRESSORS
+from ..support.archives import DECOMPRESSORS
 
 import logging
 lgr = logging.getLogger('datalad.config')

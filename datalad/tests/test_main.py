@@ -38,7 +38,7 @@ from .utils import eq_, ok_, assert_greater, \
      md5sum, ok_clean_git, ok_file_under_git
 
 from ..config import EnhancedConfigParser
-from ..main import DoubleAnnexRepo
+from ..crawler.main import DoubleAnnexRepo
 from ..db import load_db
 
 

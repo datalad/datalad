@@ -32,7 +32,7 @@ __license__ = 'MIT'
 
 from .utils import eq_, ok_
 
-from ..network import same_website, dgurljoin
+from ..support.network import same_website, dgurljoin
 
 
 def test_same_website():
