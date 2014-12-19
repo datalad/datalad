@@ -57,11 +57,13 @@ def populate_git_annex(list_, path='.'):
     for l in fileinput.FileInput(list_, openhook=fileinput.hook_compressed):
             if not l: break
             i += 1
-            items = l.split(None, 4)
+            items = l.rstrip().split(None, 3)
             s3filename = items[-1]
             if s3filename.endswith('/'):
                 continue
-            assert(s3filename.startswith('s3://'))
+            if not s3filename.startswith('s3://'):
+                print "ERROR: %i:  %s is not starting with s3://" % (i, s3filename)
+                import pdb; pdb.set_trace()
             # create a dummy file with content being just a filename
             filename_ = s3filename[5:]
             filename = os.path.join(path, filename_)
