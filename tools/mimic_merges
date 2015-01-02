@@ -42,7 +42,8 @@ done
 function multi_branch {
 	branches=$1
 	files_per_branch=$2
-	echo "Creating $branches branches with $files_per_branch per branch"
+    annex=$3
+	echo "Creating $branches branches with $files_per_branch per branch. annex=$annex"
 	i=0
 	for b in `eval echo {1..$branches}`; do
 		git co -b b$b master &> /dev/null
@@ -55,7 +56,11 @@ function multi_branch {
 			echo "file $i" > $fname;
 			i=$(($i+1))
 		done
-		git annex add * > /dev/null;
+        if [ $annex=1 ]; then
+            git annex add * > /dev/null;
+        else
+            git add * > /dev/null
+        fi
 		git commit -m "commit in branch $b" >/dev/null;
 	done
 	echo "Merging"
@@ -95,9 +100,10 @@ else
 	tdir=/tmp/testdir
 fi
 
+annex=0
 echo "Temp path $tdir"
-init_repo $tdir/branches;   cd $tdir/branches; time multi_branch $br $filespb
-init_repo $tdir/nobranches; cd $tdir/nobranches; time multi_branch 1 $files
+init_repo $tdir/branches;   cd $tdir/branches; time multi_branch $br $filespb $annex
+init_repo $tdir/nobranches; cd $tdir/nobranches; time multi_branch 1 $files $annex
 
 #init_repo
 #time singe_branch
