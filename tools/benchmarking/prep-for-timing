@@ -17,5 +17,5 @@ rsync -a $d/ $d1
 rsync -a $d/ $d2
 
 echo "I: Remapping"
-./remap-to-xx-yy.sh $d2
+./remap-to-xx-yy $d2
 
