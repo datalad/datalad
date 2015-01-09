@@ -38,6 +38,8 @@ import commands
 import fileinput
 
 i = 0
+addurl = "http://some.example.com/prefix/"
+
 def run_command(cmd):
     global i
     st, output = commands.getstatusoutput(cmd)
@@ -76,10 +78,17 @@ def populate_git_annex(list_, path='.'):
             if not (i % 100):
                 sys.stdout.write('.')
                 sys.stdout.flush()#print("D: ran {cmd}. Got output {output}".format(**locals()))
-             #run_command('cd {path}; git annex add {filename_}'.format(**locals()))
-    print()
-    print("I: adding to annex {count} files after processing {i} lines".format(**locals()))
-    run_command('cd {path}; git annex add  *'.format(**locals()))
+            # TODO
+            if addurl:
+                # we need to add a url for each file, thus first we just annex add
+                run_command('cd {path}; git annex add {filename_}'.format(**locals()))
+                # and then add a bogus url
+                url = addurl + filename_
+                run_command('cd {path}; git annex addurl --relaxed --file={filename_} {url}'.format(**locals()))
+    if not addurl:
+        print()
+        print("I: adding to annex {count} files after processing {i} lines".format(**locals()))
+        run_command('cd {path}; git annex add  *'.format(**locals()))
     print("I: committing")
     run_command('cd {path}; git commit -m "final commit"'.format(**locals()))
     print "DONE. Created {} files".format(count)
