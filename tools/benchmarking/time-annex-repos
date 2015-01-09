@@ -10,16 +10,17 @@ run_cmd() {
     d="$1"
     shift
     echo "= Command: $@ "
-    echo "== Cold $@"
+    echo -n "== Cold: "
     flush
     /usr/bin/time -f "\t%E real,\t%U user,\t%S sys" "$@"
     if [ -e $d ]; then
-        echo "== Warm/repeated"
+        echo -n "== Warm: "
         /usr/bin/time -f "\t%E real,\t%U user,\t%S sys" "$@"
     fi
 }
 
-for d in "$@"; do run_cmd $d du -scm $d; done
+echo
+for d in "$@"; do run_cmd $d du -sm $d; done
 echo
 echo
 for d in "$@"; do run_cmd $d tar -cf $d.tgz $d; done

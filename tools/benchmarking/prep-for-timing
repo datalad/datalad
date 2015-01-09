@@ -2,20 +2,35 @@
 
 set -eu
 
+stat() {
+    l=$(find $1 -type l| wc -l)
+    c=$( for d in $1/.git/annex/objects/*/*; do /bin/ls $d | wc -l ; done | sort | uniq -c | sed -e 's,^ *,,g' | sed -e 's,\(\S*\) \(\S*\),\2:\1,g' | tr '\n' ' ')
+    echo -e "$1:\t links: $l\t 2nd level collisions: $c"
+}
+
 d=$1
 d1=${d}-xx-yy-key
 d2=${d}-xx-yy
+d3=${d}-xx-y
 
-for d_ in $d1 $d2; do
+for d_ in $d1 $d2 $d3; do
     [ -e $d_ ] || continue
     chmod +w -R $d_
     rm -rf $d_
 done
 
-echo "I: rsyncing"
+echo "I: rsyncing $d into $d1 and $d2"
 rsync -a $d/ $d1
 rsync -a $d/ $d2
 
-echo "I: Remapping"
-./remap-to-xx-yy $d2
+echo "I: Remapping $d1"
+remap-to-xx-yy $d2
+echo "I: Rsyncing $d2 into $d3"
+rsync -a $d2/ $d3
+echo "I: Remapping $d3"
+remap-to-xx-y $d3
 
+echo "I: stats"
+for d_ in $d1 $d2 $d3; do
+    stat $d_
+done

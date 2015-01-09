@@ -1,15 +1,19 @@
 #!/bin/bash
 
+# take xx/yy git-annex repo and remap dropping number of 2nd level directories
+# to see if with more collisions we get better performance
+
 set -eu
 cd $1
+
 # First we will deal with .git/annex/objects
-for d in .git/annex/objects/??/??/*; do
-    [ -d $d ] || continue
-    chmod +w $d $d/..
+chmod +w -R .git/annex/objects/??
+for d in .git/annex/objects/??/??; do
     # although it must be the same name, let's be uber careful
-    mv $d ${d}_
-    mv ${d}_/* ${d}_/..
-    rmdir ${d}_
+    td=${d%?} # strip last letter
+    mkdir -p $td
+    mv $d/* $td/
+    rmdir ${d}
     #echo -n ,
 done
 
@@ -17,7 +21,8 @@ done
 find -type l \
 | while read f; do
    l=$(readlink "$f") 
-   rm $f; ln -s ${l%/*} $f
+   nl=$(echo $l| sed -e 's,\(objects/../.\)./,\1/,g')
+   rm $f; ln -s $nl $f
    # check if link is not broken
    [ -e $f ] || { echo BROKEN; exit 999; }
    #echo -n .
