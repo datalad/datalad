@@ -4,14 +4,21 @@ set -eu
 
 stat() {
     l=$(find $1 -type l| wc -l)
-    c=$( for d in $1/.git/annex/objects/*/*; do /bin/ls $d | wc -l ; done | sort | uniq -c | sed -e 's,^ *,,g' | sed -e 's,\(\S*\) \(\S*\),\2:\1,g' | tr '\n' ' ')
-    echo -e "$1:\t links: $l\t 2nd level collisions: $c"
+    if [ -e $1/.git/annex ]; then
+        c=$( for d in $1/.git/annex/objects/*/*; do /bin/ls $d | wc -l ; done | sort | uniq -c | sed -e 's,^ *,,g' | sed -e 's,\(\S*\) \(\S*\),\2:\1,g' | tr '\n' ' ')
+    else
+        c='NA'
+    fi
+    i=$(du -s --inodes $1 | awk '{print $1;}')
+    m=$(du -sm  $1 | awk '{print $1;}')
+    echo -e "$1:\tsize: ${m}M\tinodes: $i\tlinks: $l\t2nd level collisions: $c"
 }
 
 d=$1
 d1=${d}-xx-yy-key
 d2=${d}-xx-yy
 d3=${d}-xx-y
+d4=${d}-deref
 
 for d_ in $d1 $d2 $d3; do
     [ -e $d_ ] || continue
@@ -23,6 +30,9 @@ echo "I: rsyncing $d into $d1 and $d2"
 rsync -a $d/ $d1
 rsync -a $d/ $d2
 
+echo "I: rsyncing $d into $d4 with deref and excluding .git"
+rsync --exclude=.git -aL $d1 $d4
+
 echo "I: Remapping $d1"
 remap-to-xx-yy $d2
 echo "I: Rsyncing $d2 into $d3"
@@ -31,6 +41,6 @@ echo "I: Remapping $d3"
 remap-to-xx-y $d3
 
 echo "I: stats"
-for d_ in $d1 $d2 $d3; do
+for d_ in $d1 $d2 $d3 $d4; do
     stat $d_
 done

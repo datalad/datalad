@@ -29,3 +29,6 @@ find -type l \
 done
 # make it again not writable
 chmod -w -R .git/annex/objects/??
+
+git gc --aggressive &>/dev/null
+git repack -a -d -f --window=100 &>/dev/null

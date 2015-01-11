@@ -26,7 +26,7 @@ echo
 for d in "$@"; do run_cmd $d tar -cf $d.tgz $d; done
 echo
 echo
-for d in "$@"; do run_cmd $d chmod +w -R $d/.git/annex/objects; done
+for d in "$@"; do [ ! -e $d/.git/annex/objects ] || run_cmd $d chmod +w -R $d/.git/annex/objects; done
 echo
 echo
 for d in "$@"; do run_cmd $d rm -rf $d; done
