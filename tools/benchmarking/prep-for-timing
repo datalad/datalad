@@ -19,8 +19,9 @@ d1=${d}-xx-yy-key
 d2=${d}-xx-yy
 d3=${d}-xx-y
 d4=${d}-deref
+d5=${d}-x-xy
 
-for d_ in $d1 $d2 $d3; do
+for d_ in $d1 $d2 $d3 $d5; do
     [ -e $d_ ] || continue
     chmod +w -R $d_
     rm -rf $d_
@@ -39,8 +40,12 @@ echo "I: Rsyncing $d2 into $d3"
 rsync -a $d2/ $d3
 echo "I: Remapping $d3"
 remap-to-xx-y $d3
+echo "I: Rsyncing $d2 into $d5"
+rsync -a $d2/ $d5
+echo "I: Remapping $d5"
+remap-to-x-xy $d5
 
 echo "I: stats"
-for d_ in $d1 $d2 $d3 $d4; do
+for d_ in $d1 $d2 $d3 $d5 $d4; do
     stat $d_
 done

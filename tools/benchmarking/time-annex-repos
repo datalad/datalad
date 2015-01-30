@@ -1,9 +1,11 @@
-#!/bin/bash
+#!/bin/zsh
 
 set -eu
 
 flush () {
     sudo sync; sudo sh -c 'echo 3 >/proc/sys/vm/drop_caches'
+    # wait until load goes down
+    while [[ $(awk '{print $1}' /proc/loadavg) -gt 0.4 ]]; do sleep 1; done
 }
 
 run_cmd() {
