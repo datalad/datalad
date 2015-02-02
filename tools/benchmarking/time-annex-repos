@@ -2,10 +2,13 @@
 
 set -eu
 
-flush () {
-    sudo sync; sudo sh -c 'echo 3 >/proc/sys/vm/drop_caches'
+wait_till_low_load() {
     # wait until load goes down
     while [[ $(awk '{print $1}' /proc/loadavg) -gt 0.4 ]]; do sleep 1; done
+}
+
+flush () {
+    sudo sync; sudo sh -c 'echo 3 >/proc/sys/vm/drop_caches'
 }
 
 run_cmd() {
@@ -13,7 +16,8 @@ run_cmd() {
     shift
     echo "= Command: $@ "
     echo -n "== Cold: "
-    flush
+    which flush-caches >/dev/null && sudo flush-caches || flush
+    wait_till_low_load
     /usr/bin/time -f "\t%E real,\t%U user,\t%S sys" "$@"
     if [ -e $d ]; then
         echo -n "== Warm: "
@@ -25,10 +29,20 @@ echo
 for d in "$@"; do run_cmd $d du -sm $d; done
 echo
 echo
-for d in "$@"; do run_cmd $d tar -cf $d.tgz $d; done
+for d in "$@"; do run_cmd $d tar -cf $d.tar $d; pigz $d.tar; done
 echo
 echo
 for d in "$@"; do [ ! -e $d/.git/annex/objects ] || run_cmd $d chmod +w -R $d/.git/annex/objects; done
+echo 
+echo
+for d in "$@"; do [ ! -e $d/.git ] || run_cmd /XXX git clone $d $d.clone 1>/dev/null 2>&1 ; done
+echo 
+echo
+for d in "$@"; do [ ! -e $d.clone/.git ] || run_cmd /XXX bash -c "cd $d.clone; git annex get . 1>/dev/null 2>&1 || : "; done
+echo 
+echo
+for d in "$@"; do [ ! -e $d.clone/.git ] || run_cmd /XXX bash -c "cd $d.clone; git annex drop . 1>/dev/null 2>&1 || : "; done
 echo
 echo
-for d in "$@"; do run_cmd $d rm -rf $d; done
+for d in "$@"; do run_cmd $d rm -rf $d; 
+                  [ ! -e $d.clone ] || run_cmd $d.clone rm -rf $d.clone; done

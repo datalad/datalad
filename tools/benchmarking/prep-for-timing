@@ -3,6 +3,7 @@
 set -eu
 
 stat() {
+    #echo "D: '$1'"
     l=$(find $1 -type l| wc -l)
     if [ -e $1/.git/annex ]; then
         c=$( for d in $1/.git/annex/objects/*/*; do /bin/ls $d | wc -l ; done | sort | uniq -c | sed -e 's,^ *,,g' | sed -e 's,\(\S*\) \(\S*\),\2:\1,g' | tr '\n' ' ')
@@ -11,7 +12,8 @@ stat() {
     fi
     i=$(du -s --inodes $1 | awk '{print $1;}')
     m=$(du -sm  $1 | awk '{print $1;}')
-    echo -e "$1:\tsize: ${m}M\tinodes: $i\tlinks: $l\t2nd level collisions: $c"
+    printf "%-30s: " "$1"
+    echo -e "size: ${m}M\tinodes: $i\tlinks: $l\t2nd level collisions: $c"
 }
 
 d=$1
@@ -46,6 +48,8 @@ echo "I: Remapping $d5"
 remap-to-x-xy $d5
 
 echo "I: stats"
-for d_ in $d1 $d2 $d3 $d5 $d4; do
+#for d_ in $d1 $d2 $d3 $d5 $d4; do
+#/bin/ls $d-* | while read d_; do
+find . -maxdepth 1 -iname "${d}-*" -type d | while read d_; do
     stat $d_
 done

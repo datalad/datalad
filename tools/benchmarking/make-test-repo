@@ -5,11 +5,14 @@
 d=$1
 nfiles=$2
 ndirs=${3:-1}
+shift
+shift
+shift # TODO -- for now only if ndirs provided
 
 mkdir -p $d
 cd $d
 git init
-git annex init
+git "$@" annex init
 
 d=$ndirs
 f_=$(($ndirs*$nfiles)) # absolute count
