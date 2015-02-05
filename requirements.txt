@@ -2,3 +2,6 @@ beautifulsoup4
 joblib
 patool
 GitPython
+
+-- only for the tests --
+testtools
