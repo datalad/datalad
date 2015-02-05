@@ -4,16 +4,28 @@
 
 d=$1
 nfiles=$2
+ndirs=${3:-1}
+shift
+shift
+shift # TODO -- for now only if ndirs provided
 
 mkdir -p $d
 cd $d
 git init
-git annex init
-n=$nfiles
-while [ $n -gt 0 ]; do
-    echo "file$n" > $n
-    n=$(($n-1))
-done
-git annex add * >/dev/null
-git commit -m "added $nfiles files" >/dev/null
+git "$@" annex init
 
+d=$ndirs
+f_=$(($ndirs*$nfiles)) # absolute count
+while [ $d -gt 0 ]; do
+    if [ $ndirs = 1 ]; then d_=.; else d_=d$d; fi
+    mkdir -p $d_
+    n=$nfiles
+    while [ $n -gt 0 ]; do
+        echo "file$f_" > $d_/$f_
+        n=$(($n-1))
+        f_=$(($f_-1))
+    done
+    git annex add $d_/* >/dev/null
+    git commit -m "added $nfiles files to $d_" >/dev/null
+    d=$(($d-1))
+done

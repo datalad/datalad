@@ -10,7 +10,7 @@ cd $1
 chmod +w -R .git/annex/objects/??
 for d in .git/annex/objects/??/??; do
     # although it must be the same name, let's be uber careful
-    td=${d%?} # strip last letter
+    td=$(echo $d | sed -e 's,objects/\(.\)\(.\)/\(.\).,objects/\1/\2\3,g')
     mkdir -p $td
     mv $d/* $td/
     rmdir ${d}
@@ -21,7 +21,8 @@ done
 find -type l \
 | while read f; do
    l=$(readlink "$f") 
-   nl=$(echo $l| sed -e 's,\(objects/../.\)./,\1/,g')
+   nl=$(echo $l | sed -e 's,objects/\(.\)\(.\)/\(.\).,objects/\1/\2\3,g')
+   #nl=$(echo $l| sed -e 's,\(objects/../.\)./,\1/,g')
    rm $f; ln -s $nl $f
    # check if link is not broken
    [ -e $f ] || { echo BROKEN; exit 999; }

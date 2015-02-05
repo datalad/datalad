@@ -1,0 +1,86 @@
+{
+  "id": "get_forrest_minimal", 
+  "description": "Tiny demo test: Clone the Forrest Gump git annex repo and 'get' a single CSV file. The test verifies that we get the files we want and their content via hash (curtesy of testkraut). Few tests for expected Git meta data files verify that we have an annex branch and a master branch, and other minor bits.",
+  "inputs": {
+    "test implementation script": {
+      "type": "file",
+      "value": "get_forrest_minimal.sh"
+    },
+    "validation script": {
+      "type": "file",
+      "value": "print_num_localkeys.sh"
+    }
+  },
+  "outputs": {
+    "file:repo/.git/HEAD": {
+      "type": "file", 
+      "value": "repo/.git/HEAD"
+    }, 
+    "file:repo/.git/annex/index": {
+      "type": "file", 
+      "value": "repo/.git/annex/index"
+    }, 
+    "obtained annex'ed file in annex": {
+      "sha1sum": "7146d6e90d51a13fb19f29e3221627225c0c0d15", 
+      "type": "file", 
+      "value": "repo/.git/annex/objects/Jz/QP/SHA256E-s7213--0a60f2661dace61f7b645fe3127b437a3d1a3e0fd413780d49224bd3c7bb5972.csv/SHA256E-s7213--0a60f2661dace61f7b645fe3127b437a3d1a3e0fd413780d49224bd3c7bb5972.csv"
+    }, 
+    "we have git indicator": {
+      "type": "file", 
+      "value": "repo/.git/config"
+    }, 
+    "default repor description": {
+      "sha1sum": "9635f1b7e12c045212819dd934d809ef07efa2f4", 
+      "type": "file", 
+      "value": "repo/.git/description"
+    }, 
+    "we have an annex branch": {
+      "type": "file", 
+      "value": "repo/.git/refs/heads/git-annex"
+    }, 
+    "we have a master branch": {
+      "type": "file", 
+      "value": "repo/.git/refs/heads/master"
+    }, 
+    "we cloned from ORIGIN": {
+      "type": "file", 
+      "value": "repo/.git/refs/remotes/origin/HEAD"
+    }, 
+    "file directly in Git": {
+      "sha1sum": "8d5e8bbf5e3820872eaf7a4af07f20e44c3ba9aa", 
+      "type": "file", 
+      "value": "repo/LICENSE"
+    }, 
+    "file obtained via git annex": {
+      "sha1sum": "7146d6e90d51a13fb19f29e3221627225c0c0d15", 
+      "type": "file", 
+      "value": "repo/stimulus/task001/annotations/scenes.csv"
+    }, 
+    "tests::0::stdout": {
+      "type": "string", 
+      "value": "get stimulus/task001/annotations/scenes.csv (merging origin/git-annex into git-annex...)\n(Recording state in git...)\n(from origin...) ok\n(Recording state in git...)\n"
+    },
+    "tests::1::stdout": {
+      "type": "string", 
+      "value": " 1\n"
+    }
+  }, 
+  "tests": [
+    {
+      "command": [
+        "sh", 
+        "get_forrest_minimal.sh"
+      ], 
+      "type": "shell"
+    },
+    {
+      "command": [
+        "sh", 
+        "-c",
+        "cd repo && sh ../print_num_localkeys.sh"
+      ], 
+      "type": "shell"
+    }
+  ], 
+  "version": 0
+}

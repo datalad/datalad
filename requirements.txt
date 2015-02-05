@@ -2,3 +2,4 @@ beautifulsoup4
 joblib
 patool
 GitPython
+testtools
