@@ -5,6 +5,10 @@
     "test implementation script": {
       "type": "file",
       "value": "get_forrest_minimal.sh"
+    },
+    "validation script": {
+      "type": "file",
+      "value": "print_num_localkeys.sh"
     }
   },
   "outputs": {
@@ -55,6 +59,10 @@
     "tests::0::stdout": {
       "type": "string", 
       "value": "get stimulus/task001/annotations/scenes.csv (merging origin/git-annex into git-annex...)\n(Recording state in git...)\n(from origin...) ok\n(Recording state in git...)\n"
+    },
+    "tests::1::stdout": {
+      "type": "string", 
+      "value": " 1\n"
     }
   }, 
   "tests": [
@@ -62,6 +70,14 @@
       "command": [
         "sh", 
         "get_forrest_minimal.sh"
+      ], 
+      "type": "shell"
+    },
+    {
+      "command": [
+        "sh", 
+        "-c",
+        "cd repo && sh ../print_num_localkeys.sh"
       ], 
       "type": "shell"
     }
