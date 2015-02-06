@@ -16,12 +16,12 @@ information through the ``subunit`` test runner (apt-get install
 python-subunit). All these tests are implemented in
 ``datalad/tests/test_kraut.py`` and can be executed via subunit as such::
 
-  % PYTHONPATH=. python -m subunit.run datalad.tests.test_testkraut
+  % PYTHONPATH=. python -m subunit.run datalad.tests.test_kraut
 
 for a more convenient display of results subunit provides a number of filter
 commands that can read a subunit stream from stdin. For example::
 
-  % PYTHONPATH=. python -m subunit.run datalad.tests.test_testkraut | subunit2pyunit
+  % PYTHONPATH=. python -m subunit.run datalad.tests.test_kraut | subunit2pyunit
 
 generates standard pyunit-style output. ``subunit2csv``, ``subunit2gtk``,
 ``subunit-ls`` additional potentially useful filters.

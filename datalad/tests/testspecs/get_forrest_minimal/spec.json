@@ -29,7 +29,7 @@
       "type": "file", 
       "value": "repo/.git/config"
     }, 
-    "default repor description": {
+    "default repo description": {
       "sha1sum": "9635f1b7e12c045212819dd934d809ef07efa2f4", 
       "type": "file", 
       "value": "repo/.git/description"
