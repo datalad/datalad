@@ -58,7 +58,11 @@
     }, 
     "tests::0::stdout": {
       "type": "string", 
-      "value": "get stimulus/task001/annotations/scenes.csv (merging origin/git-annex into git-annex...)\n(Recording state in git...)\n(from origin...) ok\n(Recording state in git...)\n"
+      "contains": [
+        "get stimulus/task001/annotations/scenes.csv",
+        "(merging origin/git-annex into git-annex...)"
+      ],
+      "endswith": "ecording state in git...)\n"
     },
     "tests::1::stdout": {
       "type": "string", 
