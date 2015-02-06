@@ -38,9 +38,14 @@ def _raise(exception, why, input=None):
 
 def _verify_tags(struct, tags, name):
     for tag in tags:
-        if not tag in struct:
-            _raise(ValueError,
-                        "mandatory key '%s' is not in %s" % (tag, name))
+        if isinstance(tag, set):
+            if not tag.intersection(struct):
+                _raise(ValueError,
+                       "at least one of the keys %s must be in %s" % (tag, name))
+        else:
+            if not tag in struct:
+                _raise(ValueError,
+                       "mandatory key '%s' is not in %s" % (tag, name))
 
 def _verify_spec_tags(specs, tags, name):
     for i, os_id in enumerate(specs):
@@ -79,8 +84,10 @@ class SPEC(dict):
         self._check()
 
     def _check(self):
+        # Late import to prevent circular imports
+        from .testcase import __spec_matchers__
         _verify_tags(self, ('id', 'version', 'tests'), 'SPEC')
-        _verify_spec_tags(self.get('outputs', {}), ('type', 'value'),
+        _verify_spec_tags(self.get('outputs', {}), ('type', set(__spec_matchers__.keys())),
                           'outputs')
         _verify_spec_tags(self.get('inputs', {}), ('type', 'value'),
                           'inputs')

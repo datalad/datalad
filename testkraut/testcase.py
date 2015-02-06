@@ -23,7 +23,21 @@ from testtools import TestCase, RunTest
 from testtools.content import Content, text_content
 from testtools.content_type import ContentType, UTF8_TEXT
 from testtools import matchers as tm
-from testtools.matchers import Equals, Annotate, FileExists, Contains, DirExists
+from testtools.matchers import Equals, Annotate, FileExists, Contains, DirExists, \
+     MatchesRegex, StartsWith, EndsWith
+     # To be added whenever testtools gets upgraded (1.5.0 has those already exposed)
+     #DoesNotEndWith, DoesNotStartWith
+
+__spec_matchers__ = {
+    'value': Equals,
+    'contains': Contains,
+    'matches': MatchesRegex,
+    'startswith': StartsWith,
+    'endswith': EndsWith,
+#    'doesnotstartwith': DoesNotStartWith,
+#    'doesnotendwith': DoesNotEndWith,
+    }
+
 import testtools.matchers as tt_matchers
 # TKLIGHT: from . import matchers as tk_matchers
 
@@ -122,6 +136,9 @@ def discover_specs(paths=None):
             # we actually found a new one
             lgr.debug("discovered test SPEC '%s'" % spec_id)
             discovered[spec_id] = spec_fname
+        # TODO: provide configuration variable allowing to avoid this
+        # swallow-everything catcher to troubleshoot problems in the code
+        # inside
         except Exception, e:
             # not a valid SPEC
             lgr.warning("ignoring '%s': no a valid SPEC file: %s (%s)"
@@ -435,10 +452,17 @@ class TestFromSPEC(TestCase):
             elif ospectype == 'string' and ospec_id.startswith('tests'):
                 execinfo = self._details['exec_info']
                 sec, idx, field = ospec_id.split('::')
-                self.assertThat(
-                    execinfo[idx][field],
-                    Annotate("unexpected output for '%s'" % ospec_id,
-                             Equals(ospec['value'])))
+                for f, matcher in __spec_matchers__.iteritems():
+                    if f in ospec:
+                        # allow for multiple target values (given a matcher) being
+                        # specified.  For some matchers it might make no sense
+                        # (e.g. "endswith")
+                        targets = ospec[f]
+                        for target in (targets if isinstance(targets, list) else [targets]):
+                            self.assertThat(
+                                 execinfo[idx][field],
+                                 Annotate("unexpected output for '%s'" % ospec_id,
+                                           matcher(target)))
             else:
                 raise NotImplementedError(
                         "dunno how to handle output type '%s' yet"
