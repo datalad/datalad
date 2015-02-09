@@ -1,5 +1,5 @@
 beautifulsoup4
 joblib
 patool
-GitPython
+https://github.com/yarikoptic/GitPython/archive/bf/run_hooks_from_working_dir.zip
 testtools
