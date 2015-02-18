@@ -13,11 +13,13 @@ class GitRepo(object):
     Representation of a git repository
 
     Not sure if needed yet, since there is GitPython. By now, wrap it to have control.
+    Convention: method's names starting with 'git_' to not be overridden accidentally by AnnexRepo.
     """
 
     def __init__(self, path, url=None):
         """
-        Creates representation of git repository at path. If there is no git repository at this location, git init is invoked.
+        Creates representation of git repository at path. If there is no git repository at this location,
+        git init is invoked.
         Additionally the directory is created if it doesn't exist.
         If url is given, a clone is created at path
 
@@ -30,14 +32,16 @@ class GitRepo(object):
         self.path = path
 
         if url is not None:
-            Repo.clone_from(url, path)  # more arguments possible: ObjectDB etc.
-
+            Repo.clone_from(url, path)
+            # TODO: more arguments possible: ObjectDB etc.
+            # TODO: type check url? let clone_from do it? -> catch?
 
         if not exists(join(path, '.git')):
             self.repo = Repo.init(path, True)
         else:
             self.repo = Repo(path)
-        assert(isinstance(self.repo, Repo))
+        assert (isinstance(self.repo, Repo))
 
-    def dummy_git_command(self):
+
+    def git_dummy_command(self):
         raise NotImplementedError
