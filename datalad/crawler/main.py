@@ -35,7 +35,7 @@ from os.path import dirname, exists, join, sep as pathsep
 from ..db import load_db, save_db
 from ..support.repos import *
 from ..support.network import collect_urls, filter_urls, \
-      urljoin, download_url
+      urljoin, download_url_to_incoming
 from ..support.pprint import pprint_indent
 
 
@@ -249,7 +249,7 @@ class DoubleAnnexRepo(object):
                 else:
                     try:
                         incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
-                          download_url(href_full, incoming_annex.path,
+                          download_url_to_incoming(href_full, incoming_annex.path,
                                        join(repo_sectiondir, href_dir),
                                        db_incoming=db_incoming, dry_run=self.runner.dry, # TODO -- use runner?
                                        add_mode=add_mode)
@@ -280,7 +280,7 @@ class DoubleAnnexRepo(object):
                     lgr.info("(Re)downloading %(href_full)s since points to an archive, thus "
                              "pure fast mode doesn't make sense" % locals())
                     incoming_filename_, incoming_downloaded, incoming_updated_, downloaded_size = \
-                      download_url(href_full, incoming_annex.path,
+                      download_url_to_incoming(href_full, incoming_annex.path,
                                    join(repo_sectiondir, href_dir),
                                    db_incoming=db_incoming, dry_run=self.runner.dry,
                                    add_mode='download',

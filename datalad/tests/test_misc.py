@@ -35,7 +35,7 @@ from os.path import join
 from .utils import *
 
 from ..api import *
-from ..support.network import filter_urls, get_url_response_stamp, download_url, is_url_quoted
+from ..support.network import filter_urls, get_url_response_stamp, download_url_to_incoming, is_url_quoted
 
 def test_is_url_quoted():
     ok_(is_url_quoted('%22%27%3ba&b&cd|'))
@@ -74,7 +74,7 @@ def test_download_url():
     # Let's assume absent subdirectory
     #repo_filename, downloaded, updated, downloaded_size
     repo_filename, downloaded, updated, size \
-        = download_url("file://%s" % fname, dout)
+        = download_url_to_incoming("file://%s" % fname, dout)
     ok_(updated)
     ok_(downloaded)
     # check if stats are the same
@@ -85,14 +85,14 @@ def test_download_url():
 
     # and if again -- should not be updated
     repo_filename, downloaded, updated, size = \
-        download_url("file://%s" % fname, dout)
+        download_url_to_incoming("file://%s" % fname, dout)
     ok_(not updated)
     ok_(not downloaded)
 
     # but it should if we remove it
     os.unlink(join(dout, repo_filename))
     repo_filename, downloaded, updated, size = \
-        download_url("file://%s" % fname, dout)
+        download_url_to_incoming("file://%s" % fname, dout)
     full_filename = join(dout, repo_filename)
     ok_(updated)
     ok_(downloaded)
@@ -106,7 +106,7 @@ def test_download_url():
     db_incoming = {}
     os.unlink(full_filename)
     repo_filename, downloaded, updated, size = \
-        download_url("file://%s" % fname, dout, db_incoming=db_incoming)
+        download_url_to_incoming("file://%s" % fname, dout, db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(updated)
     ok_(downloaded)
@@ -120,7 +120,7 @@ def test_download_url():
     # exists -- we should skip it ATM
     os.unlink(full_filename)
     repo_filename, downloaded, updated, size = \
-        download_url("file://%s" % fname, dout, db_incoming=db_incoming)
+        download_url_to_incoming("file://%s" % fname, dout, db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(not updated)
     ok_(not downloaded)

@@ -50,7 +50,7 @@ lgr = logging.getLogger('datalad.network')
 from joblib import Memory
 memory = Memory(cachedir="/tmp/datalad", verbose=1)
 
-def get_response_filename(url, response_info):
+def get_response_deposition_filename(response_info):
     if 'Content-Disposition' in response_info:
         # If the response has Content-Disposition, try to get filename from it
         cd = dict(map(
@@ -61,8 +61,18 @@ def get_response_filename(url, response_info):
             return filename
     return None
 
+def get_url_deposition_filename(url):
+    request = urllib2.Request(url)
+    r = retry_urlopen(request)
+    try:
+        return get_response_deposition_filename(r.info())
+    finally:
+        r.close()
 
-def get_response_stamp(url, response_info):
+def get_url_straight_filename(url):
+    return os.path.basename(urllib2.unquote(urlsplit(url).path))
+
+def get_url_response_stamp(url, response_info):
     size, mtime = None, None
     if 'Content-length' in response_info:
         size = int(response_info['Content-length'])
@@ -305,8 +315,11 @@ def filter_urls(urls,
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
 
 # TODO: RF move db_incoming and modes logic outside?
-def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
-                 add_mode='download', use_content_name=False, force_download=False):
+def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run=False,
+                 add_mode='download',
+                 use_content_name=False,
+                 use_redirected_name=True,
+                 force_download=False):
     downloaded, updated, downloaded_size = False, False, 0
     # so we could check and remove it to keep it clean
     temp_full_filename = None
@@ -315,7 +328,7 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
         db_incoming = {}
 
     # unquote path's portion of url first
-    url_filename = os.path.basename(urllib2.unquote(urlsplit(url).path))
+    url_filename = get_url_straight_filename(url)
 
     class ReturnSooner(Exception):
         pass
@@ -357,20 +370,20 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
         # request.add_header('Accept-encoding', 'gzip,deflate')
         #
         # TODO: think about stamping etc -- we seems to be redoing
-        # what git-annex does for us already
+        # what git-annex does for us already... not really
         r = retry_urlopen(request)
         try:
             r_info = r.info()
 
-            r_stamp = get_response_stamp(url, r_info)
-            if url != r.url:
+            r_stamp = get_url_response_stamp(url, r_info)
+            if use_redirected_name and url != r.url:
                 # We were redirected (?) and might like to use actual url_filename
                 # from the redirected URL
-                # TODO: option!
-                url_filename = os.path.basename(urllib2.unquote(urlsplit(r.url).path))
+                # TODO: expose option
+                url_filename = get_url_straight_filename(r.url)
 
             if use_content_name:
-                filename = get_response_filename(url, r_info) or url_filename
+                filename = get_response_deposition_filename(r_info) or url_filename
             else:
                 filename = url_filename
 
@@ -460,7 +473,7 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
                 raise RuntimeError("File %s should not be there yet" % temp_full_filename)
 
             try:
-                # TODO -- download to .download temp file and rename upon success
+                # TODO -- download to .downloachad temp file and rename upon success
                 # TODO -- think either we should download here at all or just leave it
                 #         up to git-annex to do... atm we allow for mode 'rm' so it
                 #         might not be possible since it would not be fetched first by annex
@@ -469,6 +482,11 @@ def download_url(url, incoming, subdir='', db_incoming=None, dry_run=False,
                 if not os.path.exists(full_filename_dir):
                     os.makedirs(full_filename_dir)
 
+                # TODO:  avoid manual download -- delegate to wget or aria2c.
+                #  I don't think we are winning much from reusing original
+                #  request, and would need to deal with aborted transfers etc
+                #  Also then we wouldn't need to drag that 'r' around which was
+                #  originally used only to get target filename and related "stamp"
                 with open(temp_full_filename, 'wb') as f:
                     # No magical decompression for now
                     if False: #r.info().get('Content-Encoding') == 'gzip':
