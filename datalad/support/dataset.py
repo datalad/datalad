@@ -23,10 +23,9 @@ class Dataset(AnnexRepo):
         :return:
         """
 
-        #super(self.__class__, self).__init__(path, url)
         super(Dataset, self).__init__(path, url)
 
-        # TODO: create proper .datalad-file for marking as dataset and future use for config
+        # TODO: create proper .datalad-file (or -directory?) for marking as dataset and future use for config
         os.chdir(self.path)
         dataladFile = open('.datalad','w')
         dataladFile.write('dummy')
