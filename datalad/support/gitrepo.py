@@ -4,9 +4,15 @@ See http://gitpython.readthedocs.org/
 """
 __author__ = 'Benjamin Poldrack'
 
-from git import Repo
 from os.path import join, exists
 
+from git import Repo
+from git.exc import GitCommandError
+
+import datalad.log
+
+# TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
+# Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
 
 class GitRepo(object):
     """
@@ -28,20 +34,30 @@ class GitRepo(object):
         :return:
         """
 
-        assert isinstance(path, basestring)
         self.path = path
 
         if url is not None:
-            Repo.clone_from(url, path)
-            # TODO: more arguments possible: ObjectDB etc.
-            # TODO: type check url? let clone_from do it? -> catch?
+            try:
+                Repo.clone_from(url, path)
+                # TODO: more arguments possible: ObjectDB etc.
+            except GitCommandError as e:
+                # log here but let caller decide what to do
+                datalad.log.lgr.error(str(e))
+                raise
 
         if not exists(join(path, '.git')):
-            self.repo = Repo.init(path, True)
+            try:
+                self.repo = Repo.init(path, True)
+            except GitCommandError as e:
+                datalad.log.lgr.error(str(e))
+                raise
         else:
-            self.repo = Repo(path)
-        assert (isinstance(self.repo, Repo))
-
+            try:
+                self.repo = Repo(path)
+            except GitCommandError as e:
+                # TODO: Creating Repo-object from existing git repository might raise other Exceptions
+                datalad.log.lgr.error(str(e))
+                raise
 
     def git_dummy_command(self):
         raise NotImplementedError
