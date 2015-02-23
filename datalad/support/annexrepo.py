@@ -47,18 +47,12 @@ class AnnexRepo(GitRepo):
         :return:
         """
 
-        oldCWD = os.getcwd()  # save to restore afterwards
-        os.chdir(self.path)
-
-
-        status, output = self.cmd_call_wrapper.getstatusoutput('git annex init')
+        status, output = self.cmd_call_wrapper.getstatusoutput('cd %s && git annex init' % self.path)
         datalad.log.lgr.info('\"git annex init\" outputs:\n %s' % output)
         if status != 0:
             datalad.log.lgr.error('git annex init returned status %d.' % status)
 
-        os.chdir(oldCWD)
-
-
+ 
     def dummy_annex_command(self):
         """
 
