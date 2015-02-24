@@ -299,6 +299,10 @@ def _extend_globs(paths, flavors):
     # TODO: move away?
     def get_repo_url(path):
         """Return ultimate URL for this repo"""
+        if not os.path.exists(os.path.join(path, '.git')):
+            # do the dummiest check so we know it is not git.Repo's fault
+            raise AssertionError("Path %s does not point to a git repository "
+                                 "-- missing .git" % path)
         repo = git.Repo(path)
         if len(repo.remotes) == 1:
             remote = repo.remotes[0]
