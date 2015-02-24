@@ -52,7 +52,7 @@ class AnnexRepo(GitRepo):
         if status != 0:
             datalad.log.lgr.error('git annex init returned status %d.' % status)
 
- 
+
     def dummy_annex_command(self):
         """
 
