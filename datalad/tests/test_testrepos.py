@@ -40,7 +40,8 @@ from commands import getstatusoutput
 def test_having_annex(path):
     ok_(os.path.exists(os.path.join(path, '.git')))
     repo = git.Repo(path)
-    ok_('git-annex' in [r.name for r in repo.branches])
+    branches = [r.name for r in repo.branches]
+    ok_('git-annex' in branches, msg="Didn't find git-annex among %s" % branches)
 
 @with_testrepos(flavors=['network'])
 def test_point_to_github(url):
@@ -52,8 +53,9 @@ def test_point_to_github(url):
 def test_clone(src, tempdir):
     """Verify that all our repos are clonable"""
     status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
-    ok_(not status)
+    eq_(status, 0, msg="Status: %d  Output was: %r" % (status, output))
     ok_(os.path.exists(os.path.join(tempdir, ".git")))
-    status1, output1 = getstatusoutput("cd %(tempdir)s && git annex status" % locals())
-    ok_(not status1) # must be 0
+    status1, output1 = getstatusoutput("cd %(tempdir)s && git annex status"
+                                       % locals())
+    eq_(status1, 0, msg="Status: %d  Output was: %r" % (status1, output1))
     eq_(output1, "") # and empty
