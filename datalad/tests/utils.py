@@ -31,15 +31,15 @@ __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
 import shutil, stat, os
+import tempfile
+from functools import wraps
+
+from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
+    ok_, eq_
+from nose import SkipTest
 
 from ..cmd import Runner
 from ..support.repos import AnnexRepo
-
-from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
-    make_decorator, ok_, eq_
-from nose import SkipTest
-import tempfile
-
 
 def rmtree(path, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
@@ -89,25 +89,52 @@ def create_tree(path, tree):
                     load = load.encode('utf-8')
                 f.write(load)
 
-def with_tree(tree=None, **tkwargs):
-    def decorate(func):
-        def newfunc(*arg, **kw):
-            d = tempfile.mkdtemp(**tkwargs)
-            create_tree(d, tree)
-            try:
-                func(*((d,) + arg), **kw)
-            finally:
-                #print "TODO: REMOVE tree ", d
-                shutil.rmtree(d)
-        newfunc = make_decorator(func)(newfunc)
-        return newfunc
-    return decorate
+# Borrowed from pandas
+# Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
+# Licese: BSD-3
+def optional_args(decorator):
+    """allows a decorator to take optional positional and keyword arguments.
+        Assumes that taking a single, callable, positional argument means that
+        it is decorating a function, i.e. something like this::
+
+            @my_decorator
+            def function(): pass
+
+        Calls decorator with decorator(f, *args, **kwargs)"""
+
+    @wraps(decorator)
+    def wrapper(*args, **kwargs):
+        def dec(f):
+            return decorator(f, *args, **kwargs)
+
+        is_decorating = not kwargs and len(args) == 1 and callable(args[0])
+        if is_decorating:
+            f = args[0]
+            args = []
+            return dec(f)
+        else:
+            return dec
+
+    return wrapper
+
+@optional_args
+def with_tree(t, tree=None, **tkwargs):
+    @wraps(t)
+    def newfunc(*arg, **kw):
+        d = tempfile.mkdtemp(**tkwargs)
+        create_tree(d, tree)
+        try:
+            t(*((d,) + arg), **kw)
+        finally:
+            #print "TODO: REMOVE tree ", d
+            shutil.rmtree(d)
+    return newfunc
 
 
-import md5
+import hashlib
 def md5sum(filename):
     with open(filename) as f:
-        return md5.md5(f.read()).hexdigest()
+        return hashlib.md5(f.read()).hexdigest()
 
 
 import git
@@ -200,7 +227,9 @@ def sorted_files(dout):
                        if not '.git' in r], []))
 
 import glob
-def with_tempfile(*targs, **tkwargs):
+
+@optional_args
+def with_tempfile(t, *targs, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end.
 
     All arguments are passed into the call to tempfile.mktemp(), and
@@ -216,50 +245,48 @@ def with_tempfile(*targs, **tkwargs):
             open(tfile, 'w').write('silly test')
     """
 
-    def decorate(func):
-        def newfunc(*arg, **kw):
-            if len(targs)<2 and not 'prefix' in tkwargs:
-                try:
-                    tkwargs['prefix'] = 'tempfile_%s.%s' \
-                                        % (func.__module__, func.func_name)
-                except:
-                    # well -- if something wrong just proceed with defaults
-                    pass
-
-            filename = tempfile.mktemp(*targs, **tkwargs)
-            if __debug__:
-                lgr.debug('Running %s with temporary filename %s'
-                          % (func.__name__, filename))
+    @wraps(t)
+    def newfunc(*arg, **kw):
+        if len(targs)<2 and not 'prefix' in tkwargs:
             try:
-                func(*(arg + (filename,)), **kw)
-            finally:
-                # glob here for all files with the same name (-suffix)
-                # would be useful whenever we requested .img filename,
-                # and function creates .hdr as well
-                lsuffix = len(tkwargs.get('suffix', ''))
-                filename_ = lsuffix and filename[:-lsuffix] or filename
-                filenames = glob.glob(filename_ + '*')
-                if len(filename_) < 3 or len(filenames) > 5:
-                    # For paranoid yoh who stepped into this already ones ;-)
-                    lgr.warning("It is unlikely that it was intended to remove all"
-                                " files matching %r. Skipping" % filename_)
-                    return
-                for f in filenames:
-                    try:
-                        # Can also be a directory
-                        if os.path.isdir(f):
-                            shutil.rmtree(f)
-                        else:
-                            os.unlink(f)
-                    except OSError:
-                        pass
-        newfunc = make_decorator(func)(newfunc)
-        return newfunc
+                tkwargs['prefix'] = 'tempfile_%s.%s' \
+                                    % (func.__module__, func.func_name)
+            except:
+                # well -- if something wrong just proceed with defaults
+                pass
 
-    return decorate
+        filename = tempfile.mktemp(*targs, **tkwargs)
+        if __debug__:
+            lgr.debug('Running %s with temporary filename %s'
+                      % (t.__name__, filename))
+        try:
+            t(*(arg + (filename,)), **kw)
+        finally:
+            # glob here for all files with the same name (-suffix)
+            # would be useful whenever we requested .img filename,
+            # and function creates .hdr as well
+            lsuffix = len(tkwargs.get('suffix', ''))
+            filename_ = lsuffix and filename[:-lsuffix] or filename
+            filenames = glob.glob(filename_ + '*')
+            if len(filename_) < 3 or len(filenames) > 5:
+                # For paranoid yoh who stepped into this already ones ;-)
+                lgr.warning("It is unlikely that it was intended to remove all"
+                            " files matching %r. Skipping" % filename_)
+                return
+            for f in filenames:
+                try:
+                    # Can also be a directory
+                    if os.path.isdir(f):
+                        shutil.rmtree(f)
+                    else:
+                        os.unlink(f)
+                except OSError:
+                    pass
+    return newfunc
 
 
-def with_testrepos(paths='*/*', toppath=None, flavors='auto', skip=False):
+@optional_args
+def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     """Decorator function to provide test with a test repository available locally and/or over the Internet
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
@@ -293,35 +320,31 @@ def with_testrepos(paths='*/*', toppath=None, flavors='auto', skip=False):
 
     """
 
-    def decorate(func):
-        def newfunc(*arg, **kw):
-            # TODO: would need to either avoid this "decorator" approach for
-            # parametric tests or again aggregate failures like sweepargs does
-            toppath_ = os.path.join(os.path.dirname(__file__), 'testrepos') \
-                if toppath is None else toppath
+    @wraps(t)
+    def newfunc(*arg, **kw):
+        # TODO: would need to either avoid this "decorator" approach for
+        # parametric tests or again aggregate failures like sweepargs does
+        toppath_ = os.path.join(os.path.dirname(__file__), 'testrepos') \
+            if toppath is None else toppath
 
-            globs = glob.glob(os.path.join(toppath_, paths))
-            if not len(globs):
-                # currently that would be an error!
-                #raise RuntimeError("Found no test repositories under %s"
-                #        % os.path.join(toppath_, paths))
-                #lgr.warning()
-                raise (SkipTest if skip else AssertionError)(
-                       "Found no test repositories under %s."
-                       % os.path.join(toppath_, paths) +
-                       " Run git submodule update --init --recursive "
-                       if toppath is None else "")
-            for d in globs:
-                repo = d
-                if __debug__:
-                    lgr.debug('Running %s on %s'
-                              % (func.__name__, repo))
-                try:
-                    func(repo, *arg, **kw)
-                finally:
-                    pass
-        newfunc = make_decorator(func)(newfunc)
-        return newfunc
-
-    return decorate
+        globs = glob.glob(os.path.join(toppath_, paths))
+        if not len(globs):
+            # currently that would be an error!
+            #raise RuntimeError("Found no test repositories under %s"
+            #        % os.path.join(toppath_, paths))
+            #lgr.warning()
+            raise (SkipTest if skip else AssertionError)(
+                   "Found no test repositories under %s."
+                   % os.path.join(toppath_, paths) +
+                   " Run git submodule update --init --recursive "
+                   if toppath is None else "")
+        for d in globs:
+            repo = d
+            if __debug__:
+                lgr.debug('Running %s on %s' % (t.__name__, repo))
+            try:
+                t(repo, *arg, **kw)
+            finally:
+                pass
+    return newfunc
 with_testrepos.__test__ = False
