@@ -25,6 +25,16 @@ to get a better understanding of the ultimate specs and design.
 Unfortunately there is not that much of unittests, but there are few
 "functionality" tests aiming to address main use-cases.
 
+Some tests use testing repositories which are available as submodules
+under the `datalad/tests/testrepos` submodule (two tier- to not pollute
+top repository submodules namespace).  To enable those tests do
+
+```sh
+git submodule update --init --recursive
+```
+
+or clone with `--recursive` option originally.
+
 # Dependencies
 
 On Debian-based systems:
