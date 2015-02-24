@@ -51,9 +51,12 @@ class AnnexRepo(GitRepo):
             datalad.log.lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
             self.annex_init()
 
-    def annex_init(self):
+    def _annex_init(self):
         """Initializes an annex repository.
 
+        Note: This is intended for private use in this class by now.
+        If you have an object of this class already, there shouldn't be a need to 'init' again.
+        
         """
         # TODO: provide git and git-annex options.
         # TODO: Document (or implement respectively) behaviour in special cases like direct mode (if it's different),
