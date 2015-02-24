@@ -1,10 +1,18 @@
-"""
-Interface to git-annex by Joey Hess.
-See https://git-annex.branchable.com/.
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Interface to git-annex by Joey Hess.
+
+For further information on git-annex see https://git-annex.branchable.com/.
+
 """
 __author__ = 'Benjamin Poldrack'
 
-import os
 from os.path import join, exists
 
 from gitrepo import GitRepo
@@ -14,20 +22,23 @@ from datalad.cmd import Runner
 
 
 class AnnexRepo(GitRepo):
-    """
-    Representation of an git-annex repository.
+    """Representation of an git-annex repository.
 
     """
 
     def __init__(self, path, url=None):
-        """
+        """Creates representation of git-annex repository at `path`.
+
         AnnexRepo is initialized by giving a path to the annex.
         If no annex exists at that location, a new one is created.
         Optionally give url to clone from.
 
-        :param path: path to git-annex repository
-        :param url: valid git url. See http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS
-        :return:
+        path: str
+              path to git-annex repository
+        url: str
+             url to the to-be-cloned repository.
+             valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+
         """
         super(AnnexRepo, self).__init__(path, url)
 
@@ -41,11 +52,12 @@ class AnnexRepo(GitRepo):
             self.annex_init()
 
     def annex_init(self):
-        """
-        Invokes command 'git annex init'.
+        """Initializes an annex repository.
 
-        :return:
         """
+        # TODO: provide git and git-annex options.
+        # TODO: Document (or implement respectively) behaviour in special cases like direct mode (if it's different),
+        # not existing paths, etc.
 
         status, output = self.cmd_call_wrapper.getstatusoutput('cd %s && git annex init' % self.path)
         datalad.log.lgr.info('\"git annex init\" outputs:\n %s' % output)
@@ -54,8 +66,9 @@ class AnnexRepo(GitRepo):
 
 
     def dummy_annex_command(self):
-        """
+        """Just a dummy
 
-        :return:
+        No params, nothing to explain, should raise NotImplementedError.
+
         """
         raise NotImplementedError

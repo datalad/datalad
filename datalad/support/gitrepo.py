@@ -1,6 +1,15 @@
-"""
-Interface to Git via GitPython
-See http://gitpython.readthedocs.org/
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Interface to Git via GitPython
+
+For further information on GitPython see http://gitpython.readthedocs.org/
+
 """
 __author__ = 'Benjamin Poldrack'
 
@@ -15,23 +24,29 @@ import datalad.log
 # Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
 
 class GitRepo(object):
-    """
-    Representation of a git repository
+    """Representation of a git repository
 
     Not sure if needed yet, since there is GitPython. By now, wrap it to have control.
     Convention: method's names starting with 'git_' to not be overridden accidentally by AnnexRepo.
+
     """
 
     def __init__(self, path, url=None):
-        """
-        Creates representation of git repository at path. If there is no git repository at this location,
-        git init is invoked.
-        Additionally the directory is created if it doesn't exist.
-        If url is given, a clone is created at path
+        """Creates representation of git repository at `path`.
 
-        :param path: path to git repository.
-        :param url: valid git url. See http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS
-        :return:
+        If there is no git repository at this location, it will create an empty one.
+        Additionally the directory is created if it doesn't exist.
+        If url is given, a clone is created at `path`.
+
+        Parameters
+        ----------
+
+        path: str
+              path to the git repository
+        url: str
+             url to the to-be-cloned repository.
+             valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+
         """
 
         self.path = path
@@ -60,4 +75,9 @@ class GitRepo(object):
                 raise
 
     def git_dummy_command(self):
+        """Just a dummy
+
+        No params, nothing to explain, should raise NotImplementedError.
+
+        """
         raise NotImplementedError
