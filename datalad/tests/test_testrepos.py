@@ -40,8 +40,13 @@ from commands import getstatusoutput
 def test_having_annex(path):
     ok_(os.path.exists(os.path.join(path, '.git')))
     repo = git.Repo(path)
-    branches = [r.name for r in repo.branches]
-    ok_('git-annex' in branches, msg="Didn't find git-annex among %s" % branches)
+    # might not necessarily be present upon initial submodule init
+    #branches = [r.name for r in repo.branches]
+    #ok_('git-annex' in branches, msg="Didn't find git-annex among %s" % branches)
+    # look for it among remote refs
+    refs = [_.name for _ in repo.remote().refs]
+    ok_('origin/git-annex' in refs, msg="Didn't find git-annex among refs %s"
+                                        % refs)
 
 @with_testrepos(flavors=['network'])
 def test_point_to_github(url):
@@ -55,7 +60,8 @@ def test_clone(src, tempdir):
     status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
     eq_(status, 0, msg="Status: %d  Output was: %r" % (status, output))
     ok_(os.path.exists(os.path.join(tempdir, ".git")))
-    status1, output1 = getstatusoutput("cd %(tempdir)s && git annex status"
+    # TODO: requires network for sure! ;)
+    status1, output1 = getstatusoutput("cd %(tempdir)s && git annex get --from=web test-annex.dat"
                                        % locals())
     eq_(status1, 0, msg="Status: %d  Output was: %r" % (status1, output1))
-    eq_(output1, "") # and empty
+    ok_("get test-annex.dat" in output1)
