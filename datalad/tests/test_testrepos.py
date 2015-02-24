@@ -30,11 +30,30 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2015 Yaroslav Halchenko'
 __license__ = 'MIT'
 
+import git
 import os
-from datalad.tests.utils import eq_, ok_, with_testrepos
 
+from .utils import eq_, ok_, with_testrepos, with_tempfile
+from commands import getstatusoutput
 
-@with_testrepos('basic/*')
-def test_write(repo):
-    print repo
-    ok_(os.path.exists(os.path.join(repo, '.git', 'annex')))
+@with_testrepos(flavors=['local'])
+def test_having_annex(path):
+    ok_(os.path.exists(os.path.join(path, '.git')))
+    repo = git.Repo(path)
+    ok_('git-annex' in [r.name for r in repo.branches])
+
+@with_testrepos(flavors=['network'])
+def test_point_to_github(url):
+    ok_('github.com' in url)
+    ok_(url.startswith('git://github.com/datalad/testrepo--'))
+
+@with_testrepos
+@with_tempfile
+def test_clone(src, tempdir):
+    """Verify that all our repos are clonable"""
+    status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
+    ok_(not status)
+    ok_(os.path.exists(os.path.join(tempdir, ".git")))
+    status1, output1 = getstatusoutput("cd %(tempdir)s && git annex status" % locals())
+    ok_(not status1) # must be 0
+    eq_(output1, "") # and empty

@@ -35,7 +35,7 @@ import tempfile
 from functools import wraps
 
 from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
-    ok_, eq_
+    ok_, eq_, make_decorator
 from nose import SkipTest
 
 from ..cmd import Runner
@@ -240,7 +240,7 @@ def with_tempfile(t, *targs, **tkwargs):
 
     Example use::
 
-        @with_tempfile()
+        @with_tempfile
         def test_write(tfile):
             open(tfile, 'w').write('silly test')
     """
@@ -249,7 +249,7 @@ def with_tempfile(t, *targs, **tkwargs):
     def newfunc(*arg, **kw):
         if len(targs)<2 and not 'prefix' in tkwargs:
             try:
-                tkwargs['prefix'] = 'tempfile_%s.%s' \
+                tkwargs['prefix'] = 'datalad_temp_%s.%s' \
                                     % (func.__module__, func.func_name)
             except:
                 # well -- if something wrong just proceed with defaults
@@ -284,6 +284,31 @@ def with_tempfile(t, *targs, **tkwargs):
                     pass
     return newfunc
 
+
+def _extend_globs(paths, flavors):
+    globs = glob.glob(paths)
+
+    # TODO -- provide management of 'network' tags somehow
+    flavors_ = ['local', 'network'] if flavors=='auto' else flavors
+    if 'clone' in flavors_:
+        raise NotImplementedError("Providing clones is not implemented here yet")
+    globs_extended = []
+    if 'local' in flavors_:
+        globs_extended += globs
+
+    # TODO: move away?
+    def get_repo_url(path):
+        """Return ultimate URL for this repo"""
+        repo = git.Repo(path)
+        if len(repo.remotes) == 1:
+            remote = repo.remotes[0]
+        else:
+            remote = repo.remotes.origin
+        return remote.config_reader.get('url')
+
+    if 'network' in flavors_:
+        globs_extended += [get_repo_url(repo) for repo in globs]
+    return globs_extended
 
 @optional_args
 def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
@@ -327,24 +352,22 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
         toppath_ = os.path.join(os.path.dirname(__file__), 'testrepos') \
             if toppath is None else toppath
 
-        globs = glob.glob(os.path.join(toppath_, paths))
-        if not len(globs):
-            # currently that would be an error!
-            #raise RuntimeError("Found no test repositories under %s"
-            #        % os.path.join(toppath_, paths))
-            #lgr.warning()
+        globs_extended = _extend_globs(os.path.join(toppath_, paths), flavors)
+        if not len(globs_extended):
             raise (SkipTest if skip else AssertionError)(
-                   "Found no test repositories under %s."
-                   % os.path.join(toppath_, paths) +
-                   " Run git submodule update --init --recursive "
-                   if toppath is None else "")
-        for d in globs:
+                "Found no test repositories under %s."
+                % os.path.join(toppath_, paths) +
+                " Run git submodule update --init --recursive "
+                if toppath is None else "")
+
+        # print globs_extended
+        for d in globs_extended:
             repo = d
             if __debug__:
                 lgr.debug('Running %s on %s' % (t.__name__, repo))
             try:
                 t(repo, *arg, **kw)
             finally:
-                pass
+                pass # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
