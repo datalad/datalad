@@ -277,7 +277,7 @@ def with_tempfile(t, *targs, **tkwargs):
                 try:
                     # Can also be a directory
                     if os.path.isdir(f):
-                        shutil.rmtree(f)
+                        rmtree(f)
                     else:
                         os.unlink(f)
                 except OSError:
