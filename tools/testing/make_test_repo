@@ -92,7 +92,8 @@ register_repo_submodule() {
 	# TODO: verify if not registered already
 	#git submodule ...
 	git submodule add --force git://github.com/$ghrepo ./$flavor/$name && \
-		git commit -m "Added test $flavor/$name" -a
+		git commit -m "Added test $flavor/$name" -a && \
+		git push origin
 }
 
 # cd datalad/tests/testrepos

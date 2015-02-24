@@ -30,16 +30,16 @@ __author__ = 'Yaroslav Halchenko'
 __copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
 __license__ = 'MIT'
 
-import shutil, stat, os, sys
+import shutil, stat, os
 
 from ..cmd import Runner
 from ..support.repos import AnnexRepo
 
 from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
     make_decorator, ok_, eq_
+from nose import SkipTest
 import tempfile
 
-from nose.tools import make_decorator
 
 def rmtree(path, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
@@ -257,3 +257,71 @@ def with_tempfile(*targs, **tkwargs):
         return newfunc
 
     return decorate
+
+
+def with_testrepos(paths='*/*', toppath=None, flavors='auto', skip=False):
+    """Decorator function to provide test with a test repository available locally and/or over the Internet
+
+    All tests under datalad/tests/testrepos are stored in two-level hierarchy,
+    where top-level name describes nature/identifier of the test repository, and
+    there could be multiple instances (e.g. generated differently) of the same
+    "content"
+
+    Parameters
+    ----------
+    paths : string, optional
+      Glob paths to consider
+    toppath : string, optional
+      Path to the test repositories top directory.  If not provided,
+      `datalad/tests/testrepos` within datalad is used.
+    flavors : {'auto', 'local', 'clone', 'network'} or list of thereof, optional
+      What URIs to provide.  E.g. 'local' would just provide path to that
+      submodule, while 'network' would provide url of the origin remote where
+      that submodule was originally fetched from.  'clone' would clone repository
+      first to a temporary location. 'auto' would include the list of appropriate
+      ones (e.g., no 'network' if network tests are "forbidden")
+    skip : bool, optional
+      Allow to skip if no repositories were found. Otherwise would raise
+      AssertionError
+
+    Examples
+    --------
+
+        @with_testrepos('basic/*')
+        def test_write(repo):
+            assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
+
+    """
+
+    def decorate(func):
+        def newfunc(*arg, **kw):
+            # TODO: would need to either avoid this "decorator" approach for
+            # parametric tests or again aggregate failures like sweepargs does
+            toppath_ = os.path.join(os.path.dirname(__file__), 'testrepos') \
+                if toppath is None else toppath
+
+            globs = glob.glob(os.path.join(toppath_, paths))
+            if not len(globs):
+                # currently that would be an error!
+                #raise RuntimeError("Found no test repositories under %s"
+                #        % os.path.join(toppath_, paths))
+                #lgr.warning()
+                raise (SkipTest if skip else AssertionError)(
+                       "Found no test repositories under %s."
+                       % os.path.join(toppath_, paths) +
+                       " Run git submodule update --init --recursive "
+                       if toppath is None else "")
+            for d in globs:
+                repo = d
+                if __debug__:
+                    lgr.debug('Running %s on %s'
+                              % (func.__name__, repo))
+                try:
+                    func(repo, *arg, **kw)
+                finally:
+                    pass
+        newfunc = make_decorator(func)(newfunc)
+        return newfunc
+
+    return decorate
+with_testrepos.__test__ = False
