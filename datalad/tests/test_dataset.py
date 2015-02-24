@@ -20,15 +20,15 @@ from nose.tools import assert_raises, assert_is_instance, assert_true
 from git.exc import GitCommandError
 
 from datalad.support.dataset import Dataset
+from datalad.tests.utils import with_tempfile
 
-def test_Dataset():
 
-    pathToTestRepo = os.path.expanduser('~/test_dataset')
+@with_tempfile()
+def test_Dataset(pathToTestRepo):
+
     ds = Dataset(pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
     assert_is_instance(ds, Dataset, "Dataset was not created.")
     assert_true(os.path.exists(os.path.join(pathToTestRepo, '.datalad')))
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     assert_raises(GitCommandError, Dataset, pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
-
-    rmtree(pathToTestRepo)
