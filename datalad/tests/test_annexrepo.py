@@ -29,7 +29,6 @@ def test_AnnexRepo():
     assert_true(os.path.exists(os.path.join(pathToTestRepo, '.git', 'annex')))
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    with assert_raises(GitCommandError):
-        AnnexRepo(pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
+    assert_raises(GitCommandError, AnnexRepo, pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
 
     rmtree(pathToTestRepo)

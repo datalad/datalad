@@ -30,7 +30,6 @@ def test_GitRepo():
 
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    with assert_raises(GitCommandError):
-        GitRepo(pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
+    assert_raises(GitCommandError, GitRepo, pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
 
     rmtree(pathToTestRepo)
