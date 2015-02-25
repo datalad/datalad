@@ -12,6 +12,7 @@ This layer makes the difference between an arbitrary annex and a datalad-managed
 """
 __author__ = 'Benjamin Poldrack'
 
+import os
 from os.path import join
 
 from annexrepo import AnnexRepo
@@ -43,11 +44,7 @@ class Dataset(AnnexRepo):
 
         super(Dataset, self).__init__(path, url)
 
-        # TODO: create proper .datalad-file (or -directory?) for marking as dataset and future use for config
-        dataladFile = open(join(self.path,'.datalad'),'w')
-        dataladFile.write('dummy')
-        dataladFile.close()
-
+        os.mkdir(join(self.path, '.datalad'))
 
     def dummy_dataset_command(self):
         """Just a dummy
