@@ -17,7 +17,7 @@ more TODO
 
 Examples:
 
-$ datalad install /foo/bar http://psydata.ovgu.de/forrest_gump/.git
+$ datalad install http://psydata.ovgu.de/forrest_gump/.git /foo/bar
 
 TODO: See TODO.org
 
@@ -47,12 +47,12 @@ from .helpers import parser_add_common_args
 def setup_parser(parser):
 
     parser.add_argument(
-        "destination", metavar='dir',
-        help="path where to store the retrieved dataset")
-
-    parser.add_argument(
         "source", metavar='url',
         help="url to git repository")
+
+    parser.add_argument(
+        "destination", metavar='dir',
+        help="path where to store the retrieved dataset")
 
     #parser_add_common_args(parser, opt=('log_level'))
     
