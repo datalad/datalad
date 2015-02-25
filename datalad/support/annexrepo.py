@@ -33,11 +33,13 @@ class AnnexRepo(GitRepo):
         If no annex exists at that location, a new one is created.
         Optionally give url to clone from.
 
+        Parameters:
+        -----------
         path: str
-              path to git-annex repository
+          path to git-annex repository
         url: str
-             url to the to-be-cloned repository.
-             valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+          url to the to-be-cloned repository.
+          valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
 
         """
         super(AnnexRepo, self).__init__(path, url)

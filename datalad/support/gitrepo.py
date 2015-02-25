@@ -40,12 +40,11 @@ class GitRepo(object):
 
         Parameters
         ----------
-
         path: str
-              path to the git repository
+          path to the git repository
         url: str
-             url to the to-be-cloned repository.
-             valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+          url to the to-be-cloned repository.
+          valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
 
         """
 

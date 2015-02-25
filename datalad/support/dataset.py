@@ -33,13 +33,11 @@ class Dataset(AnnexRepo):
 
         Parameters
         ----------
-
         path : str
-               path to repository
-
+          path to repository
         url: str
-             url to the to-be-cloned repository.
-             valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+          url to the to-be-cloned repository.
+          valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
 
         """
 
