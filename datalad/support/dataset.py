@@ -13,7 +13,7 @@ This layer makes the difference between an arbitrary annex and a datalad-managed
 __author__ = 'Benjamin Poldrack'
 
 import os
-from os.path import join
+from os.path import join, exists
 
 from annexrepo import AnnexRepo
 
@@ -44,7 +44,9 @@ class Dataset(AnnexRepo):
 
         super(Dataset, self).__init__(path, url)
 
-        os.mkdir(join(self.path, '.datalad'))
+        dataladPath = join(self.path, '.datalad')
+        if not exists(dataladPath):
+            os.mkdir(dataladPath)
 
     def dummy_dataset_command(self):
         """Just a dummy
