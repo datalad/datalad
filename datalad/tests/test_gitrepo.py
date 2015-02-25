@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Tests to test implementation of class GitRepo
+"""Test implementation of class GitRepo
 
 Note: There's not a lot to test by now.
 
@@ -23,7 +23,7 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos
 @with_tempfile
 def test_GitRepo(src, dst):
 
