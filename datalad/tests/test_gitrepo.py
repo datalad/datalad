@@ -14,21 +14,22 @@ Note: There's not a lot to test by now.
 __author__ = 'Benjamin Poldrack'
 
 import os.path
-from shutil import rmtree
 
 from nose.tools import assert_raises, assert_is_instance, assert_true
 from git.exc import GitCommandError
 
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged
 
 
-@with_tempfile()
-def test_GitRepo(pathToTestRepo):
+@assert_cwd_unchanged
+@with_testrepos(flavors=['local'])
+@with_tempfile
+def test_GitRepo(src, dst):
 
-    gr = GitRepo(pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
+    gr = GitRepo(dst, src)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
-    assert_true(os.path.exists(os.path.join(pathToTestRepo, '.git')))
+    assert_true(os.path.exists(os.path.join(dst, '.git')))
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    assert_raises(GitCommandError, GitRepo, pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
+    assert_raises(GitCommandError, GitRepo, dst, src)
