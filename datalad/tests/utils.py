@@ -375,3 +375,17 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
                 pass # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
+
+def assert_cwd_unchanged(func):
+    """Decorator to test whether the current working directory remains unchanged by `func`
+
+    """
+
+    @make_decorator(func)
+    def newfunc(*args, **kwargs):
+        cwd_before = os.getcwd()
+        func(*args, **kwargs)
+        cwd_after = os.getcwd()
+        assert_equal(cwd_before, cwd_after ,"CWD changed from %s to %s" % (cwd_before, cwd_after))
+
+    return newfunc
