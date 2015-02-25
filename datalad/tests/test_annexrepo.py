@@ -20,15 +20,17 @@ from nose.tools import assert_raises, assert_is_instance, assert_true
 from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged
 
 
-@with_tempfile()
-def test_AnnexRepo(pathToTestRepo):
+@assert_cwd_unchanged
+@with_testrepos(flavors=['local'])
+@with_tempfile
+def test_AnnexRepo(src, dst):
 
-    ar = AnnexRepo(pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
+    ar = AnnexRepo(dst, src)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
-    assert_true(os.path.exists(os.path.join(pathToTestRepo, '.git', 'annex')))
+    assert_true(os.path.exists(os.path.join(dst, '.git', 'annex')))
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    assert_raises(GitCommandError, AnnexRepo, pathToTestRepo, 'http://psydata.ovgu.de/forrest_gump/.git')
+    assert_raises(GitCommandError, AnnexRepo, dst, src)
