@@ -17,6 +17,7 @@ install:
   - sudo apt-get install git-annex
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
+  - git submodule update --init --recursive
   - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then cd ..; pip install -q coveralls; cd -; fi
   - pip install -r requirements.txt
 

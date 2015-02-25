@@ -1,5 +1,5 @@
 beautifulsoup4
 joblib
 patool
-GitPython
+https://github.com/gitpython-developers/GitPython/archive/master.zip
 testtools

@@ -28,7 +28,7 @@
 #-----------------\____________________________________/------------------
 
 __author__ = 'Yaroslav Halchenko'
-__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
+__copyright__ = 'Copyright (c) 2013-2015 Yaroslav Halchenko'
 __license__ = 'MIT'
 
 from ConfigParser import NoOptionError

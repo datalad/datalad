@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-""""""
+"""Crawling of external resources (e.g. websites) to get/update datasets"""
 
 __docformat__ = 'restructuredtext'
 
