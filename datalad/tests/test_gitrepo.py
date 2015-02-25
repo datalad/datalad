@@ -23,13 +23,32 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
 
 
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos(flavors=['local'])
 @with_tempfile
-def test_GitRepo(src, dst):
+def test_GitRepo_instance_from_clone(src, dst):
 
     gr = GitRepo(dst, src)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     assert_true(os.path.exists(os.path.join(dst, '.git')))
 
-    #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
+    # do it again should raise GitCommandError since git will notice there's already a git-repo at that path
+    # and therefore can't clone to `dst`
     assert_raises(GitCommandError, GitRepo, dst, src)
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=['local'])
+def test_GitRepo_instance_from_existing(path):
+
+    gr = GitRepo(path)
+    assert_is_instance(gr, GitRepo, "GitRepo was not created.")
+    assert_true(os.path.exists(os.path.join(path, '.git')))
+
+
+@assert_cwd_unchanged
+@with_tempfile
+def test_GitRepo_instance_brand_new(path):
+
+    gr = GitRepo(path)
+    assert_is_instance(gr, GitRepo, "GitRepo was not created.")
+    assert_true(os.path.exists(os.path.join(path, '.git')))

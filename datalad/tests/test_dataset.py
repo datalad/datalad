@@ -24,7 +24,7 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
 
 
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos(flavors=['local'])
 @with_tempfile
 def test_Dataset(src, dst):
 
@@ -34,3 +34,22 @@ def test_Dataset(src, dst):
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     assert_raises(GitCommandError, Dataset, dst, src)
+    
+    
+@assert_cwd_unchanged
+@with_testrepos(flavors=['local'])
+def test_Dataset_instance_from_existing(path):
+
+    gr = Dataset(path)
+    assert_is_instance(gr, Dataset, "Dataset was not created.")
+    assert_true(os.path.exists(os.path.join(path, '.datalad')))
+
+
+
+@assert_cwd_unchanged
+@with_tempfile
+def test_Dataset_instance_brand_new(path):
+
+    gr = Dataset(path)
+    assert_is_instance(gr, Dataset, "Dataset was not created.")
+    assert_true(os.path.exists(os.path.join(path, '.datalad')))
