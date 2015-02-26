@@ -20,6 +20,9 @@ from datalad.log import LoggerHelper
 
 from datalad.tests.utils import with_tempfile, ok_, assert_equal
 
+# pretend we are in interactive mode so we could check if coloring is
+# disabled
+@patch("datalad.log.is_interactive", lambda: True)
 @with_tempfile
 def test_logging_to_a_file(dst):
     ok_(not exists(dst))
@@ -32,7 +35,10 @@ def test_logging_to_a_file(dst):
     with open(dst) as f:
         lines = f.readlines()
     assert_equal(len(lines), 1, "Read more than a single log line: %s" %  lines)
-    ok_(msg in lines[0])
+    line = lines[0]
+    ok_(msg in line)
+    ok_(not '\033[' in line,
+        msg="There should be no color formatting in log files. Got: %s" % line)
 
 @with_tempfile
 def test_logtarget_via_env_variable(dst):
