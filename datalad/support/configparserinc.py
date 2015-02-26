@@ -1,9 +1,17 @@
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: t -*-
-# vi: set ft=python sts=4 ts=4 sw=4 noet :
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+#   Originally written by Yaroslav Halchenko  for Fail2Ban and later
+#   adopted for use in DataLad and thus relicensed under MIT/Expat.
+#   Relicensing was conveied via email to other contributors.
+#
+#  ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-# Originally written by Yaroslav Halchenko  for Fail2Ban and later
-# adopted for use in DataLad and thus relicensed under MIT/Expat.
-# Relicensing was conveied via email to other contributors.
+
 
 import logging, os, sys
 
