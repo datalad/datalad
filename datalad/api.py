@@ -35,3 +35,4 @@ from .config import load_config, EnhancedConfigParser
 from .db import load_db, save_db
 from .support.archives import decompress_file
 from .crawler.main import DoubleAnnexRepo
+from .support.dataset import Dataset
