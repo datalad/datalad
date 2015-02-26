@@ -16,31 +16,56 @@ import datalad
 from datalad.cmdline.main import main, get_commands
 from datalad.tests.utils import assert_equal, ok_, assert_raises
 
+def run_main(args, exit_code=0, expect_stderr=False):
+    """Run main() of the datalad, do basic checks and provide outputs
+
+    Parameters
+    ----------
+    args : list
+        List of string cmdline arguments to pass
+    exit_code : int
+        Expected exit code. Would raise AssertionError if differs
+    expect_stderr : bool or string
+        Either to expect stderr output. If string -- match
+
+    Returns
+    -------
+    stdout, stderr  strings
+       Output produced
+    """
+    with patch('sys.stderr', new_callable=StringIO) as cmerr:
+        with patch('sys.stdout', new_callable=StringIO) as cmout:
+            with assert_raises(SystemExit) as cm:
+                main(args)
+            assert_equal(cm.exception.code, exit_code)  # exit code must be 0
+            stdout = cmout.getvalue()
+            stderr = cmerr.getvalue()
+            if expect_stderr == False:
+                assert_equal(stderr, "")
+            elif expect_stderr == True:
+                # do nothing -- just return
+                pass
+            else:
+                # must be a string
+                assert_equal(stderr, expect_stderr)
+    return stdout, stderr
+
+
 # TODO: switch to stdout for --version output
-# TODO: provide ultimate decorator  @run_main(args, exit_code) which would run
-#       main command, check exit_code and ship stdout, stderr into the test
-@patch('sys.stderr', new_callable=StringIO)
-def test_version(stdout):
-    with assert_raises(SystemExit) as cm:
-        main(['--version'])
-    assert_equal(cm.exception.code, 0)  # exit code must be 0
+def test_version():
+    stdout, stderr = run_main(['--version'], expect_stderr=True)
 
     # and output should contain our version, copyright, license
-    stdout = stdout.getvalue()
-    ok_(stdout.startswith('datalad %s\n' % datalad.__version__))
-    ok_("Copyright" in stdout)
-    ok_("Permission is hereby granted" in stdout)
+    ok_(stderr.startswith('datalad %s\n' % datalad.__version__))
+    ok_("Copyright" in stderr)
+    ok_("Permission is hereby granted" in stderr)
 
 def test_get_commands():
     assert('cmd_crawl' in get_commands())
 
-@patch('sys.stdout', new_callable=StringIO)
-def test_help(stdout):
-    with assert_raises(SystemExit) as cm:
-        main(['--help'])
-    assert_equal(cm.exception.code, 0)  # exit code must be 0
+def test_help():
+    stdout, stderr = run_main(['--help'])
 
-    stdout = stdout.getvalue()
     # Let's extract section titles:
     sections = filter(re.compile('[a-zA-Z ]*:').match, stdout.split('\n'))
     ok_(sections[0].startswith('Usage:')) # == Usage: nosetests [-h] if running using nose
