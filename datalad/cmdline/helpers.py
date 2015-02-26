@@ -14,11 +14,13 @@ import argparse
 import re
 import sys
 
+from ..log import is_interactive
+
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
 #        import pydb; pydb.debugger()
 
-        if option_string == '--help':
+        if is_interactive() and option_string == '--help':
             # lets use the manpage on mature systems ...
             try:
                 import subprocess
