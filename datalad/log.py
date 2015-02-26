@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging, os, sys
+import logging.handlers
 
 __all__ = ['is_interactive', 'ColorFormatter', 'log']
 
@@ -70,41 +71,82 @@ class ColorFormatter(logging.Formatter):
         return logging.Formatter.format(self, record)
 
 
-def set_level(level=None, default='WARNING', lgr=None, name='datalad'):
-    """Helper to set loglevel for an arbitrary logger
+class LoggerHelper(object):
+    """Helper to establish and control a Logger"""
 
-    By default operates for 'datalad'.
-    TODO: deduce name from upper module name so it could be reused without changes
-    """
-    if level is None:
-        # see if nothing in the environment
-        level = os.environ.get(name.upper() + '_LOGLEVEL', None)
-    if level is None:
-        level = default
+    def __init__(self, name='datalad'):
+        self.name = name
+        self.lgr = logging.getLogger(name)
 
-    try:
-        # it might be a string which still represents an int
-        log_level = int(level)
-    except ValueError:
-        # or a string which corresponds to a constant;)
-        log_level = getattr(logging, level.upper())
+    def _get_environ(self, var, default=None):
+        return os.environ.get(self.name.upper() + '_%s' % var.upper(), default)
 
-    if lgr is None:
-        lgr = logging.getLogger(name)
-    lgr.setLevel(log_level)
+    def set_level(self, level=None, default='WARNING'):
+        """Helper to set loglevel for an arbitrary logger
+
+        By default operates for 'datalad'.
+        TODO: deduce name from upper module name so it could be reused without changes
+        """
+        if level is None:
+            # see if nothing in the environment
+            level = self._get_environ('LOGLEVEL')
+        if level is None:
+            level = default
+
+        try:
+            # it might be a string which still represents an int
+            log_level = int(level)
+        except ValueError:
+            # or a string which corresponds to a constant;)
+            log_level = getattr(logging, level.upper())
+
+        self.lgr.setLevel(log_level)
 
 
-def _init_datalad_logger():
-    # By default mimic previously talkative behavior
-    lgr = logging.getLogger('datalad')
-    log_handler = logging.StreamHandler(sys.stdout)
+    def get_initialized_logger(self, logtarget=None):
+        """Initialize and return the logger
 
-    # But now improve with colors and useful information such as time
-    log_handler.setFormatter(ColorFormatter())
-    #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
-    lgr.addHandler(log_handler)
-    return lgr
+        Parameters
+        ----------
+        target: string, optional
+          Which log target to request logger for
+        logtarget: { 'stdout', 'stderr', str }, optional
+          Where to direct the logs.  stdout and stderr stand for standard streams.
+          Any other string is considered a filename.  Multiple entries could be
+          specified comma-separated
 
-lgr = _init_datalad_logger()
-set_level(lgr=lgr)                           # will set the default
+        Returns
+        -------
+        logging.Logger
+        """
+        # By default mimic previously talkative behavior
+        if logtarget is None:
+            logtarget = self._get_environ('LOGTARGET', 'stdout')
+
+        # Allow for multiple handlers being specified, comma-separated
+        if ',' in logtarget:
+            for handler_ in logtarget.split(','):
+                self.get_initialized_logger(logtarget=handler_)
+            return self.lgr
+
+        if logtarget.lower() in ('stdout', 'stderr') :
+            loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
+            use_color = is_interactive() # explicitly decide here
+        else:
+            # must be a simple filename
+            # Use RotatingFileHandler for possible future parametrization to keep
+            # log succinct and rotating
+            loghandler = logging.handlers.RotatingFileHandler(logtarget)
+            use_color = False
+            # I had decided not to guard this call and just raise exception to go
+            # out happen that specified file location is not writable etc.
+        # But now improve with colors and useful information such as time
+        loghandler.setFormatter(ColorFormatter(use_color=use_color))
+        #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
+        self.lgr.addHandler(loghandler)
+
+        self.set_level() # set default logging level
+        return self.lgr
+
+lgr = LoggerHelper().get_initialized_logger()
 
