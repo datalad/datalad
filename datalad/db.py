@@ -23,7 +23,7 @@ def load_db(path, allow_unsupported=False):
 def save_db(db, path):
     if not 'version' in db:
         db['version'] = __db_version__
-    assert(sorted(db.keys()) == ['version', 'incoming', 'public_incoming'],
-           "Got following db keys %s" % db.keys())
+    assert set(db.keys()) == set(['incoming', 'public_incoming', 'version']), \
+           "Got following db keys %s" % db.keys()
     with open(path, 'w') as f:
         json.dump(db, f, indent=2, sort_keys=True, separators=(',', ': '))
