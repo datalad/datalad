@@ -1,11 +1,11 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # ex: set sts=4 ts=4 sw=4 noet:
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Install a dataset from a given url
 
 """
@@ -28,8 +28,6 @@ __docformat__ = 'restructuredtext'
 # magic line for manpage summary
 # man: -*- % get a dataset from a remote repository
 
-__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
-__license__ = 'MIT'
 
 import calendar
 import os

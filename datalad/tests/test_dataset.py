@@ -11,7 +11,6 @@
 Note: There's not a lot to test by now.
 
 """
-__author__ = 'Benjamin Poldrack'
 
 import os.path
 from shutil import rmtree

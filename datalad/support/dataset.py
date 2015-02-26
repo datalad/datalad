@@ -10,7 +10,6 @@
 This layer makes the difference between an arbitrary annex and a datalad-managed dataset.
 
 """
-__author__ = 'Benjamin Poldrack'
 
 import os
 from os.path import join, exists

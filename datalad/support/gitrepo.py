@@ -11,7 +11,6 @@
 For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
-__author__ = 'Benjamin Poldrack'
 
 from os.path import join, exists
 

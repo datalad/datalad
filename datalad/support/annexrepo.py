@@ -11,7 +11,6 @@
 For further information on git-annex see https://git-annex.branchable.com/.
 
 """
-__author__ = 'Benjamin Poldrack'
 
 from os.path import join, exists
 

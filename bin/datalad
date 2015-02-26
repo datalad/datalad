@@ -1,13 +1,14 @@
 #!/usr/bin/python
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # ex: set sts=4 ts=4 sw=4 noet:
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-""""""
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""
+"""
 
 __docformat__ = 'restructuredtext'
 
@@ -25,6 +26,7 @@ import datalad.cmdline as mvcmd
 from datalad.cmdline import helpers
 
 
+# TODO: Besides correct licensing terms - what to write here? (or just don't write, but read the COPYING-file or sth?)
 def _license_info():
     return """\
 Copyright (c) 2013-2014 DataLad developers
