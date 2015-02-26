@@ -57,8 +57,8 @@ class HelpAction(argparse.Action):
 
 class LogLevelAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        from ..log import set_level, lgr
-        set_level(level=values, lgr=lgr)
+        from ..log import LoggerHelper
+        LoggerHelper().set_level(level=values)
 
 
 def parser_add_common_args(parser, pos=None, opt=None, **kwargs):
