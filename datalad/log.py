@@ -151,15 +151,17 @@ class LoggerHelper(object):
 
         if logtarget.lower() in ('stdout', 'stderr') :
             loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
+            use_color = is_interactive() # explicitly decide here
         else:
             # must be a simple filename
             # Use RotatingFileHandler for possible future parametrization to keep
             # log succinct and rotating
             loghandler = logging.handlers.RotatingFileHandler(logtarget)
+            use_color = False
             # I had decided not to guard this call and just raise exception to go
             # out happen that specified file location is not writable etc.
         # But now improve with colors and useful information such as time
-        loghandler.setFormatter(ColorFormatter())
+        loghandler.setFormatter(ColorFormatter(use_color=use_color))
         #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
