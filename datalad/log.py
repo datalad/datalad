@@ -1,31 +1,11 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # ex: set sts=4 ts=4 sw=4 noet:
-"""
- COPYRIGHT: Yaroslav Halchenko 2013
-
- LICENSE: MIT
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
-"""
-
-__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
-__license__ = 'MIT'
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging, os, sys
 import logging.handlers
@@ -151,15 +131,17 @@ class LoggerHelper(object):
 
         if logtarget.lower() in ('stdout', 'stderr') :
             loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
+            use_color = is_interactive() # explicitly decide here
         else:
             # must be a simple filename
             # Use RotatingFileHandler for possible future parametrization to keep
             # log succinct and rotating
             loghandler = logging.handlers.RotatingFileHandler(logtarget)
+            use_color = False
             # I had decided not to guard this call and just raise exception to go
             # out happen that specified file location is not writable etc.
         # But now improve with colors and useful information such as time
-        loghandler.setFormatter(ColorFormatter())
+        loghandler.setFormatter(ColorFormatter(use_color=use_color))
         #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
