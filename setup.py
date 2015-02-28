@@ -7,7 +7,7 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 # Minimalistic setup.py for now
 
-from setuptools import setup
+from setuptools import setup, find_packages
 
 import datalad.version
 
@@ -18,6 +18,7 @@ setup(
     version=datalad.version.__version__,
     description="git-annex based data distribution geared toward scientific datasets",
     py_modules=['datalad'],
+    packages=find_packages('.', include=['datalad*']),
     install_requires=[
         "GitPython", # 'git://github.com/gitpython-developers/GitPython'
         ],
