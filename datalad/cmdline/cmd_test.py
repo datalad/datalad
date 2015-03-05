@@ -6,11 +6,22 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""
-"""
+"""Run internal DataLad (unit)tests to verify correct operation on the system"""
+
 
 __docformat__ = 'restructuredtext'
 
-import cmd_crawl
-import cmd_install
-import cmd_test
+# magic line for manpage summary
+# man: -*- % get a dataset from a remote repository
+
+from .helpers import parser_add_common_args
+
+import nose
+
+def setup_parser(parser):
+    # TODO -- pass options such as verbosity etc
+    pass
+    
+def run(args):
+    import datalad
+    datalad.test()

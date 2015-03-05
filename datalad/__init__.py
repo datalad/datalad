@@ -10,3 +10,13 @@
 from .version import __version__
 
 import datalad.log
+
+# be friendly on systems with ancient numpy -- no tests, but at least
+# importable
+try:
+    from numpy.testing import Tester
+    test = Tester().test
+    bench = Tester().bench
+    del Tester
+except ImportError:
+    def test(*args, **kwargs): raise RuntimeError('Need numpy >= 1.2 for tests')
