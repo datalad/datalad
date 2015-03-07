@@ -22,10 +22,6 @@ def is_interactive():
 # prefixing of multiline log lines
 class ColorFormatter(logging.Formatter):
 
-    FORMAT = ("$BOLD%(asctime)-15s$RESET [%(levelname)s] "
-              "%(message)s "
-              "($BOLD%(filename)s$RESET:%(lineno)d)")
-
     BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
     RESET_SEQ = "\033[0m"
@@ -40,13 +36,20 @@ class ColorFormatter(logging.Formatter):
       'ERROR': RED
     }
 
-    def __init__(self, use_color=None):
+    def __init__(self, use_color=None, log_name=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
             use_color = is_interactive()
-        msg = self.formatter_msg(self.FORMAT, use_color)
-        logging.Formatter.__init__(self, msg)
         self.use_color = use_color
+        msg = self.formatter_msg(self._get_format(log_name), use_color)
+        logging.Formatter.__init__(self, msg)
+
+    def _get_format(self, log_name=False):
+        return ("$BOLD%(asctime)-15s$RESET "
+                + ("%(name)-15s " if log_name else "")
+                + "[%(levelname)s] "
+                "%(message)s "
+                "($BOLD%(filename)s$RESET:%(lineno)d)")
 
     def formatter_msg(self, fmt, use_color=False):
         if use_color:
@@ -120,8 +123,7 @@ class LoggerHelper(object):
         logging.Logger
         """
         # By default mimic previously talkative behavior
-        if logtarget is None:
-            logtarget = self._get_environ('LOGTARGET', 'stdout')
+        logtarget = self._get_environ('LOGTARGET', logtarget or 'stdout')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
@@ -141,7 +143,9 @@ class LoggerHelper(object):
             # I had decided not to guard this call and just raise exception to go
             # out happen that specified file location is not writable etc.
         # But now improve with colors and useful information such as time
-        loghandler.setFormatter(ColorFormatter(use_color=use_color))
+        loghandler.setFormatter(
+            ColorFormatter(use_color=use_color,
+                           log_name=self._get_environ("LOGNAME", False)))
         #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
