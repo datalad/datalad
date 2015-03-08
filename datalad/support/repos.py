@@ -47,7 +47,7 @@ class AnnexRepo(object):
             self.init(description)
 
     def run(self, cmd, git_cmd="annex"):
-        return self.runner.getstatusoutput(
+        return self.runner.run(
             "cd %s && git %s %s" % (self.path, git_cmd, cmd))
 
     def write_description(self, description):
@@ -58,8 +58,7 @@ class AnnexRepo(object):
         lgr.info("Initializing git annex repository under %s: %s"
                  % (self.path, description))
 
-        status, output = self.runner.getstatusoutput(
-            "cd %s && git init && git annex init" % self.path)
+        status = self.runner.run("cd %s && git init && git annex init" % self.path)
 
         if description:
             lgr.debug("Writing description")
@@ -320,4 +319,4 @@ def git_commit(path, files=None, msg=""):
         repo.index.update()
         assert(not len(repo.index.diff(repo.head.commit)))
         # cmd = "cd %s; git commit -m %r" % (path, msg)
-        # status, output = getstatusoutput(cmd, dry_run)
+        # status, output = getstatusoutput(cmd, dry_run)  # getstatusoutput is deprecated. Use cmd.Runner.run() instead.
