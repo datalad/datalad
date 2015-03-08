@@ -13,7 +13,6 @@ Wrapper for command calls, allowing for dry runs and output handling
 
 
 import subprocess
-import shlex
 import sys
 import logging
 
@@ -36,7 +35,10 @@ class Runner(object):
         self.cmdBuffer = []
 
     def run(self, cmd):
-        """
+        """Runs the command `cmd` using shell.
+
+        `cmd` is called and uses stdout whereas stderr is captured and logged.
+        In case of dry-mode `cmd` is just added to `cmdBuffer`.
 
         Parameters
         ----------
@@ -45,42 +47,75 @@ class Runner(object):
 
         Returns
         -------
-        Status code as returned by the called command.
+        Status code as returned by the called command or `None` in case of dry-mode.
         """
 
         self.log("Running: %s" % cmd)
 
         if not self.dry:
-            # pipeArgs = shlex.split(cmd)
 
-            proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.STDOUT, shell=True)
+            proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.PIPE, shell=True)
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple subprocesses.
 
-            status = proc.wait()
+            while proc.poll() is None:
+                err_line = proc.stderr.readline()
+                if err_line != '':
+                    self.log("stderr: %s" % err_line)
+                    #TODO: log per line or as a whole?
+
+            status = proc.poll()
 
             if not status in [0, None]:
-                msg = "Failed to run %r. Exit code=%d" \
-                      % (cmd, status)
+                msg = "Failed to run %r. Exit code=%d" % (cmd, status)
                 lgr.error(msg)
                 raise RuntimeError(msg)
 
             else:
-                self.log("Finished running %r with status %s" % (cmd, status),
-                         level=8)
+                self.log("Finished running %r with status %s" % (cmd, status), level=8)
                 return status
 
         else:
             self.cmdBuffer.append(cmd)
         return None
 
-    def log(self, msg, level=None):
-        if level is None:
-            logf = lgr.debug
-        else:
-            logf = lambda msg: lgr.log(level, msg)
+    def drycall(self, f, *args, **kwargs):
+        """Helper to unify collection of logging all "dry" actions.
+
+        Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with its arguments to `cmdBuffer` otherwise.
+
+        f : callable
+        *args, **kwargs:
+          Callable arguments
+        """
         if self.dry:
-            lgr.debug("DRY: %s" % msg)
+            self.cmdBuffer.append("%s args=%s kwargs=%s" % (f, args, kwargs))
         else:
-            lgr.debug(msg)
+            return f(*args, **kwargs)
+
+    def log(self, msg, level=logging.DEBUG):
+        if self.dry:
+            lgr.log(level, "DRY: %s" % msg)
+        else:
+            lgr.log(level, msg)
+
+
+# ####
+# Preserve from previous version
+# TODO: document intention
+# ####
+# this one might get under Runner for better output/control
+def link_file_load(src, dst, dry_run=False):
+    """Just a little helper to hardlink files's load
+    """
+    dst_dir = os.path.dirname(dst)
+    if not os.path.exists(dst_dir):
+        os.makedirs(dst_dir)
+    if os.path.lexists(dst):
+        lgr.debug("Destination file %(dst)s exists. Removing it first"
+                  % locals())
+        # TODO: how would it interact with git/git-annex
+        os.unlink(dst)
+    lgr.debug("Hardlinking %(src)s under %(dst)s" % locals())
+    os.link(os.path.realpath(src), dst)
