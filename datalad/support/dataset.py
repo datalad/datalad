@@ -47,10 +47,9 @@ class Dataset(AnnexRepo):
         if not exists(dataladPath):
             os.mkdir(dataladPath)
 
-    def dummy_dataset_command(self):
-        """Just a dummy
+    def get(self, pattern):
+        """get the actual content of files
 
-        No params, nothing to explain, should raise NotImplementedError.
-
+        This command gets the actual content of the file(s) described by `pattern`
         """
         raise NotImplementedError

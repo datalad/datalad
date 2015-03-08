@@ -17,7 +17,7 @@ from os.path import join, exists
 from gitrepo import GitRepo
 import datalad.log
 
-from datalad.cmd import Runner
+from datalad.cmd import Runner as Runner
 
 
 class AnnexRepo(GitRepo):
@@ -63,16 +63,17 @@ class AnnexRepo(GitRepo):
         # TODO: Document (or implement respectively) behaviour in special cases like direct mode (if it's different),
         # not existing paths, etc.
 
-        status, output = self.cmd_call_wrapper.getstatusoutput('cd %s && git annex init' % self.path)
-        datalad.log.lgr.info('\"git annex init\" outputs:\n %s' % output)
+        status = self.cmd_call_wrapper.run('cd %s && git annex init' % self.path)
         if status != 0:
             datalad.log.lgr.error('git annex init returned status %d.' % status)
 
 
-    def dummy_annex_command(self):
-        """Just a dummy
+    def annex_get(self, pattern):
+        """
 
         No params, nothing to explain, should raise NotImplementedError.
 
         """
-        raise NotImplementedError
+        status = self.cmd_call_wrapper.run('cd %s && git annex get %s' % (self.path, pattern))
+        datalad.log.lgr.setLevel('DEBUG')
+        datalad.log.lgr.debug('get status:\n%s' % status)

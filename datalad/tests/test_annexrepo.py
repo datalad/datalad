@@ -39,8 +39,8 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 @with_testrepos(flavors=['local'])
 def test_AnnexRepo_instance_from_existing(path):
 
-    gr = AnnexRepo(path)
-    assert_is_instance(gr, AnnexRepo, "AnnexRepo was not created.")
+    ar = AnnexRepo(path)
+    assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     assert_true(os.path.exists(os.path.join(path, '.git')))
 
 
@@ -48,6 +48,14 @@ def test_AnnexRepo_instance_from_existing(path):
 @with_tempfile
 def test_AnnexRepo_instance_brand_new(path):
 
-    gr = AnnexRepo(path)
-    assert_is_instance(gr, AnnexRepo, "AnnexRepo was not created.")
+    ar = AnnexRepo(path)
+    assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     assert_true(os.path.exists(os.path.join(path, '.git')))
+
+
+@with_testrepos(flavors=['local'])
+def test_AnnexRepo_get(path):
+
+    ar = AnnexRepo(path)
+    assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
+    ar.annex_get('.')
