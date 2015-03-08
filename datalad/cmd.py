@@ -15,6 +15,7 @@ Wrapper for command calls, allowing for dry runs and output handling
 import subprocess
 import sys
 import logging
+import os
 
 lgr = logging.getLogger('datalad.cmd')
 
