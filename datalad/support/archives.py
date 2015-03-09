@@ -39,7 +39,7 @@ def decompress_file(file, dir, directories='strip'):
             break
 #    if fullcmd is not None:
 #        lgr.debug("Extracting file: %s" % fullcmd)
-#        status, output = getstatusoutput(fullcmd)
+#        status, output = getstatusoutput(fullcmd)  # getstatusoutput is deprecated. Use cmd.Runner.run() instead.
 #        if status:
 #            lgr.debug("Failed to extract: status %d output %s" % (status, output))
 #    else:

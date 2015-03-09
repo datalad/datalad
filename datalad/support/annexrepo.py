@@ -46,7 +46,6 @@ class AnnexRepo(GitRepo):
         self.cmd_call_wrapper = Runner()
         # TODO: Concept of when to set to "dry". Includes: What to do in gitrepo class?
 
-
         # Check whether an annex already exists at destination
         if not exists(join(self.path, '.git', 'annex')):
             datalad.log.lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
