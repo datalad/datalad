@@ -34,7 +34,7 @@ def test_runner_dry(tempfile):
     assert_false(os.path.exists(tempfile))
 
     # test dry python function call
-    output = runner.drycall(os.path.join, 'foo', 'bar')
+    output = runner.call(os.path.join, 'foo', 'bar')
     assert_is(None, output, "Drycall of: os.path.join, 'foo', 'bar' returned %s" % output)
     assert_greater(runner.commands.__str__().find('join'), -1,
                    "Drycall of: os.path.join, 'foo', 'bar' resulted in buffer: %s" % runner.commands.__str__())
@@ -53,7 +53,7 @@ def test_runner(tempfile):
     assert_true(os.path.exists(tempfile), "Run of: %s resulted with non-existing file %s" % (cmd, tempfile))
 
     # test non-dry python function call
-    output = runner.drycall(os.path.join, 'foo', 'bar')
+    output = runner.call(os.path.join, 'foo', 'bar')
     assert_equal(os.path.join('foo', 'bar'), output,
                  "Drycall of: os.path.join, 'foo', 'bar' returned %s" % output)
     assert_equal(runner.commands.__str__().find('os.path.join'), -1,

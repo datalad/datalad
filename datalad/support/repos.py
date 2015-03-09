@@ -63,7 +63,7 @@ class AnnexRepo(object):
         if description:
             lgr.debug("Writing description")
             # dump description
-            self.runner.drycall(self.write_description, description)
+            self.runner.call(self.write_description, description)
 
     def get_indexed_files(self):
         """Helper to spit out a list of indexed files
@@ -88,7 +88,7 @@ class AnnexRepo(object):
             index = gitrepo.index
             if not len(index.diff(None, paths=[filename])):
                 lgr.debug("Removing %s without local changes", filename)
-                self.runner.drycall(os.unlink, full_filename)
+                self.runner.call(os.unlink, full_filename)
             else:
                 lgr.debug("Did not remove %s since there were local changes",
                           filename)
@@ -170,7 +170,7 @@ def annex_file(href,
     """
     assert(runner)                        # must be provided
     # convenience shortcuts
-    _call = runner.drycall
+    _call = runner.call
     fast_mode = add_mode in ['fast', 'relaxed']
 
     lgr.info("Annexing (mode=%s) %s//%s originating from url=%s present locally under %s//%s"

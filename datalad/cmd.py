@@ -26,8 +26,8 @@ class Runner(object):
     An object of this class provides a methods calls shell commands or python functions,
     allowing for dry runs and output handling.
 
-    TODO: more accurate doc
-    Outputs (stdout and stderr) are streamed to stdout during execution as if you were calling it from command line.
+    Outputs (stdout and stderr) can be either logged or streamed to system's stdout/stderr during execution.
+    This can be enabled or disabled for both of them independently.
     Additionally allows for dry runs. This is achieved by initializing the `Runner` with `dry=True`.
     The Runner will then collect all calls as strings in `commands`.
     """
@@ -41,7 +41,7 @@ class Runner(object):
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
 
-        This will call run() or drycall() depending on the kind of `cmd`.
+        This will call run() or call() depending on the kind of `cmd`.
         If `cmd` is a string it is interpreted as the to be executed command.
         Otherwise it is expected to be a callable.
         Any other argument is passed to the respective method.
@@ -52,7 +52,7 @@ class Runner(object):
            command string to be executed via shell or callable to be called.
 
         *args and **kwargs:
-           see Runner.run() and Runner.drycall() for available arguments.
+           see Runner.run() and Runner.call() for available arguments.
 
         Raises
         ------
@@ -62,7 +62,7 @@ class Runner(object):
         if isinstance(cmd, basestring):
             self.run(cmd, *args, **kwargs)
         elif callable(cmd):
-            self.drycall(cmd, *args, **kwargs)
+            self.call(cmd, *args, **kwargs)
         else:
             raise ValueError("Argument 'command' is neither a string nor a callable.")
 
@@ -147,7 +147,7 @@ class Runner(object):
             self.commands.append(cmd)
         return None
 
-    def drycall(self, f, *args, **kwargs):
+    def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
 
         Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with its arguments to `commands` otherwise.
