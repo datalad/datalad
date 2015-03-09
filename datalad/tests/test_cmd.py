@@ -11,6 +11,7 @@
 
 import os
 import sys
+import logging
 
 from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater
 
@@ -60,18 +61,43 @@ def test_runner(tempfile):
 
 
 def test_runner_log_stderr():
+    # TODO: no idea of how to check correct logging via any kind of assertion yet.
 
-    # no idea of how to check correct logging via any kind of assertion yet.
     runner = Runner(dry=False)
     cmd = 'echo stderr-Message should be logged >&2'
-    ret = runner.run(cmd)
+    ret = runner.run(cmd, log_stderr=True)
+    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+    assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
+
+    cmd = 'echo stderr-Message should not be logged >&2'
+    ret = runner.run(cmd, log_stderr=False)
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
 
-def test_runner_heavy_output():
+def test_runner_log_stdout():
+    # TODO: no idea of how to check correct logging via any kind of assertion yet.
 
-    # again, no automatic detection of this resulting in being stucked yet.
+    lgr = logging.getLogger('datalad.cmd')
+    level_old = lgr.getEffectiveLevel()
+    lgr.setLevel(logging.DEBUG)
+
+    runner = Runner(dry=False)
+    cmd = 'echo stdout-Message should be logged'
+    ret = runner.run(cmd, log_stdout=True)
+    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+    assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
+
+    cmd = 'echo stdout-Message should not be logged'
+    ret = runner.run(cmd, log_stdout=False)
+    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+    assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
+
+    lgr.setLevel(level_old)
+
+def test_runner_heavy_output():
+    # TODO: again, no automatic detection of this resulting in being stucked yet.
+
     runner = Runner()
     cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
     ret = runner.run(cmd)

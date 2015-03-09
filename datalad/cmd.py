@@ -7,7 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
-Wrapper for command calls, allowing for dry runs and output handling
+Wrapper for command and function calls, allowing for dry runs and output handling
 
 """
 
@@ -21,9 +21,12 @@ lgr = logging.getLogger('datalad.cmd')
 
 
 class Runner(object):
-    """Provides a wrapper for system calls.
+    """Provides a wrapper for calling functions and commands.
 
-    An object of this class provides a method to make system calls.
+    An object of this class provides a methods calls shell commands or python functions,
+    allowing for dry runs and output handling.
+
+    TODO: more accurate doc
     Outputs (stdout and stderr) are streamed to stdout during execution as if you were calling it from command line.
     Additionally allows for dry runs. This is achieved by initializing the `Runner` with `dry=True`.
     The Runner will then collect all calls as strings in `commands`.
@@ -35,7 +38,7 @@ class Runner(object):
         self.dry = dry
         self.commands = []
 
-    def run(self, cmd):
+    def run(self, cmd, log_stdout=False, log_stderr=True):
         """Runs the command `cmd` using shell.
 
         `cmd` is called and uses stdout whereas stderr is captured and logged.
@@ -49,26 +52,55 @@ class Runner(object):
         Returns
         -------
         Status code as returned by the called command or `None` in case of dry-mode.
+
+        Raises
+        ------
+        RunTimeError
+           if command's exitcode wasn't 0 or None
+
         """
 
-        self.log("Running: %s" % cmd)
+        if log_stdout:
+            outputstream = subprocess.PIPE
+        else:
+            outputstream = sys.stdout
+
+        if log_stderr:
+            errstream = subprocess.PIPE
+        else:
+            errstream = sys.stderr
+
+        self.log("Running: %s" % (cmd,))
 
         if not self.dry:
 
-            proc = subprocess.Popen(cmd, stdout=sys.stdout, stderr=subprocess.PIPE, shell=True)
+            proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream, shell=True)
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple subprocesses.
 
             while proc.poll() is None:
-                err_line = proc.stderr.readline()
-                if err_line != '':
-                    self.log("stderr: %s" % err_line)
-                    #TODO: log per line or as a whole?
+                if log_stdout:
+                    line = proc.stdout.readline()
+                    if line != '':
+                        self.log("stdout| " + line.rstrip('\n'))
+                        # TODO: what level to log at? was: level=5
+                        # Changes on that should be properly adapted in test.cmd.test_runner_log_stdout()
+                else:
+                    pass
+
+                if log_stderr:
+                    line = proc.stderr.readline()
+                    if line != '':
+                        self.log("stderr| " + line.rstrip('\n'), level=logging.ERROR)
+                        # TODO: what's the proper log level here?
+                        # Changes on that should be properly adapted in test.cmd.test_runner_log_stderr()
+                else:
+                    pass
 
             status = proc.poll()
 
-            if not status in [0, None]:
+            if status not in [0, None]:
                 msg = "Failed to run %r. Exit code=%d" % (cmd, status)
                 lgr.error(msg)
                 raise RuntimeError(msg)
@@ -96,6 +128,10 @@ class Runner(object):
             return f(*args, **kwargs)
 
     def log(self, msg, level=logging.DEBUG):
+        """log helper
+
+        Logs at DEBUG-level by default and adds "DRY:"-prefix for dry runs.
+        """
         if self.dry:
             lgr.log(level, "DRY: %s" % msg)
         else:
