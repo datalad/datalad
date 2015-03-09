@@ -13,12 +13,32 @@ import os
 import sys
 import logging
 
-from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater
+from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater, make_decorator
 
 from datalad.cmd import Runner
 from datalad.tests.utils import with_tempfile, assert_cwd_unchanged
 
 
+def ignore_nose_capturing_stdout(func):
+    """Workaround for nose's behaviour with redirecting sys.stdout
+
+    See issue reported here:
+    https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
+    """
+
+    @make_decorator(func)
+    def newfunc(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except AttributeError, e:
+            if e.message.find('StrinIO') and e.message.find('fileno'):
+                pass
+            else:
+                raise e
+    return newfunc
+
+
+@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner_dry(tempfile):
@@ -40,6 +60,8 @@ def test_runner_dry(tempfile):
                    "Drycall of: os.path.join, 'foo', 'bar' resulted in buffer: %s" % runner.commands.__str__())
 
 
+
+@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_runner(tempfile):
@@ -60,6 +82,7 @@ def test_runner(tempfile):
                    "Drycall of: os.path.join, 'foo', 'bar' resulted in buffer: %s" % runner.commands.__str__())
 
 
+@ignore_nose_capturing_stdout
 def test_runner_instance_callable():
 
     runner = Runner(dry=True)
@@ -75,6 +98,7 @@ def test_runner_instance_callable():
                    "Dry run of Runner.__call__ didn't record function join(). Buffer: %s" % runner.commands.__str__())
 
 
+@ignore_nose_capturing_stdout
 def test_runner_log_stderr():
     # TODO: no idea of how to check correct logging via any kind of assertion yet.
 
@@ -90,6 +114,7 @@ def test_runner_log_stderr():
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
 
+@ignore_nose_capturing_stdout
 def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of assertion yet.
 
@@ -111,6 +136,7 @@ def test_runner_log_stdout():
     lgr.setLevel(level_old)
 
 
+@ignore_nose_capturing_stdout
 def test_runner_heavy_output():
     # TODO: again, no automatic detection of this resulting in being stucked yet.
 
