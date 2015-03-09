@@ -110,10 +110,11 @@ def test_runner_log_stdout():
 
     lgr.setLevel(level_old)
 
-# def test_runner_heavy_output():
-#     # TODO: again, no automatic detection of this resulting in being stucked yet.
-#
-#     runner = Runner()
-#     cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
-#     ret = runner.run(cmd)
-#     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+
+def test_runner_heavy_output():
+    # TODO: again, no automatic detection of this resulting in being stucked yet.
+
+    runner = Runner()
+    cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
+    ret = runner.run(cmd)
+    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
