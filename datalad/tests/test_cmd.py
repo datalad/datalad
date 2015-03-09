@@ -60,6 +60,21 @@ def test_runner(tempfile):
                    "Drycall of: os.path.join, 'foo', 'bar' resulted in buffer: %s" % runner.commands.__str__())
 
 
+def test_runner_instance_callable():
+
+    runner = Runner(dry=True)
+    cmd = 'echo Testing __call__ with string'
+    runner(cmd)
+    assert_equal(runner.commands.__str__(), ("['%s']" % cmd),
+                 "Dry run of Runner.__call__ didn't record command: %s.\nBuffer: %s" % (cmd, runner.commands.__str__()))
+
+    runner(os.path.join, 'foo', 'bar')
+    assert_greater(runner.commands.__str__().find('join'), -1,
+                   "Dry run of Runner.__call__ didn't record function join(). Buffer: %s" % runner.commands.__str__())
+    assert_greater(runner.commands.__str__().find('args='), -1,
+                   "Dry run of Runner.__call__ didn't record function join(). Buffer: %s" % runner.commands.__str__())
+
+
 def test_runner_log_stderr():
     # TODO: no idea of how to check correct logging via any kind of assertion yet.
 
@@ -95,10 +110,10 @@ def test_runner_log_stdout():
 
     lgr.setLevel(level_old)
 
-def test_runner_heavy_output():
-    # TODO: again, no automatic detection of this resulting in being stucked yet.
-
-    runner = Runner()
-    cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
-    ret = runner.run(cmd)
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+# def test_runner_heavy_output():
+#     # TODO: again, no automatic detection of this resulting in being stucked yet.
+#
+#     runner = Runner()
+#     cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
+#     ret = runner.run(cmd)
+#     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))

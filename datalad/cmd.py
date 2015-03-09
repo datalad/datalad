@@ -38,16 +38,51 @@ class Runner(object):
         self.dry = dry
         self.commands = []
 
+    def __call__(self, cmd, *args, **kwargs):
+        """Convenience method
+
+        This will call run() or drycall() depending on the kind of `cmd`.
+        If `cmd` is a string it is interpreted as the to be executed command.
+        Otherwise it is expected to be a callable.
+        Any other argument is passed to the respective method.
+
+        Parameters
+        ----------
+        cmd: str or callable
+           command string to be executed via shell or callable to be called.
+
+        *args and **kwargs:
+           see Runner.run() and Runner.drycall() for available arguments.
+
+        Raises
+        ------
+        ValueError if cmd is neither a string nor a callable.
+        """
+
+        if isinstance(cmd, basestring):
+            self.run(cmd, *args, **kwargs)
+        elif callable(cmd):
+            self.drycall(cmd, *args, **kwargs)
+        else:
+            raise ValueError("Argument 'command' is neither a string nor a callable.")
+
     def run(self, cmd, log_stdout=False, log_stderr=True):
         """Runs the command `cmd` using shell.
 
-        `cmd` is called and uses stdout whereas stderr is captured and logged.
-        In case of dry-mode `cmd` is just added to `commands`.
+        In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
+        Allows for seperatly logging stdout and stderr  or streaming it to system's stdout
+        or stderr respectively.
 
         Parameters
         ----------
         cmd : str
           String defining the command call.
+
+        log_stdout: bool
+            If True, stdout is logged. Goes to sys.stdout otherwise.
+
+        log_stderr: bool
+            If True, stderr is logged. Goes to sys.stderr otherwise.
 
         Returns
         -------
@@ -57,7 +92,6 @@ class Runner(object):
         ------
         RunTimeError
            if command's exitcode wasn't 0 or None
-
         """
 
         if log_stdout:
