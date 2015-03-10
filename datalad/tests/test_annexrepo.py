@@ -58,7 +58,7 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 
-@with_testrepos(flavors=['local'])
+@with_testrepos
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
