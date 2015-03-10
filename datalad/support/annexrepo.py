@@ -96,17 +96,13 @@ class AnnexRepo(GitRepo):
         pathlist = ''
         for path in paths:
             pathlist += ' ' + path
-        lgr.info("TRAVIS_DEBUG_ANNEX: paths: %s" % pathlist)
 
         optlist = ''
         for key in kwargs.keys():
             optlist += " --%s=%s" % (key, kwargs.get(key))
-        lgr.info("TRAVIS_DEBUG_ANNEX: opts: %s" % optlist)
-
         #TODO: May be this should go in a decorator for use in every command.
 
-        cmd_str = 'cd %s && git annex get %s %s' % (self.path, optlist, pathlist)
-        lgr.info("TRAVIS_DEBUG_ANNEX: cmd: %s" % cmd_str)
+        cmd_str = 'cd %s && git annex get%s%s' % (self.path, optlist, pathlist)
         # TODO: Do we want to cd to self.path first? This would lead to expand paths, if
         # cwd is deeper in repo.
 
