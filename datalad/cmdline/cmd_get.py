@@ -45,19 +45,32 @@ from .helpers import parser_add_common_args
 def setup_parser(parser):
 
     parser.add_argument(
-        "file", metavar='file',
-        help="filename or pattern describing what to get")
+        "path", metavar='file', nargs='+',
+        help="path or pattern describing what to get")
 
     #parser_add_common_args(parser, opt=('log_level'))
     
 def run(args):
+    import glob
+
     from datalad.api import Dataset
     from datalad.log import lgr
 
     lgr.debug("Command line arguments: %r" % args)
 
-    path = os.getcwd()
-    ds = Dataset(path)
-    ds.get(args.file)
+    cwd_path = os.getcwd()
+    ds = Dataset(cwd_path)
 
+    # args.path comes as a list
+    # Expansions (like globs) provided by the shell itself are already done.
+    # But: We don't know exactly what shells we are running on and what it may provide or not.
+    # Therefore, make any expansion we want to guarantee, per item of the list:
 
+    expanded_list = []
+    for item in args.path:
+        expanded_list.extend(glob.glob(item))
+        # TODO: regexp + may be ext. glob zsh-style
+        # TODO: what about spaces in filenames and similar things?
+        # TODO: os.path.expandvars, os.path.expanduser? Is not needed here, isn't it? Always?
+
+    ds.get(expanded_list)

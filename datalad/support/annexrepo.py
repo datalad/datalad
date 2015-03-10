@@ -78,31 +78,26 @@ class AnnexRepo(GitRepo):
             lgr.error('git annex init returned status %d.' % status)
 
 
-    def annex_get(self, pattern, **kwargs):
+    def annex_get(self, files, **kwargs):
         """Get the actual content of files
 
         Parameters:
         -----------
-        pattern: str
-            glob pattern defining what files to get
+        files: list
+            list of paths to get
 
         kwargs: options for the git annex get command. For example `from='myremote'` translates to annex option
             "--from=myremote"
         """
 
-        paths = glob.glob(pattern)
-        #TODO: regexp + may be ext. glob zsh-style
+        paths = ' '.join(files)
 
-        pathlist = ''
-        for path in paths:
-            pathlist += ' ' + path
-
-        optlist = ''
+        options = ''
         for key in kwargs.keys():
-            optlist += " --%s=%s" % (key, kwargs.get(key))
+            options += " --%s=%s" % (key, kwargs.get(key))
         #TODO: May be this should go in a decorator for use in every command.
 
-        cmd_str = 'cd %s && git annex get%s%s' % (self.path, optlist, pathlist)
+        cmd_str = 'cd %s && git annex get %s%s' % (self.path, options, paths)
         # TODO: Do we want to cd to self.path first? This would lead to expand paths, if
         # cwd is deeper in repo.
 

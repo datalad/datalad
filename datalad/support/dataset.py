@@ -42,14 +42,19 @@ class Dataset(AnnexRepo):
         """
 
         super(Dataset, self).__init__(path, url)
+        # TODO: what about runner? (dry runs ...)
+
+        # TODO: should work with path (deeper) inside repo! => gitrepo/annexrepo
 
         dataladPath = join(self.path, '.datalad')
         if not exists(dataladPath):
             os.mkdir(dataladPath)
 
-    def get(self, pattern):
+    def get(self, list):
         """get the actual content of files
 
-        This command gets the actual content of the file(s) described by `pattern`
+        This command gets the actual content of the files in `list`.
         """
-        raise NotImplementedError
+        super(Dataset, self).annex_get(list)
+        # For now just pass
+        # TODO: options
