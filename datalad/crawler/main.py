@@ -62,7 +62,7 @@ class DoubleAnnexRepo(object):
         self.runner.dry = dry_run
 
         # convenience shortcuts
-        _call = self.runner.drycall
+        _call = self.runner.call
 
         dcfg = self.cfg.get_section('DEFAULT')
         incoming_path = dcfg.get('incoming')

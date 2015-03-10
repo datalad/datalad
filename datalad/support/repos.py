@@ -47,7 +47,7 @@ class AnnexRepo(object):
             self.init(description)
 
     def run(self, cmd, git_cmd="annex"):
-        return self.runner.getstatusoutput(
+        return self.runner.run(
             "cd %s && git %s %s" % (self.path, git_cmd, cmd))
 
     def write_description(self, description):
@@ -58,13 +58,12 @@ class AnnexRepo(object):
         lgr.info("Initializing git annex repository under %s: %s"
                  % (self.path, description))
 
-        status, output = self.runner.getstatusoutput(
-            "cd %s && git init && git annex init" % self.path)
+        status = self.runner.run("cd %s && git init && git annex init" % self.path)
 
         if description:
             lgr.debug("Writing description")
             # dump description
-            self.runner.drycall(self.write_description, description)
+            self.runner.call(self.write_description, description)
 
     def get_indexed_files(self):
         """Helper to spit out a list of indexed files
@@ -89,7 +88,7 @@ class AnnexRepo(object):
             index = gitrepo.index
             if not len(index.diff(None, paths=[filename])):
                 lgr.debug("Removing %s without local changes", filename)
-                self.runner.drycall(os.unlink, full_filename)
+                self.runner.call(os.unlink, full_filename)
             else:
                 lgr.debug("Did not remove %s since there were local changes",
                           filename)
@@ -171,7 +170,7 @@ def annex_file(href,
     """
     assert(runner)                        # must be provided
     # convenience shortcuts
-    _call = runner.drycall
+    _call = runner.call
     fast_mode = add_mode in ['fast', 'relaxed']
 
     lgr.info("Annexing (mode=%s) %s//%s originating from url=%s present locally under %s//%s"
@@ -320,4 +319,4 @@ def git_commit(path, files=None, msg=""):
         repo.index.update()
         assert(not len(repo.index.diff(repo.head.commit)))
         # cmd = "cd %s; git commit -m %r" % (path, msg)
-        # status, output = getstatusoutput(cmd, dry_run)
+        # status, output = getstatusoutput(cmd, dry_run)  # getstatusoutput is deprecated. Use cmd.Runner.run() instead.
