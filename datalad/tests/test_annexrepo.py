@@ -55,7 +55,7 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 @with_tempfile
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=['network'])
 def test_AnnexRepo_get(src, dst):
 
     ar = AnnexRepo(dst, src)
