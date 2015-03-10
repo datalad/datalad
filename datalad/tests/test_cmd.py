@@ -126,6 +126,6 @@ def test_runner_heavy_output():
     ret = runner.run(cmd, log_stderr=False, log_stdout=False)
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
-    #do it again with capturing:
-    ret = runner.run(cmd, log_stderr=True, log_stdout=True)
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+    # #do it again with capturing:
+    # ret = runner.run(cmd, log_stderr=True, log_stdout=True)
+    # assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
