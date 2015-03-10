@@ -16,6 +16,8 @@ from os.path import join, exists
 
 from annexrepo import AnnexRepo
 
+lgr = logging.getLogger('datalad.dataset')
+
 class Dataset(AnnexRepo):
     """Representation of a dataset handled by datalad.
 
