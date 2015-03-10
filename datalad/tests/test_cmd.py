@@ -13,10 +13,10 @@ import os
 import sys
 import logging
 
-from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater, ignore_nose_capturing_stdout
+from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater
 
 from datalad.cmd import Runner
-from datalad.tests.utils import with_tempfile, assert_cwd_unchanged
+from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, ignore_nose_capturing_stdout
 
 
 @ignore_nose_capturing_stdout

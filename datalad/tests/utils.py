@@ -381,8 +381,8 @@ def ignore_nose_capturing_stdout(func):
         try:
             func(*args, **kwargs)
         except AttributeError, e:
-            if e.message.find('StringIO') and e.message.find('fileno'):
+            if e.message.find('StringIO') > -1 and e.message.find('fileno') > -1:
                 pass
             else:
-                raise e
+                raise
     return newfunc

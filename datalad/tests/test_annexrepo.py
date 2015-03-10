@@ -14,13 +14,14 @@ Note: There's not a lot to test by now.
 
 import os
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, ignore_nose_capturing_stdout
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
 from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged
+from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout
 
 
+@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos(flavors=['local'])
 @with_tempfile
@@ -34,7 +35,8 @@ def test_AnnexRepo_instance_from_clone(src, dst):
     # and therefore can't clone to `dst`
     assert_raises(GitCommandError, AnnexRepo, dst, src)
 
-    
+
+@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos(flavors=['local'])
 def test_AnnexRepo_instance_from_existing(path):
@@ -44,6 +46,7 @@ def test_AnnexRepo_instance_from_existing(path):
     assert_true(os.path.exists(os.path.join(path, '.git')))
 
 
+@ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
 def test_AnnexRepo_instance_brand_new(path):
