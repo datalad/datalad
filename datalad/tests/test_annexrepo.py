@@ -22,9 +22,6 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged
 
 
-from datalad.cmd import Runner
-
-
 @assert_cwd_unchanged
 @with_testrepos(flavors=['local'])
 @with_tempfile
@@ -57,9 +54,8 @@ def test_AnnexRepo_instance_brand_new(path):
     assert_true(os.path.exists(os.path.join(path, '.git')))
 
 
-
-@with_testrepos
 @with_tempfile
+@with_testrepos(flavors=['local'])
 def test_AnnexRepo_get(src, dst):
 
     ar = AnnexRepo(dst, src)
