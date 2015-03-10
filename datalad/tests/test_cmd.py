@@ -13,29 +13,10 @@ import os
 import sys
 import logging
 
-from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater, make_decorator
+from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater, ignore_nose_capturing_stdout
 
 from datalad.cmd import Runner
 from datalad.tests.utils import with_tempfile, assert_cwd_unchanged
-
-
-def ignore_nose_capturing_stdout(func):
-    """Workaround for nose's behaviour with redirecting sys.stdout
-
-    See issue reported here:
-    https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
-    """
-
-    @make_decorator(func)
-    def newfunc(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except AttributeError, e:
-            if e.message.find('StrinIO') and e.message.find('fileno'):
-                pass
-            else:
-                raise e
-    return newfunc
 
 
 @ignore_nose_capturing_stdout

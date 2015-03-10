@@ -12,10 +12,9 @@ Note: There's not a lot to test by now.
 
 """
 
-import os.path
 import os
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, ignore_nose_capturing_stdout
 from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
@@ -54,6 +53,7 @@ def test_AnnexRepo_instance_brand_new(path):
     assert_true(os.path.exists(os.path.join(path, '.git')))
 
 
+@ignore_nose_capturing_stdout
 @with_tempfile
 @with_testrepos(flavors=['network'])
 def test_AnnexRepo_get(src, dst):
