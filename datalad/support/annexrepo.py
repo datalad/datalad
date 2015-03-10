@@ -13,11 +13,15 @@ For further information on git-annex see https://git-annex.branchable.com/.
 """
 
 from os.path import join, exists
+import glob
+import logging
 
 from gitrepo import GitRepo
 import datalad.log
 
 from datalad.cmd import Runner as Runner
+
+lgr = logging.getLogger('datalad.annex')
 
 
 class AnnexRepo(GitRepo):
@@ -25,7 +29,7 @@ class AnnexRepo(GitRepo):
 
     """
 
-    def __init__(self, path, url=None):
+    def __init__(self, path, url=None, runner=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -43,12 +47,16 @@ class AnnexRepo(GitRepo):
         """
         super(AnnexRepo, self).__init__(path, url)
 
-        self.cmd_call_wrapper = Runner()
+        self.cmd_call_wrapper = runner or Runner()
         # TODO: Concept of when to set to "dry". Includes: What to do in gitrepo class?
+        #       Now: setting "dry" means to give a dry-runner to constructor.
+        #       => Do it similar in gitrepo/dataset. Still we need a concept of when to set it
+        #       and whether this should be a single instance collecting everything or more
+        #       fine grained.
 
         # Check whether an annex already exists at destination
         if not exists(join(self.path, '.git', 'annex')):
-            datalad.log.lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
+            lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
             self._annex_init()
 
     def _annex_init(self):
@@ -63,16 +71,42 @@ class AnnexRepo(GitRepo):
         # not existing paths, etc.
 
         status = self.cmd_call_wrapper.run('cd %s && git annex init' % self.path)
-        if status != 0:
-            datalad.log.lgr.error('git annex init returned status %d.' % status)
+        if status not in [0, None]:
+            lgr.error('git annex init returned status %d.' % status)
 
 
-    def annex_get(self, pattern):
+    def annex_get(self, pattern, **kwargs):
+        """Get the actual content of files
+
+        Parameters:
+        -----------
+        pattern: str
+            glob pattern defining what files to get
+
+        kwargs: options for the git annex get command. For example `from='myremote'` translates to annex option
+            "--from=myremote"
         """
 
-        No params, nothing to explain, should raise NotImplementedError.
+        paths = glob.glob(pattern)
+        #TODO: regexp + may be ext. glob zsh-style
 
-        """
-        status = self.cmd_call_wrapper.run('cd %s && git annex get %s' % (self.path, pattern))
-        datalad.log.lgr.setLevel('DEBUG')
-        datalad.log.lgr.debug('get status:\n%s' % status)
+        pathlist = ''
+        for path in paths:
+            pathlist += ' ' + path
+
+        optlist = ''
+        for key in kwargs.keys():
+            optlist += " --%s=%s" % (key, kwargs.get(key))
+
+        cmd_str = 'git annex get %s %s' % (optlist, pathlist)
+
+        #don't capture stderr, since it provides progress display
+        status = self.cmd_call_wrapper.run(cmd_str, log_stderr=False)
+        # TODO: Do we want to cd to self.path first? This would lead to expand paths may be ...
+        # For now base is cwd so we don't need to know what repo this is meant for. git annex knows.
+
+        if status not in [0, None]:
+            # TODO: Actually this doesn't make sense. Runner raises exception in this case,
+            # which leads to: Runner doesn't have to return it at all.
+            lgr.error('git annex get returned status: %s' % status)
+            raise RuntimeError
