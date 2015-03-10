@@ -62,6 +62,8 @@ def test_version():
 
 def test_get_commands():
     assert('cmd_crawl' in get_commands())
+    assert('cmd_install' in get_commands())
+    assert('cmd_get' in get_commands())
 
 def test_help():
     stdout, stderr = run_main(['--help'])
