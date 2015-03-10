@@ -14,7 +14,7 @@ Note: There's not a lot to test by now.
 
 import os.path
 
-from nose.tools import assert_raises, assert_is_instance, assert_true
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
 from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
@@ -53,9 +53,18 @@ def test_AnnexRepo_instance_brand_new(path):
     assert_true(os.path.exists(os.path.join(path, '.git')))
 
 
-@with_testrepos(flavors=['local'])
-def test_AnnexRepo_get(path):
 
-    ar = AnnexRepo(path)
+@with_testrepos
+@with_tempfile
+def test_AnnexRepo_get(src, dst):
+
+    ar = AnnexRepo(dst, src)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
-    ar.annex_get('.')
+
+    testfile = os.path.join(dst, 'test-annex.dat')
+    assert_raises(IOError, open, testfile, 'r')
+    # If get has nothing to do, we can't test it.
+
+    ar.annex_get('test-annex.dat')
+    f = open(testfile, 'r')
+    assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")

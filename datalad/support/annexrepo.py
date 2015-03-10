@@ -97,13 +97,15 @@ class AnnexRepo(GitRepo):
         optlist = ''
         for key in kwargs.keys():
             optlist += " --%s=%s" % (key, kwargs.get(key))
+        #TODO: May be this should go in a decorator for use in every command.
 
-        cmd_str = 'git annex get %s %s' % (optlist, pathlist)
+        cmd_str = 'cd %s && git annex get %s %s' % (self.path, optlist, pathlist)
+        # TODO: Do we want to cd to self.path first? This would lead to expand paths, if
+        # cwd is deeper in repo.
+
 
         #don't capture stderr, since it provides progress display
         status = self.cmd_call_wrapper.run(cmd_str, log_stderr=False)
-        # TODO: Do we want to cd to self.path first? This would lead to expand paths may be ...
-        # For now base is cwd so we don't need to know what repo this is meant for. git annex knows.
 
         if status not in [0, None]:
             # TODO: Actually this doesn't make sense. Runner raises exception in this case,
