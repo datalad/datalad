@@ -54,7 +54,7 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 
-@with_testrepos
+@with_testrepos('basic/r1')
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 

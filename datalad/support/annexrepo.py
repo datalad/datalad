@@ -17,7 +17,6 @@ import glob
 import logging
 
 from gitrepo import GitRepo
-import datalad.log
 
 from datalad.cmd import Runner as Runner
 
@@ -40,10 +39,14 @@ class AnnexRepo(GitRepo):
         -----------
         path: str
           path to git-annex repository
+
         url: str
           url to the to-be-cloned repository.
           valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
 
+        runner: Runner
+           Provide a Runner in case AnnexRepo shall not create it's own. This is especially needed in case of
+           desired dry runs.
         """
         super(AnnexRepo, self).__init__(path, url)
 
@@ -93,13 +96,17 @@ class AnnexRepo(GitRepo):
         pathlist = ''
         for path in paths:
             pathlist += ' ' + path
+        lgr.info("TRAVIS_DEBUG_ANNEX: paths: %s" % pathlist)
 
         optlist = ''
         for key in kwargs.keys():
             optlist += " --%s=%s" % (key, kwargs.get(key))
+        lgr.info("TRAVIS_DEBUG_ANNEX: opts: %s" % optlist)
+
         #TODO: May be this should go in a decorator for use in every command.
 
         cmd_str = 'cd %s && git annex get %s %s' % (self.path, optlist, pathlist)
+        lgr.info("TRAVIS_DEBUG_ANNEX: cmd: %s" % cmd_str)
         # TODO: Do we want to cd to self.path first? This would lead to expand paths, if
         # cwd is deeper in repo.
 
