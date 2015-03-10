@@ -13,6 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os.path import join, exists
+import logging
 
 from git import Repo
 from git.exc import GitCommandError

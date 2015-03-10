@@ -13,7 +13,6 @@ For further information on git-annex see https://git-annex.branchable.com/.
 """
 
 from os.path import join, exists
-import glob
 import logging
 
 from gitrepo import GitRepo

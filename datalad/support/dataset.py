@@ -13,6 +13,7 @@ This layer makes the difference between an arbitrary annex and a datalad-managed
 
 import os
 from os.path import join, exists
+import logging
 
 from annexrepo import AnnexRepo
 
