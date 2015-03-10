@@ -67,7 +67,7 @@ def test_AnnexRepo_get(src, dst):
     assert_raises(IOError, open, testfile, 'r')
     # If get has nothing to do, we can't test it.
 
-    ar.annex_get(testfile)
+    ar.annex_get([testfile])
     f = open(testfile, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 

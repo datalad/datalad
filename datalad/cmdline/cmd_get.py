@@ -52,14 +52,31 @@ def setup_parser(parser):
     
 def run(args):
     import glob
+    import os
+    import os.path
 
     from datalad.api import Dataset
     from datalad.log import lgr
 
     lgr.debug("Command line arguments: %r" % args)
 
-    cwd_path = os.getcwd()
-    ds = Dataset(cwd_path)
+    # Since GitPython doesn't recognize we ar with in a repo, if we are
+    # deeper down the tree, walk upwards and look for '.git':
+    # TODO: May be provide a patch for GitPython to have it cleaner.
+    cwd_before = cwd = os.getcwd()
+    while True:
+        if os.path.exists(os.path.join(cwd, '.git')):
+            break
+        else:
+            if cwd == '/':  # TODO: Is this platform-dependend?
+                lgr.error("No repository found.")
+                raise ValueError  # TODO: Proper Exception or clean exit?
+            else:
+                os.chdir('..')
+                cwd = os.getcwd()
+
+    ds = Dataset(cwd)
+    os.chdir(cwd_before)
 
     # args.path comes as a list
     # Expansions (like globs) provided by the shell itself are already done.

@@ -97,7 +97,7 @@ class AnnexRepo(GitRepo):
             options += " --%s=%s" % (key, kwargs.get(key))
         #TODO: May be this should go in a decorator for use in every command.
 
-        cmd_str = 'cd %s && git annex get %s%s' % (self.path, options, paths)
+        cmd_str = 'git annex get %s%s' % (options, paths)
         # TODO: Do we want to cd to self.path first? This would lead to expand paths, if
         # cwd is deeper in repo.
 
