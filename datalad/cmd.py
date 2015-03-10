@@ -66,7 +66,7 @@ class Runner(object):
         else:
             raise ValueError("Argument 'command' is neither a string nor a callable.")
 
-    def run(self, cmd, log_stdout=False, log_stderr=True):
+    def run(self, cmd, log_stdout=True, log_stderr=True):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
@@ -94,15 +94,8 @@ class Runner(object):
            if command's exitcode wasn't 0 or None
         """
 
-        if log_stdout:
-            outputstream = subprocess.PIPE
-        else:
-            outputstream = sys.stdout
-
-        if log_stderr:
-            errstream = subprocess.PIPE
-        else:
-            errstream = sys.stderr
+        outputstream = subprocess.PIPE if log_stdout else sys.stdout
+        errstream = subprocess.PIPE if log_stderr else sys.stderr
 
         self.log("Running: %s" % (cmd,))
 
