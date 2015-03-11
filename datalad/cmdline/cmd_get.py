@@ -72,7 +72,7 @@ def run(args):
                 lgr.error("No repository found.")
                 raise ValueError  # TODO: Proper Exception or clean exit?
             else:
-                os.chdir('..')
+                os.chdir(os.pardir)
                 cwd = os.getcwd()
 
     ds = Dataset(cwd)
