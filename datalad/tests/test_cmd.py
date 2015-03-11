@@ -122,10 +122,10 @@ def test_runner_heavy_output():
     # TODO: again, no automatic detection of this resulting in being stucked yet.
 
     runner = Runner()
-    cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
+    cmd = '%s -c "import datalad.tests.heavyoutput;"' % sys.executable
     ret = runner.run(cmd, log_stderr=False, log_stdout=False)
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
-    # #do it again with capturing:
-    # ret = runner.run(cmd, log_stderr=True, log_stdout=True)
-    # assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+    #do it again with capturing:
+    ret = runner.run(cmd, log_stderr=True, log_stdout=True)
+    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
