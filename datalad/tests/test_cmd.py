@@ -118,7 +118,7 @@ def test_runner_log_stdout():
 
 
 @ignore_nose_capturing_stdout
-def test_runner_heavy_output():
+def check_runner_heavy_output(log_online):
     # TODO: again, no automatic detection of this resulting in being stucked yet.
 
     runner = Runner()
@@ -129,3 +129,15 @@ def test_runner_heavy_output():
     #do it again with capturing:
     ret = runner.run(cmd, log_stderr=True, log_stdout=True)
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+
+    # and now original problematic command with a massive single line
+    if not log_online:
+        # We know it would get stuck in online mode
+        cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
+        ret = runner.run(cmd, log_stderr=True, log_stdout=True)
+        assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+
+def test_runner_heavy_output():
+    # TODO: RF sweep_args from PyMVPA to be used here
+    for log_online in [True, False]:
+        yield check_runner_heavy_output, log_online
