@@ -1,7 +1,8 @@
 Contributing to DataLad
 =======================
 
-**Note: This document is just to get started, more thorough contributing guidlines are coming.**
+**Note: This document is just to get started, more thorough
+contributing guidelines are coming.**
 
 Files organization
 ------------------
