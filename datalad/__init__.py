@@ -19,4 +19,4 @@ try:
     bench = Tester().bench
     del Tester
 except ImportError:
-    def test(*args, **kwargs): raise RuntimeError('Need numpy >= 1.2 for tests')
+    def test(*args, **kwargs): raise RuntimeError('Need numpy >= 1.2 for datalad.tests()')
