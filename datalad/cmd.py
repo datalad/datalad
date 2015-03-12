@@ -16,6 +16,7 @@ import subprocess
 import sys
 import logging
 import os
+import shutil
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -226,4 +227,11 @@ def link_file_load(src, dst, dry_run=False):
         # TODO: how would it interact with git/git-annex
         os.unlink(dst)
     lgr.debug("Hardlinking %(src)s under %(dst)s" % locals())
-    os.link(os.path.realpath(src), dst)
+    src_realpath = os.path.realpath(src)
+
+    try:
+        os.link(src_realpath, dst)
+    except  AttributeError, e:
+        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
+        shutil.copyfile(src_realpath, dst)
+        shutil.copystat(src_realpath, dst)
