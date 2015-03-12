@@ -37,11 +37,21 @@ or clone with `--recursive` option originally.
 
 # Dependencies
 
-On Debian-based systems:
+On Debian-based systems we recommend to enable
+[NeuroDebian](http://neuro.debian.net) since we use it to provide
+backports of recent fixed external modules we depend upon:
 
 ```sh
 apt-get install patool python-bs4 python-git python-joblib git-annex
 ```
+
+or otherwise you can use pip to install Python modules
+
+```sh
+pip install -r requirements.txt
+```
+
+and will need to install git-annex using appropriate for your OS means
 
 # License
 
