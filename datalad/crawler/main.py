@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interfaces to git and git-annex
+"""Interfaces to git and git-annex and the main spagetti code
 
 """
 
