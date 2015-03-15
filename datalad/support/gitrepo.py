@@ -13,11 +13,12 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os.path import join, exists
+import logging
 
 from git import Repo
 from git.exc import GitCommandError
 
-import datalad.log
+lgr = logging.getLogger('datalad.gitrepo')
 
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
 # Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
@@ -55,21 +56,21 @@ class GitRepo(object):
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
-                datalad.log.lgr.error(str(e))
+                lgr.error(str(e))
                 raise
 
         if not exists(join(path, '.git')):
             try:
                 self.repo = Repo.init(path, True)
             except GitCommandError as e:
-                datalad.log.lgr.error(str(e))
+                lgr.error(str(e))
                 raise
         else:
             try:
                 self.repo = Repo(path)
             except GitCommandError as e:
                 # TODO: Creating Repo-object from existing git repository might raise other Exceptions
-                datalad.log.lgr.error(str(e))
+                log.lgr.error(str(e))
                 raise
 
     def git_dummy_command(self):

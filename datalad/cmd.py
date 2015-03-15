@@ -16,6 +16,7 @@ import subprocess
 import sys
 import logging
 import os
+import shutil
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -66,7 +67,49 @@ class Runner(object):
         else:
             raise ValueError("Argument 'command' is neither a string nor a callable.")
 
-    def run(self, cmd, log_stdout=False, log_stderr=True):
+
+    def _get_output_online(self, proc, log_stderr, log_stdout, return_output=False):
+        stdout, stderr = [], []
+        while proc.poll() is None:
+            if log_stdout:
+                line = proc.stdout.readline()
+                if line != '':
+                    if return_output:
+                        stdout += line
+                    self.log("stdout| " + line.rstrip('\n'))
+                    # TODO: what level to log at? was: level=5
+                    # Changes on that should be properly adapted in
+                    # test.cmd.test_runner_log_stdout()
+            else:
+                pass
+
+            if log_stderr:
+                line = proc.stderr.readline()
+                if line != '':
+                    if return_output:
+                        stderr += line
+                    self.log("stderr| " + line.rstrip('\n'),
+                             level=logging.ERROR)
+                    # TODO: what's the proper log level here?
+                    # Changes on that should be properly adapted in
+                    # test.cmd.test_runner_log_stderr()
+            else:
+                pass
+
+        return stdout, stderr
+
+    def _get_output_communicate(self, proc, log_stderr, log_stdout, return_output=False):
+        """Delegate collection of output to proc.communicate.  It always collects
+        output, thus
+        """
+        out = proc.communicate()
+        for o, n in zip(out, ('stdout', 'stderr')):
+            if o:
+                self.log("%s| " % n + o.rstrip('\n'))
+        return out
+
+    def run(self, cmd, log_stdout=True, log_stderr=True,
+            log_online=False, return_output=False):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
@@ -78,11 +121,19 @@ class Runner(object):
         cmd : str
           String defining the command call.
 
-        log_stdout: bool
+        log_stdout: bool, optional
             If True, stdout is logged. Goes to sys.stdout otherwise.
 
-        log_stderr: bool
+        log_stderr: bool, optional
             If True, stderr is logged. Goes to sys.stderr otherwise.
+
+        log_online: bool, optional
+            Either to log as output comes in.  Setting to True is preferable for
+            running user-invoked actions to provide timely output
+
+        return_output: bool, optional
+            If True, return a tuple of two strings (stdout, stderr) in addition
+            to the exit code
 
         Returns
         -------
@@ -92,17 +143,12 @@ class Runner(object):
         ------
         RunTimeError
            if command's exitcode wasn't 0 or None
+        (stdout, stderr)
+           if return_output=True
         """
 
-        if log_stdout:
-            outputstream = subprocess.PIPE
-        else:
-            outputstream = sys.stdout
-
-        if log_stderr:
-            errstream = subprocess.PIPE
-        else:
-            errstream = sys.stderr
+        outputstream = subprocess.PIPE if log_stdout else sys.stdout
+        errstream = subprocess.PIPE if log_stderr else sys.stderr
 
         self.log("Running: %s" % (cmd,))
 
@@ -111,26 +157,13 @@ class Runner(object):
             proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream, shell=True)
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
-            # Alternatively we would have to parse `cmd` and create multiple subprocesses.
+            # Alternatively we would have to parse `cmd` and create multiple
+            # subprocesses.
 
-            while proc.poll() is None:
-                if log_stdout:
-                    line = proc.stdout.readline()
-                    if line != '':
-                        self.log("stdout| " + line.rstrip('\n'))
-                        # TODO: what level to log at? was: level=5
-                        # Changes on that should be properly adapted in test.cmd.test_runner_log_stdout()
-                else:
-                    pass
-
-                if log_stderr:
-                    line = proc.stderr.readline()
-                    if line != '':
-                        self.log("stderr| " + line.rstrip('\n'), level=logging.ERROR)
-                        # TODO: what's the proper log level here?
-                        # Changes on that should be properly adapted in test.cmd.test_runner_log_stderr()
-                else:
-                    pass
+            if log_online:
+                out = self._get_output_online(proc, log_stderr, log_stdout)
+            else:
+                out = self._get_output_communicate(proc, log_stderr, log_stdout)
 
             status = proc.poll()
 
@@ -145,7 +178,12 @@ class Runner(object):
 
         else:
             self.commands.append(cmd)
-        return None
+            out = ("DRY", "DRY")
+
+        if return_output:
+            return None, out
+        else:
+            return None
 
     def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
@@ -189,4 +227,11 @@ def link_file_load(src, dst, dry_run=False):
         # TODO: how would it interact with git/git-annex
         os.unlink(dst)
     lgr.debug("Hardlinking %(src)s under %(dst)s" % locals())
-    os.link(os.path.realpath(src), dst)
+    src_realpath = os.path.realpath(src)
+
+    try:
+        os.link(src_realpath, dst)
+    except  AttributeError, e:
+        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
+        shutil.copyfile(src_realpath, dst)
+        shutil.copystat(src_realpath, dst)

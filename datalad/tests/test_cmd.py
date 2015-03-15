@@ -9,33 +9,16 @@
 """Test command call wrapper
 """
 
+from mock import patch
 import os
+import platform
 import sys
 import logging
 
-from nose.tools import assert_is, assert_equal, assert_false, assert_true, assert_greater, make_decorator
+from nose.tools import ok_, assert_is, assert_equal, assert_false, assert_true, assert_greater
 
-from datalad.cmd import Runner
-from datalad.tests.utils import with_tempfile, assert_cwd_unchanged
-
-
-def ignore_nose_capturing_stdout(func):
-    """Workaround for nose's behaviour with redirecting sys.stdout
-
-    See issue reported here:
-    https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
-    """
-
-    @make_decorator(func)
-    def newfunc(*args, **kwargs):
-        try:
-            func(*args, **kwargs)
-        except AttributeError, e:
-            if e.message.find('StrinIO') and e.message.find('fileno'):
-                pass
-            else:
-                raise e
-    return newfunc
+from datalad.cmd import Runner, link_file_load
+from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, ignore_nose_capturing_stdout
 
 
 @ignore_nose_capturing_stdout
@@ -137,10 +120,72 @@ def test_runner_log_stdout():
 
 
 @ignore_nose_capturing_stdout
-def test_runner_heavy_output():
+def check_runner_heavy_output(log_online):
     # TODO: again, no automatic detection of this resulting in being stucked yet.
 
     runner = Runner()
-    cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
-    ret = runner.run(cmd)
+    cmd = '%s -c "import datalad.tests.heavyoutput;"' % sys.executable
+    ret = runner.run(cmd, log_stderr=False, log_stdout=False)
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+
+    #do it again with capturing:
+    ret = runner.run(cmd, log_stderr=True, log_stdout=True)
+    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+
+    # and now original problematic command with a massive single line
+    if not log_online:
+        # We know it would get stuck in online mode
+        cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
+        ret = runner.run(cmd, log_stderr=True, log_stdout=True)
+        assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+
+def test_runner_heavy_output():
+    # TODO: RF sweep_args from PyMVPA to be used here
+    for log_online in [True, False]:
+        yield check_runner_heavy_output, log_online
+
+@with_tempfile
+def test_link_file_load(tempfile):
+    tempfile2 = tempfile + '_'
+
+    with open(tempfile, 'w') as f:
+        f.write("LOAD")
+
+    link_file_load(tempfile, tempfile2) # this should work in general
+
+    ok_(os.path.exists(tempfile2))
+
+    with open(tempfile2, 'r') as f:
+        assert_equal(f.read(), "LOAD")
+
+    def inode(fname):
+        with open(fname) as fd:
+            return os.fstat(fd.fileno()).st_ino
+
+    def stats(fname):
+        """Return stats on the file which should have been preserved"""
+        with open(fname) as fd:
+            st = os.fstat(fd.fileno())
+            return (st.st_mode, st.st_uid, st.st_gid, st.st_size, st.st_atime)
+            # despite copystat mtime is not copied. TODO
+            #        st.st_mtime)
+
+
+    if platform.system().lower() in ['linux', 'darwin']:
+        # above call should result in the hardlink
+        assert_equal(inode(tempfile), inode(tempfile2))
+        assert_equal(stats(tempfile), stats(tempfile2))
+        # and if we mock absence of .link
+        class raise_AttributeError:
+            def __call__(*args):
+                raise AttributeError("TEST")
+        with patch('os.link', new_callable=raise_AttributeError):
+            link_file_load(tempfile, tempfile2) # should still work
+
+    # should be a copy (either originally for windows, or after mocked call)
+    ok_(inode(tempfile) != inode(tempfile2))
+    with open(tempfile2, 'r') as f:
+        assert_equal(f.read(), "LOAD")
+    assert_equal(stats(tempfile), stats(tempfile2))
+    os.unlink(tempfile2) # TODO: next two with_tempfile
+

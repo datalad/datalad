@@ -365,3 +365,24 @@ def assert_cwd_unchanged(func):
         assert_equal(cwd_before, cwd_after ,"CWD changed from %s to %s" % (cwd_before, cwd_after))
 
     return newfunc
+
+def ignore_nose_capturing_stdout(func):
+    """Workaround for nose's behaviour with redirecting sys.stdout
+
+
+    Needed for tests involving the runner and nose redirecting stdout.
+    Counterintuitivly, that means it needed for nosestests without '-s'.
+    See issue reported here:
+    https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
+    """
+
+    @make_decorator(func)
+    def newfunc(*args, **kwargs):
+        try:
+            func(*args, **kwargs)
+        except AttributeError, e:
+            if e.message.find('StringIO') > -1 and e.message.find('fileno') > -1:
+                pass
+            else:
+                raise
+    return newfunc
