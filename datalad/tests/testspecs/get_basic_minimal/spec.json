@@ -1,10 +1,10 @@
 {
-  "id": "get_forrest_minimal", 
-  "description": "Tiny demo test: Clone the Forrest Gump git annex repo and 'get' a single CSV file. The test verifies that we get the files we want and their content via hash (curtesy of testkraut). Few tests for expected Git meta data files verify that we have an annex branch and a master branch, and other minor bits.",
+  "id": "get_basic_minimal",
+  "description": "Tiny demo test: Clone the testrepos/basic/r1 git annex repo and 'get' a single file. The test verifies that we get the files we want and their content via hash (curtesy of testkraut). Few tests for expected Git meta data files verify that we have an annex branch and a master branch, and other minor bits.",
   "inputs": {
     "test implementation script": {
       "type": "file",
-      "value": "get_forrest_minimal.sh"
+      "value": "get_basic_minimal.sh"
     },
     "validation script": {
       "type": "file",
@@ -21,19 +21,19 @@
       "value": "repo/.git/annex/index"
     }, 
     "obtained annex'ed file in annex": {
-      "sha1sum": "7146d6e90d51a13fb19f29e3221627225c0c0d15", 
-      "type": "file", 
-      "value": "repo/.git/annex/objects/Jz/QP/SHA256E-s7213--0a60f2661dace61f7b645fe3127b437a3d1a3e0fd413780d49224bd3c7bb5972.csv/SHA256E-s7213--0a60f2661dace61f7b645fe3127b437a3d1a3e0fd413780d49224bd3c7bb5972.csv"
+      "sha1sum": "a8fdc205a9f19cc1c7507a60c4f01b13d11d7fd0",
+      "type": "file",
+      "value": "repo/.git/annex/objects/zk/71/SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat/SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat"
     }, 
     "we have git indicator": {
       "type": "file", 
       "value": "repo/.git/config"
     }, 
     "default repo description": {
-      "sha1sum": "9635f1b7e12c045212819dd934d809ef07efa2f4", 
+      "sha1sum": "9635f1b7e12c045212819dd934d809ef07efa2f4",
       "type": "file", 
       "value": "repo/.git/description"
-    }, 
+    },
     "we have an annex branch": {
       "type": "file", 
       "value": "repo/.git/refs/heads/git-annex"
@@ -47,19 +47,19 @@
       "value": "repo/.git/refs/remotes/origin/HEAD"
     }, 
     "file directly in Git": {
-      "sha1sum": "8d5e8bbf5e3820872eaf7a4af07f20e44c3ba9aa", 
+      "sha1sum": "60480fec1111aabc5a86546f8d1b5027cc539af3",
       "type": "file", 
-      "value": "repo/LICENSE"
+      "value": "repo/INFO.txt"
     }, 
     "file obtained via git annex": {
-      "sha1sum": "7146d6e90d51a13fb19f29e3221627225c0c0d15", 
+      "sha1sum": "a8fdc205a9f19cc1c7507a60c4f01b13d11d7fd0",
       "type": "file", 
-      "value": "repo/stimulus/task001/annotations/scenes.csv"
+      "value": "repo/test-annex.dat"
     }, 
     "tests::0::stdout": {
       "type": "string", 
       "contains": [
-        "get stimulus/task001/annotations/scenes.csv",
+        "get test-annex.dat",
         "(merging origin/git-annex into git-annex...)"
       ],
       "endswith": "ecording state in git...)\n"
@@ -73,7 +73,7 @@
     {
       "command": [
         "sh", 
-        "get_forrest_minimal.sh"
+        "get_basic_minimal.sh"
       ], 
       "type": "shell"
     },
