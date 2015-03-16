@@ -7,7 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import logging, os, sys
+import logging, os, sys, platform
 import logging.handlers
 
 __all__ = ['is_interactive', 'ColorFormatter', 'log']
@@ -39,7 +39,8 @@ class ColorFormatter(logging.Formatter):
     def __init__(self, use_color=None, log_name=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
-            use_color = is_interactive()
+            # and we are not on Windows.
+            use_color = is_interactive() and platform.system() != 'Windows'
         self.use_color = use_color
         msg = self.formatter_msg(self._get_format(log_name), use_color)
         logging.Formatter.__init__(self, msg)
