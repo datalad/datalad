@@ -162,11 +162,15 @@ def test_link_file_load(tempfile):
         with open(fname) as fd:
             return os.fstat(fd.fileno()).st_ino
 
-    def stats(fname):
+    def stats(fname, times=True):
         """Return stats on the file which should have been preserved"""
         with open(fname) as fd:
             st = os.fstat(fd.fileno())
-            return (st.st_mode, st.st_uid, st.st_gid, st.st_size, st.st_atime)
+            stats = (st.st_mode, st.st_uid, st.st_gid, st.st_size)
+			if times:
+				return stats + (st.st_atime, st.st_mtime)
+			else:
+				return stats
             # despite copystat mtime is not copied. TODO
             #        st.st_mtime)
 
@@ -186,6 +190,6 @@ def test_link_file_load(tempfile):
     ok_(inode(tempfile) != inode(tempfile2))
     with open(tempfile2, 'r') as f:
         assert_equal(f.read(), "LOAD")
-    assert_equal(stats(tempfile), stats(tempfile2))
+    assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
     os.unlink(tempfile2) # TODO: next two with_tempfile
 
