@@ -1,34 +1,11 @@
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
+#emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 #ex: set sts=4 ts=4 sw=4 noet:
-#------------------------- =+- Python script -+= -------------------------
-"""
-
- COPYRIGHT: Yaroslav Halchenko 2013
-
- LICENSE: MIT
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
-"""
-
-__author__ = 'Yaroslav Halchenko'
-__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
-__license__ = 'MIT'
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os, tempfile, time
 from os.path import join, exists, lexists, isdir
@@ -90,7 +67,7 @@ def verify_nothing_was_done(stats):
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_page2annex_same_incoming_and_public(url, mode, path):
+def check_page2annex_same_incoming_and_public(mode, path, url):
     dout = tempfile.mkdtemp()
     cfg = EnhancedConfigParser.get_default(dict(
         DEFAULT=dict(
@@ -156,7 +133,7 @@ def test_page2annex_same_incoming_and_public():
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path):
+def check_page2annex_separate_public(separate, mode, incoming_destiny, path, url):
     fast_mode = mode in ['fast', 'relaxed']
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp() if separate else din
@@ -384,7 +361,7 @@ tree2args = dict(
 
 @with_tree(**tree2args)
 @serve_path_via_http()
-def test_page2annex_recurse(url, path):
+def test_page2annex_recurse(path, url):
 
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()

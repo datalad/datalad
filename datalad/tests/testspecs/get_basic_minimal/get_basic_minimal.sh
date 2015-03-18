@@ -1,7 +1,7 @@
 #!/bin/sh
-git clone http://psydata.ovgu.de/forrest_gump/.git repo
+git clone https://github.com/datalad/testrepo--basic--r1.git repo
 cd repo
-git annex get stimulus/task001/annotations/scenes.csv
+git annex get test-annex.dat
 
 # we need to remove the restrictive permission in order for the test harness
 # to be able to delete the git-annex repo during tear down

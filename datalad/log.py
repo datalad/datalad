@@ -1,33 +1,14 @@
-# emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # ex: set sts=4 ts=4 sw=4 noet:
-"""
- COPYRIGHT: Yaroslav Halchenko 2013
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
- LICENSE: MIT
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
-"""
-
-__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
-__license__ = 'MIT'
-
-import logging, os, sys
+import logging, os, sys, platform
+import logging.handlers
 
 __all__ = ['is_interactive', 'ColorFormatter', 'log']
 
@@ -40,10 +21,6 @@ def is_interactive():
 # Adjusted for automagic determination either coloring is needed and
 # prefixing of multiline log lines
 class ColorFormatter(logging.Formatter):
-
-    FORMAT = ("$BOLD%(asctime)-15s$RESET [%(levelname)s] "
-              "%(message)s "
-              "($BOLD%(filename)s$RESET:%(lineno)d)")
 
     BLACK, RED, GREEN, YELLOW, BLUE, MAGENTA, CYAN, WHITE = range(8)
 
@@ -59,13 +36,21 @@ class ColorFormatter(logging.Formatter):
       'ERROR': RED
     }
 
-    def __init__(self, use_color=None):
+    def __init__(self, use_color=None, log_name=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
-            use_color = is_interactive()
-        msg = self.formatter_msg(self.FORMAT, use_color)
-        logging.Formatter.__init__(self, msg)
+            # and we are not on Windows.
+            use_color = is_interactive() and platform.system() != 'Windows'
         self.use_color = use_color
+        msg = self.formatter_msg(self._get_format(log_name), use_color)
+        logging.Formatter.__init__(self, msg)
+
+    def _get_format(self, log_name=False):
+        return ("$BOLD%(asctime)-15s$RESET "
+                + ("%(name)-15s " if log_name else "")
+                + "[%(levelname)s] "
+                "%(message)s "
+                "($BOLD%(filename)s$RESET:%(lineno)d)")
 
     def formatter_msg(self, fmt, use_color=False):
         if use_color:
@@ -90,41 +75,83 @@ class ColorFormatter(logging.Formatter):
         return logging.Formatter.format(self, record)
 
 
-def set_level(level=None, default='WARNING', lgr=None, name='datalad'):
-    """Helper to set loglevel for an arbitrary logger
+class LoggerHelper(object):
+    """Helper to establish and control a Logger"""
 
-    By default operates for 'datalad'.
-    TODO: deduce name from upper module name so it could be reused without changes
-    """
-    if level is None:
-        # see if nothing in the environment
-        level = os.environ.get(name.upper() + '_LOGLEVEL', None)
-    if level is None:
-        level = default
+    def __init__(self, name='datalad'):
+        self.name = name
+        self.lgr = logging.getLogger(name)
 
-    try:
-        # it might be a string which still represents an int
-        log_level = int(level)
-    except ValueError:
-        # or a string which corresponds to a constant;)
-        log_level = getattr(logging, level.upper())
+    def _get_environ(self, var, default=None):
+        return os.environ.get(self.name.upper() + '_%s' % var.upper(), default)
 
-    if lgr is None:
-        lgr = logging.getLogger(name)
-    lgr.setLevel(log_level)
+    def set_level(self, level=None, default='WARNING'):
+        """Helper to set loglevel for an arbitrary logger
+
+        By default operates for 'datalad'.
+        TODO: deduce name from upper module name so it could be reused without changes
+        """
+        if level is None:
+            # see if nothing in the environment
+            level = self._get_environ('LOGLEVEL')
+        if level is None:
+            level = default
+
+        try:
+            # it might be a string which still represents an int
+            log_level = int(level)
+        except ValueError:
+            # or a string which corresponds to a constant;)
+            log_level = getattr(logging, level.upper())
+
+        self.lgr.setLevel(log_level)
 
 
-def _init_datalad_logger():
-    # By default mimic previously talkative behavior
-    lgr = logging.getLogger('datalad')
-    log_handler = logging.StreamHandler(sys.stdout)
+    def get_initialized_logger(self, logtarget=None):
+        """Initialize and return the logger
 
-    # But now improve with colors and useful information such as time
-    log_handler.setFormatter(ColorFormatter())
-    #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
-    lgr.addHandler(log_handler)
-    return lgr
+        Parameters
+        ----------
+        target: string, optional
+          Which log target to request logger for
+        logtarget: { 'stdout', 'stderr', str }, optional
+          Where to direct the logs.  stdout and stderr stand for standard streams.
+          Any other string is considered a filename.  Multiple entries could be
+          specified comma-separated
 
-lgr = _init_datalad_logger()
-set_level(lgr=lgr)                           # will set the default
+        Returns
+        -------
+        logging.Logger
+        """
+        # By default mimic previously talkative behavior
+        logtarget = self._get_environ('LOGTARGET', logtarget or 'stdout')
+
+        # Allow for multiple handlers being specified, comma-separated
+        if ',' in logtarget:
+            for handler_ in logtarget.split(','):
+                self.get_initialized_logger(logtarget=handler_)
+            return self.lgr
+
+        if logtarget.lower() in ('stdout', 'stderr') :
+            loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
+            use_color = is_interactive() # explicitly decide here
+        else:
+            # must be a simple filename
+            # Use RotatingFileHandler for possible future parametrization to keep
+            # log succinct and rotating
+            loghandler = logging.handlers.RotatingFileHandler(logtarget)
+            use_color = False
+            # I had decided not to guard this call and just raise exception to go
+            # out happen that specified file location is not writable etc.
+        # But now improve with colors and useful information such as time
+        loghandler.setFormatter(
+            ColorFormatter(use_color=use_color,
+                           log_name=self._get_environ("LOGNAME", False)))
+        #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
+        self.lgr.addHandler(loghandler)
+
+        self.set_level() # set default logging level
+        return self.lgr
+
+lgr = LoggerHelper().get_initialized_logger()
 

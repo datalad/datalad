@@ -7,6 +7,7 @@ repositories, while fetching data load from the original data providers.
 
 # Status
 
+
 It is currently in a "prototype" state, i.e. **a mess**. It is functional for
 many use-cases but not widely used since its organization and configuration will
 be a subject for a considerable reorganization and standardization.  Primary
@@ -25,13 +26,33 @@ to get a better understanding of the ultimate specs and design.
 Unfortunately there is not that much of unittests, but there are few
 "functionality" tests aiming to address main use-cases.
 
+Some tests use testing repositories which are available as submodules
+under the `datalad/tests/testrepos` submodule (two tier- to not pollute
+top repository submodules namespace).  To enable those tests do
+
+```sh
+git submodule update --init --recursive
+```
+
+or clone with `--recursive` option originally.
+
 # Dependencies
 
-On Debian-based systems:
+On Debian-based systems we recommend to enable
+[NeuroDebian](http://neuro.debian.net) since we use it to provide
+backports of recent fixed external modules we depend upon:
 
 ```sh
 apt-get install patool python-bs4 python-git python-joblib git-annex
 ```
+
+or otherwise you can use pip to install Python modules
+
+```sh
+pip install -r requirements.txt
+```
+
+and will need to install git-annex using appropriate for your OS means
 
 # License
 

@@ -1,30 +1,17 @@
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: t -*-
-# vi: set ft=python sts=4 ts=4 sw=4 noet :
-
-# This file is part of Fail2Ban.
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
-# Fail2Ban is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
-# (at your option) any later version.
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
 #
-# Fail2Ban is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#   Originally written by Yaroslav Halchenko  for Fail2Ban and later
+#   adopted for use in DataLad and thus relicensed under MIT/Expat.
+#   Relicensing was conveied via email to other contributors.
 #
-# You should have received a copy of the GNU General Public License
-# along with Fail2Ban; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#  ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-# Author: Yaroslav Halchenko
-# Modified: Cyril Jaquier
 
-__author__ = 'Yaroslav Halhenko'
-__copyright__ = 'Copyright (c) 2007 Yaroslav Halchenko'
-__license__ = 'GPL'
-
-# TODO: clarify license change with anyone who contributed to this file
 
 import logging, os, sys
 

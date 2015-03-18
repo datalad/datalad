@@ -1,12 +1,13 @@
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: nil -*-
-# vi: set ft=python sts=4 ts=4 sw=4 et:
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
-#   See COPYING file distributed along with the testkraut package for the
+#   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-""""""
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""
+"""
 
 __docformat__ = 'restructuredtext'
 
@@ -14,11 +15,13 @@ import argparse
 import re
 import sys
 
+from ..log import is_interactive
+
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
 #        import pydb; pydb.debugger()
 
-        if option_string == '--help':
+        if is_interactive() and option_string == '--help':
             # lets use the manpage on mature systems ...
             try:
                 import subprocess
@@ -57,8 +60,8 @@ class HelpAction(argparse.Action):
 
 class LogLevelAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        from ..log import set_level, lgr
-        set_level(level=values, lgr=lgr)
+        from ..log import LoggerHelper
+        LoggerHelper().set_level(level=values)
 
 
 def parser_add_common_args(parser, pos=None, opt=None, **kwargs):

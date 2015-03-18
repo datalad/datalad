@@ -1,94 +1,194 @@
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
-#ex: set sts=4 ts=4 sw=4 noet:
-#------------------------- =+- Python script -+= -------------------------
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""
+Wrapper for command and function calls, allowing for dry runs and output handling
+
 """
 
- COPYRIGHT: Yaroslav Halchenko 2013
 
- LICENSE: MIT
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
-"""
-#-----------------\____________________________________/------------------
-
-__author__ = 'Yaroslav Halchenko'
-__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
-__license__ = 'MIT'
-
-import os
-import commands
-
+import subprocess
+import sys
 import logging
-lgr = logging.getLogger('datalad.files')
+import os
+import shutil
 
-def dry(s, dry_):
-    """Small helper for dry runs
-    """
-    if dry_:
-        return "DRY " + s
-    return s
+lgr = logging.getLogger('datalad.cmd')
+
 
 class Runner(object):
-    """Helper to run commands and functions while allowing for dry_run and later reporting
+    """Provides a wrapper for calling functions and commands.
+
+    An object of this class provides a methods calls shell commands or python functions,
+    allowing for dry runs and output handling.
+
+    Outputs (stdout and stderr) can be either logged or streamed to system's stdout/stderr during execution.
+    This can be enabled or disabled for both of them independently.
+    Additionally allows for dry runs. This is achieved by initializing the `Runner` with `dry=True`.
+    The Runner will then collect all calls as strings in `commands`.
     """
 
     __slots__ = ['commands', 'dry']
 
     def __init__(self, dry=False):
+        self.dry = dry
         self.commands = []
-        self.dry = dry                    # TODO: make use of it
 
-    # TODO -- remove dry_run specification here -- use constructor parameter
-    #def __call__(self, cmd, dry_run=False):
-    def getstatusoutput(self, cmd, dry_run=None):
-        """A wrapper around commands.getstatusoutput
+    def __call__(self, cmd, *args, **kwargs):
+        """Convenience method
 
-        Provides improved logging for debugging purposes and raises
-        RuntimeError exception in case of non-0 return
+        This will call run() or call() depending on the kind of `cmd`.
+        If `cmd` is a string it is interpreted as the to be executed command.
+        Otherwise it is expected to be a callable.
+        Any other argument is passed to the respective method.
+
+        Parameters
+        ----------
+        cmd: str or callable
+           command string to be executed via shell or callable to be called.
+
+        *args and **kwargs:
+           see Runner.run() and Runner.call() for available arguments.
+
+        Raises
+        ------
+        ValueError if cmd is neither a string nor a callable.
         """
-        self.log("Running: %s" % (cmd,))
-        if not self.dry:
-            # status, output = commands.getstatusoutput(cmd)
-            # doing manually for improved debugging
-            pipe = os.popen('{ ' + cmd + '; } 2>&1', 'r')
-            output = ''
-            for line in iter(pipe.readline, ''):
-                self.log("| " + line.rstrip('\n'), level=5)
-                output += line
-            if output[-1:] == '\n': output = output[:-1]
-            status = pipe.close() or 0
 
-            if not status in [0, None]:
-                msg = "Failed to run %r. Exit code=%d output=%s" \
-                      % (cmd, status, output)
+        if isinstance(cmd, basestring):
+            self.run(cmd, *args, **kwargs)
+        elif callable(cmd):
+            self.call(cmd, *args, **kwargs)
+        else:
+            raise ValueError("Argument 'command' is neither a string nor a callable.")
+
+
+    def _get_output_online(self, proc, log_stderr, log_stdout, return_output=False):
+        stdout, stderr = [], []
+        while proc.poll() is None:
+            if log_stdout:
+                line = proc.stdout.readline()
+                if line != '':
+                    if return_output:
+                        stdout += line
+                    self.log("stdout| " + line.rstrip('\n'))
+                    # TODO: what level to log at? was: level=5
+                    # Changes on that should be properly adapted in
+                    # test.cmd.test_runner_log_stdout()
+            else:
+                pass
+
+            if log_stderr:
+                line = proc.stderr.readline()
+                if line != '':
+                    if return_output:
+                        stderr += line
+                    self.log("stderr| " + line.rstrip('\n'),
+                             level=logging.ERROR)
+                    # TODO: what's the proper log level here?
+                    # Changes on that should be properly adapted in
+                    # test.cmd.test_runner_log_stderr()
+            else:
+                pass
+
+        return stdout, stderr
+
+    def _get_output_communicate(self, proc, log_stderr, log_stdout, return_output=False):
+        """Delegate collection of output to proc.communicate.  It always collects
+        output, thus
+        """
+        out = proc.communicate()
+        for o, n in zip(out, ('stdout', 'stderr')):
+            if o:
+                self.log("%s| " % n + o.rstrip('\n'))
+        return out
+
+    def run(self, cmd, log_stdout=True, log_stderr=True,
+            log_online=False, return_output=False):
+        """Runs the command `cmd` using shell.
+
+        In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
+        Allows for seperatly logging stdout and stderr  or streaming it to system's stdout
+        or stderr respectively.
+
+        Parameters
+        ----------
+        cmd : str
+          String defining the command call.
+
+        log_stdout: bool, optional
+            If True, stdout is logged. Goes to sys.stdout otherwise.
+
+        log_stderr: bool, optional
+            If True, stderr is logged. Goes to sys.stderr otherwise.
+
+        log_online: bool, optional
+            Either to log as output comes in.  Setting to True is preferable for
+            running user-invoked actions to provide timely output
+
+        return_output: bool, optional
+            If True, return a tuple of two strings (stdout, stderr) in addition
+            to the exit code
+
+        Returns
+        -------
+        Status code as returned by the called command or `None` in case of dry-mode.
+
+        Raises
+        ------
+        RunTimeError
+           if command's exitcode wasn't 0 or None
+        (stdout, stderr)
+           if return_output=True
+        """
+
+        outputstream = subprocess.PIPE if log_stdout else sys.stdout
+        errstream = subprocess.PIPE if log_stderr else sys.stderr
+
+        self.log("Running: %s" % (cmd,))
+
+        if not self.dry:
+
+            proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream, shell=True)
+            # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
+            # and is considered to be a security hazard. So be careful with input.
+            # Alternatively we would have to parse `cmd` and create multiple
+            # subprocesses.
+
+            if log_online:
+                out = self._get_output_online(proc, log_stderr, log_stdout)
+            else:
+                out = self._get_output_communicate(proc, log_stderr, log_stdout)
+
+            status = proc.poll()
+
+            if status not in [0, None]:
+                msg = "Failed to run %r. Exit code=%d" % (cmd, status)
                 lgr.error(msg)
                 raise RuntimeError(msg)
+
             else:
-                self.log("Finished running %r with status %s" % (cmd, status),
-                         level=8)
-                return status, output
+                self.log("Finished running %r with status %s" % (cmd, status), level=8)
+                return status
+
         else:
             self.commands.append(cmd)
-        return None, None
+            out = ("DRY", "DRY")
 
-    def drycall(self, f, *args, **kwargs):
+        if return_output:
+            return None, out
+        else:
+            return None
+
+    def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
+
+        Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with its arguments to `commands` otherwise.
 
         f : callable
         *args, **kwargs:
@@ -97,20 +197,23 @@ class Runner(object):
         if self.dry:
             self.commands.append("%s args=%s kwargs=%s" % (f, args, kwargs))
         else:
-            f(*args, **kwargs)
+            return f(*args, **kwargs)
 
-    def log(self, msg, level=None):
-        if level is None:
-            logf = lgr.debug
-        else:
-            logf = lambda msg: lgr.log(level, msg)
+    def log(self, msg, level=logging.DEBUG):
+        """log helper
+
+        Logs at DEBUG-level by default and adds "DRY:"-prefix for dry runs.
+        """
         if self.dry:
-            lgr.debug("DRY: %s" % msg)
+            lgr.log(level, "DRY: %s" % msg)
         else:
-            lgr.debug(msg)
+            lgr.log(level, msg)
 
-#getstatusoutput = Runner()
 
+# ####
+# Preserve from previous version
+# TODO: document intention
+# ####
 # this one might get under Runner for better output/control
 def link_file_load(src, dst, dry_run=False):
     """Just a little helper to hardlink files's load
@@ -124,4 +227,11 @@ def link_file_load(src, dst, dry_run=False):
         # TODO: how would it interact with git/git-annex
         os.unlink(dst)
     lgr.debug("Hardlinking %(src)s under %(dst)s" % locals())
-    os.link(os.path.realpath(src), dst)
+    src_realpath = os.path.realpath(src)
+
+    try:
+        os.link(src_realpath, dst)
+    except  AttributeError, e:
+        lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
+        shutil.copyfile(src_realpath, dst)
+        shutil.copystat(src_realpath, dst)

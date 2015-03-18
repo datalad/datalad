@@ -1,34 +1,15 @@
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*- 
-#ex: set sts=4 ts=4 sw=4 noet:
-#------------------------- =+- Python script -+= -------------------------
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Interfaces to git and git-annex
 
- COPYRIGHT: Yaroslav Halchenko 2013
-
- LICENSE: MIT
-
-  Permission is hereby granted, free of charge, to any person obtaining a copy
-  of this software and associated documentation files (the "Software"), to deal
-  in the Software without restriction, including without limitation the rights
-  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  copies of the Software, and to permit persons to whom the Software is
-  furnished to do so, subject to the following conditions:
-
-  The above copyright notice and this permission notice shall be included in
-  all copies or substantial portions of the Software.
-
-  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-  THE SOFTWARE.
 """
 
-__author__ = 'Yaroslav Halchenko'
-__copyright__ = 'Copyright (c) 2013 Yaroslav Halchenko'
-__license__ = 'MIT'
 
 import git
 import os
@@ -66,7 +47,7 @@ class AnnexRepo(object):
             self.init(description)
 
     def run(self, cmd, git_cmd="annex"):
-        return self.runner.getstatusoutput(
+        return self.runner.run(
             "cd %s && git %s %s" % (self.path, git_cmd, cmd))
 
     def write_description(self, description):
@@ -77,13 +58,12 @@ class AnnexRepo(object):
         lgr.info("Initializing git annex repository under %s: %s"
                  % (self.path, description))
 
-        status, output = self.runner.getstatusoutput(
-            "cd %s && git init && git annex init" % self.path)
+        status = self.runner.run("cd %s && git init && git annex init" % self.path)
 
         if description:
             lgr.debug("Writing description")
             # dump description
-            self.runner.drycall(self.write_description, description)
+            self.runner.call(self.write_description, description)
 
     def get_indexed_files(self):
         """Helper to spit out a list of indexed files
@@ -108,7 +88,7 @@ class AnnexRepo(object):
             index = gitrepo.index
             if not len(index.diff(None, paths=[filename])):
                 lgr.debug("Removing %s without local changes", filename)
-                self.runner.drycall(os.unlink, full_filename)
+                self.runner.call(os.unlink, full_filename)
             else:
                 lgr.debug("Did not remove %s since there were local changes",
                           filename)
@@ -190,7 +170,7 @@ def annex_file(href,
     """
     assert(runner)                        # must be provided
     # convenience shortcuts
-    _call = runner.drycall
+    _call = runner.call
     fast_mode = add_mode in ['fast', 'relaxed']
 
     lgr.info("Annexing (mode=%s) %s//%s originating from url=%s present locally under %s//%s"
@@ -339,4 +319,4 @@ def git_commit(path, files=None, msg=""):
         repo.index.update()
         assert(not len(repo.index.diff(repo.head.commit)))
         # cmd = "cd %s; git commit -m %r" % (path, msg)
-        # status, output = getstatusoutput(cmd, dry_run)
+        # status, output = getstatusoutput(cmd, dry_run)  # getstatusoutput is deprecated. Use cmd.Runner.run() instead.
