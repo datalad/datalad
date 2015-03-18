@@ -21,8 +21,6 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout
 
 
-
-
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos

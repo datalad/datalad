@@ -239,7 +239,7 @@ def with_tempfile(t, *targs, **tkwargs):
         # let mktemp handle it otherwise. However, an explicitly provided
         # dir=... will override this.
         directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
-        if directory is not None and 'dir' not in tkwargs:
+        if directory and 'dir' not in tkwargs:
             tkwargs['dir'] = directory
 
 
