@@ -67,7 +67,7 @@ def verify_nothing_was_done(stats):
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_page2annex_same_incoming_and_public(url, mode, path):
+def check_page2annex_same_incoming_and_public(mode, path, url):
     dout = tempfile.mkdtemp()
     cfg = EnhancedConfigParser.get_default(dict(
         DEFAULT=dict(
@@ -133,7 +133,7 @@ def test_page2annex_same_incoming_and_public():
 
 @with_tree(**tree1args)
 @serve_path_via_http()
-def check_page2annex_separate_public(url, separate, mode, incoming_destiny, path):
+def check_page2annex_separate_public(separate, mode, incoming_destiny, path, url):
     fast_mode = mode in ['fast', 'relaxed']
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp() if separate else din
@@ -361,7 +361,7 @@ tree2args = dict(
 
 @with_tree(**tree2args)
 @serve_path_via_http()
-def test_page2annex_recurse(url, path):
+def test_page2annex_recurse(path, url):
 
     din = tempfile.mkdtemp()
     dout = tempfile.mkdtemp()

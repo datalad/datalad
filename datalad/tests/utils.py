@@ -100,7 +100,7 @@ def with_tree(t, tree=None, **tkwargs):
         d = tempfile.mkdtemp(**tkwargs)
         create_tree(d, tree)
         try:
-            t(*((d,) + arg), **kw)
+            t(*(arg + (d,)), **kw)
         finally:
             #print "TODO: REMOVE tree ", d
             shutil.rmtree(d)
@@ -166,7 +166,7 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 def serve_path_via_http(*args, **tkwargs):
     def decorate(func):
-        def newfunc(path, *arg, **kw):
+        def newfunc(*arg, **kw):
             port = random.randint(8000, 8500)
             #print "Starting to serve path ", path
             # TODO: ATM we are relying on path being local so we could
@@ -174,18 +174,14 @@ def serve_path_via_http(*args, **tkwargs):
             SocketServer.TCPServer.allow_reuse_address = True
             httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
             server_thread = Thread(target=httpd.serve_forever)
+            arg, path = arg[:-1], arg[-1]
             url = 'http://localhost:%d/%s/' % (port, path)
             lgr.debug("HTTP: serving %s under %s", path, url)
             server_thread.start()
-            if 'path' in kw:
-                raise ValueError(
-                    "path kwarg to be provided by serve_path_via_http")
-            kw_ = {'path': path}
-            kw_.update(kw)
 
             #time.sleep(1)               # just give it few ticks
             try:
-                func(*((url,)+arg), **kw_)
+                func(*(arg + (path, url,)), **kw)
             finally:
                 lgr.debug("HTTP: stopping server")
                 httpd.shutdown()
@@ -346,7 +342,7 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
             if __debug__:
                 lgr.debug('Running %s on %s' % (t.__name__, repo))
             try:
-                t(repo, *arg, **kw)
+                t(*(arg + (repo,)), **kw)
             finally:
                 pass # might need to provide additional handling so, handle
     return newfunc

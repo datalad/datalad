@@ -57,8 +57,8 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 @ignore_nose_capturing_stdout
-@with_tempfile
 @with_testrepos(flavors=['network'])
+@with_tempfile
 def test_AnnexRepo_get(src, dst):
 
     ar = AnnexRepo(dst, src)
