@@ -204,6 +204,7 @@ def sorted_files(dout):
 
 import glob
 
+
 @optional_args
 def with_tempfile(t, *targs, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end.
@@ -213,6 +214,9 @@ def with_tempfile(t, *targs, **tkwargs):
     the test.  If no 'prefix' argument is provided, it will be
     constructed using module and function names ('.' replaced with
     '_').
+
+    To change the used directory without providing keyword argument 'dir' set
+    DATALAD_TESTS_TEMPDIR.
 
     Example use::
 
@@ -230,6 +234,14 @@ def with_tempfile(t, *targs, **tkwargs):
             except:
                 # well -- if something wrong just proceed with defaults
                 pass
+
+        # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+        # let mktemp handle it otherwise. However, an explicitly provided
+        # dir=... will override this.
+        directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+        if directory is not None and 'dir' not in tkwargs:
+            tkwargs['dir'] = directory
+
 
         filename = tempfile.mktemp(*targs, **tkwargs)
         if __debug__:
