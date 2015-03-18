@@ -164,18 +164,32 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             return
         lgr.debug("HTTP: " + format % args)
 
+try:
+    import platform
+    _RUNNING_UNDER_WHEEZY = platform.system() == 'Linux' \
+                and platform.linux_distribution()[0] == 'debian' \
+                and platform.linux_distribution()[1].startswith('7.')
+except:
+    _RUNNING_UNDER_WHEEZY = False
+
 def serve_path_via_http(*args, **tkwargs):
     def decorate(func):
         def newfunc(*arg, **kw):
             port = random.randint(8000, 8500)
-            #print "Starting to serve path ", path
             # TODO: ATM we are relying on path being local so we could
             # start HTTP server in the same directory.  FIX IT!
             SocketServer.TCPServer.allow_reuse_address = True
             httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
             server_thread = Thread(target=httpd.serve_forever)
             arg, path = arg[:-1], arg[-1]
-            url = 'http://localhost:%d/%s/' % (port, path)
+            # There is a problem with Haskell on wheezy trying to
+            # fetch via IPv6 whenever there is a ::1 localhost entry in
+            # /etc/hosts.  Apparently fixing that docker image reliably
+            # is not that straightforward, although see
+            # http://jasonincode.com/customizing-hosts-file-in-docker/
+            # so we just force to use 127.0.0.1 while on wheezy
+            hostname = '127.0.0.1' if _RUNNING_UNDER_WHEEZY else 'localhost'
+            url = 'http://%s:%d/%s/' % (hostname, port, path)
             lgr.debug("HTTP: serving %s under %s", path, url)
             server_thread.start()
 
