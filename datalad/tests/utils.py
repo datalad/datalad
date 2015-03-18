@@ -248,7 +248,7 @@ def with_tempfile(t, *targs, **tkwargs):
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
         try:
-            t(*(arg + (filename,)), **kw)
+            return t(*(arg + (filename,)), **kw)
         finally:
             # glob here for all files with the same name (-suffix)
             # would be useful whenever we requested .img filename,
