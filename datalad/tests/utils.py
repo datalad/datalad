@@ -150,7 +150,7 @@ import SimpleHTTPServer
 import SocketServer
 from threading import Thread
 
-lgr = logging.getLogger('datalad')
+lgr = logging.getLogger('datalad.tests')
 
 class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     """A little adapter to silence the handler
