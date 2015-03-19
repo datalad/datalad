@@ -23,7 +23,7 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos
 @with_tempfile
 def test_AnnexRepo_instance_from_clone(src, dst):
 
@@ -38,7 +38,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=['local'])  # 'network' doesn't make sense for this test
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)

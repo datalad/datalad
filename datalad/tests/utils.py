@@ -214,6 +214,7 @@ def sorted_files(dout):
 
 import glob
 
+
 @optional_args
 def with_tempfile(t, *targs, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end.
@@ -223,6 +224,9 @@ def with_tempfile(t, *targs, **tkwargs):
     the test.  If no 'prefix' argument is provided, it will be
     constructed using module and function names ('.' replaced with
     '_').
+
+    To change the used directory without providing keyword argument 'dir' set
+    DATALAD_TESTS_TEMPDIR.
 
     Example use::
 
@@ -241,12 +245,20 @@ def with_tempfile(t, *targs, **tkwargs):
                 # well -- if something wrong just proceed with defaults
                 pass
 
+        # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+        # let mktemp handle it otherwise. However, an explicitly provided
+        # dir=... will override this.
+        directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+        if directory and 'dir' not in tkwargs:
+            tkwargs['dir'] = directory
+
+
         filename = tempfile.mktemp(*targs, **tkwargs)
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
         try:
-            t(*(arg + (filename,)), **kw)
+            return t(*(arg + (filename,)), **kw)
         finally:
             # glob here for all files with the same name (-suffix)
             # would be useful whenever we requested .img filename,
