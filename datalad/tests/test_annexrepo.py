@@ -67,8 +67,12 @@ def test_AnnexRepo_get(src, dst):
     cwd = os.getcwd()
     os.chdir(dst)
     testfile = 'test-annex.dat'
-    assert_raises(IOError, open, testfile, 'r')
-    # If get has nothing to do, we can't test it.
+    if platform.system() != "Windows":
+        assert_raises(IOError, open, testfile, 'r')
+        # If get has nothing to do, we can't test it.
+        # TODO: on crippled filesystem, the file is actually present before getting!
+        # So, what to test? Just skip for now.
+        # Actually, could test content!
 
     ar.annex_get([testfile])
     f = open(testfile, 'r')

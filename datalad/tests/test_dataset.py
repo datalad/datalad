@@ -66,8 +66,10 @@ def test_Dataset_get(src, dst):
     cwd = os.getcwd()
     os.chdir(dst)
     testfile = 'test-annex.dat'
-    assert_raises(IOError, open, testfile, 'r')
-    # If get has nothing to do, we can't test it.
+    if platform.system() != "Windows":
+        assert_raises(IOError, open, testfile, 'r')
+        # If get has nothing to do, we can't test it.
+        # TODO: see test_AnnexRepo_get()
 
     ds.get([testfile])
     f = open(testfile, 'r')
