@@ -6,6 +6,8 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""DataLad aims to expose (scientific) data available online as a unified data
+distribution with the convenience of git-annex repositories as a backend."""
 
 from .version import __version__
 

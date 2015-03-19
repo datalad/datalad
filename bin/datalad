@@ -10,13 +10,20 @@
 """A shim to invoke DataLad top-level command line utility"""
 
 if __name__ == '__main__':
-	try:
-		import datalad
-	except ImportError:
-		# must be running within source code
-		from os.path import dirname
-		import sys
-		sys.path.append(dirname(dirname(__file__)))
+    try:
+        import datalad
+    except ImportError:
+        # must be running within source code
+        from os.path import dirname
+        import sys
+        sys.path.append(dirname(dirname(__file__)))
 
-    from datalad.cmdline.main import main
+    # TODO: redo neatly
+    from os.path import basename
+    callname = basename(__file__)
+    if callname == 'datalad':
+        from datalad.cmdline.main import main
+    elif callname == 'git-annex-remote-datalad':
+        from datalad.customremotes.main import main
     main()
+
