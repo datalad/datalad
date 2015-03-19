@@ -19,6 +19,9 @@ topdir=$(dirname `which $0 | xargs readlink -f `)/../..
 topdir=$(readlink -f $topdir)
 reposdir=$topdir/datalad/tests/testrepos
 
+# So we could use special custom remotes
+export PATH=$topdir/bin:$PATH PYTHONPATH=$topdir
+
 flavor="$1"
 name="$2"
 
@@ -81,6 +84,27 @@ flavor_basic() {
 	git push --all origin # and push again
 }
 
+initremote_archive() {
+	git annex initremote annexed-archives encryption=none type=external externaltype=datalad
+}
+
+flavor_archive() {
+	create_repo
+	initremote_archive
+	create_info_file
+	mkdir -p d; echo "123" > d/test.dat; tar -czf d.tar.gz d;
+    mv d/test.dat test2.dat; rm -rf d;
+	git annex add d.tar.gz
+	git commit -m "Added tarball"
+	key=$(git annex lookupkey d.tar.gz)
+	git annex add test2.dat
+	git commit -m "Added the load file"
+	git annex addurl --file test2.dat dl+tarball:$key/d/test.dat
+	_info "Added the dl+tarball URL, committing"
+	#git commit -m "Added a url for the file"
+	git annex drop test2.dat
+}
+
 if [ -e $repodir ]; then
 	# TODO -- ask
 	rm_repo
@@ -99,10 +123,6 @@ register_repo_submodule() {
 # cd datalad/tests/testrepos
 # hub create -d "Super-submodule collating test repositories for datalad" datalad/testrepos
 
-case $flavor in
-	basic) flavor_basic;;
-	*) echo "Uknown flavor $flavor";
-	   exit 1;;
-esac
+eval flavor_$flavor
 
-register_repo_submodule
+#register_repo_submodule
