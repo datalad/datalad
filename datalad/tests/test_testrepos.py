@@ -11,7 +11,6 @@ import git
 import os
 
 from .utils import eq_, ok_, with_testrepos, with_tempfile
-from commands import getstatusoutput
 from datalad.cmd import Runner
 
 @with_testrepos(flavors=['local'])
