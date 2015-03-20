@@ -52,8 +52,9 @@ def test_download_url():
     # TODO: This should be possible to do in a better way
     import platform
     if platform.system() == "Windows":
-        fname = fname.replace('\\', '/')
+        fname = '/' + fname.replace('\\', '/')
         lgr.debug("Replaced '\\' in file\'s url: %s" % fname)
+        
     # Let's assume absent subdirectory
     #repo_filename, downloaded, updated, downloaded_size
     repo_filename, downloaded, updated, size \
