@@ -54,7 +54,7 @@ def test_download_url():
     if platform.system() == "Windows":
         fname_rep = fname.replace('\\', '/')
         furl = "file:///%s" % fname_rep
-        lgr.debug("Replaced '\\' in file\'s url: %s" % fname)
+        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
     else:
         furl = "file://%s" % fname
 
