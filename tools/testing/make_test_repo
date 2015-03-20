@@ -102,7 +102,8 @@ flavor_archive() {
 	git annex addurl --file test2.dat dl+tarball:$key/d/test.dat
 	_info "Added the dl+tarball URL, committing"
 	#git commit -m "Added a url for the file"
-	git annex drop test2.dat
+	git annex drop --force test2.dat
+	git annex get test2.dat
 }
 
 if [ -e $repodir ]; then

@@ -271,6 +271,13 @@ class AnnexCustomRemote(object):
         self.send("DIRHASH", key)
         return self.read("VALUE", 1)[1]
 
+    def get_URLS(self, key):
+        """Gets URL(s) associated with a Key.
+
+            """
+        self.send("DIRHASH", key)
+        return self.read("VALUE", 1)[1]
+
     def _get_key_dir(self, key):
         """Gets a full path to the directory containing the key
         """
@@ -326,7 +333,8 @@ class AnnexTarballCustomRemote(AnnexCustomRemote):
             self.send("CHECKURL-FAILURE")
 
     def req_CHECKPRESENT(self, key):
-        """
+        """Check if copy is available -- TODO: just proxy the call to annex for underlying tarball
+
         CHECKPRESENT-SUCCESS Key
             Indicates that a key has been positively verified to be present in the remote.
         CHECKPRESENT-FAILURE Key
@@ -347,9 +355,11 @@ class AnnexTarballCustomRemote(AnnexCustomRemote):
         REMOVE-FAILURE Key ErrorMsg
             Indicates that the key was unable to be removed from the remote.
         """
-        # TODO: ask Joey what should be output if it doesn't support removal -- FAILURE?
-        raise NotImplementedError()
+        # TODO: proxy query to the underlying tarball under annex
+        self.send("REMOVE-FAILURE", key, "Cannot remove from the tarball")
 
     def _transfer(self, cmd, key, file):
-        import pydb; pydb.debugger()
-        i = "sweat now"
+        # TODO: Similar issue to CHECKPRESENT: we would need to maintain url->key mapping
+        self.heavydebug(
+            "Transfering for %{cmd}s key %{key}s under %{file}s" % locals())
+        pass
