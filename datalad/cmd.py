@@ -60,13 +60,14 @@ class Runner(object):
         ValueError if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, basestring):
+        if isinstance(cmd, basestring) or isinstance(cmd, list):
             self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             self.call(cmd, *args, **kwargs)
         else:
-            raise ValueError("Argument 'command' is neither a string nor a callable.")
-        # TODO: shouldn't it return the functions instead of just calling them?
+            raise ValueError("Argument 'command' is neither a string, "
+                             "nor a list nor a callable.")
+	# TODO: shouldn't it return the functions instead of just calling them?
 
     # Two helpers to encapsulate formatting/output
     def _log_out(self, line):
@@ -128,8 +129,9 @@ class Runner(object):
 
         Parameters
         ----------
-        cmd : str
-          String defining the command call.
+        cmd : str, list
+          String (or list) defining the command call.  No shell is used if cmd
+          is specified as a list
 
         log_stdout: bool, optional
             If True, stdout is logged. Goes to sys.stdout otherwise.
@@ -164,7 +166,8 @@ class Runner(object):
 
         if not self.dry:
 
-            proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream, shell=True)
+            proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
+                                    shell=isinstance(cmd, basestring))
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple

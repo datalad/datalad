@@ -68,17 +68,21 @@ def test_runner(tempfile):
 @ignore_nose_capturing_stdout
 def test_runner_instance_callable():
 
-    runner = Runner(dry=True)
-    cmd = 'echo Testing __call__ with string'
-    runner(cmd)
-    assert_equal(runner.commands.__str__(), ("['%s']" % cmd),
-                 "Dry run of Runner.__call__ didn't record command: %s.\nBuffer: %s" % (cmd, runner.commands.__str__()))
+    cmd_ = ['echo', 'Testing __call__ with string']
+    for cmd in [cmd_, ' '.join(cmd_)]:
+        runner = Runner(dry=True)
+        runner(cmd)
+        assert_equal(runner.commands.__str__(), ("[%r]" % cmd),
+                     "Dry run of Runner.__call__ didn't record command: %s.\n"
+                     "Buffer: %s" % (cmd, runner.commands.__str__()))
 
     runner(os.path.join, 'foo', 'bar')
     assert_greater(runner.commands.__str__().find('join'), -1,
-                   "Dry run of Runner.__call__ didn't record function join(). Buffer: %s" % runner.commands.__str__())
+                   "Dry run of Runner.__call__ didn't record function join()."
+                   "Buffer: %s" % runner.commands.__str__())
     assert_greater(runner.commands.__str__().find('args='), -1,
-                   "Dry run of Runner.__call__ didn't record function join(). Buffer: %s" % runner.commands.__str__())
+                   "Dry run of Runner.__call__ didn't record function join()."
+                   "Buffer: %s" % runner.commands.__str__())
 
 
 @ignore_nose_capturing_stdout
@@ -106,10 +110,12 @@ def test_runner_log_stdout():
     lgr.setLevel(logging.DEBUG)
 
     runner = Runner(dry=False)
-    cmd = 'echo stdout-Message should be logged'
-    ret = runner.run(cmd, log_stdout=True)
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
-    assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
+    cmd_ = ['echo', 'stdout-Message should be logged']
+    for cmd in [cmd_, ' '.join(cmd_)]:
+        # should be identical runs, either as a string or as a list
+        ret = runner.run(cmd, log_stdout=True)
+        assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
+        assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
     cmd = 'echo stdout-Message should not be logged'
     ret = runner.run(cmd, log_stdout=False)
