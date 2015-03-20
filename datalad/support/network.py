@@ -341,8 +341,6 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
         request = urllib2.Request(url)
 
-        lgr.debug("url: %s\nrequest: %s" % (url, request))
-
         # No traffic compression since we do not know how to identify
         # exactly either it has to be decompressed
         # request.add_header('Accept-encoding', 'gzip,deflate')
