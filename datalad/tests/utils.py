@@ -52,7 +52,8 @@ def create_archive(path, name, load):
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    status = Runner().run('cd %(path)s && tar -czvf %(name)s %(dirname)s' % locals())
+    status = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
+                          cwd=path, expect_stderr=True)
     # remove original tree
     shutil.rmtree(full_dirname)
 
