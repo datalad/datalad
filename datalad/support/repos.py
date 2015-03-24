@@ -146,7 +146,7 @@ class AnnexRepo(object):
                          + {'download': [],
                             'fast': ['--fast'],
                             'relaxed': ['--relaxed']}[add_mode]
-                         + [href])
+                         + [_enc(href)])
         else:
             annex_cmd = (['add']
                          + annex_opts
