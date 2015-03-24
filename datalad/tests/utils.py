@@ -323,6 +323,7 @@ def _extend_globs(paths, flavors):
         globs_extended += [get_repo_url(repo) for repo in globs]
     return globs_extended
 
+
 @optional_args
 def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     """Decorator function to provide test with a test repository available locally and/or over the Internet
@@ -420,15 +421,29 @@ def ignore_nose_capturing_stdout(func):
                 raise
     return newfunc
 
-def get_most_obfuscated_supported_name():
+# List of most obscure filenames which might or not be supported by different
+# filesystems across different OSs.  Start with the most obscure
+OBSCURE_FILENAMES = (
+    " \"';a&b/&cd `| ", # shouldn't be supported anywhere I guess due to /
+    " \"';a&b&cd `| ",
+    " \"';abcd `| ",
+    " abc d.dat ", # they all should at least support spaces and dots
+)
+
+@with_tempfile(mkdir=True)
+def get_most_obscure_supported_name(tdir):
     """Return the most filename which filesystem under TEMPDIR could support
+
+    TODO: we might want to use it as a function where we would provide tdir
     """
-    for f in (" \"';a&b&cd `| ",
-              " \"';abcd `| ",
-              " abc d.dat ", # they all should at least support spaces and dots
-              )
+    for filename in OBSCURE_FILENAMES:
         try:
-            return f
+            with open(os.path.join(tdir, filename), 'w') as f:
+                f.write("TEST LOAD")
+            return filename # it will get removed as a part of wiping up the directory
         except:
+            lgr.debug("Filename %r is not supported on %s under %s",
+                      filename, platform.system(), tdir)
             pass
-    raise RuntimeError("Could not create any of the files")
+    raise RuntimeError("Could not create any of the files under %s among %s"
+                       % (tdir, OBSCURE_FILENAMES))

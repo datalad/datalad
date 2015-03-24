@@ -7,9 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import os
+import os, platform
 from glob import glob
-from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree
+from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, \
+                   OBSCURE_FILENAMES, get_most_obscure_supported_name
 
 #
 # Test with_tempfile, especially nested invocations
@@ -57,3 +58,11 @@ def test_with_tempfile_mkdir():
 
     check_mkdir()
     ok_(not os.path.exists(dnames[0])) # got removed
+
+def test_get_most_obscure_supported_name():
+    n = get_most_obscure_supported_name()
+    if platform.system() in ('Linux',):
+        eq_(n, OBSCURE_FILENAMES[1])
+    else:
+        # ATM noone else is as good
+        ok_(n in OBSCURE_FILENAMES[2:])

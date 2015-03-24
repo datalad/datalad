@@ -12,7 +12,7 @@ from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
-     md5sum, ok_clean_git, ok_file_under_git
+     md5sum, ok_clean_git, ok_file_under_git, get_most_obscure_supported_name
 from nose.exc import SkipTest
 
 from ..config import EnhancedConfigParser
@@ -346,12 +346,13 @@ def test_page2annex_separate_public():
                                      ):
                 yield check_page2annex_separate_public, separate, mode, incoming_destiny
 
+obscure = get_most_obscure_supported_name()
 
 # now with some recursive structure of directories
 tree2args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
-        ("\"';a&b&cd`|", ""),
+        (obscure, ""),
         ('2', (
             # this is yet to troubleshoot
             #(u'юнякод.txt', u'и тут юнякод'),
@@ -379,10 +380,10 @@ def test_page2annex_recurse(path, url):
     stats1 = drepo.page2annex()
 
     verify_files(din,
-        ["\"';a&b&cd`|", '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
+        [obscure, '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
     verify_files(dout,
-        ["\"';a&b&cd`|", '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
+        [obscure, '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
 
     #rmtree(dout, True)
