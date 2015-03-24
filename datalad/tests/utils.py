@@ -30,6 +30,22 @@ def rmtree(path, *args, **kwargs):
         os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
     shutil.rmtree(path, *args, **kwargs)
 
+def rmtemp(f, *args, **kwargs):
+    """Wrapper to centralize removing of temp files so we could keep them around
+
+    It will not remove the temporary file/directory if DATALAD_TESTS_KEEPTEMP
+    environment variable is defined
+    """
+    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        lgr.log(5, "Removing temp file: %s" % f)
+        # Can also be a directory
+        if os.path.isdir(f):
+            rmtree(f, *args, **kwargs)
+        else:
+            os.unlink(f)
+    else:
+        lgr.info("Keeping temp file: %s" % f)
+
 def create_archive(path, name, load):
     dirname = name[:-7]
     full_dirname = os.path.join(path, dirname)
@@ -102,8 +118,7 @@ def with_tree(t, tree=None, **tkwargs):
         try:
             t(*(arg + (d,)), **kw)
         finally:
-            #print "TODO: REMOVE tree ", d
-            shutil.rmtree(d)
+            rmtemp(d)
     return newfunc
 
 
@@ -284,11 +299,7 @@ def with_tempfile(t, *targs, **tkwargs):
                 return
             for f in filenames:
                 try:
-                    # Can also be a directory
-                    if os.path.isdir(f):
-                        rmtree(f)
-                    else:
-                        os.unlink(f)
+                    rmtemp(f)
                 except OSError:
                     pass
     return newfunc

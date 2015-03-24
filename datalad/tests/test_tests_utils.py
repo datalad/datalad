@@ -8,8 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os, platform
+from os.path import exists
 from glob import glob
-from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, \
+from mock import patch
+
+from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, rmtemp, \
                    OBSCURE_FILENAMES, get_most_obscure_supported_name
 
 #
@@ -57,7 +60,8 @@ def test_with_tempfile_mkdir():
             f.write("TEST LOAD")
 
     check_mkdir()
-    ok_(not os.path.exists(dnames[0])) # got removed
+    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        ok_(not os.path.exists(dnames[0])) # got removed
 
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
@@ -66,3 +70,25 @@ def test_get_most_obscure_supported_name():
     else:
         # ATM noone else is as good
         ok_(n in OBSCURE_FILENAMES[2:])
+
+
+def test_keeptemp_via_env_variable():
+    files = []
+    @with_tempfile()
+    def check(f):
+        open(f, 'w').write("LOAD")
+        files.append(f)
+
+    with patch.dict('os.environ', {}):
+        check()
+
+    with patch.dict('os.environ', {'DATALAD_TESTS_KEEPTEMP': '1'}):
+        check()
+
+    eq_(len(files), 2)
+    ok_(not exists(files[0]), msg="File %s still exists" % files[0])
+    ok_(    exists(files[1]), msg="File %s not exists" % files[1])
+
+    rmtemp(files[-1])
+
+
