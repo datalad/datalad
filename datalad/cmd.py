@@ -68,6 +68,15 @@ class Runner(object):
             raise ValueError("Argument 'command' is neither a string nor a callable.")
         # TODO: shouldn't it return the functions instead of just calling them?
 
+    # Two helpers to encapsulate formatting/output
+    def _log_out(self, line):
+        if line:
+            self.log("stdout| " + line.rstrip('\n'))
+
+    def _log_err(self, line):
+        if line:
+            self.log("stderr| " + line.rstrip('\n'),
+                     level=logging.ERROR)
 
     def _get_output_online(self, proc, log_stderr, log_stdout, return_output=False):
         stdout, stderr = [], []
@@ -77,7 +86,7 @@ class Runner(object):
                 if line != '':
                     if return_output:
                         stdout += line
-                    self.log("stdout| " + line.rstrip('\n'))
+                    self._log_out(line)
                     # TODO: what level to log at? was: level=5
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stdout()
@@ -89,8 +98,7 @@ class Runner(object):
                 if line != '':
                     if return_output:
                         stderr += line
-                    self.log("stderr| " + line.rstrip('\n'),
-                             level=logging.ERROR)
+                    self._log_err(line)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -103,11 +111,12 @@ class Runner(object):
         """Delegate collection of output to proc.communicate.  It always collects
         output, thus
         """
-        out = proc.communicate()
-        for o, n in zip(out, ('stdout', 'stderr')):
-            if o:
-                self.log("%s| " % n + o.rstrip('\n'))
-        return out
+        out, err = proc.communicate()
+
+        self._log_out(out)
+        self._log_err(err)
+
+        return (out, err)
 
     def run(self, cmd, log_stdout=True, log_stderr=True,
             log_online=False, return_output=False):
@@ -161,10 +170,9 @@ class Runner(object):
             # Alternatively we would have to parse `cmd` and create multiple
             # subprocesses.
 
-            if log_online:
-                out = self._get_output_online(proc, log_stderr, log_stdout)
-            else:
-                out = self._get_output_communicate(proc, log_stderr, log_stdout)
+            meth = self._get_output_online if log_online \
+                   else self._get_output_communicate
+            out = meth(proc, log_stderr, log_stdout)
 
             status = proc.poll()
 
