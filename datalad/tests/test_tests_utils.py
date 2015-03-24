@@ -61,7 +61,7 @@ def test_with_tempfile_mkdir():
 
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
-    if platform.system() in ('Linux',):
+    if platform.system() in ('Linux', 'Darwin'):
         eq_(n, OBSCURE_FILENAMES[1])
     else:
         # ATM noone else is as good
