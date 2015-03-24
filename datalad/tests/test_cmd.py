@@ -32,7 +32,7 @@ def test_runner_dry(tempfile):
     cmd = 'echo Testing dry run > %s' % tempfile
     ret = runner.run(cmd)
     assert_is(None, ret, "Dry run of: %s resulted in exitcode %s" % (cmd, ret))
-    assert_equal(runner.commands.__str__(), ("['%s']" % cmd),
+    assert_greater(runner.commands.__str__().find('echo Testing dry run'), -1,
                  "Dry run of: %s resulted in buffer: %s" % (cmd, runner.commands.__str__()))
     assert_false(os.path.exists(tempfile))
 

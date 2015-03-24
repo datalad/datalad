@@ -4,3 +4,4 @@ patool
 https://github.com/gitpython-developers/GitPython/archive/master.zip
 testtools
 mock
+nose

@@ -12,7 +12,7 @@ Note: There's not a lot to test by now.
 
 """
 
-import os
+import os, platform
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
 from git.exc import GitCommandError
@@ -23,7 +23,7 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos
 @with_tempfile
 def test_AnnexRepo_instance_from_clone(src, dst):
 
@@ -38,7 +38,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=['local'])  # 'network' doesn't make sense for this test
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)
@@ -67,8 +67,12 @@ def test_AnnexRepo_get(src, dst):
     cwd = os.getcwd()
     os.chdir(dst)
     testfile = 'test-annex.dat'
-    assert_raises(IOError, open, testfile, 'r')
-    # If get has nothing to do, we can't test it.
+    if platform.system() != "Windows":
+        assert_raises(IOError, open, testfile, 'r')
+        # If get has nothing to do, we can't test it.
+        # TODO: on crippled filesystem, the file is actually present before getting!
+        # So, what to test? Just skip for now.
+        # Actually, could test content!
 
     ar.annex_get([testfile])
     f = open(testfile, 'r')

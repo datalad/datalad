@@ -13,6 +13,7 @@ Note: There's not a lot to test by now.
 """
 
 import os.path
+import platform
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
 from git.exc import GitCommandError
@@ -66,8 +67,10 @@ def test_Dataset_get(src, dst):
     cwd = os.getcwd()
     os.chdir(dst)
     testfile = 'test-annex.dat'
-    assert_raises(IOError, open, testfile, 'r')
-    # If get has nothing to do, we can't test it.
+    if platform.system() != "Windows":
+        assert_raises(IOError, open, testfile, 'r')
+        # If get has nothing to do, we can't test it.
+        # TODO: see test_AnnexRepo_get()
 
     ds.get([testfile])
     f = open(testfile, 'r')
