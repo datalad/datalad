@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
-
+from glob import glob
 from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree
 
 #
@@ -41,3 +41,19 @@ def check_nested_with_tempfile_parametrized_surrounded(param, f0, tree, f1, f2, 
 
 def test_nested_with_tempfile_parametrized_surrounded():
     yield check_nested_with_tempfile_parametrized_surrounded, "param1"
+
+def test_with_tempfile_mkdir():
+    dnames = [] # just to store the name within the decorated function
+
+    @with_tempfile(mkdir=True)
+    def check_mkdir(d1):
+        ok_(os.path.exists(d1))
+        ok_(os.path.isdir(d1))
+        dnames.append(d1)
+        eq_(glob(os.path.join(d1, '*')), [])
+        # Create a file to assure we can remove later the temporary load
+        with open(os.path.join(d1, "test.dat"), "w") as f:
+            f.write("TEST LOAD")
+
+    check_mkdir()
+    ok_(not os.path.exists(dnames[0])) # got removed

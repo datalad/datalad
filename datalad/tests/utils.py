@@ -219,16 +219,22 @@ import glob
 def with_tempfile(t, *targs, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end.
 
-    All arguments are passed into the call to tempfile.mktemp(), and
-    resultant temporary filename is passed as the first argument into
-    the test.  If no 'prefix' argument is provided, it will be
-    constructed using module and function names ('.' replaced with
-    '_').
+    Parameters
+    ----------
+    mkdir : bool, optional (default: False)
+        If True, temporary directory created using tempfile.mkdtemp()
+    *args, **kwargs:
+        All other arguments are passed into the call to tempfile.mk{t,d}emp(),
+        and resultant temporary filename is passed as the first argument into
+        the function t.  If no 'prefix' argument is provided, it will be
+        constructed using module and function names ('.' replaced with
+        '_').
 
     To change the used directory without providing keyword argument 'dir' set
     DATALAD_TESTS_TEMPDIR.
 
-    Example use::
+    Examples
+    --------
 
         @with_tempfile
         def test_write(tfile):
@@ -249,11 +255,13 @@ def with_tempfile(t, *targs, **tkwargs):
         # let mktemp handle it otherwise. However, an explicitly provided
         # dir=... will override this.
         directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+        mkdir = tkwargs.pop('mkdir', False)
         if directory and 'dir' not in tkwargs:
             tkwargs['dir'] = directory
 
 
-        filename = tempfile.mktemp(*targs, **tkwargs)
+        filename = {False: tempfile.mktemp,
+                    True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs)
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
