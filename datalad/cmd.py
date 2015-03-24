@@ -74,12 +74,14 @@ class Runner(object):
         if line:
             self.log("stdout| " + line.rstrip('\n'))
 
-    def _log_err(self, line):
+    def _log_err(self, line, expect_stderr=False):
         if line:
             self.log("stderr| " + line.rstrip('\n'),
-                     level=logging.ERROR)
+                     level={True: logging.DEBUG,
+                            False: logging.ERROR}[expect_stderr])
 
-    def _get_output_online(self, proc, log_stderr, log_stdout, return_output=False):
+    def _get_output_online(self, proc, log_stdout, log_stderr,
+                           return_output=False, expect_stderr=False):
         stdout, stderr = [], []
         while proc.poll() is None:
             if log_stdout:
@@ -99,7 +101,7 @@ class Runner(object):
                 if line != '':
                     if return_output:
                         stderr += line
-                    self._log_err(line)
+                    self._log_err(line, expect_stderr)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -108,19 +110,9 @@ class Runner(object):
 
         return stdout, stderr
 
-    def _get_output_communicate(self, proc, log_stderr, log_stdout, return_output=False):
-        """Delegate collection of output to proc.communicate.  It always collects
-        output, thus
-        """
-        out, err = proc.communicate()
-
-        self._log_out(out)
-        self._log_err(err)
-
-        return (out, err)
-
     def run(self, cmd, log_stdout=True, log_stderr=True,
-            log_online=False, return_output=False):
+            log_online=False, return_output=False,
+            expect_stderr=False, cwd=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
@@ -147,6 +139,17 @@ class Runner(object):
             If True, return a tuple of two strings (stdout, stderr) in addition
             to the exit code
 
+        expect_stderr: bool, optional
+            Normally, having stderr output is a signal of a problem and thus it
+            gets logged at ERROR level.  But some utilities, e.g. wget, use
+            stderr for their progress output.  Whenever such output is expected,
+            set it to True and output will be logged at DEBUG level unless
+            exit status is non-0 (in non-online mode only, in online -- would
+            log at DEBUG)
+
+        cwd : string, optional
+            Directory under which run the command (passed to Popen)
+
         Returns
         -------
         Status code as returned by the called command or `None` in case of dry-mode.
@@ -167,17 +170,29 @@ class Runner(object):
         if not self.dry:
 
             proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
-                                    shell=isinstance(cmd, basestring))
+                                    shell=isinstance(cmd, basestring),
+                                    cwd=cwd)
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple
             # subprocesses.
 
-            meth = self._get_output_online if log_online \
-                   else self._get_output_communicate
-            out = meth(proc, log_stderr, log_stdout)
+            if log_online:
+                out = self._get_output_online(proc, log_stderr, log_stdout,
+                                              expect_stderr=expect_stderr)
+            else:
+                out = proc.communicate()
 
             status = proc.poll()
+
+            # needs to be done after we know status
+            if not log_online:
+                self._log_out(out[0])
+                if status not in [0, None]:
+                    self._log_err(out[1], expect_stderr=False)
+                else:
+                    # as directed
+                    self._log_err(out[1], expect_stderr=expect_stderr)
 
             if status not in [0, None]:
                 msg = "Failed to run %r. Exit code=%d" % (cmd, status)
