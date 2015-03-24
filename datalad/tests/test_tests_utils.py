@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os, platform
-from os.path import exists
+from os.path import exists, join as opj
 from glob import glob
 from mock import patch
 
@@ -45,6 +45,24 @@ def check_nested_with_tempfile_parametrized_surrounded(param, f0, tree, f1, f2, 
 
 def test_nested_with_tempfile_parametrized_surrounded():
     yield check_nested_with_tempfile_parametrized_surrounded, "param1"
+
+def test_with_testrepos():
+    repos = []
+
+    @with_testrepos
+    def check_with_testrepos(repo):
+        repos.append(repo)
+
+    check_with_testrepos()
+
+    eq_(len(repos), 4)
+    for repo in repos:
+        if not (repo.startswith('git://') or repo.startswith('http')):
+            print repo
+            # either it is a "local" or a removed clone
+            ok_(exists(opj(repo, '.git'))
+                or
+                not exists(opj(repo, '.git', 'remove-me')))
 
 def test_with_tempfile_mkdir():
     dnames = [] # just to store the name within the decorated function

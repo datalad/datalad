@@ -72,7 +72,7 @@ class AnnexRepo(GitRepo):
         # TODO: Document (or implement respectively) behaviour in special cases like direct mode (if it's different),
         # not existing paths, etc.
 
-        status = self.cmd_call_wrapper.run('cd %s && git annex init' % self.path)
+        status = self.cmd_call_wrapper.run(['git', 'annex', 'init'], cwd=self.path)
         if status not in [0, None]:
             lgr.error('git annex init returned status %d.' % status)
 

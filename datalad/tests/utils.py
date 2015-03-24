@@ -9,7 +9,10 @@
 
 import shutil, stat, os
 import tempfile
+import platform
+
 from functools import wraps
+from os.path import exists, join as opj
 
 from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
     ok_, eq_, make_decorator
@@ -18,14 +21,19 @@ from nose import SkipTest
 from ..cmd import Runner
 from ..support.repos import AnnexRepo
 
+# Some useful variables
+on_windows = platform.system() == 'Windows'
+on_osx = platform.system() == 'Darwin'
+on_linux = platform.system() == 'Linux'
+
 def rmtree(path, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
     """
     for root, dirs, files in os.walk(path):
         for f in files:
-            fullf = os.path.join(root, f)
+            fullf = opj(root, f)
             # might be the "broken" symlink which would fail to stat etc
-            if os.path.exists(fullf):
+            if exists(fullf):
                 os.chmod(fullf, os.stat(fullf).st_mode | stat.S_IWRITE | stat.S_IREAD)
         os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
     shutil.rmtree(path, *args, **kwargs)
@@ -48,7 +56,7 @@ def rmtemp(f, *args, **kwargs):
 
 def create_archive(path, name, load):
     dirname = name[:-7]
-    full_dirname = os.path.join(path, dirname)
+    full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
@@ -63,11 +71,11 @@ def create_tree(path, tree):
     if load is a tuple itself -- that would create either a subtree or an archive
     with that content and place it into the tree if name ends with .tar.gz
     """
-    if not os.path.exists(path):
+    if not exists(path):
         os.makedirs(path)
 
     for name, load in tree:
-        full_name = os.path.join(path, name)
+        full_name = opj(path, name)
         if isinstance(load, tuple):
             if name.endswith('.tar.gz'):
                 create_archive(path, name, load)
@@ -155,7 +163,7 @@ def ok_clean_git(path, annex=True, untracked=[]):
 def ok_file_under_git(path, filename, annexed=False):
     repo = AnnexRepo(path)
     assert(filename in repo.get_indexed_files()) # file is known to Git
-    assert(annexed == os.path.islink(os.path.join(path, filename)))
+    assert(annexed == os.path.islink(opj(path, filename)))
 
 
 # GRRR -- this one is crippled since path where HTTPServer is serving
@@ -224,11 +232,20 @@ def serve_path_via_http(*args, **tkwargs):
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
     """
-    return sorted(sum([[os.path.join(r, f)[len(dout)+1:] for f in files]
+    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
                        for r,d,files in os.walk(dout)
                        if not '.git' in r], []))
 
 import glob
+
+
+# TODO: just provide decorators for tempfile.mk* functions. This is ugly!
+def _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(tkwargs_):
+    """Updates kwargs to be passed to tempfile. calls depending on env
+    """
+    directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+    if directory and 'dir' not in tkwargs_:
+        tkwargs_['dir'] = directory
 
 
 @optional_args
@@ -273,11 +290,9 @@ def with_tempfile(t, *targs, **tkwargs):
         # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
         # let mktemp handle it otherwise. However, an explicitly provided
         # dir=... will override this.
-        directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
         mkdir = tkwargs_.pop('mkdir', False)
-        if directory and 'dir' not in tkwargs_:
-            tkwargs_['dir'] = directory
 
+        _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(tkwargs_)
 
         filename = {False: tempfile.mktemp,
                     True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
@@ -310,17 +325,12 @@ def _extend_globs(paths, flavors):
     globs = glob.glob(paths)
 
     # TODO -- provide management of 'network' tags somehow
-    flavors_ = ['local', 'network'] if flavors=='auto' else flavors
-    if 'clone' in flavors_:
-        raise NotImplementedError("Providing clones is not implemented here yet")
-    globs_extended = []
-    if 'local' in flavors_:
-        globs_extended += globs
+    flavors_ = ['local', 'network', 'clone', 'network-clone'] if flavors=='auto' else flavors
 
     # TODO: move away?
     def get_repo_url(path):
         """Return ultimate URL for this repo"""
-        if not os.path.exists(os.path.join(path, '.git')):
+        if not exists(opj(path, '.git')):
             # do the dummiest check so we know it is not git.Repo's fault
             raise AssertionError("Path %s does not point to a git repository "
                                  "-- missing .git" % path)
@@ -331,8 +341,29 @@ def _extend_globs(paths, flavors):
             remote = repo.remotes.origin
         return remote.config_reader.get('url')
 
+    def clone_url(url):
+        # delay import of our code until needed for certain
+        from ..cmd import Runner
+        runner = Runner()
+        kw = dict(); _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+        tdir = tempfile.mkdtemp(**kw)
+        repo = runner(["git", "clone", url, tdir])
+        open(opj(tdir, ".git", "remove-me"), "w").write("Please") # signal for it to be removed after
+        return tdir
+
+    globs_extended = []
+    if 'local' in flavors_:
+        globs_extended += globs
+
     if 'network' in flavors_:
         globs_extended += [get_repo_url(repo) for repo in globs]
+
+    if 'clone' in flavors_:
+        globs_extended += [clone_url(repo) for repo in globs]
+
+    if 'network-clone' in flavors_:
+        globs_extended += [clone_url(get_repo_url(repo)) for repo in globs]
+
     return globs_extended
 
 
@@ -352,12 +383,13 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     toppath : string, optional
       Path to the test repositories top directory.  If not provided,
       `datalad/tests/testrepos` within datalad is used.
-    flavors : {'auto', 'local', 'clone', 'network'} or list of thereof, optional
+    flavors : {'auto', 'local', 'clone', 'network', 'network-clone'} or list of thereof, optional
       What URIs to provide.  E.g. 'local' would just provide path to that
       submodule, while 'network' would provide url of the origin remote where
       that submodule was originally fetched from.  'clone' would clone repository
-      first to a temporary location. 'auto' would include the list of appropriate
-      ones (e.g., no 'network' if network tests are "forbidden")
+      first to a temporary location. 'network-clone' would first clone from the network
+      location. 'auto' would include the list of appropriate
+      ones (e.g., no 'network*' flavors if network tests are "forbidden").
     skip : bool, optional
       Allow to skip if no repositories were found. Otherwise would raise
       AssertionError
@@ -394,6 +426,9 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
             try:
                 t(*(arg + (repo,)), **kw)
             finally:
+                # ad-hoc but works
+                if exists(repo) and exists(opj(repo, ".git", "remove-me")):
+                    rmtemp(repo)
                 pass # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
@@ -455,7 +490,7 @@ def get_most_obscure_supported_name(tdir):
     """
     for filename in OBSCURE_FILENAMES:
         try:
-            with open(os.path.join(tdir, filename), 'w') as f:
+            with open(opj(tdir, filename), 'w') as f:
                 f.write("TEST LOAD")
             return filename # it will get removed as a part of wiping up the directory
         except:
