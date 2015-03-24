@@ -499,3 +499,23 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+
+#### windows workaround ###
+# TODO: There should be a better way
+def get_local_file_url(fname):
+    """Return OS specific URL pointing to a local file
+
+    Parameters
+    ----------
+    fname : string
+      Full filename
+    """
+    if on_windows:
+        fname_rep = fname.replace('\\', '/')
+        furl = "file:///%s" % fname_rep
+        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
+    else:
+        furl = "file://%s" % fname
+    return furl
+
