@@ -243,9 +243,12 @@ def with_tempfile(t, *targs, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
-        if len(targs)<2 and not 'prefix' in tkwargs:
+        # operate on a copy of tkwargs to avoid any side-effects
+        tkwargs_ = tkwargs.copy()
+
+        if len(targs)<2 and not 'prefix' in tkwargs_:
             try:
-                tkwargs['prefix'] = 'datalad_temp_%s.%s' \
+                tkwargs_['prefix'] = 'datalad_temp_%s.%s' \
                                     % (func.__module__, func.func_name)
             except:
                 # well -- if something wrong just proceed with defaults
@@ -255,13 +258,13 @@ def with_tempfile(t, *targs, **tkwargs):
         # let mktemp handle it otherwise. However, an explicitly provided
         # dir=... will override this.
         directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
-        mkdir = tkwargs.pop('mkdir', False)
-        if directory and 'dir' not in tkwargs:
-            tkwargs['dir'] = directory
+        mkdir = tkwargs_.pop('mkdir', False)
+        if directory and 'dir' not in tkwargs_:
+            tkwargs_['dir'] = directory
 
 
         filename = {False: tempfile.mktemp,
-                    True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs)
+                    True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
@@ -271,7 +274,7 @@ def with_tempfile(t, *targs, **tkwargs):
             # glob here for all files with the same name (-suffix)
             # would be useful whenever we requested .img filename,
             # and function creates .hdr as well
-            lsuffix = len(tkwargs.get('suffix', ''))
+            lsuffix = len(tkwargs_.get('suffix', ''))
             filename_ = lsuffix and filename[:-lsuffix] or filename
             filenames = glob.glob(filename_ + '*')
             if len(filename_) < 3 or len(filenames) > 5:
