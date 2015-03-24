@@ -177,16 +177,15 @@ class Runner(object):
 
             else:
                 self.log("Finished running %r with status %s" % (cmd, status), level=8)
-                return status
 
         else:
             self.commands.append(cmd)
-            out = ("DRY", "DRY")
+            status, out = None, ("DRY", "DRY")
 
         if return_output:
-            return None, out
+            return status, out
         else:
-            return None
+            return status
 
     def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
