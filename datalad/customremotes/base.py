@@ -14,6 +14,8 @@ import errno
 import os
 import sys
 
+from os.path import exists, join as opj
+
 import logging
 lgr = logging.getLogger('datalad.customremotes')
 
@@ -274,25 +276,35 @@ class AnnexCustomRemote(object):
     def get_URLS(self, key):
         """Gets URL(s) associated with a Key.
 
-            """
-        self.send("DIRHASH", key)
-        return self.read("VALUE", 1)[1]
+        """
+        self.send("DIRHASH", key, self.url_prefix)
+        urls = []
+        while True:
+            url = self.read("VALUE", 1)[1]
+            if url:
+                urls.append(url)
+            else:
+                break
+        return urls
 
     def _get_key_dir(self, key):
         """Gets a full path to the directory containing the key
         """
-        return os.path.join('.git', 'annex', 'objects', self.get_DIRHASH(key))
+        return opj('.git', 'annex', 'objects', self.get_DIRHASH(key))
 
     def _get_key_path(self, key):
         """Gets a full path to the key"""
-        self.heavydebug("Key path: %s" % os.path.join(self._get_key_dir(key), key))
-        return os.path.join(self._get_key_dir(key), key)
+        self.heavydebug("Key path: %s" % opj(self._get_key_dir(key), key))
+        return opj(self._get_key_dir(key), key)
 
     # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED
-    #SETSTATE GETSTATE SETURLPRESENT  SETURLMISSING   GETURLS
+    #SETSTATE GETSTATE SETURLPRESENT  SETURLMISSING
 
 
+from datalad.cmd import Runner
+from datalad.tests.utils import rmtree # improved for tricky permissions. TODO: move
+import tempfile
 
 class AnnexTarballCustomRemote(AnnexCustomRemote):
     """Special custom remote allowing to obtain files from archives also under annex control
@@ -302,11 +314,66 @@ class AnnexTarballCustomRemote(AnnexCustomRemote):
     PREFIX = "tarball"
     AVAILABILITY = "local"
 
+    def __init__(self, *args, **kwargs):
+        super(AnnexTarballCustomRemote, self).__init__(*args, **kwargs)
+        # annex requests load by KEY not but URL which it originally asked
+        # about.  So for a key we might get back multiple URLs and as a
+        # heuristic let's use the most recently asked one
+        self._last_url = None # for heuristic to choose among multiple URLs
+        self.runner = Runner()
+        self._init_cache()
+
+    def __del__(self):
+        self._clean_cache()
+
+    # TODO: make caching persistent across sessions/runs, with cleanup
+    # TODO: extract under .git/annex/tmp so later on annex unused could clean it
+    #       all up
+    # TODO:  urlencode file names in the url while adding/decode upon retrieval
+    def _init_cache(self):
+        self._cache_dir = tempfile.mkdtemp(dir=opj('.git', 'datalad', 'tmp'))
+        self.debug("Cleaning up the cache")
+        if not exists(self._cache_dir):
+            os.makedirs(self._cache_dir)
+
+    def _clean_cache(self):
+        self.debug("Cleaning up the cache")
+        if exists(self._cache_dir):
+            rmtree(self._cache_dir)
+
+
     # could well be class method
     def _parse_url(self, url):
         key, file = url[len(self.url_prefix):].split('/', 1)
         return key, file
 
+    # Helper methods
+    def _get_url(self, key):
+        """Given a key, figure out the URL
+
+        Raises
+        ------
+        ValueError
+            If could not figure out any URL
+        """
+        urls = self.get_URLS(key)
+        if not urls:
+            raise ValueError("Do not have any URLs for %s" % key)
+        elif len(urls) == 1:
+            return urls[0]
+        else: # multiple
+            if self._last_url and self._last_url in urls:
+                return self._last_url
+            else:
+                return urls[0] # just the first one
+
+    def _get_key_file(self, key):
+        """Given a key, figure out target archive key, and file within archive
+        """
+        url = self._get_url(key)
+        return self._parse_url(url)
+
+    # Protocol implementation
     def req_CHECKURL(self, url):
         """
         The remote replies with one of CHECKURL-FAILURE, CHECKURL-CONTENTS, or CHECKURL-MULTI.
@@ -325,12 +392,13 @@ class AnnexTarballCustomRemote(AnnexCustomRemote):
         #  only if just archive portion of url is given or the one pointing to specific file?
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
         key, file = self._parse_url(url)
-        if os.path.exists(self._get_key_path(key)):
+        if exists(self._get_key_path(key)):
             self.send("CHECKURL-CONTENTS", "UNKNOWN")
         else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
+        self._last_url = url
 
     def req_CHECKPRESENT(self, key):
         """Check if copy is available -- TODO: just proxy the call to annex for underlying tarball
@@ -346,6 +414,14 @@ class AnnexTarballCustomRemote(AnnexCustomRemote):
         # we could even store the filename within archive
         # Otherwise it is unrealistic to even require to recompute key if we knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
+        key, file = self._get_key_file(key)
+        if exists(self.get_key_path(key)):
+            self.send("CHECKPRESENT-SUCCESS", key)
+            self._last_url = url
+        else:
+            # TODO: proxy the same to annex itself to verify check for archive.
+            # If archive is no longer available -- then CHECKPRESENT-FAILURE
+            self.send("CHECKPRESENT-UNKNOWN", key)
         raise NotImplementedError()
 
     def req_REMOVE(self, key):
@@ -355,11 +431,32 @@ class AnnexTarballCustomRemote(AnnexCustomRemote):
         REMOVE-FAILURE Key ErrorMsg
             Indicates that the key was unable to be removed from the remote.
         """
-        # TODO: proxy query to the underlying tarball under annex
-        self.send("REMOVE-FAILURE", key, "Cannot remove from the tarball")
+        # TODO: proxy query to the underlying tarball under annex that if
+        # tarball was removed (not available at all) -- report success,
+        # otherwise failure (current the only one)
+        key, file = self._get_key_file(key)
+        if False: #TODO: proxy, checking present of local tarball is not sufficient  not exists(self.get_key_path(key)):
+            self.send("REMOVE-SUCCESS", key)
+        else:
+            self.send("REMOVE-FAILURE", key,
+                      "Cannot remove from the present tarball")
 
     def _transfer(self, cmd, key, file):
-        # TODO: Similar issue to CHECKPRESENT: we would need to maintain url->key mapping
-        self.heavydebug(
-            "Transfering for %{cmd}s key %{key}s under %{file}s" % locals())
+
+        akey, afile = self._get_key_file(key)
+        akey_file = self._get_key_file(akey)
+
+        if not exists(akey_file):
+            # retrieve the key using annex
+            try:
+                self.runner(["git", "annex", "get", akey])
+                assert(exists(akey_file))
+            except Exception, e:
+                self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"
+                           % locals())
+                return
+
+        #
+
+        #self.send('TRANSFER-SUCCESS', 'STORE', key)
         pass
