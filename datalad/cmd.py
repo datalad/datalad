@@ -66,6 +66,7 @@ class Runner(object):
             self.call(cmd, *args, **kwargs)
         else:
             raise ValueError("Argument 'command' is neither a string nor a callable.")
+        # TODO: shouldn't it return the functions instead of just calling them?
 
 
     def _get_output_online(self, proc, log_stderr, log_stdout, return_output=False):
@@ -174,7 +175,13 @@ class Runner(object):
 
             else:
                 self.log("Finished running %r with status %s" % (cmd, status), level=8)
-                return status
+                if return_output:
+                    return 0, out  # return 0 as status, even if it was None to avoid TypeErrors.
+                else:
+                    return 0
+                # TODO: Rethink, when to return status and/or output, since things changed
+                # by introducing log_online and return_output parameters.
+                # Plus: If we raise exception, returning status may be pointless at all.
 
         else:
             self.commands.append(cmd)

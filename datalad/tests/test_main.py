@@ -7,17 +7,22 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import os, tempfile, time
+import os, tempfile, time, platform
 from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
      md5sum, ok_clean_git, ok_file_under_git
+from nose.exc import SkipTest
 
 from ..config import EnhancedConfigParser
 from ..crawler.main import DoubleAnnexRepo
 from ..db import load_db
 
+# Too many things at a time. For now skip crawler tests on windows:
+chk_sys = platform.system()
+if chk_sys == "Windows":
+    raise SkipTest
 
 tree1args = dict(
     tree=(
