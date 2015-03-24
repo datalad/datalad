@@ -113,7 +113,11 @@ def test_runner_log_stdout():
     cmd_ = ['echo', 'stdout-Message should be logged']
     for cmd in [cmd_, ' '.join(cmd_)]:
         # should be identical runs, either as a string or as a list
-        ret = runner.run(cmd, log_stdout=True)
+        kw = {}
+        # on Windows it can't find echo if ran outside the shell
+        if platform.system() in ('Windows',) and isinstance(cmd, list):
+            kw['shell'] = True
+        ret = runner.run(cmd, log_stdout=True, **kw)
         assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
         assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 

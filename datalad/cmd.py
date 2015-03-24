@@ -112,7 +112,7 @@ class Runner(object):
 
     def run(self, cmd, log_stdout=True, log_stderr=True,
             log_online=False, return_output=False,
-            expect_stderr=False, cwd=None):
+            expect_stderr=False, cwd=None, shell=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
@@ -150,6 +150,10 @@ class Runner(object):
         cwd : string, optional
             Directory under which run the command (passed to Popen)
 
+        shell: bool, optional
+            Run command in a shell.  If not specified, then it runs in a shell only
+            if command is specified as a string (not a list)
+
         Returns
         -------
         Status code as returned by the called command or `None` in case of dry-mode.
@@ -169,8 +173,10 @@ class Runner(object):
 
         if not self.dry:
 
+            if shell is None:
+                shell = isinstance(cmd, basestring)
             proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
-                                    shell=isinstance(cmd, basestring),
+                                    shell=shell,
                                     cwd=cwd)
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
