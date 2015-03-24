@@ -195,7 +195,8 @@ class Runner(object):
                     self._log_err(out[1], expect_stderr=expect_stderr)
 
             if status not in [0, None]:
-                msg = "Failed to run %r. Exit code=%d" % (cmd, status)
+                msg = "Failed to run %r%s. Exit code=%d" \
+                      % (cmd, " under %r" % cwd if cwd else '', status)
                 lgr.error(msg)
                 raise RuntimeError(msg)
 
