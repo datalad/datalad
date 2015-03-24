@@ -396,3 +396,16 @@ def ignore_nose_capturing_stdout(func):
             else:
                 raise
     return newfunc
+
+def get_most_obfuscated_supported_name():
+    """Return the most filename which filesystem under TEMPDIR could support
+    """
+    for f in (" \"';a&b&cd `| ",
+              " \"';abcd `| ",
+              " abc d.dat ", # they all should at least support spaces and dots
+              )
+        try:
+            return f
+        except:
+            pass
+    raise RuntimeError("Could not create any of the files")
