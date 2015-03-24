@@ -37,7 +37,7 @@ def _enc(filename):
     """Encode unicode filename
     """
     if isinstance(filename, unicode):
-        return filename.encode(sys.getfilesystemencoding()).replace("'", "")
+        return filename.encode(sys.getfilesystemencoding())
     else:
         return filename
 

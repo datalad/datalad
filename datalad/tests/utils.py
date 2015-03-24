@@ -438,6 +438,11 @@ OBSCURE_FILENAMES = (
     " \"';a&b/&cd `| ", # shouldn't be supported anywhere I guess due to /
     " \"';a&b&cd `| ",
     " \"';abcd `| ",
+    " \"';abcd | ",
+    " \"';abcd ",
+    " ;abcd ",
+    " ab cd ",
+    "a",
     " abc d.dat ", # they all should at least support spaces and dots
 )
 

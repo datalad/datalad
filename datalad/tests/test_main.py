@@ -348,16 +348,26 @@ def test_page2annex_separate_public():
 
 obscure = get_most_obscure_supported_name()
 
+if platform.system() == 'Darwin':
+    # There is a known issue with annex under OSX
+    # https://github.com/datalad/datalad/issues/79
+    import logging
+    lgr = logging.getLogger('datalad.tests')
+    lgr.warn("TODO: placing non-empty load until #79 is fixed")
+    empty_load = "LOAD"
+else:
+    empty_load = ''
+
 # now with some recursive structure of directories
 tree2args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
-        (obscure, ""),
+        (obscure, empty_load),
         ('2', (
             # this is yet to troubleshoot
             #(u'юнякод.txt', u'и тут юнякод'),
-            ('d', (('1d', ''),)),
-            ('f', (('1d', ''),)),
+            ('d', (('1d', empty_load),)),
+            ('f', (('1d', empty_load),)),
             )),
         ('1.tar.gz', (
             ('1 f.txt', '1 f load'),
