@@ -186,22 +186,15 @@ class Runner(object):
 
             else:
                 self.log("Finished running %r with status %s" % (cmd, status), level=8)
-                if return_output:
-                    return 0, out  # return 0 as status, even if it was None to avoid TypeErrors.
-                else:
-                    return 0
-                # TODO: Rethink, when to return status and/or output, since things changed
-                # by introducing log_online and return_output parameters.
-                # Plus: If we raise exception, returning status may be pointless at all.
 
         else:
             self.commands.append(cmd)
-            out = ("DRY", "DRY")
+            status, out = None, ("DRY", "DRY")
 
         if return_output:
-            return None, out
+            return status, out
         else:
-            return None
+            return status
 
     def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
