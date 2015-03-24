@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import time
+import sys
 
 from os.path import join, exists, lexists
 
@@ -31,6 +32,14 @@ def _esc(filename):
     filename = filename.replace('"', r'\"').replace('`', r'\`')
     filename = '"%s"' % filename
     return filename
+
+def _enc(filename):
+    """Encode unicode filename
+    """
+    if isinstance(filename, unicode):
+        return filename.encode(sys.getfilesystemencoding()).replace("'", "")
+    else:
+        return filename
 
 class AnnexRepo(object):
     """Helper to deal with git-annex'ed repositories
@@ -133,7 +142,7 @@ class AnnexRepo(object):
         if href:
             annex_cmd = (['addurl']
                          + annex_opts
-                         + ['--file', annex_filename]
+                         + ['--file', _enc(annex_filename)]
                          + {'download': [],
                             'fast': ['--fast'],
                             'relaxed': ['--relaxed']}[add_mode]
@@ -141,7 +150,7 @@ class AnnexRepo(object):
         else:
             annex_cmd = (['add']
                          + annex_opts
-                         + [annex_filename])
+                         + [_enc(annex_filename)])
 
         return self.run(annex_cmd, expect_stderr=True)
 
