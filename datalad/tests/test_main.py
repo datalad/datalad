@@ -12,7 +12,8 @@ from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
-     md5sum, ok_clean_git, ok_file_under_git, get_most_obscure_supported_name
+     md5sum, ok_clean_git, ok_file_under_git, get_most_obscure_supported_name, \
+     on_windows, on_osx
 from nose.exc import SkipTest
 
 from ..config import EnhancedConfigParser
@@ -20,8 +21,7 @@ from ..crawler.main import DoubleAnnexRepo
 from ..db import load_db
 
 # Too many things at a time. For now skip crawler tests on windows:
-chk_sys = platform.system()
-if chk_sys == "Windows":
+if on_windows:
     raise SkipTest
 
 tree1args = dict(
@@ -348,7 +348,7 @@ def test_page2annex_separate_public():
 
 obscure = get_most_obscure_supported_name()
 
-if platform.system() == 'Darwin':
+if on_osx:
     # There is a known issue with annex under OSX
     # https://github.com/datalad/datalad/issues/79
     import logging
