@@ -175,9 +175,13 @@ class Runner(object):
 
             if shell is None:
                 shell = isinstance(cmd, basestring)
-            proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
+            try:
+                proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
                                     shell=shell,
                                     cwd=cwd)
+            except Exception, e:
+                lgr.error("Failed to start %s: %s" % (cmd, e))
+                raise
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple
