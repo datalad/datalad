@@ -101,7 +101,7 @@ def test_runner_log_stderr():
     with swallow_outputs() as cmo:
         with swallow_logs(new_level=logging.INFO) as cml:
             ret = runner.run(cmd, log_stderr=False)
-            eq_(cmo.err, "stderr-Message should not be logged\n")
+            eq_(cmo.err.rstrip(), "stderr-Message should not be logged")
             eq_(cml.out, "")
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
@@ -122,7 +122,12 @@ def test_runner_log_stdout():
         with swallow_logs(logging.DEBUG) as cm:
             ret = runner.run(cmd, log_stdout=True, **kw)
             eq_(cm.lines[0], "Running: %s" % cmd)
-            eq_(cm.lines[1], "stdout| stdout-Message should be logged")
+            if not on_windows:
+                # we can just count on sanity
+                eq_(cm.lines[1], "stdout| stdout-Message should be logged")
+            else:
+                # echo outputs quoted lines for some reason, so relax check
+                ok_("stdout-Message should be logged" in cm.lines[1])
         assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
         assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
