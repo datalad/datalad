@@ -7,13 +7,15 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import os, platform
+import os, platform, sys
+
 from os.path import exists, join as opj
 from glob import glob
 from mock import patch
 
 from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, rmtemp, \
-                   OBSCURE_FILENAMES, get_most_obscure_supported_name
+                   OBSCURE_FILENAMES, get_most_obscure_supported_name, \
+                   swallow_outputs
 
 #
 # Test with_tempfile, especially nested invocations
@@ -109,4 +111,14 @@ def test_keeptemp_via_env_variable():
 
     rmtemp(files[-1])
 
+def test_swallow_outputs():
+    with swallow_outputs() as o:
+        eq_(o.out, '')
+        sys.stdout.write("out normal")
+        sys.stderr.write("out error")
+        eq_(o.out, 'out normal')
+        sys.stdout.write(" and more")
+        eq_(o.out, 'out normal and more') # incremental
+        eq_(o.err, 'out error')
+        eq_(o.err, 'out error') # the same value if multiple times
 

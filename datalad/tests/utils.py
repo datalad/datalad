@@ -527,3 +527,40 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+#
+# Context Managers
+#
+import StringIO, sys
+from contextlib import contextmanager
+
+@contextmanager
+def swallow_outputs():
+    """Context manager to help consuming both stdout and stderr.
+
+    stdout is available as cm.out and stderr as cm.err whenever cm is the
+    yielded context manager.
+    """
+
+    class StringIOAdapter(object):
+        """Little adapter to help getting out/err values
+        """
+        def __init__(self):
+            self._out = StringIO.StringIO()
+            self._err = StringIO.StringIO()
+
+        @property
+        def out(self):
+            return self._out.getvalue()
+
+        @property
+        def err(self):
+            return self._err.getvalue()
+
+    adapter = StringIOAdapter()
+    sys.stdout, sys.stderr = adapter._out, adapter._err
+
+    try:
+        yield adapter
+    finally:
+        sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
