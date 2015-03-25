@@ -7,7 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import shutil, stat, os
+import glob, shutil, stat, os
 import tempfile
 import platform
 
@@ -25,6 +25,47 @@ from ..support.repos import AnnexRepo
 on_windows = platform.system() == 'Windows'
 on_osx = platform.system() == 'Darwin'
 on_linux = platform.system() == 'Linux'
+try:
+    on_debian_wheezy = platform.system() == 'Linux' \
+                and platform.linux_distribution()[0] == 'debian' \
+                and platform.linux_distribution()[1].startswith('7.')
+except:
+    on_debian_wheezy = False
+
+#
+# Little helpers
+#
+import hashlib
+def md5sum(filename):
+    with open(filename) as f:
+        return hashlib.md5(f.read()).hexdigest()
+
+
+def sorted_files(dout):
+    """Return a (sorted) list of files under dout
+    """
+    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
+                       for r,d,files in os.walk(dout)
+                       if not '.git' in r], []))
+
+#### windows workaround ###
+# TODO: There should be a better way
+def get_local_file_url(fname):
+    """Return OS specific URL pointing to a local file
+
+    Parameters
+    ----------
+    fname : string
+        Full filename
+    """
+    if on_windows:
+        fname_rep = fname.replace('\\', '/')
+        furl = "file:///%s" % fname_rep
+        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
+    else:
+        furl = "file://%s" % fname
+    return furl
+
 
 def rmtree(path, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
@@ -90,6 +131,44 @@ def create_tree(path, tree):
                     load = load.encode('utf-8')
                 f.write(load)
 
+#
+# Addition "checkers"
+#
+
+import git
+from os.path import exists, join
+
+def ok_clean_git(path, annex=True, untracked=[]):
+    """Verify that under given path there is a clean git repository
+
+    it exists, .git exists, nothing is uncommitted/dirty/staged
+    """
+    ok_(exists(path))
+    ok_(exists(join(path, '.git')))
+    if annex:
+        ok_(exists(join(path, '.git', 'annex')))
+    repo = git.Repo(path)
+
+    ok_(repo.head.is_valid())
+
+    # get string representations of diffs with index to ease troubleshooting
+    index_diffs = [str(d) for d in repo.index.diff(None)]
+    head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+
+    eq_(sorted(repo.untracked_files), sorted(untracked))
+    eq_(index_diffs, [])
+    eq_(head_diffs, [])
+
+def ok_file_under_git(path, filename, annexed=False):
+    repo = AnnexRepo(path)
+    assert(filename in repo.get_indexed_files()) # file is known to Git
+    assert(annexed == os.path.islink(opj(path, filename)))
+
+
+#
+# Decorators
+#
+
 # Borrowed from pandas
 # Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
 # Licese: BSD-3
@@ -131,41 +210,6 @@ def with_tree(t, tree=None, **tkwargs):
     return newfunc
 
 
-import hashlib
-def md5sum(filename):
-    with open(filename) as f:
-        return hashlib.md5(f.read()).hexdigest()
-
-
-import git
-from os.path import exists, join
-def ok_clean_git(path, annex=True, untracked=[]):
-    """Verify that under given path there is a clean git repository
-
-    it exists, .git exists, nothing is uncommitted/dirty/staged
-    """
-    ok_(exists(path))
-    ok_(exists(join(path, '.git')))
-    if annex:
-        ok_(exists(join(path, '.git', 'annex')))
-    repo = git.Repo(path)
-
-    ok_(repo.head.is_valid())
-
-    # get string representations of diffs with index to ease troubleshooting
-    index_diffs = [str(d) for d in repo.index.diff(None)]
-    head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-
-    eq_(sorted(repo.untracked_files), sorted(untracked))
-    eq_(index_diffs, [])
-    eq_(head_diffs, [])
-
-def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepo(path)
-    assert(filename in repo.get_indexed_files()) # file is known to Git
-    assert(annexed == os.path.islink(opj(path, filename)))
-
-
 # GRRR -- this one is crippled since path where HTTPServer is serving
 # from can't be changed without pain.
 import logging
@@ -188,15 +232,10 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             return
         lgr.debug("HTTP: " + format % args)
 
-try:
-    import platform
-    _RUNNING_UNDER_WHEEZY = platform.system() == 'Linux' \
-                and platform.linux_distribution()[0] == 'debian' \
-                and platform.linux_distribution()[1].startswith('7.')
-except:
-    _RUNNING_UNDER_WHEEZY = False
 
-def serve_path_via_http(*args, **tkwargs):
+def serve_path_via_http():
+    """Decorator which serves content of a directory via http url
+    """
     def decorate(func):
         def newfunc(*arg, **kw):
             port = random.randint(8000, 8500)
@@ -212,7 +251,7 @@ def serve_path_via_http(*args, **tkwargs):
             # is not that straightforward, although see
             # http://jasonincode.com/customizing-hosts-file-in-docker/
             # so we just force to use 127.0.0.1 while on wheezy
-            hostname = '127.0.0.1' if _RUNNING_UNDER_WHEEZY else 'localhost'
+            hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
             url = 'http://%s:%d/%s/' % (hostname, port, path)
             lgr.debug("HTTP: serving %s under %s", path, url)
             server_thread.start()
@@ -223,20 +262,10 @@ def serve_path_via_http(*args, **tkwargs):
             finally:
                 lgr.debug("HTTP: stopping server")
                 httpd.shutdown()
-                #print "Waiting for thread to stop"
                 server_thread.join()
         newfunc = make_decorator(func)(newfunc)
         return newfunc
     return decorate
-
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
-    """
-    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
-                       for r,d,files in os.walk(dout)
-                       if not '.git' in r], []))
-
-import glob
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
@@ -250,7 +279,7 @@ def _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(tkwargs_):
 
 @optional_args
 def with_tempfile(t, *targs, **tkwargs):
-    """Decorator function to provide a temporary file name and remove it at the end.
+    """Decorator function to provide a temporary file name and remove it at the end
 
     Parameters
     ----------
@@ -369,7 +398,7 @@ def _extend_globs(paths, flavors):
 
 @optional_args
 def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
-    """Decorator function to provide test with a test repository available locally and/or over the Internet
+    """Decorator to provide a test repository available locally and/or over the Internet
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
     where top-level name describes nature/identifier of the test repository, and
@@ -434,7 +463,7 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
 with_testrepos.__test__ = False
 
 def assert_cwd_unchanged(func):
-    """Decorator to test whether the current working directory remains unchanged by `func`
+    """Decorator to test whether the current working directory remains unchanged
 
     """
 
@@ -448,11 +477,10 @@ def assert_cwd_unchanged(func):
     return newfunc
 
 def ignore_nose_capturing_stdout(func):
-    """Workaround for nose's behaviour with redirecting sys.stdout
-
+    """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
     Needed for tests involving the runner and nose redirecting stdout.
-    Counterintuitivly, that means it needed for nosestests without '-s'.
+    Counter-intuitively, that means it needed for nosetests without '-s'.
     See issue reported here:
     https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
     """
@@ -499,23 +527,3 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
-
-
-#### windows workaround ###
-# TODO: There should be a better way
-def get_local_file_url(fname):
-    """Return OS specific URL pointing to a local file
-
-    Parameters
-    ----------
-    fname : string
-      Full filename
-    """
-    if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % fname_rep
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
-    else:
-        furl = "file://%s" % fname
-    return furl
-
