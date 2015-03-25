@@ -93,13 +93,13 @@ def test_runner_log_stderr():
 
     runner = Runner(dry=False)
     cmd = 'echo stderr-Message should be logged >&2'
-    ret = runner.run(cmd, log_stderr=True)
+    ret = runner.run(cmd, log_stderr=True, expect_stderr=True)
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
     cmd = 'echo stderr-Message should not be logged >&2'
     with swallow_outputs() as cmo:
-        with swallow_logs() as cml:
+        with swallow_logs(new_level=logging.INFO) as cml:
             ret = runner.run(cmd, log_stderr=False)
             eq_(cmo.err, "stderr-Message should not be logged\n")
             eq_(cml.out, "")
@@ -128,7 +128,7 @@ def test_runner_log_stdout():
 
     cmd = 'echo stdout-Message should not be logged'
     with swallow_outputs() as cmo:
-        with swallow_logs() as cml:
+        with swallow_logs(new_level=logging.INFO) as cml:
             ret = runner.run(cmd, log_stdout=False)
             eq_(cmo.out, "stdout-Message should not be logged\n")
             eq_(cml.out, "")
@@ -204,7 +204,9 @@ def test_link_file_load(tempfile):
             def __call__(*args):
                 raise AttributeError("TEST")
         with patch('os.link', new_callable=raise_AttributeError):
-            link_file_load(tempfile, tempfile2) # should still work
+            with swallow_logs(logging.WARNING) as cm:
+                link_file_load(tempfile, tempfile2) # should still work
+                ok_("failed (TEST), copying file" in cm.out)
 
     # should be a copy (either originally for windows, or after mocked call)
     ok_(inode(tempfile) != inode(tempfile2))
