@@ -19,7 +19,7 @@ from nose.tools import ok_, eq_, assert_is, assert_equal, assert_false, \
 
 from datalad.cmd import Runner, link_file_load
 from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, \
-    ignore_nose_capturing_stdout, swallow_outputs, \
+    ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
     on_linux, on_osx, on_windows
 
 
@@ -98,7 +98,11 @@ def test_runner_log_stderr():
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
     cmd = 'echo stderr-Message should not be logged >&2'
-    ret = runner.run(cmd, log_stderr=False)
+    with swallow_outputs() as cmo:
+        with swallow_logs() as cml:
+            ret = runner.run(cmd, log_stderr=False)
+            eq_(cmo.err, "stderr-Message should not be logged\n")
+            eq_(cml.out, "")
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
@@ -106,10 +110,6 @@ def test_runner_log_stderr():
 @ignore_nose_capturing_stdout
 def test_runner_log_stdout():
     # TODO: no idea of how to check correct logging via any kind of assertion yet.
-
-    lgr = logging.getLogger('datalad.cmd')
-    level_old = lgr.getEffectiveLevel()
-    lgr.setLevel(logging.DEBUG)
 
     runner = Runner(dry=False)
     cmd_ = ['echo', 'stdout-Message should be logged']
@@ -119,16 +119,21 @@ def test_runner_log_stdout():
         # on Windows it can't find echo if ran outside the shell
         if on_windows and isinstance(cmd, list):
             kw['shell'] = True
-        ret = runner.run(cmd, log_stdout=True, **kw)
+        with swallow_logs(logging.DEBUG) as cm:
+            ret = runner.run(cmd, log_stdout=True, **kw)
+            eq_(cm.lines[0], "Running: %s" % cmd)
+            eq_(cm.lines[1], "stdout| stdout-Message should be logged")
         assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
         assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
     cmd = 'echo stdout-Message should not be logged'
-    ret = runner.run(cmd, log_stdout=False)
+    with swallow_outputs() as cmo:
+        with swallow_logs() as cml:
+            ret = runner.run(cmd, log_stdout=False)
+            eq_(cmo.out, "stdout-Message should not be logged\n")
+            eq_(cml.out, "")
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
-
-    lgr.setLevel(level_old)
 
 
 @ignore_nose_capturing_stdout

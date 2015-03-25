@@ -623,6 +623,10 @@ def swallow_logs(new_level=None):
             return self._read(self._out)
 
         @property
+        def lines(self):
+            return self.out.split('\n')
+
+        @property
         def handle(self):
             return self._out
 
