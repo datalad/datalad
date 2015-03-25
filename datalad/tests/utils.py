@@ -588,3 +588,60 @@ def swallow_outputs():
     finally:
         sys.stdout, sys.stderr = oldout, olderr
         adapter.cleanup()
+
+@contextmanager
+def swallow_logs(new_level=None):
+    """Context manager to consume all logs.
+
+    """
+    lgr = logging.getLogger("datalad")
+
+    # Keep old settings
+    old_level = lgr.level
+    old_handlers = lgr.handlers
+
+    # Let's log everything into a string
+    # TODO: generalize with the one for swallow_outputs
+    class StringIOAdapter(object):
+        """Little adapter to help getting out values
+
+        And to stay consistent with how swallow_outputs behaves
+        """
+        def __init__(self):
+            kw = dict()
+            _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+
+            self._out = open(tempfile.mktemp(**kw), 'w')
+
+        def _read(self, h):
+            with open(h.name) as f:
+                return f.read()
+
+        @property
+        def out(self):
+            self._out.flush()
+            return self._read(self._out)
+
+        @property
+        def handle(self):
+            return self._out
+
+        def cleanup(self):
+            self._out.close()
+            rmtemp(self._out.name)
+
+    adapter = StringIOAdapter()
+    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    if old_level < logging.DEBUG: # so if HEAVYDEBUG etc -- show them!
+        lgr.handlers += old_handlers
+    if isinstance(new_level, basestring):
+        new_level = getattr(logging, new_level)
+
+    if new_level is not None:
+        lgr.setLevel(new_level)
+
+    try:
+        yield adapter
+    finally:
+        lgr.handlers, lgr.level = old_handlers, old_level
+        adapter.cleanup()

@@ -15,7 +15,7 @@ from mock import patch
 
 from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, rmtemp, \
                    OBSCURE_FILENAMES, get_most_obscure_supported_name, \
-                   swallow_outputs
+                   swallow_outputs, swallow_logs
 
 #
 # Test with_tempfile, especially nested invocations
@@ -112,13 +112,24 @@ def test_keeptemp_via_env_variable():
     rmtemp(files[-1])
 
 def test_swallow_outputs():
-    with swallow_outputs() as o:
-        eq_(o.out, '')
+    with swallow_outputs() as cm:
+        eq_(cm.out, '')
         sys.stdout.write("out normal")
         sys.stderr.write("out error")
-        eq_(o.out, 'out normal')
+        eq_(cm.out, 'out normal')
         sys.stdout.write(" and more")
-        eq_(o.out, 'out normal and more') # incremental
-        eq_(o.err, 'out error')
-        eq_(o.err, 'out error') # the same value if multiple times
+        eq_(cm.out, 'out normal and more') # incremental
+        eq_(cm.err, 'out error')
+        eq_(cm.err, 'out error') # the same value if multiple times
 
+import logging
+def test_swallow_logs():
+    lgr = logging.getLogger('datalad')
+    with swallow_logs(new_level=9) as cm:
+        eq_(cm.out, '')
+        lgr.log(8, "very heavy debug")
+        eq_(cm.out, '') # not even visible at level 9
+        lgr.log(9, "debug1")
+        eq_(cm.out, 'debug1\n') # not even visible at level 9
+        lgr.info("info")
+        eq_(cm.out, 'debug1\ninfo\n') # not even visible at level 9

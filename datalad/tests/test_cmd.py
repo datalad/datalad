@@ -11,7 +11,6 @@
 
 from mock import patch
 import os
-import platform
 import sys
 import logging
 
@@ -20,7 +19,8 @@ from nose.tools import ok_, eq_, assert_is, assert_equal, assert_false, \
 
 from datalad.cmd import Runner, link_file_load
 from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, \
-    ignore_nose_capturing_stdout, swallow_outputs
+    ignore_nose_capturing_stdout, swallow_outputs, \
+    on_linux, on_osx, on_windows
 
 
 @ignore_nose_capturing_stdout
@@ -117,7 +117,7 @@ def test_runner_log_stdout():
         # should be identical runs, either as a string or as a list
         kw = {}
         # on Windows it can't find echo if ran outside the shell
-        if platform.system() in ('Windows',) and isinstance(cmd, list):
+        if on_windows and isinstance(cmd, list):
             kw['shell'] = True
         ret = runner.run(cmd, log_stdout=True, **kw)
         assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
