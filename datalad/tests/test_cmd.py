@@ -15,10 +15,12 @@ import platform
 import sys
 import logging
 
-from nose.tools import ok_, assert_is, assert_equal, assert_false, assert_true, assert_greater
+from nose.tools import ok_, eq_, assert_is, assert_equal, assert_false, \
+    assert_true, assert_greater
 
 from datalad.cmd import Runner, link_file_load
-from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, ignore_nose_capturing_stdout
+from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, \
+    ignore_nose_capturing_stdout, swallow_outputs
 
 
 @ignore_nose_capturing_stdout
@@ -135,22 +137,25 @@ def check_runner_heavy_output(log_online):
 
     runner = Runner()
     cmd = '%s -c "import datalad.tests.heavyoutput;"' % sys.executable
-    ret = runner.run(cmd, log_stderr=False, log_stdout=False)
+    with swallow_outputs() as cm:
+        ret = runner.run(cmd, log_stderr=False, log_stdout=False, expect_stderr=True)
+        eq_(cm.err, cm.out) # they are identical in that script
+        eq_(cm.out[:10], "[0, 1, 2, ")
+        eq_(cm.out[-15:], "997, 998, 999]\n")
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
     #do it again with capturing:
-    ret = runner.run(cmd, log_stderr=True, log_stdout=True)
+    ret = runner.run(cmd, log_stderr=True, log_stdout=True, expect_stderr=True)
     assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
     # and now original problematic command with a massive single line
     if not log_online:
         # We know it would get stuck in online mode
         cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
-        ret = runner.run(cmd, log_stderr=True, log_stdout=True)
+        ret = runner.run(cmd, log_stderr=True, log_stdout=True, expect_stderr=True)
         assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
 def test_runner_heavy_output():
-    # TODO: RF sweep_args from PyMVPA to be used here
     for log_online in [True, False]:
         yield check_runner_heavy_output, log_online
 
@@ -177,15 +182,15 @@ def test_link_file_load(tempfile):
         with open(fname) as fd:
             st = os.fstat(fd.fileno())
             stats = (st.st_mode, st.st_uid, st.st_gid, st.st_size)
-			if times:
-				return stats + (st.st_atime, st.st_mtime)
-			else:
-				return stats
+            if times:
+                return stats + (st.st_atime, st.st_mtime)
+            else:
+                return stats
             # despite copystat mtime is not copied. TODO
             #        st.st_mtime)
 
 
-    if platform.system().lower() in ['linux', 'darwin']:
+    if on_linux or on_osx:
         # above call should result in the hardlink
         assert_equal(inode(tempfile), inode(tempfile2))
         assert_equal(stats(tempfile), stats(tempfile2))

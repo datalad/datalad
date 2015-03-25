@@ -540,27 +540,51 @@ def swallow_outputs():
 
     stdout is available as cm.out and stderr as cm.err whenever cm is the
     yielded context manager.
+    Internally uses temporary files to guarantee absent side-effects of swallowing
+    into StringIO which lacks .fileno
     """
 
     class StringIOAdapter(object):
         """Little adapter to help getting out/err values
         """
         def __init__(self):
-            self._out = StringIO.StringIO()
-            self._err = StringIO.StringIO()
+            kw = dict()
+            _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+
+            self._out = open(tempfile.mktemp(**kw), 'w')
+            self._err = open(tempfile.mktemp(**kw), 'w')
+
+        def _read(self, h):
+            with open(h.name) as f:
+                return f.read()
 
         @property
         def out(self):
-            return self._out.getvalue()
+            self._out.flush()
+            return self._read(self._out)
 
         @property
         def err(self):
-            return self._err.getvalue()
+            self._err.flush()
+            return self._read(self._err)
 
+        @property
+        def handles(self):
+            return self._out, self._err
+
+        def cleanup(self):
+            self._out.close()
+            self._err.close()
+            rmtemp(self._out.name)
+            rmtemp(self._err.name)
+
+    # preserve -- they could have been mocked already
+    oldout, olderr = sys.stdout, sys.stderr
     adapter = StringIOAdapter()
-    sys.stdout, sys.stderr = adapter._out, adapter._err
+    sys.stdout, sys.stderr = adapter.handles
 
     try:
         yield adapter
     finally:
-        sys.stdout, sys.stderr = sys.__stdout__, sys.__stderr__
+        sys.stdout, sys.stderr = oldout, olderr
+        adapter.cleanup()
