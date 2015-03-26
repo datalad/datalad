@@ -20,64 +20,7 @@ from nose import SkipTest
 
 from ..cmd import Runner
 from ..support.repos import AnnexRepo
-
-# Some useful variables
-on_windows = platform.system() == 'Windows'
-on_osx = platform.system() == 'Darwin'
-on_linux = platform.system() == 'Linux'
-try:
-    on_debian_wheezy = platform.system() == 'Linux' \
-                and platform.linux_distribution()[0] == 'debian' \
-                and platform.linux_distribution()[1].startswith('7.')
-except:
-    on_debian_wheezy = False
-
-#
-# Little helpers
-#
-import hashlib
-def md5sum(filename):
-    with open(filename) as f:
-        return hashlib.md5(f.read()).hexdigest()
-
-
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
-    """
-    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
-                       for r,d,files in os.walk(dout)
-                       if not '.git' in r], []))
-
-#### windows workaround ###
-# TODO: There should be a better way
-def get_local_file_url(fname):
-    """Return OS specific URL pointing to a local file
-
-    Parameters
-    ----------
-    fname : string
-        Full filename
-    """
-    if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % fname_rep
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
-    else:
-        furl = "file://%s" % fname
-    return furl
-
-
-def rmtree(path, *args, **kwargs):
-    """To remove git-annex .git it is needed to make all files and directories writable again first
-    """
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            fullf = opj(root, f)
-            # might be the "broken" symlink which would fail to stat etc
-            if exists(fullf):
-                os.chmod(fullf, os.stat(fullf).st_mode | stat.S_IWRITE | stat.S_IREAD)
-        os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
-    shutil.rmtree(path, *args, **kwargs)
+from ..utils import *
 
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
@@ -169,33 +112,7 @@ def ok_file_under_git(path, filename, annexed=False):
 # Decorators
 #
 
-# Borrowed from pandas
-# Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
-# Licese: BSD-3
-def optional_args(decorator):
-    """allows a decorator to take optional positional and keyword arguments.
-        Assumes that taking a single, callable, positional argument means that
-        it is decorating a function, i.e. something like this::
-
-            @my_decorator
-            def function(): pass
-
-        Calls decorator with decorator(f, *args, **kwargs)"""
-
-    @wraps(decorator)
-    def wrapper(*args, **kwargs):
-        def dec(f):
-            return decorator(f, *args, **kwargs)
-
-        is_decorating = not kwargs and len(args) == 1 and callable(args[0])
-        if is_decorating:
-            f = args[0]
-            args = []
-            return dec(f)
-        else:
-            return dec
-
-    return wrapper
+from ..utils import optional_args
 
 @optional_args
 def with_tree(t, tree=None, **tkwargs):
