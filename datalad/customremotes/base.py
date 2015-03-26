@@ -14,7 +14,7 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj
+from os.path import exists, join as opj, basename
 
 import logging
 
@@ -277,34 +277,50 @@ class AnnexCustomRemote(object):
         pass
 
     # some requests we can send out
-    def get_DIRHASH(self, key):
+    def get_DIRHASH(self, key, full=False):
         """Gets a two level hash associated with a Key.
+
+        Parameters
+        ----------
+        full: bool, optional
+          If True, would spit out full DIRHASH path, i.e. with a KEY/ directory
 
         Something like "abc/def". This is always the same for any given Key, so
         can be used for eg, creating hash directory structures to store Keys in.
         """
         lgr.debug("key=%r" % key)
         self.send("DIRHASH", key)
-        return self.read("VALUE", 1)[1]
+        val = self.read("VALUE", 1)[1]
+        if full:
+            return opj(val, key)
+        else:
+            return val
 
     def get_URLS(self, key):
         """Gets URL(s) associated with a Key.
 
         """
-        self.send("GETURLS", key, self.url_prefix)
+        # there seems to be a bug
+        # http://git-annex.branchable.com/bugs/GETURLS_doesn__39__t_return_URLs_if_prefix_is_provided/?updated
+        # thus for now requesting without prefix and filtering manually
+        self.send("GETURLS", key)# , self.url_prefix)
         urls = []
         while True:
-            url = self.read("VALUE", 1)[1]
+            url = self.read("VALUE", 1)[1:]
             if url:
-                urls.append(url)
+                assert(len(url) == 1)
+                urls.append(url[0])
             else:
                 break
+        urls = [u for u in urls
+                if u.startswith(self.url_prefix)]
+        self.heavydebug("Received URLS: %s" % urls)
         return urls
 
     def _get_key_dir(self, key):
         """Gets a full path to the directory containing the key
         """
-        return opj('.git', 'annex', 'objects', self.get_DIRHASH(key))
+        return opj('.git', 'annex', 'objects', self.get_DIRHASH(key, full=True))
 
     def _get_key_path(self, key):
         """Gets a full path to the key"""
@@ -331,7 +347,7 @@ class AnnexArchiveCache(object):
         if exists(path):
             self._clean_cache()
 
-        self.path = opj(os.curdir, path)
+        self._path = opj(os.curdir, path)
 
         lgr.debug("Initiating clean cache under %s" % self.path)
 
@@ -344,20 +360,28 @@ class AnnexArchiveCache(object):
                            % (self.path))
                 raise
 
+    @property
+    def path(self):
+        return self._path
+
     def clean(self):
         self.debug("Cleaning up the cache")
         if exists(self._path):
             rmtree(self._path)
 
-    def extract_file(self, path, file_):
-        file_ = basename(apath)
-        edir = "%{s}_" % file_  # where file would get extracted under
+    def extract_file(self, archive, file_):
+
+        file_ = basename(archive)
+        edir = "%s_" % file_  # where file would get extracted under
         epath = opj(self._path, edir)
         if not exists(epath):
             # we need to extract the archive
             # TODO: extract to _tmp and then move in a single command so we
             # don't end up picking up broken pieces
-            patoolib.extract_archive(path, outdir=epath)
+            lgr.debug("Extracting {archive} under {epath}".format(**locals()))
+            os.makedirs(epath)
+            patoolib.extract_archive(archive, outdir=epath)
+            lgr.debug("Adjusting permissions to read-only for the extracted contents")
             # TODO: make it all read-only so we don't screw it up
         path = opj(epath, file_)
         # TODO: make robust
@@ -508,7 +532,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def _transfer(self, cmd, key, file):
 
         akey, afile = self._get_akey_afile(key)
-        akey_path = self._get_key_path(key)
+        akey_path = self._get_key_path(akey)
 
         if not exists(akey_path):
             # retrieve the key using annex
