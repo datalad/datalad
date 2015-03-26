@@ -21,9 +21,16 @@ if __name__ == '__main__':
     # TODO: redo neatly
     from os.path import basename
     callname = basename(__file__)
+
+    annex_special_remote_prefix = 'git-annex-remote-dl+'
+
     if callname == 'datalad':
         from datalad.cmdline.main import main
-    elif callname == 'git-annex-remote-datalad':
+        main()
+    elif callname.startswith(annex_special_remote_prefix):
+        # Support custom options per each
         from datalad.customremotes.main import main
-    main()
+        main(backend=callname[len(annex_special_remote_prefix):])
+    else:
+        raise RuntimeError("I don't know how to behave as %s" % callname)
 

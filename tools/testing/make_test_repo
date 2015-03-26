@@ -85,7 +85,8 @@ flavor_basic() {
 }
 
 initremote_archive() {
-	git annex initremote annexed-archives encryption=none type=external externaltype=datalad
+	git annex initremote annexed-archives \
+	    encryption=none type=external externaltype=dl+archive
 }
 
 flavor_archive() {
@@ -99,8 +100,8 @@ flavor_archive() {
 	key=$(git annex lookupkey d.tar.gz)
 	git annex add test2.dat
 	git commit -m "Added the load file"
-	git annex addurl --file test2.dat dl+tarball:$key/d/test.dat
-	_info "Added the dl+tarball URL, committing"
+	git annex addurl --file test2.dat dl+archive:$key/d/test.dat
+	_info "Added the dl+archive URL, committing"
 	#git commit -m "Added a url for the file"
 	git annex drop --force test2.dat
 	git annex get test2.dat

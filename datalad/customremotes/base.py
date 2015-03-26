@@ -54,6 +54,9 @@ class AnnexCustomRemote(object):
         # prefix which will be used in all URLs supported by this custom remote
         self.url_prefix = "%s%s:" % (URI_PREFIX, self.PREFIX)
 
+        # To signal either we are in the loop and e.g. could correspond to annex
+        self._in_the_loop = False
+
     @property
     def PREFIX(self):
         """Just a helper to guarantee that PREFIX gets assigned in derived class
@@ -68,8 +71,12 @@ class AnnexCustomRemote(object):
         *args: list of strings
            arguments to be joined by a space and passed to git-annex
         """
+        msg = " ".join(map(str, args))
+        if not self._in_the_loop:
+            lgr.debug("We are not yet in the loop, thus should not send to annex"
+                     " anything.  Got: %s" % msg)
+            return
         try:
-            msg = " ".join(map(str, args))
             self.heavydebug("Sending %r" % msg)
             self.fout.write("%s\n" % msg)
             self.fout.flush()
@@ -106,17 +113,19 @@ class AnnexCustomRemote(object):
         self.heavydebug("Received %r" % (msg,))
         return msg
 
+    # TODO: see if we could adjust the "originating" file:line, because
+    # otherwise they are all reported from main.py:117 etc
     def heavydebug(self, msg):
         lgr.log(1, msg)
 
     # Since protocol allows for some messaging back, let's duplicate to lgr
     def debug(self, msg):
-        self.send("DEBUG", msg)
         lgr.debug(msg)
+        self.send("DEBUG", msg)
 
     def error(self, msg, annex_err="ERROR"):
-        self.send(annex_err, msg)
         lgr.error(msg)
+        self.send(annex_err, msg)
 
     def progress(self, perc):
         perc = int(perc)
@@ -128,9 +137,12 @@ class AnnexCustomRemote(object):
         """Interface to the command line tool"""
 
         try:
+            self._in_the_loop = True
             self._loop()
         except KeyboardInterrupt:
             self.stop("Interrupted by user")
+        finally:
+            self._in_the_loop = False
 
     def stop(self, msg=None):
         lgr.info("Stopping communications of %s%s" %
@@ -306,41 +318,63 @@ from datalad.cmd import Runner
 from datalad.tests.utils import rmtree # improved for tricky permissions. TODO: move
 import tempfile
 
-class AnnexTarballCustomRemote(AnnexCustomRemote):
+class AnnexArchiveCache(object):
+    # TODO: make caching persistent across sessions/runs, with cleanup
+    # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
+    #       all up
+    def __init__(self, path):
+        if exists(path):
+            self._clean_cache()
+
+        cache_full_dir = opj(os.curdir, path)
+
+        lgr.debug("Initiating clean cache under %s" % cache_full_dir)
+
+        if not exists(path):
+            try:
+                os.makedirs(path)
+                lgr.info("Cache initialized")
+            except:
+                lgr.error("Failed to initialize cached under %s"
+                           % (cache_full_dir))
+                raise
+
+    def _clean_cache(self):
+        self.debug("Cleaning up the cache")
+        if exists(path):
+            rmtree(path)
+
+    # TODO -- inject cleanup upon destroy
+    # def __del__(self):
+    #    self._clean_cache()
+
+
+class AnnexArchiveCustomRemote(AnnexCustomRemote):
     """Special custom remote allowing to obtain files from archives also under annex control
 
     """
 
-    PREFIX = "tarball"
+    PREFIX = "archive"
     AVAILABILITY = "local"
 
     def __init__(self, *args, **kwargs):
-        super(AnnexTarballCustomRemote, self).__init__(*args, **kwargs)
+        super(AnnexArchiveCustomRemote, self).__init__(*args, **kwargs)
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
-        self._last_url = None # for heuristic to choose among multiple URLs
         self.runner = Runner()
-        self._init_cache()
 
-    def __del__(self):
-        self._clean_cache()
+        self._last_url = None # for heuristic to choose among multiple URLs
 
-    # TODO: make caching persistent across sessions/runs, with cleanup
-    # TODO: extract under .git/annex/tmp so later on annex unused could clean it
-    #       all up
-    # TODO:  urlencode file names in the url while adding/decode upon retrieval
-    def _init_cache(self):
-        self._cache_dir = tempfile.mkdtemp(dir=opj('.git', 'datalad', 'tmp'))
-        self.debug("Cleaning up the cache")
-        if not exists(self._cache_dir):
-            os.makedirs(self._cache_dir)
+        # TODO:  urlencode file names in the url while adding/decode upon retrieval
 
-    def _clean_cache(self):
-        self.debug("Cleaning up the cache")
-        if exists(self._cache_dir):
-            rmtree(self._cache_dir)
+        self._cache_dir = opj('.git', 'datalad', 'tmp', 'archives')
+        self._cache = None
 
+    @property
+    def cache(self):
+        if self._cache is None:
+            self._cache = AnnexArchiveCache(self._cache_dir)
 
     # could well be class method
     def _parse_url(self, url):
@@ -456,7 +490,7 @@ class AnnexTarballCustomRemote(AnnexCustomRemote):
                            % locals())
                 return
 
-        #
+        # Extract that bloody file from the bloody archive
 
         #self.send('TRANSFER-SUCCESS', 'STORE', key)
         pass
