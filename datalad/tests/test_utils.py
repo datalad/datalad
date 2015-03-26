@@ -12,25 +12,11 @@
 
 import os, shutil
 from os.path import join as opj
+from ..utils import rotree
 
 from nose.tools import ok_, eq_, assert_false, assert_raises
-from mock import patch
-
-from ..utils import rotree
 from .utils import with_tempfile
 
-
-@with_tempfile
-def _with_tempfile_decorated_dummy(path):
-    return path
-
-
-def test_with_tempfile_dir_via_env_variable():
-    target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
-    assert_false(os.path.exists(target), "directory %s already exists." % target)
-    with patch.dict('os.environ', {'DATALAD_TESTS_TEMPDIR': target}):
-        filename = _with_tempfile_decorated_dummy()
-        ok_(filename.startswith(target))
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):

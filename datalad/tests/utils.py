@@ -14,8 +14,9 @@ import platform
 from functools import wraps
 from os.path import exists, join as opj
 
-from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
-    ok_, eq_, make_decorator
+from nose.tools import \
+    assert_equal, assert_raises, assert_greater, assert_false, \
+    raises, ok_, eq_, make_decorator
 from nose import SkipTest
 
 from ..cmd import Runner
