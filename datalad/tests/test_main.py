@@ -7,17 +7,22 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import os, tempfile, time
+import os, tempfile, time, platform
 from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
-     md5sum, ok_clean_git, ok_file_under_git
+     md5sum, ok_clean_git, ok_file_under_git, get_most_obscure_supported_name, \
+     on_windows, on_osx
+from nose.exc import SkipTest
 
 from ..config import EnhancedConfigParser
 from ..crawler.main import DoubleAnnexRepo
 from ..db import load_db
 
+# Too many things at a time. For now skip crawler tests on windows:
+if on_windows:
+    raise SkipTest
 
 tree1args = dict(
     tree=(
@@ -341,17 +346,28 @@ def test_page2annex_separate_public():
                                      ):
                 yield check_page2annex_separate_public, separate, mode, incoming_destiny
 
+obscure = get_most_obscure_supported_name()
+
+if on_osx:
+    # There is a known issue with annex under OSX
+    # https://github.com/datalad/datalad/issues/79
+    import logging
+    lgr = logging.getLogger('datalad.tests')
+    lgr.warn("TODO: placing non-empty load until #79 is fixed")
+    empty_load = "LOAD"
+else:
+    empty_load = ''
 
 # now with some recursive structure of directories
 tree2args = dict(
     tree=(
         ('test.txt', 'abracadabra'),
-        ("\"';a&b&cd`|", ""),
+        (obscure, empty_load),
         ('2', (
             # this is yet to troubleshoot
             #(u'юнякод.txt', u'и тут юнякод'),
-            ('d', (('1d', ''),)),
-            ('f', (('1d', ''),)),
+            ('d', (('1d', empty_load),)),
+            ('f', (('1d', empty_load),)),
             )),
         ('1.tar.gz', (
             ('1 f.txt', '1 f load'),
@@ -374,10 +390,10 @@ def test_page2annex_recurse(path, url):
     stats1 = drepo.page2annex()
 
     verify_files(din,
-        ["\"';a&b&cd`|", '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
+        [obscure, '.page2annex', '1.tar.gz', #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
     verify_files(dout,
-        ["\"';a&b&cd`|", '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
+        [obscure, '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
 
     #rmtree(dout, True)

@@ -15,6 +15,8 @@ import os
 import logging
 import os.path as op
 
+from .utils import on_windows
+
 if 'TESTKRAUT_LOGGER_VERBOSE' in os.environ:
     lgr = logging.getLogger('testkraut')
     console = logging.StreamHandler()
@@ -27,6 +29,10 @@ if 'TESTKRAUT_LOGGER_VERBOSE' in os.environ:
 
 from testkraut.testcase import generate_testkraut_tests
 
-local_test_cases = generate_testkraut_tests(
-    [os.path.join(os.path.dirname(__file__), 'data')],
-    [op.join(op.dirname(__file__), 'testspecs')])
+if not on_windows:
+    # TODO: there is no easy logic available to seamlessly test annex in both
+    # original (e.g. on Linux/OSX) and Direct (Windows) modes.  So for now disabled.
+    # 
+    local_test_cases = generate_testkraut_tests(
+        [os.path.join(os.path.dirname(__file__), 'data')],
+        [op.join(op.dirname(__file__), 'testspecs')])

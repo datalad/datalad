@@ -7,9 +7,12 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import shutil, stat, os
+import glob, shutil, stat, os
 import tempfile
+import platform
+
 from functools import wraps
+from os.path import exists, join as opj
 
 from nose.tools import assert_equal, assert_raises, assert_greater, raises, \
     ok_, eq_, make_decorator
@@ -18,25 +21,88 @@ from nose import SkipTest
 from ..cmd import Runner
 from ..support.repos import AnnexRepo
 
+# Some useful variables
+on_windows = platform.system() == 'Windows'
+on_osx = platform.system() == 'Darwin'
+on_linux = platform.system() == 'Linux'
+try:
+    on_debian_wheezy = platform.system() == 'Linux' \
+                and platform.linux_distribution()[0] == 'debian' \
+                and platform.linux_distribution()[1].startswith('7.')
+except:
+    on_debian_wheezy = False
+
+#
+# Little helpers
+#
+import hashlib
+def md5sum(filename):
+    with open(filename) as f:
+        return hashlib.md5(f.read()).hexdigest()
+
+
+def sorted_files(dout):
+    """Return a (sorted) list of files under dout
+    """
+    return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
+                       for r,d,files in os.walk(dout)
+                       if not '.git' in r], []))
+
+#### windows workaround ###
+# TODO: There should be a better way
+def get_local_file_url(fname):
+    """Return OS specific URL pointing to a local file
+
+    Parameters
+    ----------
+    fname : string
+        Full filename
+    """
+    if on_windows:
+        fname_rep = fname.replace('\\', '/')
+        furl = "file:///%s" % fname_rep
+        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
+    else:
+        furl = "file://%s" % fname
+    return furl
+
+
 def rmtree(path, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
     """
     for root, dirs, files in os.walk(path):
         for f in files:
-            fullf = os.path.join(root, f)
+            fullf = opj(root, f)
             # might be the "broken" symlink which would fail to stat etc
-            if os.path.exists(fullf):
+            if exists(fullf):
                 os.chmod(fullf, os.stat(fullf).st_mode | stat.S_IWRITE | stat.S_IREAD)
         os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
     shutil.rmtree(path, *args, **kwargs)
 
+def rmtemp(f, *args, **kwargs):
+    """Wrapper to centralize removing of temp files so we could keep them around
+
+    It will not remove the temporary file/directory if DATALAD_TESTS_KEEPTEMP
+    environment variable is defined
+    """
+    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        lgr.log(5, "Removing temp file: %s" % f)
+        # Can also be a directory
+        if os.path.isdir(f):
+            rmtree(f, *args, **kwargs)
+        else:
+            os.unlink(f)
+    else:
+        lgr.info("Keeping temp file: %s" % f)
+
 def create_archive(path, name, load):
     dirname = name[:-7]
-    full_dirname = os.path.join(path, dirname)
+    full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    status = Runner().run('cd %(path)s && tar -czvf %(name)s %(dirname)s' % locals())
+    status = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
+                          cwd=path, expect_stderr=True)
     # remove original tree
     shutil.rmtree(full_dirname)
 
@@ -46,11 +112,11 @@ def create_tree(path, tree):
     if load is a tuple itself -- that would create either a subtree or an archive
     with that content and place it into the tree if name ends with .tar.gz
     """
-    if not os.path.exists(path):
+    if not exists(path):
         os.makedirs(path)
 
     for name, load in tree:
-        full_name = os.path.join(path, name)
+        full_name = opj(path, name)
         if isinstance(load, tuple):
             if name.endswith('.tar.gz'):
                 create_archive(path, name, load)
@@ -64,6 +130,44 @@ def create_tree(path, tree):
                 if isinstance(load, unicode):
                     load = load.encode('utf-8')
                 f.write(load)
+
+#
+# Addition "checkers"
+#
+
+import git
+from os.path import exists, join
+
+def ok_clean_git(path, annex=True, untracked=[]):
+    """Verify that under given path there is a clean git repository
+
+    it exists, .git exists, nothing is uncommitted/dirty/staged
+    """
+    ok_(exists(path))
+    ok_(exists(join(path, '.git')))
+    if annex:
+        ok_(exists(join(path, '.git', 'annex')))
+    repo = git.Repo(path)
+
+    ok_(repo.head.is_valid())
+
+    # get string representations of diffs with index to ease troubleshooting
+    index_diffs = [str(d) for d in repo.index.diff(None)]
+    head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+
+    eq_(sorted(repo.untracked_files), sorted(untracked))
+    eq_(index_diffs, [])
+    eq_(head_diffs, [])
+
+def ok_file_under_git(path, filename, annexed=False):
+    repo = AnnexRepo(path)
+    assert(filename in repo.get_indexed_files()) # file is known to Git
+    assert(annexed == os.path.islink(opj(path, filename)))
+
+
+#
+# Decorators
+#
 
 # Borrowed from pandas
 # Copyright: 2011-2014, Lambda Foundry, Inc. and PyData Development Team
@@ -102,44 +206,8 @@ def with_tree(t, tree=None, **tkwargs):
         try:
             t(*(arg + (d,)), **kw)
         finally:
-            #print "TODO: REMOVE tree ", d
-            shutil.rmtree(d)
+            rmtemp(d)
     return newfunc
-
-
-import hashlib
-def md5sum(filename):
-    with open(filename) as f:
-        return hashlib.md5(f.read()).hexdigest()
-
-
-import git
-from os.path import exists, join
-def ok_clean_git(path, annex=True, untracked=[]):
-    """Verify that under given path there is a clean git repository
-
-    it exists, .git exists, nothing is uncommitted/dirty/staged
-    """
-    ok_(exists(path))
-    ok_(exists(join(path, '.git')))
-    if annex:
-        ok_(exists(join(path, '.git', 'annex')))
-    repo = git.Repo(path)
-
-    ok_(repo.head.is_valid())
-
-    # get string representations of diffs with index to ease troubleshooting
-    index_diffs = [str(d) for d in repo.index.diff(None)]
-    head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
-
-    eq_(sorted(repo.untracked_files), sorted(untracked))
-    eq_(index_diffs, [])
-    eq_(head_diffs, [])
-
-def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepo(path)
-    assert(filename in repo.get_indexed_files()) # file is known to Git
-    assert(annexed == os.path.islink(os.path.join(path, filename)))
 
 
 # GRRR -- this one is crippled since path where HTTPServer is serving
@@ -164,15 +232,10 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             return
         lgr.debug("HTTP: " + format % args)
 
-try:
-    import platform
-    _RUNNING_UNDER_WHEEZY = platform.system() == 'Linux' \
-                and platform.linux_distribution()[0] == 'debian' \
-                and platform.linux_distribution()[1].startswith('7.')
-except:
-    _RUNNING_UNDER_WHEEZY = False
 
-def serve_path_via_http(*args, **tkwargs):
+def serve_path_via_http():
+    """Decorator which serves content of a directory via http url
+    """
     def decorate(func):
         def newfunc(*arg, **kw):
             port = random.randint(8000, 8500)
@@ -188,7 +251,7 @@ def serve_path_via_http(*args, **tkwargs):
             # is not that straightforward, although see
             # http://jasonincode.com/customizing-hosts-file-in-docker/
             # so we just force to use 127.0.0.1 while on wheezy
-            hostname = '127.0.0.1' if _RUNNING_UNDER_WHEEZY else 'localhost'
+            hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
             url = 'http://%s:%d/%s/' % (hostname, port, path)
             lgr.debug("HTTP: serving %s under %s", path, url)
             server_thread.start()
@@ -199,32 +262,41 @@ def serve_path_via_http(*args, **tkwargs):
             finally:
                 lgr.debug("HTTP: stopping server")
                 httpd.shutdown()
-                #print "Waiting for thread to stop"
                 server_thread.join()
         newfunc = make_decorator(func)(newfunc)
         return newfunc
     return decorate
 
-def sorted_files(dout):
-    """Return a (sorted) list of files under dout
-    """
-    return sorted(sum([[os.path.join(r, f)[len(dout)+1:] for f in files]
-                       for r,d,files in os.walk(dout)
-                       if not '.git' in r], []))
 
-import glob
+# TODO: just provide decorators for tempfile.mk* functions. This is ugly!
+def _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(tkwargs_):
+    """Updates kwargs to be passed to tempfile. calls depending on env
+    """
+    directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+    if directory and 'dir' not in tkwargs_:
+        tkwargs_['dir'] = directory
+
 
 @optional_args
 def with_tempfile(t, *targs, **tkwargs):
-    """Decorator function to provide a temporary file name and remove it at the end.
+    """Decorator function to provide a temporary file name and remove it at the end
 
-    All arguments are passed into the call to tempfile.mktemp(), and
-    resultant temporary filename is passed as the first argument into
-    the test.  If no 'prefix' argument is provided, it will be
-    constructed using module and function names ('.' replaced with
-    '_').
+    Parameters
+    ----------
+    mkdir : bool, optional (default: False)
+        If True, temporary directory created using tempfile.mkdtemp()
+    *args, **kwargs:
+        All other arguments are passed into the call to tempfile.mk{t,d}emp(),
+        and resultant temporary filename is passed as the first argument into
+        the function t.  If no 'prefix' argument is provided, it will be
+        constructed using module and function names ('.' replaced with
+        '_').
 
-    Example use::
+    To change the used directory without providing keyword argument 'dir' set
+    DATALAD_TESTS_TEMPDIR.
+
+    Examples
+    --------
 
         @with_tempfile
         def test_write(tfile):
@@ -233,25 +305,36 @@ def with_tempfile(t, *targs, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
-        if len(targs)<2 and not 'prefix' in tkwargs:
+        # operate on a copy of tkwargs to avoid any side-effects
+        tkwargs_ = tkwargs.copy()
+
+        if len(targs)<2 and not 'prefix' in tkwargs_:
             try:
-                tkwargs['prefix'] = 'datalad_temp_%s.%s' \
+                tkwargs_['prefix'] = 'datalad_temp_%s.%s' \
                                     % (func.__module__, func.func_name)
             except:
                 # well -- if something wrong just proceed with defaults
                 pass
 
-        filename = tempfile.mktemp(*targs, **tkwargs)
+        # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+        # let mktemp handle it otherwise. However, an explicitly provided
+        # dir=... will override this.
+        mkdir = tkwargs_.pop('mkdir', False)
+
+        _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(tkwargs_)
+
+        filename = {False: tempfile.mktemp,
+                    True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
         try:
-            t(*(arg + (filename,)), **kw)
+            return t(*(arg + (filename,)), **kw)
         finally:
             # glob here for all files with the same name (-suffix)
             # would be useful whenever we requested .img filename,
             # and function creates .hdr as well
-            lsuffix = len(tkwargs.get('suffix', ''))
+            lsuffix = len(tkwargs_.get('suffix', ''))
             filename_ = lsuffix and filename[:-lsuffix] or filename
             filenames = glob.glob(filename_ + '*')
             if len(filename_) < 3 or len(filenames) > 5:
@@ -261,11 +344,7 @@ def with_tempfile(t, *targs, **tkwargs):
                 return
             for f in filenames:
                 try:
-                    # Can also be a directory
-                    if os.path.isdir(f):
-                        rmtree(f)
-                    else:
-                        os.unlink(f)
+                    rmtemp(f)
                 except OSError:
                     pass
     return newfunc
@@ -275,17 +354,12 @@ def _extend_globs(paths, flavors):
     globs = glob.glob(paths)
 
     # TODO -- provide management of 'network' tags somehow
-    flavors_ = ['local', 'network'] if flavors=='auto' else flavors
-    if 'clone' in flavors_:
-        raise NotImplementedError("Providing clones is not implemented here yet")
-    globs_extended = []
-    if 'local' in flavors_:
-        globs_extended += globs
+    flavors_ = ['local', 'network', 'clone', 'network-clone'] if flavors=='auto' else flavors
 
     # TODO: move away?
     def get_repo_url(path):
         """Return ultimate URL for this repo"""
-        if not os.path.exists(os.path.join(path, '.git')):
+        if not exists(opj(path, '.git')):
             # do the dummiest check so we know it is not git.Repo's fault
             raise AssertionError("Path %s does not point to a git repository "
                                  "-- missing .git" % path)
@@ -296,13 +370,35 @@ def _extend_globs(paths, flavors):
             remote = repo.remotes.origin
         return remote.config_reader.get('url')
 
+    def clone_url(url):
+        # delay import of our code until needed for certain
+        from ..cmd import Runner
+        runner = Runner()
+        kw = dict(); _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+        tdir = tempfile.mkdtemp(**kw)
+        repo = runner(["git", "clone", url, tdir])
+        open(opj(tdir, ".git", "remove-me"), "w").write("Please") # signal for it to be removed after
+        return tdir
+
+    globs_extended = []
+    if 'local' in flavors_:
+        globs_extended += globs
+
     if 'network' in flavors_:
         globs_extended += [get_repo_url(repo) for repo in globs]
+
+    if 'clone' in flavors_:
+        globs_extended += [clone_url(repo) for repo in globs]
+
+    if 'network-clone' in flavors_:
+        globs_extended += [clone_url(get_repo_url(repo)) for repo in globs]
+
     return globs_extended
+
 
 @optional_args
 def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
-    """Decorator function to provide test with a test repository available locally and/or over the Internet
+    """Decorator to provide a test repository available locally and/or over the Internet
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
     where top-level name describes nature/identifier of the test repository, and
@@ -316,12 +412,13 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     toppath : string, optional
       Path to the test repositories top directory.  If not provided,
       `datalad/tests/testrepos` within datalad is used.
-    flavors : {'auto', 'local', 'clone', 'network'} or list of thereof, optional
+    flavors : {'auto', 'local', 'clone', 'network', 'network-clone'} or list of thereof, optional
       What URIs to provide.  E.g. 'local' would just provide path to that
       submodule, while 'network' would provide url of the origin remote where
       that submodule was originally fetched from.  'clone' would clone repository
-      first to a temporary location. 'auto' would include the list of appropriate
-      ones (e.g., no 'network' if network tests are "forbidden")
+      first to a temporary location. 'network-clone' would first clone from the network
+      location. 'auto' would include the list of appropriate
+      ones (e.g., no 'network*' flavors if network tests are "forbidden").
     skip : bool, optional
       Allow to skip if no repositories were found. Otherwise would raise
       AssertionError
@@ -358,12 +455,15 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
             try:
                 t(*(arg + (repo,)), **kw)
             finally:
+                # ad-hoc but works
+                if exists(repo) and exists(opj(repo, ".git", "remove-me")):
+                    rmtemp(repo)
                 pass # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
 
 def assert_cwd_unchanged(func):
-    """Decorator to test whether the current working directory remains unchanged by `func`
+    """Decorator to test whether the current working directory remains unchanged
 
     """
 
@@ -377,11 +477,10 @@ def assert_cwd_unchanged(func):
     return newfunc
 
 def ignore_nose_capturing_stdout(func):
-    """Workaround for nose's behaviour with redirecting sys.stdout
-
+    """Decorator workaround for nose's behaviour with redirecting sys.stdout
 
     Needed for tests involving the runner and nose redirecting stdout.
-    Counterintuitivly, that means it needed for nosestests without '-s'.
+    Counter-intuitively, that means it needed for nosetests without '-s'.
     See issue reported here:
     https://code.google.com/p/python-nose/issues/detail?id=243&can=1&sort=-id&colspec=ID%20Type%20Status%20Priority%20Stars%20Milestone%20Owner%20Summary
     """
@@ -396,3 +495,157 @@ def ignore_nose_capturing_stdout(func):
             else:
                 raise
     return newfunc
+
+# List of most obscure filenames which might or not be supported by different
+# filesystems across different OSs.  Start with the most obscure
+OBSCURE_FILENAMES = (
+    " \"';a&b/&cd `| ", # shouldn't be supported anywhere I guess due to /
+    " \"';a&b&cd `| ",
+    " \"';abcd `| ",
+    " \"';abcd | ",
+    " \"';abcd ",
+    " ;abcd ",
+    " ab cd ",
+    "a",
+    " abc d.dat ", # they all should at least support spaces and dots
+)
+
+@with_tempfile(mkdir=True)
+def get_most_obscure_supported_name(tdir):
+    """Return the most filename which filesystem under TEMPDIR could support
+
+    TODO: we might want to use it as a function where we would provide tdir
+    """
+    for filename in OBSCURE_FILENAMES:
+        try:
+            with open(opj(tdir, filename), 'w') as f:
+                f.write("TEST LOAD")
+            return filename # it will get removed as a part of wiping up the directory
+        except:
+            lgr.debug("Filename %r is not supported on %s under %s",
+                      filename, platform.system(), tdir)
+            pass
+    raise RuntimeError("Could not create any of the files under %s among %s"
+                       % (tdir, OBSCURE_FILENAMES))
+
+#
+# Context Managers
+#
+import StringIO, sys
+from contextlib import contextmanager
+
+@contextmanager
+def swallow_outputs():
+    """Context manager to help consuming both stdout and stderr.
+
+    stdout is available as cm.out and stderr as cm.err whenever cm is the
+    yielded context manager.
+    Internally uses temporary files to guarantee absent side-effects of swallowing
+    into StringIO which lacks .fileno
+    """
+
+    class StringIOAdapter(object):
+        """Little adapter to help getting out/err values
+        """
+        def __init__(self):
+            kw = dict()
+            _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+
+            self._out = open(tempfile.mktemp(**kw), 'w')
+            self._err = open(tempfile.mktemp(**kw), 'w')
+
+        def _read(self, h):
+            with open(h.name) as f:
+                return f.read()
+
+        @property
+        def out(self):
+            self._out.flush()
+            return self._read(self._out)
+
+        @property
+        def err(self):
+            self._err.flush()
+            return self._read(self._err)
+
+        @property
+        def handles(self):
+            return self._out, self._err
+
+        def cleanup(self):
+            self._out.close()
+            self._err.close()
+            rmtemp(self._out.name)
+            rmtemp(self._err.name)
+
+    # preserve -- they could have been mocked already
+    oldout, olderr = sys.stdout, sys.stderr
+    adapter = StringIOAdapter()
+    sys.stdout, sys.stderr = adapter.handles
+
+    try:
+        yield adapter
+    finally:
+        sys.stdout, sys.stderr = oldout, olderr
+        adapter.cleanup()
+
+@contextmanager
+def swallow_logs(new_level=None):
+    """Context manager to consume all logs.
+
+    """
+    lgr = logging.getLogger("datalad")
+
+    # Keep old settings
+    old_level = lgr.level
+    old_handlers = lgr.handlers
+
+    # Let's log everything into a string
+    # TODO: generalize with the one for swallow_outputs
+    class StringIOAdapter(object):
+        """Little adapter to help getting out values
+
+        And to stay consistent with how swallow_outputs behaves
+        """
+        def __init__(self):
+            kw = dict()
+            _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+
+            self._out = open(tempfile.mktemp(**kw), 'w')
+
+        def _read(self, h):
+            with open(h.name) as f:
+                return f.read()
+
+        @property
+        def out(self):
+            self._out.flush()
+            return self._read(self._out)
+
+        @property
+        def lines(self):
+            return self.out.split('\n')
+
+        @property
+        def handle(self):
+            return self._out
+
+        def cleanup(self):
+            self._out.close()
+            rmtemp(self._out.name)
+
+    adapter = StringIOAdapter()
+    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    if old_level < logging.DEBUG: # so if HEAVYDEBUG etc -- show them!
+        lgr.handlers += old_handlers
+    if isinstance(new_level, basestring):
+        new_level = getattr(logging, new_level)
+
+    if new_level is not None:
+        lgr.setLevel(new_level)
+
+    try:
+        yield adapter
+    finally:
+        lgr.handlers, lgr.level = old_handlers, old_level
+        adapter.cleanup()

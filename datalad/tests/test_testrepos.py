@@ -11,7 +11,7 @@ import git
 import os
 
 from .utils import eq_, ok_, with_testrepos, with_tempfile
-from commands import getstatusoutput
+from datalad.cmd import Runner
 
 @with_testrepos(flavors=['local'])
 def test_having_annex(path):
@@ -34,7 +34,9 @@ def test_point_to_github(url):
 @with_tempfile
 def test_clone(src, tempdir):
     """Verify that all our repos are clonable"""
-    status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
+    r = Runner()
+    status, output = r.run("git clone %(src)s %(tempdir)s" % locals(), log_online=True, return_output=True)
+    #status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
     eq_(status, 0, msg="Status: %d  Output was: %r" % (status, output))
     ok_(os.path.exists(os.path.join(tempdir, ".git")))
     # TODO: requires network for sure! ;)

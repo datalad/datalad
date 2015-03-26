@@ -62,11 +62,11 @@
         "get test-annex.dat",
         "(merging origin/git-annex into git-annex...)"
       ],
-      "endswith": "ecording state in git...)\n"
+      "endswith": "ecording state in git...)<NEWLINE>"
     },
     "tests::1::stdout": {
       "type": "string", 
-      "value": " 1\n"
+      "value": " 1<NEWLINE>"
     }
   }, 
   "tests": [
