@@ -17,6 +17,7 @@ import sys
 from os.path import exists, join as opj
 
 import logging
+
 lgr = logging.getLogger('datalad.customremotes')
 
 #lgr.setLevel(1) # DEBUGGING TODO: remove
@@ -154,7 +155,7 @@ class AnnexCustomRemote(object):
         self.send("VERSION", SUPPORTED_PROTOCOL)
 
         while True:
-            l = self.read()
+            l = self.read(n=-1)
 
             if l is not None and not l:
                 # empty line: exit
@@ -282,6 +283,7 @@ class AnnexCustomRemote(object):
         Something like "abc/def". This is always the same for any given Key, so
         can be used for eg, creating hash directory structures to store Keys in.
         """
+        lgr.debug("key=%r" % key)
         self.send("DIRHASH", key)
         return self.read("VALUE", 1)[1]
 
@@ -289,7 +291,7 @@ class AnnexCustomRemote(object):
         """Gets URL(s) associated with a Key.
 
         """
-        self.send("DIRHASH", key, self.url_prefix)
+        self.send("GETURLS", key, self.url_prefix)
         urls = []
         while True:
             url = self.read("VALUE", 1)[1]
@@ -318,6 +320,9 @@ from datalad.cmd import Runner
 from datalad.tests.utils import rmtree # improved for tricky permissions. TODO: move
 import tempfile
 
+import patoolib
+from datalad.cmd import link_file_load
+
 class AnnexArchiveCache(object):
     # TODO: make caching persistent across sessions/runs, with cleanup
     # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
@@ -326,9 +331,9 @@ class AnnexArchiveCache(object):
         if exists(path):
             self._clean_cache()
 
-        cache_full_dir = opj(os.curdir, path)
+        self.path = opj(os.curdir, path)
 
-        lgr.debug("Initiating clean cache under %s" % cache_full_dir)
+        lgr.debug("Initiating clean cache under %s" % self.path)
 
         if not exists(path):
             try:
@@ -336,13 +341,28 @@ class AnnexArchiveCache(object):
                 lgr.info("Cache initialized")
             except:
                 lgr.error("Failed to initialize cached under %s"
-                           % (cache_full_dir))
+                           % (self.path))
                 raise
 
-    def _clean_cache(self):
+    def clean(self):
         self.debug("Cleaning up the cache")
-        if exists(path):
-            rmtree(path)
+        if exists(self._path):
+            rmtree(self._path)
+
+    def extract_file(self, path, file_):
+        file_ = basename(apath)
+        edir = "%{s}_" % file_  # where file would get extracted under
+        epath = opj(self._path, edir)
+        if not exists(epath):
+            # we need to extract the archive
+            # TODO: extract to _tmp and then move in a single command so we
+            # don't end up picking up broken pieces
+            patoolib.extract_archive(path, outdir=epath)
+            # TODO: make it all read-only so we don't screw it up
+        path = opj(epath, file_)
+        # TODO: make robust
+        assert(exists(path))
+        return path
 
     # TODO -- inject cleanup upon destroy
     # def __del__(self):
@@ -371,10 +391,16 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         self._cache_dir = opj('.git', 'datalad', 'tmp', 'archives')
         self._cache = None
 
+    def stop(self, *args):
+        if self._cache:
+            self._cache.cleanup()
+        super(AnnexArchiveCustomRemote, self).stop(*args)
+
     @property
     def cache(self):
         if self._cache is None:
             self._cache = AnnexArchiveCache(self._cache_dir)
+        return self._cache
 
     # could well be class method
     def _parse_url(self, url):
@@ -382,7 +408,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         return key, file
 
     # Helper methods
-    def _get_url(self, key):
+    def _get_key_url(self, key):
         """Given a key, figure out the URL
 
         Raises
@@ -396,15 +422,19 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         elif len(urls) == 1:
             return urls[0]
         else: # multiple
+            # TODO:  utilize cache to check which archives might already be
+            #        present in the cache.
+            #    Then if not present in the cache -- check which are present
+            #    locally and choose that one to use
             if self._last_url and self._last_url in urls:
                 return self._last_url
             else:
                 return urls[0] # just the first one
 
-    def _get_key_file(self, key):
+    def _get_akey_afile(self, key):
         """Given a key, figure out target archive key, and file within archive
         """
-        url = self._get_url(key)
+        url = self._get_key_url(key)
         return self._parse_url(url)
 
     # Protocol implementation
@@ -448,7 +478,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # we could even store the filename within archive
         # Otherwise it is unrealistic to even require to recompute key if we knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
-        key, file = self._get_key_file(key)
+        key, file = self._get_akey_afile(key)
         if exists(self.get_key_path(key)):
             self.send("CHECKPRESENT-SUCCESS", key)
             self._last_url = url
@@ -468,7 +498,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # TODO: proxy query to the underlying tarball under annex that if
         # tarball was removed (not available at all) -- report success,
         # otherwise failure (current the only one)
-        key, file = self._get_key_file(key)
+        key, file = self._get_akey_afile(key)
         if False: #TODO: proxy, checking present of local tarball is not sufficient  not exists(self.get_key_path(key)):
             self.send("REMOVE-SUCCESS", key)
         else:
@@ -477,20 +507,25 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
     def _transfer(self, cmd, key, file):
 
-        akey, afile = self._get_key_file(key)
-        akey_file = self._get_key_file(akey)
+        akey, afile = self._get_akey_afile(key)
+        akey_path = self._get_key_path(key)
 
-        if not exists(akey_file):
+        if not exists(akey_path):
             # retrieve the key using annex
             try:
                 self.runner(["git", "annex", "get", akey])
-                assert(exists(akey_file))
+                assert(exists(akey_path))
             except Exception, e:
                 self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"
                            % locals())
                 return
 
         # Extract that bloody file from the bloody archive
-
-        #self.send('TRANSFER-SUCCESS', 'STORE', key)
+        # TODO: implement/use caching, for now a simple one
+        #  actually patool doesn't support extraction of a single file
+        #  https://github.com/wummel/patool/issues/20
+        # so
+        path = self.cache.extract_file(akey_path, file)
+        link_file_load(path, file)
+        self.send('TRANSFER-SUCCESS', 'STORE', key)
         pass
