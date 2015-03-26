@@ -117,7 +117,7 @@ class AnnexCustomRemote(object):
     # TODO: see if we could adjust the "originating" file:line, because
     # otherwise they are all reported from main.py:117 etc
     def heavydebug(self, msg):
-        lgr.log(1, msg)
+        lgr.log(4, msg)
 
     # Since protocol allows for some messaging back, let's duplicate to lgr
     def debug(self, msg):
@@ -140,14 +140,18 @@ class AnnexCustomRemote(object):
         try:
             self._in_the_loop = True
             self._loop()
+        except AnnexRemoteQuit:
+            pass # no harm
         except KeyboardInterrupt:
             self.stop("Interrupted by user")
+        except Exception, e:
+            self.stop(str(e))
         finally:
             self._in_the_loop = False
 
     def stop(self, msg=None):
         lgr.info("Stopping communications of %s%s" %
-                 (self, ": " % msg if msg else ""))
+                 (self, ": %s" % msg if msg else ""))
         raise AnnexRemoteQuit(msg)
 
     def _loop(self):
@@ -159,6 +163,7 @@ class AnnexCustomRemote(object):
 
             if l is not None and not l:
                 # empty line: exit
+                self.stop()
                 return
 
             req, req_load = l[0], l[1:]
@@ -365,8 +370,10 @@ class AnnexArchiveCache(object):
         return self._path
 
     def clean(self):
-        self.debug("Cleaning up the cache")
+        lgr.debug("Cleaning up the cache")
         if exists(self._path):
+            # TODO:  we must be careful here -- to not modify permissions of files
+            #        only of directories
             rmtree(self._path)
 
     def extract_file(self, archive, afile):
@@ -418,7 +425,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
     def stop(self, *args):
         if self._cache:
-            self._cache.cleanup()
+            self._cache.clean()
+            self._cache = None
         super(AnnexArchiveCustomRemote, self).stop(*args)
 
     @property
@@ -540,7 +548,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             try:
                 self.runner(["git", "annex", "get", akey])
                 assert(exists(akey_path))
-            except Exception, e:
+            except Exception as e:
                 self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"
                            % locals())
                 return
