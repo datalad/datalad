@@ -65,18 +65,28 @@ def get_local_file_url(fname):
     return furl
 
 
-def rmtree(path, *args, **kwargs):
-    """To remove git-annex .git it is needed to make all files and directories writable again first
+def rotree(path, ro=True):
+    """To make tree read-only or writable
     """
+    if ro:
+        chmod = lambda f: os.chmod(f, os.stat(f).st_mode & ~stat.S_IWRITE)
+    else:
+        chmod = lambda f: os.chmod(f, os.stat(f).st_mode | stat.S_IWRITE | stat.S_IREAD)
+
     for root, dirs, files in os.walk(path):
         for f in files:
             fullf = opj(root, f)
             # might be the "broken" symlink which would fail to stat etc
             if exists(fullf):
-                os.chmod(fullf, os.stat(fullf).st_mode | stat.S_IWRITE | stat.S_IREAD)
-        os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
-    shutil.rmtree(path, *args, **kwargs)
+                chmod(fullf)
+        chmod(root)
 
+
+def rmtree(path, *args, **kwargs):
+    """To remove git-annex .git it is needed to make all files and directories writable again first
+    """
+    rotree(path, ro=False)
+    shutil.rmtree(path, *args, **kwargs)
 
 #
 # Decorators
