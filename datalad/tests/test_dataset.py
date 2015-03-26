@@ -19,12 +19,18 @@ from nose.tools import assert_raises, assert_is_instance, assert_true, assert_eq
 from git.exc import GitCommandError
 
 from datalad.support.dataset import Dataset
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout
+from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
+    on_windows
 
+
+# For now (at least) we would need to clone from the network
+# since there are troubles with submodules on Windows.
+# See: https://github.com/datalad/datalad/issues/44
+local_flavors = ['network-clone' if on_windows else 'local']
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
 def test_Dataset(src, dst):
 
@@ -38,7 +44,7 @@ def test_Dataset(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=local_flavors)
 def test_Dataset_instance_from_existing(path):
 
     gr = Dataset(path)

@@ -18,7 +18,8 @@ from nose.tools import assert_raises, assert_is_instance, assert_true, assert_eq
 from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout
+from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
+    on_windows
 
 
 @ignore_nose_capturing_stdout
@@ -36,9 +37,10 @@ def test_AnnexRepo_instance_from_clone(src, dst):
     assert_raises(GitCommandError, AnnexRepo, dst, src)
 
 
+# TODO: enable local as well whenever/if ever submodule issue gets resolved for windows
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])  # 'network' doesn't make sense for this test
+@with_testrepos(flavors=['network-clone' if on_windows else 'local'])  # 'network' doesn't make sense for this test
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)

@@ -48,15 +48,7 @@ def test_download_url():
     os.write(fd, "How do I know what to say?\n")
     os.close(fd)
 
-    #### windows workaround ###
-    # TODO: This should be possible to do in a better way
-    import platform
-    if platform.system() == "Windows":
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % fname_rep
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
-    else:
-        furl = "file://%s" % fname
+    furl = get_local_file_url(fname)
 
     # Let's assume absent subdirectory
     #repo_filename, downloaded, updated, downloaded_size
@@ -72,14 +64,14 @@ def test_download_url():
 
     # and if again -- should not be updated
     repo_filename, downloaded, updated, size = \
-        download_url_to_incoming("file://%s" % fname, dout)
+        download_url_to_incoming(furl, dout)
     ok_(not updated)
     ok_(not downloaded)
 
     # but it should if we remove it
     os.unlink(join(dout, repo_filename))
     repo_filename, downloaded, updated, size = \
-        download_url_to_incoming("file://%s" % fname, dout)
+        download_url_to_incoming(furl, dout)
     full_filename = join(dout, repo_filename)
     ok_(updated)
     ok_(downloaded)
@@ -93,7 +85,7 @@ def test_download_url():
     db_incoming = {}
     os.unlink(full_filename)
     repo_filename, downloaded, updated, size = \
-        download_url_to_incoming("file://%s" % fname, dout, db_incoming=db_incoming)
+        download_url_to_incoming(furl, dout, db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(updated)
     ok_(downloaded)
@@ -107,7 +99,7 @@ def test_download_url():
     # exists -- we should skip it ATM
     os.unlink(full_filename)
     repo_filename, downloaded, updated, size = \
-        download_url_to_incoming("file://%s" % fname, dout, db_incoming=db_incoming)
+        download_url_to_incoming(furl, dout, db_incoming=db_incoming)
     full_filename = join(dout, repo_filename)
     ok_(not updated)
     ok_(not downloaded)

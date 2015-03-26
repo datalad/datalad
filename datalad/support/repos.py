@@ -16,6 +16,7 @@ import os
 import re
 import shutil
 import time
+import sys
 
 from os.path import join, exists, lexists
 
@@ -32,6 +33,14 @@ def _esc(filename):
     filename = '"%s"' % filename
     return filename
 
+def _enc(filename):
+    """Encode unicode filename
+    """
+    if isinstance(filename, unicode):
+        return filename.encode(sys.getfilesystemencoding())
+    else:
+        return filename
+
 class AnnexRepo(object):
     """Helper to deal with git-annex'ed repositories
     """
@@ -40,15 +49,21 @@ class AnnexRepo(object):
         """
         self.path = path
         self.runner = runner or Runner()   # if none provided -- have own
-        self._default_annex_opts = " -c annex.alwayscommit=false"
+        self._default_annex_opts = ['-c', 'annex.alwayscommit=false']
         if lgr.getEffectiveLevel() <= 5:
-            self._default_annex_opts += " --debug"
+            self._default_annex_opts.append('--debug')
         if not exists(join(path, '.git', 'annex')):
             self.init(description)
 
-    def run(self, cmd, git_cmd="annex"):
-        return self.runner.run(
-            "cd %s && git %s %s" % (self.path, git_cmd, cmd))
+    def run(self, cmd, git_cmd="annex", expect_stderr=False):
+        """
+        Parameters
+        ----------
+
+        cmd : list of basestring
+        """
+        return self.runner.run(["git", git_cmd] + cmd, cwd=self.path,
+                               expect_stderr=expect_stderr)
 
     def write_description(self, description):
         with open(join(self.path, '.git', 'description'), 'w') as f:
@@ -58,7 +73,9 @@ class AnnexRepo(object):
         lgr.info("Initializing git annex repository under %s: %s"
                  % (self.path, description))
 
-        status = self.runner.run("cd %s && git init && git annex init" % self.path)
+        status = self.runner.run("git init && git annex init", cwd=self.path)
+        if status:
+            raise RuntimeError("Initialization failed")
 
         if description:
             lgr.debug("Writing description")
@@ -94,7 +111,7 @@ class AnnexRepo(object):
                           filename)
 
     def add_file(self, annex_filename, href=None, add_mode='auto',
-                       annex_opts="", git_add=False):
+                       annex_opts=[], git_add=False):
         """
         If add_mode=='auto' we assume that if file doesn't exist already --
         it should be '--fast' added
@@ -107,7 +124,7 @@ class AnnexRepo(object):
             # TODO: reflect in stats.  Now it would add to _annex_updates
             if not self.runner.dry:
                 assert(os.path.exists(full_annex_filename))
-            return self.run(_esc(annex_filename), git_cmd="add")
+            return self.run([annex_filename], git_cmd="add")
 
         # The rest for annex logic
         if add_mode == 'auto':
@@ -123,16 +140,19 @@ class AnnexRepo(object):
                 add_mode = "fast"
 
         if href:
-            annex_cmd = 'addurl %s --file %s %s %s' \
-              % (annex_opts, _esc(annex_filename),
-                 {'download': '',
-                  'fast': '--fast',
-                  'relaxed': '--relaxed'}[add_mode],
-                 _esc(href))
+            annex_cmd = (['addurl']
+                         + annex_opts
+                         + ['--file', _enc(annex_filename)]
+                         + {'download': [],
+                            'fast': ['--fast'],
+                            'relaxed': ['--relaxed']}[add_mode]
+                         + [_enc(href)])
         else:
-            annex_cmd = 'add %s %s' % (annex_opts, _esc(annex_filename),)
+            annex_cmd = (['add']
+                         + annex_opts
+                         + [_enc(annex_filename)])
 
-        return self.run(annex_cmd)
+        return self.run(annex_cmd, expect_stderr=True)
 
 def pretreat_archive(filename, archives_re=None):
     """Given a filename deduce either it is an archive and return corresponding "public" filename
@@ -282,7 +302,7 @@ def annex_file(href,
                     # normal
                     incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode, git_add=git_add)
             if incoming_destiny == 'drop' and exists(full_incoming_filename):
-                incoming_annex.run("drop %s" % incoming_filename)
+                incoming_annex.run(["drop", incoming_filename])
             if not runner.dry:
                 incoming_annex_updated = True
         elif incoming_destiny == 'keep':

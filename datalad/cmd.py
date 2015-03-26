@@ -60,16 +60,28 @@ class Runner(object):
         ValueError if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, basestring):
+        if isinstance(cmd, basestring) or isinstance(cmd, list):
             self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             self.call(cmd, *args, **kwargs)
         else:
-            raise ValueError("Argument 'command' is neither a string nor a callable.")
-        # TODO: shouldn't it return the functions instead of just calling them?
+            raise ValueError("Argument 'command' is neither a string, "
+                             "nor a list nor a callable.")
+	# TODO: shouldn't it return the functions instead of just calling them?
 
+    # Two helpers to encapsulate formatting/output
+    def _log_out(self, line):
+        if line:
+            self.log("stdout| " + line.rstrip('\n'))
 
-    def _get_output_online(self, proc, log_stderr, log_stdout, return_output=False):
+    def _log_err(self, line, expect_stderr=False):
+        if line:
+            self.log("stderr| " + line.rstrip('\n'),
+                     level={True: logging.DEBUG,
+                            False: logging.ERROR}[expect_stderr])
+
+    def _get_output_online(self, proc, log_stdout, log_stderr,
+                           return_output=False, expect_stderr=False):
         stdout, stderr = [], []
         while proc.poll() is None:
             if log_stdout:
@@ -77,7 +89,7 @@ class Runner(object):
                 if line != '':
                     if return_output:
                         stdout += line
-                    self.log("stdout| " + line.rstrip('\n'))
+                    self._log_out(line)
                     # TODO: what level to log at? was: level=5
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stdout()
@@ -89,8 +101,7 @@ class Runner(object):
                 if line != '':
                     if return_output:
                         stderr += line
-                    self.log("stderr| " + line.rstrip('\n'),
-                             level=logging.ERROR)
+                    self._log_err(line, expect_stderr)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -99,18 +110,9 @@ class Runner(object):
 
         return stdout, stderr
 
-    def _get_output_communicate(self, proc, log_stderr, log_stdout, return_output=False):
-        """Delegate collection of output to proc.communicate.  It always collects
-        output, thus
-        """
-        out = proc.communicate()
-        for o, n in zip(out, ('stdout', 'stderr')):
-            if o:
-                self.log("%s| " % n + o.rstrip('\n'))
-        return out
-
     def run(self, cmd, log_stdout=True, log_stderr=True,
-            log_online=False, return_output=False):
+            log_online=False, return_output=False,
+            expect_stderr=False, cwd=None, shell=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
@@ -119,8 +121,9 @@ class Runner(object):
 
         Parameters
         ----------
-        cmd : str
-          String defining the command call.
+        cmd : str, list
+          String (or list) defining the command call.  No shell is used if cmd
+          is specified as a list
 
         log_stdout: bool, optional
             If True, stdout is logged. Goes to sys.stdout otherwise.
@@ -135,6 +138,21 @@ class Runner(object):
         return_output: bool, optional
             If True, return a tuple of two strings (stdout, stderr) in addition
             to the exit code
+
+        expect_stderr: bool, optional
+            Normally, having stderr output is a signal of a problem and thus it
+            gets logged at ERROR level.  But some utilities, e.g. wget, use
+            stderr for their progress output.  Whenever such output is expected,
+            set it to True and output will be logged at DEBUG level unless
+            exit status is non-0 (in non-online mode only, in online -- would
+            log at DEBUG)
+
+        cwd : string, optional
+            Directory under which run the command (passed to Popen)
+
+        shell: bool, optional
+            Run command in a shell.  If not specified, then it runs in a shell only
+            if command is specified as a string (not a list)
 
         Returns
         -------
@@ -155,42 +173,54 @@ class Runner(object):
 
         if not self.dry:
 
-            proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream, shell=True)
+            if shell is None:
+                shell = isinstance(cmd, basestring)
+            try:
+                proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
+                                    shell=shell,
+                                    cwd=cwd)
+            except Exception, e:
+                lgr.error("Failed to start %s: %s" % (cmd, e))
+                raise
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple
             # subprocesses.
 
             if log_online:
-                out = self._get_output_online(proc, log_stderr, log_stdout)
+                out = self._get_output_online(proc, log_stderr, log_stdout,
+                                              expect_stderr=expect_stderr)
             else:
-                out = self._get_output_communicate(proc, log_stderr, log_stdout)
+                out = proc.communicate()
 
             status = proc.poll()
 
+            # needs to be done after we know status
+            if not log_online:
+                self._log_out(out[0])
+                if status not in [0, None]:
+                    self._log_err(out[1], expect_stderr=False)
+                else:
+                    # as directed
+                    self._log_err(out[1], expect_stderr=expect_stderr)
+
             if status not in [0, None]:
-                msg = "Failed to run %r. Exit code=%d" % (cmd, status)
+                msg = "Failed to run %r%s. Exit code=%d" \
+                      % (cmd, " under %r" % cwd if cwd else '', status)
                 lgr.error(msg)
                 raise RuntimeError(msg)
 
             else:
                 self.log("Finished running %r with status %s" % (cmd, status), level=8)
-                if return_output:
-                    return 0, out  # return 0 as status, even if it was None to avoid TypeErrors.
-                else:
-                    return 0
-                # TODO: Rethink, when to return status and/or output, since things changed
-                # by introducing log_online and return_output parameters.
-                # Plus: If we raise exception, returning status may be pointless at all.
 
         else:
             self.commands.append(cmd)
-            out = ("DRY", "DRY")
+            status, out = None, ("DRY", "DRY")
 
         if return_output:
-            return None, out
+            return status, out
         else:
-            return None
+            return status
 
     def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
