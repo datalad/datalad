@@ -85,7 +85,9 @@ def rotree(path, ro=True):
 def rmtree(path, *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
     """
-    rotree(path, ro=False)
+    # Give W permissions back only to directories, no need to bother with files
+    for root, dirs, files in os.walk(path):
+        os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
     shutil.rmtree(path, *args, **kwargs)
 
 #
