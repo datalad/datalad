@@ -288,7 +288,6 @@ class AnnexCustomRemote(object):
         Something like "abc/def". This is always the same for any given Key, so
         can be used for eg, creating hash directory structures to store Keys in.
         """
-        lgr.debug("key=%r" % key)
         self.send("DIRHASH", key)
         val = self.read("VALUE", 1)[1]
         if full:
@@ -337,7 +336,8 @@ from datalad.tests.utils import rmtree # improved for tricky permissions. TODO: 
 import tempfile
 
 import patoolib
-from datalad.cmd import link_file_load
+from ..cmd import link_file_load
+from ..utils import rotree
 
 class AnnexArchiveCache(object):
     # TODO: make caching persistent across sessions/runs, with cleanup
@@ -369,8 +369,8 @@ class AnnexArchiveCache(object):
         if exists(self._path):
             rmtree(self._path)
 
-    def extract_file(self, archive, file_):
-
+    def extract_file(self, archive, afile):
+        lgr.debug("Requested file {afile} from archive {archive}".format(**locals()))
         file_ = basename(archive)
         edir = "%s_" % file_  # where file would get extracted under
         epath = opj(self._path, edir)
@@ -382,9 +382,10 @@ class AnnexArchiveCache(object):
             os.makedirs(epath)
             patoolib.extract_archive(archive, outdir=epath)
             lgr.debug("Adjusting permissions to read-only for the extracted contents")
-            # TODO: make it all read-only so we don't screw it up
-        path = opj(epath, file_)
+            rotree(epath)
+        path = opj(epath, afile)
         # TODO: make robust
+        lgr.log(1, "Verifying that %s exists" % path)
         assert(exists(path))
         return path
 
@@ -529,7 +530,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             self.send("REMOVE-FAILURE", key,
                       "Cannot remove from the present tarball")
 
-    def _transfer(self, cmd, key, file):
+    def _transfer(self, cmd, key, path):
 
         akey, afile = self._get_akey_afile(key)
         akey_path = self._get_key_path(akey)
@@ -549,7 +550,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  actually patool doesn't support extraction of a single file
         #  https://github.com/wummel/patool/issues/20
         # so
-        path = self.cache.extract_file(akey_path, file)
-        link_file_load(path, file)
-        self.send('TRANSFER-SUCCESS', 'STORE', key)
+        apath = self.cache.extract_file(akey_path, afile)
+        link_file_load(apath, path)
+        self.send('TRANSFER-SUCCESS', cmd, key)
         pass

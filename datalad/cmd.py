@@ -273,3 +273,5 @@ def link_file_load(src, dst, dry_run=False):
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
+    else:
+        lgr.log(1, "Hardlinking finished")
