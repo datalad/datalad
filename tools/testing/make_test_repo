@@ -103,7 +103,7 @@ flavor_archive() {
 	git annex addurl --file test2.dat dl+archive:$key/d/test.dat
 	_info "Added the dl+archive URL, committing"
 	#git commit -m "Added a url for the file"
-	git annex drop --force test2.dat
+	git annex drop --force test2.dat # TODO -- should work without force
 	git annex get test2.dat
 }
 

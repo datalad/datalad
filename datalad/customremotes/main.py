@@ -60,10 +60,10 @@ def setup_parser():
 def main(args=None, backend=None):
     import sys
     # TODO: disable redirect lgr output to stderr if it is currently stdout
+    #
     parser = setup_parser()
     # parse cmd args
     args = parser.parse_args(args)
-    lgr.debug("Got args: %s" % args)
     # run the function associated with the selected command
     try:
         # TODO: For now we have only one, but we might need to actually become aware
