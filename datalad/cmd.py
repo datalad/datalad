@@ -33,10 +33,25 @@ class Runner(object):
     The Runner will then collect all calls as strings in `commands`.
     """
 
-    __slots__ = ['commands', 'dry']
+    __slots__ = ['commands', 'dry', 'cwd', 'env']
 
-    def __init__(self, dry=False):
+    def __init__(self, dry=False, cwd=None, env=None):
+        """
+        Parameters
+        ----------
+        dry: bool, optional
+             If True, none of the commands is actually ran
+        cwd: string, optional
+             Base current working directory for commands.  Could be overridden
+             per run call via cwd option
+        env: dict, optional
+             Custom environment to use for calls. Could be overridden per run
+             call via env option
+        """
         self.dry = dry
+        self.cwd = cwd
+        self.env = env
+
         self.commands = []
 
     def __call__(self, cmd, *args, **kwargs):
@@ -113,7 +128,7 @@ class Runner(object):
 
     def run(self, cmd, log_stdout=True, log_stderr=True,
             log_online=False, return_output=False,
-            expect_stderr=False, cwd=None, shell=None):
+            expect_stderr=False, cwd=None, env=None, shell=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
@@ -151,6 +166,9 @@ class Runner(object):
         cwd : string, optional
             Directory under which run the command (passed to Popen)
 
+        env : string, optional
+            Custom environment to pass
+
         shell: bool, optional
             Run command in a shell.  If not specified, then it runs in a shell only
             if command is specified as a string (not a list)
@@ -179,7 +197,8 @@ class Runner(object):
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
                                     shell=shell,
-                                    cwd=cwd)
+                                    cwd=cwd or self.cwd,
+                                    env=env or self.env)
             except Exception, e:
                 lgr.error("Failed to start %s: %s" % (cmd, e))
                 raise
