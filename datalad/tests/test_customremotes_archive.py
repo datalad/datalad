@@ -51,16 +51,23 @@ def test_basic_scenario(d):
             assert_false(ret)
         return ret
 
-    annex_opts = '--debug' if lgr.getEffectiveLevel() <= logging.DEBUG else ""
+    annex_opts = ' --debug' if lgr.getEffectiveLevel() <= logging.DEBUG else ""
 
-    rok('git init')
-    rok('git annex init')
-    rok('git annex initremote annexed-archives encryption=none type=external externaltype=dl+archive')
-    rok('git annex add a.tar.gz')
-    rok('git commit -m "Added tarball"')
-    exitcode, (out, err) = rok('git annex lookupkey a.tar.gz', return_output=True)
-    rok('git annex add test2.dat')
-    rok('git commit -m "Added the load file"')
-    rok('git annex %s addurl --file test2.dat dl+archive:%s/a/d/test.dat' % (annex_opts, out.rstrip()))
-    rok('git annex drop test2.dat') # TODO: should not require --force
-    rok('git annex %s get test2.dat' % (annex_opts))
+    def annex(cmd, *args, **kwargs):
+        return rok("git annex%s %s" % (annex_opts, cmd), *args, **kwargs)
+
+    def git(cmd, *args, **kwargs):
+        return rok("git %s" % (cmd), *args, **kwargs)
+
+    git('init')
+    annex('init')
+    annex('initremote annexed-archives encryption=none type=external externaltype=dl+archive')
+    annex('add a.tar.gz')
+    git('commit -m "Added tarball"')
+    exitcode, (out, err) = \
+        annex('lookupkey a.tar.gz', return_output=True)
+    annex('add test2.dat')
+    git('commit -m "Added the load file"')
+    annex('addurl --file test2.dat --relaxed dl+archive:%s/a/d/test.dat' % (out.rstrip()))
+    annex('drop test2.dat')
+    annex('get test2.dat')

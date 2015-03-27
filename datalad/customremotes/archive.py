@@ -63,12 +63,15 @@ class AnnexArchiveCache(object):
         """
         return opj(self._path, "%s_" % basename(archive))
 
+    def get_file_path(self, archive, afile):
+        return opj(self.get_extracted_path(archive), afile)
+
+    # TODO: remove?
     def has_file_ready(self, archive, afile):
         lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
-        return exists(opj(self.get_extracted_path(archive), afile))
+        return exists(self.get_file_path(archive, afile))
 
-    def extract_file(self, archive, afile):
-        lgr.debug("Requested file {afile} from archive {archive}".format(**locals()))
+    def get_extracted_archive(self, archive):
         earchive = self.get_extracted_path(archive)
         if not exists(earchive):
             # we need to extract the archive
@@ -88,7 +91,11 @@ class AnnexArchiveCache(object):
             lgr.debug("Adjusting permissions to read-only for the extracted contents")
             rotree(earchive)
             assert(exists(earchive))
-        path = opj(earchive, afile)
+        return earchive
+
+    def get_extracted_file(self, archive, afile):
+        lgr.debug("Requested file {afile} from archive {archive}".format(**locals()))
+        path = opj(self.get_extracted_archive(archive), afile)
         # TODO: make robust
         lgr.log(1, "Verifying that %s exists" % abspath(path))
         assert(exists(path))
@@ -188,15 +195,20 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  only if just archive portion of url is given or the one pointing to specific file?
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
         akey, afile = self._parse_url(url)
-        if self.cache.has_file_ready(akey, afile):
-            # TODO: get size
-            pass
+
+        # if for testing we want to force getting the archive extracted
+        # _ = self.cache.get_extracted_archive(self._get_key_path(akey)) # TEMP
+        efile = self.cache.get_file_path(akey, afile)
+        if exists(efile):
+            size = os.stat(efile).st_size
         else:
             size = 'UNKNOWN'
 
         # But reply that present only if archive is present
         if exists(self._get_key_path(akey)):
-            self.send("CHECKURL-CONTENTS", size)
+            # TODO: providing filename causes annex to not even talk to ask
+            # upon drop :-/
+            self.send("CHECKURL-CONTENTS", size)#, basename(afile))
         else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
@@ -262,7 +274,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  actually patool doesn't support extraction of a single file
         #  https://github.com/wummel/patool/issues/20
         # so
-        apath = self.cache.extract_file(akey_path, afile)
+        apath = self.cache.get_extracted_file(akey_path, afile)
         link_file_load(apath, path)
         self.send('TRANSFER-SUCCESS', cmd, key)
         pass
