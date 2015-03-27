@@ -206,7 +206,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
         # But reply that present only if archive is present
         if exists(self._get_key_path(akey)):
-            # TODO: providing filename causes annex to not even talk to ask
+            # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
             self.send("CHECKURL-CONTENTS", size)#, basename(afile))
         else:
