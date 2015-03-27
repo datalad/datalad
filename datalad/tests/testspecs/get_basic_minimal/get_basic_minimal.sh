@@ -1,6 +1,7 @@
 #!/bin/sh
 git clone https://github.com/datalad/testrepo--basic--r1.git repo
 cd repo
+git annex direct
 git annex get test-annex.dat
 
 # we need to remove the restrictive permission in order for the test harness

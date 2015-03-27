@@ -20,11 +20,6 @@
       "type": "file", 
       "value": "repo/.git/annex/index"
     }, 
-    "obtained annex'ed file in annex": {
-      "sha1sum": "a8fdc205a9f19cc1c7507a60c4f01b13d11d7fd0",
-      "type": "file",
-      "value": "repo/.git/annex/objects/zk/71/SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat/SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat"
-    }, 
     "we have git indicator": {
       "type": "file", 
       "value": "repo/.git/config"
