@@ -391,9 +391,9 @@ class AnnexArchiveCache(object):
             #patoolib.extract_archive(archive, outdir=epath, out=None)
             # so for now just call patool
             out = Runner().run(["patool", "extract", "--outdir", epath, archive])
-            #if out.out or out.err:
-            #    lgr.debug("patool.extract_archive call stdout: %s  stderr: %s"
-            #              % (out.out, out.err))
+            if out:
+                lgr.error("Failed to extract. Exit code=%d" % out)
+                raise RuntimeError("Failed to extract archive")
             lgr.debug("Adjusting permissions to read-only for the extracted contents")
             rotree(epath)
         path = opj(epath, afile)
