@@ -65,8 +65,17 @@ def get_local_file_url(fname):
     return furl
 
 
-def rotree(path, ro=True):
+def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
+
+    Parameters
+    ----------
+    path : string
+      Path to the tree/directory to chmod
+    ro : bool, optional
+      Either to make it R/O (default) or RW
+    chmod_files : bool, optional
+      Either to operate also on files (not just directories)
     """
     if ro:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode & ~stat.S_IWRITE)
@@ -74,20 +83,31 @@ def rotree(path, ro=True):
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode | stat.S_IWRITE | stat.S_IREAD)
 
     for root, dirs, files in os.walk(path):
-        for f in files:
-            fullf = opj(root, f)
-            # might be the "broken" symlink which would fail to stat etc
-            if exists(fullf):
-                chmod(fullf)
+        if chmod_files:
+            for f in files:
+                fullf = opj(root, f)
+                # might be the "broken" symlink which would fail to stat etc
+                if exists(fullf):
+                    chmod(fullf)
         chmod(root)
 
 
-def rmtree(path, *args, **kwargs):
+def rmtree(path, chmod_files='auto', *args, **kwargs):
     """To remove git-annex .git it is needed to make all files and directories writable again first
+
+    Parameters
+    ----------
+    chmod_files : string or bool, optional
+       Either to make files writable also before removal.  Usually it is just
+       a matter of directories to have write permissions.
+       If 'auto' it would chmod files on windows by default
+    *args, **kwargs :
+       Passed into shutil.rmtree call
     """
     # Give W permissions back only to directories, no need to bother with files
-    for root, dirs, files in os.walk(path):
-        os.chmod(root, os.stat(root).st_mode | stat.S_IWRITE | stat.S_IREAD)
+    if chmod_files == 'auto':
+        chmod_files = on_windows
+    rotree(path, ro=False, chmod_files=chmod_files)
     shutil.rmtree(path, *args, **kwargs)
 
 #
