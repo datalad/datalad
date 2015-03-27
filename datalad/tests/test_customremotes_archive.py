@@ -11,6 +11,7 @@
 import os
 from os.path import realpath, pardir, join as opj, dirname
 
+import logging
 import sys
 from ..cmd import Runner
 from .utils import *
@@ -24,15 +25,22 @@ def get_bindir_PATH():
         #lgr.debug("Adjusted PATH to become {}".format(os.environ['PATH']))
     return PATH
 
-def teardown_module():
-    pass # may be cleanup PATH
 
+# TODO: with_tree ATM for archives creates this nested top directory
+# matching archive name, so it will be a/d/test.dat ... we don't want that probably
 @with_tree(
-    tree=(('d.tar.gz', (('d', (('test.dat', '123'),)),)),
+    tree=(('a.tar.gz', (('d', (('test.dat', '123'),)),)),
           ('test2.dat', '123')
          ))
 def test_basic_scenario(d):
-    r = Runner(cwd=d, env={'PATH': get_bindir_PATH()})
+    # We could just propagate current environ I guess to versatile our testing
+    env = os.environ.copy()
+    env.update({'PATH': get_bindir_PATH(),
+                'DATALAD_LOGTARGET': 'stderr'})
+    if os.environ.get('DATALAD_LOGLEVEL'):
+        env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
+
+    r = Runner(cwd=d, env=env)
 
     def rok(cmd, *args, **kwargs):
         ret = r(cmd, *args, **kwargs)
@@ -42,13 +50,15 @@ def test_basic_scenario(d):
             assert_false(ret)
         return ret
 
+    annex_opts = '--debug' if lgr.getEffectiveLevel() <= logging.DEBUG else ""
+
     rok('git init; git annex init;')
     rok('git annex initremote annexed-archives encryption=none type=external externaltype=dl+archive')
-    rok('git annex add d.tar.gz')
+    rok('git annex add a.tar.gz')
     rok('git commit -m "Added tarball"')
-    exitcode, (out, err) = rok('git annex lookupkey d.tar.gz', return_output=True)
+    exitcode, (out, err) = rok('git annex lookupkey a.tar.gz', return_output=True)
     rok('git annex add test2.dat')
     rok('git commit -m "Added the load file"')
-    rok('git annex --debug addurl --file test2.dat dl+archive:%s/d/test.dat' % out.rstrip())
+    rok('git annex %s addurl --file test2.dat dl+archive:%s/a/d/test.dat' % (annex_opts, out.rstrip()))
     rok('git annex drop test2.dat') # TODO: should not require --force
-    rok('git annex --debug get test2.dat')
+    rok('git annex %s get test2.dat' % (annex_opts))

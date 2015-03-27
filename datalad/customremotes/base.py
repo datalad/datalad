@@ -169,7 +169,7 @@ class AnnexCustomRemote(object):
                 try:
                     method(*req_load)
                 except Exception, e:
-                    self.error("Problem processing request %r with parameters %r: %s"
+                    self.error("Problem processing request %r with parameters %r: %r"
                                 % (req, req_load, e))
             else:
                 self.error("We have no support for %s request, part of %s response"

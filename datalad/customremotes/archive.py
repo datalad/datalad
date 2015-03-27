@@ -14,7 +14,7 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj, basename
+from os.path import exists, join as opj, basename, abspath
 
 import logging
 
@@ -52,36 +52,46 @@ class AnnexArchiveCache(object):
         return self._path
 
     def clean(self):
+        return
         lgr.debug("Cleaning up the cache")
         if exists(self._path):
             # TODO:  we must be careful here -- to not modify permissions of files
             #        only of directories
             rmtree(self._path)
 
+    def get_extracted_path(self, archive):
+        """Given archive -- return full path to it within cache (extracted)
+        """
+        return opj(self._path, "%s_" % basename(archive))
+
+    def has_file_ready(self, archive, afile):
+        lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
+        return exists(opj(self.get_extracted_path(archive), afile))
+
     def extract_file(self, archive, afile):
         lgr.debug("Requested file {afile} from archive {archive}".format(**locals()))
-        file_ = basename(archive)
-        edir = "%s_" % file_  # where file would get extracted under
-        epath = opj(self._path, edir)
-        if not exists(epath):
+        earchive = self.get_extracted_path(archive)
+        if not exists(earchive):
             # we need to extract the archive
             # TODO: extract to _tmp and then move in a single command so we
             # don't end up picking up broken pieces
-            lgr.debug("Extracting {archive} under {epath}".format(**locals()))
-            os.makedirs(epath)
+            lgr.debug("Extracting {archive} under {earchive}".format(**locals()))
+            os.makedirs(earchive)
+            assert(exists(earchive))
             # TODO: didn't manage to override stdout even with a patch, WTF?
             #import patoolib # with hope to manage to override patoolib's assigned to stdout
-            #patoolib.extract_archive(archive, outdir=epath, out=None)
+            #patoolib.extract_archive(archive, outdir=earchive, out=None)
             # so for now just call patool
-            out = Runner().run(["patool", "extract", "--outdir", epath, archive])
+            out = Runner().run(["patool", "extract", "--outdir", earchive, archive])
             if out:
                 lgr.error("Failed to extract. Exit code=%d" % out)
                 raise RuntimeError("Failed to extract archive")
             lgr.debug("Adjusting permissions to read-only for the extracted contents")
-            rotree(epath)
-        path = opj(epath, afile)
+            rotree(earchive)
+            assert(exists(earchive))
+        path = opj(earchive, afile)
         # TODO: make robust
-        lgr.log(1, "Verifying that %s exists" % path)
+        lgr.log(1, "Verifying that %s exists" % abspath(path))
         assert(exists(path))
         return path
 
@@ -175,11 +185,19 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         """
         # TODO:  what about those MULTI and list to be returned?
         #  should we return all filenames or keys within archive?
+        #  might be way too many?
         #  only if just archive portion of url is given or the one pointing to specific file?
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
-        key, file = self._parse_url(url)
-        if exists(self._get_key_path(key)):
-            self.send("CHECKURL-CONTENTS", "UNKNOWN")
+        akey, afile = self._parse_url(url)
+        if self.cache.has_file_ready(akey, afile):
+            # TODO: get size
+            pass
+        else:
+            size = 'UNKNOWN'
+
+        # But reply that present only if archive is present
+        if exists(self._get_key_path(akey)):
+            self.send("CHECKURL-CONTENTS", size)
         else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
@@ -200,15 +218,13 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # we could even store the filename within archive
         # Otherwise it is unrealistic to even require to recompute key if we knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
-        key, file = self._get_akey_afile(key)
-        if exists(self.get_key_path(key)):
+        akey, afile = self._get_akey_afile(key)
+        if exists(self._get_key_path(akey)):
             self.send("CHECKPRESENT-SUCCESS", key)
-            self._last_url = url
         else:
             # TODO: proxy the same to annex itself to verify check for archive.
             # If archive is no longer available -- then CHECKPRESENT-FAILURE
             self.send("CHECKPRESENT-UNKNOWN", key)
-        raise NotImplementedError()
 
     def req_REMOVE(self, key):
         """
