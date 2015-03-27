@@ -9,7 +9,7 @@
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
 import os
-from os.path import realpath, pardir, join as opj, dirname
+from os.path import realpath, pardir, join as opj, dirname, pathsep
 
 import logging
 import sys
@@ -22,7 +22,7 @@ def get_bindir_PATH():
     bindir = realpath(opj(dirname(__file__), pardir, pardir, 'bin'))
     PATH = os.environ['PATH']
     if bindir not in PATH:
-        PATH = '%s:%s' % (bindir, PATH)
+        PATH = '%s%s%s' % (bindir, pathsep, PATH)
         #lgr.debug("Adjusted PATH to become {}".format(os.environ['PATH']))
     return PATH
 

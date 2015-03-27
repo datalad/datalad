@@ -52,7 +52,6 @@ class AnnexArchiveCache(object):
         return self._path
 
     def clean(self):
-        return
         lgr.debug("Cleaning up the cache")
         if exists(self._path):
             # TODO:  we must be careful here -- to not modify permissions of files
