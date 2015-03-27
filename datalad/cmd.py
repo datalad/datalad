@@ -61,9 +61,9 @@ class Runner(object):
         """
 
         if isinstance(cmd, basestring) or isinstance(cmd, list):
-            self.run(cmd, *args, **kwargs)
+            return self.run(cmd, *args, **kwargs)
         elif callable(cmd):
-            self.call(cmd, *args, **kwargs)
+            return self.call(cmd, *args, **kwargs)
         else:
             raise ValueError("Argument 'command' is neither a string, "
                              "nor a list nor a callable.")

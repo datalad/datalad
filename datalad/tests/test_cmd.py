@@ -68,23 +68,44 @@ def test_runner(tempfile):
 
 
 @ignore_nose_capturing_stdout
-def test_runner_instance_callable():
+def test_runner_instance_callable_dry():
 
     cmd_ = ['echo', 'Testing __call__ with string']
     for cmd in [cmd_, ' '.join(cmd_)]:
         runner = Runner(dry=True)
-        runner(cmd)
+        ret = runner(cmd)
+        eq_(ret, None) # errorcode is returned.  But in dry -- None
         assert_equal(runner.commands.__str__(), ("[%r]" % cmd),
                      "Dry run of Runner.__call__ didn't record command: %s.\n"
                      "Buffer: %s" % (cmd, runner.commands.__str__()))
 
-    runner(os.path.join, 'foo', 'bar')
+    ret = runner(os.path.join, 'foo', 'bar')
+    eq_(ret, None)
+
     assert_greater(runner.commands.__str__().find('join'), -1,
                    "Dry run of Runner.__call__ didn't record function join()."
                    "Buffer: %s" % runner.commands.__str__())
     assert_greater(runner.commands.__str__().find('args='), -1,
                    "Dry run of Runner.__call__ didn't record function join()."
                    "Buffer: %s" % runner.commands.__str__())
+
+
+@ignore_nose_capturing_stdout
+def test_runner_instance_callable_wet():
+
+    runner = Runner()
+    cmd = [sys.executable, "-c", "print('Testing')"]
+
+    ret = runner(cmd)
+    eq_(ret, 0) # must succesfully run basic command and spit out output for us
+
+    ret, out = runner(cmd, return_output=True)
+    eq_(ret, 0) # must succesfully run basic command and spit out output for us
+    eq_(out[0].rstrip(), ('Testing'))
+    eq_(out[1], '')
+
+    ret = runner(os.path.join, 'foo', 'bar')
+    eq_(ret, os.path.join('foo', 'bar'))
 
 
 @ignore_nose_capturing_stdout
