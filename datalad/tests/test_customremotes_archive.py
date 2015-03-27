@@ -52,7 +52,8 @@ def test_basic_scenario(d):
 
     annex_opts = '--debug' if lgr.getEffectiveLevel() <= logging.DEBUG else ""
 
-    rok('git init; git annex init;')
+    rok('git init')
+    rok('git annex init')
     rok('git annex initremote annexed-archives encryption=none type=external externaltype=dl+archive')
     rok('git annex add a.tar.gz')
     rok('git commit -m "Added tarball"')
