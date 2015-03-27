@@ -145,3 +145,22 @@ def optional_args(decorator):
 #
 # Context Managers
 #
+
+#
+# Additional handlers
+#
+_sys_excepthook = sys.excepthook # Just in case we ever need original one
+
+def setup_exceptionhook():
+    def _datalad_pdb_excepthook(type, value, tb):
+        if not is_interactive:
+            lgr.warn("We cannot setup exception hook since not in interactive mode")
+            # we are in interactive mode or we don't have a tty-like
+            # device, so we call the default hook
+            sys.__excepthook__(type, value, tb)
+        else:
+            import traceback, pdb
+            traceback.print_exception(type, value, tb)
+            print
+            pdb.post_mortem(tb)
+    sys.excepthook = _datalad_pdb_excepthook
