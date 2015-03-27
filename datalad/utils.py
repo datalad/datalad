@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-import shutil, stat, os
+import shutil, stat, os, sys
 import tempfile
 import platform
 
@@ -33,6 +33,13 @@ except:
 #
 # Little helpers
 #
+
+def is_interactive():
+    """Return True if all in/outs are tty"""
+    # TODO: check on windows if hasattr check would work correctly and add value:
+    #
+    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
 import hashlib
 def md5sum(filename):
     with open(filename) as f:
