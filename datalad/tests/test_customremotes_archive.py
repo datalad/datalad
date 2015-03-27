@@ -16,6 +16,7 @@ import sys
 from ..cmd import Runner
 from .utils import *
 
+
 def get_bindir_PATH():
     # we will need to adjust PATH
     bindir = realpath(opj(dirname(__file__), pardir, pardir, 'bin'))
