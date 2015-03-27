@@ -340,7 +340,6 @@ from datalad.cmd import Runner
 from datalad.tests.utils import rmtree # improved for tricky permissions. TODO: move
 import tempfile
 
-import patoolib
 from ..cmd import link_file_load
 from ..utils import rotree
 
@@ -387,7 +386,14 @@ class AnnexArchiveCache(object):
             # don't end up picking up broken pieces
             lgr.debug("Extracting {archive} under {epath}".format(**locals()))
             os.makedirs(epath)
-            patoolib.extract_archive(archive, outdir=epath)
+            # TODO: didn't manage to override stdout even with a patch, WTF?
+            #import patoolib # with hope to manage to override patoolib's assigned to stdout
+            #patoolib.extract_archive(archive, outdir=epath, out=None)
+            # so for now just call patool
+            out = Runner().run(["patool", "extract", "--outdir", epath, archive])
+            #if out.out or out.err:
+            #    lgr.debug("patool.extract_archive call stdout: %s  stderr: %s"
+            #              % (out.out, out.err))
             lgr.debug("Adjusting permissions to read-only for the extracted contents")
             rotree(epath)
         path = opj(epath, afile)
