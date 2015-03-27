@@ -95,10 +95,11 @@ def test_AnnexRepo_is_direct_mode(path):
     #Better check for filesystem instead of platform?
 
 
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
-def test_AnnexRepo_set_direct_mode(path):
+@with_testrepos
+@with_tempfile
+def test_AnnexRepo_set_direct_mode(src, dst):
 
-    ar = AnnexRepo(path)
+    ar = AnnexRepo(dst, src)
     ar.set_direct_mode(True)
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
     if on_windows:
