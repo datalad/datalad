@@ -6,6 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Miscellaneous utilities to assist with testing"""
 
 import glob, shutil, stat, os
 import tempfile
