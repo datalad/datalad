@@ -15,8 +15,9 @@ For further information on git-annex see https://git-annex.branchable.com/.
 from os.path import join, exists
 import logging
 
-from gitrepo import GitRepo
+from ConfigParser import NoOptionError
 
+from gitrepo import GitRepo
 from datalad.cmd import Runner as Runner
 
 lgr = logging.getLogger('datalad.annex')
@@ -61,6 +62,38 @@ class AnnexRepo(GitRepo):
             lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
             self._annex_init()
 
+    def is_direct_mode(self):
+        """Indicates whether or not annex is in direct mode
+
+        Returns
+        -------
+        True if in direct mode, False otherwise.
+        """
+
+        try:
+            dm = self.repo.config_reader().get_value("annex", "direct")
+        except NoOptionError, e:
+            #If .git/config lacks an entry "direct" it's actually indirect mode.
+            dm = False
+
+        return dm
+
+    def set_direct_mode(self, enable_direct_mode=True):
+        """Switch to direct or indirect mode
+
+        Parameters
+        ----------
+        enable_direct_mode: bool
+            True means switch to direct mode,
+            False switches to indirect mode
+        """
+
+        if enable_direct_mode:
+            self.cmd_call_wrapper.run(['git', 'annex', 'direct'], cwd=self.path)
+        else:
+            self.cmd_call_wrapper.run(['git', 'annex', 'indirect'], cwd=self.path)
+            #TODO: 1. Where to handle failure? 2. On crippled filesystem don't even try.
+
     def _annex_init(self):
         """Initializes an annex repository.
 
@@ -99,6 +132,7 @@ class AnnexRepo(GitRepo):
         #TODO: May be this should go in a decorator for use in every command.
 
         cmd_str = 'git annex get %s %s' % (options, paths)
+        # TODO: make it a list instead of a string
         # TODO: Do we want to cd to self.path first? This would lead to expand paths, if
         # cwd is deeper in repo.
 
