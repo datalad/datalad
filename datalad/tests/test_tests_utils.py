@@ -15,11 +15,24 @@ from mock import patch
 
 from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, rmtemp, \
                    OBSCURE_FILENAMES, get_most_obscure_supported_name, \
-                   swallow_outputs, swallow_logs
+                   swallow_outputs, swallow_logs, assert_false
 
 #
 # Test with_tempfile, especially nested invocations
 #
+
+@with_tempfile
+def _with_tempfile_decorated_dummy(path):
+    return path
+
+
+def test_with_tempfile_dir_via_env_variable():
+    target = os.path.join(os.path.expanduser("~"), "dataladtesttmpdir")
+    assert_false(os.path.exists(target), "directory %s already exists." % target)
+    with patch.dict('os.environ', {'DATALAD_TESTS_TEMPDIR': target}):
+        filename = _with_tempfile_decorated_dummy()
+        ok_(filename.startswith(target))
+
 @with_tempfile
 @with_tempfile
 def test_nested_with_tempfile_basic(f1, f2):
