@@ -11,7 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import errno
-import sys
+import sys, os
 
 from os.path import exists, join as opj, basename
 
@@ -53,6 +53,8 @@ class AnnexCustomRemote(object):
 
         # To signal either we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
+        self._protocol = [] if os.environ.get('DATALAD_REMOTES_PROTOCOL') \
+                            else None
 
     @property
     def PREFIX(self):
@@ -77,6 +79,8 @@ class AnnexCustomRemote(object):
             self.heavydebug("Sending %r" % msg)
             self.fout.write("%s\n" % msg)
             self.fout.flush()
+            if self._protocol is not None:
+                self._protocol.append("send " + msg)
         except IOError as exc:
             lgr.debug("Failed to send due to %s" % str(exc))
             if exc.errno == errno.EPIPE:
@@ -102,6 +106,8 @@ class AnnexCustomRemote(object):
         # with filenames starting/ending with spaces - encoded?
         # Split right away
         l = self.fin.readline().rstrip('\n')
+        if self._protocol is not None:
+                self._protocol.append("read " + l)
         msg = l.split(None, n)
         if req and (req != msg[0]):
             # verify correct response was given
@@ -148,6 +154,13 @@ class AnnexCustomRemote(object):
     def stop(self, msg=None):
         lgr.info("Stopping communications of %s%s" %
                  (self, ": %s" % msg if msg else ""))
+        if self._protocol is not None:
+            # save protocol
+            fname = os.environ.get('DATALAD_REMOTES_PROTOCOL')
+            lgr.info("Saving protocol to %s" % fname)
+            with open(fname, 'a') as f:
+                f.write('\n'.join(self._protocol + []))
+
         raise AnnexRemoteQuit(msg)
 
     def _loop(self):
