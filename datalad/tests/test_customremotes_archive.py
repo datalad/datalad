@@ -16,6 +16,7 @@ import sys
 from ..cmd import Runner
 from .utils import *
 
+from ..customremotes.base import AnnexExchangeProtocol
 
 def get_bindir_PATH():
     # we will need to adjust PATH
@@ -42,8 +43,10 @@ def test_basic_scenario(d):
         env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
 
     r = Runner(cwd=d, env=env)
+    protocol = AnnexExchangeProtocol(d, 'dl+archive:')
 
     def rok(cmd, *args, **kwargs):
+        protocol.write_section(cmd)
         ret = r(cmd, *args, **kwargs)
         if isinstance(ret, tuple):
             assert_false(ret[0])

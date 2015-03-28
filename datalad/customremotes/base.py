@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 import errno
 import sys, os
 
-from os.path import exists, join as opj, basename, realpath
+from os.path import exists, join as opj, basename, realpath, dirname
 
 import logging
 
@@ -27,6 +27,99 @@ DEFAULT_AVAILABILITY = "local"
 
 class AnnexRemoteQuit(Exception):
     pass
+
+class AnnexExchangeProtocol(object):
+    """A little helper to protocol interactions of custom remote with annex
+    """
+
+    HEADER = r"""#!/bin/bash
+
+set -e
+
+# Gets a VALUE response and stores it in $RET
+report () {
+    echo "$@" >&2
+}
+
+recv () {
+    read resp
+    #resp=${resp%\n}
+    target="$@"
+    if [ "$resp" != "$target" ]; then
+        report "! exp $target"
+        report "  got $resp"
+    else
+        report "+ got $resp"
+    fi
+}
+
+send () {
+    echo "$@"
+    report "sent $@"
+}
+
+"""
+
+    def __init__(self, repopath, url_prefix):
+        self.repopath = repopath
+        self.url_prefix = url_prefix
+        self._file = None
+        self._initiated = False
+
+    def initiate(self):
+        if self._initiated:
+            return
+        self._initiated = True
+        d = opj(self.repopath, '.git', 'bin')
+        if not exists(d):
+            os.makedirs(d)
+
+        self._file = _file = \
+            opj(d, 'git-annex-remote-' + self.url_prefix.rstrip(':'))
+
+        if exists(_file):
+            lgr.debug("Commenting out previous entries")
+            # comment out all the past entries
+            with open(_file) as f:
+                entries = f.readlines()
+            for i in xrange(len(self.HEADER.split('\n')), len(entries)):
+                e = entries[i]
+                if e.startswith('recv ') or e.startswith('send '):
+                    entries[i] = '#' + e
+            with open(_file, 'w') as f:
+                f.write(''.join(entries))
+            return # nothing else to be done
+
+        lgr.debug("Initiating protocoling."
+                      "cd %s; vim %s"
+                      % (realpath(self.repopath), _file[len(self.repopath)+1:]))
+        with open(_file, 'a') as f:
+            f.write(self.HEADER)
+        os.chmod(_file, 0755)
+
+    def write_section(self, cmd):
+        self.initiate()
+        with open(self._file, 'a') as f:
+            f.write('\n### %s\n' % cmd)
+        lgr.error("New section in the protocol: "
+                      "cd %s; PATH=%s:$PATH %s"
+                      % (realpath(self.repopath),
+                         dirname(self._file),
+                         cmd))
+
+
+    def write_entries(self, entries):
+        self.initiate()
+        with open(self._file, 'a') as f:
+            f.write('\n'.join(entries + ['']))
+
+    def __iadd__(self, entry):
+        self.initiate()
+        lgr.debug("HERE WITH %s" % entry)
+        with open(self._file, 'a') as f:
+            f.write(entry + '\n')
+        return self
+
 
 class AnnexCustomRemote(object):
     """Base class to provide custom special remotes for git-annex
@@ -53,7 +146,8 @@ class AnnexCustomRemote(object):
 
         # To signal either we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
-        self._protocol = [] if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
+        self._protocol = AnnexExchangeProtocol('.', self.url_prefix) \
+                            if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
                             else None
 
     @property
@@ -80,7 +174,7 @@ class AnnexCustomRemote(object):
             self.fout.write("%s\n" % msg)
             self.fout.flush()
             if self._protocol is not None:
-                self._protocol.append("send " + msg)
+                self._protocol += "send %s" % msg
         except IOError as exc:
             lgr.debug("Failed to send due to %s" % str(exc))
             if exc.errno == errno.EPIPE:
@@ -107,7 +201,7 @@ class AnnexCustomRemote(object):
         # Split right away
         l = self.fin.readline().rstrip('\n')
         if self._protocol is not None:
-            self._protocol.append("recv " + l)
+            self._protocol += "recv %s" % l
         msg = l.split(None, n)
         if req and (req != msg[0]):
             # verify correct response was given
@@ -151,61 +245,12 @@ class AnnexCustomRemote(object):
         finally:
             self._in_the_loop = False
 
-    def _save_protocol(self):
-        # save protocol
-        pattern = os.environ.get('DATALAD_PROTOCOL_REMOTE')
-        if len(pattern) > 1: # if it is more than just a symbol
-            if not pattern in str(self._protocol):
-                lgr.debug("Skipping saving protocol from this run. No match to %s" % pattern)
-                return
-        d = opj('.git', 'bin')
-        if not exists(d):
-            os.makedirs(d)
-        fname = opj(d, 'git-annex-remote-' + self.url_prefix.rstrip(':'))
-        needs_header = not exists(fname)
-        if needs_header:
-            lgr.error("Saving protocol. "
-                      "cd %s; vim %s; PATH=%s:$PATH git annex COMMAND"
-                      % (realpath('.'), fname, d))
-        with open(fname, 'a') as f:
-            if needs_header:
-                f.write(r"""#!/bin/bash
-
-set -e
-
-# Gets a VALUE response and stores it in $RET
-report () {
-    echo "$@" >&2
-}
-
-recv () {
-    read resp
-    #resp=${resp%\n}
-    target="$@"
-    if [ "$resp" != "$target" ]; then
-        report "! exp $target"
-        report "  got $resp"
-    else
-        report "+ got $resp"
-    fi
-}
-
-send () {
-    echo "$@"
-    report "sent $@"
-}
-""")
-            f.write("# ==========================\n")
-            f.write('\n'.join(self._protocol + ['']))
-        os.chmod(fname, 0755)
-
 
     def stop(self, msg=None):
         lgr.info("Stopping communications of %s%s" %
                  (self, ": %s" % msg if msg else ""))
-        if self._protocol is not None:
-            self._save_protocol()
         raise AnnexRemoteQuit(msg)
+
 
     def _loop(self):
 
