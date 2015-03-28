@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 import errno
 import sys, os
 
-from os.path import exists, join as opj, basename
+from os.path import exists, join as opj, basename, realpath
 
 import logging
 
@@ -53,7 +53,7 @@ class AnnexCustomRemote(object):
 
         # To signal either we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
-        self._protocol = [] if os.environ.get('DATALAD_REMOTES_PROTOCOL') \
+        self._protocol = [] if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
                             else None
 
     @property
@@ -107,7 +107,7 @@ class AnnexCustomRemote(object):
         # Split right away
         l = self.fin.readline().rstrip('\n')
         if self._protocol is not None:
-                self._protocol.append("read " + l)
+            self._protocol.append("recv " + l)
         msg = l.split(None, n)
         if req and (req != msg[0]):
             # verify correct response was given
@@ -151,16 +151,60 @@ class AnnexCustomRemote(object):
         finally:
             self._in_the_loop = False
 
+    def _save_protocol(self):
+        # save protocol
+        pattern = os.environ.get('DATALAD_PROTOCOL_REMOTE')
+        if len(pattern) > 1: # if it is more than just a symbol
+            if not pattern in str(self._protocol):
+                lgr.debug("Skipping saving protocol from this run. No match to %s" % pattern)
+                return
+        d = opj('.git', 'bin')
+        if not exists(d):
+            os.makedirs(d)
+        fname = opj(d, 'git-annex-remote-' + self.url_prefix.rstrip(':'))
+        needs_header = not exists(fname)
+        if needs_header:
+            lgr.error("Saving protocol. "
+                      "cd %s; vim %s; PATH=%s:$PATH git annex COMMAND"
+                      % (realpath('.'), fname, d))
+        with open(fname, 'a') as f:
+            if needs_header:
+                f.write(r"""#!/bin/bash
+
+set -e
+
+# Gets a VALUE response and stores it in $RET
+report () {
+    echo "$@" >&2
+}
+
+recv () {
+    read resp
+    #resp=${resp%\n}
+    target="$@"
+    if [ "$resp" != "$target" ]; then
+        report "! exp $target"
+        report "  got $resp"
+    else
+        report "+ got $resp"
+    fi
+}
+
+send () {
+    echo "$@"
+    report "sent $@"
+}
+""")
+            f.write("# ==========================\n")
+            f.write('\n'.join(self._protocol + ['']))
+        os.chmod(fname, 0755)
+
+
     def stop(self, msg=None):
         lgr.info("Stopping communications of %s%s" %
                  (self, ": %s" % msg if msg else ""))
         if self._protocol is not None:
-            # save protocol
-            fname = os.environ.get('DATALAD_REMOTES_PROTOCOL')
-            lgr.info("Saving protocol to %s" % fname)
-            with open(fname, 'a') as f:
-                f.write('\n'.join(self._protocol + []))
-
+            self._save_protocol()
         raise AnnexRemoteQuit(msg)
 
     def _loop(self):
