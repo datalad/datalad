@@ -300,11 +300,13 @@ class AnnexCustomRemote(object):
         """Gets URL(s) associated with a Key.
 
         """
+        assert(self.url_prefix.encode() == self.url_prefix)
         # FIXME: there seems to be a bug
         # http://git-annex.branchable.com/bugs/GETURLS_doesn__39__t_return_URLs_if_prefix_is_provided/?updated
         # thus for now requesting without prefix and filtering manually
-        assert(self.url_prefix.encode() == self.url_prefix)
-        self.send("GETURLS", key)#, self.url_prefix)
+        #self.send("GETURLS", key, ":" + self.url_prefix)
+        # with annex >= 5.20150327+git27-g6af24b6-1, should be alright
+        self.send("GETURLS", key, self.url_prefix)
         urls = []
         while True:
             url = self.read("VALUE", 1)[1:]
@@ -313,8 +315,9 @@ class AnnexCustomRemote(object):
                 urls.append(url[0])
             else:
                 break
-        urls = [u for u in urls
+        urls_ = [u for u in urls
                 if u.startswith(self.url_prefix)]
+        assert(urls_ == urls)
         self.heavydebug("Received URLS: %s" % urls)
         return urls
 
