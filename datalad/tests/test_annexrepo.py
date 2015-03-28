@@ -104,7 +104,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
     if on_windows:
         assert_raises(RuntimeError, ar.set_direct_mode, False)
-        assert_false(ar.is_direct_mode())
+        assert_true(ar.is_direct_mode())
     else:
         ar.set_direct_mode(False)
         assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
