@@ -115,7 +115,6 @@ send () {
 
     def __iadd__(self, entry):
         self.initiate()
-        lgr.debug("HERE WITH %s" % entry)
         with open(self._file, 'a') as f:
             f.write(entry + '\n')
         return self
