@@ -40,6 +40,17 @@ def test_Dataset(src, dst):
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     assert_raises(GitCommandError, Dataset, dst, src)
+
+@ignore_nose_capturing_stdout
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_Dataset_direct(src, dst):
+
+    ds = Dataset(dst, src, direct=True)
+    assert_is_instance(ds, Dataset, "Dataset was not created.")
+    assert_true(os.path.exists(os.path.join(dst, '.datalad')))
+    assert_true(ds.is_direct_mode(), "Forcing direct mode failed.")
     
 
 @ignore_nose_capturing_stdout
