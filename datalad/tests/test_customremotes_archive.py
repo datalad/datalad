@@ -8,15 +8,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-import os
+import shlex
 from os.path import realpath, pardir, join as opj, dirname, pathsep
-
-import logging
-import sys
+from ..customremotes.base import AnnexExchangeProtocol
 from ..cmd import Runner
+
 from .utils import *
 
-from ..customremotes.base import AnnexExchangeProtocol
 
 def get_bindir_PATH():
     # we will need to adjust PATH
@@ -27,12 +25,16 @@ def get_bindir_PATH():
         #lgr.debug("Adjusted PATH to become {}".format(os.environ['PATH']))
     return PATH
 
+# both files will have the same content
+fn_inarchive = 'test.dat' # get_most_obscure_supported_name()
+fn_extracted = 'test2.dat' # fn_inarchive.replace('a', 'z')
+# TODO -- obscure one for the tarball itself
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
 @with_tree(
-    tree=(('a.tar.gz', (('d', (('test.dat', '123'),)),)),
-          ('test2.dat', '123')
+    tree=(('a.tar.gz', (('d', ((fn_inarchive, '123'),)),)),
+          (fn_extracted, '123')
          ))
 def test_basic_scenario(d):
     # We could just propagate current environ I guess to versatile our testing
@@ -54,23 +56,29 @@ def test_basic_scenario(d):
             assert_false(ret)
         return ret
 
-    annex_opts = ' --debug' if lgr.getEffectiveLevel() <= logging.DEBUG else ""
+    annex_opts = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
 
     def annex(cmd, *args, **kwargs):
-        return rok("git annex%s %s" % (annex_opts, cmd), *args, **kwargs)
+        cmd = shlex.split(cmd) if isinstance(cmd, basestring) else cmd
+        return rok(["git", "annex"] + annex_opts + cmd, *args, **kwargs)
 
     def git(cmd, *args, **kwargs):
-        return rok("git %s" % (cmd), *args, **kwargs)
+        cmd = shlex.split(cmd) if isinstance(cmd, basestring) else cmd
+        return rok(["git"] + cmd, *args, **kwargs)
 
     git('init')
     annex('init')
     annex('initremote annexed-archives encryption=none type=external externaltype=dl+archive')
+    # We want two maximally obscure names, which are also different
+    assert(fn_extracted != fn_inarchive)
     annex('add a.tar.gz')
     git('commit -m "Added tarball"')
     exitcode, (out, err) = \
         annex('lookupkey a.tar.gz', return_output=True)
-    annex('add test2.dat')
+    annex(['add', fn_extracted])
     git('commit -m "Added the load file"')
-    annex('addurl --file test2.dat --relaxed dl+archive:%s/a/d/test.dat' % (out.rstrip()))
-    annex('drop test2.dat')
-    annex('get test2.dat')
+    # TODO: get url from the special remote itself
+    annex(['addurl', '--file',  fn_extracted,
+           '--relaxed', 'dl+archive:%s/a/d/%s' % (out.rstrip(), fn_inarchive)])
+    annex(['drop', fn_extracted])
+    annex(['get', fn_extracted])
