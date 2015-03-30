@@ -78,6 +78,22 @@ class AnnexRepo(GitRepo):
 
         return dm
 
+    def is_crippled_fs(self):
+        """Indicates whether or not git-annex considers current filesystem 'crippled'
+
+        Returns
+        -------
+        True if on crippled filesystem, False otherwise
+        """
+
+        try:
+            cr_fs = self.repo.config_reader().get_value("annex", "crippledfilesystem")
+        except NoOptionError, e:
+            #If .git/config lacks an entry "crippledfilesystem" it's actually not crippled.
+            cr_fs = False
+
+        return cr_fs
+
     def set_direct_mode(self, enable_direct_mode=True):
         """Switch to direct or indirect mode
 

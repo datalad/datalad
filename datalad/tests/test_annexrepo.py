@@ -109,3 +109,16 @@ def test_AnnexRepo_set_direct_mode(src, dst):
         ar.set_direct_mode(False)
         assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
     #TODO: see above (test_AnnexRepo_is_direct_mode). Check for filesystem seems to be more accurate.
+
+
+@with_testrepos
+@with_tempfile
+def test_AnnexRepo_crippled_filesystem(src, dst):
+    # TODO: This test is rudimentary, since platform not really determines filesystem.
+    # For now this should work for the buildbots. Nevertheless: Find a better way to test it.
+
+    ar = AnnexRepo(dst, src)
+    if on_windows:
+        assert_true(ar.is_crippled_fs(), "Detected non-crippled filesystem on windows.")
+    else:
+        assert_false(ar.is_crippled_fs(), "Detected crippled filesystem on non-windows.")
