@@ -11,6 +11,7 @@
 import shlex
 from os.path import realpath, pardir, join as opj, dirname, pathsep
 from ..customremotes.base import AnnexExchangeProtocol
+from ..customremotes.archive import AnnexArchiveCustomRemote
 from ..cmd import Runner
 
 from .utils import *
@@ -26,8 +27,10 @@ def get_bindir_PATH():
     return PATH
 
 # both files will have the same content
-fn_inarchive = 'test.dat' # get_most_obscure_supported_name()
-fn_extracted = 'test2.dat' # fn_inarchive.replace('a', 'z')
+#fn_inarchive = 'test.dat'
+#fn_extracted = 'test2.dat'
+fn_inarchive = get_most_obscure_supported_name()
+fn_extracted = fn_inarchive.replace('a', 'z')
 # TODO -- obscure one for the tarball itself
 
 # TODO: with_tree ATM for archives creates this nested top directory
@@ -79,12 +82,11 @@ def test_basic_scenario(d):
     assert(fn_extracted != fn_inarchive)
     annex('add a.tar.gz')
     git('commit -m "Added tarball"')
-    exitcode, (out, err) = \
-        annex('lookupkey a.tar.gz', return_output=True)
     annex(['add', fn_extracted])
     git('commit -m "Added the load file"')
-    # TODO: get url from the special remote itself
-    annex(['addurl', '--file',  fn_extracted,
-           '--relaxed', 'dl+archive:%s/a/d/%s' % (out.rstrip(), fn_inarchive)])
+    file_url = AnnexArchiveCustomRemote(path=d).get_file_url(
+        archive_file='a.tar.gz', file='a/d/'+fn_inarchive)
+    annex(['addurl', '--file',  fn_extracted, '--relaxed', file_url])
     annex(['drop', fn_extracted])
     annex(['get', fn_extracted])
+    # TODO: dropurl, addurl without --relaxed, addurl to non-existing file
