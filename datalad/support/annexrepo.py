@@ -28,7 +28,7 @@ class AnnexRepo(GitRepo):
 
     """
 
-    def __init__(self, path, url=None, runner=None):
+    def __init__(self, path, url=None, runner=None, direct=False):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -47,6 +47,9 @@ class AnnexRepo(GitRepo):
         runner: Runner
            Provide a Runner in case AnnexRepo shall not create it's own. This is especially needed in case of
            desired dry runs.
+
+        direct: bool
+           If True, force git-annex to use direct mode
         """
         super(AnnexRepo, self).__init__(path, url)
 
@@ -61,6 +64,9 @@ class AnnexRepo(GitRepo):
         if not exists(join(self.path, '.git', 'annex')):
             lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
             self._annex_init()
+
+        if direct and not self.is_direct_mode():  # only force direct mode; don't force indirect mode
+            self.set_direct_mode()
 
     def is_direct_mode(self):
         """Indicates whether or not annex is in direct mode
@@ -79,7 +85,7 @@ class AnnexRepo(GitRepo):
         return dm
 
     def is_crippled_fs(self):
-        """Indicates whether or not git-annex considers current filesystem 'crippled'
+        """Indicates whether or not git-annex considers current filesystem 'crippled'.
 
         Returns
         -------

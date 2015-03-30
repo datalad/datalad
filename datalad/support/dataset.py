@@ -29,7 +29,7 @@ class Dataset(AnnexRepo):
 
     """
 
-    def __init__(self, path, url=None):
+    def __init__(self, path, url=None, direct=False):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -42,10 +42,12 @@ class Dataset(AnnexRepo):
         url: str
           url to the to-be-cloned repository.
           valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+        direct: bool
+          if True, force git-annex to operate in direct mode
 
         """
 
-        super(Dataset, self).__init__(path, url)
+        super(Dataset, self).__init__(path, url, direct=direct)
         # TODO: what about runner? (dry runs ...)
 
         # TODO: should work with path (deeper) inside repo! => gitrepo/annexrepo
