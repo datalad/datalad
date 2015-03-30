@@ -83,34 +83,6 @@ def test_AnnexRepo_get(src, dst):
     os.chdir(cwd)
 
 
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
-def test_AnnexRepo_is_direct_mode(path):
-
-    dm = AnnexRepo(path).is_direct_mode()
-    if on_windows:
-        assert_true(dm, "AnnexRepo.is_direct_mode() returned false on windows.")
-    else:
-        assert_false(dm, "AnnexRepo.is_direct_mode() returned true on non-windows")
-    #TODO: Are there more platforms leading to direct mode?
-    #Better check for filesystem instead of platform?
-
-
-@with_testrepos
-@with_tempfile
-def test_AnnexRepo_set_direct_mode(src, dst):
-
-    ar = AnnexRepo(dst, src)
-    ar.set_direct_mode(True)
-    assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
-    if on_windows:
-        assert_raises(RuntimeError, ar.set_direct_mode, False)
-        assert_true(ar.is_direct_mode())
-    else:
-        ar.set_direct_mode(False)
-        assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
-    #TODO: see above (test_AnnexRepo_is_direct_mode). Check for filesystem seems to be more accurate.
-
-
 @with_testrepos
 @with_tempfile
 def test_AnnexRepo_crippled_filesystem(src, dst):
@@ -122,3 +94,36 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
         assert_true(ar.is_crippled_fs(), "Detected non-crippled filesystem on windows.")
     else:
         assert_false(ar.is_crippled_fs(), "Detected crippled filesystem on non-windows.")
+
+
+@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+def test_AnnexRepo_is_direct_mode(path):
+
+    ar = AnnexRepo(path)
+    dm = ar.is_direct_mode()
+    if on_windows:
+        assert_true(dm, "AnnexRepo.is_direct_mode() returned false on windows.")
+    else:
+        assert_false(dm, "AnnexRepo.is_direct_mode() returned true on non-windows")
+    # Note: In fact this test isn't totally correct, since you always can switch to direct mode.
+    # So not being on windows doesn't necessarily mean we are in indirect mode. But how to obtain a "ground truth"
+    # to test against, without making test of is_direct_mode() dependent on set_direct_mode() and vice versa?
+
+
+@with_testrepos
+@with_tempfile
+def test_AnnexRepo_set_direct_mode(src, dst):
+
+    ar = AnnexRepo(dst, src)
+    ar.set_direct_mode(True)
+    assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
+    if ar.is_crippled_fs():
+        assert_raises(RuntimeError, ar.set_direct_mode, False,
+                      "Switching to indirect mode on crippled fs resulted in unexpected behaviour.")
+        assert_true(ar.is_direct_mode(), "Indirect mode on crippled fs detected. Shouldn't be possible.")
+    else:
+        ar.set_direct_mode(False)
+        assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
+
+
+
