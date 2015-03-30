@@ -15,6 +15,8 @@ import sys, os
 
 from os.path import exists, join as opj, basename, realpath, dirname
 
+from ..cmd import Runner
+
 import logging
 
 lgr = logging.getLogger('datalad.customremotes')
@@ -130,10 +132,25 @@ class AnnexCustomRemote(object):
 
     AVAILABILITY = DEFAULT_AVAILABILITY
 
-    def __init__(self, cost=DEFAULT_COST): # , availability=DEFAULT_AVAILABILITY):
+    def __init__(self, path='.', cost=DEFAULT_COST): # , availability=DEFAULT_AVAILABILITY):
+        """
+        Parameters
+        ----------
+        path : string, optional
+            Path to the repository for which this custom remote is serving.
+            Usually this class is instantiated by a script which runs already
+            within that directory, so the default is to point to current
+            directory, i.e. '.'
+        """
+        # TODO: probably we shouldn't have runner here but rather delegate
+        # to AnnexRepo's functionality
+        self.runner = Runner()
+
         # Custom remotes correspond to annex via stdin/stdout
         self.fin = sys.stdin
         self.fout = sys.stdout
+
+        self.path = path
 
         self._progress = 0 # transmission to be reported back if available
         self.cost = cost
@@ -145,9 +162,9 @@ class AnnexCustomRemote(object):
 
         # To signal either we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
-        self._protocol = AnnexExchangeProtocol('.', self.url_prefix) \
-                            if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
-                            else None
+        self._protocol = AnnexExchangeProtocol(self.path, self.url_prefix) \
+                         if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
+                         else None
 
     @property
     def PREFIX(self):
@@ -393,7 +410,7 @@ class AnnexCustomRemote(object):
         self.send("DIRHASH", key)
         val = self.read("VALUE", 1)[1]
         if full:
-            return opj(val, key)
+            return opj(self.path, val, key)
         else:
             return val
 
@@ -422,10 +439,23 @@ class AnnexCustomRemote(object):
         self.heavydebug("Received URLS: %s" % urls)
         return urls
 
+    def _get_file_key(self, file):
+        """Return KEY for a given file
+        """
+        # TODO: should actually be implemented by AnnexRepo
+        exitcode, (out, err) = \
+            self.runner(['git', 'annex', 'lookupkey', file], return_output=True,
+                        cwd=self.path)
+        if exitcode:
+            raise RuntimeError("Failed to acquire key for the file %s" % file)
+        return out.rstrip('\n')
+
+
     def _get_key_dir(self, key):
         """Gets a full path to the directory containing the key
         """
-        return opj('.git', 'annex', 'objects', self.get_DIRHASH(key, full=True))
+        return opj(self.path, '.git', 'annex', 'objects',
+                   self.get_DIRHASH(key, full=True))
 
     def _get_key_path(self, key):
         """Gets a full path to the key"""

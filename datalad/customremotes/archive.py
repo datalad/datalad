@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 import errno
 import os
 import sys
+import urllib2
 
 from os.path import exists, join as opj, basename, abspath
 
@@ -34,7 +35,7 @@ class AnnexArchiveCache(object):
         #if exists(path):
         #    self._clean_cache()
 
-        self._path = opj(os.curdir, path)
+        self._path = path
 
         lgr.debug("Initiating clean cache under %s" % self.path)
 
@@ -52,6 +53,10 @@ class AnnexArchiveCache(object):
         return self._path
 
     def clean(self):
+        if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+            self.info("As instruction, not cleaning up the cache under %s"
+                      % self.path)
+            return
         lgr.debug("Cleaning up the cache")
         if exists(self._path):
             # TODO:  we must be careful here -- to not modify permissions of files
@@ -95,7 +100,11 @@ class AnnexArchiveCache(object):
 
     def get_extracted_file(self, archive, afile):
         lgr.debug("Requested file {afile} from archive {archive}".format(**locals()))
-        path = opj(self.get_extracted_archive(archive), afile)
+        # TODO: That could be a good place to provide "compatibility" layer if
+        # filenames within archive are too obscure for local file system.
+        # We could somehow adjust them while extracting and here channel back
+        # "fixed" up names since they are only to point to the load
+        path = opj(self.get_extracted_archive(archive), urllib2.unquote(afile))
         # TODO: make robust
         lgr.log(1, "Verifying that %s exists" % abspath(path))
         assert(exists(path))
@@ -119,13 +128,13 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
-        self.runner = Runner()
 
         self._last_url = None # for heuristic to choose among multiple URLs
 
         # TODO:  urlencode file names in the url while adding/decode upon retrieval
 
-        self._cache_dir = opj('.git', 'datalad', 'tmp', 'archives')
+        self._cache_dir = opj(self.path,
+                              '.git', 'datalad', 'tmp', 'archives')
         self._cache = None
 
     def stop(self, *args):
@@ -133,6 +142,22 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             self._cache.clean()
             self._cache = None
         super(AnnexArchiveCustomRemote, self).stop(*args)
+
+    # Should it become a class method really?
+    # @classmethod
+    def get_file_url(self, archive_file=None, archive_key=None, file=None):
+        """Given archive (file or a key) and a file -- compose URL for access
+        """
+        assert(file is not None)
+        if archive_file is not None:
+            if archive_key is not None:
+                raise ValueError("Provide archive_file or archive_key - not both")
+            archive_key = self._get_file_key(archive_file)
+        # todo exitcode, (out, err) = \
+        # annex('lookupkey a.tar.gz', return_output=True)
+        assert(archive_key is not None)
+        file_quoted = urllib2.quote(file)
+        return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
 
     @property
     def cache(self):
@@ -262,7 +287,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         if not exists(akey_path):
             # retrieve the key using annex
             try:
-                self.runner(["git", "annex", "get", akey])
+                self.runner(["git", "annex", "get", akey], cwd=self.path)
                 assert(exists(akey_path))
             except Exception as e:
                 self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"
