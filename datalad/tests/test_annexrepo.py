@@ -118,8 +118,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
     ar.set_direct_mode(True)
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
     if ar.is_crippled_fs():
-        assert_raises(RuntimeError, ar.set_direct_mode, False,
-                      "Switching to indirect mode on crippled fs resulted in unexpected behaviour.")
+        assert_raises(RuntimeError, ar.set_direct_mode, False)
         assert_true(ar.is_direct_mode(), "Indirect mode on crippled fs detected. Shouldn't be possible.")
     else:
         ar.set_direct_mode(False)
