@@ -45,10 +45,16 @@ def test_basic_scenario(d):
         env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
 
     r = Runner(cwd=d, env=env)
-    protocol = AnnexExchangeProtocol(d, 'dl+archive:')
+
+    if os.environ.get('DATALAD_PROTOCOL_REMOTE'):
+        protocol = AnnexExchangeProtocol(d, 'dl+archive:')
+    else:
+        protocol = None
+
 
     def rok(cmd, *args, **kwargs):
-        protocol.write_section(cmd)
+        if protocol:
+            protocol.write_section(cmd)
         ret = r(cmd, *args, **kwargs)
         if isinstance(ret, tuple):
             assert_false(ret[0])
