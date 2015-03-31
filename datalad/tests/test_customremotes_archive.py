@@ -9,6 +9,7 @@
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
 import shlex
+from os import readlink
 from os.path import realpath, pardir, join as opj, dirname, pathsep
 from ..customremotes.base import AnnexExchangeProtocol
 from ..customremotes.archive import AnnexArchiveCustomRemote
@@ -39,7 +40,8 @@ fn_extracted = fn_inarchive.replace('a', 'z')
     tree=(('a.tar.gz', (('d', ((fn_inarchive, '123'),)),)),
           (fn_extracted, '123')
          ))
-def test_basic_scenario(d):
+@with_tempfile()
+def test_basic_scenario(d, d2):
     # We could just propagate current environ I guess to versatile our testing
     env = os.environ.copy()
     env.update({'PATH': get_bindir_PATH(),
@@ -84,9 +86,43 @@ def test_basic_scenario(d):
     git('commit -m "Added tarball"')
     annex(['add', fn_extracted])
     git('commit -m "Added the load file"')
+
+    # Operations with archive remote URL
     file_url = AnnexArchiveCustomRemote(path=d).get_file_url(
         archive_file='a.tar.gz', file='a/d/'+fn_inarchive)
+
     annex(['addurl', '--file',  fn_extracted, '--relaxed', file_url])
     annex(['drop', fn_extracted])
+
+    status, (out, err) = annex(['whereis', fn_extracted], return_output=True)
+    in_('-- [annexed-archives]', out)
+    in_('annexed-archives: %s' % file_url, out)
+
+    ok_broken_symlink(opj(d, fn_extracted))
     annex(['get', fn_extracted])
+    #ok_(exists(readlink(opj(d, fn_extracted))))
+
+    annex(['rmurl', fn_extracted, file_url])
+    with swallow_logs() as cm:
+        assert_raises(RuntimeError, annex, ['drop', fn_extracted]) # no copies
+        in_("git-annex: drop: 1 failed", cm.out)
+
+    annex(['addurl', '--file',  fn_extracted, file_url])
+    annex(['drop', fn_extracted])
+    annex(['get', fn_extracted])
+    annex(['drop', fn_extracted]) # so we don't get from this one in next part
+
+    # Let's create a clone and verify chain of getting file by getting the tarball
+    git(['clone', d, d2], expect_stderr=True)
+    # we would still need to enable manually atm that special remote for archives
+    annex('enableremote annexed-archives', cwd=d2)
+
+
+    ok_broken_symlink(opj(d2, 'a.tar.gz'))
+    ok_broken_symlink(opj(d2, fn_extracted))
+    annex(['get', fn_extracted], cwd=d2)
+    ok_broken_symlink(opj(d2, fn_extracted))
+    # as a result it would also fetch tarball
+    ok_broken_symlink(opj(d2, 'a.tar.gz'))
+
     # TODO: dropurl, addurl without --relaxed, addurl to non-existing file

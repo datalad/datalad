@@ -54,7 +54,7 @@ class AnnexArchiveCache(object):
 
     def clean(self):
         if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-            self.info("As instruction, not cleaning up the cache under %s"
+            lgr.info("As instruction, not cleaning up the cache under %s"
                       % self.path)
             return
         lgr.debug("Cleaning up the cache")
@@ -287,7 +287,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         if not exists(akey_path):
             # retrieve the key using annex
             try:
-                self.runner(["git", "annex", "get", akey], cwd=self.path)
+                self.runner(["git", "annex", "get", "--key", akey],
+                            cwd=self.path)
                 assert(exists(akey_path))
             except Exception as e:
                 self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"
