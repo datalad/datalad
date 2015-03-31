@@ -19,6 +19,7 @@ from ConfigParser import NoOptionError
 
 from gitrepo import GitRepo
 from datalad.cmd import Runner as Runner
+from exceptions import AnnexCommandNotAvailableError, AnnexCommandError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -108,13 +109,21 @@ class AnnexRepo(GitRepo):
         enable_direct_mode: bool
             True means switch to direct mode,
             False switches to indirect mode
+
+        Raises
+        ------
+        AnnexCommandNotAvailableError
+            in case you try to switch to indirect mode on a crippled filesystem
         """
 
         if enable_direct_mode:
             self.cmd_call_wrapper.run(['git', 'annex', 'direct'], cwd=self.path)
-        else:
+        elif not self.is_crippled_fs():
             self.cmd_call_wrapper.run(['git', 'annex', 'indirect'], cwd=self.path)
-            #TODO: 1. Where to handle failure? 2. On crippled filesystem don't even try.
+        else:
+            raise AnnexCommandNotAvailableError(cmd="git-annex indirect",
+                                                msg="Can't switch to indirect mode on that filesystem.")
+
 
     def _annex_init(self):
         """Initializes an annex repository.
@@ -128,6 +137,7 @@ class AnnexRepo(GitRepo):
         # not existing paths, etc.
 
         status = self.cmd_call_wrapper.run(['git', 'annex', 'init'], cwd=self.path)
+        # TODO: When to expect stderr? on crippled filesystem for example (think so)?
         if status not in [0, None]:
             lgr.error('git annex init returned status %d.' % status)
 
@@ -160,10 +170,10 @@ class AnnexRepo(GitRepo):
 
 
         #don't capture stderr, since it provides progress display
-        status = self.cmd_call_wrapper.run(cmd_str, log_stderr=False)
+        status = self.cmd_call_wrapper.run(cmd_str, log_stdout=True, log_stderr=False, log_online=True, expect_stderr=False)
 
         if status not in [0, None]:
             # TODO: Actually this doesn't make sense. Runner raises exception in this case,
             # which leads to: Runner doesn't have to return it at all.
             lgr.error('git annex get returned status: %s' % status)
-            raise RuntimeError
+            raise AnnexCommandError(cmd=cmd_str)

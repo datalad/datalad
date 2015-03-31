@@ -20,6 +20,7 @@ from git.exc import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows
+from datalad.support.exceptions import AnnexCommandNotAvailableError
 
 
 @ignore_nose_capturing_stdout
@@ -59,6 +60,7 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 @ignore_nose_capturing_stdout
+@assert_cwd_unchanged
 @with_testrepos(flavors=['network'])
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
@@ -83,6 +85,7 @@ def test_AnnexRepo_get(src, dst):
     os.chdir(cwd)
 
 
+@assert_cwd_unchanged
 @with_testrepos
 @with_tempfile
 def test_AnnexRepo_crippled_filesystem(src, dst):
@@ -96,6 +99,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
         assert_false(ar.is_crippled_fs(), "Detected crippled filesystem on non-windows.")
 
 
+@assert_cwd_unchanged
 @with_testrepos(flavors=['network-clone' if on_windows else 'local'])
 def test_AnnexRepo_is_direct_mode(path):
 
@@ -110,6 +114,7 @@ def test_AnnexRepo_is_direct_mode(path):
     # to test against, without making test of is_direct_mode() dependent on set_direct_mode() and vice versa?
 
 
+@assert_cwd_unchanged
 @with_testrepos
 @with_tempfile
 def test_AnnexRepo_set_direct_mode(src, dst):
@@ -118,7 +123,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
     ar.set_direct_mode(True)
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
     if ar.is_crippled_fs():
-        assert_raises(RuntimeError, ar.set_direct_mode, False)
+        assert_raises(AnnexCommandNotAvailableError, ar.set_direct_mode, False)
         assert_true(ar.is_direct_mode(), "Indirect mode on crippled fs detected. Shouldn't be possible.")
     else:
         ar.set_direct_mode(False)
