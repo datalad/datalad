@@ -17,6 +17,7 @@ from os.path import exists, join as opj
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_false, \
+    assert_in, assert_in as in_, \
     raises, ok_, eq_, make_decorator
 from nose import SkipTest
 
