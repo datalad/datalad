@@ -188,7 +188,7 @@ class Runner(object):
             # subprocesses.
 
             if log_online:
-                out = self._get_output_online(proc, log_stderr, log_stdout,
+                out = self._get_output_online(proc, log_stdout, log_stderr,
                                               expect_stderr=expect_stderr)
             else:
                 out = proc.communicate()
