@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob, shutil, stat, os
+from os.path import realpath
 import tempfile
 import platform
 
@@ -110,6 +111,27 @@ def ok_file_under_git(path, filename, annexed=False):
     assert(filename in repo.get_indexed_files()) # file is known to Git
     assert(annexed == os.path.islink(opj(path, filename)))
 
+def ok_symlink(path):
+    try:
+        link = os.readlink(path)
+    except OSError:
+        raise AssertionError("Path %s seems not to be a symlink" % path)
+    ok_(link)
+    path_ = realpath(path)
+    ok_(path != link)
+    # TODO anything else?
+
+def ok_good_symlink(path):
+    ok_symlink(path)
+    ok_(exists(realpath(path)),
+        msg="Path %s seems to be missing.  Symlink %s is broken "
+            % (realpath(path), path))
+
+def ok_broken_symlink(path):
+    ok_symlink(path)
+    assert_false(exists(realpath(path)),
+                 msg="Path %s seems to be present.  Symlink %s is not broken"
+                 % (realpath(path), path))
 
 #
 # Decorators
