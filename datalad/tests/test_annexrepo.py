@@ -172,8 +172,8 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
             raise SkipTest
         else:
             raise
+    finally:
+        os.chdir(cwd)
 
     assert_true(out.__str__().find("nothing to commit, working directory clean") > -1,\
                 "git status output via proxy not plausible.")
-
-    os.chdir(cwd)
