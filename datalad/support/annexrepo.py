@@ -191,9 +191,13 @@ class AnnexRepo(GitRepo):
         # Since files is a list of paths, we have to care for escaping special characters, etc.
         # at this point. For now just quote all of them (at least this should handle spaces):
         paths = '"' + '" "'.join(files) + '"'
-        #TODO: May be this should go in a decorator for use in every command.
+        # TODO: May be this should go in a decorator for use in every command.
+        #
+        # TODO: When using a list and not shell=True, some quoting is already done.
+        # Figure out how this works on different platforms before changing the runner calls.
 
         cmd_str = 'git annex add %s' % paths
+
 
         status = self.cmd_call_wrapper.run(cmd_str, shell=True)
 

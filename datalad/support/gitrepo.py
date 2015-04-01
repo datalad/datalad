@@ -70,13 +70,45 @@ class GitRepo(object):
                 self.repo = Repo(path)
             except GitCommandError as e:
                 # TODO: Creating Repo-object from existing git repository might raise other Exceptions
-                log.lgr.error(str(e))
+                lgr.error(str(e))
                 raise
 
-    def git_dummy_command(self):
-        """Just a dummy
+    def git_add(self, files=None):
+        """Adds file(s) to the repository.
 
-        No params, nothing to explain, should raise NotImplementedError.
-
+        Parameters:
+        -----------
+        files: list
+            list of paths to get
         """
-        raise NotImplementedError
+
+        if files:
+            try:
+                self.repo.index.add(files, write=True)
+                # TODO: May be make use of 'fprogress'-option to indicate progress
+                #
+                # TODO: Is write=True a reasonable way to do it?
+                # May be should not write until success of operation is confirmed?
+                # What's best in case of a list of files?
+            except OSError, e:
+                lgr.error("git_add: %s" % e)
+                raise
+
+        else:
+            lgr.warning("git_add was called with empty file list.")
+
+    def git_commit(self, msg=None, options=None):
+        """Commit changes to git.
+
+        Parameters:
+        -----------
+        msg: str
+            commit-message
+        options:
+            to be implemented. See TODO in AnnexRepo regarding a decorator for this purpose.
+        """
+
+        if not msg:
+            msg = "What would be a good default message?"
+
+        self.repo.index.commit(msg)
