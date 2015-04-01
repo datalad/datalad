@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import logging
-import shutil, stat, os
+import shutil, stat, os, sys
 import tempfile
 import platform
 
@@ -27,12 +27,19 @@ try:
     on_debian_wheezy = platform.system() == 'Linux' \
                 and platform.linux_distribution()[0] == 'debian' \
                 and platform.linux_distribution()[1].startswith('7.')
-except:
+except:  # pragma: no cover
     on_debian_wheezy = False
 
 #
 # Little helpers
 #
+
+def is_interactive():
+    """Return True if all in/outs are tty"""
+    # TODO: check on windows if hasattr check would work correctly and add value:
+    #
+    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+
 import hashlib
 def md5sum(filename):
     with open(filename) as f:
@@ -145,3 +152,22 @@ def optional_args(decorator):
 #
 # Context Managers
 #
+
+#
+# Additional handlers
+#
+_sys_excepthook = sys.excepthook # Just in case we ever need original one
+
+def setup_exceptionhook():
+    def _datalad_pdb_excepthook(type, value, tb):
+        if not is_interactive:
+            lgr.warn("We cannot setup exception hook since not in interactive mode")
+            # we are in interactive mode or we don't have a tty-like
+            # device, so we call the default hook
+            sys.__excepthook__(type, value, tb)
+        else:
+            import traceback, pdb
+            traceback.print_exception(type, value, tb)
+            print
+            pdb.post_mortem(tb)
+    sys.excepthook = _datalad_pdb_excepthook
