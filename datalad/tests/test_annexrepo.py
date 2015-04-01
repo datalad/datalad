@@ -168,7 +168,12 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
     try:
         out = ar.annex_proxy("git status")
     except RuntimeError, e:
-        if e.message.find("Unknown command 'proxy'") > -1:
+        if e.message.find("Failed to run 'git annex proxy") > -1:
+            # This actually isn't a good way to detect "git annex proxy" is not available
+            # Would need to have a look at stderr, which is either logged or printed by now.
+            # TODO: provide logHandler, which gives access to recent Records or return stderr
+            # like stdout or whatever. The first approach may turn out to be the way to handle it anyway.
+
             raise SkipTest
         else:
             raise
