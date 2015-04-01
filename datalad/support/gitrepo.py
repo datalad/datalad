@@ -79,7 +79,7 @@ class GitRepo(object):
         Parameters:
         -----------
         files: list
-            list of paths to get
+            list of paths to add
         """
 
         if files:

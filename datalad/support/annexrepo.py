@@ -204,3 +204,37 @@ class AnnexRepo(GitRepo):
         if status not in [0, None]:
             lgr.error("git annex add returned status: %s" % status)
             raise AnnexCommandError(cmd="git-annex add %s" % paths, msg="", code=status)
+
+
+    def annex_proxy(self, git_cmd):
+        """Use git-annex as a proxy to git
+
+        This is needed in case we are in direct mode, since there's no git working tree, that git can handle.
+
+        Parameters:
+        -----------
+        git_cmd: str
+            the actual git command
+
+        Returns:
+        --------
+        output: tuple
+            a tuple constisting of the lines of the output to stdout
+            Note: This may change. See TODO.
+        """
+
+        cmd_str = "git annex proxy -- %s" % git_cmd
+        # TODO: By now git_cmd is expected to be string. Figure out how to deal with a list here.
+
+        if not self.is_direct_mode():
+            lgr.warning("annex_proxy called in indirect mode: %s" % git_cmd)
+            raise AnnexCommandNotAvailableError(cmd=cmd_str, msg="Proxy doesn't make sense if not in direct mode.")
+
+        status, output = self.cmd_call_wrapper(cmd_str, shell=True, return_output=True)
+        # TODO: For now return output for testing. This may change later on.
+
+        if status not in [0, None]:
+            lgr.error("git annex proxy returned status: %s" % status)
+            raise AnnexCommandError(cmd=cmd_str, msg="", code=status)
+
+        return output

@@ -153,3 +153,18 @@ def test_AnnexRepo_annex_add(src, annex_path):
 
     os.chdir(cwd)
 
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@with_tempfile
+def test_AnnexRepo_annex_proxy(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+    cwd = os.getcwd()
+    os.chdir(annex_path)
+
+    ar.set_direct_mode(True)
+    out = ar.annex_proxy("git status")
+    assert_true(out.__str__().find("nothing to commit, working directory clean") > -1,\
+                "git status output via proxy not plausible.")
+    os.chdir(cwd)
