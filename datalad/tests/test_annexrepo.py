@@ -15,6 +15,7 @@ Note: There's not a lot to test by now.
 import os, platform
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
+from nose import SkipTest
 from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
@@ -164,7 +165,15 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
     os.chdir(annex_path)
 
     ar.set_direct_mode(True)
-    out = ar.annex_proxy("git status")
+    try:
+        out = ar.annex_proxy("git status")
+    except RuntimeError, e:
+        if e.message.find("Unknown command 'proxy'") > -1:
+            raise SkipTest
+        else:
+            raise
+
     assert_true(out.__str__().find("nothing to commit, working directory clean") > -1,\
                 "git status output via proxy not plausible.")
+
     os.chdir(cwd)
