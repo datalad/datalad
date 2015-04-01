@@ -63,4 +63,56 @@ class Dataset(AnnexRepo):
         """
         super(Dataset, self).annex_get(list)
         # For now just pass
-        # TODO: options
+        # TODO:
+
+    def _commit(self, msg):
+        """Commit changes to repository
+
+        Parameters:
+        -----------
+        msg: str
+            commit-message
+        """
+
+        if self.is_direct_mode():
+            self.annex_proxy('git commit -m "%s"' % msg)
+        else:
+            self.git_commit(msg)
+
+    def add_to_annex(self, files):
+        """Add file(s) to the annex
+
+
+        Parameters
+        ----------
+        files: list
+            list of paths to add to the annex
+        """
+
+        self.annex_add(files=files)
+        self._commit("Added file(s) to annex: %s" % files)
+
+    def add_to_git(self, files):
+        """Add file(s) to git
+
+
+        Parameters
+        ----------
+        files: list
+            list of paths to add to git
+        """
+
+        # TODO: Rethink, whether or not the whole direct mode dependent handling should go into AnnexRepo anyway.
+        # But remember: committing after adding should be done here, so the methods are needed either way.
+
+        if self.is_direct_mode():
+            # Since files is a list of paths, we have to care for escaping special characters, etc.
+            # at this point. For now just quote all of them (at least this should handle spaces):
+            filelist = '"' + '" "'.join(files) + '"'
+            # TODO: May be this should go in a decorator for use in every command.
+
+            self.annex_proxy('git add %s' % filelist)
+        else:
+            self.git_add(files)
+
+        self._commit("Added file(s) to git: %s" % files)
