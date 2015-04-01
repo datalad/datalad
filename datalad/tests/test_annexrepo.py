@@ -130,4 +130,26 @@ def test_AnnexRepo_set_direct_mode(src, dst):
         assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
 
 
+@assert_cwd_unchanged
+@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@with_tempfile
+def test_AnnexRepo_annex_add(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+    cwd = os.getcwd()
+    os.chdir(annex_path)
+
+    filename = 'file_to_annex.dat'
+    f = open(filename, 'w')
+    f.write("What to write?")
+    f.close()
+    ar.annex_add([filename])
+    if not ar.is_direct_mode():
+        assert_true(os.path.islink(filename), "Annexed file is not a link.")
+    else:
+        assert_false(os.path.islink(filename), "Annexed file is link in direct mode.")
+        # TODO: How to test the file was added in direct mode?
+        # May be this will need 'git annex find' or sth. to be implemented.
+
+    os.chdir(cwd)
 

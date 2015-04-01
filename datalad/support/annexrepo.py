@@ -157,6 +157,7 @@ class AnnexRepo(GitRepo):
         # Since files is a list of paths, we have to care for escaping special characters, etc.
         # at this point. For now just quote all of them (at least this should handle spaces):
         paths = '"' + '" "'.join(files) + '"'
+        #TODO: May be this should go in a decorator for use in every command.
 
         options = ''
         for key in kwargs.keys():
@@ -177,3 +178,25 @@ class AnnexRepo(GitRepo):
             # which leads to: Runner doesn't have to return it at all.
             lgr.error('git annex get returned status: %s' % status)
             raise AnnexCommandError(cmd=cmd_str)
+
+    def annex_add(self, files):
+        """Add file(s) to the annex.
+
+        Parameters
+        ----------
+        files: list
+            list of paths to add to the annex
+        """
+
+        # Since files is a list of paths, we have to care for escaping special characters, etc.
+        # at this point. For now just quote all of them (at least this should handle spaces):
+        paths = '"' + '" "'.join(files) + '"'
+        #TODO: May be this should go in a decorator for use in every command.
+
+        cmd_str = 'git annex add %s' % paths
+
+        status = self.cmd_call_wrapper.run(cmd_str, shell=True)
+
+        if status not in [0, None]:
+            lgr.error("git annex add returned status: %s" % status)
+            raise AnnexCommandError(cmd="git-annex add %s" % paths, msg="", code=status)
