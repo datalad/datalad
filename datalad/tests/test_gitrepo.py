@@ -76,11 +76,10 @@ def test_GitRepo_add(src, path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_GitRepo_commit(src, path):
+def test_GitRepo_commit(path):
 
-    gr = GitRepo(path, src)
+    gr = GitRepo(path)
     filename = "test_git_add.dat"
     f = open(os.path.join(path, filename), 'w')
     f.write("File to add to git")
