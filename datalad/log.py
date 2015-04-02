@@ -10,11 +10,9 @@
 import logging, os, sys, platform
 import logging.handlers
 
-__all__ = ['is_interactive', 'ColorFormatter', 'log']
+from .utils import is_interactive
 
-def is_interactive():
-    """Return True if all in/outs are tty"""
-    return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
+__all__ = ['ColorFormatter', 'log']
 
 # Recipe from http://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
 # by Brandon Thomson

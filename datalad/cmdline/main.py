@@ -23,6 +23,7 @@ from datalad.log import lgr
 import datalad.cmdline as mvcmd
 from datalad.cmdline import helpers
 
+from ..utils import setup_exceptionhook
 
 def _license_info():
     return """\
@@ -157,11 +158,15 @@ def main(args=None):
     args = parser.parse_args(args)
 
     # run the function associated with the selected command
-    try:
+    if args.common_debug:
+        # So we could see/stop clearly at the point of failure
+        setup_exceptionhook()
         args.func(args)
-    except Exception as exc:
-        lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
-        if args.common_debug:
-            import pdb
-            pdb.post_mortem()
-        sys.exit(1)
+    else:
+        # Otherwise - guard and only log the summary. Postmortem is not
+        # as convenient if being caught in this ultimate except
+        try:
+            args.func(args)
+        except Exception as exc:
+            lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
+            sys.exit(1)
