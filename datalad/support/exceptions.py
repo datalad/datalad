@@ -10,7 +10,9 @@
 """
 
 
-class AnnexCommandError(Exception):
+class CommandError(Exception):
+    """Thrown if a command call fails.
+    """
 
     def __init__(self, cmd="", msg="", code=None):
         self.cmd = cmd
@@ -25,19 +27,24 @@ class AnnexCommandError(Exception):
         return to_str
 
 
-class AnnexCommandNotAvailableError(AnnexCommandError):
+class CommandNotAvailableError(CommandError):
+    """Thrown if a command is not available due to certain circumstances.
+    """
     pass
 
 
-class AnnexFileNotInAnnexError(AnnexCommandError, IOError):
-
+class FileNotInAnnexError(CommandError, IOError):
+    """Thrown if a file is not under control of git-annex.
+    """
     def __init__(self, cmd="", msg="", code=None, filename=""):
-        AnnexCommandError.__init__(self, cmd=cmd, msg=msg, code=code)
+        CommandError.__init__(self, cmd=cmd, msg=msg, code=code)
         IOError.__init__(self, code, "%s: %s" % (cmd, msg), filename)
 
     def __str__(self):
-        return "%s\n%s" % (AnnexCommandError.__str__(self), IOError.__str__(self))
+        return "%s\n%s" % (CommandError.__str__(self), IOError.__str__(self))
 
 
-class AnnexFileInGitError(AnnexFileNotInAnnexError):
+class FileInGitError(FileNotInAnnexError):
+    """Thrown if a file is not under control of git-annex, but git itself.
+    """
     pass

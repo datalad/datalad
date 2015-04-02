@@ -19,7 +19,7 @@ from ConfigParser import NoOptionError
 
 from gitrepo import GitRepo
 from datalad.cmd import Runner as Runner
-from exceptions import AnnexCommandNotAvailableError, AnnexCommandError, AnnexFileNotInAnnexError, AnnexFileInGitError
+from exceptions import CommandNotAvailableError, CommandError, FileNotInAnnexError, FileInGitError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -112,7 +112,7 @@ class AnnexRepo(GitRepo):
 
         Raises
         ------
-        AnnexCommandNotAvailableError
+        CommandNotAvailableError
             in case you try to switch to indirect mode on a crippled filesystem
         """
 
@@ -121,7 +121,7 @@ class AnnexRepo(GitRepo):
         elif not self.is_crippled_fs():
             self.cmd_call_wrapper.run(['git', 'annex', 'indirect'], cwd=self.path)
         else:
-            raise AnnexCommandNotAvailableError(cmd="git-annex indirect",
+            raise CommandNotAvailableError(cmd="git-annex indirect",
                                                 msg="Can't switch to indirect mode on that filesystem.")
 
 
@@ -177,7 +177,7 @@ class AnnexRepo(GitRepo):
             # TODO: Actually this doesn't make sense. Runner raises exception in this case,
             # which leads to: Runner doesn't have to return it at all.
             lgr.error('git annex get returned status: %s' % status)
-            raise AnnexCommandError(cmd=cmd_str)
+            raise CommandError(cmd=cmd_str)
 
     def annex_add(self, files):
         """Add file(s) to the annex.
@@ -203,7 +203,7 @@ class AnnexRepo(GitRepo):
 
         if status not in [0, None]:
             lgr.error("git annex add returned status: %s" % status)
-            raise AnnexCommandError(cmd="git-annex add %s" % paths, msg="", code=status)
+            raise CommandError(cmd="git-annex add %s" % paths, msg="", code=status)
 
     def annex_proxy(self, git_cmd):
         """Use git-annex as a proxy to git
@@ -227,14 +227,14 @@ class AnnexRepo(GitRepo):
 
         if not self.is_direct_mode():
             lgr.warning("annex_proxy called in indirect mode: %s" % git_cmd)
-            raise AnnexCommandNotAvailableError(cmd=cmd_str, msg="Proxy doesn't make sense if not in direct mode.")
+            raise CommandNotAvailableError(cmd=cmd_str, msg="Proxy doesn't make sense if not in direct mode.")
 
         status, output = self.cmd_call_wrapper(cmd_str, shell=True, return_output=True)
         # TODO: For now return output for testing. This may change later on.
 
         if status not in [0, None]:
             lgr.error("git annex proxy returned status: %s" % status)
-            raise AnnexCommandError(cmd=cmd_str, msg="", code=status)
+            raise CommandError(cmd=cmd_str, msg="", code=status)
 
         return output
 
@@ -268,10 +268,10 @@ class AnnexRepo(GitRepo):
                 # if we got here, the file is present and accessible, but not in the annex
 
                 if path_to_file in self.get_indexed_files():
-                    raise AnnexFileInGitError(cmd=cmd_str, msg="File not in annex, but git: %s" % path_to_file,
+                    raise FileInGitError(cmd=cmd_str, msg="File not in annex, but git: %s" % path_to_file,
                                               filename=path_to_file)
 
-                raise AnnexFileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path_to_file,
+                raise FileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path_to_file,
                                                filename=path_to_file)
 
         key = output[0].split()[0]

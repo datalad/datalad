@@ -21,7 +21,7 @@ from git.exc import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git_annex_proxy
-from datalad.support.exceptions import AnnexCommandNotAvailableError, AnnexFileInGitError, AnnexFileNotInAnnexError
+from datalad.support.exceptions import CommandNotAvailableError, FileInGitError, FileNotInAnnexError
 
 
 @ignore_nose_capturing_stdout
@@ -124,7 +124,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
     ar.set_direct_mode(True)
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
     if ar.is_crippled_fs():
-        assert_raises(AnnexCommandNotAvailableError, ar.set_direct_mode, False)
+        assert_raises(CommandNotAvailableError, ar.set_direct_mode, False)
         assert_true(ar.is_direct_mode(), "Indirect mode on crippled fs detected. Shouldn't be possible.")
     else:
         ar.set_direct_mode(False)
@@ -180,8 +180,8 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     # test.dat is actually in git
     # should raise Exception; also test for polymorphism
     assert_raises(IOError, ar.get_file_key, "test.dat")
-    assert_raises(AnnexFileNotInAnnexError, ar.get_file_key, "test.dat")
-    assert_raises(AnnexFileInGitError, ar.get_file_key, "test.dat")
+    assert_raises(FileNotInAnnexError, ar.get_file_key, "test.dat")
+    assert_raises(FileInGitError, ar.get_file_key, "test.dat")
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
