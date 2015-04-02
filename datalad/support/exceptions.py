@@ -20,7 +20,7 @@ class AnnexCommandError(Exception):
     def __str__(self):
         to_str = "%s: command '%s'" % (self.__class__.__name__, self.cmd)
         if self.code:
-            to_str += "failed with exitcode %d" % self.code
+            to_str += " failed with exitcode %d" % self.code
         to_str += ".\n%s" % self.msg
         return to_str
 
@@ -28,3 +28,16 @@ class AnnexCommandError(Exception):
 class AnnexCommandNotAvailableError(AnnexCommandError):
     pass
 
+
+class AnnexFileNotInAnnexError(AnnexCommandError, IOError):
+
+    def __init__(self, cmd="", msg="", code=None, filename=""):
+        AnnexCommandError.__init__(self, cmd=cmd, msg=msg, code=code)
+        IOError.__init__(self, code, "%s: %s" % (cmd, msg), filename)
+
+    def __str__(self):
+        return "%s\n%s" % (AnnexCommandError.__str__(self), IOError.__str__(self))
+
+
+class AnnexFileInGitError(AnnexFileNotInAnnexError):
+    pass

@@ -21,7 +21,7 @@ from git.exc import GitCommandError
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows
-from datalad.support.exceptions import AnnexCommandNotAvailableError
+from datalad.support.exceptions import AnnexCommandNotAvailableError, AnnexFileInGitError, AnnexFileNotInAnnexError
 
 
 @ignore_nose_capturing_stdout
@@ -182,3 +182,26 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 
     assert_true(out.__str__().find("nothing to commit, working directory clean") > -1,\
                 "git status output via proxy not plausible.")
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@with_tempfile
+def test_AnnexRepo_get_file_key(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+    cwd = os.getcwd()
+    os.chdir(annex_path)
+
+    # test-annex.dat should return the correct key:
+    assert_equal(ar.get_file_key("test-annex.dat"), 'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat')
+
+    # test.dat is actually in git
+    # should raise Exception; also test for polymorphism
+    assert_raises(IOError, ar.get_file_key, "test.dat")
+    assert_raises(AnnexFileNotInAnnexError, ar.get_file_key, "test.dat")
+    assert_raises(AnnexFileInGitError, ar.get_file_key, "test.dat")
+
+    # filenotpresent.wtf doesn't even exist
+    assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
+        
+    os.chdir(cwd)

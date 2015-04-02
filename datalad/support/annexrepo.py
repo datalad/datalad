@@ -19,7 +19,7 @@ from ConfigParser import NoOptionError
 
 from gitrepo import GitRepo
 from datalad.cmd import Runner as Runner
-from exceptions import AnnexCommandNotAvailableError, AnnexCommandError
+from exceptions import AnnexCommandNotAvailableError, AnnexCommandError, AnnexFileNotInAnnexError, AnnexFileInGitError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -205,7 +205,6 @@ class AnnexRepo(GitRepo):
             lgr.error("git annex add returned status: %s" % status)
             raise AnnexCommandError(cmd="git-annex add %s" % paths, msg="", code=status)
 
-
     def annex_proxy(self, git_cmd):
         """Use git-annex as a proxy to git
 
@@ -238,3 +237,43 @@ class AnnexRepo(GitRepo):
             raise AnnexCommandError(cmd=cmd_str, msg="", code=status)
 
         return output
+
+    def get_file_key(self, path_to_file):
+        """Get key of an annexed file
+
+        Parameters:
+        -----------
+        path_to_file: str
+            file to look up
+
+        Returns:
+        --------
+        key: str
+
+        """
+
+        cmd_str = "git annex lookupkey %s" % path_to_file
+
+        try:
+            status, output = self.cmd_call_wrapper.run(cmd_str, shell=True, return_output=True)
+        except RuntimeError, e:
+            if e.message.find("Failed to run '%s'" % cmd_str) > -1 and e.message.find("Exit code=1") > -1:
+                # if annex command fails we don't get the status directly
+                # nor does git-annex propagate IOError (file not found) or sth.
+                # So, we have to find out:
+
+                f = open(path_to_file, 'r')  # raise possible IOErrors
+                f.close()
+
+                # if we got here, the file is present and accessible, but not in the annex
+
+                if path_to_file in self.get_indexed_files():
+                    raise AnnexFileInGitError(cmd=cmd_str, msg="File not in annex, but git: %s" % path_to_file,
+                                              filename=path_to_file)
+
+                raise AnnexFileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path_to_file,
+                                               filename=path_to_file)
+
+        key = output[0].split()[0]
+
+        return key
