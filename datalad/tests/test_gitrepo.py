@@ -97,3 +97,19 @@ def test_GitRepo_commit(path):
 
     os.chdir(cwd)
 
+
+@with_testrepos(flavors=['local'])
+def test_GitRepo_get_indexed_files(path):
+
+    gr = GitRepo(path)
+    idx_list = gr.get_indexed_files()
+
+    runner = Runner()
+    st, out = runner.run(['git', 'ls-files'], return_output=True, cwd=path)
+    out_list = out[0].split()
+
+    for item in idx_list:
+        assert_true(out_list.__contains__(item), "%s not found in output of git ls-files in %s" % (item, path))
+
+    for item in out_list:
+        assert_true(idx_list.__contains__(item), "%s not found in output of get_indexed_files in %s" % (item, path))

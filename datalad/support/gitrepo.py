@@ -112,3 +112,14 @@ class GitRepo(object):
             msg = "What would be a good default message?"
 
         self.repo.index.commit(msg)
+
+    def get_indexed_files(self):
+        """Get a list of files in git's index
+
+        Returns:
+        --------
+        list
+            list of paths rooting in git's base dir
+        """
+
+        return [x[0] for x in self.repo.index.entries.keys()]
