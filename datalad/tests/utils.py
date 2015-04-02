@@ -80,7 +80,39 @@ def create_tree(path, tree):
 #
 
 import git
+import os
 from os.path import exists, join
+from datalad.support.annexrepo import AnnexRepo
+
+def ok_clean_git_annex_proxy(path):
+    """Helper to check, whether an annex in direct mode is clean
+    """
+    # TODO: May be let's make a method of AnnexRepo for this purpose
+
+    ar = AnnexRepo(path)
+    cwd = os.getcwd()
+    os.chdir(path)
+
+    try:
+        out = ar.annex_proxy("git status")
+    except RuntimeError, e:
+        if e.message.find("Failed to run 'git annex proxy") > -1:
+            # This actually isn't a good way to detect "git annex proxy" is not available
+            # Would need to have a look at stderr, which is either logged or printed by now.
+            # TODO: provide logHandler, which gives access to recent Records or return stderr
+            # like stdout or whatever. The first approach may turn out to be the way to handle it anyway.
+
+            raise SkipTest
+        else:
+            raise
+    finally:
+        os.chdir(cwd)
+
+    assert(out.__str__().find("nothing to commit, working directory clean") > -1,\
+                "git status output via proxy not plausible.")
+
+
+
 
 def ok_clean_git(path, annex=True, untracked=[]):
     """Verify that under given path there is a clean git repository

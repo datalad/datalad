@@ -20,7 +20,7 @@ from git.exc import GitCommandError
 
 from datalad.support.dataset import Dataset
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git
+    on_windows, ok_clean_git, ok_clean_git_annex_proxy
 
 
 # For now (at least) we would need to clone from the network
@@ -114,12 +114,12 @@ def test_Dataset_add_to_annex(src, dst):
 
     if not ds.is_direct_mode():
         assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
+        ok_clean_git(dst, annex=True)
     else:
         assert_false(os.path.islink(filename_abs), "Annexed file is link in direct mode.")
         # TODO: How to test the file was added in direct mode?
         # May be this will need 'git annex find' or sth. to be implemented.
-
-    ok_clean_git(dst, annex=True)
+        ok_clean_git_annex_proxy(dst)
 
 
 @assert_cwd_unchanged
@@ -134,7 +134,10 @@ def test_Dataset__add_to_git(src, dst):
     f.write("What to write?")
     f.close()
     ds.add_to_git([filename])
-    ok_clean_git(dst, annex=False)
+    if ds.is_direct_mode():
+        ok_clean_git_annex_proxy(dst)
+    else:
+        ok_clean_git(dst, annex=False)
 
 
 @assert_cwd_unchanged
@@ -151,6 +154,14 @@ def test_Dataset_commit(path):
     ds.annex_add([filename])
     os.chdir(cwd)
 
-    assert_raises(AssertionError, ok_clean_git, path, annex=True)
+    if ds.is_direct_mode():
+        assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
+    else:
+        assert_raises(AssertionError, ok_clean_git, path, annex=True)
+
     ds._commit("test _commit")
-    ok_clean_git(path, annex=True)
+
+    if ds.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
