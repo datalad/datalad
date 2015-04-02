@@ -23,6 +23,11 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
     on_windows, ok_clean_git_annex_proxy
 from datalad.support.exceptions import CommandNotAvailableError, FileInGitError, FileNotInAnnexError
 
+# For now (at least) we would need to clone from the network
+# since there are troubles with submodules on Windows.
+# See: https://github.com/datalad/datalad/issues/44
+local_flavors = ['network-clone' if on_windows else 'local']
+
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -42,7 +47,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 # TODO: enable local as well whenever/if ever submodule issue gets resolved for windows
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])  # 'network' doesn't make sense for this test
+@with_testrepos(flavors=local_flavors)  # 'network' doesn't make sense for this test
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)
@@ -101,7 +106,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@with_testrepos(flavors=local_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
@@ -132,7 +137,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add(src, annex_path):
 
@@ -156,7 +161,7 @@ def test_AnnexRepo_annex_add(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
 
@@ -166,7 +171,7 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_key(src, annex_path):
 

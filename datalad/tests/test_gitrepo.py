@@ -19,12 +19,17 @@ from nose.tools import assert_raises, assert_is_instance, assert_true
 from git.exc import GitCommandError
 
 from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ok_clean_git
+from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ok_clean_git, on_windows
 from datalad.cmd import Runner
+
+# For now (at least) we would need to clone from the network
+# since there are troubles with submodules on Windows.
+# See: https://github.com/datalad/datalad/issues/44
+local_flavors = ['network-clone' if on_windows else 'local']
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
 def test_GitRepo_instance_from_clone(src, dst):
 
@@ -38,7 +43,7 @@ def test_GitRepo_instance_from_clone(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=local_flavors)
 def test_GitRepo_instance_from_existing(path):
 
     gr = GitRepo(path)
@@ -56,10 +61,11 @@ def test_GitRepo_instance_brand_new(path):
 
 
 @assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_GitRepo_add(path):
+def test_GitRepo_add(src, path):
 
-    gr = GitRepo(path)
+    gr = GitRepo(path, src)
     filename = "test_git_add.dat"
     f = open(os.path.join(path, filename), 'w')
     f.write("File to add to git")
@@ -70,10 +76,11 @@ def test_GitRepo_add(path):
 
 
 @assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_GitRepo_commit(path):
+def test_GitRepo_commit(src, path):
 
-    gr = GitRepo(path)
+    gr = GitRepo(path, src)
     filename = "test_git_add.dat"
     f = open(os.path.join(path, filename), 'w')
     f.write("File to add to git")
@@ -84,10 +91,11 @@ def test_GitRepo_commit(path):
     ok_clean_git(path, annex=False, untracked=[])
 
 
-@with_testrepos(flavors=['local'])
-def test_GitRepo_get_indexed_files(path):
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_GitRepo_get_indexed_files(src, path):
 
-    gr = GitRepo(path)
+    gr = GitRepo(path, src)
     idx_list = gr.get_indexed_files()
 
     runner = Runner()

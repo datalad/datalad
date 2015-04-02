@@ -151,10 +151,11 @@ def test_Dataset__add_to_git(src, dst):
 
 
 @assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_Dataset_commit(path):
+def test_Dataset_commit(src, path):
 
-    ds = Dataset(path)
+    ds = Dataset(path, src)
     filename = os.path.join(path, "test_git_add.dat")
     f = open(filename, 'w')
     f.write("File to add to git")
