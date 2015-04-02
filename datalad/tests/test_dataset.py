@@ -15,12 +15,12 @@ Note: There's not a lot to test by now.
 import os.path
 import platform
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
 from git.exc import GitCommandError
 
 from datalad.support.dataset import Dataset
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows
+    on_windows, ok_clean_git
 
 
 # For now (at least) we would need to clone from the network
@@ -94,3 +94,63 @@ def test_Dataset_get(src, dst):
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 
     os.chdir(cwd)
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_Dataset_add_to_annex(src, dst):
+
+    ds = Dataset(dst, src)
+    filename = 'file_to_annex.dat'
+    filename_abs = os.path.join(dst, filename)
+    f = open(filename_abs, 'w')
+    f.write("What to write?")
+    f.close()
+    cwd = os.getcwd()
+    os.chdir(dst)
+    ds.add_to_annex([filename])
+    os.chdir(cwd)
+
+    if not ds.is_direct_mode():
+        assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
+    else:
+        assert_false(os.path.islink(filename_abs), "Annexed file is link in direct mode.")
+        # TODO: How to test the file was added in direct mode?
+        # May be this will need 'git annex find' or sth. to be implemented.
+
+    ok_clean_git(dst, annex=True)
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_Dataset__add_to_git(src, dst):
+
+    ds = Dataset(dst, src)
+    filename = 'file_to_git.dat'
+    filename_abs = os.path.join(dst, filename)
+    f = open(filename_abs, 'w')
+    f.write("What to write?")
+    f.close()
+    ds.add_to_git([filename])
+    ok_clean_git(dst, annex=False)
+
+
+@assert_cwd_unchanged
+@with_tempfile
+def test_Dataset_commit(path):
+
+    ds = Dataset(path)
+    filename = os.path.join(path, "test_git_add.dat")
+    f = open(filename, 'w')
+    f.write("File to add to git")
+    f.close()
+    cwd = os.getcwd()
+    os.chdir(path)
+    ds.annex_add([filename])
+    os.chdir(cwd)
+
+    assert_raises(AssertionError, ok_clean_git, path, annex=True)
+    ds._commit("test _commit")
+    ok_clean_git(path, annex=True)
