@@ -16,7 +16,7 @@ from os.path import exists, join as opj
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_false, \
-    raises, ok_, eq_, make_decorator
+    raises, ok_, eq_, make_decorator, assert_true
 from nose import SkipTest
 
 from ..cmd import Runner
@@ -82,14 +82,14 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import AnnexRepo as AnnexRepoNew
 
 def ok_clean_git_annex_proxy(path):
     """Helper to check, whether an annex in direct mode is clean
     """
     # TODO: May be let's make a method of AnnexRepo for this purpose
 
-    ar = AnnexRepo(path)
+    ar = AnnexRepoNew(path)
     cwd = os.getcwd()
     os.chdir(path)
 
@@ -108,7 +108,7 @@ def ok_clean_git_annex_proxy(path):
     finally:
         os.chdir(cwd)
 
-    assert(out.__str__().find("nothing to commit, working directory clean") > -1,\
+    assert_true(out.__str__().find("nothing to commit, working directory clean") > -1,\
                 "git status output via proxy not plausible.")
 
 

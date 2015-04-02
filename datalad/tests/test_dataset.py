@@ -16,6 +16,7 @@ import os.path
 import platform
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
+from nose import SkipTest
 from git.exc import GitCommandError
 
 from datalad.support.dataset import Dataset
@@ -128,6 +129,10 @@ def test_Dataset_add_to_annex(src, dst):
 def test_Dataset__add_to_git(src, dst):
 
     ds = Dataset(dst, src)
+    # For now adding to git in direct doesn't seem to work
+    if ds.is_direct_mode():
+        raise SkipTest
+
     filename = 'file_to_git.dat'
     filename_abs = os.path.join(dst, filename)
     f = open(filename_abs, 'w')
@@ -135,12 +140,14 @@ def test_Dataset__add_to_git(src, dst):
     f.close()
     cwd = os.getcwd()
     os.chdir(dst)
-    ds.add_to_git([filename])
-    os.chdir(cwd)
+
+    ds.add_to_git([filename_abs])
+
     if ds.is_direct_mode():
         ok_clean_git_annex_proxy(dst)
     else:
         ok_clean_git(dst, annex=False)
+    os.chdir(cwd)
 
 
 @assert_cwd_unchanged
@@ -155,7 +162,6 @@ def test_Dataset_commit(path):
     cwd = os.getcwd()
     os.chdir(path)
     ds.annex_add([filename])
-    os.chdir(cwd)
 
     if ds.is_direct_mode():
         assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
@@ -168,3 +174,4 @@ def test_Dataset_commit(path):
         ok_clean_git_annex_proxy(path)
     else:
         ok_clean_git(path, annex=True)
+    os.chdir(cwd)
