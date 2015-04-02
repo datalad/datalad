@@ -133,7 +133,10 @@ def test_Dataset__add_to_git(src, dst):
     f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
+    cwd = os.getcwd()
+    os.chdir(dst)
     ds.add_to_git([filename])
+    os.chdir(cwd)
     if ds.is_direct_mode():
         ok_clean_git_annex_proxy(dst)
     else:
