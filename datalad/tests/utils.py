@@ -325,7 +325,7 @@ def _extend_globs(paths, flavors):
         runner = Runner()
         kw = dict(); _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
         tdir = tempfile.mkdtemp(**kw)
-        repo = runner(["git", "clone", url, tdir])
+        repo = runner(["git", "clone", url, tdir], expect_stderr=True)
         open(opj(tdir, ".git", "remove-me"), "w").write("Please") # signal for it to be removed after
         return tdir
 

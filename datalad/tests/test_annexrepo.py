@@ -19,7 +19,7 @@ from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows
+    on_windows, swallow_logs
 
 
 @ignore_nose_capturing_stdout
@@ -34,7 +34,9 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
     # do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     # and therefore can't clone to `dst`
-    assert_raises(GitCommandError, AnnexRepo, dst, src)
+    with swallow_logs() as cm:
+        assert_raises(GitCommandError, AnnexRepo, dst, src)
+        assert("already exists" in cm.out)
 
 
 # TODO: enable local as well whenever/if ever submodule issue gets resolved for windows

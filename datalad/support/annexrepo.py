@@ -87,12 +87,10 @@ class AnnexRepo(GitRepo):
             True means switch to direct mode,
             False switches to indirect mode
         """
-
-        if enable_direct_mode:
-            self.cmd_call_wrapper.run(['git', 'annex', 'direct'], cwd=self.path)
-        else:
-            self.cmd_call_wrapper.run(['git', 'annex', 'indirect'], cwd=self.path)
-            #TODO: 1. Where to handle failure? 2. On crippled filesystem don't even try.
+        mode = 'direct' if enable_direct_mode else 'indirect'
+        self.cmd_call_wrapper.run(['git', 'annex', mode], cwd=self.path,
+                                  expect_stderr=True)
+        #TODO: 1. Where to handle failure? 2. On crippled filesystem don't even try.
 
     def _annex_init(self):
         """Initializes an annex repository.
