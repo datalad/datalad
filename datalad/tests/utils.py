@@ -391,7 +391,13 @@ def assert_cwd_unchanged(func):
         cwd_before = os.getcwd()
         func(*args, **kwargs)
         cwd_after = os.getcwd()
-        assert_equal(cwd_before, cwd_after ,"CWD changed from %s to %s" % (cwd_before, cwd_after))
+        if cwd_after != cwd_before:
+            lgr.warning(
+                "%s changed cwd to %s. Mitigating and changing back to %s"
+                % (func, cwd_after, cwd_before))
+            os.chdir(cwd_before)
+            assert_equal(cwd_before, cwd_after,
+                         "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
     return newfunc
 

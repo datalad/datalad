@@ -13,9 +13,11 @@ from os.path import exists, join as opj
 from glob import glob
 from mock import patch
 
-from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, rmtemp, \
-                   OBSCURE_FILENAMES, get_most_obscure_supported_name, \
-                   swallow_outputs, swallow_logs, assert_false
+from .utils import eq_, ok_, assert_false, \
+    with_tempfile, with_testrepos, with_tree, \
+    rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
+    swallow_outputs, swallow_logs, \
+    on_windows, assert_raises, assert_equal, assert_cwd_unchanged
 
 #
 # Test with_tempfile, especially nested invocations
@@ -146,3 +148,15 @@ def test_swallow_logs():
         eq_(cm.out, 'debug1\n') # not even visible at level 9
         lgr.info("info")
         eq_(cm.out, 'debug1\ninfo\n') # not even visible at level 9
+
+
+def test_assert_cwd_unchanged():
+
+    @assert_cwd_unchanged
+    def do_chdir():
+        os.chdir(os.pardir)
+
+    orig_dir = os.getcwd()
+    assert_raises(AssertionError, do_chdir)
+    eq_(orig_dir, os.getcwd(),
+        "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
