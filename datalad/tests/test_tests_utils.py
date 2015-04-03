@@ -13,9 +13,11 @@ from os.path import exists, join as opj, basename
 from glob import glob
 from mock import patch
 
-from .utils import eq_, ok_, with_tempfile, with_testrepos, with_tree, rmtemp, \
-                   OBSCURE_FILENAMES, get_most_obscure_supported_name, \
-                   swallow_outputs, swallow_logs, assert_false
+from .utils import eq_, ok_, ok_startswith, nok_startswith, assert_false, \
+    with_tempfile, with_testrepos, with_tree, \
+    rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
+    swallow_outputs, swallow_logs, \
+    on_windows
 
 #
 # Test with_tempfile, especially nested invocations
@@ -31,7 +33,7 @@ def test_with_tempfile_dir_via_env_variable():
     assert_false(os.path.exists(target), "directory %s already exists." % target)
     with patch.dict('os.environ', {'DATALAD_TESTS_TEMPDIR': target}):
         filename = _with_tempfile_decorated_dummy()
-        ok_(filename.startswith(target))
+        ok_startswith(filename, target)
 
 @with_tempfile
 @with_tempfile
@@ -101,14 +103,22 @@ def test_with_tempfile_prefix():
 
     @with_tempfile()
     def check_default_prefix(d1):
-        ok_(basename(d1).startswith('datalad_temp_'))
+        d = basename(d1)
+        short = 'datalad_temp_'
+        full = short + 'datalad.tests.test_tests_utils.check_default_prefix'
+        if on_windows:
+            ok_startswith(d, short)
+            ok_startswith(d, full)
+        else:
+            ok_startswith(d, full)
 
     @with_tempfile(prefix="nodatalad_")
     def check_specified_prefix(d1):
-        ok_(basename(d1).startswith('nodatalad_'))
+        ok_startswith(basename(d1), 'nodatalad_')
+        ok_('datalad.tests.test_tests_utils.check_default_prefix' not in d1)
 
-    check_default_prefix()
-    check_specified_prefix()
+    yield check_default_prefix
+    yield check_specified_prefix
 
 
 def test_get_most_obscure_supported_name():
