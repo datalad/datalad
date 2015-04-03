@@ -15,7 +15,7 @@ from functools import wraps
 from os.path import exists, join as opj
 
 from nose.tools import \
-    assert_equal, assert_raises, assert_greater, assert_false, \
+    assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_in as in_, \
     raises, ok_, eq_, make_decorator
 from nose import SkipTest
@@ -108,6 +108,15 @@ def ok_file_under_git(path, filename, annexed=False):
     repo = AnnexRepo(path)
     assert(filename in repo.get_indexed_files()) # file is known to Git
     assert(annexed == os.path.islink(opj(path, filename)))
+
+
+def ok_startswith(s, prefix):
+    ok_(s.startswith(prefix),
+        msg="String %r doesn't start with %r" % (s, prefix))
+
+def nok_startswith(s, prefix):
+    assert_false(s.startswith(prefix),
+        msg="String %r starts with %r" % (s, prefix))
 
 
 #
@@ -228,12 +237,10 @@ def with_tempfile(t, *targs, **tkwargs):
         tkwargs_ = tkwargs.copy()
 
         if len(targs)<2 and not 'prefix' in tkwargs_:
-            try:
-                tkwargs_['prefix'] = 'datalad_temp_%s.%s' \
-                                    % (func.__module__, func.func_name)
-            except:
-                # well -- if something wrong just proceed with defaults
-                pass
+            tkwargs_['prefix'] = \
+                'datalad_temp_' + \
+                ('' if on_windows \
+                    else '%s.%s' % (t.__module__, t.func_name))
 
         # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
         # let mktemp handle it otherwise. However, an explicitly provided
