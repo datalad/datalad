@@ -228,12 +228,8 @@ def with_tempfile(t, *targs, **tkwargs):
         tkwargs_ = tkwargs.copy()
 
         if len(targs)<2 and not 'prefix' in tkwargs_:
-            try:
-                tkwargs_['prefix'] = 'datalad_temp_%s.%s' \
-                                    % (func.__module__, func.func_name)
-            except:
-                # well -- if something wrong just proceed with defaults
-                pass
+            tkwargs_['prefix'] = 'datalad_temp_%s.%s' \
+                                % (t.__module__, t.func_name)
 
         # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
         # let mktemp handle it otherwise. However, an explicitly provided

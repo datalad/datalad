@@ -9,7 +9,7 @@
 
 import os, platform, sys
 
-from os.path import exists, join as opj
+from os.path import exists, join as opj, basename
 from glob import glob
 from mock import patch
 
@@ -95,6 +95,21 @@ def test_with_tempfile_mkdir():
     check_mkdir()
     if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
         ok_(not os.path.exists(dnames[0])) # got removed
+
+
+def test_with_tempfile_prefix():
+
+    @with_tempfile()
+    def check_default_prefix(d1):
+        ok_(basename(d1).startswith('datalad_temp_'))
+
+    @with_tempfile(prefix="nodatalad_")
+    def check_specified_prefix(d1):
+        ok_(basename(d1).startswith('nodatalad_'))
+
+    check_default_prefix()
+    check_specified_prefix()
+
 
 def test_get_most_obscure_supported_name():
     n = get_most_obscure_supported_name()
