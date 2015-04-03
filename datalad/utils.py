@@ -117,6 +117,50 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     rotree(path, ro=False, chmod_files=chmod_files)
     shutil.rmtree(path, *args, **kwargs)
 
+
+def is_symlink(file_, good=None):
+    """Check if file_ is a symlink
+
+    Parameters
+    ----------
+    good: None or bool, optional
+        Test not only that it is a symlink, but either it is a good symlink
+        (good=True) or broken (good=False) symlink.  So if good=False,
+        it would return True only if it is a symlink and it is broken.
+    """
+    try:
+        link = os.readlink(file_)
+    except OSError:
+        link = None
+
+    # TODO: copied from ok_symlink so may be we also want to check the path etc?
+    # path_ = realpath(file_)
+    # ok_(path_ != link)
+    # TODO anything else?
+
+    if good is None:
+        # nothing to do more:
+        return bool(link)
+    else:
+        return is_good_symlink(file_)
+
+
+def is_good_symlink(file_):
+    """Return if a file_ is a good symlink (assuming it is a symlink)
+    """
+    return exists(realpath(file_))
+
+
+def has_content(file_):
+    """Returns True if a file is not a broken symlink, and if it has content
+    """
+    if not on_windows:
+        if not is_symlink(file_, good=True):
+            return False
+    # verify it has content
+    return os.stat(realpath(file_)).st_size > 0
+
+
 #
 # Decorators
 #

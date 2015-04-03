@@ -11,6 +11,7 @@
 For further information on git-annex see https://git-annex.branchable.com/.
 
 """
+import os
 
 from os.path import join, exists
 import logging
@@ -19,6 +20,8 @@ from ConfigParser import NoOptionError
 
 from gitrepo import GitRepo
 from datalad.cmd import Runner as Runner
+
+from ..utils import has_content
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -145,3 +148,108 @@ class AnnexRepo(GitRepo):
             # which leads to: Runner doesn't have to return it at all.
             lgr.error('git annex get returned status: %s' % status)
             raise RuntimeError
+
+    def __too_complicated_traverse_for_content(self,
+                             do_empty=None,
+                             do_non_empty=None,
+                             do_full=None,
+                             initial=os.curdir,
+                             ):
+        """Traverse and perform actions depending on either given tree carries any content
+
+        """
+        # Ad-hoc recursive implementation could have been easier/more
+        # straightforward but lets try this way the os.walk provides.  There
+        # is also os.path.walk with does
+        prev_split = None
+        prev_level = 0
+        def handle_prev():
+
+        for root, dirs, files in os.walk(path):
+            root_split = os.path.split(root)
+            if prev_split is not None:
+                if len(prev_split) < len(root_split):
+                    # Went into a child
+                    # we visit parent first
+                    assert(len(prev_split)+1 == len(root_split))
+                    assert(prev_split == root_split[:-1])
+                    # we need to collect all the crap there
+                    type_ = child_deeper
+                elif len(prev_split) == len(root_split):
+                    # Must be a directory at the same level
+                    assert(prev_split[:-1] == root_split[:-1])
+                    type_ = child_same
+                else:
+                    # Could have went all the way up
+                    assert(prev_split[:-1] == root_split[:-1])
+                    # and we would need to handle at each level...
+                    # COMPLICATED!
+            for f in files:
+                fullf = opj(root, f)
+                # might be the "broken" symlink which would fail to stat etc
+                if exists(fullf):
+                    chmod(fullf)
+        xxx(root)
+
+
+    def traverse_for_content(path,
+                             do_none=None,
+                             do_any=None,
+                             do_all=None,
+                             # TODO: we might want some better function
+                             check=has_content
+                             ):
+        """Traverse and perform actions depending on either given tree carries any content
+
+        Note: do_some is judged at the level of a directory, i.e. children
+        directories are assessed only either they are full.
+
+        Returns
+        -------
+        None if initial == os.curdir, else either the directory is empty (True)
+        """
+        # Naive recursive implementation, still using os.walk though
+
+        # Get all elements of current directory
+        root, dirs, files = os.walk(path).next()
+        assert(root == path)
+
+        # TODO: I feel like in some cases we might want to stop descent earlier
+        # and not even bother with kids, but I could be wrong
+        status_dirs = [
+            self.traverse_for_content(do_none=do_none,
+                                      do_any=do_any,
+                                      do_all=do_all,
+                                      initial=os.path.join(root, d),
+                                      check=check)
+            for d in dirs
+        ]
+
+        # TODO: Theoretically we could sophisticate it. E.g. if only do_some
+        # or do_none defined and already we have some of status_dirs, no need
+        # to verify files. Also if some are not defined in dirs and we have
+        # only do_all -- no need to check files.  For now -- KISS
+
+        # Now verify all the files
+        status_files = [
+            check(os.path.join(root, f))
+            for f in files
+        ]
+
+        def some(i):
+            return any(i) and not all(i)
+
+        status_all = status_dirs + status_files
+
+        # TODO: may be there is a point to pass those files into do_
+        # callbacks -- add option  pass_files?
+        all_present = all(status_all)
+        if all_present:
+            if do_all: do_all(root)
+        elif any(status_all):
+            if do_any: do_any(root)
+        else:
+            if do_none: do_none(root)
+
+        return all_present
+
