@@ -99,26 +99,23 @@ def test_with_tempfile_mkdir():
         ok_(not os.path.exists(dnames[0])) # got removed
 
 
-def test_with_tempfile_prefix():
+@with_tempfile()
+def test_with_tempfile_default_prefix(d1):
+    d = basename(d1)
+    short = 'datalad_temp_'
+    full = short + \
+           'datalad.tests.test_tests_utils.test_with_tempfile_default_prefix'
+    if on_windows:
+        ok_startswith(d, short)
+        ok_startswith(d, full)
+    else:
+        ok_startswith(d, full)
 
-    @with_tempfile()
-    def check_default_prefix(d1):
-        d = basename(d1)
-        short = 'datalad_temp_'
-        full = short + 'datalad.tests.test_tests_utils.check_default_prefix'
-        if on_windows:
-            ok_startswith(d, short)
-            ok_startswith(d, full)
-        else:
-            ok_startswith(d, full)
 
-    @with_tempfile(prefix="nodatalad_")
-    def check_specified_prefix(d1):
-        ok_startswith(basename(d1), 'nodatalad_')
-        ok_('datalad.tests.test_tests_utils.check_default_prefix' not in d1)
-
-    yield check_default_prefix
-    yield check_specified_prefix
+@with_tempfile(prefix="nodatalad_")
+def test_with_tempfile_specified_prefix(d1):
+    ok_startswith(basename(d1), 'nodatalad_')
+    ok_('datalad.tests.test_tests_utils.test_with_tempfile_specified_prefix' not in d1)
 
 
 def test_get_most_obscure_supported_name():
