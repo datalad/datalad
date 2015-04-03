@@ -121,8 +121,8 @@ def test_basic_scenario(d, d2):
     ok_broken_symlink(opj(d2, 'a.tar.gz'))
     ok_broken_symlink(opj(d2, fn_extracted))
     annex(['get', fn_extracted], cwd=d2)
-    ok_broken_symlink(opj(d2, fn_extracted))
+    ok_good_symlink(opj(d2, fn_extracted))
     # as a result it would also fetch tarball
-    ok_broken_symlink(opj(d2, 'a.tar.gz'))
+    ok_good_symlink(opj(d2, 'a.tar.gz'))
 
     # TODO: dropurl, addurl without --relaxed, addurl to non-existing file
