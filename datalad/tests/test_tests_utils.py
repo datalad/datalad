@@ -107,7 +107,7 @@ def test_with_tempfile_default_prefix(d1):
            'datalad.tests.test_tests_utils.test_with_tempfile_default_prefix'
     if on_windows:
         ok_startswith(d, short)
-        ok_startswith(d, full)
+        nok_startswith(d, full)
     else:
         ok_startswith(d, full)
 
