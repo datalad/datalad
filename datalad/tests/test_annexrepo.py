@@ -19,7 +19,7 @@ from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, swallow_logs
+    on_windows, swallow_logs, swallow_outputs, in_
 
 
 @ignore_nose_capturing_stdout
@@ -78,7 +78,10 @@ def test_AnnexRepo_get(src, dst):
         # So, what to test? Just skip for now.
         # Actually, could test content!
 
-    ar.annex_get([testfile])
+    with swallow_outputs() as cm:
+        ar.annex_get([testfile])
+        in_(cm.out, '100%')
+
     f = open(testfile, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 
