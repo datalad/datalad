@@ -37,10 +37,9 @@ class ColorFormatter(logging.Formatter):
     def __init__(self, use_color=None, log_name=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
-            # and we are not on Windows.
-            use_color = is_interactive() and platform.system() != 'Windows'
-        self.use_color = use_color
-        msg = self.formatter_msg(self._get_format(log_name), use_color)
+            use_color = is_interactive()
+        self.use_color = use_color and platform.system() != 'Windows'  # don't use color on windows
+        msg = self.formatter_msg(self._get_format(log_name), self.use_color)
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False):

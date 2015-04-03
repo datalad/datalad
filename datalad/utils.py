@@ -27,7 +27,7 @@ try:
     on_debian_wheezy = platform.system() == 'Linux' \
                 and platform.linux_distribution()[0] == 'debian' \
                 and platform.linux_distribution()[1].startswith('7.')
-except:
+except:  # pragma: no cover
     on_debian_wheezy = False
 
 #

@@ -176,13 +176,14 @@ class Runner(object):
         Returns
         -------
         Status code as returned by the called command or `None` in case of dry-mode.
+        
+        (stdout, stderr)
+           if return_output=True
 
         Raises
         ------
         RunTimeError
            if command's exitcode wasn't 0 or None
-        (stdout, stderr)
-           if return_output=True
         """
 
         outputstream = subprocess.PIPE if log_stdout else sys.stdout

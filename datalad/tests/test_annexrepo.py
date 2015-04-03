@@ -14,7 +14,7 @@ Note: There's not a lot to test by now.
 
 import os, platform
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
 from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
@@ -81,3 +81,31 @@ def test_AnnexRepo_get(src, dst):
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 
     os.chdir(cwd)
+
+
+@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+def test_AnnexRepo_is_direct_mode(path):
+
+    dm = AnnexRepo(path).is_direct_mode()
+    if on_windows:
+        assert_true(dm, "AnnexRepo.is_direct_mode() returned false on windows.")
+    else:
+        assert_false(dm, "AnnexRepo.is_direct_mode() returned true on non-windows")
+    #TODO: Are there more platforms leading to direct mode?
+    #Better check for filesystem instead of platform?
+
+
+@with_testrepos
+@with_tempfile
+def test_AnnexRepo_set_direct_mode(src, dst):
+
+    ar = AnnexRepo(dst, src)
+    ar.set_direct_mode(True)
+    assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
+    if on_windows:
+        assert_raises(RuntimeError, ar.set_direct_mode, False)
+        assert_true(ar.is_direct_mode())
+    else:
+        ar.set_direct_mode(False)
+        assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
+    #TODO: see above (test_AnnexRepo_is_direct_mode). Check for filesystem seems to be more accurate.
