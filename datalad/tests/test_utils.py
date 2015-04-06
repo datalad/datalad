@@ -12,10 +12,10 @@
 
 import os, shutil
 from os.path import join as opj
-from ..utils import rotree
+from ..utils import rotree, rm_empties, lsrecurse
 
 from nose.tools import ok_, eq_, assert_false, assert_raises
-from .utils import with_tempfile, traverse_for_content, with_tree
+from .utils import with_tempfile, traverse_for_content, with_tree, ok_startswith
 
 
 @with_tempfile(mkdir=True)
@@ -39,7 +39,7 @@ def test_rotree(d):
 
 @with_tree([
     ('loaded.txt', 'abracadabra'),
-    ('empty.ascii', ''),
+    ('empty.txt', ''),
     ('d1', (
         ('loaded2.txt', '1 f load'),
         ('d2',
@@ -47,11 +47,14 @@ def test_rotree(d):
              )),
         )),
     ('d3', (
-        ('empty.txt', ''),
+        ('empty', ''),
         ('d2',
             (('empty', ''),
              )),
-        ))
+        )),
+    ('d4', (
+        ('loaded3', 'load'),
+        )),
     ])
 def test_traverse_for_content(d):
     # shouldn't blow if just ran without any callables and say that there is some load
@@ -61,18 +64,20 @@ def test_traverse_for_content(d):
     eq_(traverse_for_content(opj(d, 'd3')), False)
     # but not upstairs for d1 since of loaded2.txt
     ok_(traverse_for_content(opj(d, 'd1')))
+    ok_(traverse_for_content(opj(d, 'd4')))
 
+    #
     # Verify that it seems to be calling callbacks appropriately
+    #
     def cb_dummy_noargs(d):
         ok_(d is not None)
-        pass
+
     def cb_dummy_kwargs(d, empty_files=None, empty_dirs=None):
         ok_(d is not None)
         ok_(isinstance(empty_files, list))
         ok_(isinstance(empty_dirs, list))
         for f in empty_files:
-            ok_(f.startswith('empty'))
-        pass
+            ok_startswith(f, 'empty')
 
     ok_(traverse_for_content(d,
                              do_all=cb_dummy_noargs,
@@ -84,3 +89,78 @@ def test_traverse_for_content(d):
                              do_none=cb_dummy_kwargs,
                              do_any=cb_dummy_kwargs,
                              pass_files=True))
+
+    # more thorough tests
+    def cb_any(d_, empty_files=None, empty_dirs=None):
+        ok_(d_ is not None)
+        if d_ == d:
+            eq_(empty_files, ['empty.txt'])
+            eq_(empty_dirs, ['d3'])
+        elif d_ == opj(d, 'd1'):
+            # indeed we have empty d2 but loaded.txt
+            eq_(empty_files, [])
+            eq_(empty_dirs, ['d2'])
+        else:
+            raise ValueError("Must not be called for %d" % d_)
+
+    def cb_all(d_, empty_files=None, empty_dirs=None):
+        ok_(d_ is not None)
+        if d_ == opj(d, 'd4'):
+            eq_(empty_files, [])
+            eq_(empty_dirs, [])
+        else:
+            raise ValueError("Must not be called for %s" % d_)
+
+    def cb_none(d_, empty_files=None, empty_dirs=None):
+        ok_(d_ is not None)
+        if d_ in (opj(d, 'd1', 'd2'), opj(d, 'd3', 'd2')):
+            eq_(empty_files, ['empty'])
+            eq_(empty_dirs, [])
+        elif d_ == opj(d, 'd3'):
+            eq_(empty_files, ['empty'])
+            eq_(empty_dirs, ['d2'])
+        else:
+            raise ValueError("Must not be called for %s" % d_)
+
+    ok_(traverse_for_content(d,
+                             do_all=cb_all,
+                             do_none=cb_none,
+                             do_any=cb_any,
+                             pass_files=True))
+
+
+    # And now let's do some desired action -- clean it up!
+    ok_(traverse_for_content(d,
+                             do_none=rm_empties,
+                             do_any=rm_empties,
+                             pass_files=True))
+    # And check what is left
+    eq_(lsrecurse(d),
+        ['d1', 'd1/loaded2.txt', 'd4', 'd4/loaded3', 'loaded.txt'])
+
+
+@with_tree([
+    ('empty.txt', ''),
+    ('d1', (
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d3', (
+        ('empty', ''),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d4', (
+        ('empty', ''),
+        )),
+    ])
+def test_traverse_for_content_fully_empty(d):
+    # And now let's do some desired action -- clean it up!
+    ok_(not traverse_for_content(d,
+                             do_none=rm_empties,
+                             do_any=rm_empties,
+                             pass_files=True))
+    # And check that nothing is left behind
+    eq_(lsrecurse(d), [])

@@ -150,6 +150,22 @@ def is_good_symlink(file_):
     """
     return exists(realpath(file_))
 
+def lsrecurse(path, files_only=False, relative=True):
+    """Recurse into the directory and return all found files (and dirs if dirs)
+    """
+    out = []
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            out.append(opj(root, f))
+        if not files_only:
+            for d in dirs:
+                out.append(opj(root, d))
+    out = sorted(out)
+    if relative:
+        beg = len(path) + len(os.pathsep)
+        return [o[beg:] for o in out]
+    else:
+        return out
 
 def has_content(file_):
     """Returns True if a file is not a broken symlink, and if it has content
@@ -159,6 +175,17 @@ def has_content(file_):
             return False
     # verify it has content
     return os.stat(realpath(file_)).st_size > 0
+
+
+def rm_empties(p, empty_files=None, empty_dirs=None):
+    """Callback for traverse_for_content to be used for do_any, do_none
+
+    To prune empty content
+    """
+    for d in empty_dirs:
+        rmtree(opj(p, d))
+    for f in empty_files:
+        os.unlink(opj(p, f))
 
 
 def traverse_for_content(path,
