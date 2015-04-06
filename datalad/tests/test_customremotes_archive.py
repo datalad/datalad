@@ -9,7 +9,6 @@
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
 import shlex
-from os import readlink
 from os.path import realpath, pardir, join as opj, dirname, pathsep
 from ..customremotes.base import AnnexExchangeProtocol
 from ..customremotes.archive import AnnexArchiveCustomRemote
