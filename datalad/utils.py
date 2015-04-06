@@ -150,7 +150,7 @@ def is_good_symlink(file_):
     """
     return exists(realpath(file_))
 
-def lsrecurse(path, files_only=False, relative=True):
+def ls_tree(path, files_only=False, relative=True):
     """Recurse into the directory and return all found files (and dirs if dirs)
     """
     out = []

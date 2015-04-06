@@ -12,7 +12,7 @@
 
 import os, shutil
 from os.path import join as opj
-from ..utils import rotree, rm_empties, lsrecurse
+from ..utils import rotree, rm_empties, ls_tree
 
 from nose.tools import ok_, eq_, assert_false, assert_raises
 from .utils import with_tempfile, traverse_for_content, with_tree, ok_startswith
@@ -135,8 +135,8 @@ def test_traverse_for_content(d):
                              do_any=rm_empties,
                              pass_files=True))
     # And check what is left
-    eq_(lsrecurse(d),
-        ['d1', 'd1/loaded2.txt', 'd4', 'd4/loaded3', 'loaded.txt'])
+    eq_(ls_tree(d),
+        ['d1', opj('d1', 'loaded2.txt'), 'd4', opj('d4', 'loaded3'), 'loaded.txt'])
 
 
 @with_tree([
@@ -163,4 +163,4 @@ def test_traverse_for_content_fully_empty(d):
                              do_any=rm_empties,
                              pass_files=True))
     # And check that nothing is left behind
-    eq_(lsrecurse(d), [])
+    eq_(ls_tree(d), [])
