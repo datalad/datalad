@@ -17,7 +17,7 @@ from .utils import eq_, ok_, ok_startswith, nok_startswith, assert_false, \
     with_tempfile, with_testrepos, with_tree, \
     rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
-    on_windows
+    on_windows, assert_raises
 
 #
 # Test with_tempfile, especially nested invocations
@@ -107,7 +107,7 @@ def test_with_tempfile_default_prefix(d1):
            'datalad.tests.test_tests_utils.test_with_tempfile_default_prefix'
     if on_windows:
         ok_startswith(d, short)
-        ok_startswith(d, full)
+        nok_startswith(d, full)
     else:
         ok_startswith(d, full)
 
@@ -168,3 +168,18 @@ def test_swallow_logs():
         eq_(cm.out, 'debug1\n') # not even visible at level 9
         lgr.info("info")
         eq_(cm.out, 'debug1\ninfo\n') # not even visible at level 9
+
+def test_ok_startswith():
+    ok_startswith('abc', 'abc')
+    ok_startswith('abc', 'a')
+    ok_startswith('abc', '')
+    ok_startswith(' abc', ' ')
+    ok_startswith('abc\r\n', 'a') # no effect from \r\n etc
+    assert_raises(AssertionError, ok_startswith, 'abc', 'b')
+    assert_raises(AssertionError, ok_startswith, 'abc', 'abcd')
+
+def test_nok_startswith():
+    nok_startswith('abc', 'bc')
+    nok_startswith('abc', 'c')
+    assert_raises(AssertionError, nok_startswith, 'abc', 'a')
+    assert_raises(AssertionError, nok_startswith, 'abc', 'abc')

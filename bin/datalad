@@ -33,4 +33,3 @@ if __name__ == '__main__':
         main(backend=callname[len(annex_special_remote_prefix):])
     else:
         raise RuntimeError("I don't know how to behave as %s" % callname)
-
