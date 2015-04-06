@@ -13,7 +13,7 @@ import tempfile
 import platform
 
 from functools import wraps
-from os.path import exists, join as opj
+from os.path import exists, join as opj, realpath
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -160,6 +160,94 @@ def has_content(file_):
     # verify it has content
     return os.stat(realpath(file_)).st_size > 0
 
+
+def traverse_for_content(path,
+                         do_none=None,
+                         do_any=None,
+                         do_all=None,
+                         # TODO: we might want some better function
+                         check=has_content,
+                         pass_files=False,
+                         ):
+    """Traverse and perform actions depending on either given tree carries any content
+
+    Note: do_some is judged at the level of a directory, i.e. children
+    directories are assessed only either they are full.
+
+    Parameters
+    ----------
+    do_none, do_any, do_all: callable, optional
+        Callback to use for each traversed directory in case it has None, any,
+        or all files (in that directory, or under) present with the content.
+        Those callbacks should have following arguments
+           path: string
+             path to the directory
+           empty_files, empty_dirs: list, optional
+             list of empty files, directories found present in the path.
+             Passed only if pass_files=True
+    check: callable, optional
+        Given the path (to a file) returns judgement either file considered
+        empty or not
+    pass_files: bool, optional
+        Either to pass empty_files, empty_dirs into do_* callables
+
+    Returns
+    -------
+    None if initial == os.curdir, else either the directory has content (True)
+    or empty (False)
+    """
+    # Naive recursive implementation, still using os.walk though
+
+    # Get all elements of current directory
+    root, dirs, files = os.walk(path).next()
+    assert(root == path)
+
+    # TODO: I feel like in some cases we might want to stop descent earlier
+    # and not even bother with kids, but I could be wrong
+    status_dirs = [
+        traverse_for_content(os.path.join(root, d),
+                             do_none=do_none,
+                             do_any=do_any,
+                             do_all=do_all,
+                             pass_files=pass_files,
+                             check=check)
+        for d in dirs
+    ]
+
+    # TODO: Theoretically we could sophisticate it. E.g. if only do_some
+    # or do_none defined and already we have some of status_dirs, no need
+    # to verify files. Also if some are not defined in dirs and we have
+    # only do_all -- no need to check files.  For now -- KISS
+
+    # Now verify all the files
+    status_files = [
+        check(os.path.join(root, f))
+        for f in files
+    ]
+
+    status_all = status_dirs + status_files
+
+    # TODO: may be there is a point to pass those files into do_
+    # callbacks -- add option  pass_files?
+    all_present = all(status_all)
+    any_present = any(status_all)
+    if pass_files:
+        kw = {'empty_dirs': [d for d, c in zip(dirs, status_dirs) if not c],
+              'empty_files': [f for f, c in zip(files, status_files) if not c],
+              }
+    else:
+        kw = {}
+    if all_present:
+        if do_all:
+            do_all(root, **kw)
+    elif any_present:
+        if do_any:
+            do_any(root, **kw)
+    else:
+        if do_none:
+            do_none(root, **kw)
+
+    return any_present
 
 #
 # Decorators
