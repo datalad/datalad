@@ -203,3 +203,20 @@ def test_AnnexRepo_file_has_content(src, annex_path):
     assert_false(ar.file_has_content("test-annex.dat"))
     ar.annex_get(["test-annex.dat"])
     assert_true(ar.file_has_content("test-annex.dat"))
+
+
+@with_tempfile
+def test_AnnexRepo_check_path(annex_path):
+
+    ar = AnnexRepo(annex_path)
+    result = ar._check_path("testfile")
+    assert_equal(result, "testfile", "_check_path() returned %s" % result)
+    result = ar._check_path("./testfile")
+    assert_equal(result, "testfile", "_check_path() returned %s" % result)
+    result = ar._check_path("testdir/../testfile")
+    assert_equal(result, "testfile", "_check_path() returned %s" % result)
+    result = ar._check_path("testdir/testfile")
+    assert_equal(result, "testdir/testfile", "_check_path() returned %s" % result)
+    result = ar._check_path(os.path.join(annex_path, "testfile"))
+    assert_equal(result, "testfile", "_check_path() returned %s" % result)
+    assert_raises(FileNotInAnnexError, ar._check_path, os.getcwd())

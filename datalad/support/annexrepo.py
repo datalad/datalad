@@ -12,7 +12,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
-from os.path import join, exists
+from os.path import join, exists, normpath, isabs
 import logging
 
 from ConfigParser import NoOptionError
@@ -309,3 +309,22 @@ class AnnexRepo(GitRepo):
             is_present = output[0].split()[0] == path
 
         return is_present
+
+    def _check_path(self, path):
+        """Helper to check paths passed to methods of this class.
+
+        TODO: This may go into a decorator or sth. like that and then should work on a list.
+        But: Think about behaviour if only some of the list's items are invalid.
+
+        Checks whether `path` is inside repository and normalize it. Additionally absolute paths are converted into
+        relative paths with respect to AnnexRepo's base dir.
+        """
+
+        import os.path
+        if os.path.isabs(path):
+            if os.path.commonprefix([path, self.path]) == self.path:
+                path = os.path.relpath(path, start=self.path)
+            else:
+                raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
+
+        return normpath(path)
