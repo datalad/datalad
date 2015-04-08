@@ -194,11 +194,10 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     os.chdir(cwd)
 
 
-@with_testrepos(flavors=local_flavors)
-@with_tempfile
-def test_AnnexRepo_file_has_content(src, annex_path):
+@with_testrepos(flavors='network-clone')
+def test_AnnexRepo_file_has_content(annex_path):
 
-    ar = AnnexRepo(annex_path, src)
+    ar = AnnexRepo(annex_path)
 
     assert_false(ar.file_has_content("test-annex.dat"))
     ar.annex_get(["test-annex.dat"])
