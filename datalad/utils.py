@@ -189,10 +189,9 @@ def rm_empties(p, empty_files=None, empty_dirs=None):
 
 
 def traverse_for_content(path,
-                         do_any=None,
-                         do_all=None,
-                         do_some=None,
                          do_none=None,
+                         do_some=None,
+                         do_all=None,
                          # TODO: we might want some better function
                          check=has_content,
                          pass_files=False,
@@ -204,7 +203,7 @@ def traverse_for_content(path,
 
     Parameters
     ----------
-    do_any, do_all, do_some, do_none: callable, optional
+    do_none, do_some, do_all: callable, optional
         Callback to use for each traversed directory in case it has None, any,
         or all files (in that directory, or under) present with the content.
         Those callbacks should have following arguments
@@ -224,11 +223,6 @@ def traverse_for_content(path,
     None if initial == os.curdir, else either the directory has content (True)
     or empty (False)
     """
-
-    if do_any:
-        if do_all or do_some:
-            raise ValueError("Either specify do_any or one/both of do_all, do_some")
-
     # Naive recursive implementation, still using os.walk though
 
     # Get all elements of current directory
@@ -239,10 +233,9 @@ def traverse_for_content(path,
     # and not even bother with kids, but I could be wrong
     status_dirs = [
         traverse_for_content(os.path.join(root, d),
-                             do_any=do_any,
-                             do_all=do_all,
-                             do_some=do_some,
                              do_none=do_none,
+                             do_some=do_some,
+                             do_all=do_all,
                              pass_files=pass_files,
                              check=check)
         for d in dirs
@@ -271,26 +264,15 @@ def traverse_for_content(path,
               }
     else:
         kw = {}
-
-    if do_any:
-        # special case -- if do_any specified
-        assert(not do_some)
-        assert(not do_all)
-        if any_present:
-            do_any(root, **kw)
-        elif do_none:
-            do_none(root, **kw)
+    if all_present:
+        if do_all:
+            do_all(root, **kw)
+    elif any_present:
+        if do_some:
+            do_some(root, **kw)
     else:
-        # full dance
-        if all_present:
-            if do_all:
-                do_all(root, **kw)
-        elif any_present:
-            if do_some:
-                do_some(root, **kw)
-        else:
-            if do_none:
-                do_none(root, **kw)
+        if do_none:
+            do_none(root, **kw)
 
     return any_present
 
