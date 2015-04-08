@@ -388,23 +388,40 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     return newfunc
 with_testrepos.__test__ = False
 
-def assert_cwd_unchanged(func):
+
+@optional_args
+def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
 
     """
 
-    @make_decorator(func)
+    @wraps(func)
     def newfunc(*args, **kwargs):
         cwd_before = os.getcwd()
-        func(*args, **kwargs)
-        cwd_after = os.getcwd()
+        exc_info = None
+        try:
+            func(*args, **kwargs)
+        except:
+            exc_info = sys.exc_info()
+        finally:
+            cwd_after = os.getcwd()
+
         if cwd_after != cwd_before:
-            lgr.warning(
-                "%s changed cwd to %s. Mitigating and changing back to %s"
-                % (func, cwd_after, cwd_before))
             os.chdir(cwd_before)
-            assert_equal(cwd_before, cwd_after,
-                         "CWD changed from %s to %s" % (cwd_before, cwd_after))
+            if not ok_to_chdir:
+                lgr.warning(
+                    "%s changed cwd to %s. Mitigating and changing back to %s"
+                    % (func, cwd_after, cwd_before))
+                # If there was already exception raised, we better re-raise
+                # that one since it must be more important, so not masking it
+                # here with our assertion
+                if exc_info is None:
+                    assert_equal(cwd_before, cwd_after,
+                                 "CWD changed from %s to %s" % (cwd_before, cwd_after))
+
+        if exc_info is not None:
+            raise exc_info[0], exc_info[1], exc_info[2]
+
 
     return newfunc
 
