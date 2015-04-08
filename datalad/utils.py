@@ -178,7 +178,7 @@ def has_content(file_):
 
 
 def rm_empties(p, empty_files=None, empty_dirs=None):
-    """Callback for traverse_for_content to be used for do_any, do_none
+    """Callback for traverse_for_content to be used for do_some, do_none
 
     To prune empty content
     """
@@ -190,7 +190,7 @@ def rm_empties(p, empty_files=None, empty_dirs=None):
 
 def traverse_for_content(path,
                          do_none=None,
-                         do_any=None,
+                         do_some=None,
                          do_all=None,
                          # TODO: we might want some better function
                          check=has_content,
@@ -203,7 +203,7 @@ def traverse_for_content(path,
 
     Parameters
     ----------
-    do_none, do_any, do_all: callable, optional
+    do_none, do_some, do_all: callable, optional
         Callback to use for each traversed directory in case it has None, any,
         or all files (in that directory, or under) present with the content.
         Those callbacks should have following arguments
@@ -234,7 +234,7 @@ def traverse_for_content(path,
     status_dirs = [
         traverse_for_content(os.path.join(root, d),
                              do_none=do_none,
-                             do_any=do_any,
+                             do_some=do_some,
                              do_all=do_all,
                              pass_files=pass_files,
                              check=check)
@@ -268,8 +268,8 @@ def traverse_for_content(path,
         if do_all:
             do_all(root, **kw)
     elif any_present:
-        if do_any:
-            do_any(root, **kw)
+        if do_some:
+            do_some(root, **kw)
     else:
         if do_none:
             do_none(root, **kw)

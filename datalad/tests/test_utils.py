@@ -82,12 +82,12 @@ def test_traverse_for_content(d):
     ok_(traverse_for_content(d,
                              do_all=cb_dummy_noargs,
                              do_none=cb_dummy_noargs,
-                             do_any=cb_dummy_noargs))
+                             do_some=cb_dummy_noargs))
 
     ok_(traverse_for_content(d,
                              do_all=cb_dummy_kwargs,
                              do_none=cb_dummy_kwargs,
-                             do_any=cb_dummy_kwargs,
+                             do_some=cb_dummy_kwargs,
                              pass_files=True))
 
     # more thorough tests
@@ -125,14 +125,14 @@ def test_traverse_for_content(d):
     ok_(traverse_for_content(d,
                              do_all=cb_all,
                              do_none=cb_none,
-                             do_any=cb_any,
+                             do_some=cb_any,
                              pass_files=True))
 
 
     # And now let's do some desired action -- clean it up!
     ok_(traverse_for_content(d,
                              do_none=rm_empties,
-                             do_any=rm_empties,
+                             do_some=rm_empties,
                              pass_files=True))
     # And check what is left
     eq_(ls_tree(d),
@@ -160,7 +160,7 @@ def test_traverse_for_content_fully_empty(d):
     # And now let's do some desired action -- clean it up!
     ok_(not traverse_for_content(d,
                              do_none=rm_empties,
-                             do_any=rm_empties,
+                             do_some=rm_empties,
                              pass_files=True))
     # And check that nothing is left behind
     eq_(ls_tree(d), [])
