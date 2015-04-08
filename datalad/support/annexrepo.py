@@ -242,16 +242,19 @@ class AnnexRepo(GitRepo):
         Parameters:
         -----------
         path_to_file: str
-            file to look up
+            file to look up; have to be a path relative to repo's base dir
 
         Returns:
         --------
         key: str
-
+            key used by git-annex for `path_to_file`
         """
 
         cmd_list = ['git', 'annex', 'lookupkey']
         cmd_list.extend([path_to_file])
+        # TODO: For now this means, path_to_file has to be a string,
+        # containing a single path. In oppposition to git annex lookupkey itself,
+        # which can look up several files at once.
 
         cmd_str = ' '.join(cmd_list)  # have a string for messages
 
@@ -279,3 +282,30 @@ class AnnexRepo(GitRepo):
         key = output[0].split()[0]
 
         return key
+
+    def file_has_content(self, path):
+        """ Check whether the file `path` is present with its content.
+
+        Parameters:
+        -----------
+        path: str
+
+        """
+
+        # TODO: Also provide option to look for key instead of path
+
+        cmd_list = ['git', 'annex', 'find']
+        cmd_list.extend([path])
+
+        try:
+            status, output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
+            # TODO: Proper exception/exitcode handling after that topic is reworked in Runner-class
+        except RuntimeError, e:
+            status = 1
+
+        if status not in [0, None] or output[0] == '':
+            is_present = False
+        else:
+            is_present = output[0].split()[0] == path
+
+        return is_present

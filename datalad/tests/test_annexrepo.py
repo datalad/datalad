@@ -192,3 +192,14 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
     os.chdir(cwd)
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_file_has_content(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+
+    assert_false(ar.file_has_content("test-annex.dat"))
+    ar.annex_get(["test-annex.dat"])
+    assert_true(ar.file_has_content("test-annex.dat"))
