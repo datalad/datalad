@@ -13,11 +13,11 @@ from os.path import exists, join as opj, basename
 from glob import glob
 from mock import patch
 
-from .utils import eq_, ok_, ok_startswith, nok_startswith, assert_false, \
+from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
     rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
-    on_windows, assert_raises
+    on_windows, assert_raises, assert_equal, assert_cwd_unchanged
 
 #
 # Test with_tempfile, especially nested invocations
@@ -183,3 +183,14 @@ def test_nok_startswith():
     nok_startswith('abc', 'c')
     assert_raises(AssertionError, nok_startswith, 'abc', 'a')
     assert_raises(AssertionError, nok_startswith, 'abc', 'abc')
+
+def test_assert_cwd_unchanged():
+
+    @assert_cwd_unchanged
+    def do_chdir():
+        os.chdir(os.pardir)
+
+    orig_dir = os.getcwd()
+    assert_raises(AssertionError, do_chdir)
+    eq_(orig_dir, os.getcwd(),
+        "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
