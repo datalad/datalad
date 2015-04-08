@@ -27,8 +27,14 @@ lgr = logging.getLogger('datalad.annex')
 class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
 
-    """
 
+    Paths given to any of the class methods will be interpreted as relative to Repo's dir if they're relative paths.
+    Absolute paths should also be accepted.
+    """
+    # TODO: Check exceptions for the latter and find a workaround. For example: git annex lookupkey doesn't accept
+    # absolute paths. So, build relative paths from absolute ones and may be include checking whether or not they
+    # result in a path inside the repo.
+    # git annex proxy will need additional work regarding paths.
     def __init__(self, path, url=None, runner=None, direct=False):
         """Creates representation of git-annex repository at `path`.
 
@@ -171,7 +177,8 @@ class AnnexRepo(GitRepo):
 
 
         #don't capture stderr, since it provides progress display
-        status = self.cmd_call_wrapper.run(cmd_str, log_stdout=True, log_stderr=False, log_online=True, expect_stderr=False)
+        status = self.cmd_call_wrapper.run(cmd_str, log_stdout=True, log_stderr=False, log_online=True,
+                                           expect_stderr=False, cwd=self.path)
 
         if status not in [0, None]:
             # TODO: Actually this doesn't make sense. Runner raises exception in this case,
@@ -199,7 +206,7 @@ class AnnexRepo(GitRepo):
         cmd_str = 'git annex add %s' % paths
 
 
-        status = self.cmd_call_wrapper.run(cmd_str, shell=True)
+        status = self.cmd_call_wrapper.run(cmd_str, shell=True, cwd=self.path)
 
         if status not in [0, None]:
             lgr.error("git annex add returned status: %s" % status)
@@ -255,7 +262,7 @@ class AnnexRepo(GitRepo):
         cmd_str = "git annex lookupkey %s" % path_to_file
 
         try:
-            status, output = self.cmd_call_wrapper.run(cmd_str, shell=True, return_output=True)
+            status, output = self.cmd_call_wrapper.run(cmd_str, shell=True, return_output=True, cwd=self.path)
         except RuntimeError, e:
             if e.message.find("Failed to run '%s'" % cmd_str) > -1 and e.message.find("Exit code=1") > -1:
                 # if annex command fails we don't get the status directly
