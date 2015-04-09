@@ -70,7 +70,7 @@ class AnnexRepo(GitRepo):
         #       fine grained.
 
         # Check whether an annex already exists at destination
-        if not exists(join(self.path, '.git', 'annex')):
+        if not exists(p_join(self.path, '.git', 'annex')):
             lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
             self._annex_init()
 
