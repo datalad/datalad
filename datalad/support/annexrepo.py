@@ -29,8 +29,9 @@ class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
 
 
-    Paths given to any of the class methods will be interpreted as relative to Repo's dir if they're relative paths.
-    Absolute paths should also be accepted.
+    Paths given to any of the class methods will be interpreted as relative to os.getcwd() in case this is currently beneath
+    AnnexRepo's base dir (`self.path`). If os.getcwd() is outside of the repository, relative paths will be interpreted as
+    relative to `self.path`. Absolute paths will be accepted either way.
     """
     # TODO: Check exceptions for the latter and find a workaround. For example: git annex lookupkey doesn't accept
     # absolute paths. So, build relative paths from absolute ones and may be include checking whether or not they
