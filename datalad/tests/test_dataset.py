@@ -81,20 +81,16 @@ def test_Dataset_get(src, dst):
 
     ds = Dataset(dst, src)
     assert_is_instance(ds, Dataset, "AnnexRepo was not created.")
-
-    cwd = os.getcwd()
-    os.chdir(dst)
     testfile = 'test-annex.dat'
+    testfile_abs = os.path.join(dst, testfile)
     if platform.system() != "Windows":
-        assert_raises(IOError, open, testfile, 'r')
+        assert_raises(IOError, open, testfile_abs, 'r')
         # If get has nothing to do, we can't test it.
         # TODO: see test_AnnexRepo_get()
 
     ds.get([testfile])
-    f = open(testfile, 'r')
+    f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
-
-    os.chdir(cwd)
 
 
 @assert_cwd_unchanged
@@ -108,10 +104,7 @@ def test_Dataset_add_to_annex(src, dst):
     f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
-    cwd = os.getcwd()
-    os.chdir(dst)
     ds.add_to_annex([filename])
-    os.chdir(cwd)
 
     if not ds.is_direct_mode():
         assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
@@ -138,16 +131,12 @@ def test_Dataset__add_to_git(src, dst):
     f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
-    cwd = os.getcwd()
-    os.chdir(dst)
-
     ds.add_to_git([filename_abs])
 
     if ds.is_direct_mode():
         ok_clean_git_annex_proxy(dst)
     else:
         ok_clean_git(dst, annex=False)
-    os.chdir(cwd)
 
 
 @assert_cwd_unchanged
@@ -160,8 +149,6 @@ def test_Dataset_commit(src, path):
     f = open(filename, 'w')
     f.write("File to add to git")
     f.close()
-    cwd = os.getcwd()
-    os.chdir(path)
     ds.annex_add([filename])
 
     if ds.is_direct_mode():
@@ -175,4 +162,3 @@ def test_Dataset_commit(src, path):
         ok_clean_git_annex_proxy(path)
     else:
         ok_clean_git(path, annex=True)
-    os.chdir(cwd)

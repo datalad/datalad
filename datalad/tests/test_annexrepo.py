@@ -75,12 +75,10 @@ def test_AnnexRepo_get(src, dst):
 
     ar = AnnexRepo(dst, src)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
-
-    cwd = os.getcwd()
-    os.chdir(dst)
     testfile = 'test-annex.dat'
+    testfile_abs = os.path.join(dst, testfile)
     if platform.system() != "Windows":
-        assert_raises(IOError, open, testfile, 'r')
+        assert_raises(IOError, open, testfile_abs, 'r')
         # If get has nothing to do, we can't test it.
         # TODO: on crippled filesystem, the file is actually present before getting!
         # So, what to test? Just skip for now.
@@ -90,10 +88,8 @@ def test_AnnexRepo_get(src, dst):
         ar.annex_get([testfile])
         in_(cm.out, '100%')
 
-    f = open(testfile, 'r')
+    f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
-
-    os.chdir(cwd)
 
 
 @assert_cwd_unchanged
@@ -147,22 +143,19 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 def test_AnnexRepo_annex_add(src, annex_path):
 
     ar = AnnexRepo(annex_path, src)
-    cwd = os.getcwd()
-    os.chdir(annex_path)
 
     filename = 'file_to_annex.dat'
-    f = open(filename, 'w')
+    filename_abs = os.path.join(annex_path, filename)
+    f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
     ar.annex_add([filename])
     if not ar.is_direct_mode():
-        assert_true(os.path.islink(filename), "Annexed file is not a link.")
+        assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
     else:
-        assert_false(os.path.islink(filename), "Annexed file is link in direct mode.")
+        assert_false(os.path.islink(filename_abs), "Annexed file is link in direct mode.")
         # TODO: How to test the file was added in direct mode?
         # May be this will need 'git annex find' or sth. to be implemented.
-
-    os.chdir(cwd)
 
 
 @assert_cwd_unchanged
@@ -181,8 +174,6 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 def test_AnnexRepo_get_file_key(src, annex_path):
 
     ar = AnnexRepo(annex_path, src)
-    cwd = os.getcwd()
-    os.chdir(annex_path)
 
     # test-annex.dat should return the correct key:
     assert_equal(ar.get_file_key("test-annex.dat"), 'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat')
@@ -195,8 +186,6 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
     # filenotpresent.wtf doesn't even exist
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
-
-    os.chdir(cwd)
 
 
 @with_testrepos(flavors=local_flavors)

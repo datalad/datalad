@@ -270,7 +270,7 @@ class AnnexRepo(GitRepo):
                 # nor does git-annex propagate IOError (file not found) or sth.
                 # So, we have to find out:
 
-                f = open(path, 'r')  # raise possible IOErrors
+                f = open(p_join(self.path, path), 'r')  # raise possible IOErrors
                 f.close()
 
                 # if we got here, the file is present and accessible, but not in the annex
