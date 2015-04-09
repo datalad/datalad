@@ -98,7 +98,7 @@ def ok_clean_git_annex_proxy(path):
     try:
         out = ar.annex_proxy("git status")
     except RuntimeError, e:
-        if e.message.find("Failed to run 'git annex proxy") > -1:
+        if "Failed to run 'git annex proxy" in e.message:
             # This actually isn't a good way to detect "git annex proxy" is not available
             # Would need to have a look at stderr, which is either logged or printed by now.
             # TODO: provide logHandler, which gives access to recent Records or return stderr
@@ -110,8 +110,7 @@ def ok_clean_git_annex_proxy(path):
     finally:
         os.chdir(cwd)
 
-    assert_true(out.__str__().find("nothing to commit, working directory clean") > -1,\
-                "git status output via proxy not plausible.")
+    assert_in("nothing to commit, working directory clean", str(out), "git status output via proxy not plausible.")
 
 
 

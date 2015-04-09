@@ -265,6 +265,7 @@ class AnnexRepo(GitRepo):
         try:
             status, output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
         except RuntimeError, e:
+            # TODO: This has to be changed, due to PR #103, anyway.
             if e.message.find("Failed to run %s" % cmd_list) > -1 and e.message.find("Exit code=1") > -1:
                 # if annex command fails we don't get the status directly
                 # nor does git-annex propagate IOError (file not found) or sth.

@@ -101,9 +101,8 @@ def test_Dataset_add_to_annex(src, dst):
     ds = Dataset(dst, src)
     filename = 'file_to_annex.dat'
     filename_abs = os.path.join(dst, filename)
-    f = open(filename_abs, 'w')
-    f.write("What to write?")
-    f.close()
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
     ds.add_to_annex([filename])
 
     if not ds.is_direct_mode():
@@ -128,9 +127,8 @@ def test_Dataset__add_to_git(src, dst):
 
     filename = 'file_to_git.dat'
     filename_abs = os.path.join(dst, filename)
-    f = open(filename_abs, 'w')
-    f.write("What to write?")
-    f.close()
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
     ds.add_to_git([filename_abs])
 
     if ds.is_direct_mode():
@@ -146,9 +144,8 @@ def test_Dataset_commit(src, path):
 
     ds = Dataset(path, src)
     filename = os.path.join(path, "test_git_add.dat")
-    f = open(filename, 'w')
-    f.write("File to add to git")
-    f.close()
+    with open(filename, 'w') as f:
+        f.write("File to add to git")
     ds.annex_add([filename])
 
     if ds.is_direct_mode():
@@ -157,7 +154,6 @@ def test_Dataset_commit(src, path):
         assert_raises(AssertionError, ok_clean_git, path, annex=True)
 
     ds._commit("test _commit")
-
     if ds.is_direct_mode():
         ok_clean_git_annex_proxy(path)
     else:

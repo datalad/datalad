@@ -15,7 +15,7 @@ Note: There's not a lot to test by now.
 import os
 import os.path
 
-from nose.tools import assert_raises, assert_is_instance, assert_true
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_in
 from git.exc import GitCommandError
 
 from datalad.support.gitrepo import GitRepo
@@ -67,12 +67,11 @@ def test_GitRepo_add(src, path):
 
     gr = GitRepo(path, src)
     filename = "test_git_add.dat"
-    f = open(os.path.join(path, filename), 'w')
-    f.write("File to add to git")
-    f.close()
+    with open(os.path.join(path, filename), 'w') as f:
+        f.write("File to add to git")
     gr.git_add([filename])
 
-    assert_true(gr.get_indexed_files().__contains__(filename), "%s not successfully added to %s" % (filename, path))
+    assert_in(filename, gr.get_indexed_files(), "%s not successfully added to %s" % (filename, path))
 
 
 @assert_cwd_unchanged
@@ -81,9 +80,8 @@ def test_GitRepo_commit(path):
 
     gr = GitRepo(path)
     filename = "test_git_add.dat"
-    f = open(os.path.join(path, filename), 'w')
-    f.write("File to add to git")
-    f.close()
+    with open(os.path.join(path, filename), 'w') as f:
+        f.write("File to add to git")
 
     gr.git_add([filename])
     gr.git_commit("Testing GitRepo.git_commit().")
@@ -102,7 +100,6 @@ def test_GitRepo_get_indexed_files(src, path):
     out_list = out[0].split()
 
     for item in idx_list:
-        assert_true(out_list.__contains__(item), "%s not found in output of git ls-files in %s" % (item, path))
-
+        assert_in(item, out_list, "%s not found in output of git ls-files in %s" % (item, path))
     for item in out_list:
-        assert_true(idx_list.__contains__(item), "%s not found in output of get_indexed_files in %s" % (item, path))
+        assert_in(item, idx_list, "%s not found in output of get_indexed_files in %s" % (item, path))
