@@ -326,8 +326,12 @@ class AnnexRepo(GitRepo):
             normalized path, that is a relative path with respect to `self.path`
         """
 
-        if isabs(path) and not commonprefix([path, self.path]) == self.path:
+        if isabs(path):
+            if commonprefix([path, self.path]) != self.path:
                 raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
+            else:
+                pass
+
         elif commonprefix([getcwd(), self.path]) == self.path:
             # If we are inside repository, rebuilt relative paths.
             path = p_join(getcwd(), path)
