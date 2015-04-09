@@ -198,7 +198,6 @@ def test_AnnexRepo_file_has_content(src, annex_path):
     assert_true(ar.file_has_content("test-annex.dat"))
 
 
-@assert_cwd_unchanged
 @with_tree([
     ('empty', ''),
     ('d1', (
