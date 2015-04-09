@@ -10,13 +10,13 @@
 """A shim to invoke DataLad top-level command line utility"""
 
 if __name__ == '__main__':
-	try:
-		import datalad
-	except ImportError:
-		# must be running within source code
-		from os.path import dirname
-		import sys
-		sys.path.append(dirname(dirname(__file__)))
+    try:
+        import datalad
+    except ImportError:
+        # must be running within source code
+        from os.path import dirname
+        import sys
+        sys.path.append(dirname(dirname(__file__)))
 
     from datalad.cmdline.main import main
     main()

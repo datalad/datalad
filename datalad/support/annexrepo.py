@@ -123,15 +123,13 @@ class AnnexRepo(GitRepo):
         CommandNotAvailableError
             in case you try to switch to indirect mode on a crippled filesystem
         """
-
-        if enable_direct_mode:
-            self.cmd_call_wrapper.run(['git', 'annex', 'direct'], cwd=self.path)
-        elif not self.is_crippled_fs():
-            self.cmd_call_wrapper.run(['git', 'annex', 'indirect'], cwd=self.path)
-        else:
+        if self.is_crippled_fs() and not enable_direct_mode:
             raise CommandNotAvailableError(cmd="git-annex indirect",
-                                                msg="Can't switch to indirect mode on that filesystem.")
-
+                                           msg="Can't switch to indirect mode on that filesystem.")
+        mode = 'direct' if enable_direct_mode else 'indirect'
+        self.cmd_call_wrapper.run(['git', 'annex', mode], cwd=self.path,
+                                  expect_stderr=True)
+        #TODO: 1. Where to handle failure? 2. On crippled filesystem don't even try.
 
     def _annex_init(self):
         """Initializes an annex repository.

@@ -20,7 +20,7 @@ from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git_annex_proxy
+    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_
 from datalad.support.exceptions import CommandNotAvailableError, FileInGitError, FileNotInAnnexError
 
 # For now (at least) we would need to clone from the network
@@ -41,7 +41,9 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
     # do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     # and therefore can't clone to `dst`
-    assert_raises(GitCommandError, AnnexRepo, dst, src)
+    with swallow_logs() as cm:
+        assert_raises(GitCommandError, AnnexRepo, dst, src)
+        assert("already exists" in cm.out)
 
 
 # TODO: enable local as well whenever/if ever submodule issue gets resolved for windows
@@ -84,7 +86,10 @@ def test_AnnexRepo_get(src, dst):
         # So, what to test? Just skip for now.
         # Actually, could test content!
 
-    ar.annex_get([testfile])
+    with swallow_outputs() as cm:
+        ar.annex_get([testfile])
+        in_(cm.out, '100%')
+
     f = open(testfile, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 

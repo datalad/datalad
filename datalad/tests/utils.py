@@ -15,7 +15,7 @@ from functools import wraps
 from os.path import exists, join as opj
 
 from nose.tools import \
-    assert_equal, assert_raises, assert_greater, assert_false, \
+    assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_in as in_, \
     raises, ok_, eq_, make_decorator, assert_true
 
@@ -143,6 +143,15 @@ def ok_file_under_git(path, filename, annexed=False):
     assert(annexed == os.path.islink(opj(path, filename)))
 
 
+def ok_startswith(s, prefix):
+    ok_(s.startswith(prefix),
+        msg="String %r doesn't start with %r" % (s, prefix))
+
+def nok_startswith(s, prefix):
+    assert_false(s.startswith(prefix),
+        msg="String %r starts with %r" % (s, prefix))
+
+
 #
 # Decorators
 #
@@ -261,12 +270,10 @@ def with_tempfile(t, *targs, **tkwargs):
         tkwargs_ = tkwargs.copy()
 
         if len(targs)<2 and not 'prefix' in tkwargs_:
-            try:
-                tkwargs_['prefix'] = 'datalad_temp_%s.%s' \
-                                    % (func.__module__, func.func_name)
-            except:
-                # well -- if something wrong just proceed with defaults
-                pass
+            tkwargs_['prefix'] = \
+                'datalad_temp_' + \
+                ('' if on_windows \
+                    else '%s.%s' % (t.__module__, t.func_name))
 
         # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
         # let mktemp handle it otherwise. However, an explicitly provided
@@ -328,7 +335,7 @@ def _extend_globs(paths, flavors):
         runner = Runner()
         kw = dict(); _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
         tdir = tempfile.mkdtemp(**kw)
-        repo = runner(["git", "clone", url, tdir])
+        repo = runner(["git", "clone", url, tdir], expect_stderr=True)
         open(opj(tdir, ".git", "remove-me"), "w").write("Please") # signal for it to be removed after
         return tdir
 
@@ -414,17 +421,40 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     return newfunc
 with_testrepos.__test__ = False
 
-def assert_cwd_unchanged(func):
+
+@optional_args
+def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
 
     """
 
-    @make_decorator(func)
+    @wraps(func)
     def newfunc(*args, **kwargs):
         cwd_before = os.getcwd()
-        func(*args, **kwargs)
-        cwd_after = os.getcwd()
-        assert_equal(cwd_before, cwd_after ,"CWD changed from %s to %s" % (cwd_before, cwd_after))
+        exc_info = None
+        try:
+            func(*args, **kwargs)
+        except:
+            exc_info = sys.exc_info()
+        finally:
+            cwd_after = os.getcwd()
+
+        if cwd_after != cwd_before:
+            os.chdir(cwd_before)
+            if not ok_to_chdir:
+                lgr.warning(
+                    "%s changed cwd to %s. Mitigating and changing back to %s"
+                    % (func, cwd_after, cwd_before))
+                # If there was already exception raised, we better re-raise
+                # that one since it must be more important, so not masking it
+                # here with our assertion
+                if exc_info is None:
+                    assert_equal(cwd_before, cwd_after,
+                                 "CWD changed from %s to %s" % (cwd_before, cwd_after))
+
+        if exc_info is not None:
+            raise exc_info[0], exc_info[1], exc_info[2]
+
 
     return newfunc
 
