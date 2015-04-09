@@ -12,7 +12,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
 
-from os.path import join, exists
+from os.path import join, exists, normpath
 import logging
 
 from git import Repo
@@ -48,7 +48,7 @@ class GitRepo(object):
 
         """
 
-        self.path = path
+        self.path = normpath(path)
 
         if url is not None:
             try:

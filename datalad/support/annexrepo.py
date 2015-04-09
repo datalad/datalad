@@ -165,7 +165,9 @@ class AnnexRepo(GitRepo):
         for key in kwargs.keys():
             cmd_list.extend([" --%s=%s" % (key, kwargs.get(key))])
         #TODO: May be this should go in a decorator for use in every command.
-        cmd_list.extend(files)
+
+        for path in files:
+            cmd_list.append(self._check_path(path))
 
         #don't capture stderr, since it provides progress display
         status = self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False, log_online=True,
@@ -191,14 +193,15 @@ class AnnexRepo(GitRepo):
         for key in kwargs.keys():
             cmd_list.extend([" --%s=%s" % (key, kwargs.get(key))])
         #TODO: May be this should go in a decorator for use in every command.
-        cmd_list.extend(files)
 
+        for path in files:
+            cmd_list.append(self._check_path(path))
 
         status = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
 
         if status not in [0, None]:
             lgr.error("git annex add returned status: %s" % status)
-            raise CommandError(cmd="git-annex add %s" % paths, msg="", code=status)
+            raise CommandError(cmd=' '.join(cmd_list), msg="", code=status)
 
     def annex_proxy(self, git_cmd):
         """Use git-annex as a proxy to git
@@ -235,22 +238,23 @@ class AnnexRepo(GitRepo):
 
         return output
 
-    def get_file_key(self, path_to_file):
+    def get_file_key(self, path):
         """Get key of an annexed file
 
         Parameters:
         -----------
-        path_to_file: str
+        path: str
             file to look up; have to be a path relative to repo's base dir
 
         Returns:
         --------
-        key: str
-            key used by git-annex for `path_to_file`
+        str
+            key used by git-annex for `path`
         """
 
-        cmd_list = ['git', 'annex', 'lookupkey']
-        cmd_list.extend([path_to_file])
+        path = self._check_path(path)
+        cmd_list = ['git', 'annex', 'lookupkey', path]
+
         # TODO: For now this means, path_to_file has to be a string,
         # containing a single path. In oppposition to git annex lookupkey itself,
         # which can look up several files at once.
@@ -266,17 +270,17 @@ class AnnexRepo(GitRepo):
                 # nor does git-annex propagate IOError (file not found) or sth.
                 # So, we have to find out:
 
-                f = open(path_to_file, 'r')  # raise possible IOErrors
+                f = open(path, 'r')  # raise possible IOErrors
                 f.close()
 
                 # if we got here, the file is present and accessible, but not in the annex
 
-                if path_to_file in self.get_indexed_files():
-                    raise FileInGitError(cmd=cmd_str, msg="File not in annex, but git: %s" % path_to_file,
-                                              filename=path_to_file)
+                if path in self.get_indexed_files():
+                    raise FileInGitError(cmd=cmd_str, msg="File not in annex, but git: %s" % path,
+                                              filename=path)
 
-                raise FileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path_to_file,
-                                               filename=path_to_file)
+                raise FileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path,
+                                               filename=path)
 
         key = output[0].split()[0]
 
@@ -290,11 +294,10 @@ class AnnexRepo(GitRepo):
         path: str
 
         """
-
         # TODO: Also provide option to look for key instead of path
 
-        cmd_list = ['git', 'annex', 'find']
-        cmd_list.extend([path])
+        path = self._check_path(path)
+        cmd_list = ['git', 'annex', 'find', path]
 
         try:
             status, output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
@@ -320,7 +323,7 @@ class AnnexRepo(GitRepo):
 
         Returns:
         --------
-        npath:
+        str:
             normalized path, that is a relative path with respect to `self.path`
         """
         path = normpath(path)
