@@ -25,6 +25,25 @@ from exceptions import CommandNotAvailableError, CommandError, FileNotInAnnexErr
 lgr = logging.getLogger('datalad.annex')
 
 
+def _options_decorator(func):
+    """Decorator to provide convenient way to pass options to command calls.
+
+    Any keyword argument "foo='bar'" translates to " --foo=bar".
+    All of these are collected in a list and then passed to keyword argument `options`
+    of the decorated function.
+    Note: This is meant to especially decorate the methods of AnnexRepo-class and therefore
+    returns a class method.
+    """
+
+    def newfunc(self, *args, **kwargs):
+        option_list=[]
+        for key in kwargs.keys():
+            option_list.extend([" --%s=%s" % (key, kwargs.get(key))])
+
+        func(self, *args, options=option_list)
+    return newfunc
+
+
 class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
 
@@ -148,8 +167,8 @@ class AnnexRepo(GitRepo):
         if status not in [0, None]:
             lgr.error('git annex init returned status %d.' % status)
 
-
-    def annex_get(self, files, **kwargs):
+    @_options_decorator
+    def annex_get(self, files, options=[]):
         """Get the actual content of files
 
         Parameters:
@@ -162,10 +181,7 @@ class AnnexRepo(GitRepo):
         """
 
         cmd_list = ['git', 'annex', 'get']
-
-        for key in kwargs.keys():
-            cmd_list.extend([" --%s=%s" % (key, kwargs.get(key))])
-        #TODO: May be this should go in a decorator for use in every command.
+        cmd_list.extend(options)
 
         for path in files:
             cmd_list.append(self._check_path(path))
@@ -180,7 +196,7 @@ class AnnexRepo(GitRepo):
             lgr.error('git annex get returned status: %s' % status)
             raise CommandError(cmd=' '.join(cmd_list))
 
-    def annex_add(self, files, **kwargs):
+    def annex_add(self, files, options=[]):
         """Add file(s) to the annex.
 
         Parameters
@@ -190,10 +206,7 @@ class AnnexRepo(GitRepo):
         """
 
         cmd_list = ['git', 'annex', 'add']
-
-        for key in kwargs.keys():
-            cmd_list.extend([" --%s=%s" % (key, kwargs.get(key))])
-        #TODO: May be this should go in a decorator for use in every command.
+        cmd_list.extend(options)
 
         for path in files:
             cmd_list.append(self._check_path(path))
