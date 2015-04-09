@@ -323,7 +323,7 @@ class AnnexRepo(GitRepo):
         npath:
             normalized path, that is a relative path with respect to `self.path`
         """
-
+        path = normpath(path)
         if isabs(path):
             if commonprefix([path, self.path]) != self.path:
                 raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
@@ -336,6 +336,6 @@ class AnnexRepo(GitRepo):
         else:
             # We were called from outside the repo. Therefore relative paths
             # are interpreted as being relative to self.path already.
-            return normpath(path)
+            return path
 
-        return normpath(relpath(path, start=self.path))
+        return relpath(path, start=self.path)

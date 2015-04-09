@@ -20,7 +20,7 @@ from git.exc import GitCommandError
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_
+    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree
 from datalad.support.exceptions import CommandNotAvailableError, FileInGitError, FileNotInAnnexError
 
 # For now (at least) we would need to clone from the network
@@ -204,17 +204,29 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 def test_AnnexRepo_file_has_content(src, annex_path):
 
     ar = AnnexRepo(annex_path, src)
-
     assert_false(ar.file_has_content("test-annex.dat"))
     ar.annex_get(["test-annex.dat"])
     assert_true(ar.file_has_content("test-annex.dat"))
 
 
-@with_tempfile
+@assert_cwd_unchanged
+@with_tree([
+    ('empty', ''),
+    ('d1', (
+        ('empty', ''),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ])
 def test_AnnexRepo_check_path(annex_path):
-    # TODO: with_tree => deep inside
 
+    cwd = os.getcwd()
     ar = AnnexRepo(annex_path)
+
+    # cwd is currently outside the repo, so any relative path
+    # should be interpreted as relative to `annex_path`
+    assert_raises(FileNotInAnnexError, ar._check_path, os.getcwd())
     result = ar._check_path("testfile")
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
     result = ar._check_path("./testfile")
@@ -228,4 +240,23 @@ def test_AnnexRepo_check_path(annex_path):
         assert_equal(result, "testdir/testfile", "_check_path() returned %s" % result)
     result = ar._check_path(os.path.join(annex_path, "testfile"))
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
-    assert_raises(FileNotInAnnexError, ar._check_path, os.getcwd())
+
+    # now we are inside, so relative paths are relative to cwd and have
+    # to be converted to be relative to annex_path:
+    os.chdir(os.path.join(annex_path, 'd1', 'd2'))
+
+    result = ar._check_path("testfile")
+    if on_windows:
+        assert_equal(result, "d1\\d2\\testfile", "_check_path() returned %s" % result)
+    else:
+        assert_equal(result, "d1/d2/testfile", "_check_path() returned %s" % result)
+    result = ar._check_path("../testfile")
+    if on_windows:
+        assert_equal(result, "d1\\testfile", "_check_path() returned %s" % result)
+    else:
+        assert_equal(result, "d1/testfile", "_check_path() returned %s" % result)
+    assert_raises(FileNotInAnnexError, ar._check_path, os.path.join(annex_path, "../outside"))
+    result = ar._check_path(os.path.join(annex_path, 'd1', 'testfile'))
+    assert_equal(result, "d1/testfile", "_check_path() returned %s" % result)
+
+    os.chdir(cwd)
