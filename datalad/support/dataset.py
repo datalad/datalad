@@ -79,7 +79,7 @@ class Dataset(AnnexRepo):
         else:
             self.git_commit(msg)
 
-    def add_to_annex(self, files):
+    def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
         """Add file(s) to the annex
 
 
@@ -90,9 +90,9 @@ class Dataset(AnnexRepo):
         """
 
         self.annex_add(files=files)
-        self._commit("Added file(s) to annex: %s" % files)
+        self._commit(commit_msg)
 
-    def add_to_git(self, files):
+    def add_to_git(self, files, commit_msg="Added file(s) to git."):
         """Add file(s) to git
 
 
@@ -115,4 +115,4 @@ class Dataset(AnnexRepo):
         else:
             self.git_add(files)
 
-        self._commit("Added file(s) to git: %s" % files)
+        self._commit(commit_msg)
