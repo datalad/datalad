@@ -279,8 +279,10 @@ def with_tempfile(t, *targs, **tkwargs):
 def _extend_globs(paths, flavors):
     globs = glob.glob(paths)
 
-    # TODO -- provide management of 'network' tags somehow
     flavors_ = ['local', 'network', 'clone', 'network-clone'] if flavors=='auto' else flavors
+
+    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        flavors_ = [x for x in flavors_ if not x.startswith('network')]
 
     # TODO: move away?
     def get_repo_url(path):
