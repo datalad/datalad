@@ -72,11 +72,11 @@ def test_traverse_for_content(d):
     def cb_dummy_noargs(d):
         ok_(d is not None)
 
-    def cb_dummy_kwargs(d, empty_files=None, empty_dirs=None):
+    def cb_dummy_kwargs(d, misses_files=None, misses_dirs=None):
         ok_(d is not None)
-        ok_(isinstance(empty_files, list))
-        ok_(isinstance(empty_dirs, list))
-        for f in empty_files:
+        ok_(isinstance(misses_files, list))
+        ok_(isinstance(misses_dirs, list))
+        for f in misses_files:
             ok_startswith(f, 'empty')
 
     ok_(traverse_for_content(d,
@@ -88,37 +88,37 @@ def test_traverse_for_content(d):
                              do_all=cb_dummy_kwargs,
                              do_none=cb_dummy_kwargs,
                              do_some=cb_dummy_kwargs,
-                             pass_files=True))
+                             pass_misses=True))
 
     # more thorough tests
-    def cb_any(d_, empty_files=None, empty_dirs=None):
+    def cb_any(d_, misses_files=None, misses_dirs=None):
         ok_(d_ is not None)
         if d_ == d:
-            eq_(empty_files, ['empty.txt'])
-            eq_(empty_dirs, ['d3'])
+            eq_(misses_files, ['empty.txt'])
+            eq_(misses_dirs, ['d3'])
         elif d_ == opj(d, 'd1'):
             # indeed we have empty d2 but loaded.txt
-            eq_(empty_files, [])
-            eq_(empty_dirs, ['d2'])
+            eq_(misses_files, [])
+            eq_(misses_dirs, ['d2'])
         else:
             raise ValueError("Must not be called for %d" % d_)
 
-    def cb_all(d_, empty_files=None, empty_dirs=None):
+    def cb_all(d_, misses_files=None, misses_dirs=None):
         ok_(d_ is not None)
         if d_ == opj(d, 'd4'):
-            eq_(empty_files, [])
-            eq_(empty_dirs, [])
+            eq_(misses_files, [])
+            eq_(misses_dirs, [])
         else:
             raise ValueError("Must not be called for %s" % d_)
 
-    def cb_none(d_, empty_files=None, empty_dirs=None):
+    def cb_none(d_, misses_files=None, misses_dirs=None):
         ok_(d_ is not None)
         if d_ in (opj(d, 'd1', 'd2'), opj(d, 'd3', 'd2')):
-            eq_(empty_files, ['empty'])
-            eq_(empty_dirs, [])
+            eq_(misses_files, ['empty'])
+            eq_(misses_dirs, [])
         elif d_ == opj(d, 'd3'):
-            eq_(empty_files, ['empty'])
-            eq_(empty_dirs, ['d2'])
+            eq_(misses_files, ['empty'])
+            eq_(misses_dirs, ['d2'])
         else:
             raise ValueError("Must not be called for %s" % d_)
 
@@ -126,14 +126,14 @@ def test_traverse_for_content(d):
                              do_all=cb_all,
                              do_none=cb_none,
                              do_some=cb_any,
-                             pass_files=True))
+                             pass_misses=True))
 
 
     # And now let's do some desired action -- clean it up!
     ok_(traverse_for_content(d,
                              do_none=rm_empties,
                              do_some=rm_empties,
-                             pass_files=True))
+                             pass_misses=True))
     # And check what is left
     eq_(ls_tree(d),
         ['d1', opj('d1', 'loaded2.txt'), 'd4', opj('d4', 'loaded3'), 'loaded.txt'])
@@ -161,6 +161,6 @@ def test_traverse_for_content_fully_empty(d):
     ok_(not traverse_for_content(d,
                              do_none=rm_empties,
                              do_some=rm_empties,
-                             pass_files=True))
+                             pass_misses=True))
     # And check that nothing is left behind
     eq_(ls_tree(d), [])

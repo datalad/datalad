@@ -177,14 +177,14 @@ def has_content(file_):
     return os.stat(realpath(file_)).st_size > 0
 
 
-def rm_empties(p, empty_files=None, empty_dirs=None):
+def rm_empties(p, misses_files=None, misses_dirs=None):
     """Callback for traverse_for_content to be used for do_some, do_none
 
     To prune empty content
     """
-    for d in empty_dirs:
+    for d in misses_dirs:
         rmtree(opj(p, d))
-    for f in empty_files:
+    for f in misses_files:
         os.unlink(opj(p, f))
 
 
@@ -192,42 +192,66 @@ def traverse_for_content(path,
                          do_none=None,
                          do_some=None,
                          do_all=None,
-                         # TODO: we might want some better function
-                         check=has_content,
-                         pass_files=False,
+                         matcher=has_content,
+                         exclude=(),
+                         pass_hits=False,
+                         pass_misses=False,
+                         return_="any"
                          ):
-    """Traverse and perform actions depending on either given tree carries any content
+    """Traverse and perform actions depending on either tree files pass the matcher
 
-    Note: do_some is judged at the level of a directory, i.e. children
-    directories are assessed only either they are full.
+    Note
+    ----
+
+    "some" is used instead of "any" to accent that it is the case when only some,
+    not all files are matched
 
     Parameters
     ----------
     do_none, do_some, do_all: callable, optional
         Callback to use for each traversed directory in case it has None, any,
-        or all files (in that directory, or under) present with the content.
+        or all files (in that directory, or under) hit by `matcher`.
         Those callbacks should have following arguments
            path: string
              path to the directory
-           empty_files, empty_dirs: list, optional
-             list of empty files, directories found present in the path.
-             Passed only if pass_files=True
-    check: callable, optional
-        Given the path (to a file) returns judgement either file considered
-        empty or not
-    pass_files: bool, optional
-        Either to pass empty_files, empty_dirs into do_* callables
+           hits_files, hits_dirs: list, optional
+             list of files and list of directories which pass the matcher.
+             Passed only if pass_hits=True
+           misses_files, misses_dirs: list, optional
+             list of files and list of directories which pass the matcher.
+             Passed only if pass_misses=True
+    matcher: callable, optional
+        Given the path (to a file) should return the bool result
+    exclude: iterable or regexp, optional
+        Files/directories to exclude from consideration. If an iterable (e.g.
+        list or string) -- checked for presence in that iterable, otherwise --
+        assuming it is a compiled regular expression to .match against
+    pass_hits: bool, optional
+        Either to pass hits_files, hits_dirs into do_* callables
+    pass_misses: bool, optional
+        Either to pass misses_files, misses_dirs into do_* callables
+    return_: {'all', 'any'}, optional
+        Instructs either function should return True when 'all' or 'any' of
+        its children passed the matcher
 
     Returns
     -------
-    None if initial == os.curdir, else either the directory has content (True)
-    or empty (False)
+    bool
     """
     # Naive recursive implementation, still using os.walk though
 
     # Get all elements of current directory
     root, dirs, files = os.walk(path).next()
     assert(root == path)
+
+    if exclude:
+        if hasattr(exclude, '__iter__'):
+            excluder = lambda x: x not in exclude
+        else:
+            excluder = lambda x: not exclude.match(x)
+
+        dirs = filter(excluder, dirs)
+        files = filter(excluder, files)
 
     # TODO: I feel like in some cases we might want to stop descent earlier
     # and not even bother with kids, but I could be wrong
@@ -236,45 +260,56 @@ def traverse_for_content(path,
                              do_none=do_none,
                              do_some=do_some,
                              do_all=do_all,
-                             pass_files=pass_files,
-                             check=check)
+                             matcher=matcher,
+                             pass_hits=pass_hits,
+                             pass_misses=pass_misses,
+                             return_=return_)
         for d in dirs
     ]
 
     # TODO: Theoretically we could sophisticate it. E.g. if only do_some
     # or do_none defined and already we have some of status_dirs, no need
     # to verify files. Also if some are not defined in dirs and we have
-    # only do_all -- no need to check files.  For now -- KISS
+    # only do_all -- no need to matcher files.  For now -- KISS
 
     # Now verify all the files
     status_files = [
-        check(os.path.join(root, f))
+        matcher(os.path.join(root, f))
         for f in files
     ]
 
     status_all = status_dirs + status_files
 
     # TODO: may be there is a point to pass those files into do_
-    # callbacks -- add option  pass_files?
-    all_present = all(status_all)
-    any_present = any(status_all)
-    if pass_files:
-        kw = {'empty_dirs': [d for d, c in zip(dirs, status_dirs) if not c],
-              'empty_files': [f for f, c in zip(files, status_files) if not c],
-              }
-    else:
-        kw = {}
-    if all_present:
+    # callbacks -- add option  pass_hits?
+    all_match = all(status_all)
+    some_match = any(status_all)
+
+    kw = {}
+    if pass_hits:
+        kw.update(
+            {'hits_dirs':  [d for d, c in zip(dirs, status_dirs) if c],
+             'hits_files': [f for f, c in zip(files, status_files) if c]})
+
+    if pass_misses:
+        kw.update(
+            {'misses_dirs':  [d for d, c in zip(dirs, status_dirs) if not c],
+             'misses_files': [f for f, c in zip(files, status_files) if not c]})
+
+    if all_match:
         if do_all:
             do_all(root, **kw)
-    elif any_present:
+    elif some_match:
         if do_some:
             do_some(root, **kw)
     else:
         if do_none:
             do_none(root, **kw)
 
-    return any_present
+    return {'all': all_match,
+            'any': some_match,
+            }[return_]
+
 
 #
 # Decorators
