@@ -227,17 +227,19 @@ def test_AnnexRepo_check_path(annex_path):
     # cwd is currently outside the repo, so any relative path
     # should be interpreted as relative to `annex_path`
     assert_raises(FileNotInAnnexError, ar._check_path, os.getcwd())
+
     result = ar._check_path("testfile")
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
+
     result = ar._check_path("./testfile")
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
+
     result = ar._check_path("testdir/../testfile")
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
+
     result = ar._check_path("testdir/testfile")
-    if on_windows:
-        assert_equal(result, "testdir\\testfile", "_check_path() returned %s" % result)
-    else:
-        assert_equal(result, "testdir/testfile", "_check_path() returned %s" % result)
+    assert_equal(result, os.path.join("testdir", "testfile"), "_check_path() returned %s" % result)
+
     result = ar._check_path(os.path.join(annex_path, "testfile"))
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
 
@@ -246,17 +248,14 @@ def test_AnnexRepo_check_path(annex_path):
     os.chdir(os.path.join(annex_path, 'd1', 'd2'))
 
     result = ar._check_path("testfile")
-    if on_windows:
-        assert_equal(result, "d1\\d2\\testfile", "_check_path() returned %s" % result)
-    else:
-        assert_equal(result, "d1/d2/testfile", "_check_path() returned %s" % result)
+    assert_equal(result, os.path.join('d1', 'd2', 'testfile'), "_check_path() returned %s" % result)
+
     result = ar._check_path("../testfile")
-    if on_windows:
-        assert_equal(result, "d1\\testfile", "_check_path() returned %s" % result)
-    else:
-        assert_equal(result, "d1/testfile", "_check_path() returned %s" % result)
+    assert_equal(result, os.path.join('d1', 'testfile'), "_check_path() returned %s" % result)
+
     assert_raises(FileNotInAnnexError, ar._check_path, os.path.join(annex_path, "../outside"))
+
     result = ar._check_path(os.path.join(annex_path, 'd1', 'testfile'))
-    assert_equal(result, "d1/testfile", "_check_path() returned %s" % result)
+    assert_equal(result, os.path.join('d1', 'testfile'), "_check_path() returned %s" % result)
 
     os.chdir(cwd)
