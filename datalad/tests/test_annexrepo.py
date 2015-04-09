@@ -220,13 +220,13 @@ def test_AnnexRepo_check_path(annex_path):
     result = ar._check_path("testfile")
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
 
-    result = ar._check_path("./testfile")
+    result = ar._check_path(os.path.join('.', 'testfile'))
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
 
-    result = ar._check_path("testdir/../testfile")
+    result = ar._check_path(os.path.join('testdir', '..', 'testfile'))
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
 
-    result = ar._check_path("testdir/testfile")
+    result = ar._check_path(os.path.join('testdir', 'testfile'))
     assert_equal(result, os.path.join("testdir", "testfile"), "_check_path() returned %s" % result)
 
     result = ar._check_path(os.path.join(annex_path, "testfile"))
@@ -239,10 +239,10 @@ def test_AnnexRepo_check_path(annex_path):
     result = ar._check_path("testfile")
     assert_equal(result, os.path.join('d1', 'd2', 'testfile'), "_check_path() returned %s" % result)
 
-    result = ar._check_path("../testfile")
+    result = ar._check_path(os.path.join('..', 'testfile'))
     assert_equal(result, os.path.join('d1', 'testfile'), "_check_path() returned %s" % result)
 
-    assert_raises(FileNotInAnnexError, ar._check_path, os.path.join(annex_path, "../outside"))
+    assert_raises(FileNotInAnnexError, ar._check_path, os.path.join(annex_path, '..', 'outside'))
 
     result = ar._check_path(os.path.join(annex_path, 'd1', 'testfile'))
     assert_equal(result, os.path.join('d1', 'testfile'), "_check_path() returned %s" % result)
