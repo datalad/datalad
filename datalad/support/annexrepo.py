@@ -12,7 +12,8 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
-from os.path import join, exists, normpath, isabs
+from os import getcwd
+from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath
 import logging
 
 from ConfigParser import NoOptionError
@@ -316,15 +317,23 @@ class AnnexRepo(GitRepo):
         TODO: This may go into a decorator or sth. like that and then should work on a list.
         But: Think about behaviour if only some of the list's items are invalid.
 
-        Checks whether `path` is inside repository and normalize it. Additionally absolute paths are converted into
-        relative paths with respect to AnnexRepo's base dir.
+        Checks whether `path` is inside repository and normalize it. Additionally paths are converted into
+        relative paths with respect to AnnexRepo's base dir, considering os.getcwd() in case of relative paths.
+
+        Returns:
+        --------
+        npath:
+            normalized path, that is a relative path with respect to `self.path`
         """
 
-        import os.path
-        if os.path.isabs(path):
-            if os.path.commonprefix([path, self.path]) == self.path:
-                path = os.path.relpath(path, start=self.path)
-            else:
+        if isabs(path) and not commonprefix([path, self.path]) == self.path:
                 raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
+        elif commonprefix([getcwd(), self.path]) == self.path:
+            # If we are inside repository, rebuilt relative paths.
+            path = p_join(getcwd(), path)
+        else:
+            # We were called from outside the repo. Therefore relative paths
+            # are interpreted as being relative to self.path already.
+            return normpath(path)
 
-        return normpath(path)
+        return normpath(relpath(path, start=self.path))

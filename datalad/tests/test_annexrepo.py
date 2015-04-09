@@ -206,6 +206,7 @@ def test_AnnexRepo_file_has_content(annex_path):
 
 @with_tempfile
 def test_AnnexRepo_check_path(annex_path):
+    # TODO: with_tree => deep inside
 
     ar = AnnexRepo(annex_path)
     result = ar._check_path("testfile")
@@ -215,7 +216,10 @@ def test_AnnexRepo_check_path(annex_path):
     result = ar._check_path("testdir/../testfile")
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
     result = ar._check_path("testdir/testfile")
-    assert_equal(result, "testdir/testfile", "_check_path() returned %s" % result)
+    if on_windows:
+        assert_equal(result, "testdir\\testfile", "_check_path() returned %s" % result)
+    else:
+        assert_equal(result, "testdir/testfile", "_check_path() returned %s" % result)
     result = ar._check_path(os.path.join(annex_path, "testfile"))
     assert_equal(result, "testfile", "_check_path() returned %s" % result)
     assert_raises(FileNotInAnnexError, ar._check_path, os.getcwd())
