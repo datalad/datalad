@@ -181,7 +181,7 @@ class Runner(object):
                                     shell=shell,
                                     cwd=cwd)
             except Exception, e:
-                lgr.error("Failed to start %s: %s" % (cmd, e))
+                lgr.error("Failed to start %r: %s" % (cmd, " under %r" % cwd if cwd else '', e))
                 raise
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
@@ -205,14 +205,7 @@ class Runner(object):
                     # as directed
                     self._log_err(out[1], expect_stderr=expect_stderr)
 
-            if status not in [0, None]:
-                msg = "Failed to run %r%s. Exit code=%d" \
-                      % (cmd, " under %r" % cwd if cwd else '', status)
-                lgr.error(msg)
-                raise RuntimeError(msg)
-
-            else:
-                self.log("Finished running %r with status %s" % (cmd, status), level=8)
+            self.log("Finished running %r with status %s" % (cmd, status), level=8)
 
         else:
             self.commands.append(cmd)
