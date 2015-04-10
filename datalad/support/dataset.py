@@ -89,7 +89,7 @@ class Dataset(AnnexRepo):
             list of paths to add to the annex
         """
 
-        self.annex_add(files=files)
+        self.annex_add(files)
         self._commit(commit_msg)
 
     def add_to_git(self, files, commit_msg="Added file(s) to git."):
@@ -101,6 +101,8 @@ class Dataset(AnnexRepo):
         files: list
             list of paths to add to git
         """
+        # TODO: See issue #97!
+
 
         # TODO: Rethink, whether or not the whole direct mode dependent handling should go into AnnexRepo anyway.
         # But remember: committing after adding should be done here, so the methods are needed either way.

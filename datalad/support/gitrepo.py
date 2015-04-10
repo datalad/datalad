@@ -23,6 +23,9 @@ lgr = logging.getLogger('datalad.gitrepo')
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
 # Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
 
+# TODO: make use of _checkpath or corresponding decorator from annexrepo.py to unify handling of paths.
+# TODO: Check whether it makes sense to unify passing of options in a similar way.
+
 class GitRepo(object):
     """Representation of a git repository
 
@@ -86,6 +89,7 @@ class GitRepo(object):
             try:
                 self.repo.index.add(files, write=True)
                 # TODO: May be make use of 'fprogress'-option to indicate progress
+                # But then, we done have it for git-annex add, anyway.
                 #
                 # TODO: Is write=True a reasonable way to do it?
                 # May be should not write until success of operation is confirmed?

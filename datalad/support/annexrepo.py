@@ -40,7 +40,67 @@ def _options_decorator(func):
         for key in kwargs.keys():
             option_list.extend([" --%s=%s" % (key, kwargs.get(key))])
 
-        func(self, *args, options=option_list)
+        return func(self, *args, options=option_list)
+    return newfunc
+
+def _normalize_path(base_dir, path):
+        """Helper to check paths passed to methods of this class.
+
+        Checks whether `path` is beneath `base_dir` and normalize it. Additionally paths are converted into
+        relative paths with respect to `base_dir`, considering os.getcwd() in case of relative paths.
+        This is intended to be used in repository classes, which means that `base_dir` usually will be
+        the repository's base directory.
+
+        Parameters:
+        -----------
+        path: str
+            path to be normalized
+        base_dir: str
+            directory to serve as base to normalized, relative paths
+
+        Returns:
+        --------
+        str:
+            normalized path, that is a relative path with respect to `base_dir`
+        """
+        path = normpath(path)
+        if isabs(path):
+            if commonprefix([path, base_dir]) != base_dir:
+                raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
+            else:
+                pass
+
+        elif commonprefix([getcwd(), base_dir]) == base_dir:
+            # If we are inside repository, rebuilt relative paths.
+            path = p_join(getcwd(), path)
+        else:
+            # We were called from outside the repo. Therefore relative paths
+            # are interpreted as being relative to self.path already.
+            return path
+
+        return relpath(path, start=base_dir)
+
+def _files_decorator(func):
+    """Decorator to provide unified path conversions.
+
+    Note: This is intended to be used within the repository classes and therefore returns
+    a class method!
+    The decorated function is expected to take a path or a list of paths at first positional
+    argument (after 'self'). Additionally the class `func` is a member of, is expected to have
+    an attribute 'path'.
+    """
+
+    def newfunc(self, files, *args, **kwargs):
+        if isinstance(files, basestring):
+            files_new = _normalize_path(self.path, files)
+        elif isinstance(files, list):
+            files_new = []
+            for path in files:
+                files_new.append(_normalize_path(self.path, path))
+        else:
+            raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
+                             files.__class__.__name__)
+        return func(self, files_new, *args, **kwargs)
     return newfunc
 
 
@@ -67,7 +127,7 @@ class AnnexRepo(GitRepo):
         Parameters:
         -----------
         path: str
-          path to git-annex repository
+          path to git-annex repository. In case it's not an absolute path, it's relative to os.getcwd()
 
         url: str
           url to the to-be-cloned repository.
@@ -168,6 +228,7 @@ class AnnexRepo(GitRepo):
             lgr.error('git annex init returned status %d.' % status)
 
     @_options_decorator
+    @_files_decorator
     def annex_get(self, files, options=[]):
         """Get the actual content of files
 
@@ -184,7 +245,7 @@ class AnnexRepo(GitRepo):
         cmd_list.extend(options)
 
         for path in files:
-            cmd_list.append(self._check_path(path))
+            cmd_list.append(path)
 
         #don't capture stderr, since it provides progress display
         status = self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False, log_online=True,
@@ -196,6 +257,8 @@ class AnnexRepo(GitRepo):
             lgr.error('git annex get returned status: %s' % status)
             raise CommandError(cmd=' '.join(cmd_list))
 
+    @_options_decorator
+    @_files_decorator
     def annex_add(self, files, options=[]):
         """Add file(s) to the annex.
 
@@ -209,7 +272,7 @@ class AnnexRepo(GitRepo):
         cmd_list.extend(options)
 
         for path in files:
-            cmd_list.append(self._check_path(path))
+            cmd_list.append(path)
 
         status = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
 
@@ -252,6 +315,7 @@ class AnnexRepo(GitRepo):
 
         return output
 
+    @_files_decorator
     def get_file_key(self, path):
         """Get key of an annexed file
 
@@ -266,7 +330,6 @@ class AnnexRepo(GitRepo):
             key used by git-annex for `path`
         """
 
-        path = self._check_path(path)
         cmd_list = ['git', 'annex', 'lookupkey', path]
 
         # TODO: For now this means, path_to_file has to be a string,
@@ -301,6 +364,7 @@ class AnnexRepo(GitRepo):
 
         return key
 
+    @_files_decorator
     def file_has_content(self, path):
         """ Check whether the file `path` is present with its content.
 
@@ -311,7 +375,6 @@ class AnnexRepo(GitRepo):
         """
         # TODO: Also provide option to look for key instead of path
 
-        path = self._check_path(path)
         cmd_list = ['git', 'annex', 'find', path]
 
         try:
@@ -326,34 +389,3 @@ class AnnexRepo(GitRepo):
             is_present = output[0].split()[0] == path
 
         return is_present
-
-    def _check_path(self, path):
-        """Helper to check paths passed to methods of this class.
-
-        TODO: This may go into a decorator or sth. like that and then should work on a list.
-        But: Think about behaviour if only some of the list's items are invalid.
-
-        Checks whether `path` is inside repository and normalize it. Additionally paths are converted into
-        relative paths with respect to AnnexRepo's base dir, considering os.getcwd() in case of relative paths.
-
-        Returns:
-        --------
-        str:
-            normalized path, that is a relative path with respect to `self.path`
-        """
-        path = normpath(path)
-        if isabs(path):
-            if commonprefix([path, self.path]) != self.path:
-                raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
-            else:
-                pass
-
-        elif commonprefix([getcwd(), self.path]) == self.path:
-            # If we are inside repository, rebuilt relative paths.
-            path = p_join(getcwd(), path)
-        else:
-            # We were called from outside the repo. Therefore relative paths
-            # are interpreted as being relative to self.path already.
-            return path
-
-        return relpath(path, start=self.path)
