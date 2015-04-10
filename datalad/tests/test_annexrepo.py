@@ -198,58 +198,6 @@ def test_AnnexRepo_file_has_content(src, annex_path):
     assert_true(ar.file_has_content("test-annex.dat"))
 
 
-from datalad.support.annexrepo import _normalize_path
-@with_tree([
-    ('empty', ''),
-    ('d1', (
-        ('empty', ''),
-        ('d2',
-            (('empty', ''),
-             )),
-        )),
-    ])
-def test_AnnexRepo_normalize_path(annex_path):
-
-    cwd = os.getcwd()
-    ar = AnnexRepo(annex_path)
-
-    # cwd is currently outside the repo, so any relative path
-    # should be interpreted as relative to `annex_path`
-    assert_raises(FileNotInAnnexError, _normalize_path, ar.path, os.getcwd())
-
-    result = _normalize_path(ar.path, "testfile")
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
-
-    result = _normalize_path(ar.path, os.path.join('.', 'testfile'))
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
-
-    result = _normalize_path(ar.path, os.path.join('testdir', '..', 'testfile'))
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
-
-    result = _normalize_path(ar.path, os.path.join('testdir', 'testfile'))
-    assert_equal(result, os.path.join("testdir", "testfile"), "_normalize_path() returned %s" % result)
-
-    result = _normalize_path(ar.path, os.path.join(annex_path, "testfile"))
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
-
-    # now we are inside, so relative paths are relative to cwd and have
-    # to be converted to be relative to annex_path:
-    os.chdir(os.path.join(annex_path, 'd1', 'd2'))
-
-    result = _normalize_path(ar.path, "testfile")
-    assert_equal(result, os.path.join('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
-
-    result = _normalize_path(ar.path, os.path.join('..', 'testfile'))
-    assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
-
-    assert_raises(FileNotInAnnexError, _normalize_path, ar.path, os.path.join(annex_path, '..', 'outside'))
-
-    result = _normalize_path(ar.path, os.path.join(annex_path, 'd1', 'testfile'))
-    assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
-
-    os.chdir(cwd)
-
-
 from datalad.support.annexrepo import _options_decorator
 def test_AnnexRepo_options_decorator():
 
@@ -259,40 +207,3 @@ def test_AnnexRepo_options_decorator():
 
     assert_equal(decorated(1, 2, someoption='first', someotheroption='second'),
                  [' --someoption=first', ' --someotheroption=second'])
-
-
-from datalad.support.annexrepo import _files_decorator
-def test_AnnexRepo_files_decorator():
-
-    class testclass(object):
-        def __init__(self):
-            self.path = os.path.join('some', 'where')
-
-        @_files_decorator
-        def decorated(self, files):
-            return files
-
-    test_instance = testclass()
-
-    files_to_test = os.path.join(test_instance.path, 'deep', get_most_obscure_supported_name())
-    assert_equal(test_instance.decorated(files_to_test),
-                 _normalize_path(test_instance.path, files_to_test))
-
-    files_to_test = get_most_obscure_supported_name()
-    assert_equal(test_instance.decorated(files_to_test),
-                 _normalize_path(test_instance.path, files_to_test))
-
-    files_to_test = os.path.join(get_most_obscure_supported_name(), 'beyond', 'obscure')
-    assert_equal(test_instance.decorated(files_to_test),
-                 _normalize_path(test_instance.path, files_to_test))
-
-    files_to_test = os.path.join(os.getcwd(), 'somewhere', 'else', get_most_obscure_supported_name())
-    assert_raises(FileNotInAnnexError, test_instance.decorated, files_to_test)
-
-    files_to_test = ['now', os.path.join('a list', 'of'), 'paths']
-    expect = []
-    for item in files_to_test:
-        expect.append(_normalize_path(test_instance.path, item))
-    assert_equal(test_instance.decorated(files_to_test), expect)
-
-    assert_raises(ValueError, test_instance.decorated, 1)

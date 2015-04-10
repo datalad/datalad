@@ -15,11 +15,13 @@ Note: There's not a lot to test by now.
 import os
 import os.path
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_in
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_in
 from git.exc import GitCommandError
 
-from datalad.support.gitrepo import GitRepo
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ok_clean_git, on_windows
+from datalad.support.gitrepo import GitRepo, files_decorator, _normalize_path
+from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, on_windows,\
+    with_tree, get_most_obscure_supported_name, ok_clean_git
+from datalad.support.exceptions import FileNotInAnnexError
 from datalad.cmd import Runner
 
 # For now (at least) we would need to clone from the network
@@ -103,3 +105,90 @@ def test_GitRepo_get_indexed_files(src, path):
         assert_in(item, out_list, "%s not found in output of git ls-files in %s" % (item, path))
     for item in out_list:
         assert_in(item, idx_list, "%s not found in output of get_indexed_files in %s" % (item, path))
+
+
+@with_tree([
+    ('empty', ''),
+    ('d1', (
+        ('empty', ''),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ])
+def test_AnnexRepo_normalize_path(git_path):
+
+    cwd = os.getcwd()
+    gr = GitRepo(git_path)
+
+    # cwd is currently outside the repo, so any relative path
+    # should be interpreted as relative to `annex_path`
+    assert_raises(FileNotInAnnexError, _normalize_path, gr.path, os.getcwd())
+
+    result = _normalize_path(gr.path, "testfile")
+    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+
+    result = _normalize_path(gr.path, os.path.join('.', 'testfile'))
+    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+
+    result = _normalize_path(gr.path, os.path.join('testdir', '..', 'testfile'))
+    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+
+    result = _normalize_path(gr.path, os.path.join('testdir', 'testfile'))
+    assert_equal(result, os.path.join("testdir", "testfile"), "_normalize_path() returned %s" % result)
+
+    result = _normalize_path(gr.path, os.path.join(git_path, "testfile"))
+    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+
+    # now we are inside, so relative paths are relative to cwd and have
+    # to be converted to be relative to annex_path:
+    os.chdir(os.path.join(git_path, 'd1', 'd2'))
+
+    result = _normalize_path(gr.path, "testfile")
+    assert_equal(result, os.path.join('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
+
+    result = _normalize_path(gr.path, os.path.join('..', 'testfile'))
+    assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
+
+    assert_raises(FileNotInAnnexError, _normalize_path, gr.path, os.path.join(git_path, '..', 'outside'))
+
+    result = _normalize_path(gr.path, os.path.join(git_path, 'd1', 'testfile'))
+    assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
+
+    os.chdir(cwd)
+
+
+def test_AnnexRepo_files_decorator():
+
+    class testclass(object):
+        def __init__(self):
+            self.path = os.path.join('some', 'where')
+
+        @files_decorator
+        def decorated(self, files):
+            return files
+
+    test_instance = testclass()
+
+    files_to_test = os.path.join(test_instance.path, 'deep', get_most_obscure_supported_name())
+    assert_equal(test_instance.decorated(files_to_test),
+                 _normalize_path(test_instance.path, files_to_test))
+
+    files_to_test = get_most_obscure_supported_name()
+    assert_equal(test_instance.decorated(files_to_test),
+                 _normalize_path(test_instance.path, files_to_test))
+
+    files_to_test = os.path.join(get_most_obscure_supported_name(), 'beyond', 'obscure')
+    assert_equal(test_instance.decorated(files_to_test),
+                 _normalize_path(test_instance.path, files_to_test))
+
+    files_to_test = os.path.join(os.getcwd(), 'somewhere', 'else', get_most_obscure_supported_name())
+    assert_raises(FileNotInAnnexError, test_instance.decorated, files_to_test)
+
+    files_to_test = ['now', os.path.join('a list', 'of'), 'paths']
+    expect = []
+    for item in files_to_test:
+        expect.append(_normalize_path(test_instance.path, item))
+    assert_equal(test_instance.decorated(files_to_test), expect)
+
+    assert_raises(ValueError, test_instance.decorated, 1)

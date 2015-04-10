@@ -114,6 +114,7 @@ class Dataset(AnnexRepo):
             # TODO: May be this should go in a decorator for use in every command.
 
             self.annex_proxy('git add %s' % filelist)
+            # TODO: Doesn't work. Use "git -c core.bare=false add 'files'" instead!
         else:
             self.git_add(files)
 

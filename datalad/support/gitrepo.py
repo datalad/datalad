@@ -12,11 +12,14 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
 
-from os.path import join, exists, normpath
+from os import getcwd
+from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath
 import logging
 
 from git import Repo
 from git.exc import GitCommandError
+
+from datalad.support.exceptions import FileNotInAnnexError
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -24,6 +27,70 @@ lgr = logging.getLogger('datalad.gitrepo')
 # Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
 
 # TODO: make use of _checkpath or corresponding decorator from annexrepo.py to unify handling of paths.
+def _normalize_path(base_dir, path):
+        """Helper to check paths passed to methods of this class.
+
+        Checks whether `path` is beneath `base_dir` and normalize it. Additionally paths are converted into
+        relative paths with respect to `base_dir`, considering os.getcwd() in case of relative paths.
+        This is intended to be used in repository classes, which means that `base_dir` usually will be
+        the repository's base directory.
+
+        Parameters:
+        -----------
+        path: str
+            path to be normalized
+        base_dir: str
+            directory to serve as base to normalized, relative paths
+
+        Returns:
+        --------
+        str:
+            normalized path, that is a relative path with respect to `base_dir`
+        """
+        path = normpath(path)
+        if isabs(path):
+            if commonprefix([path, base_dir]) != base_dir:
+                raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
+            else:
+                pass
+
+        elif commonprefix([getcwd(), base_dir]) == base_dir:
+            # If we are inside repository, rebuilt relative paths.
+            path = p_join(getcwd(), path)
+        else:
+            # We were called from outside the repo. Therefore relative paths
+            # are interpreted as being relative to self.path already.
+            return path
+
+        return relpath(path, start=base_dir)
+
+
+def files_decorator(func):
+    """Decorator to provide unified path conversions.
+
+    Note: This is intended to be used within the repository classes and therefore returns
+    a class method!
+    The decorated function is expected to take a path or a list of paths at first positional
+    argument (after 'self'). Additionally the class `func` is a member of, is expected to have
+    an attribute 'path'.
+    """
+
+    def newfunc(self, files, *args, **kwargs):
+        if isinstance(files, basestring):
+            files_new = _normalize_path(self.path, files)
+        elif isinstance(files, list):
+            files_new = []
+            for path in files:
+                files_new.append(_normalize_path(self.path, path))
+        else:
+            raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
+                             files.__class__.__name__)
+        return func(self, files_new, *args, **kwargs)
+    return newfunc
+
+
+
+
 # TODO: Check whether it makes sense to unify passing of options in a similar way.
 
 class GitRepo(object):
@@ -62,7 +129,7 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-        if not exists(join(path, '.git')):
+        if not exists(p_join(path, '.git')):
             try:
                 self.repo = Repo.init(path, True)
             except GitCommandError as e:
