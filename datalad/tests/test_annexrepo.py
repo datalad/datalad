@@ -188,7 +188,7 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=['network'])
 @with_tempfile
 def test_AnnexRepo_file_has_content(src, annex_path):
 
