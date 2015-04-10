@@ -25,8 +25,9 @@ lgr = logging.getLogger('datalad.gitrepo')
 
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
 # Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
+# TODO: Check whether it makes sense to unify passing of options in a similar way.
 
-# TODO: make use of _checkpath or corresponding decorator from annexrepo.py to unify handling of paths.
+
 def _normalize_path(base_dir, path):
         """Helper to check paths passed to methods of this class.
 
@@ -89,10 +90,6 @@ def files_decorator(func):
     return newfunc
 
 
-
-
-# TODO: Check whether it makes sense to unify passing of options in a similar way.
-
 class GitRepo(object):
     """Representation of a git repository
 
@@ -111,7 +108,7 @@ class GitRepo(object):
         Parameters
         ----------
         path: str
-          path to the git repository
+          path to the git repository; In case it's not an absolute path, it's relative to os.getcwd()
         url: str
           url to the to-be-cloned repository.
           valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
@@ -143,7 +140,8 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-    def git_add(self, files=None):
+    @files_decorator
+    def git_add(self, files):
         """Adds file(s) to the repository.
 
         Parameters:
