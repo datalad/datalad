@@ -6,7 +6,9 @@
 #   copyright and license terms.
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Support of custom remotes (e.g. extraction from archives)"""
+"""Support of custom remotes (e.g. extraction from archives)
+
+"""
 
 __docformat__ = 'restructuredtext'
 
