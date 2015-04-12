@@ -129,11 +129,13 @@ def test_normalize_path(git_path):
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
 
-    result = _normalize_path(gr.path, os.path.join('.', 'testfile'))
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
-
-    result = _normalize_path(gr.path, os.path.join('testdir', '..', 'testfile'))
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+    # result = _normalize_path(gr.path, os.path.join('.', 'testfile'))
+    # assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+    #
+    # result = _normalize_path(gr.path, os.path.join('testdir', '..', 'testfile'))
+    # assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+    # Note: By now, normpath within normalize_paths() is disabled, therefore
+    # disable these tests.
 
     result = _normalize_path(gr.path, os.path.join('testdir', 'testfile'))
     assert_equal(result, os.path.join("testdir", "testfile"), "_normalize_path() returned %s" % result)
@@ -144,11 +146,6 @@ def test_normalize_path(git_path):
     # now we are inside, so relative paths are relative to cwd and have
     # to be converted to be relative to annex_path:
     os.chdir(os.path.join(git_path, 'd1', 'd2'))
-    import logging
-    lgr = logging.getLogger('datalad.testdebug')
-    lgr.debug("CWD: %s" % os.getcwd())
-    lgr.debug("git_path: %s" % git_path)
-    lgr.debug("gr.path: %s" % gr.path)
 
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, os.path.join('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)

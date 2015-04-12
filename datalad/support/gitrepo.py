@@ -13,7 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os import getcwd
-from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath
+from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
 
 from git import Repo
@@ -46,10 +46,15 @@ def _normalize_path(base_dir, path):
         Returns:
         --------
         str:
-            normalized path, that is a relative path with respect to `base_dir`
+            path, that is a relative path with respect to `base_dir`
         """
-        path = normpath(path)
+        base_dir = realpath(base_dir)
+        # path = normpath(path)
+        # Note: disabled normpath, because it may break paths containing symlinks;
+        # But we don't want to realpath relative paths, in case cwd isn't the correct base.
+
         if isabs(path):
+            path = realpath(path)
             if commonprefix([path, base_dir]) != base_dir:
                 raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
             else:
