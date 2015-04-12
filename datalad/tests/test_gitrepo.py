@@ -116,7 +116,7 @@ def test_GitRepo_get_indexed_files(src, path):
              )),
         )),
     ])
-def test_AnnexRepo_normalize_path(git_path):
+def test_normalize_path(git_path):
 
     cwd = os.getcwd()
     gr = GitRepo(git_path)
@@ -143,6 +143,11 @@ def test_AnnexRepo_normalize_path(git_path):
     # now we are inside, so relative paths are relative to cwd and have
     # to be converted to be relative to annex_path:
     os.chdir(os.path.join(git_path, 'd1', 'd2'))
+    import logging
+    lgr = logging.getLogger('datalad.testdebug')
+    lgr.debug("CWD: %s" % os.getcwd())
+    lgr.debug("git_path: %s" % git_path)
+    lgr.debug("gr.path: %s" % gr.path)
 
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, os.path.join('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
