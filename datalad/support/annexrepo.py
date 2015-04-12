@@ -247,7 +247,7 @@ class AnnexRepo(GitRepo):
             lgr.warning("annex_proxy called in indirect mode: %s" % git_cmd)
             raise CommandNotAvailableError(cmd=cmd_str, msg="Proxy doesn't make sense if not in direct mode.")
 
-        status, output = self.cmd_call_wrapper(cmd_str, shell=True, return_output=True)
+        status, output = self.cmd_call_wrapper(cmd_str, shell=True, return_output=True, cwd=self.path)
         # TODO: For now return output for testing. This may change later on.
 
         if status not in [0, None]:
