@@ -9,13 +9,13 @@ python:
   - "2.7"
 
 before_install:
-  - echo 'deb http://ppa.launchpad.net/fmarier/git-annex/ubuntu precise main' | sudo tee /etc/apt/sources.list.d/annex.list
-  #- sudo apt-key adv --recv-keys --keyserver hkp://pgp.mit.edu:80 90F7E9EB 
-  - cat tools/ci/gpg-90F7E9EB.pub | sudo apt-key add -
+  # The ultimate one-liner setup for NeuroDebian repository
+  - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
   - sudo apt-get update -qq
 
 install:
-  - sudo apt-get install git-annex
+  # Install standalone build of git-annex for the recent enough version
+  - sudo apt-get install git-annex-standalone
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - git submodule update --init --recursive
