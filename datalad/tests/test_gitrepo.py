@@ -116,6 +116,7 @@ def test_GitRepo_get_indexed_files(src, path):
              )),
         )),
     ])
+@assert_cwd_unchanged(ok_to_chdir=True)
 def test_normalize_path(git_path):
 
     cwd = os.getcwd()
