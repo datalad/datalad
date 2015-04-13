@@ -21,6 +21,7 @@ install:
   - git submodule update --init --recursive
   - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then cd ..; pip install -q coveralls; cd -; fi
   - pip install -r requirements.txt
+  - pip install -e .
 
 script:
   - DATALAD_LOGLEVEL=INFO nosetests -s -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO
