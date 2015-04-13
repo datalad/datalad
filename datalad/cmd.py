@@ -162,7 +162,8 @@ class Runner(object):
         Raises
         ------
         CommandError
-           if command's exitcode wasn't 0 or None. exitcode is passed CommandError's `code`-field.
+           if command's exitcode wasn't 0 or None. exitcode is passed to CommandError's `code`-field.
+           command's stdout and stderr are stored in CommandError's `stdout` and `stderr` fields respectively.
         """
 
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
@@ -207,7 +208,7 @@ class Runner(object):
                 msg = "Failed to run %r%s. Exit code=%d" \
                     % (cmd, " under %r" % cwd if cwd else '', status)
                 lgr.error(msg)
-                raise CommandError(str(cmd), msg, status)
+                raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
                 self.log("Finished running %r with status %s" % (cmd, status), level=8)
 
