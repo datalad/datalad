@@ -78,16 +78,9 @@ def test_AnnexRepo_get(src, dst):
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    if platform.system() != "Windows":
-        assert_raises(IOError, open, testfile_abs, 'r')
-        # If get has nothing to do, we can't test it.
-        # TODO: on crippled filesystem, the file is actually present before getting!
-        # So, what to test? Just skip for now.
-        # Actually, could test content!
-
-    with swallow_outputs() as cm:
-        ar.annex_get([testfile])
-        in_(cm.out, '100%')
+    assert_false(ar.file_has_content("test-annex.dat"))
+    ar.annex_get(testfile)
+    assert_true(ar.file_has_content("test-annex.dat"))
 
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
