@@ -22,10 +22,10 @@ setup(
     install_requires=[
         "GitPython", # 'git://github.com/gitpython-developers/GitPython'
         ],
-    # TODO: proper setuptools way through entry points
-    #entry_points="""
-    #    [console_scripts]
-    #"""
-    scripts = ['bin/datalad'],
+    entry_points={
+        'console_scripts' : [
+            'datalad=datalad.cmdline.main:main',
+            'git-annex-remote-dl+archive=datalad.customremotes.archive:main'],
+    }
 )
 

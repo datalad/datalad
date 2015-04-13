@@ -304,3 +304,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         link_file_load(apath, path)
         self.send('TRANSFER-SUCCESS', cmd, key)
         pass
+
+
+from .main import main as super_main
+def main():
+    """cmdline entry point"""
+    super_main(backend="archive")
