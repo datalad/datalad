@@ -330,3 +330,27 @@ class AnnexRepo(GitRepo):
             is_present = output[0].split()[0] == path
 
         return is_present
+
+    @files_decorator
+    def annex_add_to_git(self, files):
+        """Add file(s) directly to git
+
+        Parameters
+        ----------
+        files: list
+            list of paths to add to git
+        """
+
+        if self.is_direct_mode():
+            cmd_list = ['git', '-c', 'core.bare=false', 'add']
+            if isinstance(files, basestring):
+                cmd_list.append(files)
+            else:
+                # `files` has to be list, due to files_decorator's check.
+                cmd_list.extend(files)
+
+            status = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
+            # TODO: Error handling after Runner's error handling is reworked!
+
+        else:
+            self.git_add(files)

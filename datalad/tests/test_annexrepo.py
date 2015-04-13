@@ -16,11 +16,12 @@ import os
 import platform
 from git.exc import GitCommandError
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false, assert_in
 
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import AnnexRepo, _options_decorator
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree, get_most_obscure_supported_name
+    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree,\
+    get_most_obscure_supported_name, ok_clean_git
 from datalad.support.exceptions import CommandNotAvailableError, FileInGitError, FileNotInAnnexError
 
 # For now (at least) we would need to clone from the network
@@ -198,7 +199,6 @@ def test_AnnexRepo_file_has_content(src, annex_path):
     assert_true(ar.file_has_content("test-annex.dat"))
 
 
-from datalad.support.annexrepo import _options_decorator
 def test_AnnexRepo_options_decorator():
 
     @_options_decorator
@@ -207,3 +207,20 @@ def test_AnnexRepo_options_decorator():
 
     assert_equal(decorated(1, 2, someoption='first', someotheroption='second'),
                  [' --someoption=first', ' --someotheroption=second'])
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_annex_add_to_git(src, dst):
+
+    ar = AnnexRepo(dst, src)
+
+    filename = 'file_to_git.dat'
+    filename_abs = os.path.join(dst, filename)
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
+
+    assert_raises(IOError, ar.get_file_key, filename)
+    ar.annex_add_to_git([filename])
+    assert_in(filename, ar.get_indexed_files())

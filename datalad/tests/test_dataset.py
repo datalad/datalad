@@ -121,9 +121,6 @@ def test_Dataset_add_to_annex(src, dst):
 def test_Dataset__add_to_git(src, dst):
 
     ds = Dataset(dst, src)
-    # For now adding to git in direct doesn't seem to work
-    if ds.is_direct_mode():
-        raise SkipTest
 
     filename = 'file_to_git.dat'
     filename_abs = os.path.join(dst, filename)
@@ -134,7 +131,7 @@ def test_Dataset__add_to_git(src, dst):
     if ds.is_direct_mode():
         ok_clean_git_annex_proxy(dst)
     else:
-        ok_clean_git(dst, annex=False)
+        ok_clean_git(dst, annex=True)
 
 
 @assert_cwd_unchanged

@@ -80,42 +80,32 @@ class Dataset(AnnexRepo):
             self.git_commit(msg)
 
     def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
-        """Add file(s) to the annex
+        """Add file(s) to the annex.
 
+        Adds files to the annex and commits.
 
         Parameters
         ----------
+        commit_msg: str
+            commit message
         files: list
-            list of paths to add to the annex
+            list of paths to add to the annex; Can also be a str, in case of a single path.
         """
 
         self.annex_add(files)
         self._commit(commit_msg)
 
     def add_to_git(self, files, commit_msg="Added file(s) to git."):
-        """Add file(s) to git
+        """Add file(s) directly to git
 
+        Adds files directly to git and commits.
 
         Parameters
         ----------
+        commit_msg: str
+            commit message
         files: list
-            list of paths to add to git
+            list of paths to add to git; Can also be a str, in case of a single path.
         """
-        # TODO: See issue #97!
-
-
-        # TODO: Rethink, whether or not the whole direct mode dependent handling should go into AnnexRepo anyway.
-        # But remember: committing after adding should be done here, so the methods are needed either way.
-
-        if self.is_direct_mode():
-            # Since files is a list of paths, we have to care for escaping special characters, etc.
-            # at this point. For now just quote all of them (at least this should handle spaces):
-            filelist = '"' + '" "'.join(files) + '"'
-            # TODO: May be this should go in a decorator for use in every command.
-
-            self.annex_proxy('git add %s' % filelist)
-            # TODO: Doesn't work. Use "git -c core.bare=false add 'files'" instead!
-        else:
-            self.git_add(files)
-
+        self.annex_add_to_git(files)
         self._commit(commit_msg)
