@@ -69,7 +69,7 @@ def test_GitRepo_add(src, path):
     filename = "test_git_add.dat"
     with open(os.path.join(path, filename), 'w') as f:
         f.write("File to add to git")
-    gr.git_add([filename])
+    gr.git_add(filename)
 
     assert_in(filename, gr.get_indexed_files(), "%s not successfully added to %s" % (filename, path))
 
@@ -83,7 +83,7 @@ def test_GitRepo_commit(path):
     with open(os.path.join(path, filename), 'w') as f:
         f.write("File to add to git")
 
-    gr.git_add([filename])
+    gr.git_add(filename)
     gr.git_commit("Testing GitRepo.git_commit().")
     ok_clean_git(path, annex=False, untracked=[])
 
@@ -96,7 +96,7 @@ def test_GitRepo_get_indexed_files(src, path):
     idx_list = gr.get_indexed_files()
 
     runner = Runner()
-    st, out = runner.run(['git', 'ls-files'], return_output=True, cwd=path)
+    out = runner(['git', 'ls-files'], return_output=True, cwd=path)
     out_list = out[0].split()
 
     for item in idx_list:

@@ -12,7 +12,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
-from os import getcwd
+from os import linesep
 from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath
 import logging
 
@@ -164,10 +164,8 @@ class AnnexRepo(GitRepo):
         # TODO: Document (or implement respectively) behaviour in special cases like direct mode (if it's different),
         # not existing paths, etc.
 
-        status = self.cmd_call_wrapper.run(['git', 'annex', 'init'], cwd=self.path)
+        self.cmd_call_wrapper.run(['git', 'annex', 'init'], cwd=self.path)
         # TODO: When to expect stderr? on crippled filesystem for example (think so)?
-        if status not in [0, None]:
-            lgr.error('git annex init returned status %d.' % status)
 
     @_options_decorator
     @files_decorator
@@ -188,14 +186,8 @@ class AnnexRepo(GitRepo):
         cmd_list.extend(files)
 
         #don't capture stderr, since it provides progress display
-        status = self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False, log_online=True,
-                                           expect_stderr=False, cwd=self.path)
-
-        if status not in [0, None]:
-            # TODO: Actually this doesn't make sense. Runner raises exception in this case,
-            # which leads to: Runner doesn't have to return it at all.
-            lgr.error('git annex get returned status: %s' % status)
-            raise CommandError(cmd=' '.join(cmd_list))
+        self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False, log_online=True,
+                                           expect_stderr=True, cwd=self.path)
 
     @_options_decorator
     @files_decorator
@@ -212,11 +204,7 @@ class AnnexRepo(GitRepo):
         cmd_list.extend(options)
         cmd_list.extend(files)
 
-        status = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
-
-        if status not in [0, None]:
-            lgr.error("git annex add returned status: %s" % status)
-            raise CommandError(cmd=' '.join(cmd_list), msg="", code=status)
+        self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
 
     def annex_proxy(self, git_cmd):
         """Use git-annex as a proxy to git
@@ -230,28 +218,24 @@ class AnnexRepo(GitRepo):
 
         Returns:
         --------
-        output: tuple
-            a tuple constisting of the lines of the output to stdout
-            Note: This may change. See TODO.
+        output: str
+            a str containing stdout of the command
         """
-
-
 
         cmd_str = "git annex proxy -- %s" % git_cmd
         # TODO: By now git_cmd is expected to be string. Figure out how to deal with a list here.
 
         if not self.is_direct_mode():
-            lgr.warning("annex_proxy called in indirect mode: %s" % git_cmd)
+            lgr.warning("annex_proxy() called in indirect mode: %s" % git_cmd)
             raise CommandNotAvailableError(cmd=cmd_str, msg="Proxy doesn't make sense if not in direct mode.")
-
-        status, output = self.cmd_call_wrapper(cmd_str, shell=True, return_output=True, cwd=self.path)
-        # TODO: For now return output for testing. This may change later on.
-
-        if status not in [0, None]:
-            lgr.error("git annex proxy returned status: %s" % status)
-            raise CommandError(cmd=cmd_str, msg="", code=status)
-
-        return output
+        try:
+            output = self.cmd_call_wrapper(cmd_str, shell=True, return_output=True, cwd=self.path)
+        except CommandError, e:
+            if "Unknown command" in output[1]:
+                raise CommandNotAvailableError(cmd=cmd_str, msg=e.msg, stderr=e.stderr, stdout=e.stdout)
+            else:
+                raise e
+        return output[0]
 
     @files_decorator
     def get_file_key(self, files):
@@ -275,31 +259,24 @@ class AnnexRepo(GitRepo):
         cmd_list = ['git', 'annex', 'lookupkey', path]
         cmd_str = ' '.join(cmd_list)  # have a string for messages
 
-        output = None
         try:
-            status, output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
-        except RuntimeError, e:
-            # TODO: This has to be changed, due to PR #103, anyway.
-            if e.message.find("Failed to run %s" % cmd_list) > -1 and e.message.find("Exit code=1") > -1:
-                # if annex command fails we don't get the status directly
-                # nor does git-annex propagate IOError (file not found) or sth.
-                # So, we have to find out:
-
-                f = open(p_join(self.path, path), 'r')  # raise possible IOErrors
-                f.close()
-
-                # if we got here, the file is present and accessible, but not in the annex
-
-                if path in self.get_indexed_files():
+            output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
+        except CommandError, e:
+            if e.code == 1:
+                if not exists(p_join(self.path, path)):
+                    raise IOError(e.code, "File not found.", path)
+                elif path in self.get_indexed_files():
+                    # if we got here, the file is present and in git, but not in the annex
                     raise FileInGitError(cmd=cmd_str, msg="File not in annex, but git: %s" % path,
                                               filename=path)
-
-                raise FileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path,
+                else:
+                    raise FileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path,
                                                filename=path)
+            else:
+                # Not sure, whether or not this can actually happen
+                raise e
 
-        key = output[0].split()[0]
-
-        return key
+        return output[0].split(linesep)[0]
 
     @files_decorator
     def file_has_content(self, files):
@@ -321,17 +298,18 @@ class AnnexRepo(GitRepo):
         cmd_list.extend(files)
 
         try:
-            status, output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
-            # TODO: Proper exception/exitcode handling after that topic is reworked in Runner-class
-        except RuntimeError, e:
-            status = 1
+            output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
+        except CommandError, e:
+            if e.code == 1 and \
+                    "%s not found" % files[0] in e.stderr:
+                return False
+            else:
+                raise
 
-        if status not in [0, None] or output[0] == '':
-            is_present = False
+        if files[0] in output[0]:
+            return True
         else:
-            is_present = output[0].split()[0] == files[0]
-
-        return is_present
+            return False
 
     @files_decorator
     def annex_add_to_git(self, files):
@@ -346,9 +324,7 @@ class AnnexRepo(GitRepo):
         if self.is_direct_mode():
             cmd_list = ['git', '-c', 'core.bare=false', 'add']
             cmd_list.extend(files)
-
-            status = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
-            # TODO: Error handling after Runner's error handling is reworked!
+            self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
 
         else:
             self.git_add(files)

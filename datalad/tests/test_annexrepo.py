@@ -141,13 +141,14 @@ def test_AnnexRepo_annex_add(src, annex_path):
     f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
-    ar.annex_add([filename])
+    ar.annex_add(filename)
     if not ar.is_direct_mode():
         assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
     else:
         assert_false(os.path.islink(filename_abs), "Annexed file is link in direct mode.")
-        # TODO: How to test the file was added in direct mode?
-        # May be this will need 'git annex find' or sth. to be implemented.
+    key = ar.get_file_key(filename)
+    assert_false(key == '')
+    # could test for the actual key, but if there's something and no exception raised, it's fine anyway.
 
 
 @assert_cwd_unchanged
@@ -186,7 +187,7 @@ def test_AnnexRepo_file_has_content(src, annex_path):
 
     ar = AnnexRepo(annex_path, src)
     assert_false(ar.file_has_content("test-annex.dat"))
-    ar.annex_get(["test-annex.dat"])
+    ar.annex_get("test-annex.dat")
     assert_true(ar.file_has_content("test-annex.dat"))
 
 
@@ -213,5 +214,5 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
         f.write("What to write?")
 
     assert_raises(IOError, ar.get_file_key, filename)
-    ar.annex_add_to_git([filename])
+    ar.annex_add_to_git(filename)
     assert_in(filename, ar.get_indexed_files())

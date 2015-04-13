@@ -24,6 +24,7 @@ from nose import SkipTest
 from ..cmd import Runner
 from ..support.repos import AnnexRepo
 from ..utils import *
+from ..support.exceptions import CommandNotAvailableError
 
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
@@ -86,6 +87,7 @@ import os
 from os.path import exists, join
 from datalad.support.annexrepo import AnnexRepo as AnnexRepoNew
 
+
 def ok_clean_git_annex_proxy(path):
     """Helper to check, whether an annex in direct mode is clean
     """
@@ -97,22 +99,12 @@ def ok_clean_git_annex_proxy(path):
 
     try:
         out = ar.annex_proxy("git status")
-    except RuntimeError, e:
-        if "Failed to run 'git annex proxy" in e.message:
-            # This actually isn't a good way to detect "git annex proxy" is not available
-            # Would need to have a look at stderr, which is either logged or printed by now.
-            # TODO: provide logHandler, which gives access to recent Records or return stderr
-            # like stdout or whatever. The first approach may turn out to be the way to handle it anyway.
-
-            raise SkipTest
-        else:
-            raise
+    except CommandNotAvailableError, e:
+        raise SkipTest
     finally:
         os.chdir(cwd)
 
-    assert_in("nothing to commit, working directory clean", str(out), "git status output via proxy not plausible.")
-
-
+    assert_in("nothing to commit, working directory clean", out, "git status output via proxy not plausible: %s" % out)
 
 
 def ok_clean_git(path, annex=True, untracked=[]):

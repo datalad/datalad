@@ -8,8 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test implementation of class Dataset
 
-Note: There's not a lot to test by now.
-
 """
 
 import os.path
@@ -22,6 +20,7 @@ from git.exc import GitCommandError
 from datalad.support.dataset import Dataset
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git, ok_clean_git_annex_proxy
+from datalad.support.exceptions import FileInGitError
 
 
 # For now (at least) we would need to clone from the network
@@ -83,12 +82,9 @@ def test_Dataset_get(src, dst):
     assert_is_instance(ds, Dataset, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    if platform.system() != "Windows":
-        assert_raises(IOError, open, testfile_abs, 'r')
-        # If get has nothing to do, we can't test it.
-        # TODO: see test_AnnexRepo_get()
-
-    ds.get([testfile])
+    assert_false(ds.file_has_content("test-annex.dat"))
+    ds.get(testfile)
+    assert_true(ds.file_has_content("test-annex.dat"))
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 
@@ -103,16 +99,19 @@ def test_Dataset_add_to_annex(src, dst):
     filename_abs = os.path.join(dst, filename)
     with open(filename_abs, 'w') as f:
         f.write("What to write?")
-    ds.add_to_annex([filename])
+    ds.add_to_annex(filename)
 
     if not ds.is_direct_mode():
         assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
         ok_clean_git(dst, annex=True)
     else:
         assert_false(os.path.islink(filename_abs), "Annexed file is link in direct mode.")
-        # TODO: How to test the file was added in direct mode?
-        # May be this will need 'git annex find' or sth. to be implemented.
         ok_clean_git_annex_proxy(dst)
+
+    key = ds.get_file_key(filename)
+    assert_false(key == '')
+    # could test for the actual key, but if there's something and no exception raised, it's fine anyway.
+
 
 
 @assert_cwd_unchanged
@@ -126,12 +125,13 @@ def test_Dataset__add_to_git(src, dst):
     filename_abs = os.path.join(dst, filename)
     with open(filename_abs, 'w') as f:
         f.write("What to write?")
-    ds.add_to_git([filename_abs])
+    ds.add_to_git(filename_abs)
 
     if ds.is_direct_mode():
         ok_clean_git_annex_proxy(dst)
     else:
         ok_clean_git(dst, annex=True)
+    assert_raises(FileInGitError, ds.get_file_key, filename)
 
 
 @assert_cwd_unchanged
@@ -143,7 +143,7 @@ def test_Dataset_commit(src, path):
     filename = os.path.join(path, "test_git_add.dat")
     with open(filename, 'w') as f:
         f.write("File to add to git")
-    ds.annex_add([filename])
+    ds.annex_add(filename)
 
     if ds.is_direct_mode():
         assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
