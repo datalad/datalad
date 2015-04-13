@@ -8,8 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test implementation of class AnnexRepo
 
-Note: There's not a lot to test by now.
-
 """
 
 import os

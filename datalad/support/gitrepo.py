@@ -19,13 +19,14 @@ import logging
 from git import Repo
 from git.exc import GitCommandError
 
-from datalad.support.exceptions import FileNotInAnnexError
+from datalad.support.exceptions import FileNotInRepositoryError
 
 lgr = logging.getLogger('datalad.gitrepo')
 
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
 # Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
-# TODO: Check whether it makes sense to unify passing of options in a similar way.
+# TODO: Check whether it makes sense to unify passing of options in a way similar to paths.
+# See options_decorator in annexrepo.py
 
 
 def _normalize_path(base_dir, path):
@@ -56,7 +57,7 @@ def _normalize_path(base_dir, path):
         if isabs(path):
             path = realpath(path)
             if commonprefix([path, base_dir]) != base_dir:
-                raise FileNotInAnnexError(msg="Path outside repository: %s" % path, filename=path)
+                raise FileNotInRepositoryError(msg="Path outside repository: %s" % path, filename=path)
             else:
                 pass
 
@@ -181,7 +182,7 @@ class GitRepo(object):
         msg: str
             commit-message
         options:
-            to be implemented. See TODO in AnnexRepo regarding a decorator for this purpose.
+            to be implemented. See options_decorator in annexrepo.
         """
 
         if not msg:

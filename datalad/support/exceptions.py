@@ -48,3 +48,7 @@ class FileInGitError(FileNotInAnnexError):
     """Thrown if a file is not under control of git-annex, but git itself.
     """
     pass
+
+class FileNotInRepositoryError(FileNotInAnnexError):
+    """Thrown if a file is not in the repository at all.
+    """

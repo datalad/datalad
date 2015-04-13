@@ -110,7 +110,7 @@ class AnnexRepo(GitRepo):
         try:
             dm = self.repo.config_reader().get_value("annex", "direct")
         except NoOptionError, e:
-            #If .git/config lacks an entry "direct" it's actually indirect mode.
+            # If .git/config lacks an entry "direct" it's actually indirect mode.
             dm = False
 
         return dm
@@ -126,7 +126,7 @@ class AnnexRepo(GitRepo):
         try:
             cr_fs = self.repo.config_reader().get_value("annex", "crippledfilesystem")
         except NoOptionError, e:
-            #If .git/config lacks an entry "crippledfilesystem" it's actually not crippled.
+            # If .git/config lacks an entry "crippledfilesystem" it's actually not crippled.
             cr_fs = False
 
         return cr_fs
@@ -151,7 +151,7 @@ class AnnexRepo(GitRepo):
         mode = 'direct' if enable_direct_mode else 'indirect'
         self.cmd_call_wrapper.run(['git', 'annex', mode], cwd=self.path,
                                   expect_stderr=True)
-        #TODO: 1. Where to handle failure? 2. On crippled filesystem don't even try.
+        # TODO: 1. Where to handle failure?
 
     def _annex_init(self):
         """Initializes an annex repository.

@@ -8,8 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test implementation of class GitRepo
 
-Note: There's not a lot to test by now.
-
 """
 
 import os
@@ -21,7 +19,7 @@ from git.exc import GitCommandError
 from datalad.support.gitrepo import GitRepo, files_decorator, _normalize_path
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, on_windows,\
     with_tree, get_most_obscure_supported_name, ok_clean_git
-from datalad.support.exceptions import FileNotInAnnexError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.cmd import Runner
 
 # For now (at least) we would need to clone from the network
@@ -124,7 +122,7 @@ def test_normalize_path(git_path):
 
     # cwd is currently outside the repo, so any relative path
     # should be interpreted as relative to `annex_path`
-    assert_raises(FileNotInAnnexError, _normalize_path, gr.path, os.getcwd())
+    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, os.getcwd())
 
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
@@ -153,7 +151,7 @@ def test_normalize_path(git_path):
     result = _normalize_path(gr.path, os.path.join('..', 'testfile'))
     assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
-    assert_raises(FileNotInAnnexError, _normalize_path, gr.path, os.path.join(git_path, '..', 'outside'))
+    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, os.path.join(git_path, '..', 'outside'))
 
     result = _normalize_path(gr.path, os.path.join(git_path, 'd1', 'testfile'))
     assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
@@ -186,7 +184,7 @@ def test_GitRepo_files_decorator():
                  [_normalize_path(test_instance.path, files_to_test)])
 
     files_to_test = os.path.join(os.getcwd(), 'somewhere', 'else', get_most_obscure_supported_name())
-    assert_raises(FileNotInAnnexError, test_instance.decorated, files_to_test)
+    assert_raises(FileNotInRepositoryError, test_instance.decorated, files_to_test)
 
     files_to_test = ['now', os.path.join('a list', 'of'), 'paths']
     expect = []
