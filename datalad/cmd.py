@@ -17,6 +17,7 @@ import sys
 import logging
 import os
 import shutil
+from datalad.support.exceptions import CommandError
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -67,7 +68,6 @@ class Runner(object):
         else:
             raise ValueError("Argument 'command' is neither a string, "
                              "nor a list nor a callable.")
-	# TODO: shouldn't it return the functions instead of just calling them?
 
     # Two helpers to encapsulate formatting/output
     def _log_out(self, line):
@@ -156,15 +156,14 @@ class Runner(object):
 
         Returns
         -------
-        Status code as returned by the called command or `None` in case of dry-mode.
-        
         (stdout, stderr)
            if return_output=True
 
         Raises
         ------
-        RunTimeError
-           if command's exitcode wasn't 0 or None
+        CommandError
+           if command's exitcode wasn't 0 or None. exitcode is passed to CommandError's `code`-field.
+           command's stdout and stderr are stored in CommandError's `stdout` and `stderr` fields respectively.
         """
 
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
@@ -181,7 +180,7 @@ class Runner(object):
                                     shell=shell,
                                     cwd=cwd)
             except Exception, e:
-                lgr.error("Failed to start %s: %s" % (cmd, e))
+                lgr.error("Failed to start %r%r: %s" % (cmd, " under %r" % cwd if cwd else '', e))
                 raise
             # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
             # and is considered to be a security hazard. So be careful with input.
@@ -207,21 +206,20 @@ class Runner(object):
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s. Exit code=%d" \
-                      % (cmd, " under %r" % cwd if cwd else '', status)
+                    % (cmd, " under %r" % cwd if cwd else '', status)
                 lgr.error(msg)
-                raise RuntimeError(msg)
-
+                raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
                 self.log("Finished running %r with status %s" % (cmd, status), level=8)
 
         else:
             self.commands.append(cmd)
-            status, out = None, ("DRY", "DRY")
+            out = ("DRY", "DRY")
 
         if return_output:
-            return status, out
+            return out
         else:
-            return status
+            return None
 
     def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.

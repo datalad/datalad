@@ -10,14 +10,17 @@
 """
 
 
-class CommandError(Exception):
+class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
 
-    def __init__(self, cmd="", msg="", code=None):
+    def __init__(self, cmd="", msg="", code=None, stdout="", stderr=""):
+        RuntimeError.__init__(self, msg)
         self.cmd = cmd
         self.msg = msg
         self.code = code
+        self.stdout = stdout
+        self.stderr = stderr
 
     def __str__(self):
         to_str = "%s: command '%s'" % (self.__class__.__name__, self.cmd)
