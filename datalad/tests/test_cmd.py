@@ -15,12 +15,13 @@ import sys
 import logging
 
 from nose.tools import ok_, eq_, assert_is, assert_equal, assert_false, \
-    assert_true, assert_greater
+    assert_true, assert_greater, assert_raises, assert_in
 
 from datalad.cmd import Runner, link_file_load
 from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
-    on_linux, on_osx, on_windows
+    on_linux, on_osx, on_windows, with_testrepos
+from datalad.support.exceptions import CommandError
 
 
 @ignore_nose_capturing_stdout
@@ -232,3 +233,15 @@ def test_link_file_load(tempfile):
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
     os.unlink(tempfile2) # TODO: next two with_tempfile
 
+@with_testrepos(flavors='local')
+def test_runner_failure(dir):
+
+    runner = Runner()
+    failing_cmd = ['git', 'annex', 'add', 'notexistent.dat']
+    assert_raises(CommandError, runner.run, failing_cmd, cwd=dir)
+
+    try:
+        runner.run(failing_cmd, cwd=dir)
+    except CommandError, e:
+        assert_equal(1, e.code)
+        assert_in('notexistent.dat not found', e.stderr)
