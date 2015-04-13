@@ -56,12 +56,12 @@ class Dataset(AnnexRepo):
         if not exists(dataladPath):
             os.mkdir(dataladPath)
 
-    def get(self, list):
+    def get(self, files):
         """get the actual content of files
 
         This command gets the actual content of the files in `list`.
         """
-        super(Dataset, self).annex_get(list)
+        self.annex_get(files)
         # For now just pass
         # TODO:
 

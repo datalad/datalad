@@ -79,11 +79,13 @@ def files_decorator(func):
     The decorated function is expected to take a path or a list of paths at first positional
     argument (after 'self'). Additionally the class `func` is a member of, is expected to have
     an attribute 'path'.
+
+    Accepts either a list of paths or a single path in a str. Passes a list to decorated function either way!
     """
 
     def newfunc(self, files, *args, **kwargs):
         if isinstance(files, basestring):
-            files_new = _normalize_path(self.path, files)
+            files_new = [_normalize_path(self.path, files)]
         elif isinstance(files, list):
             files_new = []
             for path in files:
@@ -159,7 +161,7 @@ class GitRepo(object):
             try:
                 self.repo.index.add(files, write=True)
                 # TODO: May be make use of 'fprogress'-option to indicate progress
-                # But then, we done have it for git-annex add, anyway.
+                # But then, we don't have it for git-annex add, anyway.
                 #
                 # TODO: Is write=True a reasonable way to do it?
                 # May be should not write until success of operation is confirmed?

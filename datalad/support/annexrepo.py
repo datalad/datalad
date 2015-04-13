@@ -49,9 +49,10 @@ class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
 
 
-    Paths given to any of the class methods will be interpreted as relative to os.getcwd() in case this is currently beneath
-    AnnexRepo's base dir (`self.path`). If os.getcwd() is outside of the repository, relative paths will be interpreted as
-    relative to `self.path`. Absolute paths will be accepted either way.
+    Paths given to any of the class methods will be interpreted as relative to os.getcwd(),
+    in case this is currently beneath AnnexRepo's base dir (`self.path`). If os.getcwd() is outside of the repository,
+    relative paths will be interpreted as relative to `self.path`.
+    Absolute paths will be accepted either way.
     """
     # TODO: Check exceptions for the latter and find a workaround. For example: git annex lookupkey doesn't accept
     # absolute paths. So, build relative paths from absolute ones and may be include checking whether or not they
@@ -184,9 +185,7 @@ class AnnexRepo(GitRepo):
 
         cmd_list = ['git', 'annex', 'get']
         cmd_list.extend(options)
-
-        for path in files:
-            cmd_list.append(path)
+        cmd_list.extend(files)
 
         #don't capture stderr, since it provides progress display
         status = self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False, log_online=True,
@@ -211,9 +210,7 @@ class AnnexRepo(GitRepo):
 
         cmd_list = ['git', 'annex', 'add']
         cmd_list.extend(options)
-
-        for path in files:
-            cmd_list.append(path)
+        cmd_list.extend(files)
 
         status = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
 
@@ -257,13 +254,13 @@ class AnnexRepo(GitRepo):
         return output
 
     @files_decorator
-    def get_file_key(self, path):
-        """Get key of an annexed file
+    def get_file_key(self, files):
+        """Get key of an annexed file.
 
         Parameters:
         -----------
-        path: str
-            file to look up; have to be a path relative to repo's base dir
+        files: list, str
+            file to look up
 
         Returns:
         --------
@@ -271,12 +268,11 @@ class AnnexRepo(GitRepo):
             key used by git-annex for `path`
         """
 
+        if len(files) > 1:
+            raise NotImplementedError("No handling of multiple files implemented yet for get_file_key()!")
+        path = files[0]
+
         cmd_list = ['git', 'annex', 'lookupkey', path]
-
-        # TODO: For now this means, path_to_file has to be a string,
-        # containing a single path. In oppposition to git annex lookupkey itself,
-        # which can look up several files at once.
-
         cmd_str = ' '.join(cmd_list)  # have a string for messages
 
         output = None
@@ -306,17 +302,23 @@ class AnnexRepo(GitRepo):
         return key
 
     @files_decorator
-    def file_has_content(self, path):
-        """ Check whether the file `path` is present with its content.
+    def file_has_content(self, files):
+        """ Check whether `files` are present with their content.
+
+        Note: Handling of multiple files not yet implemented!
+        TODO: Decide how to behave in case of multiple files, with some of them not present.
 
         Parameters:
         -----------
-        path: str
-
+        files: list
+            file(s) to check for being actually present.
         """
         # TODO: Also provide option to look for key instead of path
+        if len(files) > 1:
+            raise NotImplementedError("No handling of multiple files implemented yet for file_has_content()!")
 
-        cmd_list = ['git', 'annex', 'find', path]
+        cmd_list = ['git', 'annex', 'find']
+        cmd_list.extend(files)
 
         try:
             status, output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
@@ -327,7 +329,7 @@ class AnnexRepo(GitRepo):
         if status not in [0, None] or output[0] == '':
             is_present = False
         else:
-            is_present = output[0].split()[0] == path
+            is_present = output[0].split()[0] == files[0]
 
         return is_present
 
@@ -343,11 +345,7 @@ class AnnexRepo(GitRepo):
 
         if self.is_direct_mode():
             cmd_list = ['git', '-c', 'core.bare=false', 'add']
-            if isinstance(files, basestring):
-                cmd_list.append(files)
-            else:
-                # `files` has to be list, due to files_decorator's check.
-                cmd_list.extend(files)
+            cmd_list.extend(files)
 
             status = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
             # TODO: Error handling after Runner's error handling is reworked!

@@ -161,7 +161,7 @@ def test_normalize_path(git_path):
     os.chdir(cwd)
 
 
-def test_AnnexRepo_files_decorator():
+def test_GitRepo_files_decorator():
 
     class testclass(object):
         def __init__(self):
@@ -175,15 +175,15 @@ def test_AnnexRepo_files_decorator():
 
     files_to_test = os.path.join(test_instance.path, 'deep', get_most_obscure_supported_name())
     assert_equal(test_instance.decorated(files_to_test),
-                 _normalize_path(test_instance.path, files_to_test))
+                 [_normalize_path(test_instance.path, files_to_test)])
 
     files_to_test = get_most_obscure_supported_name()
     assert_equal(test_instance.decorated(files_to_test),
-                 _normalize_path(test_instance.path, files_to_test))
+                 [_normalize_path(test_instance.path, files_to_test)])
 
     files_to_test = os.path.join(get_most_obscure_supported_name(), 'beyond', 'obscure')
     assert_equal(test_instance.decorated(files_to_test),
-                 _normalize_path(test_instance.path, files_to_test))
+                 [_normalize_path(test_instance.path, files_to_test)])
 
     files_to_test = os.path.join(os.getcwd(), 'somewhere', 'else', get_most_obscure_supported_name())
     assert_raises(FileNotInAnnexError, test_instance.decorated, files_to_test)
