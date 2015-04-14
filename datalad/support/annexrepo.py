@@ -335,3 +335,37 @@ class AnnexRepo(GitRepo):
             self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
         else:
             self.git_add(files)
+
+
+# TODO:
+#         
+#     def annex_initremote(self, name, options):
+#         """
+#         """
+#         pass
+#
+#     def annex_enableremote(self, name):
+#         """
+#         """
+#         pass
+#
+#     def annex_addurl(self, url, options):
+#         """
+#         """
+#         pass
+#
+#     def annex_rmurl(self, file, url):
+#         """
+#         """
+#         pass
+#
+#     @normalize_paths
+#     def annex_drop(self, files):
+#         """
+#         """
+#         pass
+#
+#     def annex_whereis(self, files):
+#         """
+#         """
+#         pass
