@@ -60,10 +60,6 @@ def test_basic_scenario(d, d2):
         if protocol:
             protocol.write_section(cmd)
         ret = r(cmd, *args, **kwargs)
-        if isinstance(ret, tuple):
-            assert_false(ret[0])
-        else:
-            assert_false(ret)
         return ret
 
     annex_opts = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
@@ -93,7 +89,7 @@ def test_basic_scenario(d, d2):
     annex(['addurl', '--file',  fn_extracted, '--relaxed', file_url])
     annex(['drop', fn_extracted])
 
-    status, (out, err) = annex(['whereis', fn_extracted], return_output=True)
+    (out, err) = annex(['whereis', fn_extracted])
     in_('-- [annexed-archives]', out)
     in_('annexed-archives: %s' % file_url, out)
 
