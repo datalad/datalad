@@ -13,7 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os import getcwd
-from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath, realpath
+from os.path import join, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
 
 from git import Repo
@@ -63,7 +63,7 @@ def _normalize_path(base_dir, path):
 
         elif commonprefix([getcwd(), base_dir]) == base_dir:
             # If we are inside repository, rebuilt relative paths.
-            path = p_join(getcwd(), path)
+            path = join(getcwd(), path)
         else:
             # We were called from outside the repo. Therefore relative paths
             # are interpreted as being relative to self.path already.
@@ -134,7 +134,7 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-        if not exists(p_join(path, '.git')):
+        if not exists(join(path, '.git')):
             try:
                 self.repo = Repo.init(path, True)
             except GitCommandError as e:

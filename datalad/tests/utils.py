@@ -48,7 +48,7 @@ def create_archive(path, name, load):
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    status = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
+    output = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
                           cwd=path, expect_stderr=True)
     # remove original tree
     shutil.rmtree(full_dirname)
@@ -104,7 +104,7 @@ def ok_clean_git_annex_proxy(path):
     finally:
         os.chdir(cwd)
 
-    assert_in("nothing to commit, working directory clean", out, "git status output via proxy not plausible: %s" % out)
+    assert_in("nothing to commit, working directory clean", out, "git-status output via proxy not plausible: %s" % out)
 
 
 def ok_clean_git(path, annex=True, untracked=[]):

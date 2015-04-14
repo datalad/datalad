@@ -73,9 +73,7 @@ class AnnexRepo(object):
         lgr.info("Initializing git annex repository under %s: %s"
                  % (self.path, description))
 
-        status = self.runner.run("git init && git annex init", cwd=self.path)
-        if status:
-            raise RuntimeError("Initialization failed")
+        self.runner.run("git init && git annex init", cwd=self.path)
 
         if description:
             lgr.debug("Writing description")

@@ -34,7 +34,7 @@ def test_runner_dry(tempfile):
     # test dry command call
     cmd = 'echo Testing dry run > %s' % tempfile
     ret = runner.run(cmd)
-    assert_is(None, ret, "Dry run of: %s resulted in exitcode %s" % (cmd, ret))
+    assert_equal(("DRY", "DRY"), ret, "Dry run of: %s resulted in output %s" % (cmd, ret))
     assert_greater(runner.commands.__str__().find('echo Testing dry run'), -1,
                  "Dry run of: %s resulted in buffer: %s" % (cmd, runner.commands.__str__()))
     assert_false(os.path.exists(tempfile))
@@ -74,7 +74,7 @@ def test_runner_instance_callable_dry():
     for cmd in [cmd_, ' '.join(cmd_)]:
         runner = Runner(dry=True)
         ret = runner(cmd)
-        eq_(ret, None) # errorcode is returned.  But in dry -- None
+        eq_(ret, ("DRY", "DRY"))  # (stdout, stderr) is returned.  But in dry -- ("DRY","DRY")
         assert_equal(runner.commands.__str__(), ("[%r]" % cmd),
                      "Dry run of Runner.__call__ didn't record command: %s.\n"
                      "Buffer: %s" % (cmd, runner.commands.__str__()))
@@ -96,10 +96,7 @@ def test_runner_instance_callable_wet():
     runner = Runner()
     cmd = [sys.executable, "-c", "print('Testing')"]
 
-    ret = runner(cmd)
-    eq_(ret, None)  # must succesfully run basic command and spit out output for us
-
-    out = runner(cmd, return_output=True)
+    out = runner(cmd)
     eq_(out[0].rstrip(), ('Testing'))
     eq_(out[1], '')
 

@@ -96,7 +96,7 @@ def test_GitRepo_get_indexed_files(src, path):
     idx_list = gr.get_indexed_files()
 
     runner = Runner()
-    out = runner(['git', 'ls-files'], return_output=True, cwd=path)
+    out = runner(['git', 'ls-files'], cwd=path)
     out_list = out[0].split()
 
     for item in idx_list:

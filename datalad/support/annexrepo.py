@@ -13,7 +13,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 """
 
 from os import linesep
-from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath
+from os.path import join, exists, normpath, isabs, commonprefix, relpath
 import logging
 
 from ConfigParser import NoOptionError
@@ -92,7 +92,7 @@ class AnnexRepo(GitRepo):
         #       fine grained.
 
         # Check whether an annex already exists at destination
-        if not exists(p_join(self.path, '.git', 'annex')):
+        if not exists(join(self.path, '.git', 'annex')):
             lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
             self._annex_init()
 
@@ -181,9 +181,7 @@ class AnnexRepo(GitRepo):
             "--from=myremote"
         """
 
-        cmd_list = ['git', 'annex', 'get']
-        cmd_list.extend(options)
-        cmd_list.extend(files)
+        cmd_list = ['git', 'annex', 'get'] + options + files
 
         #don't capture stderr, since it provides progress display
         self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False, log_online=True,
@@ -200,10 +198,7 @@ class AnnexRepo(GitRepo):
             list of paths to add to the annex
         """
 
-        cmd_list = ['git', 'annex', 'add']
-        cmd_list.extend(options)
-        cmd_list.extend(files)
-
+        cmd_list = ['git', 'annex', 'add'] + options + files
         self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
 
     def annex_proxy(self, git_cmd):
@@ -218,8 +213,7 @@ class AnnexRepo(GitRepo):
 
         Returns:
         --------
-        output: str
-            a str containing stdout of the command
+        str containing stdout of the command
         """
 
         cmd_str = "git annex proxy -- %s" % git_cmd
@@ -229,7 +223,7 @@ class AnnexRepo(GitRepo):
             lgr.warning("annex_proxy() called in indirect mode: %s" % git_cmd)
             raise CommandNotAvailableError(cmd=cmd_str, msg="Proxy doesn't make sense if not in direct mode.")
         try:
-            output = self.cmd_call_wrapper(cmd_str, shell=True, return_output=True, cwd=self.path)
+            output = self.cmd_call_wrapper(cmd_str, shell=True, cwd=self.path)
         except CommandError, e:
             if "Unknown command" in output[1]:
                 raise CommandNotAvailableError(cmd=cmd_str, msg=e.msg, stderr=e.stderr, stdout=e.stdout)
@@ -260,10 +254,10 @@ class AnnexRepo(GitRepo):
         cmd_str = ' '.join(cmd_list)  # have a string for messages
 
         try:
-            output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
+            output = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
         except CommandError, e:
             if e.code == 1:
-                if not exists(p_join(self.path, path)):
+                if not exists(join(self.path, path)):
                     raise IOError(e.code, "File not found.", path)
                 elif path in self.get_indexed_files():
                     # if we got here, the file is present and in git, but not in the annex
@@ -294,11 +288,10 @@ class AnnexRepo(GitRepo):
         if len(files) > 1:
             raise NotImplementedError("No handling of multiple files implemented yet for file_has_content()!")
 
-        cmd_list = ['git', 'annex', 'find']
-        cmd_list.extend(files)
+        cmd_list = ['git', 'annex', 'find'] + files
 
         try:
-            output = self.cmd_call_wrapper.run(cmd_list, return_output=True, cwd=self.path)
+            output = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
         except CommandError, e:
             if e.code == 1 and \
                     "%s not found" % files[0] in e.stderr:
@@ -306,10 +299,7 @@ class AnnexRepo(GitRepo):
             else:
                 raise
 
-        if files[0] in output[0]:
-            return True
-        else:
-            return False
+        return files[0] in output[0]
 
     @files_decorator
     def annex_add_to_git(self, files):
@@ -322,9 +312,7 @@ class AnnexRepo(GitRepo):
         """
 
         if self.is_direct_mode():
-            cmd_list = ['git', '-c', 'core.bare=false', 'add']
-            cmd_list.extend(files)
+            cmd_list = ['git', '-c', 'core.bare=false', 'add'] + files
             self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
-
         else:
             self.git_add(files)
