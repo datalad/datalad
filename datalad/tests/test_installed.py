@@ -21,7 +21,7 @@ def check_run_and_get_output(cmd):
         output = runner.run(["datalad", "--help"])
     except CommandError, e:
         raise AssertionError("'datalad --help' failed to start normally. "
-                             "Exited with %d and output %s" % (status, output))
+                             "Exited with %d and output %s" % (e.code, (e.stdout, e.stderr)))
     return output
 
 @ignore_nose_capturing_stdout
