@@ -23,8 +23,28 @@ to get a better understanding of the ultimate specs and design.
 
 # Tests
 
-Unfortunately there is not that much of unittests, but there are few
-"functionality" tests aiming to address main use-cases.
+All tests are available under `datalad/tests`.  To exercise tests, the codebase
+need to be "installed" to generate scripts for the entry points.  For that,
+recommended course of action is to use virtualenv, e.g.
+
+```sh
+virtualenv --system-site-packages venv-tests
+venv-tests/bin/pip install -r requirements
+venv-tests/bin/python setup.py develop
+```
+
+and then use that virtual environment to run the tests, e.g. via
+
+```sh
+venv-tests/bin/python -m nose -s -v datalad
+```
+
+You can avoid entering venv-tests/bin  by simply activating that environment in
+the current shell session:
+
+```sh
+source venv-tests/bin/activate
+```
 
 Some tests use testing repositories which are available as submodules
 under the `datalad/tests/testrepos` submodule (two tier- to not pollute
