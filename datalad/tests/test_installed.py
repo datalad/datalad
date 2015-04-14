@@ -18,7 +18,7 @@ from datalad.support.exceptions import CommandError
 def check_run_and_get_output(cmd):
     runner = Runner()
     try:
-        output = runner.run(["datalad", "--help"], return_output=True)
+        output = runner.run(["datalad", "--help"])
     except CommandError, e:
         raise AssertionError("'datalad --help' failed to start normally. "
                              "Exited with %d and output %s" % (status, output))
