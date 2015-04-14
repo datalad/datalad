@@ -17,12 +17,14 @@ from os.path import exists, join as opj
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_in as in_, \
-    raises, ok_, eq_, make_decorator
+    raises, ok_, eq_, make_decorator, assert_true
+
 from nose import SkipTest
 
 from ..cmd import Runner
 from ..support.repos import AnnexRepo
 from ..utils import *
+from ..support.exceptions import CommandNotAvailableError
 
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
@@ -46,7 +48,7 @@ def create_archive(path, name, load):
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    status = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
+    output = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
                           cwd=path, expect_stderr=True)
     # remove original tree
     shutil.rmtree(full_dirname)
@@ -81,7 +83,29 @@ def create_tree(path, tree):
 #
 
 import git
+import os
 from os.path import exists, join
+from datalad.support.annexrepo import AnnexRepo as AnnexRepoNew
+
+
+def ok_clean_git_annex_proxy(path):
+    """Helper to check, whether an annex in direct mode is clean
+    """
+    # TODO: May be let's make a method of AnnexRepo for this purpose
+
+    ar = AnnexRepoNew(path)
+    cwd = os.getcwd()
+    os.chdir(path)
+
+    try:
+        out = ar.annex_proxy("git status")
+    except CommandNotAvailableError, e:
+        raise SkipTest
+    finally:
+        os.chdir(cwd)
+
+    assert_in("nothing to commit, working directory clean", out[0], "git-status output via proxy not plausible: %s" % out[0])
+
 
 def ok_clean_git(path, annex=True, untracked=[]):
     """Verify that under given path there is a clean git repository

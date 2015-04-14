@@ -8,19 +8,19 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test implementation of class Dataset
 
-Note: There's not a lot to test by now.
-
 """
 
 import os.path
 import platform
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
+from nose import SkipTest
 from git.exc import GitCommandError
 
 from datalad.support.dataset import Dataset
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows
+    on_windows, ok_clean_git, ok_clean_git_annex_proxy
+from datalad.support.exceptions import FileInGitError
 
 
 # For now (at least) we would need to clone from the network
@@ -40,6 +40,17 @@ def test_Dataset(src, dst):
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     assert_raises(GitCommandError, Dataset, dst, src)
+
+@ignore_nose_capturing_stdout
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_Dataset_direct(src, dst):
+
+    ds = Dataset(dst, src, direct=True)
+    assert_is_instance(ds, Dataset, "Dataset was not created.")
+    assert_true(os.path.exists(os.path.join(dst, '.datalad')))
+    assert_true(ds.is_direct_mode(), "Forcing direct mode failed.")
     
 
 @ignore_nose_capturing_stdout
@@ -69,17 +80,78 @@ def test_Dataset_get(src, dst):
 
     ds = Dataset(dst, src)
     assert_is_instance(ds, Dataset, "AnnexRepo was not created.")
-
-    cwd = os.getcwd()
-    os.chdir(dst)
     testfile = 'test-annex.dat'
-    if platform.system() != "Windows":
-        assert_raises(IOError, open, testfile, 'r')
-        # If get has nothing to do, we can't test it.
-        # TODO: see test_AnnexRepo_get()
-
-    ds.get([testfile])
-    f = open(testfile, 'r')
+    testfile_abs = os.path.join(dst, testfile)
+    assert_false(ds.file_has_content("test-annex.dat")[0][1])
+    ds.get(testfile)
+    assert_true(ds.file_has_content("test-annex.dat")[0][1])
+    f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 
-    os.chdir(cwd)
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_Dataset_add_to_annex(src, dst):
+
+    ds = Dataset(dst, src)
+    filename = 'file_to_annex.dat'
+    filename_abs = os.path.join(dst, filename)
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
+    ds.add_to_annex(filename)
+
+    if not ds.is_direct_mode():
+        assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
+        ok_clean_git(dst, annex=True)
+    else:
+        assert_false(os.path.islink(filename_abs), "Annexed file is link in direct mode.")
+        ok_clean_git_annex_proxy(dst)
+
+    key = ds.get_file_key(filename)
+    assert_false(key == '')
+    # could test for the actual key, but if there's something and no exception raised, it's fine anyway.
+
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_Dataset__add_to_git(src, dst):
+
+    ds = Dataset(dst, src)
+
+    filename = 'file_to_git.dat'
+    filename_abs = os.path.join(dst, filename)
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
+    ds.add_to_git(filename_abs)
+
+    if ds.is_direct_mode():
+        ok_clean_git_annex_proxy(dst)
+    else:
+        ok_clean_git(dst, annex=True)
+    assert_raises(FileInGitError, ds.get_file_key, filename)
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_Dataset_commit(src, path):
+
+    ds = Dataset(path, src)
+    filename = os.path.join(path, "test_git_add.dat")
+    with open(filename, 'w') as f:
+        f.write("File to add to git")
+    ds.annex_add(filename)
+
+    if ds.is_direct_mode():
+        assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
+    else:
+        assert_raises(AssertionError, ok_clean_git, path, annex=True)
+
+    ds._commit("test _commit")
+    if ds.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
