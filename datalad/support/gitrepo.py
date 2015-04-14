@@ -13,8 +13,10 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os import getcwd
-from os.path import join as p_join, exists, normpath, isabs, commonprefix, relpath, realpath
+from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
+
+from functools import wraps
 
 from git import Repo
 from git.exc import GitCommandError
@@ -24,76 +26,83 @@ from datalad.support.exceptions import FileNotInRepositoryError
 lgr = logging.getLogger('datalad.gitrepo')
 
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
-# Didn't work as expected on a first try. Probably there is a neatier way to log Exceptions from git commands.
-# TODO: Check whether it makes sense to unify passing of options in a way similar to paths.
-# See options_decorator in annexrepo.py
+# Didn't work as expected on a first try. Probably there is a neatier way to
+# log Exceptions from git commands.
+
+# TODO: Check whether it makes sense to unify passing of options in a way
+# similar to paths. See options_decorator in annexrepo.py
 
 
 def _normalize_path(base_dir, path):
-        """Helper to check paths passed to methods of this class.
+    """Helper to check paths passed to methods of this class.
 
-        Checks whether `path` is beneath `base_dir` and normalize it. Additionally paths are converted into
-        relative paths with respect to `base_dir`, considering os.getcwd() in case of relative paths.
-        This is intended to be used in repository classes, which means that `base_dir` usually will be
-        the repository's base directory.
+    Checks whether `path` is beneath `base_dir` and normalize it.
+    Additionally paths are converted into relative paths with respect to
+    `base_dir`, considering os.getcwd() in case of relative paths. This
+    is intended to be used in repository classes, which means that
+    `base_dir` usually will be the repository's base directory.
 
-        Parameters:
-        -----------
-        path: str
-            path to be normalized
-        base_dir: str
-            directory to serve as base to normalized, relative paths
+    Parameters:
+    -----------
+    path: str
+        path to be normalized
+    base_dir: str
+        directory to serve as base to normalized, relative paths
 
-        Returns:
-        --------
-        str:
-            path, that is a relative path with respect to `base_dir`
-        """
-        base_dir = realpath(base_dir)
-        # path = normpath(path)
-        # Note: disabled normpath, because it may break paths containing symlinks;
-        # But we don't want to realpath relative paths, in case cwd isn't the correct base.
+    Returns:
+    --------
+    str:
+        path, that is a relative path with respect to `base_dir`
+    """
+    base_dir = realpath(base_dir)
+    # path = normpath(path)
+    # Note: disabled normpath, because it may break paths containing symlinks;
+    # But we don't want to realpath relative paths, in case cwd isn't the correct base.
 
-        if isabs(path):
-            path = realpath(path)
-            if commonprefix([path, base_dir]) != base_dir:
-                raise FileNotInRepositoryError(msg="Path outside repository: %s" % path, filename=path)
-            else:
-                pass
-
-        elif commonprefix([getcwd(), base_dir]) == base_dir:
-            # If we are inside repository, rebuilt relative paths.
-            path = p_join(getcwd(), path)
+    if isabs(path):
+        path = realpath(path)
+        if commonprefix([path, base_dir]) != base_dir:
+            raise FileNotInRepositoryError(msg="Path outside repository: %s"
+                                               % path, filename=path)
         else:
-            # We were called from outside the repo. Therefore relative paths
-            # are interpreted as being relative to self.path already.
-            return path
+            pass
 
-        return relpath(path, start=base_dir)
+    elif commonprefix([getcwd(), base_dir]) == base_dir:
+        # If we are inside repository, rebuilt relative paths.
+        path = opj(getcwd(), path)
+    else:
+        # We were called from outside the repo. Therefore relative paths
+        # are interpreted as being relative to self.path already.
+        return path
+
+    return relpath(path, start=base_dir)
 
 
-def files_decorator(func):
+def normalize_paths(func):
     """Decorator to provide unified path conversions.
 
-    Note: This is intended to be used within the repository classes and therefore returns
-    a class method!
-    The decorated function is expected to take a path or a list of paths at first positional
-    argument (after 'self'). Additionally the class `func` is a member of, is expected to have
-    an attribute 'path'.
+    Note
+    ----
+    This is intended to be used within the repository classes and therefore
+    returns a class method!
 
-    Accepts either a list of paths or a single path in a str. Passes a list to decorated function either way!
+    The decorated function is expected to take a path or a list of paths at
+    first positional argument (after 'self'). Additionally the class `func`
+    is a member of, is expected to have an attribute 'path'.
+
+    Accepts either a list of paths or a single path in a str. Passes a list
+    to decorated function either way!
     """
 
+    @wraps(func)
     def newfunc(self, files, *args, **kwargs):
         if isinstance(files, basestring):
             files_new = [_normalize_path(self.path, files)]
         elif isinstance(files, list):
-            files_new = []
-            for path in files:
-                files_new.append(_normalize_path(self.path, path))
+            files_new = [_normalize_path(self.path, path) for path in files]
         else:
             raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
-                             files.__class__.__name__)
+                             type(files))
         return func(self, files_new, *args, **kwargs)
     return newfunc
 
@@ -101,8 +110,9 @@ def files_decorator(func):
 class GitRepo(object):
     """Representation of a git repository
 
-    Not sure if needed yet, since there is GitPython. By now, wrap it to have control.
-    Convention: method's names starting with 'git_' to not be overridden accidentally by AnnexRepo.
+    Not sure if needed yet, since there is GitPython. By now, wrap it to have
+    control. Convention: method's names starting with 'git_' to not be
+    overridden accidentally by AnnexRepo.
 
     """
 
@@ -116,10 +126,11 @@ class GitRepo(object):
         Parameters
         ----------
         path: str
-          path to the git repository; In case it's not an absolute path, it's relative to os.getcwd()
+          path to the git repository; In case it's not an absolute path,
+          it's relative to os.getcwd()
         url: str
-          url to the to-be-cloned repository.
-          valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+          url to the to-be-cloned repository. Requires a valid git url according to
+          http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
 
         """
 
@@ -134,7 +145,7 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-        if not exists(p_join(path, '.git')):
+        if not exists(opj(path, '.git')):
             try:
                 self.repo = Repo.init(path, True)
             except GitCommandError as e:
@@ -148,7 +159,8 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-    @files_decorator
+
+    @normalize_paths
     def git_add(self, files):
         """Adds file(s) to the repository.
 
@@ -174,6 +186,7 @@ class GitRepo(object):
         else:
             lgr.warning("git_add was called with empty file list.")
 
+
     def git_commit(self, msg=None, options=None):
         """Commit changes to git.
 
@@ -189,6 +202,7 @@ class GitRepo(object):
             msg = "What would be a good default message?"
 
         self.repo.index.commit(msg)
+
 
     def get_indexed_files(self):
         """Get a list of files in git's index
