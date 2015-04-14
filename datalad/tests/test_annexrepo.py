@@ -76,9 +76,9 @@ def test_AnnexRepo_get(src, dst):
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    assert_false(ar.file_has_content("test-annex.dat"))
+    assert_false(ar.file_has_content("test-annex.dat")[0][1])
     ar.annex_get(testfile)
-    assert_true(ar.file_has_content("test-annex.dat"))
+    assert_true(ar.file_has_content("test-annex.dat")[0][1])
 
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
@@ -186,9 +186,12 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 def test_AnnexRepo_file_has_content(src, annex_path):
 
     ar = AnnexRepo(annex_path, src)
-    assert_false(ar.file_has_content("test-annex.dat"))
+    testfiles = ["test-annex.dat", "test.dat"]
+    assert_equal(ar.file_has_content(testfiles),
+                 [("test-annex.dat", False), ("test.dat", False)])
     ar.annex_get("test-annex.dat")
-    assert_true(ar.file_has_content("test-annex.dat"))
+    assert_equal(ar.file_has_content(testfiles),
+                 [("test-annex.dat", True), ("test.dat", False)])
 
 
 def test_AnnexRepo_options_decorator():

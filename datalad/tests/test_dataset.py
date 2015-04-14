@@ -82,9 +82,9 @@ def test_Dataset_get(src, dst):
     assert_is_instance(ds, Dataset, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    assert_false(ds.file_has_content("test-annex.dat"))
+    assert_false(ds.file_has_content("test-annex.dat")[0][1])
     ds.get(testfile)
-    assert_true(ds.file_has_content("test-annex.dat"))
+    assert_true(ds.file_has_content("test-annex.dat")[0][1])
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 

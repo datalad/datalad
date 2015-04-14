@@ -276,17 +276,17 @@ class AnnexRepo(GitRepo):
     def file_has_content(self, files):
         """ Check whether `files` are present with their content.
 
-        Note: Handling of multiple files not yet implemented!
-        TODO: Decide how to behave in case of multiple files, with some of them not present.
-
         Parameters:
         -----------
         files: list
             file(s) to check for being actually present.
+
+        Returns:
+        --------
+        list of (str, bool)
+            list with a tuple per file in `files`.
         """
         # TODO: Also provide option to look for key instead of path
-        if len(files) > 1:
-            raise NotImplementedError("No handling of multiple files implemented yet for file_has_content()!")
 
         cmd_list = ['git', 'annex', 'find'] + files
 
@@ -299,7 +299,12 @@ class AnnexRepo(GitRepo):
             else:
                 raise
 
-        return files[0] in output[0]
+        files_found = set(output[0].split(linesep))
+        result = []
+        for f in files:
+            result.append((f, f in files_found))
+
+        return result
 
     @files_decorator
     def annex_add_to_git(self, files):
