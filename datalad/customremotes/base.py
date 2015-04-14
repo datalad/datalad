@@ -443,11 +443,8 @@ class AnnexCustomRemote(object):
         """Return KEY for a given file
         """
         # TODO: should actually be implemented by AnnexRepo
-        exitcode, (out, err) = \
-            self.runner(['git', 'annex', 'lookupkey', file], return_output=True,
-                        cwd=self.path)
-        if exitcode:
-            raise RuntimeError("Failed to acquire key for the file %s" % file)
+        (out, err) = \
+            self.runner(['git', 'annex', 'lookupkey', file], cwd=self.path)
         return out.rstrip('\n')
 
 

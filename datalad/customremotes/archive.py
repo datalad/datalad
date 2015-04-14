@@ -153,8 +153,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             if archive_key is not None:
                 raise ValueError("Provide archive_file or archive_key - not both")
             archive_key = self._get_file_key(archive_file)
-        # todo exitcode, (out, err) = \
-        # annex('lookupkey a.tar.gz', return_output=True)
+        # todo (out, err) = \
+        # annex('lookupkey a.tar.gz')
         assert(archive_key is not None)
         file_quoted = urllib2.quote(file)
         return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
