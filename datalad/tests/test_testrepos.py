@@ -35,9 +35,8 @@ def test_point_to_github(url):
 def test_clone(src, tempdir):
     """Verify that all our repos are clonable"""
     r = Runner()
-    status, output = r.run("git clone %(src)s %(tempdir)s" % locals(), log_online=True, return_output=True)
+    status, output = r.run("git clone %(src)s %(tempdir)s" % locals(), log_online=True)
     #status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())
-    eq_(status, 0, msg="Status: %d  Output was: %r" % (status, output))
     ok_(os.path.exists(os.path.join(tempdir, ".git")))
     # TODO: requires network for sure! ;)
     # TODO: figure out why fails on travis  -- demands init first! bleh

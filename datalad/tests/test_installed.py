@@ -13,11 +13,13 @@ from .utils import ok_startswith, eq_, \
     ignore_nose_capturing_stdout, assert_cwd_unchanged
 
 from datalad.cmd import Runner
+from datalad.support.exceptions import CommandError
 
 def check_run_and_get_output(cmd):
     runner = Runner()
-    status, output = runner.run(["datalad", "--help"], return_output=True)
-    if status:
+    try:
+        output = runner.run(["datalad", "--help"])
+    except CommandError, e:
         raise AssertionError("'datalad --help' failed to start normally. "
                              "Exited with %d and output %s" % (status, output))
     return output

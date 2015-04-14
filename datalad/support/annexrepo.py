@@ -103,10 +103,7 @@ class AnnexRepo(GitRepo):
         # TODO: Document (or implement respectively) behaviour in special cases like direct mode (if it's different),
         # not existing paths, etc.
 
-        status = self.cmd_call_wrapper.run(['git', 'annex', 'init'], cwd=self.path)
-        if status not in [0, None]:
-            lgr.error('git annex init returned status %d.' % status)
-
+        self.cmd_call_wrapper.run(['git', 'annex', 'init'], cwd=self.path)
 
     def annex_get(self, files, **kwargs):
         """Get the actual content of files
@@ -136,10 +133,4 @@ class AnnexRepo(GitRepo):
 
 
         #don't capture stderr, since it provides progress display
-        status = self.cmd_call_wrapper.run(cmd_str, log_stderr=False)
-
-        if status not in [0, None]:
-            # TODO: Actually this doesn't make sense. Runner raises exception in this case,
-            # which leads to: Runner doesn't have to return it at all.
-            lgr.error('git annex get returned status: %s' % status)
-            raise RuntimeError
+        self.cmd_call_wrapper.run(cmd_str, log_stderr=False)
