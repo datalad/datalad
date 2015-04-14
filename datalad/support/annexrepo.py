@@ -13,30 +13,38 @@ For further information on git-annex see https://git-annex.branchable.com/.
 """
 
 from os import linesep
-from os.path import join, exists, normpath, isabs, commonprefix, relpath
+from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath
 import logging
+
+from functools import wraps
 
 from ConfigParser import NoOptionError
 
-from gitrepo import GitRepo, files_decorator
+from gitrepo import GitRepo, normalize_paths
 from datalad.cmd import Runner as Runner
-from exceptions import CommandNotAvailableError, CommandError, FileNotInAnnexError, FileInGitError
+from exceptions import CommandNotAvailableError, CommandError, \
+    FileNotInAnnexError, FileInGitError
 
 lgr = logging.getLogger('datalad.annex')
 
 
-def _options_decorator(func):
+def kwargs_to_options(func):
     """Decorator to provide convenient way to pass options to command calls.
 
     Any keyword argument "foo='bar'" translates to " --foo=bar".
-    All of these are collected in a list and then passed to keyword argument `options`
-    of the decorated function.
-    Note: This is meant to especially decorate the methods of AnnexRepo-class and therefore
-    returns a class method.
+    All of these are collected in a list and then passed to keyword argument
+    `options` of the decorated function.
+
+    Note
+    ----
+
+    This is meant to especially decorate the methods of AnnexRepo-class and
+    therefore returns a class method.
     """
 
+    @wraps(func)
     def newfunc(self, *args, **kwargs):
-        option_list=[]
+        option_list = []
         for key in kwargs.keys():
             option_list.extend([" --%s=%s" % (key, kwargs.get(key))])
 
@@ -48,15 +56,16 @@ def _options_decorator(func):
 class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
 
-
-    Paths given to any of the class methods will be interpreted as relative to os.getcwd(),
-    in case this is currently beneath AnnexRepo's base dir (`self.path`). If os.getcwd() is outside of the repository,
-    relative paths will be interpreted as relative to `self.path`.
-    Absolute paths will be accepted either way.
+    Paths given to any of the class methods will be interpreted as relative
+    to os.getcwd(), in case this is currently beneath AnnexRepo's base dir
+    (`self.path`). If os.getcwd() is outside of the repository, relative paths
+    will be interpreted as relative to `self.path`. Absolute paths will be
+    accepted either way.
     """
-    # TODO: Check exceptions for the latter and find a workaround. For example: git annex lookupkey doesn't accept
-    # absolute paths. So, build relative paths from absolute ones and may be include checking whether or not they
-    # result in a path inside the repo.
+    # TODO: Check exceptions for the latter and find a workaround. For
+    # example: git annex lookupkey doesn't accept absolute paths. So,
+    # build relative paths from absolute ones and may be include checking
+    # whether or not they result in a path inside the repo.
     # How to expand paths, if cwd is deeper in repo?
     # git annex proxy will need additional work regarding paths.
     def __init__(self, path, url=None, runner=None, direct=False):
@@ -69,15 +78,16 @@ class AnnexRepo(GitRepo):
         Parameters:
         -----------
         path: str
-          path to git-annex repository. In case it's not an absolute path, it's relative to os.getcwd()
+          path to git-annex repository. In case it's not an absolute path, it's
+          relative to os.getcwd()
 
         url: str
-          url to the to-be-cloned repository.
-          valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+          url to the to-be-cloned repository. Requires valid git url according to
+          http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
 
         runner: Runner
-           Provide a Runner in case AnnexRepo shall not create it's own. This is especially needed in case of
-           desired dry runs.
+           Provide a Runner in case AnnexRepo shall not create it's own. This is
+           especially needed in case of desired dry runs.
 
         direct: bool
            If True, force git-annex to use direct mode
@@ -92,12 +102,14 @@ class AnnexRepo(GitRepo):
         #       fine grained.
 
         # Check whether an annex already exists at destination
-        if not exists(join(self.path, '.git', 'annex')):
+        if not exists(opj(self.path, '.git', 'annex')):
             lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
             self._annex_init()
 
-        if direct and not self.is_direct_mode():  # only force direct mode; don't force indirect mode
+        # only force direct mode; don't force indirect mode
+        if direct and not self.is_direct_mode():
             self.set_direct_mode()
+
 
     def is_direct_mode(self):
         """Indicates whether or not annex is in direct mode
@@ -108,12 +120,11 @@ class AnnexRepo(GitRepo):
         """
 
         try:
-            dm = self.repo.config_reader().get_value("annex", "direct")
+            return self.repo.config_reader().get_value("annex", "direct")
         except NoOptionError, e:
             # If .git/config lacks an entry "direct" it's actually indirect mode.
-            dm = False
+            return False
 
-        return dm
 
     def is_crippled_fs(self):
         """Indicates whether or not git-annex considers current filesystem 'crippled'.
@@ -124,12 +135,11 @@ class AnnexRepo(GitRepo):
         """
 
         try:
-            cr_fs = self.repo.config_reader().get_value("annex", "crippledfilesystem")
+            return self.repo.config_reader().get_value("annex", "crippledfilesystem")
         except NoOptionError, e:
             # If .git/config lacks an entry "crippledfilesystem" it's actually not crippled.
-            cr_fs = False
+            return False
 
-        return cr_fs
 
     def set_direct_mode(self, enable_direct_mode=True):
         """Switch to direct or indirect mode
@@ -153,6 +163,7 @@ class AnnexRepo(GitRepo):
                                   expect_stderr=True)
         # TODO: 1. Where to handle failure?
 
+
     def _annex_init(self):
         """Initializes an annex repository.
 
@@ -167,8 +178,9 @@ class AnnexRepo(GitRepo):
         self.cmd_call_wrapper.run(['git', 'annex', 'init'], cwd=self.path)
         # TODO: When to expect stderr? on crippled filesystem for example (think so)?
 
-    @_options_decorator
-    @files_decorator
+
+    @kwargs_to_options
+    @normalize_paths
     def annex_get(self, files, options=[]):
         """Get the actual content of files
 
@@ -177,18 +189,20 @@ class AnnexRepo(GitRepo):
         files: list
             list of paths to get
 
-        kwargs: options for the git annex get command. For example `from='myremote'` translates to annex option
-            "--from=myremote"
+        kwargs: options for the git annex get command. For example `from='myremote'`
+         translates to annex option "--from=myremote"
         """
 
         cmd_list = ['git', 'annex', 'get'] + options + files
 
         #don't capture stderr, since it provides progress display
-        self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False, log_online=True,
-                                           expect_stderr=True, cwd=self.path)
+        self.cmd_call_wrapper.run(cmd_list, log_stdout=True, log_stderr=False,
+                                  log_online=True, expect_stderr=True,
+                                  cwd=self.path)
 
-    @_options_decorator
-    @files_decorator
+
+    @kwargs_to_options
+    @normalize_paths
     def annex_add(self, files, options=[]):
         """Add file(s) to the annex.
 
@@ -201,10 +215,12 @@ class AnnexRepo(GitRepo):
         cmd_list = ['git', 'annex', 'add'] + options + files
         self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
 
+
     def annex_proxy(self, git_cmd):
         """Use git-annex as a proxy to git
 
-        This is needed in case we are in direct mode, since there's no git working tree, that git can handle.
+        This is needed in case we are in direct mode, since there's no git
+        working tree, that git can handle.
 
         Parameters:
         -----------
@@ -223,15 +239,17 @@ class AnnexRepo(GitRepo):
             lgr.warning("annex_proxy() called in indirect mode: %s" % git_cmd)
             raise CommandNotAvailableError(cmd=cmd_str, msg="Proxy doesn't make sense if not in direct mode.")
         try:
-            output = self.cmd_call_wrapper(cmd_str, shell=True, cwd=self.path)
+            out = self.cmd_call_wrapper(cmd_str, shell=True, cwd=self.path)
         except CommandError, e:
-            if "Unknown command" in output[1]:
-                raise CommandNotAvailableError(cmd=cmd_str, msg=e.msg, stderr=e.stderr, stdout=e.stdout)
+            if "Unknown command" in e.stderr:
+                raise CommandNotAvailableError(cmd=cmd_str, msg=e.msg,
+                                               stderr=e.stderr, stdout=e.stdout)
             else:
                 raise e
-        return output[0]
+        return out
 
-    @files_decorator
+
+    @normalize_paths
     def get_file_key(self, files):
         """Get key of an annexed file.
 
@@ -257,7 +275,7 @@ class AnnexRepo(GitRepo):
             output = self.cmd_call_wrapper.run(cmd_list, cwd=self.path)
         except CommandError, e:
             if e.code == 1:
-                if not exists(join(self.path, path)):
+                if not exists(opj(self.path, path)):
                     raise IOError(e.code, "File not found.", path)
                 elif path in self.get_indexed_files():
                     # if we got here, the file is present and in git, but not in the annex
@@ -272,7 +290,8 @@ class AnnexRepo(GitRepo):
 
         return output[0].split(linesep)[0]
 
-    @files_decorator
+
+    @normalize_paths
     def file_has_content(self, files):
         """ Check whether `files` are present with their content.
 
@@ -299,14 +318,9 @@ class AnnexRepo(GitRepo):
             else:
                 raise
 
-        files_found = set(output[0].split(linesep))
-        result = []
-        for f in files:
-            result.append((f, f in files_found))
+        return [(f, f in set(output[0].split(linesep))) for f in files]
 
-        return result
-
-    @files_decorator
+    @normalize_paths
     def annex_add_to_git(self, files):
         """Add file(s) directly to git
 

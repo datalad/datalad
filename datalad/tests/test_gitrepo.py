@@ -16,7 +16,7 @@ import os.path
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_in
 from git.exc import GitCommandError
 
-from datalad.support.gitrepo import GitRepo, files_decorator, _normalize_path
+from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, on_windows,\
     with_tree, get_most_obscure_supported_name, ok_clean_git
 from datalad.support.exceptions import FileNotInRepositoryError
@@ -165,7 +165,7 @@ def test_GitRepo_files_decorator():
         def __init__(self):
             self.path = os.path.join('some', 'where')
 
-        @files_decorator
+        @normalize_paths
         def decorated(self, files):
             return files
 

@@ -16,7 +16,7 @@ from git.exc import GitCommandError
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false, assert_in
 
-from datalad.support.annexrepo import AnnexRepo, _options_decorator
+from datalad.support.annexrepo import AnnexRepo, kwargs_to_options
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree,\
     get_most_obscure_supported_name, ok_clean_git
@@ -196,7 +196,7 @@ def test_AnnexRepo_file_has_content(src, annex_path):
 
 def test_AnnexRepo_options_decorator():
 
-    @_options_decorator
+    @kwargs_to_options
     def decorated(self, whatever, options=[]):
         return options
 

@@ -104,7 +104,7 @@ def ok_clean_git_annex_proxy(path):
     finally:
         os.chdir(cwd)
 
-    assert_in("nothing to commit, working directory clean", out, "git-status output via proxy not plausible: %s" % out)
+    assert_in("nothing to commit, working directory clean", out[0], "git-status output via proxy not plausible: %s" % out[0])
 
 
 def ok_clean_git(path, annex=True, untracked=[]):
