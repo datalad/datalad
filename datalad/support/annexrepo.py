@@ -336,36 +336,82 @@ class AnnexRepo(GitRepo):
         else:
             self.git_add(files)
 
+    def annex_initremote(self, name, options):
+        """Creates a new special remote
 
-# TODO:
-#         
-#     def annex_initremote(self, name, options):
-#         """
-#         """
-#         pass
-#
-#     def annex_enableremote(self, name):
-#         """
-#         """
-#         pass
-#
-#     def annex_addurl(self, url, options):
-#         """
-#         """
-#         pass
-#
-#     def annex_rmurl(self, file, url):
-#         """
-#         """
-#         pass
-#
-#     @normalize_paths
-#     def annex_drop(self, files):
-#         """
-#         """
-#         pass
-#
-#     def annex_whereis(self, files):
-#         """
-#         """
-#         pass
+        Parameters:
+        -----------
+        name: str
+            name of the special remote
+        """
+        # TODO: figure out consistent way for passing options + document
+
+        cmd_list = ['git', 'annex', 'initremote', name] + options
+        self.cmd_call_wrapper(cmd_list, cwd=self.path)
+
+    def annex_enableremote(self, name):
+        """Enables use of an existing special remote
+
+        Parameters:
+        -----------
+        name: str
+            name, the special remote was created with
+        """
+
+        cmd_list = ['git', 'annex', 'enableremote', name]
+        self.cmd_call_wrapper(cmd_list, cwd=self.path)
+
+    @normalize_paths
+    def annex_addurl_to_file(self, file, url, options):
+        """Add file from url to the annex.
+
+        Downloads `file` from `url` and add it to the annex.
+        If annex knows `file` already, records that it can be downloaded from `url`.
+
+        Parameters:
+        -----------
+        file: str
+            technically it's a list, but conversion is done by the decorator and
+            only a single string will work here.
+            TODO: figure out, how to document this behaviour properly everywhere
+
+        url: str
+        """
+
+        cmd_list = ['git', 'annex', 'addurl', '--file=%s' % file[0]] + options + [url]
+        self.cmd_call_wrapper(cmd_list, cwd=self.path)
+
+    def annex_addurl(self, urls, options):
+        """Downloads each url to its own file, which is added to the annex.
+
+        Parameters:
+        -----------
+        urls: list
+        """
+
+        cmd_list = ['git', 'annex', 'addurl'] + options + urls
+        self.cmd_call_wrapper(cmd_list, cwd=self.path)
+
+    @normalize_paths
+    def annex_rmurl(self, file, url):
+        """Record that the file is no longer available at the url.
+        """
+
+        cmd_list = ['git', 'annex', 'rmurl', file[0], url]
+        self.cmd_call_wrapper(cmd_list, cwd=self.path)
+
+    @normalize_paths
+    def annex_drop(self, files):
+        """Drops the content of annexed files from this repository, when possible.
+        """
+        # TODO: options needed
+
+        cmd_list = ['git', 'annex', 'drop'] + files
+        self.cmd_call_wrapper(cmd_list, cwd=self.path)
+
+    def annex_whereis(self, files):
+        """Lists repositories that have file content
+        """
+        # TODO: May be use JSON-output (--json) to parse it
+        # TODO: What to return? Just a list of names?
+        raise NotImplementedError("git-annex 'whereis' not yet implemented.")
