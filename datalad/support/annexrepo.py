@@ -118,8 +118,10 @@ class AnnexRepo(GitRepo):
         """
         # TODO: documentation
         # TODO: runner options (log_sth)
+        debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
 
-        cmd_list = ['git'] + git_options + ['annex', annex_cmd] + annex_options
+        cmd_list = ['git'] + git_options + ['annex', annex_cmd]\
+                   + debug + annex_options
         try:
             return self.cmd_call_wrapper.run(cmd_list, log_stdout=log_stdout, log_stderr=log_stderr,
                                              log_online=log_online, expect_stderr=expect_stderr)
