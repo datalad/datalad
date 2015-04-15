@@ -420,7 +420,7 @@ class AnnexRepo(GitRepo):
         """Lists repositories that have actual content of file
 
         Returns:
-        [(file, [desc])]
+        {file: [desc]}
             where `file` is every file from `files`, git-annex whereis was successfully ran on.
             [desc] contains a unicode describing the remote for each remote, which was found by
             git-annex whereis, like:
@@ -445,9 +445,9 @@ class AnnexRepo(GitRepo):
                 json_objects.append(json.loads(line))
 
 
-        result = []
+        result = {}
         for item in json_objects:
             if item.get('success'):
-                result.append((item.get('file'), [remote.get('description') for remote in item.get('whereis')]))
+                result[item.get('file')] = [remote.get('description') for remote in item.get('whereis')]
 
         return result
