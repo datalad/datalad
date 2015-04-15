@@ -83,12 +83,13 @@ class AnnexRepo(GitRepo):
           relative to os.getcwd()
 
         url: str
-          url to the to-be-cloned repository. Requires valid git url according to
+          url to the to-be-cloned repository. Requires valid git url
+          according to
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
 
         runner: Runner
-           Provide a Runner in case AnnexRepo shall not create it's own. This is
-           especially needed in case of desired dry runs.
+           Provide a Runner in case AnnexRepo shall not create it's own.
+           This is especially needed in case of desired dry runs.
 
         direct: bool
            If True, force git-annex to use direct mode
@@ -96,15 +97,18 @@ class AnnexRepo(GitRepo):
         super(AnnexRepo, self).__init__(path, url)
 
         self.cmd_call_wrapper = runner or Runner(cwd=self.path)
-        # TODO: Concept of when to set to "dry". Includes: What to do in gitrepo class?
+        # TODO: Concept of when to set to "dry".
+        #       Includes: What to do in gitrepo class?
         #       Now: setting "dry" means to give a dry-runner to constructor.
-        #       => Do it similar in gitrepo/dataset. Still we need a concept of when to set it
-        #       and whether this should be a single instance collecting everything or more
+        #       => Do it similar in gitrepo/dataset.
+        #       Still we need a concept of when to set it and whether this
+        #       should be a single instance collecting everything or more
         #       fine grained.
 
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
-            lgr.debug('No annex found in %s. Creating a new one ...' % self.path)
+            lgr.debug('No annex found in %s.'
+                      ' Creating a new one ...' % self.path)
             self._annex_init()
 
         # only force direct mode; don't force indirect mode
@@ -120,14 +124,19 @@ class AnnexRepo(GitRepo):
         # TODO: runner options (log_sth)
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
 
-        cmd_list = ['git'] + git_options + ['annex', annex_cmd]\
-                   + debug + annex_options
+        cmd_list = ['git'] + git_options +\
+                   ['annex', annex_cmd] + debug + annex_options
         try:
-            return self.cmd_call_wrapper.run(cmd_list, log_stdout=log_stdout, log_stderr=log_stderr,
-                                             log_online=log_online, expect_stderr=expect_stderr)
+            return self.cmd_call_wrapper.run(cmd_list,
+                                             log_stdout=log_stdout,
+                                             log_stderr=log_stderr,
+                                             log_online=log_online,
+                                             expect_stderr=expect_stderr)
         except CommandError, e:
             if "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
-                raise CommandNotAvailableError(str(cmd_list), "Unknown command: 'git-annex %s'" % annex_cmd,
+                raise CommandNotAvailableError(str(cmd_list),
+                                               "Unknown command:"
+                                               " 'git-annex %s'" % annex_cmd,
                                                e.code, e.stdout, e.stderr)
             else:
                 raise e
@@ -143,7 +152,8 @@ class AnnexRepo(GitRepo):
         try:
             return self.repo.config_reader().get_value("annex", "direct")
         except NoOptionError, e:
-            # If .git/config lacks an entry "direct" it's actually indirect mode.
+            # If .git/config lacks an entry "direct",
+            # it's actually indirect mode.
             return False
 
 
@@ -156,7 +166,8 @@ class AnnexRepo(GitRepo):
         """
 
         try:
-            return self.repo.config_reader().get_value("annex", "crippledfilesystem")
+            return self.repo.config_reader().get_value("annex",
+                                                       "crippledfilesystem")
         except NoOptionError, e:
             # If .git/config lacks an entry "crippledfilesystem",
             # it's actually not crippled.
@@ -210,8 +221,9 @@ class AnnexRepo(GitRepo):
         files: list
             list of paths to get
 
-        kwargs: options for the git annex get command. For example `from='myremote'`
-         translates to annex option "--from=myremote"
+        kwargs: options for the git annex get command.
+            For example `from='myremote'` translates to
+            annex option "--from=myremote".
         """
 
         # don't capture stderr, since it provides progress display
@@ -250,17 +262,19 @@ class AnnexRepo(GitRepo):
         """
 
         cmd_str = "git annex proxy -- %s" % git_cmd
-        # TODO: By now git_cmd is expected to be string. Figure out how to deal with a list here.
+        # TODO: By now git_cmd is expected to be string.
+        # Figure out how to deal with a list here.
 
         if not self.is_direct_mode():
             lgr.warning("annex_proxy() called in indirect mode: %s" % cmd_str)
             raise CommandNotAvailableError(cmd=cmd_str,
-                                           msg="Proxy doesn't make sense if not in direct mode.")
+                                           msg="Proxy doesn't make sense"
+                                               " if not in direct mode.")
         import shlex
         # Temporarily use shlex, until calls use lists
-        return self._run_annex_command('proxy', annex_options=['--'] + shlex.split(git_cmd))
-
-
+        return self._run_annex_command('proxy',
+                                       annex_options=['--'] +
+                                                     shlex.split(git_cmd))
 
     @normalize_paths
     def get_file_key(self, files):
@@ -278,7 +292,8 @@ class AnnexRepo(GitRepo):
         """
 
         if len(files) > 1:
-            raise NotImplementedError("No handling of multiple files implemented yet for get_file_key()!")
+            raise NotImplementedError("No handling of multiple files"
+                                      " implemented yet for get_file_key()!")
         path = files[0]
 
         cmd_str = 'git annex lookupkey %s' % path  # have a string for messages
@@ -290,12 +305,17 @@ class AnnexRepo(GitRepo):
                 if not exists(opj(self.path, path)):
                     raise IOError(e.code, "File not found.", path)
                 elif path in self.get_indexed_files():
-                    # if we got here, the file is present and in git, but not in the annex
-                    raise FileInGitError(cmd=cmd_str, msg="File not in annex, but git: %s" % path,
-                                              filename=path)
+                    # if we got here, the file is present and in git,
+                    # but not in the annex
+                    raise FileInGitError(cmd=cmd_str,
+                                         msg="File not in annex, but git: %s"
+                                             % path,
+                                         filename=path)
                 else:
-                    raise FileNotInAnnexError(cmd=cmd_str, msg="File not in annex: %s" % path,
-                                               filename=path)
+                    raise FileNotInAnnexError(cmd=cmd_str,
+                                              msg="File not in annex: %s"
+                                                  % path,
+                                              filename=path)
             else:
                 # Not sure, whether or not this can actually happen
                 raise e
@@ -322,7 +342,8 @@ class AnnexRepo(GitRepo):
         try:
             output = self._run_annex_command('find', annex_options=files)
         except CommandError, e:
-            # TODO: The following is incorrect, since it now handles multiple files!
+            # TODO: The following is incorrect,
+            # since it now handles multiple files!
             if e.code == 1 and \
                     "%s not found" % files[0] in e.stderr:
                 return False
@@ -377,16 +398,21 @@ class AnnexRepo(GitRepo):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
-        If annex knows `file` already, records that it can be downloaded from `url`.
+        If annex knows `file` already,
+        records that it can be downloaded from `url`.
 
         Parameters:
         -----------
         file: str
-            technically it's a list, but conversion is done by the decorator and
-            only a single string will work here.
-            TODO: figure out, how to document this behaviour properly everywhere
+            technically it's a list, but conversion is done by the decorator
+            and only a single string will work here.
+            TODO: figure out, how to document this behaviour
+                  properly everywhere
 
         url: str
+
+        options: list
+            options to the annex command
         """
 
         annex_options = ['--file=%s' % file[0]] + options + [url]
@@ -398,6 +424,9 @@ class AnnexRepo(GitRepo):
         Parameters:
         -----------
         urls: list
+
+        options: list
+            options to the annex command
         """
 
         self._run_annex_command('addurl', annex_options=options + urls)
@@ -405,13 +434,26 @@ class AnnexRepo(GitRepo):
     @normalize_paths
     def annex_rmurl(self, file, url):
         """Record that the file is no longer available at the url.
+
+        Parameters:
+        -----------
+        file: str
+
+        url: str
         """
 
         self._run_annex_command('rmurl', annex_options=[file[0]] + [url])
 
     @normalize_paths
     def annex_drop(self, files):
-        """Drops the content of annexed files from this repository, when possible.
+        """Drops the content of annexed files from this repository.
+
+        Drops only if possible with respect to required minimal number of
+        available copies.
+
+        Parameters:
+        -----------
+        files: list
         """
         # TODO: options needed
 
@@ -419,20 +461,29 @@ class AnnexRepo(GitRepo):
 
     @normalize_paths
     def annex_whereis(self, files):
-        """Lists repositories that have actual content of file
+        """Lists repositories that have actual content of file(s).
+
+        Parameters:
+        -----------
+        files: list
+            files to look for
 
         Returns:
+        --------
         {file: [desc]}
-            where `file` is every file from `files`, git-annex whereis was successfully ran on.
-            [desc] contains a unicode describing the remote for each remote, which was found by
-            git-annex whereis, like:
-                u'datalad@smaug:~/datalad.fucked/datalad/tests/testrepos/basic/r1 [origin]' or
-                u'web' or
-                u'ben@tree:~/Development/testannex2'
+            where `file` is every file from `files`,
+            'whereis' was successfully ran on.
+            [desc] contains a unicode describing the remote for each remote,
+            which was found by git-annex whereis, like:
+
+            u'me@mycomputer:~/where/my/repo/is [origin]' or
+            u'web' or
+            u'me@mycomputer:~/some/other/clone'
         """
 
         try:
-            out, err = self._run_annex_command('whereis', annex_options=['--json'] + files)
+            out, err = self._run_annex_command('whereis',
+                                              annex_options=['--json'] + files)
         except CommandError, e:
             # if multiple files, whereis may technically fail,
             # but still returns correct response
@@ -446,10 +497,10 @@ class AnnexRepo(GitRepo):
             if line.startswith('{'):
                 json_objects.append(json.loads(line))
 
-
         result = {}
         for item in json_objects:
             if item.get('success'):
-                result[item.get('file')] = [remote.get('description') for remote in item.get('whereis')]
+                result[item.get('file')] = \
+                  [remote.get('description') for remote in item.get('whereis')]
 
         return result
