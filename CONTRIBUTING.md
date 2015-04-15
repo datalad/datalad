@@ -7,9 +7,6 @@ contributing guidelines are coming.**
 Files organization
 ------------------
 
-- `bin/` contains the public command line API aiming to have just a single
-  script (`datalad`) which would provide access to all commands defined under
-  `datalad/cmdline`
 - `datalad/` is the main Python module where major development is happening,
   with major submodules being
     - `cmdline/` contains commands for the command line interface.  See any of
