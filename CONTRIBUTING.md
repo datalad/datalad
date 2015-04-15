@@ -104,6 +104,7 @@ previously opened PR.
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
 
+
 Quality Assurance
 -----------------
 
@@ -113,10 +114,48 @@ rules before submitting a pull request:
 - All public methods should have informative docstrings with sample usage
   presented as doctests when appropriate.
 
-- All other tests pass when everything is rebuilt from scratch. On Unix-like
-  systems, check with (from the toplevel source folder):
+- All other tests pass when everything is rebuilt from scratch.
 
-          $ make
+- New code should be accompanied by tests.
+
+
+### Tests
+
+All tests are available under `datalad/tests`.  To exercise tests, the codebase
+need to be "installed" to generate scripts for the entry points.  For that,
+recommended course of action is to use virtualenv, e.g.
+
+```sh
+virtualenv --system-site-packages venv-tests
+venv-tests/bin/pip install -r requirements
+venv-tests/bin/python setup.py develop
+```
+
+and then use that virtual environment to run the tests, e.g. via
+
+```sh
+venv-tests/bin/python -m nose -s -v datalad
+```
+
+You can avoid entering `venv-tests/bin` by simply activating that environment in
+the current shell session:
+
+```sh
+source venv-tests/bin/activate
+```
+
+Some tests use testing repositories which are available as submodules
+under the `datalad/tests/testrepos` submodule (two tier- to not pollute
+top repository submodules namespace).  To enable those tests do
+
+```sh
+git submodule update --init --recursive
+```
+
+or clone with `--recursive` option originally.
+
+
+### Coverage
 
 You can also check for common programming errors with the following tools:
 
@@ -124,6 +163,17 @@ You can also check for common programming errors with the following tools:
 
           $ pip install nose coverage
           $ nosetests --with-coverage path/to/tests_for_package
+
+
+### Linting
+
+We are not (yet) fully PEP8 compliant, so please use these tools as
+guidelines to your contributions, but not to PEP8 entire code
+base.
+
+*Sidenote*: watch [Raymond Hettinger - Beyond PEP 8][beyond-pep8]
+
+[beyond-pep8]: https://www.youtube.com/watch?v=wf-BqAjZb8M
 
 - No pyflakes warnings, check with:
 
@@ -140,8 +190,14 @@ You can also check for common programming errors with the following tools:
            $ pip install autopep8
            $ autopep8 path/to/pep8.py
 
-Test repositories
------------------
+Some team developers use
+[PyCharm community edition](https://www.jetbrains.com/pycharm) which
+provides built-in PEP8 checker and handy tools such as smart
+splits/joins making it easier to maintain code following the PEP8
+recommendations.  NeuroDebian provides `pycharm-community-sloppy`
+package to ease pycharm installation even further.
+
+### Test repositories
 
 `datalad/tests/testrepos/` is a submodule containing git/git-annex repositories
 (again as submodules) which are then used by various unit tests under
@@ -158,6 +214,7 @@ Since those are linked to mainline `datalad` repository as submodules of the
 levels. `make_test_repo` script, on example of `basic` flavor provides steps to
 achieve that.
 
+
 Easy Issues
 -----------
 
@@ -167,4 +224,3 @@ tracker. Resolving these issues allow you to start contributing to the project
 without much prior knowledge. Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
-
