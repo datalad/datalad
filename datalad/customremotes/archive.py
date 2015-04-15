@@ -89,10 +89,7 @@ class AnnexArchiveCache(object):
             #import patoolib # with hope to manage to override patoolib's assigned to stdout
             #patoolib.extract_archive(archive, outdir=earchive, out=None)
             # so for now just call patool
-            out = Runner().run(["patool", "extract", "--outdir", earchive, archive])
-            if out:
-                lgr.error("Failed to extract. Exit code=%d" % out)
-                raise RuntimeError("Failed to extract archive")
+            Runner().run(["patool", "extract", "--outdir", earchive, archive])
             lgr.debug("Adjusting permissions to read-only for the extracted contents")
             rotree(earchive)
             assert(exists(earchive))
