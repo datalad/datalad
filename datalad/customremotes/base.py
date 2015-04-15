@@ -218,7 +218,7 @@ class AnnexCustomRemote(object):
         # TODO: should we strip or should we not? verify how annex would deal
         # with filenames starting/ending with spaces - encoded?
         # Split right away
-        l = self.fin.readline().rstrip('\n')
+        l = self.fin.readline().rstrip('\n\r')
         if self._protocol is not None:
             self._protocol += "recv %s" % l
         msg = l.split(None, n)
@@ -452,7 +452,7 @@ class AnnexCustomRemote(object):
         # TODO: should actually be implemented by AnnexRepo
         (out, err) = \
             self.runner(['git', 'annex', 'lookupkey', file], cwd=self.path)
-        return out.rstrip('\n')
+        return out.rstrip('\n\r')
 
 
     def _get_key_dir(self, key):
