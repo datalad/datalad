@@ -216,7 +216,7 @@ class Runner(object):
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s. Exit code=%d" \
-                    % (cmd, " under %r" % cwd if cwd else '', status)
+                    % (cmd, " under %r" % (cwd or self.cwd), status)
                 lgr.error(msg)
                 raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:

@@ -1,4 +1,4 @@
-    # emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -122,7 +122,7 @@ def test_basic_scenario(d, d2):
 
     # Let's create a clone and verify chain of getting file by getting the tarball
     #git(['clone', d, d2], expect_stderr=True)
-    cloned_handle = Handle(d2, d)
+    cloned_handle = Handle(d2, d, runner=Runner(cwd=d2, env=env))
     # TODO: provide clone-method in GitRepo: cloned_handle = handle.getClone(d2) or sth.
     # we would still need to enable manually atm that special remote for archives
     #annex('enableremote annexed-archives', cwd=d2)
