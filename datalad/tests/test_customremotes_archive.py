@@ -13,7 +13,6 @@ from os.path import realpath, pardir, join as opj, dirname, pathsep
 from ..customremotes.base import AnnexExchangeProtocol
 from ..customremotes.archive import AnnexArchiveCustomRemote
 from ..cmd import Runner
-from ..support.gitrepo import GitRepo
 from ..support.handle import Handle
 
 from .utils import *
@@ -58,21 +57,7 @@ def test_basic_scenario(d, d2):
 
     r = Runner(cwd=d, env=env, protocol=protocol)
 
-    def rok(cmd, *args, **kwargs):
-        if protocol:
-            protocol.write_section(cmd)
-        ret = r(cmd, *args, **kwargs)
-        return ret
-
     annex_opts = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
-
-    def annex(cmd, *args, **kwargs):
-        cmd = shlex.split(cmd) if isinstance(cmd, basestring) else cmd
-        return rok(["git", "annex"] + annex_opts + cmd, *args, **kwargs)
-
-    def git(cmd, *args, **kwargs):
-        cmd = shlex.split(cmd) if isinstance(cmd, basestring) else cmd
-        return rok(["git"] + cmd, *args, **kwargs)
 
     handle = Handle(d, runner=r)
     handle.annex_initremote('annexed-archives',
