@@ -29,7 +29,7 @@ class Dataset(AnnexRepo):
 
     """
 
-    def __init__(self, path, url=None, direct=False):
+    def __init__(self, path, url=None, direct=False, runner=None):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -47,7 +47,7 @@ class Dataset(AnnexRepo):
 
         """
 
-        super(Dataset, self).__init__(path, url, direct=direct)
+        super(Dataset, self).__init__(path, url, direct=direct, runner=runner)
         # TODO: what about runner? (dry runs ...)
 
         # TODO: should work with path (deeper) inside repo! => gitrepo/annexrepo
