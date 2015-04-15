@@ -96,9 +96,11 @@ def test_basic_scenario(d, d2):
     #annex(['drop', fn_extracted])
     handle.annex_drop(fn_extracted)
 
-    (out, err) = annex(['whereis', fn_extracted])
-    in_('-- [annexed-archives]', out)
-    in_('annexed-archives: %s' % file_url, out)
+    #(out, err) = annex(['whereis', fn_extracted])
+    #in_('-- [annexed-archives]', out)
+    #in_('annexed-archives: %s' % file_url, out)
+    list_of_remotes = handle.annex_whereis(fn_extracted)
+    in_('[annexed-archives]', list_of_remotes[fn_extracted])
 
     ok_broken_symlink(opj(d, fn_extracted))
     #annex(['get', fn_extracted])
