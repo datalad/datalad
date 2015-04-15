@@ -16,6 +16,7 @@ from os import linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath
 import logging
 import json
+import shlex
 
 from functools import wraps
 
@@ -188,8 +189,9 @@ class AnnexRepo(GitRepo):
             in case you try to switch to indirect mode on a crippled filesystem
         """
         if self.is_crippled_fs() and not enable_direct_mode:
-            raise CommandNotAvailableError(cmd="git-annex indirect",
-                    msg="Can't switch to indirect mode on that filesystem.")
+            raise CommandNotAvailableError(
+                cmd="git-annex indirect",
+                msg="Can't switch to indirect mode on that filesystem.")
 
         self._run_annex_command('direct' if enable_direct_mode else 'indirect',
                                 expect_stderr=True)
@@ -270,8 +272,7 @@ class AnnexRepo(GitRepo):
             raise CommandNotAvailableError(cmd=cmd_str,
                                            msg="Proxy doesn't make sense"
                                                " if not in direct mode.")
-        import shlex
-        # Temporarily use shlex, until calls use lists
+        # Temporarily use shlex, until calls use lists for git_cmd
         return self._run_annex_command('proxy',
                                        annex_options=['--'] +
                                                      shlex.split(git_cmd))
@@ -482,8 +483,9 @@ class AnnexRepo(GitRepo):
         """
 
         try:
-            out, err = self._run_annex_command('whereis',
-                                              annex_options=['--json'] + files)
+            out, err = self._run_annex_command(
+                'whereis',
+                annex_options=['--json'] + files)
         except CommandError, e:
             # if multiple files, whereis may technically fail,
             # but still returns correct response
@@ -492,15 +494,10 @@ class AnnexRepo(GitRepo):
             else:
                 raise e
 
-        json_objects = []
-        for line in out.split(linesep):
-            if line.startswith('{'):
-                json_objects.append(json.loads(line))
+        json_objects = [json.loads(line)
+                        for line in out.split(linesep) if line.startswith('{')]
 
-        result = {}
-        for item in json_objects:
-            if item.get('success'):
-                result[item.get('file')] = \
-                  [remote.get('description') for remote in item.get('whereis')]
-
-        return result
+        return {
+            item.get('file'):
+                [remote.get('description') for remote in item.get('whereis')]
+                for item in json_objects if item.get('success')}
