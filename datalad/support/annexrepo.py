@@ -15,6 +15,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 from os import linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath
 import logging
+import json
 
 from functools import wraps
 
@@ -409,9 +410,29 @@ class AnnexRepo(GitRepo):
         cmd_list = ['git', 'annex', 'drop'] + files
         self.cmd_call_wrapper(cmd_list, cwd=self.path)
 
+
     def annex_whereis(self, files):
-        """Lists repositories that have file content
+        """Lists repositories that have actual content of file
         """
-        # TODO: May be use JSON-output (--json) to parse it
-        # TODO: What to return? Just a list of names?
-        raise NotImplementedError("git-annex 'whereis' not yet implemented.")
+
+        cmd_list = ['git', 'annex', 'whereis', '--json', files]
+        try:
+            out, err = self.cmd_call_wrapper(cmd_list, cwd=self.path)
+        except CommandError, e:
+            if e.code == 1 and e.stdout.startswith('{'):
+                out = e.stdout
+            else:
+                raise e
+
+        json_objects = []
+        for line in out.split(linesep):
+            if line.startswith('{'):
+                json_objects.append(json.loads(line))
+
+
+        result = []
+        for item in json_objects:
+            if item.get('success'):
+                result.append((item.get('file'), [remote.get('description') for remote in item.get('whereis')]))
+
+        return result
