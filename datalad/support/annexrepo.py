@@ -410,9 +410,18 @@ class AnnexRepo(GitRepo):
         cmd_list = ['git', 'annex', 'drop'] + files
         self.cmd_call_wrapper(cmd_list, cwd=self.path)
 
-
+    @normalize_paths
     def annex_whereis(self, files):
         """Lists repositories that have actual content of file
+
+        Returns:
+        [(file, [desc])]
+            where `file` is every file from `files`, git-annex whereis was successfully ran on.
+            [desc] contains a unicode describing the remote for each remote, which was found by
+            git-annex whereis, like:
+                u'datalad@smaug:~/datalad.fucked/datalad/tests/testrepos/basic/r1 [origin]' or
+                u'web' or
+                u'ben@tree:~/Development/testannex2'
         """
 
         cmd_list = ['git', 'annex', 'whereis', '--json', files]
