@@ -17,6 +17,7 @@ import sys
 import logging
 import os
 import shutil
+import shlex
 from datalad.support.exceptions import CommandError
 
 lgr = logging.getLogger('datalad.cmd')
@@ -25,18 +26,20 @@ lgr = logging.getLogger('datalad.cmd')
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
-    An object of this class provides a methods calls shell commands or python functions,
-    allowing for dry runs and output handling.
+    An object of this class provides a methods calls shell commands or python
+    functions, allowing for dry runs and output handling.
 
-    Outputs (stdout and stderr) can be either logged or streamed to system's stdout/stderr during execution.
+    Outputs (stdout and stderr) can be either logged or streamed to system's
+    stdout/stderr during execution.
     This can be enabled or disabled for both of them independently.
-    Additionally allows for dry runs. This is achieved by initializing the `Runner` with `dry=True`.
+    Additionally allows for dry runs. This is achieved by initializing the
+    `Runner` with `dry=True`.
     The Runner will then collect all calls as strings in `commands`.
     """
 
-    __slots__ = ['commands', 'dry', 'cwd', 'env']
+    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
 
-    def __init__(self, dry=False, cwd=None, env=None):
+    def __init__(self, dry=False, cwd=None, env=None, protocol=None):
         """
         Parameters
         ----------
@@ -52,6 +55,7 @@ class Runner(object):
         self.dry = dry
         self.cwd = cwd
         self.env = env
+        self.protocol = protocol
 
         self.commands = []
 
@@ -95,7 +99,8 @@ class Runner(object):
                      level={True: logging.DEBUG,
                             False: logging.ERROR}[expect_stderr])
 
-    def _get_output_online(self, proc, log_stdout, log_stderr, expect_stderr=False):
+    def _get_output_online(self, proc, log_stdout, log_stderr,
+                           expect_stderr=False):
         stdout, stderr = [], []
         while proc.poll() is None:
             if log_stdout:
@@ -126,9 +131,10 @@ class Runner(object):
             expect_stderr=False, cwd=None, env=None, shell=None):
         """Runs the command `cmd` using shell.
 
-        In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
-        Allows for seperatly logging stdout and stderr  or streaming it to system's stdout
-        or stderr respectively.
+        In case of dry-mode `cmd` is just added to `commands` and it is
+        actually executed otherwise.
+        Allows for seperatly logging stdout and stderr  or streaming it to
+        system's stdout or stderr respectively.
 
         Parameters
         ----------
@@ -143,8 +149,8 @@ class Runner(object):
             If True, stderr is logged. Goes to sys.stderr otherwise.
 
         log_online: bool, optional
-            Either to log as output comes in.  Setting to True is preferable for
-            running user-invoked actions to provide timely output
+            Either to log as output comes in.  Setting to True is preferable
+            for running user-invoked actions to provide timely output
 
         expect_stderr: bool, optional
             Normally, having stderr output is a signal of a problem and thus it
@@ -161,8 +167,8 @@ class Runner(object):
             Custom environment to pass
 
         shell: bool, optional
-            Run command in a shell.  If not specified, then it runs in a shell only
-            if command is specified as a string (not a list)
+            Run command in a shell.  If not specified, then it runs in a shell
+            only if command is specified as a string (not a list)
 
         Returns
         -------
@@ -171,8 +177,9 @@ class Runner(object):
         Raises
         ------
         CommandError
-           if command's exitcode wasn't 0 or None. exitcode is passed to CommandError's `code`-field.
-           command's stdout and stderr are stored in CommandError's `stdout` and `stderr` fields respectively.
+           if command's exitcode wasn't 0 or None. exitcode is passed to
+           CommandError's `code`-field. Command's stdout and stderr are stored
+           in CommandError's `stdout` and `stderr` fields respectively.
         """
 
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
@@ -184,16 +191,24 @@ class Runner(object):
 
             if shell is None:
                 shell = isinstance(cmd, basestring)
+
+            if self.protocol:
+                self.protocol.write_section(
+                    shlex.split(cmd) if isinstance(cmd, basestring) else cmd)
             try:
-                proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
-                                    shell=shell,
-                                    cwd=cwd or self.cwd,
-                                    env=env or self.env)
+                proc = subprocess.Popen(cmd, stdout=outputstream,
+                                        stderr=errstream,
+                                        shell=shell,
+                                        cwd=cwd or self.cwd,
+                                        env=env or self.env)
             except Exception, e:
-                lgr.error("Failed to start %r%r: %s" % (cmd, " under %r" % cwd if cwd else '', e))
+                lgr.error("Failed to start %r%r: %s" %
+                          (cmd, " under %r" % cwd if cwd else '', e))
                 raise
-            # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
-            # and is considered to be a security hazard. So be careful with input.
+            # shell=True allows for piping, multiple commands, etc.,
+            # but that implies to not use shlex.split()
+            # and is considered to be a security hazard.
+            # So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple
             # subprocesses.
 
@@ -216,11 +231,12 @@ class Runner(object):
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s. Exit code=%d" \
-                    % (cmd, " under %r" % cwd if cwd else '', status)
+                    % (cmd, " under %r" % (cwd or self.cwd), status)
                 lgr.error(msg)
                 raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
-                self.log("Finished running %r with status %s" % (cmd, status), level=8)
+                self.log("Finished running %r with status %s" % (cmd, status),
+                         level=8)
 
         else:
             self.commands.append(cmd)
@@ -231,7 +247,8 @@ class Runner(object):
     def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
 
-        Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with its arguments to `commands` otherwise.
+        Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with
+        its arguments to `commands` otherwise.
 
         f : callable
         *args, **kwargs:

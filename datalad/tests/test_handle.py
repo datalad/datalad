@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class Dataset
+"""Test implementation of class Handle
 
 """
 
@@ -17,7 +17,7 @@ from nose.tools import assert_raises, assert_is_instance, assert_true, assert_eq
 from nose import SkipTest
 from git.exc import GitCommandError
 
-from datalad.support.dataset import Dataset
+from datalad.support.handle import Handle
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git, ok_clean_git_annex_proxy
 from datalad.support.exceptions import FileInGitError
@@ -32,23 +32,23 @@ local_flavors = ['network-clone' if on_windows else 'local']
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_Dataset(src, dst):
+def test_Handle(src, dst):
 
-    ds = Dataset(dst, src)
-    assert_is_instance(ds, Dataset, "Dataset was not created.")
+    ds = Handle(dst, src)
+    assert_is_instance(ds, Handle, "Handle was not created.")
     assert_true(os.path.exists(os.path.join(dst, '.datalad')))
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    assert_raises(GitCommandError, Dataset, dst, src)
+    assert_raises(GitCommandError, Handle, dst, src)
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_Dataset_direct(src, dst):
+def test_Handle_direct(src, dst):
 
-    ds = Dataset(dst, src, direct=True)
-    assert_is_instance(ds, Dataset, "Dataset was not created.")
+    ds = Handle(dst, src, direct=True)
+    assert_is_instance(ds, Handle, "Handle was not created.")
     assert_true(os.path.exists(os.path.join(dst, '.datalad')))
     assert_true(ds.is_direct_mode(), "Forcing direct mode failed.")
     
@@ -56,30 +56,30 @@ def test_Dataset_direct(src, dst):
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_flavors)
-def test_Dataset_instance_from_existing(path):
+def test_Handle_instance_from_existing(path):
 
-    gr = Dataset(path)
-    assert_is_instance(gr, Dataset, "Dataset was not created.")
+    gr = Handle(path)
+    assert_is_instance(gr, Handle, "Handle was not created.")
     assert_true(os.path.exists(os.path.join(path, '.datalad')))
 
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
 @with_tempfile
-def test_Dataset_instance_brand_new(path):
+def test_Handle_instance_brand_new(path):
 
-    gr = Dataset(path)
-    assert_is_instance(gr, Dataset, "Dataset was not created.")
+    gr = Handle(path)
+    assert_is_instance(gr, Handle, "Handle was not created.")
     assert_true(os.path.exists(os.path.join(path, '.datalad')))
 
 
 @ignore_nose_capturing_stdout
 @with_testrepos(flavors=['network'])
 @with_tempfile
-def test_Dataset_get(src, dst):
+def test_Handle_get(src, dst):
 
-    ds = Dataset(dst, src)
-    assert_is_instance(ds, Dataset, "AnnexRepo was not created.")
+    ds = Handle(dst, src)
+    assert_is_instance(ds, Handle, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
     assert_false(ds.file_has_content("test-annex.dat")[0][1])
@@ -92,9 +92,9 @@ def test_Dataset_get(src, dst):
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_Dataset_add_to_annex(src, dst):
+def test_Handle_add_to_annex(src, dst):
 
-    ds = Dataset(dst, src)
+    ds = Handle(dst, src)
     filename = 'file_to_annex.dat'
     filename_abs = os.path.join(dst, filename)
     with open(filename_abs, 'w') as f:
@@ -117,9 +117,9 @@ def test_Dataset_add_to_annex(src, dst):
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_Dataset__add_to_git(src, dst):
+def test_Handle__add_to_git(src, dst):
 
-    ds = Dataset(dst, src)
+    ds = Handle(dst, src)
 
     filename = 'file_to_git.dat'
     filename_abs = os.path.join(dst, filename)
@@ -137,9 +137,9 @@ def test_Dataset__add_to_git(src, dst):
 @assert_cwd_unchanged
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
-def test_Dataset_commit(src, path):
+def test_Handle_commit(src, path):
 
-    ds = Dataset(path, src)
+    ds = Handle(path, src)
     filename = os.path.join(path, "test_git_add.dat")
     with open(filename, 'w') as f:
         f.write("File to add to git")
