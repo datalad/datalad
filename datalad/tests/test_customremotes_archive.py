@@ -57,8 +57,6 @@ def test_basic_scenario(d, d2):
 
     r = Runner(cwd=d, env=env, protocol=protocol)
 
-    annex_opts = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
-
     handle = Handle(d, runner=r)
     handle.annex_initremote('annexed-archives',
                             ['encryption=none', 'type=external', 'externaltype=dl+archive'])
