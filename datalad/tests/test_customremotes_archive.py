@@ -50,13 +50,13 @@ def test_basic_scenario(d, d2):
     if os.environ.get('DATALAD_LOGLEVEL'):
         env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
 
-    r = Runner(cwd=d, env=env)
 
     if os.environ.get('DATALAD_PROTOCOL_REMOTE'):
         protocol = AnnexExchangeProtocol(d, 'dl+archive:')
     else:
         protocol = None
 
+    r = Runner(cwd=d, env=env, protocol=protocol)
 
     def rok(cmd, *args, **kwargs):
         if protocol:
@@ -108,7 +108,7 @@ def test_basic_scenario(d, d2):
     handle.annex_drop(fn_extracted) # so we don't get from this one in next part
 
     # Let's create a clone and verify chain of getting file by getting the tarball
-    cloned_handle = Handle(d2, d, runner=Runner(cwd=d2, env=env))
+    cloned_handle = Handle(d2, d, runner=Runner(cwd=d2, env=env, protocol=protocol))
     # TODO: provide clone-method in GitRepo: cloned_handle = handle.getClone(d2) or sth.
     # we would still need to enable manually atm that special remote for archives
     cloned_handle.annex_enableremote('annexed-archives')

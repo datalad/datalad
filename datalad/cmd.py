@@ -17,6 +17,7 @@ import sys
 import logging
 import os
 import shutil
+import shlex
 from datalad.support.exceptions import CommandError
 
 lgr = logging.getLogger('datalad.cmd')
@@ -34,9 +35,9 @@ class Runner(object):
     The Runner will then collect all calls as strings in `commands`.
     """
 
-    __slots__ = ['commands', 'dry', 'cwd', 'env']
+    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
 
-    def __init__(self, dry=False, cwd=None, env=None):
+    def __init__(self, dry=False, cwd=None, env=None, protocol=None):
         """
         Parameters
         ----------
@@ -52,6 +53,7 @@ class Runner(object):
         self.dry = dry
         self.cwd = cwd
         self.env = env
+        self.protocol=protocol
 
         self.commands = []
 
@@ -184,6 +186,10 @@ class Runner(object):
 
             if shell is None:
                 shell = isinstance(cmd, basestring)
+
+            if self.protocol:
+                self.protocol.write_section(
+                    shlex.split(cmd) if isinstance(cmd, basestring) else cmd)
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
                                     shell=shell,
