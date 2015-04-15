@@ -362,7 +362,7 @@ class AnnexRepo(GitRepo):
         self.cmd_call_wrapper(cmd_list, cwd=self.path)
 
     @normalize_paths
-    def annex_addurl_to_file(self, file, url, options):
+    def annex_addurl_to_file(self, file, url, options=[]):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -381,7 +381,7 @@ class AnnexRepo(GitRepo):
         cmd_list = ['git', 'annex', 'addurl', '--file=%s' % file[0]] + options + [url]
         self.cmd_call_wrapper(cmd_list, cwd=self.path)
 
-    def annex_addurl(self, urls, options):
+    def annex_addurl(self, urls, options=[]):
         """Downloads each url to its own file, which is added to the annex.
 
         Parameters:
