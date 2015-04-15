@@ -11,13 +11,16 @@
 __docformat__ = 'restructuredtext'
 
 import errno
-import sys, os
+import os
+import sys
 
 from os.path import exists, join as opj, basename, realpath, dirname
+from traceback import format_exc
 
 from ..cmd import Runner
 
 import logging
+
 
 lgr = logging.getLogger('datalad.customremotes')
 
@@ -269,6 +272,8 @@ class AnnexCustomRemote(object):
 
 
     def _loop(self):
+        """The main loop
+        """
 
         self.send("VERSION", SUPPORTED_PROTOCOL)
 
@@ -283,16 +288,18 @@ class AnnexCustomRemote(object):
             req, req_load = l[0], l[1:]
 
             method = getattr(self, "req_%s" % req, None)
-            if method:
-                try:
-                    method(*req_load)
-                except Exception, e:
-                    self.error("Problem processing request %r with parameters %r: %r"
-                                % (req, req_load, e))
-            else:
+            if not method:
                 self.error("We have no support for %s request, part of %s response"
                            % (req, l))
                 self.send("UNSUPPORTED-REQUEST")
+                continue
+
+            try:
+                method(*req_load)
+            except Exception, e:
+                self.error("Problem processing %r with parameters %r: %r"
+                           % (req, req_load, e))
+                lgr.error("Caught exception detail: %s" % format_exc())
 
 
     def req_INITREMOTE(self, *args):
