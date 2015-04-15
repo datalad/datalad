@@ -14,7 +14,7 @@ from ..customremotes.base import AnnexExchangeProtocol
 from ..customremotes.archive import AnnexArchiveCustomRemote
 from ..cmd import Runner
 from ..support.gitrepo import GitRepo
-from ..support.dataset import Dataset as Handle
+from ..support.handle import Handle
 
 from .utils import *
 
