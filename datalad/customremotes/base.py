@@ -87,7 +87,7 @@ send () {
             # comment out all the past entries
             with open(_file) as f:
                 entries = f.readlines()
-            for i in xrange(len(self.HEADER.split('\n')), len(entries)):
+            for i in xrange(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):
                     entries[i] = '#' + e
@@ -105,7 +105,7 @@ send () {
     def write_section(self, cmd):
         self.initiate()
         with open(self._file, 'a') as f:
-            f.write('\n### %s\n' % cmd)
+            f.write('%s### %s%s' % (os.linesep, cmd, os.linesep))
         lgr.error("New section in the protocol: "
                       "cd %s; PATH=%s:$PATH %s"
                       % (realpath(self.repopath),
@@ -116,12 +116,12 @@ send () {
     def write_entries(self, entries):
         self.initiate()
         with open(self._file, 'a') as f:
-            f.write('\n'.join(entries + ['']))
+            f.write(os.linesep.join(entries + ['']))
 
     def __iadd__(self, entry):
         self.initiate()
         with open(self._file, 'a') as f:
-            f.write(entry + '\n')
+            f.write(entry + os.linesep)
         return self
 
 
@@ -218,7 +218,7 @@ class AnnexCustomRemote(object):
         # TODO: should we strip or should we not? verify how annex would deal
         # with filenames starting/ending with spaces - encoded?
         # Split right away
-        l = self.fin.readline().rstrip('\n\r')
+        l = self.fin.readline().rstrip(os.linesep)
         if self._protocol is not None:
             self._protocol += "recv %s" % l
         msg = l.split(None, n)
@@ -452,7 +452,7 @@ class AnnexCustomRemote(object):
         # TODO: should actually be implemented by AnnexRepo
         (out, err) = \
             self.runner(['git', 'annex', 'lookupkey', file], cwd=self.path)
-        return out.rstrip('\n\r')
+        return out.rstrip(os.linesep)
 
 
     def _get_key_dir(self, key):
