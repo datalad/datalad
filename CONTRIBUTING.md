@@ -29,20 +29,46 @@ How to contribute
 -----------------
 
 The preferred way to contribute to datalad code base is to fork the
-[main repository](http://github.com/datalad/datalad/) on GitHub:
+[main repository](http://github.com/datalad/datalad/) on GitHub.  Here
+we outline the workflow used by the developers:
 
-1. Fork the [project repository](http://github.com/datalad/datalad): click on
-   the 'Fork' button near the top of the page. This creates a copy of the code
-   under your account on the GitHub server.
+[gh-datalad]: http://github.com/datalad/datalad
 
-2. Clone this copy to your local disk:
+0. Have a clone of our main [project repository][gh-datalad] as `origin`
+   remote in your git:
 
-          $ git clone --recursive git@github.com:YourLogin/datalad.git
+          $ git clone --recursive git://github.com:datalad/datalad
 
     `--recursive` is used to initialize used git submodules.  If you have cloned
     without it already, just run `git submodule update --init --recursive`
 
-3. Create a branch to hold your changes:
+1. Fork the [project repository][gh-datalad]: click on the 'Fork'
+   button near the top of the page. This creates a copy of the code
+   under your account on the GitHub server.
+
+2. Add your clone to the local clone you already have on your local disk:
+
+          $ git remote add gh-YourLogin git@github.com:YourLogin/datalad.git
+
+    To ease addition of other github repositories as remotes, here is
+    a little bash function/script to your `~/.bashrc`:
+
+        ghremote () {
+                url="$1"
+                proj=${url##*/}
+                url_=${url%/*}
+                login=${url_##*/}
+                git remote add gh-$login $url
+                git fetch gh-$login
+        }
+
+    so you could simply run
+
+         $ ghremote git@github.com:YourLogin/datalad.git
+
+    to add that `gh-YourLogin` remote.
+
+3. Create a branch (generally off the `origin/master`) to hold your changes:
 
           $ git checkout -b nf-my-feature
 
