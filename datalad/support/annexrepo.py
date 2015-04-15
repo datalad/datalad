@@ -405,7 +405,7 @@ class AnnexRepo(GitRepo):
         """Record that the file is no longer available at the url.
         """
 
-        self._run_annex_command('rmurl', annex_options=file[0] + url)
+        self._run_annex_command('rmurl', annex_options=[file[0]] + [url])
 
     @normalize_paths
     def annex_drop(self, files):
