@@ -14,13 +14,13 @@ import os
 import platform
 from git.exc import GitCommandError
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false, assert_in
+from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false, assert_in, assert_not_in
 
 from datalad.support.annexrepo import AnnexRepo, kwargs_to_options
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree,\
     get_most_obscure_supported_name, ok_clean_git
-from datalad.support.exceptions import CommandNotAvailableError, FileInGitError, FileNotInAnnexError
+from datalad.support.exceptions import CommandNotAvailableError, FileInGitError, FileNotInAnnexError, CommandError
 
 # For now (at least) we would need to clone from the network
 # since there are troubles with submodules on Windows.
@@ -220,11 +220,56 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
     ar.annex_add_to_git(filename)
     assert_in(filename, ar.get_indexed_files())
 
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_web_remote(src, dst):
+
+    ar = AnnexRepo(dst, src)
+
+    testurl = 'http://datalad.org/pages/about.html'
+    testfile = 'datalad.org_pages_about.html'
+
+    # get the file from remote
+    ar.annex_addurls([testurl])
+    l = ar.annex_whereis(testfile)
+    assert_in('web', l[testfile])
+    assert_equal(len(l[testfile]), 2)
+    assert_in((testfile, True), ar.file_has_content(testfile))
+
+    # remove the remote
+    ar.annex_rmurl(testfile, testurl)
+    l = ar.annex_whereis(testfile)
+    assert_not_in('web', l[testfile])
+    assert_equal(len(l[testfile]), 1)
+
+    # now only 1 copy; drop should fail
+    try:
+        ar.annex_drop(testfile)
+    except CommandError, e:
+        assert_equal(e.code, 1)
+        assert_in('Could only verify the '
+                  'existence of 0 out of 1 necessary copies', e.stdout)
+        failed = True
+
+    assert_true(failed)
+
+    # readd the url using different method
+    ar.annex_addurl_to_file(testfile, testurl)
+    l = ar.annex_whereis(testfile)
+    assert_in('web', l[testfile])
+    assert_equal(len(l[testfile]), 2)
+    assert_in((testfile, True), ar.file_has_content(testfile))
+
+    # 2 known copies now; drop should succeed
+    ar.annex_drop(testfile)
+    l = ar.annex_whereis(testfile)
+    assert_in('web', l[testfile])
+    assert_equal(len(l[testfile]), 1)
+    assert_in((testfile, False), ar.file_has_content(testfile))
+
 # TODO:
 #def annex_initremote(self, name, options):
 #def annex_enableremote(self, name):
-#def annex_addurl_to_file(self, file, url, options=[]):
-#def annex_addurls(self, urls, options=[]):
-#def annex_rmurl(self, file, url):
-#def annex_drop(self, files):
-#def annex_whereis(self, files):
+
+
