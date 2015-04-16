@@ -19,7 +19,7 @@ from git.exc import GitCommandError
 
 from datalad.support.handle import Handle
 from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git, ok_clean_git_annex_proxy
+    on_windows, ok_clean_git, ok_clean_git_annex_proxy, get_most_obscure_supported_name
 from datalad.support.exceptions import FileInGitError
 
 
@@ -95,7 +95,7 @@ def test_Handle_get(src, dst):
 def test_Handle_add_to_annex(src, dst):
 
     ds = Handle(dst, src)
-    filename = 'file_to_annex.dat'
+    filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(dst, filename)
     with open(filename_abs, 'w') as f:
         f.write("What to write?")
@@ -121,7 +121,7 @@ def test_Handle__add_to_git(src, dst):
 
     ds = Handle(dst, src)
 
-    filename = 'file_to_git.dat'
+    filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(dst, filename)
     with open(filename_abs, 'w') as f:
         f.write("What to write?")
@@ -140,7 +140,7 @@ def test_Handle__add_to_git(src, dst):
 def test_Handle_commit(src, path):
 
     ds = Handle(path, src)
-    filename = os.path.join(path, "test_git_add.dat")
+    filename = os.path.join(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
     ds.annex_add(filename)
