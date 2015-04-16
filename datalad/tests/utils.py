@@ -503,7 +503,9 @@ OBSCURE_FILENAMES = (
     " \"';abcd | ",
     " \"';abcd ",
     " ;abcd ",
+    " ;abcd",
     " ab cd ",
+    " ab cd",
     "a",
     " abc d.dat ", # they all should at least support spaces and dots
 )
@@ -515,6 +517,8 @@ def get_most_obscure_supported_name(tdir):
     TODO: we might want to use it as a function where we would provide tdir
     """
     for filename in OBSCURE_FILENAMES:
+        if on_windows and filename.rstrip() != filename:
+            continue
         try:
             with open(opj(tdir, filename), 'w') as f:
                 f.write("TEST LOAD")
