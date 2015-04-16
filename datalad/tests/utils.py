@@ -176,7 +176,9 @@ from ..utils import optional_args
 def with_tree(t, tree=None, **tkwargs):
     @wraps(t)
     def newfunc(*arg, **kw):
-        d = tempfile.mkdtemp(**tkwargs)
+        tkwargs_ = tkwargs.copy()
+        tkwargs_['prefix'] = tkwargs_.get('prefix', 'datalad_temp_tree_')
+        d = tempfile.mkdtemp(**tkwargs_)
         create_tree(d, tree)
         try:
             t(*(arg + (d,)), **kw)
