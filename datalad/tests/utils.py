@@ -493,6 +493,10 @@ def get_most_obscure_supported_name(tdir):
         try:
             with open(opj(tdir, filename), 'w') as f:
                 f.write("TEST LOAD")
+            with open(opj(tdir, filename), 'r') as f:
+                cont = f.readline().strip(os.linesep)
+                if not cont == "TEST LOAD":
+                    raise Exception
             return filename # it will get removed as a part of wiping up the directory
         except:
             lgr.debug("Filename %r is not supported on %s under %s",
