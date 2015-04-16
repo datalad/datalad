@@ -37,12 +37,6 @@ class Runner(object):
     The Runner will then collect all calls as strings in `commands`.
     """
 
-<<<<<<< HEAD
-    __slots__ = ['commands', 'dry']
-
-    def __init__(self, dry=False):
-        self.dry = dry
-=======
     __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
 
     def __init__(self, dry=False, cwd=None, env=None, protocol=None):
@@ -63,7 +57,6 @@ class Runner(object):
         self.env = env
         self.protocol = protocol
 
->>>>>>> 4448157... NF: protocol can be attached to the runner
         self.commands = []
 
     def __call__(self, cmd, *args, **kwargs):
@@ -134,8 +127,8 @@ class Runner(object):
 
         return stdout, stderr
 
-    def run(self, cmd, log_stdout=True, log_stderr=True,
-            log_online=False, expect_stderr=False, cwd=None, shell=None):
+    def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
+            expect_stderr=False, cwd=None, env=None, shell=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is
@@ -170,6 +163,9 @@ class Runner(object):
         cwd : string, optional
             Directory under which run the command (passed to Popen)
 
+        env : string, optional
+            Custom environment to pass
+
         shell: bool, optional
             Run command in a shell.  If not specified, then it runs in a shell
             only if command is specified as a string (not a list)
@@ -200,17 +196,11 @@ class Runner(object):
                 self.protocol.write_section(
                     shlex.split(cmd) if isinstance(cmd, basestring) else cmd)
             try:
-<<<<<<< HEAD
-                proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
-                                    shell=shell,
-                                    cwd=cwd)
-=======
                 proc = subprocess.Popen(cmd, stdout=outputstream,
                                         stderr=errstream,
                                         shell=shell,
                                         cwd=cwd or self.cwd,
                                         env=env or self.env)
->>>>>>> 0f1e523... more documenting and PEP8
             except Exception, e:
                 lgr.error("Failed to start %r%r: %s" %
                           (cmd, " under %r" % cwd if cwd else '', e))
@@ -305,3 +295,5 @@ def link_file_load(src, dst, dry_run=False):
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
+    else:
+        lgr.log(1, "Hardlinking finished")
