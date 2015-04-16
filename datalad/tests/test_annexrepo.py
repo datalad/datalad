@@ -136,7 +136,7 @@ def test_AnnexRepo_annex_add(src, annex_path):
 
     ar = AnnexRepo(annex_path, src)
 
-    filename = 'file_to_annex.dat'
+    filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(annex_path, filename)
     f = open(filename_abs, 'w')
     f.write("What to write?")
@@ -211,7 +211,7 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
 
     ar = AnnexRepo(dst, src)
 
-    filename = 'file_to_git.dat'
+    filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(dst, filename)
     with open(filename_abs, 'w') as f:
         f.write("What to write?")
@@ -219,3 +219,12 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
     assert_raises(IOError, ar.get_file_key, filename)
     ar.annex_add_to_git(filename)
     assert_in(filename, ar.get_indexed_files())
+
+# TODO:
+#def annex_initremote(self, name, options):
+#def annex_enableremote(self, name):
+#def annex_addurl_to_file(self, file, url, options=[]):
+#def annex_addurls(self, urls, options=[]):
+#def annex_rmurl(self, file, url):
+#def annex_drop(self, files):
+#def annex_whereis(self, files):
