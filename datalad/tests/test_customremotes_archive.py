@@ -28,26 +28,28 @@ def get_bindir_PATH():
     return PATH
 
 # both files will have the same content
-#fn_inarchive = 'test.dat'
-#fn_extracted = 'test2.dat'
-fn_inarchive = get_most_obscure_supported_name()
-fn_extracted = fn_inarchive.replace('a', 'z')
+#fn_inarchive_obscure = 'test.dat'
+#fn_extracted_obscure = 'test2.dat'
+fn_inarchive_obscure = get_most_obscure_supported_name()
+fn_archive_obscure = fn_inarchive_obscure.replace('a', 'b') + '.tar.gz'
+fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
+
 # TODO -- obscure one for the tarball itself
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
 @with_tree(
-    tree=(('a.tar.gz', (('d', ((fn_inarchive, '123'),)),)),
+    tree=(('a.tar.gz', (('d', ((fn_inarchive_obscure, '123'),)),)),
           ('simple.txt', '123'),
-          (fn_extracted, '123')
+          (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
+          (fn_extracted_obscure, '123')
          ))
 @with_tempfile()
-@with_tempfile(suffix="_custom.log")
-def check_basic_scenario(fn, d, d2, dl_logfile):
+def check_basic_scenario(fn_archive, fn_extracted, d, d2):
     # We could just propagate current environ I guess to versatile our testing
     env = os.environ.copy()
     env.update({'PATH': get_bindir_PATH(),
-                'DATALAD_LOGTARGET': dl_logfile})
+                'DATALAD_LOGTARGET': d2 + "_custom.log"})
     if os.environ.get('DATALAD_LOGLEVEL'):
         env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
 
@@ -63,34 +65,35 @@ def check_basic_scenario(fn, d, d2, dl_logfile):
     handle.annex_initremote('annexed-archives',
                             ['encryption=none', 'type=external', 'externaltype=dl+archive'])
     # We want two maximally obscure names, which are also different
-    assert(fn != fn_inarchive)
-    handle.add_to_annex('a.tar.gz', "Added tarball")
-    handle.add_to_annex(fn, "Added the load file")
+    assert(fn_extracted != fn_inarchive_obscure)
+    handle.add_to_annex(fn_archive, "Added tarball")
+    handle.add_to_annex(fn_extracted, "Added the load file")
 
     # Operations with archive remote URL
     file_url = AnnexArchiveCustomRemote(path=d).get_file_url(
-        archive_file='a.tar.gz', file='a/d/'+fn_inarchive)
+        archive_file=fn_archive,
+        file=fn_archive.replace('.tar.gz','') + '/d/'+fn_inarchive_obscure)
 
-    handle.annex_addurl_to_file(fn, file_url, ['--relaxed'])
-    handle.annex_drop(fn)
+    handle.annex_addurl_to_file(fn_extracted, file_url, ['--relaxed'])
+    handle.annex_drop(fn_extracted)
 
-    list_of_remotes = handle.annex_whereis(fn)
-    in_('[annexed-archives]', list_of_remotes[fn])
+    list_of_remotes = handle.annex_whereis(fn_extracted)
+    in_('[annexed-archives]', list_of_remotes[fn_extracted])
 
-    ok_broken_symlink(opj(d, fn))
-    handle.get(fn)
-    in_((fn, True), handle.file_has_content(fn))
-    #ok_(exists(readlink(opj(d, fn))))
+    ok_broken_symlink(opj(d, fn_extracted))
+    handle.get(fn_extracted)
+    in_((fn_extracted, True), handle.file_has_content(fn_extracted))
+    #ok_(exists(readlink(opj(d, fn_extracted_obscure))))
 
-    handle.annex_rmurl(fn, file_url)
+    handle.annex_rmurl(fn_extracted, file_url)
     with swallow_logs() as cm:
-        assert_raises(RuntimeError, handle.annex_drop, fn) # no copies
+        assert_raises(RuntimeError, handle.annex_drop, fn_extracted) # no copies
         in_("git-annex: drop: 1 failed", cm.out)
 
-    handle.annex_addurl_to_file(fn, file_url)
-    handle.annex_drop(fn)
-    handle.get(fn)
-    handle.annex_drop(fn) # so we don't get from this one in next part
+    handle.annex_addurl_to_file(fn_extracted, file_url)
+    handle.annex_drop(fn_extracted)
+    handle.get(fn_extracted)
+    handle.annex_drop(fn_extracted) # so we don't get from this one in next part
 
     # Let's create a clone and verify chain of getting file by getting the tarball
     cloned_handle = Handle(d2, d, runner=Runner(cwd=d2, env=env, protocol=protocol))
@@ -99,15 +102,17 @@ def check_basic_scenario(fn, d, d2, dl_logfile):
     cloned_handle.annex_enableremote('annexed-archives')
 
 
-    ok_broken_symlink(opj(d2, 'a.tar.gz'))
-    ok_broken_symlink(opj(d2, fn))
-    cloned_handle.get(fn)
-    ok_good_symlink(opj(d2, fn))
+    ok_broken_symlink(opj(d2, fn_archive))
+    ok_broken_symlink(opj(d2, fn_extracted))
+    cloned_handle.get(fn_extracted)
+    ok_good_symlink(opj(d2, fn_extracted))
     # as a result it would also fetch tarball
-    ok_good_symlink(opj(d2, 'a.tar.gz'))
+    ok_good_symlink(opj(d2, fn_archive))
 
     # TODO: dropurl, addurl without --relaxed, addurl to non-existing file
 
 def test_basic_scenario():
-    yield check_basic_scenario, 'simple.txt'
-    yield check_basic_scenario, fn_extracted
+    yield check_basic_scenario, 'a.tar.gz', 'simple.txt'
+    #yield check_basic_scenario, 'a.tar.gz', fn_extracted_obscure
+    #yield check_basic_scenario, fn_archive_obscure, 'simple.txt'
+    yield check_basic_scenario, fn_archive_obscure, fn_extracted_obscure

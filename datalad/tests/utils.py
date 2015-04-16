@@ -50,7 +50,7 @@ def create_archive(path, name, load):
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    output = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
+    output = Runner().run(['tar', '-czvf', name, dirname],
                           cwd=path, expect_stderr=True)
     # remove original tree
     shutil.rmtree(full_dirname)

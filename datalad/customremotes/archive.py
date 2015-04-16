@@ -105,7 +105,7 @@ class AnnexArchiveCache(object):
         path = opj(self.get_extracted_archive(archive), urllib2.unquote(afile))
         # TODO: make robust
         lgr.log(1, "Verifying that %s exists" % abspath(path))
-        assert(exists(path))
+        assert exists(path), "%s must exist" % path
         return path
 
     # TODO -- inject cleanup upon destroy
