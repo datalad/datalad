@@ -42,11 +42,12 @@ fn_extracted = fn_inarchive.replace('a', 'z')
           (fn_extracted, '123')
          ))
 @with_tempfile()
-def check_basic_scenario(fn, d, d2):
+@with_tempfile(suffix="_custom.log")
+def check_basic_scenario(fn, d, d2, dl_logfile):
     # We could just propagate current environ I guess to versatile our testing
     env = os.environ.copy()
     env.update({'PATH': get_bindir_PATH(),
-                'DATALAD_LOGTARGET': 'stderr'})
+                'DATALAD_LOGTARGET': dl_logfile})
     if os.environ.get('DATALAD_LOGLEVEL'):
         env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
 
