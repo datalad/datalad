@@ -24,6 +24,7 @@ lgr = logging.getLogger('datalad.customremotes.archive')
 
 from ..cmd import link_file_load, Runner
 from ..utils import rotree, rmtree
+from ..support.exceptions import CommandError
 
 from .base import AnnexCustomRemote
 
@@ -279,13 +280,16 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def _transfer(self, cmd, key, path):
 
         akey, afile = self._get_akey_afile(key)
-        akey_path = self._get_key_path(akey)
-
-        if not exists(akey_path):
-            # retrieve the key using annex
+        try:
+            akey_path = self._get_key_path(akey)
+        except CommandError:
+            # TODO: make it more stringent?
+            # Command could have fail to run if key was not present locally yet
+            # Thus retrieve the key using annex
             try:
                 self.runner(["git", "annex", "get", "--key", akey],
                             cwd=self.path)
+                akey_path = self._get_key_path(akey)
                 assert(exists(akey_path))
             except Exception as e:
                 self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"

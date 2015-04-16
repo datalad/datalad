@@ -454,17 +454,16 @@ class AnnexCustomRemote(object):
             self.runner(['git', 'annex', 'lookupkey', file], cwd=self.path)
         return out.rstrip(os.linesep)
 
-
-    def _get_key_dir(self, key):
-        """Gets a full path to the directory containing the key
-        """
-        return opj(self.path, '.git', 'annex', 'objects',
-                   self.get_DIRHASH(key, full=True))
-
     def _get_key_path(self, key):
-        """Gets a full path to the key"""
-        self.heavydebug("Key path: %s" % opj(self._get_key_dir(key), key))
-        return opj(self._get_key_dir(key), key)
+        """Return path to the KEY file
+        """
+        # TODO: should actually be implemented by AnnexRepo
+        #       Command is available in annex >= 20140410
+        (out, err) = \
+            self.runner(['git', 'annex', 'contentlocation', key], cwd=self.path)
+        # TODO: it would exit with non-0 if key is not present locally.
+        # we need to catch and throw our exception
+        return opj(self.path, out.rstrip(os.linesep))
 
     # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED
