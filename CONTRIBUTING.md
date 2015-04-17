@@ -8,24 +8,24 @@ Files organization
 ------------------
 
 - `datalad/` is the main Python module where major development is happening,
-  with major submodules being
+  with major submodules being:
     - `cmdline/` contains commands for the command line interface.  See any of
-      the `cmd_*.py` file there for an example
+      the `cmd_*.py` files there for an example
     - `crawler/` functionality relevant for `crawl`ing operation of datalad
     - `tests/` all unit- and regression- tests
-        - `testrepos/` a git submodule pointing to
+        - `testrepos/` a git submodule pointing to the
           [datalad/testrepos repository](http://github.com/datalad/testrepos/)
           intended to collate repositories used for testing
-        - `utils.py` provides convenience helpers used by unit-tests suchas
+        - `utils.py` provides convenience helpers used by unit-tests such as
           `@with_tree`, `@serve_path_via_http` and other decorators
 - `tools/` contains helper utilities used during development, testing, and
   benchmarking of DataLad.  Implemented in any most appropriate language
-  (Python, bash, ...)
+  (Python, bash, etc.)
 
 How to contribute
 -----------------
 
-The preferred way to contribute to datalad code base is to fork the
+The preferred way to contribute to the datalad code base is to fork the
 [main repository](http://github.com/datalad/datalad/) on GitHub.  Here
 we outline the workflow used by the developers:
 
@@ -36,19 +36,19 @@ we outline the workflow used by the developers:
 
           $ git clone --recursive git://github.com:datalad/datalad
 
-    `--recursive` is used to initialize used git submodules.  If you have cloned
-    without it already, just run `git submodule update --init --recursive`
+    `--recursive` is used to initialize any needed git submodules.  If you have 
+    cloned without it already, just run `git submodule update --init --recursive`
 
 1. Fork the [project repository][gh-datalad]: click on the 'Fork'
    button near the top of the page. This creates a copy of the code
    under your account on the GitHub server.
 
-2. Add your clone to the local clone you already have on your local disk:
+2. Add your forked clone to the local clone you already have on your local disk:
 
           $ git remote add gh-YourLogin git@github.com:YourLogin/datalad.git
 
     To ease addition of other github repositories as remotes, here is
-    a little bash function/script to your `~/.bashrc`:
+    a little bash function/script to add to your `~/.bashrc`:
 
         ghremote () {
                 url="$1"
@@ -59,7 +59,7 @@ we outline the workflow used by the developers:
                 git fetch gh-$login
         }
 
-    so you could simply run
+    thus you could simply run:
 
          $ ghremote git@github.com:YourLogin/datalad.git
 
@@ -74,7 +74,7 @@ we outline the workflow used by the developers:
     - `nf-` for new features
     - `bf-` for bug fixes
     - `rf-` for refactoring
-    - `doc-` for documentation contributions (including in the code docstrings)
+    - `doc-` for documentation contributions (including in the code docstrings).
     We recommend to not work in the ``master`` branch!
 
 4. Work on this copy on your computer using Git to do the version control. When
@@ -84,21 +84,21 @@ we outline the workflow used by the developers:
           $ git commit
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
-   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but also you
-   could use `TST` for commits concerned solely with tests, and `BK` to signal
-   that commit causes a breakage (e.g. of tests) at this point.  Multiple
-   entries could be listed joined with +.  See `git log` for examples.  If
-   commit closes an existing DataLad issue -- add to the end of the mesage
+   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but you could 
+   also use `TST` for commits concerned solely with tests, and `BK` to signal
+   that the commit causes a breakage (e.g. of tests) at this point.  Multiple
+   entries could be listed joined with a `+`.  See `git log` for examples.  If
+   a commit closes an existing DataLad issue, then add to the end of the mesage
    `(Closes #ISSUE_NUMER)`
 
 5. Push them to GitHub with:
 
           $ git push -u origin nf-my-feature
 
-  Finally, go to the web page of the your fork of the datalad repo, and click
+  Finally, go to the web page of your fork of the datalad repo, and click
 'Pull request' (PR) to send your changes to the maintainers for review. This
 will send an email to the committers.  You can commit new changes to this branch
-and keep pushing to your remote -- github would automagically add them to your
+and keep pushing to your remote -- github automagically adds them to your
 previously opened PR.
 
 (If any of the above seems like magic to you, then look up the
@@ -122,8 +122,8 @@ rules before submitting a pull request:
 ### Tests
 
 All tests are available under `datalad/tests`.  To exercise tests, the codebase
-need to be "installed" to generate scripts for the entry points.  For that,
-recommended course of action is to use virtualenv, e.g.
+needs to be "installed" in order to generate scripts for the entry points.  For 
+that, recommended course of action is to use `virtualenv`, e.g.
 
 ```sh
 virtualenv --system-site-packages venv-tests
@@ -146,7 +146,7 @@ source venv-tests/bin/activate
 
 Some tests use testing repositories which are available as submodules
 under the `datalad/tests/testrepos` submodule (two tier- to not pollute
-top repository submodules namespace).  To enable those tests do
+top repository submodules namespace).  To enable those tests do:
 
 ```sh
 git submodule update --init --recursive
