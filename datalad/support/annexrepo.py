@@ -53,6 +53,8 @@ def kwargs_to_options(func):
         return func(self, *args, options=option_list)
     return newfunc
 
+# TODO: Depending on decision about options, implement common annex-options,
+# like --force and specific ones for all annex commands
 
 
 class AnnexRepo(GitRepo):
@@ -70,7 +72,8 @@ class AnnexRepo(GitRepo):
     # whether or not they result in a path inside the repo.
     # How to expand paths, if cwd is deeper in repo?
     # git annex proxy will need additional work regarding paths.
-    def __init__(self, path, url=None, runner=None, direct=False):
+    def __init__(self, path, url=None, runner=None,
+                 direct=False, backend=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -94,9 +97,14 @@ class AnnexRepo(GitRepo):
 
         direct: bool
            If True, force git-annex to use direct mode
+
+        backend: str
+            set default backend used by this annex. This does NOT affect files,
+            that are already annexed.
         """
         super(AnnexRepo, self).__init__(path, url)
 
+        self.default_backend = backend
         self.cmd_call_wrapper = runner or Runner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
         #       Includes: What to do in gitrepo class?
@@ -118,15 +126,19 @@ class AnnexRepo(GitRepo):
 
     def _run_annex_command(self, annex_cmd, git_options=[], annex_options=[],
                            log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=False):
+                           expect_stderr=False, backend=None):
         """Helper to run actual git-annex calls
         """
         # TODO: documentation
-        # TODO: runner options (log_sth)
-        debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
 
+        if not backend:
+            backend = self.default_backend
+        debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
+        backend = ['--backend=%s' % backend] if backend else []
         cmd_list = ['git'] + git_options +\
-                   ['annex', annex_cmd] + debug + annex_options
+                   ['annex', annex_cmd] +\
+                   backend +\
+                   debug + annex_options
         try:
             return self.cmd_call_wrapper.run(cmd_list,
                                              log_stdout=log_stdout,
@@ -235,7 +247,7 @@ class AnnexRepo(GitRepo):
 
     @kwargs_to_options
     @normalize_paths
-    def annex_add(self, files, options=[]):
+    def annex_add(self, files, backend=None, options=[]):
         """Add file(s) to the annex.
 
         Parameters
@@ -244,7 +256,8 @@ class AnnexRepo(GitRepo):
             list of paths to add to the annex
         """
 
-        self._run_annex_command('add', annex_options=options + files)
+        self._run_annex_command('add', annex_options=options + files,
+                                backend=backend)
 
     def annex_proxy(self, git_cmd):
         """Use git-annex as a proxy to git
@@ -395,7 +408,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('enableremote', annex_options=[name])
 
     @normalize_paths
-    def annex_addurl_to_file(self, file, url, options=[]):
+    def annex_addurl_to_file(self, file, url, options=[], backend=None):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -417,9 +430,10 @@ class AnnexRepo(GitRepo):
         """
 
         annex_options = ['--file=%s' % file[0]] + options + [url]
-        self._run_annex_command('addurl', annex_options=annex_options)
+        self._run_annex_command('addurl', annex_options=annex_options,
+                                backend=None)
 
-    def annex_addurls(self, urls, options=[]):
+    def annex_addurls(self, urls, options=[], backend=None):
         """Downloads each url to its own file, which is added to the annex.
 
         Parameters:
@@ -430,7 +444,8 @@ class AnnexRepo(GitRepo):
             options to the annex command
         """
 
-        self._run_annex_command('addurl', annex_options=options + urls)
+        self._run_annex_command('addurl', annex_options=options + urls,
+                                backend=None)
 
     @normalize_paths
     def annex_rmurl(self, file, url):
@@ -501,3 +516,23 @@ class AnnexRepo(GitRepo):
             item.get('file'):
                 [remote.get('description') for remote in item.get('whereis')]
                 for item in json_objects if item.get('success')}
+
+    @normalize_paths
+    def migrate_backend(self, files='', backend=None):
+        """Changes the backend used for `file`.
+
+        The backend used for the key-value of `files`. Only files currently
+        present are migrated.
+
+        Parameters:
+        -----------
+        files: list
+            files to migrate. If no files are given, migrate all files.
+        backend: str
+            specify the backend to migrate to. If none is given, the
+            default backend of this instance will be used.
+        """
+
+        self._run_annex_command('migrate',
+                                annex_options=files,
+                                backend=backend)

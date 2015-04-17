@@ -283,6 +283,29 @@ def test_AnnexRepo_web_remote(src, dst):
     assert_equal(len(l[testfile]), 1)
     assert_in((testfile, False), ar.file_has_content(testfile))
 
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_backends(src, dst):
+    ar = AnnexRepo(dst, src)
+
+    filename = get_most_obscure_supported_name()
+    filename_abs = os.path.join(dst, filename)
+    f = open(filename_abs, 'w')
+    f.write("What to write?")
+    f.close()
+
+    ar.annex_add(filename, backend='MD5')
+    assert_true(ar.get_file_key(filename).startswith('MD5'))
+    assert_true(ar.get_file_key('test-annex.dat').startswith('SHA256E'))
+
+    ar.migrate_backend('test-annex.dat')
+    assert_true(ar.get_file_key(filename).startswith('MD5'))
+
+    ar.migrate_backend(backend='SHA1')
+    assert_true(ar.get_file_key(filename).startswith('SHA1'))
+    assert_true(ar.get_file_key('test-annex.dat').startswith('SHA1'))
+
+
 # TODO:
 #def annex_initremote(self, name, options):
 #def annex_enableremote(self, name):
