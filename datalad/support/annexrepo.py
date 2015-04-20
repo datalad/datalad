@@ -542,5 +542,17 @@ class AnnexRepo(GitRepo):
 
     @normalize_paths
     def get_file_backend(self, files):
+        """Get the backend currently used for file(s).
+
+        Parameters:
+        -----------
+        files: list
+
+        Returns:
+        --------
+        {str: str}
+            dictionary with the entries of `files` as keys and a str
+            to indicate the used backend for this file.
+        """
 
         return {f: self.get_file_key(f).split('-')[0] for f in files}
