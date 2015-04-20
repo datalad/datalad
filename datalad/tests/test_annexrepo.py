@@ -340,11 +340,20 @@ def test_AnnexRepo_backend_option(path, url):
     ar.annex_addurls([url +'faraway'], backend='SHA1')
     # TODO: what's the annex-generated name of this?
     # For now, workaround:
-    files = ar.get_indexed_files()
-    for f in files:
-        if 'faraway' in f:
-            assert_true(ar.get_file_key(f).startswith('SHA1'))
+    assert_true(ar.get_file_key(f).startswith('SHA1')
+                for f in ar.get_indexed_files() if 'faraway' in f)
 
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_get_file_backend(src, dst):
+    ar = AnnexRepo(dst, src)
+
+    assert_true(ar.get_file_backend('test-annex.dat').
+                get('test-annex.dat') == 'SHA256E')
+    ar.annex_get('test-annex.dat')
+    ar.migrate_backend('test-annex.dat', backend='SHA1')
+    assert_true(ar.get_file_backend('test-annex.dat').
+                get('test-annex.dat') == 'SHA1')
 
 # TODO:
 #def annex_initremote(self, name, options):

@@ -539,3 +539,8 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('migrate',
                                 annex_options=files,
                                 backend=backend)
+
+    @normalize_paths
+    def get_file_backend(self, files):
+
+        return {f: self.get_file_key(f).split('-')[0] for f in files}
