@@ -105,7 +105,7 @@ after = 1.conf
 		
 		parser = SafeConfigParser()
 		try:
-			if sys.version_info >= (3,2): # pragma: no cover
+			if sys.version_info >= (3,2):  # pragma: no cover
 				parser.read(resource, encoding='utf-8')
 			else:
 				parser.read(resource)
@@ -142,7 +142,7 @@ after = 1.conf
 		for filename in filenames:
 			fileNamesFull += SafeConfigParserWithIncludes.getIncludes(filename)
 		logSys.debug("Reading files: %s" % fileNamesFull)
-		if sys.version_info >= (3,2): # pragma: no cover
+		if sys.version_info >= (3,2):  # pragma: no cover
 			return SafeConfigParser.read(self, fileNamesFull, encoding='utf-8')
 		else:
 			return SafeConfigParser.read(self, fileNamesFull)

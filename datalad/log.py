@@ -131,7 +131,7 @@ class LoggerHelper(object):
 
         if logtarget.lower() in ('stdout', 'stderr') :
             loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
-            use_color = is_interactive() # explicitly decide here
+            use_color = is_interactive()  # explicitly decide here
         else:
             # must be a simple filename
             # Use RotatingFileHandler for possible future parametrization to keep
@@ -147,7 +147,7 @@ class LoggerHelper(object):
         #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
-        self.set_level() # set default logging level
+        self.set_level()  # set default logging level
         return self.lgr
 
 lgr = LoggerHelper().get_initialized_logger()

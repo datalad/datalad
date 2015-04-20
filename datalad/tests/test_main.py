@@ -82,7 +82,7 @@ def check_page2annex_same_incoming_and_public(mode, path, url):
             mode=mode,
             ),
         files=dict(
-            directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
+            directory='files',  # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
             url=url,
             git_add='(\.ascii)')))
 
