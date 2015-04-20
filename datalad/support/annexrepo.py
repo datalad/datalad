@@ -535,6 +535,10 @@ class AnnexRepo(GitRepo):
             default backend of this instance will be used.
         """
 
+        if self.is_direct_mode():
+            raise CommandNotAvailableError(
+                'git-annex migrate',
+                "Command 'migrate' is not available in direct mode.")
         self._run_annex_command('migrate',
                                 annex_options=files,
                                 backend=backend)

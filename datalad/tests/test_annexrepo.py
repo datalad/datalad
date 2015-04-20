@@ -300,13 +300,19 @@ def test_AnnexRepo_backends(src, dst):
 
     # migrating will only do, if file is present
     ar.annex_get('test-annex.dat')
-    assert_true(ar.get_file_key('test-annex.dat').startswith('SHA256E'))
-    ar.migrate_backend('test-annex.dat')
-    assert_true(ar.get_file_key('test-annex.dat').startswith('MD5'))
 
-    ar.migrate_backend('', backend='SHA1')
-    assert_true(ar.get_file_key(filename).startswith('SHA1'))
-    assert_true(ar.get_file_key('test-annex.dat').startswith('SHA1'))
+    if ar.is_direct_mode():
+        # No migration in direct mode
+        assert_raises(CommandNotAvailableError, ar.migrate_backend,
+                      'test-annex.dat')
+    else:
+        assert_true(ar.get_file_key('test-annex.dat').startswith('SHA256E'))
+        ar.migrate_backend('test-annex.dat')
+        assert_true(ar.get_file_key('test-annex.dat').startswith('MD5'))
+
+        ar.migrate_backend('', backend='SHA1')
+        assert_true(ar.get_file_key(filename).startswith('SHA1'))
+        assert_true(ar.get_file_key('test-annex.dat').startswith('SHA1'))
 
 
 # TODO:
