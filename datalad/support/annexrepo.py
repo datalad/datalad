@@ -422,7 +422,7 @@ class AnnexRepo(GitRepo):
 
         annex_options = ['--file=%s' % file[0]] + options + [url]
         self._run_annex_command('addurl', annex_options=annex_options,
-                                backend=None, log_online=True,
+                                backend=backend, log_online=True,
                                 log_stderr=False)
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
@@ -439,7 +439,7 @@ class AnnexRepo(GitRepo):
         """
 
         self._run_annex_command('addurl', annex_options=options + urls,
-                                backend=None, log_online=True,
+                                backend=backend, log_online=True,
                                 log_stderr=False)
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
