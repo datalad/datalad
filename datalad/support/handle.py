@@ -20,7 +20,7 @@ from annexrepo import AnnexRepo
 lgr = logging.getLogger('datalad.dataset')
 
 
-class Dataset(AnnexRepo):
+class Handle(AnnexRepo):
     """Representation of a dataset handled by datalad.
 
     Implementations of datalad commands are supposed to use this rather than AnnexRepo or GitRepo directly,
@@ -29,7 +29,7 @@ class Dataset(AnnexRepo):
 
     """
 
-    def __init__(self, path, url=None, direct=False):
+    def __init__(self, path, url=None, direct=False, runner=None):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -47,7 +47,7 @@ class Dataset(AnnexRepo):
 
         """
 
-        super(Dataset, self).__init__(path, url, direct=direct)
+        super(Handle, self).__init__(path, url, direct=direct, runner=runner)
         # TODO: what about runner? (dry runs ...)
 
         # TODO: should work with path (deeper) inside repo! => gitrepo/annexrepo
