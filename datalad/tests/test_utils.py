@@ -20,7 +20,7 @@ from .utils import with_tempfile
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
-    d2 = opj(d, 'd1', 'd2') # deep nested directory
+    d2 = opj(d, 'd1', 'd2')  # deep nested directory
     f = opj(d2, 'f1')
     os.makedirs(d2)
     with open(f, 'w') as f_:

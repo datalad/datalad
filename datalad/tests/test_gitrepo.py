@@ -66,7 +66,7 @@ def test_GitRepo_instance_brand_new(path):
 def test_GitRepo_add(src, path):
 
     gr = GitRepo(path, src)
-    filename = "test_git_add.dat"
+    filename = get_most_obscure_supported_name()
     with open(os.path.join(path, filename), 'w') as f:
         f.write("File to add to git")
     gr.git_add(filename)
@@ -79,7 +79,7 @@ def test_GitRepo_add(src, path):
 def test_GitRepo_commit(path):
 
     gr = GitRepo(path)
-    filename = "test_git_add.dat"
+    filename = get_most_obscure_supported_name()
     with open(os.path.join(path, filename), 'w') as f:
         f.write("File to add to git")
 

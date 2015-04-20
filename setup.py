@@ -1,10 +1,10 @@
 #!/usr/bin/env python
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
 #   See COPYING file distributed along with the DataLad package for the
 #   copyright and license terms.
 #
-### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 # Minimalistic setup.py for now
 
 from setuptools import setup, find_packages
@@ -25,12 +25,11 @@ setup(
     py_modules=['datalad'],
     packages=datalad_pkgs,
     install_requires=[
-        "GitPython", # 'git://github.com/gitpython-developers/GitPython'
+        "GitPython",  # 'git://github.com/gitpython-developers/GitPython'
         ],
     entry_points={
-        'console_scripts' : [
+        'console_scripts': [
             'datalad=datalad.cmdline.main:main',
             'git-annex-remote-dl+archive=datalad.customremotes.archive:main'],
     }
 )
-
