@@ -77,9 +77,9 @@ def test_AnnexRepo_get(src, dst):
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    assert_false(ar.file_has_content("test-annex.dat")[0])
+    assert_false(ar.file_has_content("test-annex.dat"))
     ar.annex_get(testfile)
-    assert_true(ar.file_has_content("test-annex.dat")[0])
+    assert_true(ar.file_has_content("test-annex.dat"))
 
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'],
@@ -206,12 +206,13 @@ def test_AnnexRepo_file_has_content(src, annex_path):
 
     ar.annex_get("test-annex.dat")
     assert_equal(ar.file_has_content(testfiles), [True, False])
+    assert_equal(ar.file_has_content(testfiles[:1]), [True])
 
     assert_equal(ar.file_has_content(testfiles + ["bogus.txt"]),
                  [True, False, False])
 
-    assert_equal(ar.file_has_content(["bogus.txt"]),
-                 [False])
+    assert_false(ar.file_has_content("bogus.txt"))
+    assert_true(ar.file_has_content("test-annex.dat"))
 
 
 def test_AnnexRepo_options_decorator():
@@ -255,7 +256,7 @@ def test_AnnexRepo_web_remote(src, dst):
     l = ar.annex_whereis(testfile)
     assert_in('web', l[testfile])
     assert_equal(len(l[testfile]), 2)
-    assert_equal(ar.file_has_content(testfile), [True])
+    assert_true(ar.file_has_content(testfile))
 
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
@@ -279,14 +280,14 @@ def test_AnnexRepo_web_remote(src, dst):
     l = ar.annex_whereis(testfile)
     assert_in('web', l[testfile])
     assert_equal(len(l[testfile]), 2)
-    assert_equal(ar.file_has_content(testfile), [True])
+    assert_true(ar.file_has_content(testfile))
 
     # 2 known copies now; drop should succeed
     ar.annex_drop(testfile)
     l = ar.annex_whereis(testfile)
     assert_in('web', l[testfile])
     assert_equal(len(l[testfile]), 1)
-    assert_equal(ar.file_has_content(testfile), [False])
+    assert_false(ar.file_has_content(testfile))
 
 # TODO:
 #def annex_initremote(self, name, options):

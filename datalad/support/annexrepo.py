@@ -276,7 +276,7 @@ class AnnexRepo(GitRepo):
         Parameters:
         -----------
         files: list, str
-            file to look up
+            file(s) to look up
 
         Returns:
         --------
@@ -313,7 +313,7 @@ class AnnexRepo(GitRepo):
                 # Not sure, whether or not this can actually happen
                 raise e
 
-        return output[0].split(linesep)[0]
+        return output[0].rstrip(linesep).split(linesep)
 
 
     @normalize_paths
@@ -341,7 +341,7 @@ class AnnexRepo(GitRepo):
                               "'find' operation per each file")
                     # we need to go file by file since one of them is non
                     # existent and annex pukes on it
-                    return [self.file_has_content(file_)[0] for file_ in files]
+                    return [self.file_has_content(file_) for file_ in files]
                 return [False]
             else:
                 raise
@@ -467,7 +467,7 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('drop', annex_options=files)
 
-    @normalize_paths
+    @normalize_paths(match_return_type=False)
     def annex_whereis(self, files):
         """Lists repositories that have actual content of file(s).
 
