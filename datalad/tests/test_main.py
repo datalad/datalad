@@ -348,8 +348,8 @@ def test_page2annex_separate_public():
 
 obscure = get_most_obscure_supported_name()
 
-if on_osx:
-    # There is a known issue with annex under OSX
+if False: # pragma: no cover
+    # There used to be an issue with annex under OSX
     # https://github.com/datalad/datalad/issues/79
     import logging
     lgr = logging.getLogger('datalad.tests')
