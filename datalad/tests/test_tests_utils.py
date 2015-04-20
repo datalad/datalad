@@ -14,6 +14,7 @@ from glob import glob
 from mock import patch
 
 from nose.tools import assert_in, assert_not_in
+from nose import SkipTest
 
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
@@ -22,7 +23,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     on_windows, assert_raises, assert_equal, assert_cwd_unchanged
 
 
-#
+##
 # Test with_tempfile, especially nested invocations
 #
 
@@ -107,7 +108,7 @@ def test_with_tempfile_default_prefix(d1):
     d = basename(d1)
     short = 'datalad_temp_'
     full = short + \
-           'datalad.tests.test_tests_utils.test_with_tempfile_default_prefix'
+           'test_with_tempfile_default_prefix'
     if on_windows:
         ok_startswith(d, short)
         nok_startswith(d, full)
@@ -118,7 +119,7 @@ def test_with_tempfile_default_prefix(d1):
 @with_tempfile(prefix="nodatalad_")
 def test_with_tempfile_specified_prefix(d1):
     ok_startswith(basename(d1), 'nodatalad_')
-    ok_('datalad.tests.test_tests_utils.test_with_tempfile_specified_prefix' not in d1)
+    ok_('test_with_tempfile_specified_prefix' not in d1)
 
 
 def test_get_most_obscure_supported_name():
@@ -131,7 +132,12 @@ def test_get_most_obscure_supported_name():
 
 
 def test_keeptemp_via_env_variable():
+
+    if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        raise SkipTest("We have env variable set to preserve tempfiles")
+
     files = []
+
     @with_tempfile()
     def check(f):
         open(f, 'w').write("LOAD")
