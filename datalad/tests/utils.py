@@ -153,7 +153,8 @@ from ..utils import optional_args
 def with_tree(t, tree=None, **tkwargs):
     @wraps(t)
     def newfunc(*arg, **kw):
-        d = tempfile.mkdtemp(**tkwargs)
+        tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
+        d = tempfile.mkdtemp(**tkwargs_)
         create_tree(d, tree)
         try:
             t(*(arg + (d,)), **kw)
@@ -221,12 +222,26 @@ def serve_path_via_http():
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(tkwargs_):
-    """Updates kwargs to be passed to tempfile. calls depending on env
+def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
+    """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
+    # operate on a copy of tkwargs to avoid any side-effects
+    tkwargs_ = tkwargs.copy()
+
+    # TODO: don't remember why I had this one originally
+    # if len(targs)<2 and \
+    if not 'prefix' in tkwargs_:
+        tkwargs_['prefix'] = '_'.join(
+            ['datalad_temp'] +
+            ([prefix] if prefix else []) +
+            ([''] if (on_windows or not wrapped)
+                  else [wrapped.func_name]))
+
     directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
     if directory and 'dir' not in tkwargs_:
         tkwargs_['dir'] = directory
+
+    return tkwargs_
 
 
 @optional_args
@@ -257,21 +272,14 @@ def with_tempfile(t, *targs, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
-        # operate on a copy of tkwargs to avoid any side-effects
-        tkwargs_ = tkwargs.copy()
 
-        if len(targs)<2 and not 'prefix' in tkwargs_:
-            tkwargs_['prefix'] = \
-                'datalad_temp_' + \
-                ('' if on_windows \
-                    else '%s.%s' % (t.__module__, t.func_name))
+        tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=t)
 
         # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
         # let mktemp handle it otherwise. However, an explicitly provided
         # dir=... will override this.
         mkdir = tkwargs_.pop('mkdir', False)
 
-        _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(tkwargs_)
 
         filename = {False: tempfile.mktemp,
                     True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
@@ -324,9 +332,8 @@ def _extend_globs(paths, flavors):
         # delay import of our code until needed for certain
         from ..cmd import Runner
         runner = Runner()
-        kw = dict(); _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
-        tdir = tempfile.mkdtemp(**kw)
-        repo = runner(["git", "clone", url, tdir], expect_stderr=True)
+        tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
+        _ = runner(["git", "clone", url, tdir], expect_stderr=True)
         open(opj(tdir, ".git", "remove-me"), "w").write("Please") # signal for it to be removed after
         return tdir
 
@@ -525,8 +532,7 @@ def swallow_outputs():
         """Little adapter to help getting out/err values
         """
         def __init__(self):
-            kw = dict()
-            _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+            kw = get_tempfile_kwargs({}, prefix="outputs")
 
             self._out = open(tempfile.mktemp(**kw), 'w')
             self._err = open(tempfile.mktemp(**kw), 'w')
@@ -586,7 +592,7 @@ def swallow_logs(new_level=None):
         """
         def __init__(self):
             kw = dict()
-            _update_tempfile_kwargs_for_DATALAD_TESTS_TEMPDIR(kw)
+            get_tempfile_kwargs(kw, prefix="logs")
 
             self._out = open(tempfile.mktemp(**kw), 'w')
 

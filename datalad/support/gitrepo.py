@@ -22,6 +22,7 @@ from git import Repo
 from git.exc import GitCommandError
 
 from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -115,8 +116,9 @@ class GitRepo(object):
     overridden accidentally by AnnexRepo.
 
     """
+    __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
-    def __init__(self, path, url=None):
+    def __init__(self, path, url=None, runner=None):
         """Creates representation of git repository at `path`.
 
         If there is no git repository at this location, it will create an empty one.
@@ -135,10 +137,18 @@ class GitRepo(object):
         """
 
         self.path = normpath(path)
+        self.cmd_call_wrapper = runner or Runner(cwd=self.path)
+        # TODO: Concept of when to set to "dry".
+        #       Includes: What to do in gitrepo class?
+        #       Now: setting "dry" means to give a dry-runner to constructor.
+        #       => Do it similar in gitrepo/dataset.
+        #       Still we need a concept of when to set it and whether this
+        #       should be a single instance collecting everything or more
+        #       fine grained.
 
         if url is not None:
             try:
-                Repo.clone_from(url, path)
+                self.cmd_call_wrapper(Repo.clone_from, url, path)
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
@@ -147,13 +157,13 @@ class GitRepo(object):
 
         if not exists(opj(path, '.git')):
             try:
-                self.repo = Repo.init(path, True)
+                self.repo = self.cmd_call_wrapper(Repo.init, path, True)
             except GitCommandError as e:
                 lgr.error(str(e))
                 raise
         else:
             try:
-                self.repo = Repo(path)
+                self.repo = self.cmd_call_wrapper(Repo, path)
             except GitCommandError as e:
                 # TODO: Creating Repo-object from existing git repository might raise other Exceptions
                 lgr.error(str(e))
@@ -171,7 +181,7 @@ class GitRepo(object):
 
         if files:
             try:
-                self.repo.index.add(files, write=True)
+                self.cmd_call_wrapper(self.repo.index.add, files, write=True)
                 # TODO: May be make use of 'fprogress'-option to indicate progress
                 # But then, we don't have it for git-annex add, anyway.
                 #
@@ -199,7 +209,7 @@ class GitRepo(object):
         if not msg:
             msg = "What would be a good default message?"
 
-        self.repo.index.commit(msg)
+        self.cmd_call_wrapper(self.repo.index.commit ,msg)
 
     def get_indexed_files(self):
         """Get a list of files in git's index
@@ -210,4 +220,5 @@ class GitRepo(object):
             list of paths rooting in git's base dir
         """
 
-        return [x[0] for x in self.repo.index.entries.keys()]
+        return [x[0] for x in self.cmd_call_wrapper(
+            self.repo.index.entries.keys)]

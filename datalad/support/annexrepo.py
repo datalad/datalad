@@ -23,7 +23,6 @@ from functools import wraps
 from ConfigParser import NoOptionError
 
 from gitrepo import GitRepo, normalize_paths
-from datalad.cmd import Runner as Runner
 from exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 
@@ -103,17 +102,9 @@ class AnnexRepo(GitRepo):
             that are already annexed nor will it automatically migrate files,
             that are 'getted' afterwards.
         """
-        super(AnnexRepo, self).__init__(path, url)
+        super(AnnexRepo, self).__init__(path, url, runner=runner)
 
         self.default_backend = backend
-        self.cmd_call_wrapper = runner or Runner(cwd=self.path)
-        # TODO: Concept of when to set to "dry".
-        #       Includes: What to do in gitrepo class?
-        #       Now: setting "dry" means to give a dry-runner to constructor.
-        #       => Do it similar in gitrepo/dataset.
-        #       Still we need a concept of when to set it and whether this
-        #       should be a single instance collecting everything or more
-        #       fine grained.
 
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
@@ -431,7 +422,10 @@ class AnnexRepo(GitRepo):
 
         annex_options = ['--file=%s' % file[0]] + options + [url]
         self._run_annex_command('addurl', annex_options=annex_options,
-                                backend=None)
+                                backend=None, log_online=True,
+                                log_stderr=False)
+        # Don't capture stderr, since download progress provided by wget uses
+        # stderr.
 
     def annex_addurls(self, urls, options=[], backend=None):
         """Downloads each url to its own file, which is added to the annex.
@@ -445,7 +439,10 @@ class AnnexRepo(GitRepo):
         """
 
         self._run_annex_command('addurl', annex_options=options + urls,
-                                backend=None)
+                                backend=None, log_online=True,
+                                log_stderr=False)
+        # Don't capture stderr, since download progress provided by wget uses
+        # stderr.
 
     @normalize_paths
     def annex_rmurl(self, file, url):
