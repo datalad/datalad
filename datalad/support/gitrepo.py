@@ -81,6 +81,31 @@ def _normalize_path(base_dir, path):
 
 
 @optional_args
+def normalize_path(func):
+    """Decorator to provide unified path conversion for a single file
+
+    Unlike normalize_paths, intended to be used for functions dealing with a
+    single filename at a time
+
+    Note
+    ----
+    This is intended to be used within the repository classes and therefore
+    returns a class method!
+
+    The decorated function is expected to take a path at
+    first positional argument (after 'self'). Additionally the class `func`
+    is a member of, is expected to have an attribute 'path'.
+    """
+
+    @wraps(func)
+    def newfunc(self, file_, *args, **kwargs):
+        file_new = _normalize_path(self.path, file_)
+        return func(self, file_new, *args, **kwargs)
+
+    return newfunc
+
+
+@optional_args
 def normalize_paths(func, match_return_type=True):
     """Decorator to provide unified path conversions.
 
