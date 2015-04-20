@@ -94,7 +94,7 @@ def test_with_testrepos():
 
 
 def test_with_tempfile_mkdir():
-    dnames = [] # just to store the name within the decorated function
+    dnames = []  # just to store the name within the decorated function
 
     @with_tempfile(mkdir=True)
     def check_mkdir(d1):
@@ -108,7 +108,7 @@ def test_with_tempfile_mkdir():
 
     check_mkdir()
     if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-        ok_(not os.path.exists(dnames[0])) # got removed
+        ok_(not os.path.exists(dnames[0]))  # got removed
 
 
 @with_tempfile()
@@ -193,7 +193,7 @@ def test_ok_startswith():
     ok_startswith('abc', 'a')
     ok_startswith('abc', '')
     ok_startswith(' abc', ' ')
-    ok_startswith('abc\r\n', 'a') # no effect from \r\n etc
+    ok_startswith('abc\r\n', 'a')  # no effect from \r\n etc
     assert_raises(AssertionError, ok_startswith, 'abc', 'b')
     assert_raises(AssertionError, ok_startswith, 'abc', 'abcd')
 

@@ -130,7 +130,7 @@ def ok_clean_git(path, annex=True, untracked=[]):
 
 def ok_file_under_git(path, filename, annexed=False):
     repo = AnnexRepo(path)
-    assert(filename in repo.get_indexed_files()) # file is known to Git
+    assert(filename in repo.get_indexed_files())  # file is known to Git
     assert(annexed == os.path.islink(opj(path, filename)))
 
 
@@ -334,7 +334,7 @@ def _extend_globs(paths, flavors):
         runner = Runner()
         tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
         _ = runner(["git", "clone", url, tdir], expect_stderr=True)
-        open(opj(tdir, ".git", "remove-me"), "w").write("Please") # signal for it to be removed after
+        open(opj(tdir, ".git", "remove-me"), "w").write("Please")  # signal for it to be removed after
         return tdir
 
     globs_extended = []
@@ -415,7 +415,7 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
                 # ad-hoc but works
                 if exists(repo) and exists(opj(repo, ".git", "remove-me")):
                     rmtemp(repo)
-                pass # might need to provide additional handling so, handle
+                pass  # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
 
@@ -479,7 +479,7 @@ def ignore_nose_capturing_stdout(func):
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_FILENAMES = (
-    " \"';a&b/&cd `| ", # shouldn't be supported anywhere I guess due to /
+    " \"';a&b/&cd `| ",  # shouldn't be supported anywhere I guess due to /
     " \"';a&b&cd `| ",
     " \"';abcd `| ",
     " \"';abcd | ",
@@ -489,7 +489,7 @@ OBSCURE_FILENAMES = (
     " ab cd ",
     " ab cd",
     "a",
-    " abc d.dat ", # they all should at least support spaces and dots
+    " abc d.dat ",  # they all should at least support spaces and dots
 )
 
 @with_tempfile(mkdir=True)
@@ -504,7 +504,7 @@ def get_most_obscure_supported_name(tdir):
         try:
             with open(opj(tdir, filename), 'w') as f:
                 f.write("TEST LOAD")
-            return filename # it will get removed as a part of wiping up the directory
+            return filename  # it will get removed as a part of wiping up the directory
         except:
             lgr.debug("Filename %r is not supported on %s under %s",
                       filename, platform.system(), tdir)
@@ -619,7 +619,7 @@ def swallow_logs(new_level=None):
 
     adapter = StringIOAdapter()
     lgr.handlers = [logging.StreamHandler(adapter.handle)]
-    if old_level < logging.DEBUG: # so if HEAVYDEBUG etc -- show them!
+    if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
     if isinstance(new_level, basestring):
         new_level = getattr(logging, new_level)

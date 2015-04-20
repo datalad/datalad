@@ -175,7 +175,7 @@ def annex_file(href,
                incoming_destiny="auto",
                archives_directories="strip",
                add_mode='auto',
-               # TODO!? uncomp_strip_leading_dir=True, #  False; would strip only if 1 directory
+               # TODO!? uncomp_strip_leading_dir=True,  #  False; would strip only if 1 directory
                addurl_opts=None,
                runner=None,
                git_add=False,
@@ -205,7 +205,7 @@ def annex_file(href,
 
     # Deal with public part first!
     if update_public:
-        ## # TODO: WRONG! we might not have full_incoming_filename == e.g. in fast mode
+        ##  # TODO: WRONG! we might not have full_incoming_filename == e.g. in fast mode
         ## if not exists(full_incoming_filename) and not runner.dry:
         ##     lgr.error("Cannot update public %s because incoming %s is N/A. Skipping."
         ##               % (public_filename, incoming_filename))
@@ -304,7 +304,7 @@ def annex_file(href,
             if not runner.dry:
                 incoming_annex_updated = True
         elif incoming_destiny == 'keep':
-            pass # do nothing more
+            pass  # do nothing more
         else:
             raise ValueError("Unknown value of incoming_destiny=%r"
                              % incoming_destiny)
@@ -326,7 +326,7 @@ def git_commit(path, files=None, msg=""):
 
     repo = git.Repo(path)
 
-    if files: # smth to add to commit?
+    if files:  # smth to add to commit?
         repo.index.add(files)
 
     # anything staged to be committed
