@@ -20,7 +20,7 @@ from datalad.support.annexrepo import AnnexRepo, kwargs_to_options
 from datalad.tests.utils import with_tempfile, with_testrepos, \
     assert_cwd_unchanged, ignore_nose_capturing_stdout, on_windows,\
     ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree,\
-    get_most_obscure_supported_name, ok_clean_git
+    get_most_obscure_supported_name, ok_clean_git, serve_path_via_http
 from datalad.support.exceptions import CommandNotAvailableError,\
     FileInGitError, FileNotInAnnexError, CommandError
 
@@ -285,7 +285,7 @@ def test_AnnexRepo_web_remote(src, dst):
 
 @with_testrepos(flavors='network')
 @with_tempfile
-def test_AnnexRepo_backends(src, dst):
+def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo(dst, src, backend='MD5')
 
     filename = get_most_obscure_supported_name()
@@ -313,6 +313,37 @@ def test_AnnexRepo_backends(src, dst):
         ar.migrate_backend('', backend='SHA1')
         assert_true(ar.get_file_key(filename).startswith('SHA1'))
         assert_true(ar.get_file_key('test-annex.dat').startswith('SHA1'))
+
+
+tree1args = dict(
+    tree=(
+        ('firstfile', 'whatever'),
+        ('secondfile', 'something else'),
+        ('remotefile', 'pretends to be remote'),
+        ('faraway', 'incredibly remote')),
+    dir=os.curdir)
+
+
+@with_tree(**tree1args)
+@serve_path_via_http()
+def test_AnnexRepo_backend_option(path, url):
+    ar = AnnexRepo(path, backend='MD5')
+
+    ar.annex_add('firstfile', backend='SHA1')
+    ar.annex_add('secondfile')
+    assert_true(ar.get_file_key('firstfile').startswith('SHA1'))
+    assert_true(ar.get_file_key('secondfile').startswith('MD5'))
+
+    ar.annex_addurl_to_file('remotefile', url + 'remotefile', backend='SHA1')
+    assert_true(ar.get_file_key('remotefile').startswith('SHA1'))
+
+    ar.annex_addurls([url +'faraway'], backend='SHA1')
+    # TODO: what's the annex-generated name of this?
+    # For now, workaround:
+    files = ar.get_indexed_files()
+    for f in files:
+        if 'faraway' in f:
+            assert_true(ar.get_file_key(f).startswith('SHA1'))
 
 
 # TODO:
