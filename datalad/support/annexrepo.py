@@ -417,7 +417,10 @@ class AnnexRepo(GitRepo):
         """
 
         annex_options = ['--file=%s' % file[0]] + options + [url]
-        self._run_annex_command('addurl', annex_options=annex_options)
+        self._run_annex_command('addurl', annex_options=annex_options,
+                                log_online=True, log_stderr=False)
+        # Don't capture stderr, since download progress provided by wget uses
+        # stderr.
 
     def annex_addurls(self, urls, options=[]):
         """Downloads each url to its own file, which is added to the annex.
@@ -430,7 +433,10 @@ class AnnexRepo(GitRepo):
             options to the annex command
         """
 
-        self._run_annex_command('addurl', annex_options=options + urls)
+        self._run_annex_command('addurl', annex_options=options + urls,
+                                log_online=True, log_stderr=False)
+        # Don't capture stderr, since download progress provided by wget uses
+        # stderr.
 
     @normalize_paths
     def annex_rmurl(self, file, url):
