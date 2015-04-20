@@ -283,7 +283,7 @@ def test_AnnexRepo_web_remote(src, dst):
     assert_equal(len(l[testfile]), 1)
     assert_in((testfile, False), ar.file_has_content(testfile))
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors='network')
 @with_tempfile
 def test_AnnexRepo_backends(src, dst):
     ar = AnnexRepo(dst, src, backend='MD5')
