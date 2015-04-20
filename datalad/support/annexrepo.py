@@ -23,7 +23,6 @@ from functools import wraps
 from ConfigParser import NoOptionError
 
 from gitrepo import GitRepo, normalize_paths
-from datalad.cmd import Runner as Runner
 from exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 
@@ -95,16 +94,9 @@ class AnnexRepo(GitRepo):
         direct: bool
            If True, force git-annex to use direct mode
         """
-        super(AnnexRepo, self).__init__(path, url)
+        super(AnnexRepo, self).__init__(path, url, runner=runner)
 
-        self.cmd_call_wrapper = runner or Runner(cwd=self.path)
-        # TODO: Concept of when to set to "dry".
-        #       Includes: What to do in gitrepo class?
-        #       Now: setting "dry" means to give a dry-runner to constructor.
-        #       => Do it similar in gitrepo/dataset.
-        #       Still we need a concept of when to set it and whether this
-        #       should be a single instance collecting everything or more
-        #       fine grained.
+
 
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
