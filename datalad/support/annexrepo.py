@@ -212,7 +212,7 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: [str], str
+        files: list of str
             list of paths to get
 
         kwargs: options for the git annex get command.
@@ -232,7 +232,7 @@ class AnnexRepo(GitRepo):
 
         Parameters
         ----------
-        files: [str], str
+        files: list of str
             list of paths to add to the annex
         """
 
@@ -275,12 +275,12 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: [str], str
+        files: list of str
             file(s) to look up
 
         Returns:
         --------
-        [str]
+        list of str
             keys used by git-annex for each of the files
         """
 
@@ -322,12 +322,12 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: [str], str
+        files: list of str
             file(s) to check for being actually present.
 
         Returns:
         --------
-        [bool]
+        list of bool
             Per each input file states either file has content locally
         """
         # TODO: Also provide option to look for key instead of path
@@ -361,7 +361,7 @@ class AnnexRepo(GitRepo):
 
         Parameters
         ----------
-        files: [str], str
+        files: list of str
             list of paths to add to git
         """
 
@@ -461,7 +461,7 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: [str]
+        files: list of str
         """
         # TODO: options needed
 
