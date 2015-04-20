@@ -350,10 +350,12 @@ def test_AnnexRepo_get_file_backend(src, dst):
 
     assert_true(ar.get_file_backend('test-annex.dat').
                 get('test-annex.dat') == 'SHA256E')
-    ar.annex_get('test-annex.dat')
-    ar.migrate_backend('test-annex.dat', backend='SHA1')
-    assert_true(ar.get_file_backend('test-annex.dat').
-                get('test-annex.dat') == 'SHA1')
+    if not ar.is_direct_mode():
+        # no migration in direct mode
+        ar.annex_get('test-annex.dat')
+        ar.migrate_backend('test-annex.dat', backend='SHA1')
+        assert_true(ar.get_file_backend('test-annex.dat').
+                    get('test-annex.dat') == 'SHA1')
 
 # TODO:
 #def annex_initremote(self, name, options):
