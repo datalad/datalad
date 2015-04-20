@@ -100,7 +100,8 @@ class AnnexRepo(GitRepo):
 
         backend: str
             set default backend used by this annex. This does NOT affect files,
-            that are already annexed.
+            that are already annexed nor will it automatically migrate files,
+            that are 'getted' afterwards.
         """
         super(AnnexRepo, self).__init__(path, url)
 
@@ -245,7 +246,6 @@ class AnnexRepo(GitRepo):
                                 log_stdout=True, log_stderr=False,
                                 log_online=True, expect_stderr=True)
 
-    @kwargs_to_options
     @normalize_paths
     def annex_add(self, files, backend=None, options=[]):
         """Add file(s) to the annex.
@@ -518,16 +518,18 @@ class AnnexRepo(GitRepo):
                 for item in json_objects if item.get('success')}
 
     @normalize_paths
-    def migrate_backend(self, files='', backend=None):
+    def migrate_backend(self, files, backend=None):
         """Changes the backend used for `file`.
 
         The backend used for the key-value of `files`. Only files currently
         present are migrated.
+        Note: There will be no notification if migrating fails due to the
+        absence of a file's content!
 
         Parameters:
         -----------
         files: list
-            files to migrate. If no files are given, migrate all files.
+            files to migrate.
         backend: str
             specify the backend to migrate to. If none is given, the
             default backend of this instance will be used.

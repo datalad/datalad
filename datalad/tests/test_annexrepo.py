@@ -286,7 +286,7 @@ def test_AnnexRepo_web_remote(src, dst):
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
 def test_AnnexRepo_backends(src, dst):
-    ar = AnnexRepo(dst, src)
+    ar = AnnexRepo(dst, src, backend='MD5')
 
     filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(dst, filename)
@@ -298,10 +298,13 @@ def test_AnnexRepo_backends(src, dst):
     assert_true(ar.get_file_key(filename).startswith('MD5'))
     assert_true(ar.get_file_key('test-annex.dat').startswith('SHA256E'))
 
+    # migrating will only do, if file is present
+    ar.annex_get('test-annex.dat')
+    assert_true(ar.get_file_key('test-annex.dat').startswith('SHA256E'))
     ar.migrate_backend('test-annex.dat')
-    assert_true(ar.get_file_key(filename).startswith('MD5'))
+    assert_true(ar.get_file_key('test-annex.dat').startswith('MD5'))
 
-    ar.migrate_backend(backend='SHA1')
+    ar.migrate_backend('', backend='SHA1')
     assert_true(ar.get_file_key(filename).startswith('SHA1'))
     assert_true(ar.get_file_key('test-annex.dat').startswith('SHA1'))
 
