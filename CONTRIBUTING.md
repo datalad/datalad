@@ -34,7 +34,7 @@ we outline the workflow used by the developers:
 0. Have a clone of our main [project repository][gh-datalad] as `origin`
    remote in your git:
 
-          $ git clone --recursive git://github.com:datalad/datalad
+          $ git clone --recursive git://github.com/datalad/datalad
 
     `--recursive` is used to initialize any needed git submodules.  If you have 
     cloned without it already, just run `git submodule update --init --recursive`
