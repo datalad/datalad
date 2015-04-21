@@ -222,3 +222,6 @@ class GitRepo(object):
 
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
+
+
+    # TODO: rm, remote add, remote rm

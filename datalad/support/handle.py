@@ -109,3 +109,5 @@ class Handle(AnnexRepo):
         """
         self.annex_add_to_git(files)
         self._commit(commit_msg)
+
+    # TODO: get_metadata (=> rdflib?)
