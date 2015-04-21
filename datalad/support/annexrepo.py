@@ -65,12 +65,7 @@ class AnnexRepo(GitRepo):
     will be interpreted as relative to `self.path`. Absolute paths will be
     accepted either way.
     """
-    # TODO: Check exceptions for the latter and find a workaround. For
-    # example: git annex lookupkey doesn't accept absolute paths. So,
-    # build relative paths from absolute ones and may be include checking
-    # whether or not they result in a path inside the repo.
-    # How to expand paths, if cwd is deeper in repo?
-    # git annex proxy will need additional work regarding paths.
+
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None):
         """Creates representation of git-annex repository at `path`.
@@ -151,7 +146,6 @@ class AnnexRepo(GitRepo):
         CommandNotAvailableError
             if an annex command call returns "unknown command"
         """
-        # TODO: documentation
 
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
@@ -297,7 +291,8 @@ class AnnexRepo(GitRepo):
 
         cmd_str = "git annex proxy -- %s" % git_cmd
         # TODO: By now git_cmd is expected to be string.
-        # Figure out how to deal with a list here.
+        # Figure out how to deal with a list here. Especially where and how to
+        # treat paths.
 
         if not self.is_direct_mode():
             lgr.warning("annex_proxy() called in indirect mode: %s" % cmd_str)
@@ -486,7 +481,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('rmurl', annex_options=[file[0]] + [url])
 
     @normalize_paths
-    def annex_drop(self, files):
+    def annex_drop(self, files, options=[]):
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -496,9 +491,8 @@ class AnnexRepo(GitRepo):
         -----------
         files: list
         """
-        # TODO: options needed
 
-        self._run_annex_command('drop', annex_options=files)
+        self._run_annex_command('drop', annex_options=files + options)
 
     @normalize_paths
     def annex_whereis(self, files):
