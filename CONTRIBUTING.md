@@ -127,7 +127,7 @@ that, recommended course of action is to use `virtualenv`, e.g.
 
 ```sh
 virtualenv --system-site-packages venv-tests
-venv-tests/bin/pip install -r requirements
+venv-tests/bin/pip install -r requirements.txt
 venv-tests/bin/python setup.py develop
 ```
 
