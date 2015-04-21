@@ -104,8 +104,6 @@ class AnnexRepo(GitRepo):
         """
         super(AnnexRepo, self).__init__(path, url, runner=runner)
 
-        self.default_backend = backend
-
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
             lgr.debug('No annex found in %s.'
@@ -116,21 +114,32 @@ class AnnexRepo(GitRepo):
         if direct and not self.is_direct_mode():
             self.set_direct_mode()
 
+        # set default backend for future annex commands:
+        # TODO: Should the backend option of __init__() also migrate
+        # the annex, in case there are annexed files already?
+        if backend:
+            self.repo.config_writer().set_value("annex", "backends", backend)
+
     def _run_annex_command(self, annex_cmd, git_options=[], annex_options=[],
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, backend=None):
         """Helper to run actual git-annex calls
+
+        Unifies annex command calls.
+
+        Raises
+        ------
+        CommandNotAvailableError
+            if an annex command call returns "unknown command"
         """
         # TODO: documentation
 
-        if not backend:
-            backend = self.default_backend
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
         cmd_list = ['git'] + git_options +\
                    ['annex', annex_cmd] +\
-                   backend +\
-                   debug + annex_options
+                   backend + debug +\
+                   annex_options
         try:
             return self.cmd_call_wrapper.run(cmd_list,
                                              log_stdout=log_stdout,
