@@ -23,6 +23,9 @@ from os.path import join
 import logging
 lgr = logging.getLogger('datalad.files')
 
+# yoh: only keys are used atm, logic in decompress_file is replaced to use
+# patool
+
 DECOMPRESSORS = {
     '\.(tar\.bz|tbz)$' : 'tar -xjvf %(file)s -C %(dir)s',
     '\.(tar\.xz)$' : 'tar -xJvf %(file)s -C %(dir)s',
@@ -31,34 +34,44 @@ DECOMPRESSORS = {
     }
 
 
-def decompress_file(file, dir, directories='strip'):
-    fullcmd = None
-    for ptr, cmd in DECOMPRESSORS.iteritems():
-        if re.search(ptr, file):
-            fullcmd = cmd % locals()
-            break
+def decompress_file(file_, dir_, leading_directories='strip'):
+    """Decompress `file_` into a directory `dir_`
+
+    Parameters
+    ----------
+    file_: str
+    dir_: str
+    leading_directories: {'strip', None}
+    """
+#    fullcmd = None
+#    for ptr, cmd in DECOMPRESSORS.iteritems():
+#        if re.search(ptr, file_):
+#            fullcmd = cmd % locals()
+#            break
 #    if fullcmd is not None:
-#        lgr.debug("Extracting file: %s" % fullcmd)
+#        lgr.debug("Extracting file_: %s" % fullcmd)
 #        status, output = getstatusoutput(fullcmd)  # getstatusoutput is deprecated. Use cmd.Runner.run() instead.
 #        if status:
 #            lgr.debug("Failed to extract: status %d output %s" % (status, output))
 #    else:
-    #lgr.debug("Have no clue how to extract %s -- using patool" % file)
+    #lgr.debug("Have no clue how to extract %s -- using patool" % file_)
     verbosity = -1                        # silent by default
     ef_level = lgr.getEffectiveLevel() 
     if ef_level and lgr.getEffectiveLevel() <= logging.DEBUG:
         verbosity = 1
     #elif lgr.getEffectiveLevel() <= logging.INFO:
     #    verbosity = 0
-    patoolib.extract_archive(file, outdir=dir, verbosity=verbosity)
-    if directories == 'strip':
-        _, dirs, files = os.walk(dir).next()
+    patoolib.extract_archive(file_, outdir=dir_, verbosity=verbosity)
+    if leading_directories == 'strip':
+        _, dirs, files = os.walk(dir_).next()
         if not len(files) and len(dirs) == 1:
             # move all the content under dirs[0] up 1 level
-            subdir, subdirs_, files_ = os.walk(join(dir, dirs[0])).next()
+            subdir, subdirs_, files_ = os.walk(join(dir_, dirs[0])).next()
             for f in subdirs_ + files_:
-                os.rename(join(subdir, f), join(dir, f))
+                os.rename(join(subdir, f), join(dir_, f))
+    elif leading_directories is None:
+        pass   # really do nothing
     else:
-        raise NotImplementedError("Not supported %s" % directories)
+        raise NotImplementedError("Not supported %s" % leading_directories)
     # TODO: (re)move containing directory
 
