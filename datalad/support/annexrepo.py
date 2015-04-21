@@ -582,5 +582,7 @@ class AnnexRepo(GitRepo):
             dictionary with the entries of `files` as keys and a str
             to indicate the used backend for this file.
         """
+        # TODO: When PR #120 is merged, adapt return format to be more
+        # consistent.
 
         return {f: self.get_file_key(f).split('-')[0] for f in files}
