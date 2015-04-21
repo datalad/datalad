@@ -96,8 +96,6 @@ class AnnexRepo(GitRepo):
         """
         super(AnnexRepo, self).__init__(path, url, runner=runner)
 
-
-
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
             lgr.debug('No annex found in %s.'
