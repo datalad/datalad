@@ -25,6 +25,7 @@ lgr = logging.getLogger('datalad.customremotes.archive')
 from ..cmd import link_file_load, Runner
 from ..utils import rotree, rmtree
 from ..support.exceptions import CommandError
+from ..support.archives import decompress_file
 
 from .base import AnnexCustomRemote
 
@@ -89,9 +90,11 @@ class AnnexArchiveCache(object):
             # TODO: didn't manage to override stdout even with a patch, WTF?
             #import patoolib # with hope to manage to override patoolib's assigned to stdout
             #patoolib.extract_archive(archive, outdir=earchive, out=None)
-            # so for now just call patool
-            Runner().run(["patool", "extract", "--outdir", earchive, archive])
-            lgr.debug("Adjusting permissions to read-only for the extracted contents")
+            # so for now just call patool -- doesn't work nicely because of on
+            # Windows:  https://github.com/wummel/patool/issues/21
+            Runner().call(decompress_file, archive, earchive,
+                          leading_directories=None)
+            lgr.debug("Adjusting permissions to R/O for the extracted content")
             rotree(earchive)
             assert(exists(earchive))
         return earchive
