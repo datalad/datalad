@@ -127,6 +127,25 @@ class AnnexRepo(GitRepo):
 
         Unifies annex command calls.
 
+        Parameters:
+        -----------
+        annex_cmd: str
+            the actual git-annex command, like 'init' or 'add'
+        git_options: list of str
+            options to be passed to git
+        annex_options: list of str
+            options to be passed to the git-annex command
+        backend: str
+            backend to be used by this command; Currently this can also be
+            achieved by having an item '--backend=XXX' in annex_options.
+            This may change.
+        log_stdout,
+        log_stderr,
+        log_online,
+        expect_stderr: bool
+            these are passed to the respective options of
+            datalad.cmd.Runner.run()
+
         Raises
         ------
         CommandNotAvailableError
