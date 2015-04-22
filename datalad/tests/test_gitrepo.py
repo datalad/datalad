@@ -63,6 +63,7 @@ def test_GitRepo_instance_brand_new(path):
     gr = GitRepo(path)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     assert_true(os.path.exists(opj(path, '.git')))
+    ok_clean_git(path, annex=False)
 
 
 @assert_cwd_unchanged
