@@ -114,4 +114,53 @@ def test_Collection_add_handle(annex_path, clone_path, clt_path):
         assert_equal(f.readline().rstrip(), "metadata = %s" % handle.get_metadata())
         assert_equal(f.readline(), "")
     assert_equal(clt.handles, [("first handle", handle.get_datalad_id(),
-                                handle.path)])
+                                handle.path, handle.get_metadata())])
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+def test_Collection_remove_handle(annex_path, handle_path, clt_path):
+
+    handle = Handle(handle_path, annex_path)
+    collection = Collection(clt_path)
+    collection.add_handle(handle, "MyHandle")
+    collection.remove_handle("MyHandle")
+    ok_clean_git(clt_path, annex=False)
+    assert_false(os.path.exists(opj(clt_path, "MyHandle")))
+    assert_equal(collection.handles, [])
+    # reminder:
+    # last statemant means: instance lost any knowledge of
+    # handle's name, id, path, metadata
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_Collection_get_handles(annex_path, handle_path,
+                                handle_path2, clt_path):
+
+    handle1 = Handle(handle_path, annex_path)
+    handle2 = Handle(handle_path2, annex_path)
+    collection = Collection(clt_path)
+    collection.add_handle(handle1, "First Handle")
+    collection.add_handle(handle2, "Second Handle")
+
+    # get a single handle instance:
+    t_handle = collection.get_handle("Second Handle")
+    assert_in(("Second Handle", t_handle.get_datalad_id(),
+               t_handle.path, t_handle.get_metadata()),
+              collection.handles)
+    assert_equal(t_handle.path, handle_path2)
+    assert_equal(t_handle.get_datalad_id(), handle2.get_datalad_id())
+    assert_equal(t_handle.get_metadata(), handle2.get_metadata())
+
+    # now get a list:
+    t_list = collection.get_handles()
+    assert_equal(len(t_list), 2)
+    assert_equal(t_list[0], handle1)
+    assert_equal(t_list[1], handle2)
+
+
+

@@ -49,7 +49,7 @@ class Collection(GitRepo):
         super(Collection, self).__init__(path, url, runner=runner)
 
         self.handles = []
-        
+
         if not self.get_indexed_files():
             # it's a brand new collection repo.
 
@@ -67,7 +67,7 @@ class Collection(GitRepo):
         else:
             # may be read the collection file/handle infos
             # or may be do it on demand?
-            # For now read a list of handles' names, ids and paths
+            # For now read a list of handles' names, ids, paths and metadata
             # as a proof of concept:
 
             for filename in self.get_indexed_files():
@@ -78,11 +78,12 @@ class Collection(GitRepo):
                                 id_ = line[12:]
                             elif line.startswith("last_seen = "):
                                 url = line[12:]
+                            elif line.startswith("metadata = "):
+                                md = line[11:]
                             else:
                                 continue
-                self.handles.append((filename, id_, url))
-
-
+                    # TODO: check all is present
+                self.handles.append((filename, id_, url, md))
 
     # Attention: files are valid only if in git.
     # Being present is not sufficient!
@@ -106,6 +107,7 @@ class Collection(GitRepo):
             f.write("handle_id = %s\n" % handle.get_datalad_id())
             f.write("last_seen = %s\n" % handle.path)
             f.write("metadata = %s\n" % handle.get_metadata())
+            # what else? maybe default view or sth.
 
         # TODO: write to collection file:
         # entry for default layout?
@@ -114,15 +116,28 @@ class Collection(GitRepo):
         self.git_commit("Add handle %s." % name)
 
         # currently need to add to self.handles:
-        self.handles.append((name, handle.get_datalad_id(), handle.path))
+        self.handles.append((name, handle.get_datalad_id(), handle.path,
+                             handle.get_metadata()))
 
     def remove_handle(self, name):
+
+        # TODO: also accept a Handle instead of a name
         # TODO: remove stuff from collection file
         self.git_remove(name)
         self.git_commit("Removed handle %s." % name)
 
+        for x in self.handles:
+            if x[0] == name:
+                self.handles.remove(x)
+
     def publish(self, target):
+        # Q: Is this even a class method or just a datalad command?
+
         # TODO: lintian check for all handles and may be the collection itself,
+
+        # TODO: Figure out uploading procedure
+        #   => target should be some Uploader-Interface and (may be) an url, ...
+
         # especially cross-platform checks
         # first (try to) upload handles
         # check all is fine
@@ -131,26 +146,12 @@ class Collection(GitRepo):
         pass
 
     def get_handles(self):
-        # return list?
-        pass
+
+        return [Handle(x[2]) for x in self.handles]
 
     def get_handle(self, name):
-        pass
+
+        return [Handle(x[2]) for x in self.handles if x[0] == name][0]
 
     def update_metadata_cache(self, handle):
         pass
-
-# handle files:
-#   - some cross-collection ID (annex uuid of origin?)
-#   - name within scope of the collection is the file's name
-#
-#   - location: collection's source of the handle.?
-#           -> some valid git url?
-#           -> in case of THE local collection it's the local path?
-#           => datalad/utils.py:def get_local_file_url(fname):
-#   - may be a default view?
-
-#   metadata cache per each handle
-
-# collection file:
-#   - default layout (FS)
