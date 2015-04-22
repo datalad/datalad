@@ -29,6 +29,7 @@ from ..cmd import Runner
 from ..support.repos import AnnexRepo
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
+from ..support.archives import compress_files
 
 
 def rmtemp(f, *args, **kwargs):
@@ -47,16 +48,19 @@ def rmtemp(f, *args, **kwargs):
     else:
         lgr.info("Keeping temp file: %s" % f)
 
-def create_archive(path, name, load):
+
+def create_tree_archive(path, name, load, overwrite=False):
+    """Given an archive `name`, create under `path` with specified `load` tree
+    """
     dirname = name[:-7]
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    output = Runner().run(['tar', '-czvf', name, dirname],
-                          cwd=path, expect_stderr=True)
+    compress_files([dirname], name, path=path, overwrite=overwrite)
     # remove original tree
     shutil.rmtree(full_dirname)
+
 
 def create_tree(path, tree):
     """Given a list of tuples (name, load) create such a tree
@@ -71,7 +75,7 @@ def create_tree(path, tree):
         full_name = opj(path, name)
         if isinstance(load, tuple):
             if name.endswith('.tar.gz'):
-                create_archive(path, name, load)
+                create_tree_archive(path, name, load)
             else:
                 create_tree(full_name, load)
         else:

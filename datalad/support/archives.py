@@ -46,15 +46,15 @@ import patoolib.util
 # And I don't want to mock for every invocation
 from ..support.exceptions import CommandError
 
+from ..cmd import Runner
+_runner = Runner()
 
 def _patool_run(cmd, verbosity=0, **kwargs):
     """Decorated runner for patool so it doesn't spit out outputs to stdout"""
     # use our runner
-    from ..cmd import Runner
-    runner = Runner()
     try:
         # kwargs_ = kwargs[:];         kwargs_['shell'] = True
-        runner.run(cmd, **kwargs)
+        _runner.run(cmd, **kwargs)
         return 0
     except CommandError as e:
         return e.code
@@ -95,12 +95,12 @@ def unixify_path(path):
         return path
 
 
-def decompress_file(file_, dir_, leading_directories='strip'):
-    """Decompress `file_` into a directory `dir_`
+def decompress_file(archive, dir_, leading_directories='strip'):
+    """Decompress `archive` into a directory `dir_`
 
     Parameters
     ----------
-    file_: str
+    archive: str
     dir_: str
     leading_directories: {'strip', None}
     """
@@ -110,10 +110,10 @@ def decompress_file(file_, dir_, leading_directories='strip'):
 
     from ..tests.utils import swallow_outputs
     with swallow_outputs() as cmo:
-        patoolib.util.check_existing_filename(file_)
+        patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
         # Call protected one to avoid the checks on existence on unixified path
-        patoolib._extract_archive(unixify_path(file_),
+        patoolib._extract_archive(unixify_path(archive),
                                   outdir=unixify_path(dir_),
                                   verbosity=100)
         if cmo.out:
@@ -136,3 +136,40 @@ def decompress_file(file_, dir_, leading_directories='strip'):
     else:
         raise NotImplementedError("Not supported %s" % leading_directories)
 
+
+def compress_files(files, archive, path=None, overwrite=True):
+    """Compress `files` into an `archive` file
+
+    Parameters
+    ----------
+    files : list of str
+    archive : str
+    """
+    from ..tests.utils import swallow_outputs
+    with swallow_outputs() as cmo:
+        # to test filenames, if path is not None, we should join:
+        if path:
+            opj_path = lambda p: opj(path, p)
+        else:
+            opj_path = lambda p: p
+        if not overwrite:
+            patoolib.util.check_new_filename(opj_path(archive))
+        patoolib.util.check_archive_filelist([opj_path(f) for f in files])
+
+        # ugly but what can you do? ;-) we might wrap it all into a class
+        # at some point. TODO
+        old_cwd = _runner.cwd
+        if path is not None:
+            _runner.cwd = path
+        try:
+            # Call protected one to avoid the checks on existence on unixified path
+            patoolib._create_archive(unixify_path(archive),
+                                     [unixify_path(f) for f in files],
+                                     verbosity=100)
+        finally:
+            _runner.cwd = old_cwd
+
+        if cmo.out:
+            lgr.debug("patool gave stdout:\n%s" % cmo.out)
+        if cmo.err:
+            lgr.debug("patool gave stderr:\n%s" % cmo.err)
