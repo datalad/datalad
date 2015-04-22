@@ -45,7 +45,7 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
           (fn_extracted_obscure, '123')
          ))
 @with_tempfile()
-def check_basic_scenario(fn_archive, fn_extracted, d, d2):
+def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     # We could just propagate current environ I guess to versatile our testing
     env = os.environ.copy()
     env.update({'PATH': get_bindir_PATH(),
@@ -61,7 +61,7 @@ def check_basic_scenario(fn_archive, fn_extracted, d, d2):
 
     r = Runner(cwd=d, env=env, protocol=protocol)
 
-    handle = Handle(d, runner=r)
+    handle = Handle(d, runner=r, direct=direct)
     handle.annex_initremote(
         'annexed-archives',
         ['encryption=none', 'type=external', 'externaltype=dl+archive'])
@@ -98,7 +98,8 @@ def check_basic_scenario(fn_archive, fn_extracted, d, d2):
 
     # Let's create a clone and verify chain of getting file through the tarball
     cloned_handle = Handle(d2, d,
-                           runner=Runner(cwd=d2, env=env, protocol=protocol))
+                           runner=Runner(cwd=d2, env=env, protocol=protocol),
+                           direct=direct)
     # we would still need to enable manually atm that special remote for archives
     cloned_handle.annex_enableremote('annexed-archives')
 
@@ -112,7 +113,9 @@ def check_basic_scenario(fn_archive, fn_extracted, d, d2):
     # TODO: dropurl, addurl without --relaxed, addurl to non-existing file
 
 def test_basic_scenario():
-    yield check_basic_scenario, 'a.tar.gz', 'simple.txt'
-    #yield check_basic_scenario, 'a.tar.gz', fn_extracted_obscure
-    #yield check_basic_scenario, fn_archive_obscure, 'simple.txt'
-    yield check_basic_scenario, fn_archive_obscure, fn_extracted_obscure
+    yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False
+    if not on_windows:
+        yield check_basic_scenario, 'a.tar.gz', 'simple.txt', True
+    #yield check_basic_scenario, 'a.tar.gz', fn_extracted_obscure, False
+    #yield check_basic_scenario, fn_archive_obscure, 'simple.txt', False
+    yield check_basic_scenario, fn_archive_obscure, fn_extracted_obscure, False
