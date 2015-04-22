@@ -224,26 +224,38 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-# TODO: --------------------------------------------------------------------
-
     @normalize_paths
-    def git_custom_command(self, files, cmd_str,
+    def _git_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, cwd=None, env=None,
                            shell=None):
         """Allows for calling arbitrary commands.
+
+        Helper for developing purposes, i.e. to quickly implement git commands
+        for proof of concept without the need to figure out, how this is done
+        via GitPython.
 
         Parameters:
         -----------
         files: list of files
         cmd_str: str
             arbitrary command str. `files` is appended to that string.
+
+        Returns:
+        --------
+        stdout, stderr
         """
-        cmd = shlex.split(cmd_str + " ".join(files))
-        self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
+        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
                                   env=env, shell=shell)
+
+# TODO: --------------------------------------------------------------------
+
+# THE local collection:
+# operations on remotes like looking for certain files, list files, git cat?
+# May be better: fetch the remotes -> query branch remote/master
 
     @normalize_paths
     def git_remove(self, files):
@@ -277,5 +289,3 @@ class GitRepo(object):
         """
         raise NotImplementedError
 
-    # operations on remotes like looking for certain files, list files, git cat?
-    # fetch the remotes -> query branch remote/master
