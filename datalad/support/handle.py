@@ -110,4 +110,16 @@ class Handle(AnnexRepo):
         self.annex_add_to_git(files)
         self._commit(commit_msg)
 
-    # TODO: get_metadata (=> rdflib?)
+# TODO: --------------------------------------------------------------------
+
+    def get_metadata(self):
+        """whatever this may return at the end
+            => rdflib?!
+        """
+        return "Dummy metadata"
+
+    def get_id(self):
+        """
+        ID: store annex uuid on creation
+        May be in .git/config datalad.id
+        """

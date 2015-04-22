@@ -10,13 +10,14 @@
 """
 
 import os
-from os.path import join as opj
+from os.path import join as opj, exists
 import logging
 
 from .gitrepo import GitRepo
 from .handle import Handle
 
 lgr = logging.getLogger('datalad.collection')
+
 
 class Collection(GitRepo):
     """Representation of a datalad collection.
@@ -41,22 +42,23 @@ class Collection(GitRepo):
 
         super(Collection, self).__init__(path, url, runner=runner)
 
-        # if not new (how to check for?):
-        # read collection file and handles?
-        # or do it on demand?
+        # TODO: How to name that file?
+        if 'collection' not in self.get_indexed_files():
+            # create collection file
+            # ConfigWriter =>
+            # [collection]
+            # default_name = XXX (=> argument)
 
-        #
-
-        # is it really a gitrepo or should this one may be a remote of local collection, too?
-
-
-        # How about THE local collection? On datalad command level or does it
-        # have its own class?
+            # => JSON!
 
 
-    # TODO: add_remote in GitRepo (for local collection)/remove remote
-    # TODO: get_metadata or sth. in Handle => modify, commit, republish?
+            # if this is a new collection, we want to register it in the
+            # local collection, do we?
 
+            pass
+        else:
+            # may be read the collection file
+            pass
 
     # Attention: files are valid only if in git.
     # Being present is not sufficient!
@@ -65,7 +67,13 @@ class Collection(GitRepo):
         # TODO: Does a handle have a default name?
         with open(opj(self.path, name), 'w') as f:
             #write whatever
+            # metadata, location/url?, ...
             pass
+
+        # write to collection file:
+        # location or sth.
+        # entry for default layout?
+
         self.git_add(name)
         self.git_commit("Add handle.")
 
@@ -84,6 +92,8 @@ class Collection(GitRepo):
         # return list?
         pass
 
+    def get_handle(self, name):
+        pass
 
 # handle files:
 #   - some cross-collection ID

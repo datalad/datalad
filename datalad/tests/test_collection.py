@@ -31,15 +31,38 @@ def get_local_collection():
     # May be this location my change.
     # So, we need a ~/.datalad or sth.
 
+    # TODO: local collection needs a name too!
+
     return Collection(os.path.expanduser(
         os.path.join('~', 'datalad', 'localcollection')))
 
 
+def register_collection(url, name):
+    # Is there a default name of a collection?
+    # derived from url?
 
-    # TODO: register a collection
-    # TODO: install a collection
+    # add as remote to the local one:
+    localCollection = get_local_collection()
+    localCollection.git_remote_add(name, url)
+
+
+
+def install_collection(name, dst):
+    # cloning the remote 'name' of local collection to dst.
+    localCollection = get_local_collection()
+    url = localCollection.git_get_remote_url(name)
+    return Collection(dst, url)
+
+
+
+def install_handle(?):
     # TODO: get a handle (identified what way? => collectionName/handleName?)
+
+
+def new_collection(handles):
     # create a new collection
+
+#----------------------------------------------
     # add a handle to collection
     # remove a handle from a collection
     # publish a collection

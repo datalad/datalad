@@ -15,6 +15,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 from os import getcwd
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
+import shlex
 
 from functools import wraps
 
@@ -223,5 +224,58 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
+# TODO: --------------------------------------------------------------------
 
-    # TODO: rm, remote add, remote rm
+    @normalize_paths
+    def git_custom_command(self, files, cmd_str,
+                           log_stdout=True, log_stderr=True, log_online=False,
+                           expect_stderr=False, cwd=None, env=None,
+                           shell=None):
+        """Allows for calling arbitrary commands.
+
+        Parameters:
+        -----------
+        files: list of files
+        cmd_str: str
+            arbitrary command str. `files` is appended to that string.
+        """
+        cmd = shlex.split(cmd_str + " ".join(files))
+        self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
+                                  log_stdout=log_stdout, log_online=log_online,
+                                  expect_stderr=expect_stderr, cwd=cwd,
+                                  env=env, shell=shell)
+
+    @normalize_paths
+    def git_remove(self, files):
+        """git rm
+        """
+        raise NotImplementedError
+
+    def git_remote_add(self, name, url):
+        """
+        """
+        raise NotImplementedError
+
+    def git_remote_remove(self, name):
+        """
+        """
+        raise NotImplementedError
+
+    def git_fetch(self, whatever):
+        """
+        """
+        raise NotImplementedError
+
+    def git_checkout(self, whatever):
+        """
+        """
+        raise NotImplementedError
+
+    def git_get_remote_url(self, name):
+        """We need to know, where to clone from, if a remote is
+        requested
+        """
+        raise NotImplementedError
+
+    # operations on remotes like looking for certain files, list files, git cat?
+    # fetch the remotes -> query branch remote/master
