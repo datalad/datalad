@@ -15,6 +15,7 @@ import logging
 
 from .gitrepo import GitRepo
 from .handle import Handle
+from .exceptions import CollectionBrokenError
 
 lgr = logging.getLogger('datalad.collection')
 
@@ -36,46 +37,65 @@ class Collection(GitRepo):
           relative to os.getcwd()
 
         url: str
-          url to the to-be-cloned repository. Requires valid git url according to
+          url to the to-be-cloned repository. Requires valid git url
+          according to
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
+
+        Raises:
+        -------
+        CollectionBrokenError
         """
 
         super(Collection, self).__init__(path, url, runner=runner)
 
-        # TODO: How to name that file?
-        if 'collection' not in self.get_indexed_files():
+        if not self.get_indexed_files():
+            # it's a brand new collection repo.
+
             # create collection file
-            # ConfigWriter =>
-            # [collection]
-            # default_name = XXX (=> argument)
-
-            # => JSON!
-
-
-            # if this is a new collection, we want to register it in the
-            # local collection, do we?
-
+            # How to name that file? For now just 'collection'
+            #  generally contains:
+            #   - default layout on filesystem
+            #     (Q: implicitly requires a list of handles?
+            #      This would give an additional consistency check)
             pass
+
+        elif 'collection' not in self.get_indexed_files():
+            raise CollectionBrokenError("Missing file: 'collection'.")
+
         else:
-            # may be read the collection file
+            # may be read the collection file/handle infos
+            # or may be do it on demand?
             pass
+
 
     # Attention: files are valid only if in git.
     # Being present is not sufficient!
 
     def add_handle(self, handle, name):
+        """Adds a handle to the collection
+
+        Parameters:
+        -----------
+        handle: Handle
+          For now, this has to be a locally available handle.
+        name: str
+          name of the handle. This is required to be unique with respect to the
+          collection.
+        """
         # TODO: Does a handle have a default name?
+
+        # Writing plain text for now. This is supposed to change to use
+        # rdflib or sth.
         with open(opj(self.path, name), 'w') as f:
-            #write whatever
-            # metadata, location/url?, ...
-            pass
+            f.write("handle_id = %s\n" % handle.get_datalad_id())
+            f.write("last_seen = %s\n" % handle.path)
+            f.write("metadata = %s\n" % handle.get_metadata())
 
         # write to collection file:
-        # location or sth.
         # entry for default layout?
 
         self.git_add(name)
-        self.git_commit("Add handle.")
+        self.git_commit("Add handle %s." % name)
 
     def remove_handle(self, name):
         # TODO: git rm
@@ -86,6 +106,10 @@ class Collection(GitRepo):
     def publish(self, target):
         # TODO: lintian check for all handles and may be the collection itself,
         # especially cross-platform checks
+        # first (try to) upload handles
+        # check all is fine
+        # update location for uploaded handles
+        # upload collection itself
         pass
 
     def get_handles(self):
@@ -95,8 +119,11 @@ class Collection(GitRepo):
     def get_handle(self, name):
         pass
 
+    def update_metadata_cache(self, handle):
+        pass
+
 # handle files:
-#   - some cross-collection ID
+#   - some cross-collection ID (annex uuid of origin?)
 #   - name within scope of the collection is the file's name
 #
 #   - location: collection's source of the handle.?
@@ -104,6 +131,8 @@ class Collection(GitRepo):
 #           -> in case of THE local collection it's the local path?
 #           => datalad/utils.py:def get_local_file_url(fname):
 #   - may be a default view?
+
+#   metadata cache per each handle
 
 # collection file:
 #   - default layout (FS)

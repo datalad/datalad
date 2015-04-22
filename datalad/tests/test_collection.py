@@ -11,16 +11,23 @@
 """
 
 import os
+from os.path import join as opj
 import platform
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false, assert_in
 
-from datalad.support.dataset import Dataset
-from datalad.support.collection import Collection
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
+from ..support.gitrepo import GitRepo
+from ..support.handle import Handle
+from ..support.collection import Collection
+from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree,\
     get_most_obscure_supported_name, ok_clean_git
+from ..support.exceptions import CollectionBrokenError
 
+# For now (at least) we would need to clone from the network
+# since there are troubles with submodules on Windows.
+# See: https://github.com/datalad/datalad/issues/44
+local_flavors = ['network-clone' if on_windows else 'local']
 
 # ###########
 # Test the handling of base classes before
@@ -30,8 +37,6 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
 def get_local_collection():
     # May be this location my change.
     # So, we need a ~/.datalad or sth.
-
-    # TODO: local collection needs a name too!
 
     return Collection(os.path.expanduser(
         os.path.join('~', 'datalad', 'localcollection')))
@@ -55,22 +60,56 @@ def install_collection(name, dst):
 
 
 
-def install_handle(?):
-    # TODO: get a handle (identified what way? => collectionName/handleName?)
+def install_handle(whatever):
+    # TODO: get a handle
+    # (identified what way? => collectionName/handleName?, url?)
+    pass
 
 
 def new_collection(handles):
     # create a new collection
-
-#----------------------------------------------
-    # add a handle to collection
-    # remove a handle from a collection
-    # publish a collection
-    # update metadata cache?
-
-
+    # if this is a new collection, we want to register it in the
+    # local collection as a remote, do we?
+    pass
 
 
 # ##########
 # Now the actual tests for collection class
 # ##########
+
+@with_tempfile
+@with_tempfile
+def test_Collection_constructor(clean_path, broken_path):
+    # Just a brand new collection:
+    clt = Collection(clean_path)
+    # ok_clean_git(clean_path, annex=False)
+    # TODO: ok_clean_git doesn't work on empty repo, due to
+    # repo.head.is_valid() returns False
+
+    # Now, there's something in git, but it's not a collection:
+    git = GitRepo(broken_path)
+    filename = get_most_obscure_supported_name()
+    with open(opj(broken_path, filename), 'w') as f:
+        f.write("something")
+    git.git_add(filename)
+    git.git_commit("add a file")
+    assert_raises(CollectionBrokenError, Collection, broken_path)
+
+    # TODO: provide a minimal test collection, that contains something valid
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+def test_Collection_add_handle(annex_path, clone_path, clt_path):
+
+    handle = Handle(clone_path, annex_path)
+    clt = Collection(clt_path)
+    clt.add_handle(handle, "first handle")
+    ok_clean_git(clt_path, annex=False)
+    os.path.exists(opj(clt_path, "first handle"))
+    assert_in("first handle", clt.get_indexed_files())
+    with open(opj(clt_path, "first handle"), 'r') as f:
+        assert_equal(f.readline().rstrip(), "handle_id = %s" % handle.get_datalad_id())
+        assert_equal(f.readline().rstrip(), "last_seen = %s" % handle.path)
+        assert_equal(f.readline().rstrip(), "metadata = %s" % handle.get_metadata())
+        assert_equal(f.readline(), "")

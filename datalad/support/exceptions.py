@@ -57,3 +57,9 @@ class FileInGitError(FileNotInAnnexError):
 class FileNotInRepositoryError(FileNotInAnnexError):
     """Thrown if a file is not in the repository at all.
     """
+
+
+class CollectionBrokenError(Exception):
+    """Thrown if a collection is somehow invalid
+    """
+    pass
