@@ -301,8 +301,8 @@ def test_AnnexRepo_migrating_backends(src, dst):
     f.close()
 
     ar.annex_add(filename, backend='MD5')
-    assert_true(ar.get_file_key(filename).startswith('MD5'))
-    assert_true(ar.get_file_key('test-annex.dat').startswith('SHA256E'))
+    assert_equal(ar.get_file_backend(filename), 'MD5')
+    assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
 
     # migrating will only do, if file is present
     ar.annex_get('test-annex.dat')
@@ -312,13 +312,13 @@ def test_AnnexRepo_migrating_backends(src, dst):
         assert_raises(CommandNotAvailableError, ar.migrate_backend,
                       'test-annex.dat')
     else:
-        assert_true(ar.get_file_key('test-annex.dat').startswith('SHA256E'))
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
         ar.migrate_backend('test-annex.dat')
-        assert_true(ar.get_file_key('test-annex.dat').startswith('MD5'))
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'MD5')
 
         ar.migrate_backend('', backend='SHA1')
-        assert_true(ar.get_file_key(filename).startswith('SHA1'))
-        assert_true(ar.get_file_key('test-annex.dat').startswith('SHA1'))
+        assert_equal(ar.get_file_backend(filename), 'SHA1')
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 
 tree1args = dict(
@@ -337,16 +337,16 @@ def test_AnnexRepo_backend_option(path, url):
 
     ar.annex_add('firstfile', backend='SHA1')
     ar.annex_add('secondfile')
-    assert_true(ar.get_file_key('firstfile').startswith('SHA1'))
-    assert_true(ar.get_file_key('secondfile').startswith('MD5'))
+    assert_equal(ar.get_file_backend('firstfile'), 'SHA1')
+    assert_equal(ar.get_file_backend('secondfile'), 'MD5')
 
     ar.annex_addurl_to_file('remotefile', url + 'remotefile', backend='SHA1')
-    assert_true(ar.get_file_key('remotefile').startswith('SHA1'))
+    assert_equal(ar.get_file_backend('remotefile'), 'SHA1')
 
     ar.annex_addurls([url +'faraway'], backend='SHA1')
     # TODO: what's the annex-generated name of this?
     # For now, workaround:
-    assert_true(ar.get_file_key(f).startswith('SHA1')
+    assert_true(ar.get_file_backend(f) == 'SHA1'
                 for f in ar.get_indexed_files() if 'faraway' in f)
 
 @with_testrepos(flavors=local_flavors)
