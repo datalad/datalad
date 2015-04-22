@@ -254,15 +254,15 @@ def test_AnnexRepo_web_remote(src, dst):
     # get the file from remote
     ar.annex_addurls([testurl])
     l = ar.annex_whereis(testfile)
-    assert_in('web', l[0])
-    assert_equal(len(l[0]), 2)
+    assert_in('web', l)
+    assert_equal(len(l), 2)
     assert_true(ar.file_has_content(testfile))
 
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
     l = ar.annex_whereis(testfile)
-    assert_not_in('web', l[0])
-    assert_equal(len(l[0]), 1)
+    assert_not_in('web', l)
+    assert_equal(len(l), 1)
 
     # now only 1 copy; drop should fail
     try:
@@ -278,15 +278,15 @@ def test_AnnexRepo_web_remote(src, dst):
     # read the url using different method
     ar.annex_addurl_to_file(testfile, testurl)
     l = ar.annex_whereis(testfile)
-    assert_in('web', l[0])
-    assert_equal(len(l[0]), 2)
+    assert_in('web', l)
+    assert_equal(len(l), 2)
     assert_true(ar.file_has_content(testfile))
 
     # 2 known copies now; drop should succeed
     ar.annex_drop(testfile)
     l = ar.annex_whereis(testfile)
-    assert_in('web', l[0])
-    assert_equal(len(l[0]), 1)
+    assert_in('web', l)
+    assert_equal(len(l), 1)
     assert_false(ar.file_has_content(testfile))
 
 # TODO:

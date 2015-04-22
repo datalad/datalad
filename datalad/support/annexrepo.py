@@ -313,7 +313,6 @@ class AnnexRepo(GitRepo):
 
         return output[0].rstrip(linesep).split(linesep)
 
-
     @normalize_paths
     def file_has_content(self, files):
         """ Check whether files have their content present under annex.
@@ -465,7 +464,7 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('drop', annex_options=files)
 
-    @normalize_paths(match_return_type=False)
+    @normalize_paths
     def annex_whereis(self, files):
         """Lists repositories that have actual content of file(s).
 
