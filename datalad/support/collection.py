@@ -154,4 +154,15 @@ class Collection(GitRepo):
         return [Handle(x[2]) for x in self.handles if x[0] == name][0]
 
     def update_metadata_cache(self, handle):
-        pass
+
+        if isinstance(handle, Handle):
+            for h_ in self.handles:
+                if h_[1] == handle.get_datalad_id():
+                    h_[3] = handle.get_metadata()
+        elif isinstance(handle, basestring):
+            for h_ in self.handles:
+                if h_[2] == handle:
+                    h_[3] = Handle(h_[2]).get_metadata()
+        else:
+            raise TypeError("argument 'handle' is expected either to be "
+                            "a 'Handle' or a 'basestring'")
