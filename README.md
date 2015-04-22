@@ -32,7 +32,7 @@ On Debian-based systems we recommend to enable
 backports of recent fixed external modules we depend upon:
 
 ```sh
-apt-get install patool python-bs4 python-git python-joblib git-annex-standalone
+apt-get install patool python-bs4 python-git python-joblib python-testtools python-mock python-nose git-annex-standalone
 ```
 
 or otherwise you can use pip to install Python modules
@@ -42,8 +42,9 @@ pip install -r requirements.txt
 ```
 
 and will need to install recent git-annex using appropriate for your
-OS means.  We later will provide bundled installations of DataLad
-across popular platforms.
+OS means (for Debian/Ubuntu, once again, just use NeuroDebian).  We
+later will provide bundled installations of DataLad across popular
+platforms.
 
 
 # License

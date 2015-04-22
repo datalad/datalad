@@ -22,7 +22,7 @@ from functools import wraps
 
 from ConfigParser import NoOptionError
 
-from gitrepo import GitRepo, normalize_paths
+from gitrepo import GitRepo, normalize_path, normalize_paths
 from exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 
@@ -210,7 +210,7 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: list
+        files: list of str
             list of paths to get
 
         kwargs: options for the git annex get command.
@@ -230,7 +230,7 @@ class AnnexRepo(GitRepo):
 
         Parameters
         ----------
-        files: list
+        files: list of str
             list of paths to add to the annex
         """
 
@@ -273,13 +273,13 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: list, str
+        files: list of str
             file(s) to look up
 
         Returns:
         --------
-        str
-            key used by git-annex for `path`
+        list of str
+            keys used by git-annex for each of the files
         """
 
         if len(files) > 1:
@@ -320,12 +320,12 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: list
-            file_(s) to check for being actually present.
+        files: list of str
+            file(s) to check for being actually present.
 
         Returns:
         --------
-        [bool]
+        list of bool
             Per each input file states either file has content locally
         """
         # TODO: Also provide option to look for key instead of path
@@ -359,7 +359,7 @@ class AnnexRepo(GitRepo):
 
         Parameters
         ----------
-        files: list
+        files: list of str
             list of paths to add to git
         """
 
@@ -393,8 +393,8 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('enableremote', annex_options=[name])
 
-    @normalize_paths
-    def annex_addurl_to_file(self, file, url, options=[]):
+    @normalize_path
+    def annex_addurl_to_file(self, file_, url, options=[]):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -403,7 +403,7 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        file: str
+        file_: str
             technically it's a list, but conversion is done by the decorator
             and only a single string will work here.
             TODO: figure out, how to document this behaviour
@@ -415,7 +415,7 @@ class AnnexRepo(GitRepo):
             options to the annex command
         """
 
-        annex_options = ['--file=%s' % file[0]] + options + [url]
+        annex_options = ['--file=%s' % file_] + options + [url]
         self._run_annex_command('addurl', annex_options=annex_options,
                                 log_online=True, log_stderr=False)
         # Don't capture stderr, since download progress provided by wget uses
@@ -437,18 +437,18 @@ class AnnexRepo(GitRepo):
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
 
-    @normalize_paths
-    def annex_rmurl(self, file, url):
+    @normalize_path
+    def annex_rmurl(self, file_, url):
         """Record that the file is no longer available at the url.
 
         Parameters:
         -----------
-        file: str
+        file_: str
 
         url: str
         """
 
-        self._run_annex_command('rmurl', annex_options=[file[0]] + [url])
+        self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
     @normalize_paths
     def annex_drop(self, files):
@@ -459,7 +459,7 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: list
+        files: list of str
         """
         # TODO: options needed
 

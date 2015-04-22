@@ -1,8 +1,7 @@
+patool>=1.7
 beautifulsoup4
+GitPython>=0.3.7
 joblib
-patool
-https://github.com/gitpython-developers/GitPython/archive/master.zip
 testtools
 mock
 nose>=1.3.4
-numpy

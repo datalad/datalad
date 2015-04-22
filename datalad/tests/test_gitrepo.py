@@ -24,6 +24,8 @@ from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchan
 from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.cmd import Runner
 
+from .utils import swallow_logs
+
 # For now (at least) we would need to clone from the network
 # since there are troubles with submodules on Windows.
 # See: https://github.com/datalad/datalad/issues/44
@@ -41,7 +43,8 @@ def test_GitRepo_instance_from_clone(src, dst):
 
     # do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     # and therefore can't clone to `dst`
-    assert_raises(GitCommandError, GitRepo, dst, src)
+    with swallow_logs() as logs:
+        assert_raises(GitCommandError, GitRepo, dst, src)
 
 
 @assert_cwd_unchanged
@@ -168,27 +171,37 @@ def test_GitRepo_files_decorator():
             self.path = opj('some', 'where')
 
         @normalize_paths
-        def decorated(self, files):
+        def decorated_many(self, files):
             return files
+
+        @normalize_paths
+        def decorated_one(self, file_):
+            return file_
+
 
     test_instance = testclass()
 
     # When a single file passed -- single path returned
     obscure_filename = get_most_obscure_supported_name()
     file_to_test = opj(test_instance.path, 'deep', obscure_filename)
-    assert_equal(test_instance.decorated(file_to_test),
+    assert_equal(test_instance.decorated_many(file_to_test),
+                 _normalize_path(test_instance.path, file_to_test))
+    assert_equal(test_instance.decorated_one(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
     file_to_test = obscure_filename
-    assert_equal(test_instance.decorated(file_to_test),
+    assert_equal(test_instance.decorated_many(file_to_test),
+                 _normalize_path(test_instance.path, file_to_test))
+    assert_equal(test_instance.decorated_one(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
+
     file_to_test = opj(obscure_filename, 'beyond', 'obscure')
-    assert_equal(test_instance.decorated(file_to_test),
+    assert_equal(test_instance.decorated_many(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
     file_to_test = opj(os.getcwd(), 'somewhere', 'else', obscure_filename)
-    assert_raises(FileNotInRepositoryError, test_instance.decorated,
+    assert_raises(FileNotInRepositoryError, test_instance.decorated_many,
                   file_to_test)
 
     # If a list passed -- list returned
@@ -196,6 +209,6 @@ def test_GitRepo_files_decorator():
     expect = []
     for item in files_to_test:
         expect.append(_normalize_path(test_instance.path, item))
-    assert_equal(test_instance.decorated(files_to_test), expect)
+    assert_equal(test_instance.decorated_many(files_to_test), expect)
 
-    assert_raises(ValueError, test_instance.decorated, 1)
+    assert_raises(ValueError, test_instance.decorated_many, 1)
