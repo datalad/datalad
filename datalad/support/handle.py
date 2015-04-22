@@ -129,10 +129,6 @@ class Handle(AnnexRepo):
         """whatever this may return at the end
             => rdflib?!
         """
+        # check whether .datalad/metadata exists => raise Not Available
+        # read it => rdflib
         return "Dummy metadata"
-
-    def get_id(self):
-        """
-        ID: store annex uuid on creation
-        May be in .git/config datalad.id
-        """
