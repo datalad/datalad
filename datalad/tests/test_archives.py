@@ -5,9 +5,9 @@ import os
 from os.path import join as opj, exists, lexists, isdir
 
 from .utils import assert_true, assert_false, eq_, \
-     with_tree, swallow_outputs, swallow_logs
+     with_tree, swallow_outputs, swallow_logs, on_windows
 
-from ..support.archives import decompress_file
+from ..support.archives import decompress_file, unixify_path
 
 tree_simplearchive = dict(
     tree=(
@@ -15,6 +15,15 @@ tree_simplearchive = dict(
             ('2copy.txt', '2 load'),
             ('3.txt', '3 load'))),),
     prefix='datalad-')
+
+if on_windows:
+
+    def test_unixify_path():
+        from ..tests.utils import eq_
+        eq_(unixify_path(r"a"), "a")
+        eq_(unixify_path(r"c:\buga"), "/c/buga")
+        eq_(unixify_path(r"c:\buga\duga.dat"), "/c/buga/duga.dat")
+        eq_(unixify_path(r"buga\duga.dat"), "buga/duga.dat")
 
 
 @with_tree(**tree_simplearchive)
