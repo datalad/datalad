@@ -67,6 +67,10 @@ class Handle(AnnexRepo):
         """Decides whether or not two instances of this class are equal.
 
         This is done by comparing the base repository path.
+        Note: There is a second meaning of 'equal' handles, meaning that
+        they have the same datalad id. However, at the level of instances
+        'equal' means, that the both of them are representing the very same
+        repository.
         """
         return self.path == obj.path
 
