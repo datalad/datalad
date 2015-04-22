@@ -15,7 +15,7 @@ before_install:
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - sudo apt-get install git-annex-standalone
+  - sudo apt-get install git-annex-standalone zip
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - git submodule update --init --recursive
