@@ -58,6 +58,13 @@ class Handle(AnnexRepo):
             self.add_to_git(opj('.datalad', 'handle_id'),
                             "Created datalad handle id.")
 
+    def __eq__(self, obj):
+        """Decides whether or not two instances of this class are equal.
+
+        This is done by comparing the base repository path.
+        """
+        return self.path == obj.path
+
     def get_datalad_id(self):
         """Get the identifier of the handle.
 
