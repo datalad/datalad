@@ -59,7 +59,10 @@ class Collection(GitRepo):
             #   - default layout on filesystem
             #     (Q: implicitly requires a list of handles?
             #      This would give an additional consistency check)
-            pass
+            with open(opj(self.path, 'collection'), 'w') as f:
+                f.write("New collection: %s" % os.path.basename(self.path))
+            self.git_add('collection')
+            self.git_commit("Collection initialized.")
 
         elif 'collection' not in self.get_indexed_files():
             raise CollectionBrokenError("Missing file: 'collection'.")
