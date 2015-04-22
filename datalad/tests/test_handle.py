@@ -82,9 +82,9 @@ def test_Handle_get(src, dst):
     assert_is_instance(ds, Handle, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    assert_false(ds.file_has_content("test-annex.dat")[0][1])
+    assert_false(ds.file_has_content("test-annex.dat"))
     ds.get(testfile)
-    assert_true(ds.file_has_content("test-annex.dat")[0][1])
+    assert_true(ds.file_has_content("test-annex.dat"))
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 
