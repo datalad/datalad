@@ -113,3 +113,5 @@ def test_Collection_add_handle(annex_path, clone_path, clt_path):
         assert_equal(f.readline().rstrip(), "last_seen = %s" % handle.path)
         assert_equal(f.readline().rstrip(), "metadata = %s" % handle.get_metadata())
         assert_equal(f.readline(), "")
+    assert_equal(clt.handles, [("first handle", handle.get_datalad_id(),
+                                handle.path)])

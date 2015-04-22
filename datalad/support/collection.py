@@ -24,8 +24,8 @@ class Collection(GitRepo):
     """Representation of a datalad collection.
     """
 
-    # __slots__ = []
-    # check how slots work with derived classes
+    __slots__ = ['handles']
+    # TODO: check how slots work with derived classes
 
     def __init__(self, path, url=None, runner=None):
         """
@@ -48,6 +48,8 @@ class Collection(GitRepo):
 
         super(Collection, self).__init__(path, url, runner=runner)
 
+        self.handles = []
+        
         if not self.get_indexed_files():
             # it's a brand new collection repo.
 
@@ -65,24 +67,20 @@ class Collection(GitRepo):
         else:
             # may be read the collection file/handle infos
             # or may be do it on demand?
-            # For now read a list of handles' names and ids:
-            self.handles = []
-#            for filename in self.get_indexed_files():
-#                if filename != 'collection':
-#                    with open(opj(self.path, filename), 'r') as f:
-#                        self.handles.append()
-#                else:
-#                    continue
-            with (open(filename, 'r') for filename in self.get_indexed_files()
-                  if filename != 'collection') as f:
-                for line in f.readlines():
-                    if line.startswith("handle_id = "):
-                        id = line[12:]
-                    elif line.startswith("last_seen = "):
-                        url = line[12:]
-                    else:
-                        continue
-=====meh:       self.handles.append((filename, id, url))
+            # For now read a list of handles' names, ids and paths
+            # as a proof of concept:
+
+            for filename in self.get_indexed_files():
+                if filename != 'collection':
+                    with open(filename, 'r') as f:
+                        for line in f.readlines():
+                            if line.startswith("handle_id = "):
+                                id_ = line[12:]
+                            elif line.startswith("last_seen = "):
+                                url = line[12:]
+                            else:
+                                continue
+                self.handles.append((filename, id_, url))
 
 
 
@@ -109,11 +107,14 @@ class Collection(GitRepo):
             f.write("last_seen = %s\n" % handle.path)
             f.write("metadata = %s\n" % handle.get_metadata())
 
-        # write to collection file:
+        # TODO: write to collection file:
         # entry for default layout?
 
         self.git_add(name)
         self.git_commit("Add handle %s." % name)
+
+        # currently need to add to self.handles:
+        self.handles.append((name, handle.get_datalad_id(), handle.path))
 
     def remove_handle(self, name):
         # TODO: remove stuff from collection file
