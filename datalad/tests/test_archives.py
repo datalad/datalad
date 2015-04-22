@@ -4,9 +4,8 @@
 import os
 from os.path import join as opj, exists, lexists, isdir
 
-from .utils import assert_true, assert_false, eq_, ok_, assert_greater, \
-     with_tree, with_tempfile, sorted_files, rmtree, create_archive, \
-     md5sum, ok_clean_git, ok_file_under_git
+from .utils import assert_true, assert_false, eq_, \
+     with_tree, swallow_outputs, swallow_logs
 
 from ..support.archives import decompress_file
 
@@ -21,8 +20,12 @@ tree_simplearchive = dict(
 @with_tree(**tree_simplearchive)
 def check_decompress_file(leading_directories, path):
     outdir = opj(path, 'simple-extracted')
-    decompress_file(opj(path, 'simple.tar.gz'), outdir,
-                    leading_directories=leading_directories)
+
+    with swallow_outputs() as cmo:
+        decompress_file(opj(path, 'simple.tar.gz'), outdir,
+                        leading_directories=leading_directories)
+        eq_(cmo.out, "")
+        eq_(cmo.err, "")
 
     if leading_directories == 'strip':
         assert_false(exists(opj(outdir, 'simple')))
