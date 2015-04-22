@@ -30,5 +30,5 @@ after_success:
   - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then coveralls; fi
 
 after_failure:
-  # re-run failing with higher verbosity 
-  - DATALAD_LOGLEVEL=1 nosetests -s -v --with-doctest --with-cov --cover-package datalad --failed --logging-level=DEBUG
+  # re-run failing with higher verbosity but swallowing outputs so only nosetests presenting them after failures
+  - DATALAD_LOGLEVEL=1 nosetests -v --with-doctest --with-cov --cover-package datalad --failed --logging-level=DEBUG
