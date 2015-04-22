@@ -65,7 +65,25 @@ class Collection(GitRepo):
         else:
             # may be read the collection file/handle infos
             # or may be do it on demand?
-            pass
+            # For now read a list of handles' names and ids:
+            self.handles = []
+#            for filename in self.get_indexed_files():
+#                if filename != 'collection':
+#                    with open(opj(self.path, filename), 'r') as f:
+#                        self.handles.append()
+#                else:
+#                    continue
+            with (open(filename, 'r') for filename in self.get_indexed_files()
+                  if filename != 'collection') as f:
+                for line in f.readlines():
+                    if line.startswith("handle_id = "):
+                        id = line[12:]
+                    elif line.startswith("last_seen = "):
+                        url = line[12:]
+                    else:
+                        continue
+=====meh:       self.handles.append((filename, id, url))
+
 
 
     # Attention: files are valid only if in git.
@@ -98,10 +116,9 @@ class Collection(GitRepo):
         self.git_commit("Add handle %s." % name)
 
     def remove_handle(self, name):
-        # TODO: git rm
-        # os.unlink(opj(self.path, name))
-        # self.git_commit("Removed handle.")
-        pass
+        # TODO: remove stuff from collection file
+        self.git_remove(name)
+        self.git_commit("Removed handle %s." % name)
 
     def publish(self, target):
         # TODO: lintian check for all handles and may be the collection itself,
