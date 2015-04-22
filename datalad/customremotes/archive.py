@@ -12,7 +12,6 @@ __docformat__ = 'restructuredtext'
 
 import errno
 import os
-import patoolib
 import sys
 import urllib2
 
@@ -88,14 +87,9 @@ class AnnexArchiveCache(object):
             lgr.debug("Extracting {archive} under {earchive}".format(**locals()))
             os.makedirs(earchive)
             assert(exists(earchive))
-            # verbosity has to stay that low -- for some reason we can't manage
-            # to swallow patoolib's outputs
-            patoolib.extract_archive(archive, outdir=earchive, verbosity=-1)
-            # so for now just call patool -- doesn't work nicely because of on
-            # Windows:  https://github.com/wummel/patool/issues/21
-            #().run(["patool", "extract", "--outdir", earchive, archive])
-            #Runner().call(decompress_file, archive, earchive,
-            #              leading_directories=None)
+
+            decompress_file(archive, earchive, leading_directories=None)
+
             lgr.debug("Adjusting permissions to R/O for the extracted content")
             rotree(earchive)
             assert(exists(earchive))
