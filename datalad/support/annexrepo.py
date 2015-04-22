@@ -471,16 +471,15 @@ class AnnexRepo(GitRepo):
 
         Parameters:
         -----------
-        files: list
+        files: list of str
             files to look for
 
         Returns:
         --------
-        {file: [desc]}
-            where `file` is every file from `files`,
-            'whereis' was successfully ran on.
-            [desc] contains a unicode describing the remote for each remote,
-            which was found by git-annex whereis, like:
+        list of list of unicode
+            Contains a list of descriptions per each input file,
+            describing the remote for each remote, which was found by
+            git-annex whereis, like:
 
             u'me@mycomputer:~/where/my/repo/is [origin]' or
             u'web' or
@@ -502,7 +501,7 @@ class AnnexRepo(GitRepo):
         json_objects = [json.loads(line)
                         for line in out.split(linesep) if line.startswith('{')]
 
-        return {
-            item.get('file'):
-                [remote.get('description') for remote in item.get('whereis')]
-                for item in json_objects if item.get('success')}
+        return [
+            [remote.get('description') for remote in item.get('whereis')]
+            if item.get('success') else []
+            for item in json_objects]
