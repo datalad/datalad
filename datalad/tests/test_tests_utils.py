@@ -7,12 +7,14 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import os, platform, sys
+import platform
+import sys
+import logging
+import os
 
 from os.path import exists, join as opj, basename
 from glob import glob
 from mock import patch
-
 from nose.tools import assert_in, assert_not_in
 from nose import SkipTest
 
@@ -20,10 +22,10 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
     rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
-    on_windows, assert_raises, assert_equal, assert_cwd_unchanged
+    on_windows, assert_raises, assert_cwd_unchanged
 
 
-##
+#
 # Test with_tempfile, especially nested invocations
 #
 
@@ -39,12 +41,14 @@ def test_with_tempfile_dir_via_env_variable():
         filename = _with_tempfile_decorated_dummy()
         ok_startswith(filename, target)
 
+
 @with_tempfile
 @with_tempfile
 def test_nested_with_tempfile_basic(f1, f2):
     ok_(f1 != f2)
     ok_(not os.path.exists(f1))
     ok_(not os.path.exists(f2))
+
 
 # And the most obscure case to test.  Generator for the test is
 # used as well to verify that every one of those functions adds new argument
@@ -54,7 +58,8 @@ def test_nested_with_tempfile_basic(f1, f2):
 @with_tempfile(suffix='.cfg')
 @with_tempfile(suffix='.cfg.old')
 @with_testrepos(flavors=['local'])
-def check_nested_with_tempfile_parametrized_surrounded(param, f0, tree, f1, f2, repo):
+def check_nested_with_tempfile_parametrized_surrounded(
+        param, f0, tree, f1, f2, repo):
     eq_(param, "param1")
     ok_(f0.endswith('big'), msg="got %s" % f0)
     ok_(os.path.basename(f0).startswith('TEST'), msg="got %s" % f0)
@@ -64,8 +69,10 @@ def check_nested_with_tempfile_parametrized_surrounded(param, f0, tree, f1, f2, 
     ok_(f2.endswith('.cfg.old'), msg="got %s" % f2)
     ok_('testrepos' in repo)
 
+
 def test_nested_with_tempfile_parametrized_surrounded():
     yield check_nested_with_tempfile_parametrized_surrounded, "param1"
+
 
 def test_with_testrepos():
     repos = []
@@ -85,8 +92,9 @@ def test_with_testrepos():
                 or
                 not exists(opj(repo, '.git', 'remove-me')))
 
+
 def test_with_tempfile_mkdir():
-    dnames = [] # just to store the name within the decorated function
+    dnames = []  # just to store the name within the decorated function
 
     @with_tempfile(mkdir=True)
     def check_mkdir(d1):
@@ -100,7 +108,7 @@ def test_with_tempfile_mkdir():
 
     check_mkdir()
     if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-        ok_(not os.path.exists(dnames[0])) # got removed
+        ok_(not os.path.exists(dnames[0]))  # got removed
 
 
 @with_tempfile()
@@ -155,6 +163,7 @@ def test_keeptemp_via_env_variable():
 
     rmtemp(files[-1])
 
+
 def test_swallow_outputs():
     with swallow_outputs() as cm:
         eq_(cm.out, '')
@@ -162,30 +171,32 @@ def test_swallow_outputs():
         sys.stderr.write("out error")
         eq_(cm.out, 'out normal')
         sys.stdout.write(" and more")
-        eq_(cm.out, 'out normal and more') # incremental
+        eq_(cm.out, 'out normal and more')  # incremental
         eq_(cm.err, 'out error')
-        eq_(cm.err, 'out error') # the same value if multiple times
+        eq_(cm.err, 'out error')  # the same value if multiple times
 
-import logging
+
 def test_swallow_logs():
     lgr = logging.getLogger('datalad')
     with swallow_logs(new_level=9) as cm:
         eq_(cm.out, '')
         lgr.log(8, "very heavy debug")
-        eq_(cm.out, '') # not even visible at level 9
+        eq_(cm.out, '')  # not even visible at level 9
         lgr.log(9, "debug1")
-        eq_(cm.out, 'debug1\n') # not even visible at level 9
+        eq_(cm.out, 'debug1\n')  # not even visible at level 9
         lgr.info("info")
-        eq_(cm.out, 'debug1\ninfo\n') # not even visible at level 9
+        eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+
 
 def test_ok_startswith():
     ok_startswith('abc', 'abc')
     ok_startswith('abc', 'a')
     ok_startswith('abc', '')
     ok_startswith(' abc', ' ')
-    ok_startswith('abc\r\n', 'a') # no effect from \r\n etc
+    ok_startswith('abc\r\n', 'a')  # no effect from \r\n etc
     assert_raises(AssertionError, ok_startswith, 'abc', 'b')
     assert_raises(AssertionError, ok_startswith, 'abc', 'abcd')
+
 
 def test_nok_startswith():
     nok_startswith('abc', 'bc')
@@ -239,7 +250,6 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
             "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
         assert_in("Mitigating and changing back", cml.out)
 
-
     # and again but allowing to chdir
     @assert_cwd_unchanged(ok_to_chdir=True)
     def do_chdir_value_error():
@@ -251,4 +261,3 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         eq_(orig_dir, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
         assert_not_in("Mitigating and changing back", cml.out)
-

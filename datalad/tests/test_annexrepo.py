@@ -77,9 +77,9 @@ def test_AnnexRepo_get(src, dst):
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    assert_false(ar.file_has_content("test-annex.dat")[0][1])
+    assert_false(ar.file_has_content("test-annex.dat"))
     ar.annex_get(testfile)
-    assert_true(ar.file_has_content("test-annex.dat")[0][1])
+    assert_true(ar.file_has_content("test-annex.dat"))
 
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'],
@@ -202,11 +202,17 @@ def test_AnnexRepo_file_has_content(src, annex_path):
 
     ar = AnnexRepo(annex_path, src)
     testfiles = ["test-annex.dat", "test.dat"]
-    assert_equal(ar.file_has_content(testfiles),
-                 [("test-annex.dat", False), ("test.dat", False)])
+    assert_equal(ar.file_has_content(testfiles), [False, False])
+
     ar.annex_get("test-annex.dat")
-    assert_equal(ar.file_has_content(testfiles),
-                 [("test-annex.dat", True), ("test.dat", False)])
+    assert_equal(ar.file_has_content(testfiles), [True, False])
+    assert_equal(ar.file_has_content(testfiles[:1]), [True])
+
+    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"]),
+                 [True, False, False])
+
+    assert_false(ar.file_has_content("bogus.txt"))
+    assert_true(ar.file_has_content("test-annex.dat"))
 
 
 def test_AnnexRepo_options_decorator():
@@ -248,15 +254,15 @@ def test_AnnexRepo_web_remote(src, dst):
     # get the file from remote
     ar.annex_addurls([testurl])
     l = ar.annex_whereis(testfile)
-    assert_in('web', l[testfile])
-    assert_equal(len(l[testfile]), 2)
-    assert_in((testfile, True), ar.file_has_content(testfile))
+    assert_in('web', l)
+    assert_equal(len(l), 2)
+    assert_true(ar.file_has_content(testfile))
 
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
     l = ar.annex_whereis(testfile)
-    assert_not_in('web', l[testfile])
-    assert_equal(len(l[testfile]), 1)
+    assert_not_in('web', l)
+    assert_equal(len(l), 1)
 
     # now only 1 copy; drop should fail
     try:
@@ -269,19 +275,19 @@ def test_AnnexRepo_web_remote(src, dst):
 
     assert_true(failed)
 
-    # readd the url using different method
+    # read the url using different method
     ar.annex_addurl_to_file(testfile, testurl)
     l = ar.annex_whereis(testfile)
-    assert_in('web', l[testfile])
-    assert_equal(len(l[testfile]), 2)
-    assert_in((testfile, True), ar.file_has_content(testfile))
+    assert_in('web', l)
+    assert_equal(len(l), 2)
+    assert_true(ar.file_has_content(testfile))
 
     # 2 known copies now; drop should succeed
     ar.annex_drop(testfile)
     l = ar.annex_whereis(testfile)
-    assert_in('web', l[testfile])
-    assert_equal(len(l[testfile]), 1)
-    assert_in((testfile, False), ar.file_has_content(testfile))
+    assert_in('web', l)
+    assert_equal(len(l), 1)
+    assert_false(ar.file_has_content(testfile))
 
 @with_testrepos(flavors='network')
 @with_tempfile
@@ -348,14 +354,12 @@ def test_AnnexRepo_backend_option(path, url):
 def test_AnnexRepo_get_file_backend(src, dst):
     ar = AnnexRepo(dst, src)
 
-    assert_true(ar.get_file_backend('test-annex.dat').
-                get('test-annex.dat') == 'SHA256E')
+    assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
     if not ar.is_direct_mode():
         # no migration in direct mode
         ar.annex_get('test-annex.dat')
         ar.migrate_backend('test-annex.dat', backend='SHA1')
-        assert_true(ar.get_file_backend('test-annex.dat').
-                    get('test-annex.dat') == 'SHA1')
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA1')
 
 # TODO:
 #def annex_initremote(self, name, options):
