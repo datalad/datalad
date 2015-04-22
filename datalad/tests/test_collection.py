@@ -171,12 +171,12 @@ def test_Collection_metadata_cache(h_path, c_path):
     collection.add_handle(handle, "MyHandle")
 
     # initial metadata:
-    assert_equal(collection.handles[0][3], "Metadata not available yet.\n")
+    assert_equal(collection.handles[0][3], ["Metadata not available yet.\n"])
 
     # edit handle's metadata:
     handle.set_metadata("Fresh Metadata.\n")
-    assert_equal(handle.get_metadata(), "Fresh Metadata.\n")
+    assert_equal(handle.get_metadata(), ["Fresh Metadata.\n"])
     # without updating the cache, collection still has initial metadata:
-    assert_equal(collection.handles[0][3], "Metadata not available yet.\n")
+    assert_equal(collection.handles[0][3], ["Metadata not available yet.\n"])
     collection.update_metadata_cache(handle)
-    assert_equal(collection.handles[0][3], "Fresh Metadata.\n")
+    assert_equal(collection.handles[0][3], ["Fresh Metadata.\n"])

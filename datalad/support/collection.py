@@ -158,11 +158,13 @@ class Collection(GitRepo):
         if isinstance(handle, Handle):
             for h_ in self.handles:
                 if h_[1] == handle.get_datalad_id():
-                    h_[3] = handle.get_metadata()
+                    self.handles[self.handles.index(h_)] = \
+                        (h_[0], h_[1], h_[2], handle.get_metadata())
         elif isinstance(handle, basestring):
             for h_ in self.handles:
                 if h_[2] == handle:
-                    h_[3] = Handle(h_[2]).get_metadata()
+                    self.handles[self.handles.index(h_)] = \
+                        (h_[0], h_[1], h_[2], Handle(h_[2]).get_metadata())
         else:
             raise TypeError("argument 'handle' is expected either to be "
                             "a 'Handle' or a 'basestring'")
