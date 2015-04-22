@@ -21,8 +21,9 @@ from functools import wraps
 from git import Repo
 from git.exc import GitCommandError
 
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.cmd import Runner
+from ..support.exceptions import FileNotInRepositoryError
+from ..cmd import Runner
+from ..utils import optional_args
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -79,7 +80,33 @@ def _normalize_path(base_dir, path):
     return relpath(path, start=base_dir)
 
 
-def normalize_paths(func):
+@optional_args
+def normalize_path(func):
+    """Decorator to provide unified path conversion for a single file
+
+    Unlike normalize_paths, intended to be used for functions dealing with a
+    single filename at a time
+
+    Note
+    ----
+    This is intended to be used within the repository classes and therefore
+    returns a class method!
+
+    The decorated function is expected to take a path at
+    first positional argument (after 'self'). Additionally the class `func`
+    is a member of, is expected to have an attribute 'path'.
+    """
+
+    @wraps(func)
+    def newfunc(self, file_, *args, **kwargs):
+        file_new = _normalize_path(self.path, file_)
+        return func(self, file_new, *args, **kwargs)
+
+    return newfunc
+
+
+@optional_args
+def normalize_paths(func, match_return_type=True):
     """Decorator to provide unified path conversions.
 
     Note
@@ -92,19 +119,41 @@ def normalize_paths(func):
     is a member of, is expected to have an attribute 'path'.
 
     Accepts either a list of paths or a single path in a str. Passes a list
-    to decorated function either way!
+    to decorated function either way, but would return based on the value of
+    match_return_type and possibly input argument
+
+    Parameters
+    ----------
+    match_return_type : bool, optional
+      If True, and a single string was passed in, it would return the first
+      element of the output (after verifying that it is a list of length 1).
+      It makes easier to work with single files input.
     """
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
         if isinstance(files, basestring):
             files_new = [_normalize_path(self.path, files)]
+            single_file = True
         elif isinstance(files, list):
             files_new = [_normalize_path(self.path, path) for path in files]
+            single_file = False
         else:
             raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
                              type(files))
-        return func(self, files_new, *args, **kwargs)
+
+        result = func(self, files_new, *args, **kwargs)
+
+        if (result is None) or not match_return_type or not single_file:
+            # If function doesn't return anything or no denormalization
+            # was requested or it was not a single file
+            return result
+        elif single_file:
+            assert(len(result) == 1)
+            return result[0]
+        else:
+            return RuntimeError("should have not got here... check logic")
+
     return newfunc
 
 

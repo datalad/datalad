@@ -115,7 +115,7 @@ class DoubleAnnexRepo(object):
         else:
             # create fresh
             db = dict(incoming={},   # incoming_filename -> (url, mtime, size (AKA Content-Length, os.stat().st_size ))
-                      public_incoming={}) # public_filename -> incoming_filename
+                      public_incoming={})  # public_filename -> incoming_filename
 
         db_incoming = db['incoming']
         # reverse map: url -> incoming
@@ -232,7 +232,7 @@ class DoubleAnnexRepo(object):
                         incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
                           download_url_to_incoming(href_full, incoming_annex.path,
                                        join(repo_sectiondir, href_dir),
-                                       db_incoming=db_incoming, dry_run=self.runner.dry, # TODO -- use runner?
+                                       db_incoming=db_incoming, dry_run=self.runner.dry,  # TODO -- use runner?
                                        add_mode=add_mode)
                     except Exception, e:
                         lgr.warning("Skipping %(href_full)s due to error: %(e)s" % locals())

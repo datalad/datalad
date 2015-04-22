@@ -163,7 +163,7 @@ def check_runner_heavy_output(log_online):
     cmd = '%s %s' % (sys.executable, opj(dirname(__file__), "heavyoutput.py"))
     with swallow_outputs() as cm:
         ret = runner.run(cmd, log_stderr=False, log_stdout=False, expect_stderr=True)
-        eq_(cm.err, cm.out) # they are identical in that script
+        eq_(cm.err, cm.out)  # they are identical in that script
         eq_(cm.out[:10], "[0, 1, 2, ")
         eq_(cm.out[-15:], "997, 998, 999]\n")
 
@@ -187,7 +187,7 @@ def test_link_file_load(tempfile):
     with open(tempfile, 'w') as f:
         f.write("LOAD")
 
-    link_file_load(tempfile, tempfile2) # this should work in general
+    link_file_load(tempfile, tempfile2)  # this should work in general
 
     ok_(os.path.exists(tempfile2))
 
@@ -221,7 +221,7 @@ def test_link_file_load(tempfile):
                 raise AttributeError("TEST")
         with patch('os.link', new_callable=raise_AttributeError):
             with swallow_logs(logging.WARNING) as cm:
-                link_file_load(tempfile, tempfile2) # should still work
+                link_file_load(tempfile, tempfile2)  # should still work
                 ok_("failed (TEST), copying file" in cm.out)
 
     # should be a copy (either originally for windows, or after mocked call)
@@ -229,7 +229,7 @@ def test_link_file_load(tempfile):
     with open(tempfile2, 'r') as f:
         assert_equal(f.read(), "LOAD")
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
-    os.unlink(tempfile2) # TODO: next two with_tempfile
+    os.unlink(tempfile2)  # TODO: next two with_tempfile
 
 @with_testrepos(flavors='local')
 def test_runner_failure(dir):

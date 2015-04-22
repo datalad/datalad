@@ -82,7 +82,7 @@ def check_page2annex_same_incoming_and_public(mode, path, url):
             mode=mode,
             ),
         files=dict(
-            directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
+            directory='files',  # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
             url=url,
             git_add='(\.ascii)')))
 
@@ -348,8 +348,8 @@ def test_page2annex_separate_public():
 
 obscure = get_most_obscure_supported_name()
 
-if on_osx:
-    # There is a known issue with annex under OSX
+if False: # pragma: no cover
+    # There used to be an issue with annex under OSX
     # https://github.com/datalad/datalad/issues/79
     import logging
     lgr = logging.getLogger('datalad.tests')

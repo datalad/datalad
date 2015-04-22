@@ -34,7 +34,7 @@ we outline the workflow used by the developers:
 0. Have a clone of our main [project repository][gh-datalad] as `origin`
    remote in your git:
 
-          $ git clone --recursive git://github.com:datalad/datalad
+          $ git clone --recursive git://github.com/datalad/datalad
 
     `--recursive` is used to initialize any needed git submodules.  If you have 
     cloned without it already, just run `git submodule update --init --recursive`
@@ -127,7 +127,7 @@ that, recommended course of action is to use `virtualenv`, e.g.
 
 ```sh
 virtualenv --system-site-packages venv-tests
-venv-tests/bin/pip install -r requirements
+venv-tests/bin/pip install -r requirements.txt
 venv-tests/bin/python setup.py develop
 ```
 
