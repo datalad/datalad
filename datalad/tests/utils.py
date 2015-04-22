@@ -118,15 +118,17 @@ def ok_clean_git(path, annex=True, untracked=[]):
         ok_(exists(join(path, '.git', 'annex')))
     repo = git.Repo(path)
 
-    ok_(repo.head.is_valid())
+    if repo.index.entries.keys():
+        ok_(repo.head.is_valid())
 
-    # get string representations of diffs with index to ease troubleshooting
-    index_diffs = [str(d) for d in repo.index.diff(None)]
-    head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+        # get string representations of diffs with index to ease
+        # troubleshooting
+        index_diffs = [str(d) for d in repo.index.diff(None)]
+        head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
 
-    eq_(sorted(repo.untracked_files), sorted(untracked))
-    eq_(index_diffs, [])
-    eq_(head_diffs, [])
+        eq_(sorted(repo.untracked_files), sorted(untracked))
+        eq_(index_diffs, [])
+        eq_(head_diffs, [])
 
 def ok_file_under_git(path, filename, annexed=False):
     repo = AnnexRepo(path)
