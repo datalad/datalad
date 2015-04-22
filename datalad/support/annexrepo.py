@@ -267,51 +267,47 @@ class AnnexRepo(GitRepo):
                                        annex_options=['--'] +
                                                      shlex.split(git_cmd))
 
-    @normalize_paths
-    def get_file_key(self, files):
+    @normalize_path
+    def get_file_key(self, file_):
         """Get key of an annexed file.
 
         Parameters:
         -----------
-        files: list of str
-            file(s) to look up
+        file_: str
+            file to look up
 
         Returns:
         --------
-        list of str
+        str
             keys used by git-annex for each of the files
         """
 
-        if len(files) > 1:
-            raise NotImplementedError("No handling of multiple files"
-                                      " implemented yet for get_file_key()!")
-        path = files[0]
-
-        cmd_str = 'git annex lookupkey %s' % path  # have a string for messages
+        cmd_str = 'git annex lookupkey %s' % file_  # have a string for messages
 
         try:
-            output = self._run_annex_command('lookupkey', annex_options=[path])
+            out, err = self._run_annex_command('lookupkey',
+                                               annex_options=[file_])
         except CommandError, e:
             if e.code == 1:
-                if not exists(opj(self.path, path)):
-                    raise IOError(e.code, "File not found.", path)
-                elif path in self.get_indexed_files():
+                if not exists(opj(self.path, file_)):
+                    raise IOError(e.code, "File not found.", file_)
+                elif file_ in self.get_indexed_files():
                     # if we got here, the file is present and in git,
                     # but not in the annex
                     raise FileInGitError(cmd=cmd_str,
                                          msg="File not in annex, but git: %s"
-                                             % path,
-                                         filename=path)
+                                             % file_,
+                                         filename=file_)
                 else:
                     raise FileNotInAnnexError(cmd=cmd_str,
                                               msg="File not in annex: %s"
-                                                  % path,
-                                              filename=path)
+                                                  % file_,
+                                              filename=file_)
             else:
                 # Not sure, whether or not this can actually happen
                 raise e
 
-        return output[0].rstrip(linesep).split(linesep)
+        return out.rstrip(linesep).split(linesep)[0]
 
     @normalize_paths
     def file_has_content(self, files):
