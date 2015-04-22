@@ -261,7 +261,7 @@ class GitRepo(object):
     def git_remove(self, files):
         """git rm
         """
-        raise NotImplementedError
+        self._git_custom_command(files, 'git rm')
 
     def git_remote_add(self, name, url):
         """
