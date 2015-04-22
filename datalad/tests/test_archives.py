@@ -5,11 +5,11 @@ import os
 from os.path import join as opj, exists, lexists, isdir
 
 from .utils import assert_true, assert_false, eq_, \
-     with_tree, swallow_outputs, swallow_logs, on_windows
+     with_tree, swallow_outputs, on_windows
 
 from ..support.archives import decompress_file, unixify_path
 
-from .utils import get_most_obscure_supported_name
+from .utils import get_most_obscure_supported_name, assert_raises
 
 fn_inarchive_obscure = get_most_obscure_supported_name()
 fn_archive_obscure = fn_inarchive_obscure.replace('a', 'b')
@@ -50,7 +50,8 @@ def check_decompress_file(leading_directories, path):
         assert_true(exists(path_archive_obscure))
         testpath = path_archive_obscure
     else:
-        raise ValueError("Dunno about this strategy: %s" % leading_directories)
+        raise NotImplementedError("Dunno about this strategy: %s"
+                                  % leading_directories)
 
     assert_true(exists(opj(testpath, '3.txt')))
     assert_true(exists(opj(testpath, fn_inarchive_obscure)))
@@ -61,3 +62,4 @@ def check_decompress_file(leading_directories, path):
 def test_decompress_file():
     yield check_decompress_file, None
     yield check_decompress_file, 'strip'
+    yield assert_raises, NotImplementedError, check_decompress_file, "unknown"
