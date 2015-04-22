@@ -12,7 +12,7 @@ This layer makes the difference between an arbitrary annex and a datalad-managed
 """
 
 import os
-from os.path import join, exists
+from os.path import join as opj, exists
 import logging
 
 from annexrepo import AnnexRepo
@@ -48,13 +48,26 @@ class Handle(AnnexRepo):
         """
 
         super(Handle, self).__init__(path, url, direct=direct, runner=runner)
-        # TODO: what about runner? (dry runs ...)
 
-        # TODO: should work with path (deeper) inside repo! => gitrepo/annexrepo
+        datalad_path = opj(self.path, '.datalad')
+        if not exists(datalad_path):
+            os.mkdir(datalad_path)
+            # create ID file:
+            with open(opj(datalad_path, 'handle_id'), 'w') as f:
+                f.write(self.repo.config_reader().get_value("annex", "uuid"))
+            self.add_to_git(opj('.datalad', 'handle_id'),
+                            "Created datalad handle id.")
 
-        dataladPath = join(self.path, '.datalad')
-        if not exists(dataladPath):
-            os.mkdir(dataladPath)
+    def get_datalad_id(self):
+        """Get the identifier of the handle.
+
+        Returns
+        -------
+        str
+        """
+
+        with open(opj(self.path, '.datalad', 'handle_id'), 'r') as f:
+            return f.readline()
 
     def get(self, files):
         """get the actual content of files

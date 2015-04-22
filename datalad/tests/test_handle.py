@@ -13,7 +13,8 @@
 import os.path
 import platform
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
+from nose.tools import assert_raises, assert_is_instance, assert_true, \
+    assert_equal, assert_false, assert_is_not_none
 from nose import SkipTest
 from git.exc import GitCommandError
 
@@ -155,3 +156,20 @@ def test_Handle_commit(src, path):
         ok_clean_git_annex_proxy(path)
     else:
         ok_clean_git(path, annex=True)
+
+
+@with_tempfile
+@with_tempfile
+def test_Handle_id(path1, path2):
+
+    # check id is generated:
+    handle1 = Handle(path1)
+    id1 = handle1.get_datalad_id()
+    assert_is_not_none(id1)
+    assert_is_instance(id1, basestring)
+    assert_equal(id1,
+                 handle1.repo.config_reader().get_value("annex", "uuid"))
+
+    # check clone has same id:
+    handle2 = Handle(path2, path1)
+    assert_equal(id1, handle2.get_datalad_id())
