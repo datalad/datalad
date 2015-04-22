@@ -349,7 +349,7 @@ def test_AnnexRepo_backend_option(path, url):
     assert_true(ar.get_file_backend(f) == 'SHA1'
                 for f in ar.get_indexed_files() if 'faraway' in f)
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=['network'])
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
     ar = AnnexRepo(dst, src)
