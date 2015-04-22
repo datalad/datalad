@@ -53,6 +53,7 @@ def _patool_run(cmd, verbosity=0, **kwargs):
     from ..cmd import Runner
     runner = Runner()
     try:
+        # kwargs_ = kwargs[:];         kwargs_['shell'] = True
         runner.run(cmd, **kwargs)
         return 0
     except CommandError as e:
@@ -73,6 +74,26 @@ DECOMPRESSORS = {
     '\.(zip)$': 'unzip %(file)s -d %(dir)s',
     }
 
+from ..utils import on_windows
+def unixify_path(path):
+    """On windows convert paths from drive:\d\file to /drive/d/file
+
+    This overcomes problems with various cmdline tools we are to use,
+    such as tar etc
+    """
+    if on_windows:
+        drive, path_ = os.path.splitdrive(path)
+        path_ = path_.split(os.sep)
+        path_ = '/'.join(path_)
+        if drive:
+            # last one must be :
+            assert(drive[-1] == ":")
+            return '/%s%s' % (drive[:-1], path_)
+        else:
+            return path_
+    else:
+        return path
+
 
 def decompress_file(file_, dir_, leading_directories='strip'):
     """Decompress `file_` into a directory `dir_`
@@ -89,7 +110,12 @@ def decompress_file(file_, dir_, leading_directories='strip'):
 
     from ..tests.utils import swallow_outputs
     with swallow_outputs() as cmo:
-        patoolib.extract_archive(file_, outdir=dir_, verbosity=100)
+        patoolib.util.check_existing_filename(file_)
+        patoolib.util.check_existing_filename(dir_, onlyfiles=False)
+        # Call protected one to avoid the checks on existence on unixified path
+        patoolib._extract_archive(unixify_path(file_),
+                                  outdir=unixify_path(dir_),
+                                  verbosity=100)
         if cmo.out:
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
         if cmo.err:
