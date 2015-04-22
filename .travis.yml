@@ -24,7 +24,10 @@ install:
   - pip install -e .
 
 script:
-  - DATALAD_LOGLEVEL=INFO nosetests -s -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO
+  - DATALAD_LOGLEVEL=INFO nosetests -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
 
 after_success:
   - if [[ $TRAVIS_PYTHON_VERSION == 2.7 ]]; then coveralls; fi
+
+after_failure:
+  - DATALAD_LOGLEVEL=DEBUG nosetests -s -v --with-doctest --with-cov --cover-package datalad --logging-level=DEBUG --failed
