@@ -14,13 +14,15 @@ import os.path
 import platform
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_false, assert_is_not_none, assert_not_equal
+    assert_equal, assert_false, assert_is_not_none, assert_not_equal, assert_in
 from nose import SkipTest
 from git.exc import GitCommandError
 
 from datalad.support.handle import Handle
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git, ok_clean_git_annex_proxy, get_most_obscure_supported_name, ok_
+from datalad.tests.utils import with_tempfile, with_testrepos, \
+    assert_cwd_unchanged, ignore_nose_capturing_stdout, \
+    on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
+    get_most_obscure_supported_name, ok_
 from datalad.support.exceptions import FileInGitError
 
 
@@ -186,3 +188,17 @@ def test_Handle_equals(path1, path2):
     handle2 = Handle(path2)
     assert_not_equal(handle1, handle2)
     ok_(handle1 != handle2)
+
+@with_tempfile
+def test_Handle_metadata(path):
+
+    handle = Handle(path)
+    md = handle.get_metadata()
+    assert_equal(len(md), 1)
+    assert_in("Metadata not available yet.\n", md)
+
+    handle.set_metadata("line 1\nline 2\n")
+    md = handle.get_metadata()
+    assert_equal(len(md), 2)
+    assert_in("line 1\n", md)
+    assert_in("line 2\n", md)

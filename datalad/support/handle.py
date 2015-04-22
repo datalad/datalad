@@ -58,6 +58,11 @@ class Handle(AnnexRepo):
             self.add_to_git(opj('.datalad', 'handle_id'),
                             "Created datalad handle id.")
 
+            with open(opj(datalad_path, 'metadata'), 'w') as f:
+                f.write("Metadata not available yet.\n")
+            self.add_to_git(opj('.datalad', 'metadata'),
+                            "Initialized metadata.")
+
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
 
@@ -138,4 +143,11 @@ class Handle(AnnexRepo):
         """
         # check whether .datalad/metadata exists => raise Not Available
         # read it => rdflib
-        return "Dummy metadata"
+        with open(opj(self.path, '.datalad', 'metadata'), 'r') as f:
+            return f.readlines()
+
+    def set_metadata(self, content):
+        with open(opj(self.path, '.datalad', 'metadata'), 'w') as f:
+            f.write(content)
+        self.add_to_git(opj('.datalad', 'metadata'),
+                        "Updated metadata.")
