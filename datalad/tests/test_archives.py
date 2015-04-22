@@ -84,4 +84,5 @@ def check_compress_file(ext, path, name):
 
 def test_compress_file():
     yield check_compress_file, '.tar.gz'
-    yield check_compress_file, '.zip'
+    yield check_compress_file, '.tar'
+    #yield check_compress_file, '.zip'
