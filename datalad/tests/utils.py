@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import __builtin__
+
 import glob, shutil, stat, os
 import tempfile
 import platform
@@ -25,6 +27,7 @@ from ..cmd import Runner
 from ..support.repos import AnnexRepo
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
+
 
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
@@ -520,12 +523,16 @@ from contextlib import contextmanager
 
 @contextmanager
 def swallow_outputs():
-    """Context manager to help consuming both stdout and stderr.
+    """Context manager to help consuming both stdout and stderr, and print()
 
     stdout is available as cm.out and stderr as cm.err whenever cm is the
     yielded context manager.
     Internally uses temporary files to guarantee absent side-effects of swallowing
-    into StringIO which lacks .fileno
+    into StringIO which lacks .fileno.
+
+    print mocking is necessary for some uses where sys.stdout was already bound
+    to original sys.stdout, thus mocking it later had no effect. Overriding
+    print function had desired effect
     """
 
     class StringIOAdapter(object):
@@ -561,16 +568,34 @@ def swallow_outputs():
             rmtemp(self._out.name)
             rmtemp(self._err.name)
 
+
+
     # preserve -- they could have been mocked already
+    oldprint = getattr(__builtin__, 'print')
     oldout, olderr = sys.stdout, sys.stderr
     adapter = StringIOAdapter()
     sys.stdout, sys.stderr = adapter.handles
+
+    def fake_print(*args, **kwargs):
+        sep = kwargs.pop('sep', ' ')
+        end = kwargs.pop('end', '\n')
+        file = kwargs.pop('file', sys.stdout)
+
+        if file in (oldout, olderr, sys.stdout, sys.stderr):
+            # we mock
+            sys.stdout.write(sep.join(args) + end)
+        else:
+            # must be some other file one -- leave it alone
+            oldprint(*args, sep=sep, end=end, file=file)
+    setattr(__builtin__, 'print', fake_print)
 
     try:
         yield adapter
     finally:
         sys.stdout, sys.stderr = oldout, olderr
+        setattr(__builtin__, 'print',  oldprint)
         adapter.cleanup()
+
 
 @contextmanager
 def swallow_logs(new_level=None):
