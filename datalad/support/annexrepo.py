@@ -52,6 +52,8 @@ def kwargs_to_options(func):
         return func(self, *args, options=option_list)
     return newfunc
 
+# TODO: Depending on decision about options, implement common annex-options,
+# like --force and specific ones for all annex commands
 
 
 class AnnexRepo(GitRepo):
@@ -63,13 +65,9 @@ class AnnexRepo(GitRepo):
     will be interpreted as relative to `self.path`. Absolute paths will be
     accepted either way.
     """
-    # TODO: Check exceptions for the latter and find a workaround. For
-    # example: git annex lookupkey doesn't accept absolute paths. So,
-    # build relative paths from absolute ones and may be include checking
-    # whether or not they result in a path inside the repo.
-    # How to expand paths, if cwd is deeper in repo?
-    # git annex proxy will need additional work regarding paths.
-    def __init__(self, path, url=None, runner=None, direct=False):
+
+    def __init__(self, path, url=None, runner=None,
+                 direct=False, backend=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -93,6 +91,11 @@ class AnnexRepo(GitRepo):
 
         direct: bool
            If True, force git-annex to use direct mode
+
+        backend: str
+            set default backend used by this annex. This does NOT affect files,
+            that are already annexed nor will it automatically migrate files,
+            that are 'getted' afterwards.
         """
         super(AnnexRepo, self).__init__(path, url, runner=runner)
 
@@ -106,17 +109,50 @@ class AnnexRepo(GitRepo):
         if direct and not self.is_direct_mode():
             self.set_direct_mode()
 
+        # set default backend for future annex commands:
+        # TODO: Should the backend option of __init__() also migrate
+        # the annex, in case there are annexed files already?
+        if backend:
+            self.repo.config_writer().set_value("annex", "backends", backend)
+
     def _run_annex_command(self, annex_cmd, git_options=[], annex_options=[],
                            log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=False):
+                           expect_stderr=False, backend=None):
         """Helper to run actual git-annex calls
-        """
-        # TODO: documentation
-        # TODO: runner options (log_sth)
-        debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
 
+        Unifies annex command calls.
+
+        Parameters:
+        -----------
+        annex_cmd: str
+            the actual git-annex command, like 'init' or 'add'
+        git_options: list of str
+            options to be passed to git
+        annex_options: list of str
+            options to be passed to the git-annex command
+        backend: str
+            backend to be used by this command; Currently this can also be
+            achieved by having an item '--backend=XXX' in annex_options.
+            This may change.
+        log_stdout,
+        log_stderr,
+        log_online,
+        expect_stderr: bool
+            these are passed to the respective options of
+            datalad.cmd.Runner.run()
+
+        Raises
+        ------
+        CommandNotAvailableError
+            if an annex command call returns "unknown command"
+        """
+
+        debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
+        backend = ['--backend=%s' % backend] if backend else []
         cmd_list = ['git'] + git_options +\
-                   ['annex', annex_cmd] + debug + annex_options
+                   ['annex', annex_cmd] +\
+                   backend + debug +\
+                   annex_options
         try:
             return self.cmd_call_wrapper.run(cmd_list,
                                              log_stdout=log_stdout,
@@ -202,7 +238,6 @@ class AnnexRepo(GitRepo):
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
 
-
     @kwargs_to_options
     @normalize_paths
     def annex_get(self, files, options=[]):
@@ -220,12 +255,11 @@ class AnnexRepo(GitRepo):
 
         # don't capture stderr, since it provides progress display
         self._run_annex_command('get', annex_options=options + files,
-                                log_stdout=True, log_stderr=False,
-                                log_online=True, expect_stderr=True)
+                                log_stdout=True, log_stderr=True,
+                                log_online=True, expect_stderr=False)
 
-    @kwargs_to_options
     @normalize_paths
-    def annex_add(self, files, options=[]):
+    def annex_add(self, files, backend=None, options=[]):
         """Add file(s) to the annex.
 
         Parameters
@@ -234,7 +268,8 @@ class AnnexRepo(GitRepo):
             list of paths to add to the annex
         """
 
-        self._run_annex_command('add', annex_options=options + files)
+        self._run_annex_command('add', annex_options=options + files,
+                                backend=backend)
 
     def annex_proxy(self, git_cmd):
         """Use git-annex as a proxy to git
@@ -255,7 +290,8 @@ class AnnexRepo(GitRepo):
 
         cmd_str = "git annex proxy -- %s" % git_cmd
         # TODO: By now git_cmd is expected to be string.
-        # Figure out how to deal with a list here.
+        # Figure out how to deal with a list here. Especially where and how to
+        # treat paths.
 
         if not self.is_direct_mode():
             lgr.warning("annex_proxy() called in indirect mode: %s" % cmd_str)
@@ -393,8 +429,8 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('enableremote', annex_options=[name])
 
-    @normalize_path
-    def annex_addurl_to_file(self, file_, url, options=[]):
+    @normalize_paths
+    def annex_addurl_to_file(self, file_, url, options=[], backend=None):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -417,11 +453,12 @@ class AnnexRepo(GitRepo):
 
         annex_options = ['--file=%s' % file_] + options + [url]
         self._run_annex_command('addurl', annex_options=annex_options,
-                                log_online=True, log_stderr=False)
+                                backend=backend, log_online=True,
+                                log_stderr=False)
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
 
-    def annex_addurls(self, urls, options=[]):
+    def annex_addurls(self, urls, options=[], backend=None):
         """Downloads each url to its own file, which is added to the annex.
 
         Parameters:
@@ -433,7 +470,8 @@ class AnnexRepo(GitRepo):
         """
 
         self._run_annex_command('addurl', annex_options=options + urls,
-                                log_online=True, log_stderr=False)
+                                backend=backend, log_online=True,
+                                log_stderr=False)
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
 
@@ -451,7 +489,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
     @normalize_paths
-    def annex_drop(self, files):
+    def annex_drop(self, files, options=[]):
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -461,9 +499,8 @@ class AnnexRepo(GitRepo):
         -----------
         files: list of str
         """
-        # TODO: options needed
 
-        self._run_annex_command('drop', annex_options=files)
+        self._run_annex_command('drop', annex_options=files + options)
 
     @normalize_paths(match_return_type=False)
     def annex_whereis(self, files):
@@ -506,3 +543,48 @@ class AnnexRepo(GitRepo):
             item.get('file'):
                 [remote.get('description') for remote in item.get('whereis')]
                 for item in json_objects if item.get('success')}
+
+    @normalize_paths
+    def migrate_backend(self, files, backend=None):
+        """Changes the backend used for `file`.
+
+        The backend used for the key-value of `files`. Only files currently
+        present are migrated.
+        Note: There will be no notification if migrating fails due to the
+        absence of a file's content!
+
+        Parameters:
+        -----------
+        files: list
+            files to migrate.
+        backend: str
+            specify the backend to migrate to. If none is given, the
+            default backend of this instance will be used.
+        """
+
+        if self.is_direct_mode():
+            raise CommandNotAvailableError(
+                'git-annex migrate',
+                "Command 'migrate' is not available in direct mode.")
+        self._run_annex_command('migrate',
+                                annex_options=files,
+                                backend=backend)
+
+    @normalize_paths
+    def get_file_backend(self, files):
+        """Get the backend currently used for file(s).
+
+        Parameters:
+        -----------
+        files: list
+
+        Returns:
+        --------
+        {str: str}
+            dictionary with the entries of `files` as keys and a str
+            to indicate the used backend for this file.
+        """
+        # TODO: When PR #120 is merged, adapt return format to be more
+        # consistent.
+
+        return {f: self.get_file_key(f).split('-')[0] for f in files}
