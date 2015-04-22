@@ -9,10 +9,16 @@ from .utils import assert_true, assert_false, eq_, \
 
 from ..support.archives import decompress_file, unixify_path
 
+from .utils import get_most_obscure_supported_name
+
+fn_inarchive_obscure = get_most_obscure_supported_name()
+fn_archive_obscure = fn_inarchive_obscure.replace('a', 'b')
+fn_archive_obscure_ext = fn_archive_obscure + '.tar.gz'
+
 tree_simplearchive = dict(
     tree=(
-        ('simple.tar.gz', (
-            ('2copy.txt', '2 load'),
+        (fn_archive_obscure_ext, (
+            (fn_inarchive_obscure, '2 load'),
             ('3.txt', '3 load'))),),
     prefix='datalad-')
 
@@ -31,23 +37,24 @@ def check_decompress_file(leading_directories, path):
     outdir = opj(path, 'simple-extracted')
 
     with swallow_outputs() as cmo:
-        decompress_file(opj(path, 'simple.tar.gz'), outdir,
+        decompress_file(opj(path, fn_archive_obscure_ext), outdir,
                         leading_directories=leading_directories)
         eq_(cmo.out, "")
         eq_(cmo.err, "")
 
+    path_archive_obscure = opj(outdir, fn_archive_obscure)
     if leading_directories == 'strip':
-        assert_false(exists(opj(outdir, 'simple')))
-        testdir = outdir
+        assert_false(exists(path_archive_obscure))
+        testpath = outdir
     elif leading_directories is None:
-        assert_true(exists(opj(outdir, 'simple')))
-        testdir = opj(outdir, 'simple')
+        assert_true(exists(path_archive_obscure))
+        testpath = path_archive_obscure
     else:
         raise ValueError("Dunno about this strategy: %s" % leading_directories)
 
-    assert_true(exists(opj(testdir, '3.txt')))
-    assert_true(exists(opj(testdir, '2copy.txt')))
-    with open(opj(testdir, '3.txt')) as f:
+    assert_true(exists(opj(testpath, '3.txt')))
+    assert_true(exists(opj(testpath, fn_inarchive_obscure)))
+    with open(opj(testpath, '3.txt')) as f:
         eq_(f.read(), '3 load')
 
 
