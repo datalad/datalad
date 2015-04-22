@@ -255,8 +255,8 @@ class AnnexRepo(GitRepo):
 
         # don't capture stderr, since it provides progress display
         self._run_annex_command('get', annex_options=options + files,
-                                log_stdout=True, log_stderr=True,
-                                log_online=True, expect_stderr=False)
+                                log_stdout=True, log_stderr=False,
+                                log_online=True, expect_stderr=True)
 
     @normalize_paths
     def annex_add(self, files, backend=None, options=[]):
