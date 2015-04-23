@@ -77,7 +77,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle.annex_drop(fn_extracted)
 
     list_of_remotes = handle.annex_whereis(fn_extracted)
-    in_('[annexed-archives]', list_of_remotes[fn_extracted])
+    in_('[annexed-archives]', list_of_remotes)
 
     assert_false(handle.file_has_content(fn_extracted))
     handle.get(fn_extracted)
