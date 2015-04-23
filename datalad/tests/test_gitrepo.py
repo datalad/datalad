@@ -285,6 +285,51 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
     origin.git_checkout('new-branch')
     assert_true(exists(opj(orig_path, filename)))
 
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_GitRepo_remote_update(path1, path2, path3):
+
+    git1 = GitRepo(path1)
+    git2 = GitRepo(path2)
+    git3 = GitRepo(path3)
+
+    git1.git_remote_add('git2', path2)
+    git1.git_remote_add('git3', path3)
+
+    # Setting up remote 'git2'
+    with open(opj(path2, 'masterfile'), 'w') as f:
+        f.write("git2 in master")
+    git2.git_add('masterfile')
+    git2.git_commit("Add something to master.")
+    git2.git_checkout('branch2', '-b')
+    with open(opj(path2, 'branch2file'), 'w') as f:
+        f.write("git2 in branch2")
+    git2.git_add('branch2file')
+    git2.git_commit("Add something to branch2.")
+
+    # Setting up remote 'git3'
+    with open(opj(path3, 'masterfile'), 'w') as f:
+        f.write("git3 in master")
+    git3.git_add('masterfile')
+    git3.git_commit("Add something to master.")
+    git3.git_checkout('branch3', '-b')
+    with open(opj(path3, 'branch3file'), 'w') as f:
+        f.write("git3 in branch3")
+    git3.git_add('branch3file')
+    git3.git_commit("Add something to branch3.")
+
+    git1.git_remote_update()
+
+    # checkouts are 'tests' themselves, since they'll raise CommandError
+    # if something went wrong
+    git1.git_checkout('branch2')
+    git1.git_checkout('branch3')
+
+    branches1 = git1.git_branch()
+    assert_equal({'  branch2', '* branch3'}, set(branches1))
+
+
 # TODO:
-#   def git_remote_update(self, name, verbose=False):
 #   def git_fetch(self, name, options=''):

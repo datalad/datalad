@@ -287,7 +287,12 @@ class GitRepo(object):
                                             (v, name))
         return out.rstrip(linesep).split(linesep)
 
-    def git_remote_update(self, name, verbose=False):
+    def git_branch(self):
+
+        out, err = self._git_custom_command('', 'git branch')
+        return out.rstrip(linesep).split(linesep)
+
+    def git_remote_update(self, name='', verbose=False):
         """
         """
 
