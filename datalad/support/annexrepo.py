@@ -325,7 +325,8 @@ class AnnexRepo(GitRepo):
 
         try:
             out, err = self._run_annex_command('lookupkey',
-                                               annex_options=[file_])
+                                               annex_options=[file_],
+                                               expect_fail=True)
         except CommandError, e:
             if e.code == 1:
                 if not exists(opj(self.path, file_)):
