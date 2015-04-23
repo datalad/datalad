@@ -24,17 +24,16 @@ def get_bindir_PATH():
     PATH = os.environ['PATH']
     if bindir not in PATH:
         PATH = '%s%s%s' % (bindir, pathsep, PATH)
-        #lgr.debug("Adjusted PATH to become {}".format(os.environ['PATH']))
+        lgr.log(5, "Adjusted PATH to become {}".format(os.environ['PATH']))
     return PATH
 
 # both files will have the same content
-#fn_inarchive_obscure = 'test.dat'
-#fn_extracted_obscure = 'test2.dat'
+# fn_inarchive_obscure = 'test.dat'
+# fn_extracted_obscure = 'test2.dat'
 fn_inarchive_obscure = get_most_obscure_supported_name()
 fn_archive_obscure = fn_inarchive_obscure.replace('a', 'b') + '.tar.gz'
 fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 
-# TODO -- obscure one for the tarball itself
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
@@ -42,8 +41,7 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
     tree=(('a.tar.gz', (('d', ((fn_inarchive_obscure, '123'),)),)),
           ('simple.txt', '123'),
           (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
-          (fn_extracted_obscure, '123')
-         ))
+          (fn_extracted_obscure, '123')))
 @with_tempfile()
 def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     # We could just propagate current environ I guess to versatile our testing
@@ -84,11 +82,10 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_false(handle.file_has_content(fn_extracted))
     handle.get(fn_extracted)
     assert_true(handle.file_has_content(fn_extracted))
-    # ok_(exists(readlink(opj(d, fn_extracted_obscure))))
 
     handle.annex_rmurl(fn_extracted, file_url)
     with swallow_logs() as cm:
-        assert_raises(RuntimeError, handle.annex_drop, fn_extracted) # no copies
+        assert_raises(RuntimeError, handle.annex_drop, fn_extracted)
         in_("git-annex: drop: 1 failed", cm.out)
 
     handle.annex_addurl_to_file(fn_extracted, file_url)
@@ -100,7 +97,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     cloned_handle = Handle(d2, d,
                            runner=Runner(cwd=d2, env=env, protocol=protocol),
                            direct=direct)
-    # we would still need to enable manually atm that special remote for archives
+    # we still need to enable manually atm that special remote for archives
     cloned_handle.annex_enableremote('annexed-archives')
 
     assert_false(cloned_handle.file_has_content(fn_archive))
@@ -111,6 +108,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_true(cloned_handle.file_has_content(fn_archive))
 
     # TODO: dropurl, addurl without --relaxed, addurl to non-existing file
+
 
 def test_basic_scenario():
     yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False
