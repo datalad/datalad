@@ -103,6 +103,9 @@ def decompress_file(archive, dir_, leading_directories='strip'):
     archive: str
     dir_: str
     leading_directories: {'strip', None}
+      If `strip`, and archive contains a single leading directory under which
+      all content is stored, all the content will be moved one directory up
+      and that leading directory will be removed.
     """
     if not exists(dir_):
         lgr.debug("Creating directory %s to extract archive into" % dir_)
@@ -144,6 +147,11 @@ def compress_files(files, archive, path=None, overwrite=True):
     ----------
     files : list of str
     archive : str
+    path : str
+      Alternative directory under which compressor will be invoked, to e.g.
+      take into account relative paths of files and/or archive
+    overwrite : bool
+      Either to allow overwriting the target archive file if one already exists
     """
     from ..tests.utils import swallow_outputs
     with swallow_outputs() as cmo:
