@@ -11,7 +11,7 @@
 """
 
 import os
-import os.path
+from os.path import join as opj, exists
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_in
 from git.exc import GitCommandError
@@ -35,7 +35,7 @@ def test_GitRepo_instance_from_clone(src, dst):
 
     gr = GitRepo(dst, src)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
-    assert_true(os.path.exists(os.path.join(dst, '.git')))
+    assert_true(exists(opj(dst, '.git')))
 
     # do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     # and therefore can't clone to `dst`
@@ -48,7 +48,7 @@ def test_GitRepo_instance_from_existing(path):
 
     gr = GitRepo(path)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
-    assert_true(os.path.exists(os.path.join(path, '.git')))
+    assert_true(exists(opj(path, '.git')))
 
 
 @assert_cwd_unchanged
@@ -57,7 +57,7 @@ def test_GitRepo_instance_brand_new(path):
 
     gr = GitRepo(path)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
-    assert_true(os.path.exists(os.path.join(path, '.git')))
+    assert_true(exists(opj(path, '.git')))
 
 
 @assert_cwd_unchanged
@@ -67,7 +67,7 @@ def test_GitRepo_add(src, path):
 
     gr = GitRepo(path, src)
     filename = get_most_obscure_supported_name()
-    with open(os.path.join(path, filename), 'w') as f:
+    with open(opj(path, filename), 'w') as f:
         f.write("File to add to git")
     gr.git_add(filename)
 
@@ -80,7 +80,7 @@ def test_GitRepo_commit(path):
 
     gr = GitRepo(path)
     filename = get_most_obscure_supported_name()
-    with open(os.path.join(path, filename), 'w') as f:
+    with open(opj(path, filename), 'w') as f:
         f.write("File to add to git")
 
     gr.git_add(filename)
@@ -127,34 +127,34 @@ def test_normalize_path(git_path):
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
 
-    # result = _normalize_path(gr.path, os.path.join('.', 'testfile'))
+    # result = _normalize_path(gr.path, opj('.', 'testfile'))
     # assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
     #
-    # result = _normalize_path(gr.path, os.path.join('testdir', '..', 'testfile'))
+    # result = _normalize_path(gr.path, opj('testdir', '..', 'testfile'))
     # assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
     # Note: By now, normpath within normalize_paths() is disabled, therefore
     # disable these tests.
 
-    result = _normalize_path(gr.path, os.path.join('testdir', 'testfile'))
-    assert_equal(result, os.path.join("testdir", "testfile"), "_normalize_path() returned %s" % result)
+    result = _normalize_path(gr.path, opj('testdir', 'testfile'))
+    assert_equal(result, opj("testdir", "testfile"), "_normalize_path() returned %s" % result)
 
-    result = _normalize_path(gr.path, os.path.join(git_path, "testfile"))
+    result = _normalize_path(gr.path, opj(git_path, "testfile"))
     assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
 
     # now we are inside, so relative paths are relative to cwd and have
     # to be converted to be relative to annex_path:
-    os.chdir(os.path.join(git_path, 'd1', 'd2'))
+    os.chdir(opj(git_path, 'd1', 'd2'))
 
     result = _normalize_path(gr.path, "testfile")
-    assert_equal(result, os.path.join('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
+    assert_equal(result, opj('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
 
-    result = _normalize_path(gr.path, os.path.join('..', 'testfile'))
-    assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
+    result = _normalize_path(gr.path, opj('..', 'testfile'))
+    assert_equal(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
-    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, os.path.join(git_path, '..', 'outside'))
+    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, opj(git_path, '..', 'outside'))
 
-    result = _normalize_path(gr.path, os.path.join(git_path, 'd1', 'testfile'))
-    assert_equal(result, os.path.join('d1', 'testfile'), "_normalize_path() returned %s" % result)
+    result = _normalize_path(gr.path, opj(git_path, 'd1', 'testfile'))
+    assert_equal(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
     os.chdir(cwd)
 
@@ -163,7 +163,7 @@ def test_GitRepo_files_decorator():
 
     class testclass(object):
         def __init__(self):
-            self.path = os.path.join('some', 'where')
+            self.path = opj('some', 'where')
 
         @normalize_paths
         def decorated(self, files):
@@ -171,7 +171,7 @@ def test_GitRepo_files_decorator():
 
     test_instance = testclass()
 
-    files_to_test = os.path.join(test_instance.path, 'deep', get_most_obscure_supported_name())
+    files_to_test = opj(test_instance.path, 'deep', get_most_obscure_supported_name())
     assert_equal(test_instance.decorated(files_to_test),
                  [_normalize_path(test_instance.path, files_to_test)])
 
@@ -179,14 +179,14 @@ def test_GitRepo_files_decorator():
     assert_equal(test_instance.decorated(files_to_test),
                  [_normalize_path(test_instance.path, files_to_test)])
 
-    files_to_test = os.path.join(get_most_obscure_supported_name(), 'beyond', 'obscure')
+    files_to_test = opj(get_most_obscure_supported_name(), 'beyond', 'obscure')
     assert_equal(test_instance.decorated(files_to_test),
                  [_normalize_path(test_instance.path, files_to_test)])
 
-    files_to_test = os.path.join(os.getcwd(), 'somewhere', 'else', get_most_obscure_supported_name())
+    files_to_test = opj(os.getcwd(), 'somewhere', 'else', get_most_obscure_supported_name())
     assert_raises(FileNotInRepositoryError, test_instance.decorated, files_to_test)
 
-    files_to_test = ['now', os.path.join('a list', 'of'), 'paths']
+    files_to_test = ['now', opj('a list', 'of'), 'paths']
     expect = []
     for item in files_to_test:
         expect.append(_normalize_path(test_instance.path, item))
@@ -258,29 +258,33 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
 
     origin = GitRepo(orig_path, test_path)
     clone = GitRepo(clone_path, orig_path)
+    filename = get_most_obscure_supported_name()
 
-    with open(os.path.join(orig_path,
-                            get_most_obscure_supported_name()), 'w') as f:
+    with open(opj(orig_path, filename), 'w') as f:
         f.write("New file.")
+    origin.git_add(filename)
     origin.git_commit("new file added.")
     clone.git_pull()
-    assert_true(os.path.exists(os.path.join(clone_path, get_most_obscure_supported_name())))
+    assert_true(exists(opj(clone_path, filename)))
 
 
 @with_tempfile
 @with_tempfile
-def test_GitRepo_push(orig_path, clone_path):
+def test_GitRepo_push_n_checkout(orig_path, clone_path):
 
     origin = GitRepo(orig_path)
     clone = GitRepo(clone_path, orig_path)
+    filename = get_most_obscure_supported_name()
 
-    with open(os.path.join(clone_path,
-                            get_most_obscure_supported_name()), 'w') as f:
+    with open(opj(clone_path, filename), 'w') as f:
         f.write("New file.")
+    clone.git_add(filename)
     clone.git_commit("new file added.")
     # TODO: need checkout first:
     clone.git_push('origin +master:new-branch')
-    assert_true(os.path.exists(os.path.join(orig_path, get_most_obscure_supported_name())))
+    origin.git_checkout('new-branch')
+    assert_true(exists(opj(orig_path, filename)))
 
- #   def git_remote_update(self, name, verbose=False):
- #   def git_fetch(self, name, options=''):
+# TODO:
+#   def git_remote_update(self, name, verbose=False):
+#   def git_fetch(self, name, options=''):

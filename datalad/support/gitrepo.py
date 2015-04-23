@@ -315,7 +315,7 @@ class GitRepo(object):
         """
         """
 
-        self._git_custom_command('', 'git pull %s %s' % (options, name))
+        return self._git_custom_command('', 'git pull %s %s' % (options, name))
 
     def git_push(self, name='', options=''):
         """
@@ -323,7 +323,8 @@ class GitRepo(object):
 
         self._git_custom_command('', 'git push %s %s' % (options, name))
 
-    def git_checkout(self, whatever):
+    def git_checkout(self, name, options=''):
         """
         """
-        raise NotImplementedError
+
+        self._git_custom_command('', 'git checkout %s %s' % (options, name))
