@@ -53,8 +53,6 @@ class Collection(GitRepo):
 
         super(Collection, self).__init__(path, url, runner=runner)
 
-        self.handles = []
-
         if not self.get_indexed_files():
             # it's a brand new collection repo.
             self.name = name if name else os.path.basename(self.path)
@@ -83,17 +81,17 @@ class Collection(GitRepo):
             # as a proof of concept:
             self._update_handle_data()
 
-
-
     # Attention: files are valid only if in git.
     # Being present is not sufficient!
 
     def _update_handle_data(self):
         """temp. helper to read all handle files
         """
+        self.handles = []
+
         for filename in self.get_indexed_files():
                 if filename != 'collection':
-                    with open(filename, 'r') as f:
+                    with open(opj(self.path, filename), 'r') as f:
                         for line in f.readlines():
                             if line.startswith("handle_id = "):
                                 id_ = line[12:]
@@ -117,7 +115,7 @@ class Collection(GitRepo):
           name of the handle. This is required to be unique with respect to the
           collection.
         """
-        # TODO: Does a handle have a default name?
+        # TODO: Does a handle have a default name? => repo's name
 
         # Writing plain text for now. This is supposed to change to use
         # rdflib or sth.
@@ -163,6 +161,8 @@ class Collection(GitRepo):
         # upload collection itself
         pass
 
+
+    # TODO: Regarding the 'gets': What about not installed handles?
     def get_handles(self):
 
         return [Handle(x[2]) for x in self.handles]
