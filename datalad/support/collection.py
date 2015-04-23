@@ -52,6 +52,7 @@ class Collection(GitRepo):
         """
 
         super(Collection, self).__init__(path, url, runner=runner)
+        self.handles = []
 
         if not self.get_indexed_files():
             # it's a brand new collection repo.
