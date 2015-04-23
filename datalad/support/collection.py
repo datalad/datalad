@@ -10,12 +10,13 @@
 """
 
 import os
-from os.path import join as opj, exists
+from os.path import join as opj, basename
 import logging
 
 from .gitrepo import GitRepo
 from .handle import Handle
 from .exceptions import CollectionBrokenError
+from ..cmd import Runner
 
 lgr = logging.getLogger('datalad.collection')
 
@@ -56,7 +57,7 @@ class Collection(GitRepo):
 
         if not self.get_indexed_files():
             # it's a brand new collection repo.
-            self.name = name if name else os.path.basename(self.path)
+            self.name = name if name else basename(self.path)
 
             # create collection file
             # How to name that file? For now just 'collection'

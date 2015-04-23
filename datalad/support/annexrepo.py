@@ -499,3 +499,30 @@ class AnnexRepo(GitRepo):
             item.get('file'):
                 [remote.get('description') for remote in item.get('whereis')]
                 for item in json_objects if item.get('success')}
+
+# TODO: ---------------------------------------------------------------------
+    @normalize_paths
+    def _annex_custom_command(self, files, cmd_str,
+                           log_stdout=True, log_stderr=True, log_online=False,
+                           expect_stderr=False, cwd=None, env=None,
+                           shell=None):
+        """Allows for calling arbitrary commands.
+
+        Helper for developing purposes, i.e. to quickly implement git-annex
+        commands for proof of concept.
+
+        Parameters:
+        -----------
+        files: list of files
+        cmd_str: str
+            arbitrary command str. `files` is appended to that string.
+
+        Returns:
+        --------
+        stdout, stderr
+        """
+        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
+                                  log_stdout=log_stdout, log_online=log_online,
+                                  expect_stderr=expect_stderr, cwd=cwd,
+                                  env=env, shell=shell)
