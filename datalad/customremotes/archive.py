@@ -30,6 +30,13 @@ from ..support.archives import decompress_file
 from .base import AnnexCustomRemote
 
 class AnnexArchiveCache(object):
+    """Cache to maintain extracted archives
+
+    Parameters
+    ----------
+    path : str
+      Directory where to keep the cache
+    """
     # TODO: make caching persistent across sessions/runs, with cleanup
     # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
     #       all up
@@ -56,8 +63,8 @@ class AnnexArchiveCache(object):
 
     def clean(self):
         if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-            lgr.info("As instruction, not cleaning up the cache under %s"
-                      % self.path)
+            lgr.info("As instructed, not cleaning up the cache under %s"
+                     % self.path)
             return
         lgr.debug("Cleaning up the cache")
         if exists(self._path):
@@ -66,11 +73,12 @@ class AnnexArchiveCache(object):
             rmtree(self._path)
 
     def get_extracted_path(self, archive):
-        """Given archive -- return full path to it within cache (extracted)
+        """Given an archive -- return full path to it within cache (extracted)
         """
         return opj(self._path, "%s_" % basename(archive))
 
     def get_file_path(self, archive, afile):
+        """Return full path to the `afile` within extracted `archive`"""
         return opj(self.get_extracted_path(archive), afile)
 
     # TODO: remove?
@@ -79,6 +87,8 @@ class AnnexArchiveCache(object):
         return exists(self.get_file_path(archive, afile))
 
     def get_extracted_archive(self, archive):
+        """Return path to the extracted `archive`.  Extract archive if necessary
+        """
         earchive = self.get_extracted_path(archive)
         if not exists(earchive):
             # we need to extract the archive
@@ -113,8 +123,9 @@ class AnnexArchiveCache(object):
 
 
 class AnnexArchiveCustomRemote(AnnexCustomRemote):
-    """Special custom remote allowing to obtain files from archives also under annex control
+    """Special custom remote allowing to obtain files from archives
 
+     Archives should also be under annex control.
     """
 
     PREFIX = "archive"
@@ -126,15 +137,12 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
 
-        self._last_url = None # for heuristic to choose among multiple URLs
-
-        # TODO:  urlencode file names in the url while adding/decode upon retrieval
-
-        self._cache_dir = opj(self.path,
-                              '.git', 'datalad', 'tmp', 'archives')
+        self._last_url = None  # for heuristic to choose among multiple URLs
+        self._cache_dir = opj(self.path, '.git', 'datalad', 'tmp', 'archives')
         self._cache = None
 
     def stop(self, *args):
+        """Stop communication with annex"""
         if self._cache:
             self._cache.clean()
             self._cache = None
@@ -150,8 +158,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             if archive_key is not None:
                 raise ValueError("Provide archive_file or archive_key - not both")
             archive_key = self._get_file_key(archive_file)
-        # todo (out, err) = \
-        # annex('lookupkey a.tar.gz')
+        # todo (out, err) = annex('lookupkey a.tar.gz')
         assert(archive_key is not None)
         file_quoted = urllib2.quote(file)
         return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
@@ -164,8 +171,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
     # could well be class method
     def _parse_url(self, url):
-        key, file = url[len(self.url_prefix):].split('/', 1)
-        return key, file
+        key, file_ = url[len(self.url_prefix):].split('/', 1)
+        return key, file_
 
     # Helper methods
     def _get_key_url(self, key):
@@ -181,7 +188,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             raise ValueError("Do not have any URLs for %s" % key)
         elif len(urls) == 1:
             return urls[0]
-        else: # multiple
+        else:  # multiple
             # TODO:  utilize cache to check which archives might already be
             #        present in the cache.
             #    Then if not present in the cache -- check which are present
@@ -189,7 +196,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             if self._last_url and self._last_url in urls:
                 return self._last_url
             else:
-                return urls[0] # just the first one
+                return urls[0]  # just the first one
 
     def _get_akey_afile(self, key):
         """Given a key, figure out target archive key, and file within archive
@@ -200,21 +207,30 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     # Protocol implementation
     def req_CHECKURL(self, url):
         """
-        The remote replies with one of CHECKURL-FAILURE, CHECKURL-CONTENTS, or CHECKURL-MULTI.
+
+        Replies
+        -------
+
         CHECKURL-CONTENTS Size|UNKNOWN Filename
             Indicates that the requested url has been verified to exist.
-            The Size is the size in bytes, or use "UNKNOWN" if the size could not be determined.
-            The Filename can be empty (in which case a default is used), or can specify a filename that is suggested to be used for this url.
+            The Size is the size in bytes, or use "UNKNOWN" if the size could
+            not be determined.
+            The Filename can be empty (in which case a default is used), or can
+            specify a filename that is suggested to be used for this url.
         CHECKURL-MULTI Url Size|UNKNOWN Filename ...
-            Indicates that the requested url has been verified to exist, and contains multiple files, which can each be accessed using their own url.
-            Note that since a list is returned, neither the Url nor the Filename can contain spaces.
+            Indicates that the requested url has been verified to exist, and
+            contains multiple files, which can each be accessed using their own
+            url.
+            Note that since a list is returned, neither the Url nor the Filename
+            can contain spaces.
         CHECKURL-FAILURE
             Indicates that the requested url could not be accessed.
         """
         # TODO:  what about those MULTI and list to be returned?
         #  should we return all filenames or keys within archive?
         #  might be way too many?
-        #  only if just archive portion of url is given or the one pointing to specific file?
+        #  only if just archive portion of url is given or the one pointing
+        #  to specific file?
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
         akey, afile = self._parse_url(url)
 
@@ -238,18 +254,27 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         self._last_url = url
 
     def req_CHECKPRESENT(self, key):
-        """Check if copy is available -- TODO: just proxy the call to annex for underlying tarball
+        """Check if copy is available
+
+        TODO: just proxy the call to annex for underlying tarball
+
+        Replies
+        -------
 
         CHECKPRESENT-SUCCESS Key
-            Indicates that a key has been positively verified to be present in the remote.
+            Indicates that a key has been positively verified to be present in
+            the remote.
         CHECKPRESENT-FAILURE Key
-            Indicates that a key has been positively verified to not be present in the remote.
+            Indicates that a key has been positively verified to not be present
+            in the remote.
         CHECKPRESENT-UNKNOWN Key ErrorMsg
-            Indicates that it is not currently possible to verify if the key is present in the remote. (Perhaps the remote cannot be contacted.)
+            Indicates that it is not currently possible to verify if the key is
+            present in the remote. (Perhaps the remote cannot be contacted.)
         """
         # TODO: so we need to maintain mapping from urls to keys.  Then
         # we could even store the filename within archive
-        # Otherwise it is unrealistic to even require to recompute key if we knew the backend etc
+        # Otherwise it is unrealistic to even require to recompute key if we
+        # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
         akey, afile = self._get_akey_afile(key)
         if exists(self._get_key_path(akey)):
@@ -262,7 +287,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def req_REMOVE(self, key):
         """
         REMOVE-SUCCESS Key
-            Indicates the key has been removed from the remote. May be returned if the remote didn't have the key at the point removal was requested.
+            Indicates the key has been removed from the remote. May be returned
+            if the remote didn't have the key at the point removal was requested
         REMOVE-FAILURE Key ErrorMsg
             Indicates that the key was unable to be removed from the remote.
         """
@@ -270,7 +296,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # tarball was removed (not available at all) -- report success,
         # otherwise failure (current the only one)
         key, file = self._get_akey_afile(key)
-        if False: #TODO: proxy, checking present of local tarball is not sufficient  not exists(self.get_key_path(key)):
+        if False:
+            # TODO: proxy, checking present of local tarball is not sufficient
+            #  not exists(self.get_key_path(key)):
             self.send("REMOVE-SUCCESS", key)
         else:
             self.send("REMOVE-FAILURE", key,
@@ -303,7 +331,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         apath = self.cache.get_extracted_file(akey_path, afile)
         link_file_load(apath, path)
         self.send('TRANSFER-SUCCESS', cmd, key)
-        pass
 
 
 from .main import main as super_main
