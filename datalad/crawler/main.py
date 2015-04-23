@@ -83,17 +83,17 @@ class DoubleAnnexRepo(object):
         # TODO: description might need to be evaluated provided with some
         #       page content
         description = dcfg.get('description')
-        public_annex = AnnexRepo(public_path, runner=self.runner, description=description)
+        public_annex = AnnexRepoOld(public_path, runner=self.runner, description=description)
 
         if public_path != incoming_path:
-            incoming_annex = AnnexRepo(incoming_path, runner=self.runner,
+            incoming_annex = AnnexRepoOld(incoming_path, runner=self.runner,
                                        description=description + ' (incoming)')
             # TODO: git remote add public to incoming, so we could
             # copy/get some objects between the two
         else:
             incoming_annex = public_annex
 
-        # TODO: provide AnnexRepo's with the "runner"
+        # TODO: provide AnnexRepoOld's with the "runner"
 
         # TODO: load previous status info
         """We need
