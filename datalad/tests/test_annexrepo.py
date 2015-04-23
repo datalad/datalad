@@ -262,7 +262,10 @@ def test_AnnexRepo_web_remote(src, dst):
 
     # now only 1 copy; drop should fail
     try:
-        ar.annex_drop(testfile)
+        with swallow_logs() as cml:
+            ar.annex_drop(testfile)
+            assert_in('ERROR', cml.out)
+            assert_in('drop: 1 failed', cml.out)
     except CommandError, e:
         assert_equal(e.code, 1)
         assert_in('Could only verify the '
