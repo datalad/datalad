@@ -45,7 +45,7 @@ import patoolib.util
 # do want to use it at "verbosity>=0" so we could get idea on what is going on.
 # And I don't want to mock for every invocation
 from ..support.exceptions import CommandError
-
+from ..utils import swallow_outputs
 from ..cmd import Runner
 _runner = Runner()
 
@@ -111,7 +111,6 @@ def decompress_file(archive, dir_, leading_directories='strip'):
         lgr.debug("Creating directory %s to extract archive into" % dir_)
         os.makedirs(dir_)
 
-    from ..tests.utils import swallow_outputs
     with swallow_outputs() as cmo:
         patoolib.util.check_existing_filename(archive)
         patoolib.util.check_existing_filename(dir_, onlyfiles=False)
@@ -153,7 +152,7 @@ def compress_files(files, archive, path=None, overwrite=True):
     overwrite : bool
       Either to allow overwriting the target archive file if one already exists
     """
-    from ..tests.utils import swallow_outputs
+
     with swallow_outputs() as cmo:
         # to test filenames, if path is not None, we should join:
         if path:
