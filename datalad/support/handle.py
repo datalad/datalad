@@ -29,7 +29,7 @@ class Handle(AnnexRepo):
 
     """
 
-    def __init__(self, path, url=None, direct=False, runner=None):
+    def __init__(self, path, url=None, direct=False, runner=None, backend=None):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -47,7 +47,8 @@ class Handle(AnnexRepo):
 
         """
 
-        super(Handle, self).__init__(path, url, direct=direct, runner=runner)
+        super(Handle, self).__init__(path, url, direct=direct, runner=runner,
+                                     backend=backend)
         # TODO: what about runner? (dry runs ...)
 
         # TODO: should work with path (deeper) inside repo! => gitrepo/annexrepo
