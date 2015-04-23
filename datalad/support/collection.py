@@ -24,10 +24,10 @@ class Collection(GitRepo):
     """Representation of a datalad collection.
     """
 
-    __slots__ = ['handles']
+    __slots__ = ['handles', 'name']
     # TODO: check how slots work with derived classes
 
-    def __init__(self, path, url=None, runner=None):
+    def __init__(self, path, url=None, name=None, runner=None):
         """
 
         Parameters:
@@ -41,6 +41,11 @@ class Collection(GitRepo):
           according to
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
 
+        name: str
+          optional name of the collection. This is only used for creating new
+          collections. If there is a collection repo at path already, `name`
+          is ignored.
+
         Raises:
         -------
         CollectionBrokenError
@@ -52,6 +57,7 @@ class Collection(GitRepo):
 
         if not self.get_indexed_files():
             # it's a brand new collection repo.
+            self.name = name if name else os.path.basename(self.path)
 
             # create collection file
             # How to name that file? For now just 'collection'
@@ -60,7 +66,7 @@ class Collection(GitRepo):
             #     (Q: implicitly requires a list of handles?
             #      This would give an additional consistency check)
             with open(opj(self.path, 'collection'), 'w') as f:
-                f.write("New collection: %s" % os.path.basename(self.path))
+                f.write("New collection: %s" % self.name)
             self.git_add('collection')
             self.git_commit("Collection initialized.")
 
@@ -70,10 +76,22 @@ class Collection(GitRepo):
         else:
             # may be read the collection file/handle infos
             # or may be do it on demand?
+            with open(opj(self.path, 'collection'), 'r') as f:
+                self.name = f.readline()[18:]
+
             # For now read a list of handles' names, ids, paths and metadata
             # as a proof of concept:
+            self._update_handle_data()
 
-            for filename in self.get_indexed_files():
+
+
+    # Attention: files are valid only if in git.
+    # Being present is not sufficient!
+
+    def _update_handle_data(self):
+        """temp. helper to read all handle files
+        """
+        for filename in self.get_indexed_files():
                 if filename != 'collection':
                     with open(filename, 'r') as f:
                         for line in f.readlines():
@@ -86,10 +104,7 @@ class Collection(GitRepo):
                             else:
                                 continue
                     # TODO: check all is present
-                self.handles.append((filename, id_, url, md))
-
-    # Attention: files are valid only if in git.
-    # Being present is not sufficient!
+                    self.handles.append((filename, id_, url, md))
 
     def add_handle(self, handle, name):
         """Adds a handle to the collection

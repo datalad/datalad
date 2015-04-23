@@ -12,16 +12,15 @@
 
 import os
 from os.path import join as opj
-import platform
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false, assert_in
+from nose.tools import assert_raises, assert_equal, assert_false, assert_in
 
 from ..support.gitrepo import GitRepo
 from ..support.handle import Handle
 from ..support.collection import Collection
-from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, with_tree,\
-    get_most_obscure_supported_name, ok_clean_git
+from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
+    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
+    with_tree, get_most_obscure_supported_name, ok_clean_git
 from ..support.exceptions import CollectionBrokenError
 
 # For now (at least) we would need to clone from the network
@@ -29,62 +28,23 @@ from ..support.exceptions import CollectionBrokenError
 # See: https://github.com/datalad/datalad/issues/44
 local_flavors = ['network-clone' if on_windows else 'local']
 
-# ###########
-# Test the handling of base classes before
-# implementing it into the actual commands
-# ############
-
-def get_local_collection():
-    # May be this location my change.
-    # So, we need a ~/.datalad or sth.
-
-    return Collection(os.path.expanduser(
-        os.path.join('~', 'datalad', 'localcollection')))
-
-
-def register_collection(url, name):
-    # Is there a default name of a collection?
-    # derived from url?
-
-    # add as remote to the local one:
-    localCollection = get_local_collection()
-    localCollection.git_remote_add(name, url)
-
-
-
-def install_collection(name, dst):
-    # cloning the remote 'name' of local collection to dst.
-    localCollection = get_local_collection()
-    url = localCollection.git_get_remote_url(name)
-    return Collection(dst, url)
-
-
-
-def install_handle(whatever):
-    # TODO: get a handle
-    # (identified what way? => collectionName/handleName?, url?)
-    pass
-
-
-def new_collection(handles):
-    # create a new collection
-    # if this is a new collection, we want to register it in the
-    # local collection as a remote, do we?
-    pass
-
-
-# ##########
-# Now the actual tests for collection class
-# ##########
 
 @with_tempfile
 @with_tempfile
-def test_Collection_constructor(clean_path, broken_path):
+@with_tempfile
+def test_Collection_constructor(clean_path, clean_path2, broken_path):
     # Just a brand new collection:
     clt = Collection(clean_path)
     # ok_clean_git(clean_path, annex=False)
     # TODO: ok_clean_git doesn't work on empty repo, due to
     # repo.head.is_valid() returns False
+    assert_equal(os.path.basename(os.path.normpath(clean_path)),
+                 clt.name)
+
+    clt2 = Collection(clean_path2, name='different')
+    assert_equal('different', clt2.name)
+    with open(opj(clean_path2, 'collection'), 'r') as f:
+        assert_equal(f.readline(), "New collection: different")
 
     # Now, there's something in git, but it's not a collection:
     git = GitRepo(broken_path)
@@ -109,9 +69,11 @@ def test_Collection_add_handle(annex_path, clone_path, clt_path):
     os.path.exists(opj(clt_path, "first handle"))
     assert_in("first handle", clt.get_indexed_files())
     with open(opj(clt_path, "first handle"), 'r') as f:
-        assert_equal(f.readline().rstrip(), "handle_id = %s" % handle.get_datalad_id())
+        assert_equal(f.readline().rstrip(), "handle_id = %s" %
+                                            handle.get_datalad_id())
         assert_equal(f.readline().rstrip(), "last_seen = %s" % handle.path)
-        assert_equal(f.readline().rstrip(), "metadata = %s" % handle.get_metadata())
+        assert_equal(f.readline().rstrip(), "metadata = %s" %
+                                            handle.get_metadata())
         assert_equal(f.readline(), "")
     assert_equal(clt.handles, [("first handle", handle.get_datalad_id(),
                                 handle.path, handle.get_metadata())])
