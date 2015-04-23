@@ -189,7 +189,8 @@ def ok_annex_get(annex, files):
     """
     with swallow_outputs() as cmo:
         annex.annex_get(files)
-        assert_in('100%', cmo.err)
+        # wget or curl
+        ok_('100%' in cmo.err or '100.0%' in cmo.err)
 
 #
 # Decorators
