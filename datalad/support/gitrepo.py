@@ -12,7 +12,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
 
-from os import getcwd
+from os import getcwd, linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
 import shlex
@@ -257,35 +257,73 @@ class GitRepo(object):
 # operations on remotes like looking for certain files, list files, git cat?
 # May be better: fetch the remotes -> query branch remote/master
 
+
     @normalize_paths
     def git_remove(self, files):
         """git rm
         """
-        self._git_custom_command(files, 'git rm')
 
-    def git_remote_add(self, name, url):
+        return self._git_custom_command(files, 'git rm')
+
+    def git_remote_add(self, name, url, options=''):
         """
         """
-        raise NotImplementedError
+
+        return self._git_custom_command('', 'git remote add %s %s %s' %
+                                 (options, name, url))
 
     def git_remote_remove(self, name):
         """
         """
-        raise NotImplementedError
 
-    def git_fetch(self, whatever):
-        """
-        """
-        raise NotImplementedError
+        return self._git_custom_command('', 'git remote remove %s' % name)
 
-    def git_checkout(self, whatever):
+    def git_remote_show(self, name='', verbose=False):
         """
         """
-        raise NotImplementedError
+
+        v = "-v" if verbose else ""
+        out, err = self._git_custom_command('', 'git remote %s show %s' %
+                                            (v, name))
+        return out.rstrip(linesep).split(linesep)
+
+    def git_remote_update(self, name, verbose=False):
+        """
+        """
+
+        v = "-v" if verbose else ''
+        self._git_custom_command('', 'git remote %s update %s' %
+                                        (name, v))
+
+    def git_fetch(self, name, options=''):
+        """
+        """
+
+        self._git_custom_command('', 'git fetch %s %s' %
+                                        (options, name))
 
     def git_get_remote_url(self, name):
         """We need to know, where to clone from, if a remote is
         requested
         """
-        raise NotImplementedError
 
+        out, err =self._git_custom_command(
+            '', 'git config --get remote.%s.url' %name)
+        return out.rstrip(linesep)
+
+    def git_pull(self, name='', options=''):
+        """
+        """
+
+        self._git_custom_command('', 'git pull %s %s' % (options, name))
+
+    def git_push(self, name='', options=''):
+        """
+        """
+
+        self._git_custom_command('', 'git push %s %s' % (options, name))
+
+    def git_checkout(self, whatever):
+        """
+        """
+        raise NotImplementedError

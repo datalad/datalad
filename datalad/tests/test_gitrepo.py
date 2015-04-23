@@ -193,3 +193,94 @@ def test_GitRepo_files_decorator():
     assert_equal(test_instance.decorated(files_to_test), expect)
 
     assert_raises(ValueError, test_instance.decorated, 1)
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_GitRepo_remote_add(orig_path, path):
+
+    gr = GitRepo(path, orig_path)
+    out = gr.git_remote_show()
+    assert_in('origin', out)
+    assert_equal(len(out), 1)
+    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    out = gr.git_remote_show()
+    assert_in('origin', out)
+    assert_in('github', out)
+    assert_equal(len(out), 2)
+    out = gr.git_remote_show('github')
+    assert_in('  Fetch URL: git://github.com/datalad/testrepo--basic--r1', out)
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_GitRepo_remote_remove(orig_path, path):
+
+    gr = GitRepo(path, orig_path)
+    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.git_remote_remove('github')
+    out = gr.git_remote_show()
+    assert_equal(len(out), 1)
+    assert_in('origin', out)
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_GitRepo_remote_show(orig_path, path):
+
+    gr = GitRepo(path, orig_path)
+    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    out = gr.git_remote_show(verbose=True)
+    assert_equal(len(out), 4)
+    assert_in('github\tgit://github.com/datalad/testrepo--basic--r1 (fetch)',
+              out)
+    assert_in('github\tgit://github.com/datalad/testrepo--basic--r1 (push)',
+              out)
+    assert_in('origin\t%s (fetch)' % orig_path, out)
+    assert_in('origin\t%s (push)' % orig_path, out)
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_GitRepo_get_remote_url(orig_path, path):
+
+    gr = GitRepo(path, orig_path)
+    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    assert_equal(gr.git_get_remote_url('origin'), orig_path)
+    assert_equal(gr.git_get_remote_url('github'),
+                 'git://github.com/datalad/testrepo--basic--r1')
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+def test_GitRepo_pull(test_path, orig_path, clone_path):
+
+    origin = GitRepo(orig_path, test_path)
+    clone = GitRepo(clone_path, orig_path)
+
+    with open(os.path.join(orig_path,
+                            get_most_obscure_supported_name()), 'w') as f:
+        f.write("New file.")
+    origin.git_commit("new file added.")
+    clone.git_pull()
+    assert_true(os.path.exists(os.path.join(clone_path, get_most_obscure_supported_name())))
+
+
+@with_tempfile
+@with_tempfile
+def test_GitRepo_push(orig_path, clone_path):
+
+    origin = GitRepo(orig_path)
+    clone = GitRepo(clone_path, orig_path)
+
+    with open(os.path.join(clone_path,
+                            get_most_obscure_supported_name()), 'w') as f:
+        f.write("New file.")
+    clone.git_commit("new file added.")
+    # TODO: need checkout first:
+    clone.git_push('origin +master:new-branch')
+    assert_true(os.path.exists(os.path.join(orig_path, get_most_obscure_supported_name())))
+
+ #   def git_remote_update(self, name, verbose=False):
+ #   def git_fetch(self, name, options=''):
