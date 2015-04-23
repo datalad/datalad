@@ -17,6 +17,8 @@ import sys
 import logging
 import os
 import shutil
+import shlex
+from datalad.support.exceptions import CommandError
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -24,19 +26,37 @@ lgr = logging.getLogger('datalad.cmd')
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
-    An object of this class provides a methods calls shell commands or python functions,
-    allowing for dry runs and output handling.
+    An object of this class provides a methods calls shell commands or python
+    functions, allowing for dry runs and output handling.
 
-    Outputs (stdout and stderr) can be either logged or streamed to system's stdout/stderr during execution.
+    Outputs (stdout and stderr) can be either logged or streamed to system's
+    stdout/stderr during execution.
     This can be enabled or disabled for both of them independently.
-    Additionally allows for dry runs. This is achieved by initializing the `Runner` with `dry=True`.
+    Additionally allows for dry runs. This is achieved by initializing the
+    `Runner` with `dry=True`.
     The Runner will then collect all calls as strings in `commands`.
     """
 
-    __slots__ = ['commands', 'dry']
+    __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
 
-    def __init__(self, dry=False):
+    def __init__(self, dry=False, cwd=None, env=None, protocol=None):
+        """
+        Parameters
+        ----------
+        dry: bool, optional
+             If True, none of the commands is actually ran
+        cwd: string, optional
+             Base current working directory for commands.  Could be overridden
+             per run call via cwd option
+        env: dict, optional
+             Custom environment to use for calls. Could be overridden per run
+             call via env option
+        """
         self.dry = dry
+        self.cwd = cwd
+        self.env = env
+        self.protocol = protocol
+
         self.commands = []
 
     def __call__(self, cmd, *args, **kwargs):
@@ -67,28 +87,26 @@ class Runner(object):
         else:
             raise ValueError("Argument 'command' is neither a string, "
                              "nor a list nor a callable.")
-	# TODO: shouldn't it return the functions instead of just calling them?
 
     # Two helpers to encapsulate formatting/output
     def _log_out(self, line):
         if line:
             self.log("stdout| " + line.rstrip('\n'))
 
-    def _log_err(self, line, expect_stderr=False):
+    def _log_err(self, line, expected=False):
         if line:
             self.log("stderr| " + line.rstrip('\n'),
                      level={True: logging.DEBUG,
-                            False: logging.ERROR}[expect_stderr])
+                            False: logging.ERROR}[expected])
 
     def _get_output_online(self, proc, log_stdout, log_stderr,
-                           return_output=False, expect_stderr=False):
+                           expect_stderr=False, expect_fail=False):
         stdout, stderr = [], []
         while proc.poll() is None:
             if log_stdout:
                 line = proc.stdout.readline()
                 if line != '':
-                    if return_output:
-                        stdout += line
+                    stdout += line
                     self._log_out(line)
                     # TODO: what level to log at? was: level=5
                     # Changes on that should be properly adapted in
@@ -99,9 +117,8 @@ class Runner(object):
             if log_stderr:
                 line = proc.stderr.readline()
                 if line != '':
-                    if return_output:
-                        stderr += line
-                    self._log_err(line, expect_stderr)
+                    stderr += line
+                    self._log_err(line, expect_stderr or expect_fail)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -110,14 +127,15 @@ class Runner(object):
 
         return stdout, stderr
 
-    def run(self, cmd, log_stdout=True, log_stderr=True,
-            log_online=False, return_output=False,
-            expect_stderr=False, cwd=None, shell=None):
+    def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
+            expect_stderr=False, expect_fail=False,
+            cwd=None, env=None, shell=None):
         """Runs the command `cmd` using shell.
 
-        In case of dry-mode `cmd` is just added to `commands` and it is executed otherwise.
-        Allows for seperatly logging stdout and stderr  or streaming it to system's stdout
-        or stderr respectively.
+        In case of dry-mode `cmd` is just added to `commands` and it is
+        actually executed otherwise.
+        Allows for separately logging stdout and stderr  or streaming it to
+        system's stdout or stderr respectively.
 
         Parameters
         ----------
@@ -132,12 +150,8 @@ class Runner(object):
             If True, stderr is logged. Goes to sys.stderr otherwise.
 
         log_online: bool, optional
-            Either to log as output comes in.  Setting to True is preferable for
-            running user-invoked actions to provide timely output
-
-        return_output: bool, optional
-            If True, return a tuple of two strings (stdout, stderr) in addition
-            to the exit code
+            Either to log as output comes in.  Setting to True is preferable
+            for running user-invoked actions to provide timely output
 
         expect_stderr: bool, optional
             Normally, having stderr output is a signal of a problem and thus it
@@ -147,24 +161,32 @@ class Runner(object):
             exit status is non-0 (in non-online mode only, in online -- would
             log at DEBUG)
 
+        expect_fail: bool, optional
+            Normally, if command exits with non-0 status, it is considered an
+            ERROR and logged accordingly.  But if the call intended for checking
+            routine, such alarming message should not be logged as ERROR, thus
+            it will be logged at DEBUG level.
+
         cwd : string, optional
             Directory under which run the command (passed to Popen)
 
+        env : string, optional
+            Custom environment to pass
+
         shell: bool, optional
-            Run command in a shell.  If not specified, then it runs in a shell only
-            if command is specified as a string (not a list)
+            Run command in a shell.  If not specified, then it runs in a shell
+            only if command is specified as a string (not a list)
 
         Returns
         -------
-        Status code as returned by the called command or `None` in case of dry-mode.
-        
         (stdout, stderr)
-           if return_output=True
 
         Raises
         ------
-        RunTimeError
-           if command's exitcode wasn't 0 or None
+        CommandError
+           if command's exitcode wasn't 0 or None. exitcode is passed to
+           CommandError's `code`-field. Command's stdout and stderr are stored
+           in CommandError's `stdout` and `stderr` fields respectively.
         """
 
         outputstream = subprocess.PIPE if log_stdout else sys.stdout
@@ -176,21 +198,31 @@ class Runner(object):
 
             if shell is None:
                 shell = isinstance(cmd, basestring)
+
+            if self.protocol:
+                self.protocol.write_section(
+                    shlex.split(cmd) if isinstance(cmd, basestring) else cmd)
             try:
-                proc = subprocess.Popen(cmd, stdout=outputstream, stderr=errstream,
-                                    shell=shell,
-                                    cwd=cwd)
+                proc = subprocess.Popen(cmd, stdout=outputstream,
+                                        stderr=errstream,
+                                        shell=shell,
+                                        cwd=cwd or self.cwd,
+                                        env=env or self.env)
             except Exception, e:
-                lgr.error("Failed to start %s: %s" % (cmd, e))
+                lgr.error("Failed to start %r%r: %s" %
+                          (cmd, " under %r" % cwd if cwd else '', e))
                 raise
-            # shell=True allows for piping, multiple commands, etc., but that implies to not use shlex.split()
-            # and is considered to be a security hazard. So be careful with input.
+            # shell=True allows for piping, multiple commands, etc.,
+            # but that implies to not use shlex.split()
+            # and is considered to be a security hazard.
+            # So be careful with input.
             # Alternatively we would have to parse `cmd` and create multiple
             # subprocesses.
 
             if log_online:
-                out = self._get_output_online(proc, log_stderr, log_stdout,
-                                              expect_stderr=expect_stderr)
+                out = self._get_output_online(proc, log_stdout, log_stderr,
+                                              expect_stderr=expect_stderr,
+                                              expect_fail=expect_fail)
             else:
                 out = proc.communicate()
 
@@ -200,33 +232,31 @@ class Runner(object):
             if not log_online:
                 self._log_out(out[0])
                 if status not in [0, None]:
-                    self._log_err(out[1], expect_stderr=False)
+                    self._log_err(out[1], expected=expect_fail)
                 else:
                     # as directed
-                    self._log_err(out[1], expect_stderr=expect_stderr)
+                    self._log_err(out[1], expected=expect_stderr)
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s. Exit code=%d" \
-                      % (cmd, " under %r" % cwd if cwd else '', status)
-                lgr.error(msg)
-                raise RuntimeError(msg)
-
+                    % (cmd, " under %r" % (cwd or self.cwd), status)
+                (lgr.debug if expect_fail else lgr.error)(msg)
+                raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
-                self.log("Finished running %r with status %s" % (cmd, status), level=8)
+                self.log("Finished running %r with status %s" % (cmd, status),
+                         level=8)
 
         else:
             self.commands.append(cmd)
-            status, out = None, ("DRY", "DRY")
+            out = ("DRY", "DRY")
 
-        if return_output:
-            return status, out
-        else:
-            return status
+        return out
 
     def call(self, f, *args, **kwargs):
         """Helper to unify collection of logging all "dry" actions.
 
-        Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with its arguments to `commands` otherwise.
+        Calls `f` if `Runner`-object is not in dry-mode. Adds `f` along with
+        its arguments to `commands` otherwise.
 
         f : callable
         *args, **kwargs:
@@ -273,3 +303,5 @@ def link_file_load(src, dst, dry_run=False):
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
+    else:
+        lgr.log(1, "Hardlinking finished")

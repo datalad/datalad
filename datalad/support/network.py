@@ -116,7 +116,7 @@ def is_url_quoted(url):
     try:
         url_ = urllib2.unquote(url)
         return url != url_
-    except: # problem with unquoting -- then it must be wasn't quoted (correctly)
+    except:  # problem with unquoting -- then it must be wasn't quoted (correctly)
         return False
 
 
@@ -138,7 +138,7 @@ def _parse_urls(page):
     return urls
 
 def parse_urls(page, cache=False):
-    if False: # cache:
+    if False:  # cache:
         # disabled until bs4 addresses Pickling issue
         # https://bugs.launchpad.net/beautifulsoup/+bug/1231545
         return memory.eval(_parse_urls, page)
@@ -167,11 +167,11 @@ def same_website(url_rec, u_rec):
     # and u_rec.path.startswith(url_rec.path)):
 
 def dgurljoin(u_path, url):
-    url_rec = urlparse(url) # probably duplicating parsing :-/ TODO
+    url_rec = urlparse(url)  # probably duplicating parsing :-/ TODO
     if url_rec.scheme:
         # independent full url, so just return it
         return url
-    if u_path.endswith('/'): # should here be also a scheme use?
+    if u_path.endswith('/'):  # should here be also a scheme use?
         return os.path.join(u_path, url)
     # TODO: recall where all this dirname came from and bring into the test
     return urljoin(os.path.dirname(u_path) + '/', url)
@@ -309,7 +309,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
     class ReturnSooner(Exception):
         pass
 
-    try: # might RF -- this is just to not repeat the same return
+    try:  # might RF -- this is just to not repeat the same return
         if dry_run or add_mode == 'relaxed':
             # we can only try to deduce from the url...
             # TODO: now that there is use_content_name  -- make dry_run run smarter and more detailed

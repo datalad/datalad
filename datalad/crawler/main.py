@@ -83,17 +83,17 @@ class DoubleAnnexRepo(object):
         # TODO: description might need to be evaluated provided with some
         #       page content
         description = dcfg.get('description')
-        public_annex = AnnexRepo(public_path, runner=self.runner, description=description)
+        public_annex = AnnexRepoOld(public_path, runner=self.runner, description=description)
 
         if public_path != incoming_path:
-            incoming_annex = AnnexRepo(incoming_path, runner=self.runner,
+            incoming_annex = AnnexRepoOld(incoming_path, runner=self.runner,
                                        description=description + ' (incoming)')
             # TODO: git remote add public to incoming, so we could
             # copy/get some objects between the two
         else:
             incoming_annex = public_annex
 
-        # TODO: provide AnnexRepo's with the "runner"
+        # TODO: provide AnnexRepoOld's with the "runner"
 
         # TODO: load previous status info
         """We need
@@ -115,7 +115,7 @@ class DoubleAnnexRepo(object):
         else:
             # create fresh
             db = dict(incoming={},   # incoming_filename -> (url, mtime, size (AKA Content-Length, os.stat().st_size ))
-                      public_incoming={}) # public_filename -> incoming_filename
+                      public_incoming={})  # public_filename -> incoming_filename
 
         db_incoming = db['incoming']
         # reverse map: url -> incoming
@@ -232,7 +232,7 @@ class DoubleAnnexRepo(object):
                         incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
                           download_url_to_incoming(href_full, incoming_annex.path,
                                        join(repo_sectiondir, href_dir),
-                                       db_incoming=db_incoming, dry_run=self.runner.dry, # TODO -- use runner?
+                                       db_incoming=db_incoming, dry_run=self.runner.dry,  # TODO -- use runner?
                                        add_mode=add_mode)
                     except Exception, e:
                         lgr.warning("Skipping %(href_full)s due to error: %(e)s" % locals())

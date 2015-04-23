@@ -52,15 +52,19 @@ def setup_parser(parser):
         "destination", metavar='dir',
         help="path where to store the retrieved dataset")
 
+    parser.add_argument(
+        "--direct", action="store_true",
+        help="Force git-annex to use direct mode.")
+
     #parser_add_common_args(parser, opt=('log_level'))
     
 def run(args):
-    from datalad.api import Dataset
+    from datalad.api import Handle
     from datalad.log import lgr
 
     lgr.debug("Command line arguments: %r" % args)
 
     path = os.path.expandvars(os.path.expanduser(args.destination))
-    ds = Dataset(path, args.source)
+    ds = Handle(path, args.source, direct=args.direct)
 
 

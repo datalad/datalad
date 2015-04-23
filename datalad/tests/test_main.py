@@ -11,7 +11,7 @@ import os, tempfile, time, platform
 from os.path import join, exists, lexists, isdir
 
 from .utils import eq_, ok_, assert_greater, \
-     with_tree, serve_path_via_http, sorted_files, rmtree, create_archive, \
+     with_tree, serve_path_via_http, sorted_files, rmtree, create_tree_archive, \
      md5sum, ok_clean_git, ok_file_under_git, get_most_obscure_supported_name, \
      on_windows, on_osx
 from nose.exc import SkipTest
@@ -82,7 +82,7 @@ def check_page2annex_same_incoming_and_public(mode, path, url):
             mode=mode,
             ),
         files=dict(
-            directory='files', # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
+            directory='files',  # TODO: recall what was wrong with __name__ substitution, look into fail2ban/client/configparserinc.py
             url=url,
             git_add='(\.ascii)')))
 
@@ -278,9 +278,10 @@ def check_page2annex_separate_public(separate, mode, incoming_destiny, path, url
     # Archive gets replaced with identical but freshly generated one:
     # there should be no crashed or complaints and updates should
     # still happen as far as the action is concerned
-    create_archive(path, '1.tar.gz',
+    create_tree_archive(path, '1.tar.gz',
             (('1 f.txt', '1 f load'),
-             ('d', (('1d', ''),)),))
+             ('d', (('1d', ''),)),),
+            overwrite=True)
     stats = drepo.page2annex()
     eq_(stats['incoming_annex_updates'],
         0 if incoming_destiny in ['rm', 'keep'] or mode == 'relaxed' else 1)
@@ -291,9 +292,10 @@ def check_page2annex_separate_public(separate, mode, incoming_destiny, path, url
 
     # Archive gets content in one of the files modified
     target_load = '1 f load updated'
-    create_archive(path, '1.tar.gz',
+    create_tree_archive(path, '1.tar.gz',
             (('1 f.txt', '1 f load updated'),
-             ('d', (('1d', ''),)),))
+             ('d', (('1d', ''),)),),
+            overwrite=True)
     stats = drepo.page2annex()
     ok_clean_git(din, untracked=din_untracked)
     ok_clean_git(dout)
@@ -348,8 +350,8 @@ def test_page2annex_separate_public():
 
 obscure = get_most_obscure_supported_name()
 
-if on_osx:
-    # There is a known issue with annex under OSX
+if False: # pragma: no cover
+    # There used to be an issue with annex under OSX
     # https://github.com/datalad/datalad/issues/79
     import logging
     lgr = logging.getLogger('datalad.tests')

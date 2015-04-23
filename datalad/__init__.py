@@ -6,6 +6,8 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""DataLad aims to expose (scientific) data available online as a unified data
+distribution with the convenience of git-annex repositories as a backend."""
 
 from .version import __version__
 
@@ -19,4 +21,5 @@ try:
     bench = Tester().bench
     del Tester
 except ImportError:
-    def test(*args, **kwargs): raise RuntimeError('Need numpy >= 1.2 for datalad.tests()')
+    def test(*args, **kwargs):
+        raise RuntimeError('Need numpy >= 1.2 for datalad.tests()')

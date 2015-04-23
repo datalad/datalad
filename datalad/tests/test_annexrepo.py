@@ -8,18 +8,21 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test implementation of class AnnexRepo
 
-Note: There's not a lot to test by now.
-
 """
 
-import os, platform
-
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_false
 from git.exc import GitCommandError
+from nose.tools import assert_raises, assert_is_instance, assert_true, \
+    assert_equal, assert_false, assert_in, assert_not_in
 
-from datalad.support.annexrepo import AnnexRepo
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, ignore_nose_capturing_stdout, \
-    on_windows
+from ..support.annexrepo import AnnexRepo, kwargs_to_options
+from ..support.exceptions import CommandNotAvailableError, \
+    FileInGitError, FileNotInAnnexError, CommandError
+from .utils import *
+
+# For now (at least) we would need to clone from the network
+# since there are troubles with submodules on Windows.
+# See: https://github.com/datalad/datalad/issues/44
+local_flavors = ['network-clone' if on_windows else 'local']
 
 
 @ignore_nose_capturing_stdout
@@ -32,15 +35,16 @@ def test_AnnexRepo_instance_from_clone(src, dst):
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     assert_true(os.path.exists(os.path.join(dst, '.git', 'annex')))
 
-    # do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    # and therefore can't clone to `dst`
-    assert_raises(GitCommandError, AnnexRepo, dst, src)
+    # do it again should raise GitCommandError since git will notice
+    # there's already a git-repo at that path and therefore can't clone to `dst`
+    with swallow_logs() as cm:
+        assert_raises(GitCommandError, AnnexRepo, dst, src)
+        assert("already exists" in cm.out)
 
 
-# TODO: enable local as well whenever/if ever submodule issue gets resolved for windows
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])  # 'network' doesn't make sense for this test
+@with_testrepos(flavors=local_flavors)
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)
@@ -59,42 +63,60 @@ def test_AnnexRepo_instance_brand_new(path):
 
 
 @ignore_nose_capturing_stdout
+@assert_cwd_unchanged
 @with_testrepos(flavors=['network'])
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
     ar = AnnexRepo(dst, src)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
-
-    cwd = os.getcwd()
-    os.chdir(dst)
     testfile = 'test-annex.dat'
-    if platform.system() != "Windows":
-        assert_raises(IOError, open, testfile, 'r')
-        # If get has nothing to do, we can't test it.
-        # TODO: on crippled filesystem, the file is actually present before getting!
-        # So, what to test? Just skip for now.
-        # Actually, could test content!
+    testfile_abs = os.path.join(dst, testfile)
+    assert_false(ar.file_has_content("test-annex.dat"))
+    ok_annex_get(ar, testfile)
 
-    ar.annex_get([testfile])
-    f = open(testfile, 'r')
-    assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
-
-    os.chdir(cwd)
+    f = open(testfile_abs, 'r')
+    assert_equal(f.readlines(), ['123\n'],
+                 "test-annex.dat's content doesn't match.")
 
 
-@with_testrepos(flavors=['network-clone' if on_windows else 'local'])
+@assert_cwd_unchanged
+@with_testrepos
+@with_tempfile
+def test_AnnexRepo_crippled_filesystem(src, dst):
+    # TODO: This test is rudimentary, since platform does not really determine
+    # the filesystem. For now this should work for the buildbots.
+    # Nevertheless: Find a better way to test it.
+
+    ar = AnnexRepo(dst, src)
+    if on_windows:
+        assert_true(ar.is_crippled_fs(),
+                    "Detected non-crippled filesystem on windows.")
+    else:
+        assert_false(ar.is_crippled_fs(),
+                     "Detected crippled filesystem on non-windows.")
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
-    dm = AnnexRepo(path).is_direct_mode()
+    ar = AnnexRepo(path)
+    dm = ar.is_direct_mode()
     if on_windows:
-        assert_true(dm, "AnnexRepo.is_direct_mode() returned false on windows.")
+        assert_true(dm,
+                    "AnnexRepo.is_direct_mode() returned false on windows.")
     else:
-        assert_false(dm, "AnnexRepo.is_direct_mode() returned true on non-windows")
-    #TODO: Are there more platforms leading to direct mode?
-    #Better check for filesystem instead of platform?
+        assert_false(dm,
+                     "AnnexRepo.is_direct_mode() returned true on non-windows")
+    # Note: In fact this test isn't totally correct, since you always can
+    # switch to direct mode. So not being on windows doesn't necessarily mean
+    # we are in indirect mode. But how to obtain a "ground truth" to test
+    # against, without making test of is_direct_mode() dependent on
+    # set_direct_mode() and vice versa?
 
 
+@assert_cwd_unchanged
 @with_testrepos
 @with_tempfile
 def test_AnnexRepo_set_direct_mode(src, dst):
@@ -102,10 +124,248 @@ def test_AnnexRepo_set_direct_mode(src, dst):
     ar = AnnexRepo(dst, src)
     ar.set_direct_mode(True)
     assert_true(ar.is_direct_mode(), "Switching to direct mode failed.")
-    if on_windows:
-        assert_raises(RuntimeError, ar.set_direct_mode, False)
-        assert_true(ar.is_direct_mode())
+    if ar.is_crippled_fs():
+        assert_raises(CommandNotAvailableError, ar.set_direct_mode, False)
+        assert_true(ar.is_direct_mode(),
+            "Indirect mode on crippled fs detected. Shouldn't be possible.")
     else:
         ar.set_direct_mode(False)
         assert_false(ar.is_direct_mode(), "Switching to indirect mode failed.")
-    #TODO: see above (test_AnnexRepo_is_direct_mode). Check for filesystem seems to be more accurate.
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_annex_add(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+
+    filename = get_most_obscure_supported_name()
+    filename_abs = os.path.join(annex_path, filename)
+    f = open(filename_abs, 'w')
+    f.write("What to write?")
+    f.close()
+    ar.annex_add(filename)
+    if not ar.is_direct_mode():
+        assert_true(os.path.islink(filename_abs),
+                    "Annexed file is not a link.")
+    else:
+        assert_false(os.path.islink(filename_abs),
+                     "Annexed file is link in direct mode.")
+    key = ar.get_file_key(filename)
+    assert_false(key == '')
+    # could test for the actual key, but if there's something
+    # and no exception raised, it's fine anyway.
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_annex_proxy(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+    ar.set_direct_mode(True)
+    ok_clean_git_annex_proxy(path=annex_path)
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_get_file_key(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+
+    # test-annex.dat should return the correct key:
+    assert_equal(
+        ar.get_file_key("test-annex.dat"),
+        'SHA256E-s4--181210f8f9c779c26da1d9b2075bde0127302ee0e3fca38c9a83f5b1dd8e5d3b.dat')
+
+    # test.dat is actually in git
+    # should raise Exception; also test for polymorphism
+    assert_raises(IOError, ar.get_file_key, "test.dat")
+    assert_raises(FileNotInAnnexError, ar.get_file_key, "test.dat")
+    assert_raises(FileInGitError, ar.get_file_key, "test.dat")
+
+    # filenotpresent.wtf doesn't even exist
+    assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
+
+
+@with_testrepos(flavors=['network'])
+@with_tempfile
+def test_AnnexRepo_file_has_content(src, annex_path):
+
+    ar = AnnexRepo(annex_path, src)
+    testfiles = ["test-annex.dat", "test.dat"]
+    assert_equal(ar.file_has_content(testfiles), [False, False])
+
+    ok_annex_get(ar, "test-annex.dat")
+    assert_equal(ar.file_has_content(testfiles), [True, False])
+    assert_equal(ar.file_has_content(testfiles[:1]), [True])
+
+    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"]),
+                 [True, False, False])
+
+    assert_false(ar.file_has_content("bogus.txt"))
+    assert_true(ar.file_has_content("test-annex.dat"))
+
+
+def test_AnnexRepo_options_decorator():
+
+    @kwargs_to_options
+    def decorated(self, whatever, options=[]):
+        return options
+
+    assert_equal(decorated(1, 2, someoption='first', someotheroption='second'),
+                 [' --someoption=first', ' --someotheroption=second'])
+
+
+@assert_cwd_unchanged
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_annex_add_to_git(src, dst):
+
+    ar = AnnexRepo(dst, src)
+
+    filename = get_most_obscure_supported_name()
+    filename_abs = os.path.join(dst, filename)
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
+
+    assert_raises(IOError, ar.get_file_key, filename)
+    ar.annex_add_to_git(filename)
+    assert_in(filename, ar.get_indexed_files())
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_web_remote(src, dst):
+
+    ar = AnnexRepo(dst, src)
+
+    testurl = 'http://datalad.org/pages/about.html'
+    testfile = 'datalad.org_pages_about.html'
+
+    # get the file from remote
+    with swallow_outputs() as cmo:
+        ar.annex_addurls([testurl])
+    l = ar.annex_whereis(testfile)
+    assert_in('web', l)
+    assert_equal(len(l), 2)
+    assert_true(ar.file_has_content(testfile))
+
+    # remove the remote
+    ar.annex_rmurl(testfile, testurl)
+    l = ar.annex_whereis(testfile)
+    assert_not_in('web', l)
+    assert_equal(len(l), 1)
+
+    # now only 1 copy; drop should fail
+    try:
+        with swallow_logs() as cml:
+            ar.annex_drop(testfile)
+            assert_in('ERROR', cml.out)
+            assert_in('drop: 1 failed', cml.out)
+    except CommandError, e:
+        assert_equal(e.code, 1)
+        assert_in('Could only verify the '
+                  'existence of 0 out of 1 necessary copies', e.stdout)
+        failed = True
+
+    assert_true(failed)
+
+    # read the url using different method
+    ar.annex_addurl_to_file(testfile, testurl)
+    l = ar.annex_whereis(testfile)
+    assert_in('web', l)
+    assert_equal(len(l), 2)
+    assert_true(ar.file_has_content(testfile))
+
+    # 2 known copies now; drop should succeed
+    ar.annex_drop(testfile)
+    l = ar.annex_whereis(testfile)
+    assert_in('web', l)
+    assert_equal(len(l), 1)
+    assert_false(ar.file_has_content(testfile))
+
+@with_testrepos(flavors='network')
+@with_tempfile
+def test_AnnexRepo_migrating_backends(src, dst):
+    ar = AnnexRepo(dst, src, backend='MD5')
+
+    filename = get_most_obscure_supported_name()
+    filename_abs = os.path.join(dst, filename)
+    f = open(filename_abs, 'w')
+    f.write("What to write?")
+    f.close()
+
+    ar.annex_add(filename, backend='MD5')
+    assert_equal(ar.get_file_backend(filename), 'MD5')
+    assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
+
+    # migrating will only do, if file is present
+    ok_annex_get(ar, 'test-annex.dat')
+
+    if ar.is_direct_mode():
+        # No migration in direct mode
+        assert_raises(CommandNotAvailableError, ar.migrate_backend,
+                      'test-annex.dat')
+    else:
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
+        ar.migrate_backend('test-annex.dat')
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'MD5')
+
+        ar.migrate_backend('', backend='SHA1')
+        assert_equal(ar.get_file_backend(filename), 'SHA1')
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA1')
+
+
+tree1args = dict(
+    tree=(
+        ('firstfile', 'whatever'),
+        ('secondfile', 'something else'),
+        ('remotefile', 'pretends to be remote'),
+        ('faraway', 'incredibly remote')),
+    dir=os.curdir)
+
+
+@with_tree(**tree1args)
+@serve_path_via_http()
+def test_AnnexRepo_backend_option(path, url):
+    ar = AnnexRepo(path, backend='MD5')
+
+    ar.annex_add('firstfile', backend='SHA1')
+    ar.annex_add('secondfile')
+    assert_equal(ar.get_file_backend('firstfile'), 'SHA1')
+    assert_equal(ar.get_file_backend('secondfile'), 'MD5')
+
+    with swallow_outputs() as cmo:
+        ar.annex_addurl_to_file('remotefile', url + 'remotefile', backend='SHA1')
+    assert_equal(ar.get_file_backend('remotefile'), 'SHA1')
+
+    with swallow_outputs() as cmo:
+        ar.annex_addurls([url +'faraway'], backend='SHA1')
+    # TODO: what's the annex-generated name of this?
+    # For now, workaround:
+    assert_true(ar.get_file_backend(f) == 'SHA1'
+                for f in ar.get_indexed_files() if 'faraway' in f)
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+def test_AnnexRepo_get_file_backend(src, dst):
+    #init local test-annex before cloning:
+    AnnexRepo(src)
+
+    ar = AnnexRepo(dst, src)
+
+    assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
+    if not ar.is_direct_mode():
+        # no migration in direct mode
+        ok_annex_get(ar, 'test-annex.dat')
+        ar.migrate_backend('test-annex.dat', backend='SHA1')
+        assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA1')
+
+# TODO:
+#def annex_initremote(self, name, options):
+#def annex_enableremote(self, name):
+
+

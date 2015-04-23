@@ -11,16 +11,18 @@
 
 from mock import patch
 import os
+from os.path import dirname, join as opj
 import sys
 import logging
 
 from nose.tools import ok_, eq_, assert_is, assert_equal, assert_false, \
-    assert_true, assert_greater
+    assert_true, assert_greater, assert_raises, assert_in
 
 from datalad.cmd import Runner, link_file_load
 from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
-    on_linux, on_osx, on_windows
+    on_linux, on_osx, on_windows, with_testrepos
+from datalad.support.exceptions import CommandError
 
 
 @ignore_nose_capturing_stdout
@@ -33,7 +35,7 @@ def test_runner_dry(tempfile):
     # test dry command call
     cmd = 'echo Testing dry run > %s' % tempfile
     ret = runner.run(cmd)
-    assert_is(None, ret, "Dry run of: %s resulted in exitcode %s" % (cmd, ret))
+    assert_equal(("DRY", "DRY"), ret, "Dry run of: %s resulted in output %s" % (cmd, ret))
     assert_greater(runner.commands.__str__().find('echo Testing dry run'), -1,
                  "Dry run of: %s resulted in buffer: %s" % (cmd, runner.commands.__str__()))
     assert_false(os.path.exists(tempfile))
@@ -55,7 +57,6 @@ def test_runner(tempfile):
     runner = Runner(dry=False)
     cmd = 'echo Testing real run > %s' % tempfile
     ret = runner.run(cmd)
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
     assert_true(os.path.exists(tempfile), "Run of: %s resulted with non-existing file %s" % (cmd, tempfile))
 
@@ -74,7 +75,7 @@ def test_runner_instance_callable_dry():
     for cmd in [cmd_, ' '.join(cmd_)]:
         runner = Runner(dry=True)
         ret = runner(cmd)
-        eq_(ret, None) # errorcode is returned.  But in dry -- None
+        eq_(ret, ("DRY", "DRY"))  # (stdout, stderr) is returned.  But in dry -- ("DRY","DRY")
         assert_equal(runner.commands.__str__(), ("[%r]" % cmd),
                      "Dry run of Runner.__call__ didn't record command: %s.\n"
                      "Buffer: %s" % (cmd, runner.commands.__str__()))
@@ -96,11 +97,7 @@ def test_runner_instance_callable_wet():
     runner = Runner()
     cmd = [sys.executable, "-c", "print('Testing')"]
 
-    ret = runner(cmd)
-    eq_(ret, 0) # must succesfully run basic command and spit out output for us
-
-    ret, out = runner(cmd, return_output=True)
-    eq_(ret, 0) # must succesfully run basic command and spit out output for us
+    out = runner(cmd)
     eq_(out[0].rstrip(), ('Testing'))
     eq_(out[1], '')
 
@@ -115,7 +112,6 @@ def test_runner_log_stderr():
     runner = Runner(dry=False)
     cmd = 'echo stderr-Message should be logged >&2'
     ret = runner.run(cmd, log_stderr=True, expect_stderr=True)
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
     cmd = 'echo stderr-Message should not be logged >&2'
@@ -124,7 +120,6 @@ def test_runner_log_stderr():
             ret = runner.run(cmd, log_stderr=False)
             eq_(cmo.err.rstrip(), "stderr-Message should not be logged")
             eq_(cml.out, "")
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
 
@@ -149,7 +144,6 @@ def test_runner_log_stdout():
             else:
                 # echo outputs quoted lines for some reason, so relax check
                 ok_("stdout-Message should be logged" in cm.lines[1])
-        assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
         assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
     cmd = 'echo stdout-Message should not be logged'
@@ -158,7 +152,6 @@ def test_runner_log_stdout():
             ret = runner.run(cmd, log_stdout=False)
             eq_(cmo.out, "stdout-Message should not be logged\n")
             eq_(cml.out, "")
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
     assert_equal(runner.commands, [], "Run of: %s resulted in non-empty buffer: %s" % (cmd, runner.commands.__str__()))
 
 
@@ -167,24 +160,21 @@ def check_runner_heavy_output(log_online):
     # TODO: again, no automatic detection of this resulting in being stucked yet.
 
     runner = Runner()
-    cmd = '%s -c "import datalad.tests.heavyoutput;"' % sys.executable
+    cmd = '%s %s' % (sys.executable, opj(dirname(__file__), "heavyoutput.py"))
     with swallow_outputs() as cm:
         ret = runner.run(cmd, log_stderr=False, log_stdout=False, expect_stderr=True)
-        eq_(cm.err, cm.out) # they are identical in that script
+        eq_(cm.err, cm.out)  # they are identical in that script
         eq_(cm.out[:10], "[0, 1, 2, ")
         eq_(cm.out[-15:], "997, 998, 999]\n")
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
     #do it again with capturing:
     ret = runner.run(cmd, log_stderr=True, log_stdout=True, expect_stderr=True)
-    assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
     # and now original problematic command with a massive single line
     if not log_online:
         # We know it would get stuck in online mode
         cmd = '%s -c "import sys; x=str(list(range(1000))); [(sys.stdout.write(x), sys.stderr.write(x)) for i in xrange(100)];"' % sys.executable
         ret = runner.run(cmd, log_stderr=True, log_stdout=True, expect_stderr=True)
-        assert_equal(0, ret, "Run of: %s resulted in exitcode %s" % (cmd, ret))
 
 def test_runner_heavy_output():
     for log_online in [True, False]:
@@ -197,7 +187,7 @@ def test_link_file_load(tempfile):
     with open(tempfile, 'w') as f:
         f.write("LOAD")
 
-    link_file_load(tempfile, tempfile2) # this should work in general
+    link_file_load(tempfile, tempfile2)  # this should work in general
 
     ok_(os.path.exists(tempfile2))
 
@@ -231,7 +221,7 @@ def test_link_file_load(tempfile):
                 raise AttributeError("TEST")
         with patch('os.link', new_callable=raise_AttributeError):
             with swallow_logs(logging.WARNING) as cm:
-                link_file_load(tempfile, tempfile2) # should still work
+                link_file_load(tempfile, tempfile2)  # should still work
                 ok_("failed (TEST), copying file" in cm.out)
 
     # should be a copy (either originally for windows, or after mocked call)
@@ -239,5 +229,17 @@ def test_link_file_load(tempfile):
     with open(tempfile2, 'r') as f:
         assert_equal(f.read(), "LOAD")
     assert_equal(stats(tempfile, times=False), stats(tempfile2, times=False))
-    os.unlink(tempfile2) # TODO: next two with_tempfile
+    os.unlink(tempfile2)  # TODO: next two with_tempfile
 
+@with_testrepos(flavors='local')
+def test_runner_failure(dir):
+
+    runner = Runner()
+    failing_cmd = ['git', 'annex', 'add', 'notexistent.dat']
+    assert_raises(CommandError, runner.run, failing_cmd, cwd=dir)
+
+    try:
+        runner.run(failing_cmd, cwd=dir)
+    except CommandError, e:
+        assert_equal(1, e.code)
+        assert_in('notexistent.dat not found', e.stderr)

@@ -57,7 +57,7 @@ def test_logtarget_via_env_variable(dst):
 
 @with_tempfile
 @with_tempfile
-def test_mutliple_targets(dst1,dst2):
+def test_mutliple_targets(dst1, dst2):
     ok_(not exists(dst1))
     ok_(not exists(dst2))
     lgr = LoggerHelper("dataladtest").get_initialized_logger(

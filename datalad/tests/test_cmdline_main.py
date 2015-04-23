@@ -69,6 +69,6 @@ def test_help():
     stdout, stderr = run_main(['--help'])
 
     # Let's extract section titles:
-    sections = filter(re.compile('[a-zA-Z ]*:').match, stdout.split('\n'))
-    ok_(sections[0].startswith('Usage:')) # == Usage: nosetests [-h] if running using nose
+    sections = filter(re.compile('[a-zA-Z ]{4,50}:').match, stdout.split('\n'))
+    ok_(sections[0].startswith('Usage:'))  # == Usage: nosetests [-h] if running using nose
     assert_equal(sections[1:], ['Positional arguments:', 'Options:'])
