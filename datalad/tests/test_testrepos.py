@@ -33,7 +33,7 @@ def test_point_to_github(url):
 @with_testrepos
 @with_tempfile
 def test_clone(src, tempdir):
-    """Verify that all our repos are clonable"""
+    # Verify that all our repos are clonable
     r = Runner()
     output = r.run("git clone %(src)s %(tempdir)s" % locals(), log_online=True)
     #status, output = getstatusoutput("git clone %(src)s %(tempdir)s" % locals())

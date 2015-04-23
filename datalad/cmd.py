@@ -93,14 +93,14 @@ class Runner(object):
         if line:
             self.log("stdout| " + line.rstrip('\n'))
 
-    def _log_err(self, line, expect_stderr=False):
+    def _log_err(self, line, expected=False):
         if line:
             self.log("stderr| " + line.rstrip('\n'),
                      level={True: logging.DEBUG,
-                            False: logging.ERROR}[expect_stderr])
+                            False: logging.ERROR}[expected])
 
     def _get_output_online(self, proc, log_stdout, log_stderr,
-                           expect_stderr=False):
+                           expect_stderr=False, expect_fail=False):
         stdout, stderr = [], []
         while proc.poll() is None:
             if log_stdout:
@@ -118,7 +118,7 @@ class Runner(object):
                 line = proc.stderr.readline()
                 if line != '':
                     stderr += line
-                    self._log_err(line, expect_stderr)
+                    self._log_err(line, expect_stderr or expect_fail)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -128,12 +128,13 @@ class Runner(object):
         return stdout, stderr
 
     def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
-            expect_stderr=False, cwd=None, env=None, shell=None):
+            expect_stderr=False, expect_fail=False,
+            cwd=None, env=None, shell=None):
         """Runs the command `cmd` using shell.
 
         In case of dry-mode `cmd` is just added to `commands` and it is
         actually executed otherwise.
-        Allows for seperatly logging stdout and stderr  or streaming it to
+        Allows for separately logging stdout and stderr  or streaming it to
         system's stdout or stderr respectively.
 
         Parameters
@@ -159,6 +160,12 @@ class Runner(object):
             set it to True and output will be logged at DEBUG level unless
             exit status is non-0 (in non-online mode only, in online -- would
             log at DEBUG)
+
+        expect_fail: bool, optional
+            Normally, if command exits with non-0 status, it is considered an
+            ERROR and logged accordingly.  But if the call intended for checking
+            routine, such alarming message should not be logged as ERROR, thus
+            it will be logged at DEBUG level.
 
         cwd : string, optional
             Directory under which run the command (passed to Popen)
@@ -214,7 +221,8 @@ class Runner(object):
 
             if log_online:
                 out = self._get_output_online(proc, log_stdout, log_stderr,
-                                              expect_stderr=expect_stderr)
+                                              expect_stderr=expect_stderr,
+                                              expect_fail=expect_fail)
             else:
                 out = proc.communicate()
 
@@ -224,15 +232,15 @@ class Runner(object):
             if not log_online:
                 self._log_out(out[0])
                 if status not in [0, None]:
-                    self._log_err(out[1], expect_stderr=False)
+                    self._log_err(out[1], expected=expect_fail)
                 else:
                     # as directed
-                    self._log_err(out[1], expect_stderr=expect_stderr)
+                    self._log_err(out[1], expected=expect_stderr)
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s. Exit code=%d" \
                     % (cmd, " under %r" % (cwd or self.cwd), status)
-                lgr.error(msg)
+                (lgr.debug if expect_fail else lgr.error)(msg)
                 raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
                 self.log("Finished running %r with status %s" % (cmd, status),

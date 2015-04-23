@@ -117,7 +117,8 @@ class AnnexRepo(GitRepo):
 
     def _run_annex_command(self, annex_cmd, git_options=[], annex_options=[],
                            log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=False, backend=None):
+                           expect_stderr=False, expect_fail=False,
+                           backend=None):
         """Helper to run actual git-annex calls
 
         Unifies annex command calls.
@@ -137,7 +138,8 @@ class AnnexRepo(GitRepo):
         log_stdout,
         log_stderr,
         log_online,
-        expect_stderr: bool
+        expect_stderr,
+        expect_fail: bool
             these are passed to the respective options of
             datalad.cmd.Runner.run()
 
@@ -158,7 +160,8 @@ class AnnexRepo(GitRepo):
                                              log_stdout=log_stdout,
                                              log_stderr=log_stderr,
                                              log_online=log_online,
-                                             expect_stderr=expect_stderr)
+                                             expect_stderr=expect_stderr,
+                                             expect_fail=expect_fail)
         except CommandError, e:
             if "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
@@ -322,7 +325,8 @@ class AnnexRepo(GitRepo):
 
         try:
             out, err = self._run_annex_command('lookupkey',
-                                               annex_options=[file_])
+                                               annex_options=[file_],
+                                               expect_fail=True)
         except CommandError, e:
             if e.code == 1:
                 if not exists(opj(self.path, file_)):
@@ -362,7 +366,8 @@ class AnnexRepo(GitRepo):
         # TODO: Also provide option to look for key instead of path
 
         try:
-            out, err = self._run_annex_command('find', annex_options=files)
+            out, err = self._run_annex_command('find', annex_options=files,
+                                               expect_fail=True)
         except CommandError, e:
             if e.code == 1 and "not found" in e.stderr:
                 if len(files) > 1:

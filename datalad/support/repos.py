@@ -41,7 +41,7 @@ def _enc(filename):
     else:
         return filename
 
-class AnnexRepo(object):
+class AnnexRepoOld(object):
     """Helper to deal with git-annex'ed repositories
     """
     def __init__(self, path, runner=None, description=None):
