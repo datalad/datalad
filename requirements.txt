@@ -1,4 +1,4 @@
-patool
+patool>=1.7
 beautifulsoup4
 GitPython>=0.3.7
 joblib

@@ -6,8 +6,12 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Miscellaneous utilities to assist with testing"""
+
+import __builtin__
 
 import glob, shutil, stat, os
+from os.path import realpath
 import tempfile
 import platform
 
@@ -25,6 +29,8 @@ from ..cmd import Runner
 from ..support.repos import AnnexRepo
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
+from ..support.archives import compress_files
+
 
 def rmtemp(f, *args, **kwargs):
     """Wrapper to centralize removing of temp files so we could keep them around
@@ -42,16 +48,19 @@ def rmtemp(f, *args, **kwargs):
     else:
         lgr.info("Keeping temp file: %s" % f)
 
-def create_archive(path, name, load):
+
+def create_tree_archive(path, name, load, overwrite=False):
+    """Given an archive `name`, create under `path` with specified `load` tree
+    """
     dirname = name[:-7]
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    output = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
-                          cwd=path, expect_stderr=True)
+    compress_files([dirname], name, path=path, overwrite=overwrite)
     # remove original tree
     shutil.rmtree(full_dirname)
+
 
 def create_tree(path, tree):
     """Given a list of tuples (name, load) create such a tree
@@ -66,7 +75,7 @@ def create_tree(path, tree):
         full_name = opj(path, name)
         if isinstance(load, tuple):
             if name.endswith('.tar.gz'):
-                create_archive(path, name, load)
+                create_tree_archive(path, name, load)
             else:
                 create_tree(full_name, load)
         else:
@@ -135,6 +144,27 @@ def ok_file_under_git(path, filename, annexed=False):
     assert(filename in repo.get_indexed_files())  # file is known to Git
     assert(annexed == os.path.islink(opj(path, filename)))
 
+def ok_symlink(path):
+    try:
+        link = os.readlink(path)
+    except OSError:
+        raise AssertionError("Path %s seems not to be a symlink" % path)
+    ok_(link)
+    path_ = realpath(path)
+    ok_(path != link)
+    # TODO anything else?
+
+def ok_good_symlink(path):
+    ok_symlink(path)
+    ok_(exists(realpath(path)),
+        msg="Path %s seems to be missing.  Symlink %s is broken "
+            % (realpath(path), path))
+
+def ok_broken_symlink(path):
+    ok_symlink(path)
+    assert_false(exists(realpath(path)),
+                 msg="Path %s seems to be present.  Symlink %s is not broken"
+                 % (realpath(path), path))
 
 def ok_startswith(s, prefix):
     ok_(s.startswith(prefix),
@@ -522,12 +552,16 @@ from contextlib import contextmanager
 
 @contextmanager
 def swallow_outputs():
-    """Context manager to help consuming both stdout and stderr.
+    """Context manager to help consuming both stdout and stderr, and print()
 
     stdout is available as cm.out and stderr as cm.err whenever cm is the
     yielded context manager.
     Internally uses temporary files to guarantee absent side-effects of swallowing
-    into StringIO which lacks .fileno
+    into StringIO which lacks .fileno.
+
+    print mocking is necessary for some uses where sys.stdout was already bound
+    to original sys.stdout, thus mocking it later had no effect. Overriding
+    print function had desired effect
     """
 
     class StringIOAdapter(object):
@@ -563,16 +597,34 @@ def swallow_outputs():
             rmtemp(self._out.name)
             rmtemp(self._err.name)
 
+
+
     # preserve -- they could have been mocked already
+    oldprint = getattr(__builtin__, 'print')
     oldout, olderr = sys.stdout, sys.stderr
     adapter = StringIOAdapter()
     sys.stdout, sys.stderr = adapter.handles
+
+    def fake_print(*args, **kwargs):
+        sep = kwargs.pop('sep', ' ')
+        end = kwargs.pop('end', '\n')
+        file = kwargs.pop('file', sys.stdout)
+
+        if file in (oldout, olderr, sys.stdout, sys.stderr):
+            # we mock
+            sys.stdout.write(sep.join(args) + end)
+        else:
+            # must be some other file one -- leave it alone
+            oldprint(*args, sep=sep, end=end, file=file)
+    setattr(__builtin__, 'print', fake_print)
 
     try:
         yield adapter
     finally:
         sys.stdout, sys.stderr = oldout, olderr
+        setattr(__builtin__, 'print',  oldprint)
         adapter.cleanup()
+
 
 @contextmanager
 def swallow_logs(new_level=None):

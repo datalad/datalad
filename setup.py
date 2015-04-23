@@ -28,6 +28,8 @@ setup(
         "GitPython",  # 'git://github.com/gitpython-developers/GitPython'
         ],
     entry_points={
-        'console_scripts': ['datalad=datalad.cmdline.main:main'],
+        'console_scripts': [
+            'datalad=datalad.cmdline.main:main',
+            'git-annex-remote-dl+archive=datalad.customremotes.archive:main'],
     }
 )
