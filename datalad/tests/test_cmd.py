@@ -235,7 +235,7 @@ def test_link_file_load(tempfile):
 def test_runner_failure(dir):
 
     runner = Runner()
-    failing_cmd = ['git', 'annex', 'add', 'notexistent.dat']
+    failing_cmd = ['git-annex', 'add', 'notexistent.dat']
     assert_raises(CommandError, runner.run, failing_cmd, cwd=dir)
 
     try:
