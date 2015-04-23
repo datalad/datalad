@@ -74,7 +74,6 @@ def test_AnnexRepo_get(src, dst):
     testfile_abs = os.path.join(dst, testfile)
     assert_false(ar.file_has_content("test-annex.dat"))
     ok_annex_get(ar, testfile)
-    assert_true(ar.file_has_content("test-annex.dat"))
 
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'],
