@@ -10,11 +10,14 @@ all: clean test
 
 clean:
 	$(PYTHON) setup.py clean
-	rm -rf dist
+	rm -rf dist build bin
 
+bin:
+	mkdir -p $@
+	PYTHONPATH=bin:$(PYTHONPATH) python setup.py develop --install-dir $@
 
-test-code:
-	$(NOSETESTS) -s -v $(MODULE)
+test-code: bin
+	PATH=bin:$(PATH) PYTHONPATH=bin:$(PYTHONPATH) $(NOSETESTS) -s -v $(MODULE)
 
 test-coverage:
 	rm -rf coverage .coverage
