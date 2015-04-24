@@ -22,75 +22,122 @@ from ..cmd import Runner
 lgr = logging.getLogger('datalad.collection')
 
 
-class CollectionDict(dict):
+class Collection(dict):
 
-    def __init__(self, path=None, branch='HEAD', url=None, load_remotes=False):
-
-        super(CollectionDict, self).__init__()
-        self.path = path
-
-        self._gitrepo = None
-
-        if path:
-            self._gitrepo = GitRepo(path, url)
-            out_ls_files, err = self._gitrepo._git_custom_command('', 'git ls-files --with-tree %s' % branch)
-
-            for filename in out_ls_files.rstrip(os.linesep).split(os.linesep):
-                if filename != 'collection':
-                    out_cat, err = self._gitrepo._git_custom_command('', 'git cat-file blob %s:%s' % (branch, filename))
-                    for line in out_cat.rstrip(os.linesep).split(os.linesep):
-                        if line.startswith("handle_id = "):
-                            id_ = line[12:]
-                        elif line.startswith("last_seen = "):
-                            url = line[12:]
-                        elif line.startswith("metadata = "):
-                            md = line[11:]
-                        else:
-                            continue
-                    # TODO: check all is present
-                    self[filename] = (id_, url, md)
-
-
+    def __init__(self, src=None, branch='HEAD', load_remotes=False):
+        super(Collection, self).__init__()
         self.linked_collections = None
-        if load_remotes:
-            self.linked_collections = dict()
+        # I want a better name
+        self._branch = branch
+        self._load_remotes_flag = load_remotes
+        if isinstance(src, Collection):
+            self._colrepo = None
+            self.update(src)
+            # XXX most likely a copy
+            self.meta = src.meta
+        elif isinstance(src, CollectionRepo):
+            self._colrepo = src
+            self._reload()
+        elif src is None:
+            self._colrepo = None
+            self.meta = 'rdf thingie later'
+        else:
+            raise ValueError('unknown source for Collection()')
 
-            for remote in self._gitrepo.git_remote_show():
-                if remote.strip() == "":
-                    continue
+    def _reload(self):
+        if not self._colrepo:
+            return
 
-                head_branch = None
-                for remote_branch in self._gitrepo.git_branch():
-                    head = re.findall(r'-> (.*)', remote_branch)
+        self.update(self._load_handle_files(self._branch))
 
-                    if len(head):
-                        head_branch = head[0]
+        if self._load_remotes_flag:
+            self.linked_collections = self._load_remotes()
+
+        self.meta = 'rdf thingie later'
+
+
+    def _load_handle_files(self, branch):
+        out = {}
+        out_ls_files, err = \
+                self._colrepo._git_custom_command(
+                        '',
+                        'git ls-files --with-tree %s' % branch)
+
+        # load handle from local branch
+        for filename in out_ls_files.rstrip(os.linesep).split(os.linesep):
+            if filename != 'collection':
+                out_cat, err = \
+                    self._colrepo._git_custom_command(
+                            '',
+                            'git cat-file blob %s:%s' % (branch, filename))
+                for line in out_cat.rstrip(os.linesep).split(os.linesep):
+                    if line.startswith("handle_id = "):
+                        id_ = line[12:]
+                    elif line.startswith("last_seen = "):
+                        url = line[12:]
+                    elif line.startswith("metadata = "):
+                        md = line[11:]
+                    else:
                         continue
+                out[self._filename2key(filename)] = (id_, url, md)
+        return out
 
-                    out_ls_files, err = self._gitrepo._git_custom_command('', 'git ls-files --with-tree %s' % remote_branch)
+    def _load_remotes(self):
+        if not self._colrepo:
+            return None
 
-                    for filename in out_ls_files.rstrip(os.linesep).split(os.linesep):
-                        if filename != 'collection':
-                            out_cat, err = self._gitrepo._git_custom_command('', 'git cat-file blob %s:%s' % (remote_branch, filename))
-                            for line in out_cat.rstrip(os.linesep).split(os.linesep):
-                                if line.startswith("handle_id = "):
-                                    id_ = line[12:]
-                                elif line.startswith("last_seen = "):
-                                    url = line[12:]
-                                elif line.startswith("metadata = "):
-                                    md = line[11:]
-                                else:
-                                    continue
-                            # TODO: check all is present
-                            self.linked_collections[remote][remote_branch][filename] = (id_, url, md)
+        remotes = dict()
 
-        self.meta = "rdf-thing later on"
+        for remote in self._colrepo.git_remote_show():
+            if remote.strip() == "":
+                continue
+            remote_dict = remotes.get(remote, {})
+            head_branch = None
+            for remote_branch in self._colrepo.git_branch():
+                head = re.findall(r'-> (.*)', remote_branch)
+
+                if len(head):
+                    # found the HEAD pointer
+                    head_branch = head[0]
+                    continue
+                remote_dict[remote_branch] = \
+                        self._load_handle_files(remote_branch)
+            remotes[remote] = remote_dict
+        return remotes
 
     def query(self):
         pass
 
-    def commit(self, path=None):
-        pass
+    def commit(self, branch=None, msg="Cheers!"):
+        colrepo = self._colrepo
+        if not colrepo:
+            raise RuntimeError("cannot commit -- have relationship issues")
+
+        # handle we no longer have
+        nomore = set(colrepo.get_indexed_files()).difference(
+                        [self._key2filename(k) for k in self.keys()])
+        for gone in nomore:
+            # collection meta data is treated differently
+            if gone != 'collection':
+                colrepo.git_remove(gone)
+
+        # update everything else to be safe
+        for k, v in self.iteritems():
+            with open(opj(colrepo.path, self._key2filename(k)), 'w') as ofile:
+                ofile.write('\n'.join(['%s = %s' % (cat, val)
+                                      for cat, val in zip(('handle_id',
+                                                           'last_seen',
+                                                           'metadata'), v)]))
+        colrepo.git_add('.')
+        colrepo.git_commit(msg)
+
+    def _filename2key(self, fname):
+        return fname
+
+    def _key2filename(self, key):
+        return key
+
+
 
 
 
@@ -106,7 +153,7 @@ class CollectionDict(dict):
 
 
 
-class Collection(GitRepo):
+class CollectionRepo(GitRepo):
     """Representation of a datalad collection.
     """
 
@@ -137,7 +184,7 @@ class Collection(GitRepo):
         CollectionBrokenError
         """
 
-        super(Collection, self).__init__(path, url, runner=runner)
+        super(CollectionRepo, self).__init__(path, url, runner=runner)
         self.handles = []
 
         if not self.get_indexed_files():
