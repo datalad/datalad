@@ -9,6 +9,7 @@
 """Implements datalad collections.
 """
 
+import re
 import os
 from os.path import join as opj, basename
 import logging
@@ -19,6 +20,90 @@ from .exceptions import CollectionBrokenError
 from ..cmd import Runner
 
 lgr = logging.getLogger('datalad.collection')
+
+
+class CollectionDict(dict):
+
+    def __init__(self, path=None, branch='HEAD', url=None, load_remotes=False):
+
+        super(CollectionDict, self).__init__()
+        self.path = path
+
+        self._gitrepo = None
+
+        if path:
+            self._gitrepo = GitRepo(path, url)
+            out_ls_files, err = self._gitrepo._git_custom_command('', 'git ls-files --with-tree %s' % branch)
+
+            for filename in out_ls_files.rstrip(os.linesep).split(os.linesep):
+                if filename != 'collection':
+                    out_cat, err = self._gitrepo._git_custom_command('', 'git cat-file blob %s:%s' % (branch, filename))
+                    for line in out_cat.rstrip(os.linesep).split(os.linesep):
+                        if line.startswith("handle_id = "):
+                            id_ = line[12:]
+                        elif line.startswith("last_seen = "):
+                            url = line[12:]
+                        elif line.startswith("metadata = "):
+                            md = line[11:]
+                        else:
+                            continue
+                    # TODO: check all is present
+                    self[filename] = (id_, url, md)
+
+
+        self.linked_collections = None
+        if load_remotes:
+            self.linked_collections = dict()
+
+            for remote in self._gitrepo.git_remote_show():
+                if remote.strip() == "":
+                    continue
+
+                head_branch = None
+                for remote_branch in self._gitrepo.git_branch():
+                    head = re.findall(r'-> (.*)', remote_branch)
+
+                    if len(head):
+                        head_branch = head[0]
+                        continue
+
+                    out_ls_files, err = self._gitrepo._git_custom_command('', 'git ls-files --with-tree %s' % remote_branch)
+
+                    for filename in out_ls_files.rstrip(os.linesep).split(os.linesep):
+                        if filename != 'collection':
+                            out_cat, err = self._gitrepo._git_custom_command('', 'git cat-file blob %s:%s' % (remote_branch, filename))
+                            for line in out_cat.rstrip(os.linesep).split(os.linesep):
+                                if line.startswith("handle_id = "):
+                                    id_ = line[12:]
+                                elif line.startswith("last_seen = "):
+                                    url = line[12:]
+                                elif line.startswith("metadata = "):
+                                    md = line[11:]
+                                else:
+                                    continue
+                            # TODO: check all is present
+                            self.linked_collections[remote][remote_branch][filename] = (id_, url, md)
+
+        self.meta = "rdf-thing later on"
+
+    def query(self):
+        pass
+
+    def commit(self, path=None):
+        pass
+
+
+
+    # TODO: __set_item()__ / del, whatever
+    # TODO: def reload(self):
+
+
+
+
+
+
+
+
 
 
 class Collection(GitRepo):
