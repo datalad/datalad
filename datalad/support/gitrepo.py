@@ -56,6 +56,9 @@ def _normalize_path(base_dir, path):
     str:
         path, that is a relative path with respect to `base_dir`
     """
+    if not path:
+        return path
+
     base_dir = realpath(base_dir)
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
@@ -98,7 +101,7 @@ def normalize_paths(func):
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
-        if isinstance(files, basestring):
+        if isinstance(files, basestring) or not files:
             files_new = [_normalize_path(self.path, files)]
         elif isinstance(files, list):
             files_new = [_normalize_path(self.path, path) for path in files]

@@ -192,6 +192,8 @@ def test_GitRepo_files_decorator():
         expect.append(_normalize_path(test_instance.path, item))
     assert_equal(test_instance.decorated(files_to_test), expect)
 
+    assert_equal(test_instance.decorated(''), [''])
+
     assert_raises(ValueError, test_instance.decorated, 1)
 
 
