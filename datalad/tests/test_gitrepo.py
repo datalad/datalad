@@ -328,7 +328,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
     git1.git_checkout('branch3')
 
     branches1 = git1.git_branch()
-    assert_equal({'  branch2', '* branch3'}, set(branches1))
+    assert_equal({'branch2', 'branch3'}, set(branches1))
 
 
 # TODO:

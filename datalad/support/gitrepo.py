@@ -288,9 +288,12 @@ class GitRepo(object):
         return out.rstrip(linesep).split(linesep)
 
     def git_branch(self):
+        """Return a list of branches as returned by `git branch`
 
+        The indicator for the current branch is stripped.
+        """
         out, err = self._git_custom_command('', 'git branch')
-        return out.rstrip(linesep).split(linesep)
+        return [o.lstrip('*').strip() for o in out.rstrip(linesep).split(linesep)]
 
     def git_remote_update(self, name='', verbose=False):
         """
