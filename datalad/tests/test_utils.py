@@ -75,11 +75,11 @@ def test_traverse_and_do(d):
     #
     # Verify that it seems to be calling callbacks appropriately
     #
-    def cb_dummy_noargs(d):
-        ok_(d is not None)
+    def cb_dummy_noargs(d_):
+        ok_(d_ is not None)
 
-    def cb_dummy_kwargs(d, misses_files=None, misses_dirs=None):
-        ok_(d is not None)
+    def cb_dummy_kwargs(d_, misses_files=None, misses_dirs=None):
+        ok_(d_ is not None)
         ok_(isinstance(misses_files, list))
         ok_(isinstance(misses_dirs, list))
         for f in misses_files:
