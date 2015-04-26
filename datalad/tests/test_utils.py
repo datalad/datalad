@@ -16,11 +16,11 @@ import sys
 import logging
 
 from os.path import join as opj
-from ..utils import rm_empties, ls_tree
+from ..utils import rm_misses, ls_tree
 from ..utils import rotree, swallow_outputs, swallow_logs
 
 from nose.tools import ok_, eq_, assert_false, assert_raises
-from .utils import with_tempfile, traverse_for_content, with_tree, ok_startswith
+from .utils import with_tempfile, traverse_and_do, with_tree, ok_startswith
 
 
 @with_tempfile(mkdir=True)
@@ -62,15 +62,15 @@ def test_rotree(d):
         ('loaded3', 'load'),
         )),
     ])
-def test_traverse_for_content(d):
+def test_traverse_and_do(d):
     # shouldn't blow if just ran without any callables and say that there is some load
-    ok_(traverse_for_content(d))
+    ok_(traverse_and_do(d))
     # but should report empty for
-    eq_(traverse_for_content(opj(d, 'd1', 'd2')), False)
-    eq_(traverse_for_content(opj(d, 'd3')), False)
+    eq_(traverse_and_do(opj(d, 'd1', 'd2')), False)
+    eq_(traverse_and_do(opj(d, 'd3')), False)
     # but not upstairs for d1 since of loaded2.txt
-    ok_(traverse_for_content(opj(d, 'd1')))
-    ok_(traverse_for_content(opj(d, 'd4')))
+    ok_(traverse_and_do(opj(d, 'd1')))
+    ok_(traverse_and_do(opj(d, 'd4')))
 
     #
     # Verify that it seems to be calling callbacks appropriately
@@ -85,16 +85,16 @@ def test_traverse_for_content(d):
         for f in misses_files:
             ok_startswith(f, 'empty')
 
-    ok_(traverse_for_content(d,
-                             do_all=cb_dummy_noargs,
-                             do_none=cb_dummy_noargs,
-                             do_some=cb_dummy_noargs))
+    ok_(traverse_and_do(d,
+                        do_all=cb_dummy_noargs,
+                        do_none=cb_dummy_noargs,
+                        do_some=cb_dummy_noargs))
 
-    ok_(traverse_for_content(d,
-                             do_all=cb_dummy_kwargs,
-                             do_none=cb_dummy_kwargs,
-                             do_some=cb_dummy_kwargs,
-                             pass_misses=True))
+    ok_(traverse_and_do(d,
+                        do_all=cb_dummy_kwargs,
+                        do_none=cb_dummy_kwargs,
+                        do_some=cb_dummy_kwargs,
+                        pass_misses=True))
 
     # more thorough tests
     def cb_any(d_, misses_files=None, misses_dirs=None):
@@ -128,18 +128,18 @@ def test_traverse_for_content(d):
         else:
             raise ValueError("Must not be called for %s" % d_)
 
-    ok_(traverse_for_content(d,
-                             do_all=cb_all,
-                             do_none=cb_none,
-                             do_some=cb_any,
-                             pass_misses=True))
+    ok_(traverse_and_do(d,
+                        do_all=cb_all,
+                        do_none=cb_none,
+                        do_some=cb_any,
+                        pass_misses=True))
 
 
     # And now let's do some desired action -- clean it up!
-    ok_(traverse_for_content(d,
-                             do_none=rm_empties,
-                             do_some=rm_empties,
-                             pass_misses=True))
+    ok_(traverse_and_do(d,
+                        do_none=rm_misses,
+                        do_some=rm_misses,
+                        pass_misses=True))
     # And check what is left
     eq_(ls_tree(d),
         ['d1', opj('d1', 'loaded2.txt'), 'd4', opj('d4', 'loaded3'), 'loaded.txt'])
@@ -162,12 +162,12 @@ def test_traverse_for_content(d):
         ('empty', ''),
         )),
     ])
-def test_traverse_for_content_fully_empty(d):
+def test_traverse_and_do_fully_empty(d):
     # And now let's do some desired action -- clean it up!
-    ok_(not traverse_for_content(d,
-                             do_none=rm_empties,
-                             do_some=rm_empties,
-                             pass_misses=True))
+    ok_(not traverse_and_do(d,
+                            do_none=rm_misses,
+                            do_some=rm_misses,
+                            pass_misses=True))
     # And check that nothing is left behind
     eq_(ls_tree(d), [])
 

@@ -196,10 +196,10 @@ def has_content(file_):
     return os.stat(realpath(file_)).st_size > 0
 
 
-def rm_empties(p, misses_files=None, misses_dirs=None):
-    """Callback for traverse_for_content to be used for do_some, do_none
+def rm_misses(p, misses_files=None, misses_dirs=None):
+    """Callback for traverse_and_do to be used for do_some, do_none
 
-    To prune empty content
+    To prune "misses", e.g. empty content
     """
     for d in misses_dirs:
         rmtree(opj(p, d))
@@ -207,16 +207,16 @@ def rm_empties(p, misses_files=None, misses_dirs=None):
         os.unlink(opj(p, f))
 
 
-def traverse_for_content(path,
-                         do_none=None,
-                         do_some=None,
-                         do_all=None,
-                         matcher=has_content,
-                         exclude=(),
-                         pass_hits=False,
-                         pass_misses=False,
-                         return_="any"
-                         ):
+def traverse_and_do(path,
+                    do_none=None,
+                    do_some=None,
+                    do_all=None,
+                    matcher=has_content,
+                    exclude=(),
+                    pass_hits=False,
+                    pass_misses=False,
+                    return_="any"
+                    ):
     """Traverse and perform actions depending on either tree files pass the matcher
 
     Note
@@ -275,14 +275,14 @@ def traverse_for_content(path,
     # TODO: I feel like in some cases we might want to stop descent earlier
     # and not even bother with kids, but I could be wrong
     status_dirs = [
-        traverse_for_content(os.path.join(root, d),
-                             do_none=do_none,
-                             do_some=do_some,
-                             do_all=do_all,
-                             matcher=matcher,
-                             pass_hits=pass_hits,
-                             pass_misses=pass_misses,
-                             return_=return_)
+        traverse_and_do(os.path.join(root, d),
+                        do_none=do_none,
+                        do_some=do_some,
+                        do_all=do_all,
+                        matcher=matcher,
+                        pass_hits=pass_hits,
+                        pass_misses=pass_misses,
+                        return_=return_)
         for d in dirs
     ]
 
