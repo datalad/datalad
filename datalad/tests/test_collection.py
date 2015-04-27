@@ -17,7 +17,7 @@ from nose.tools import assert_raises, assert_equal, assert_false, assert_in
 
 from ..support.gitrepo import GitRepo
 from ..support.handle import Handle
-from ..support.collection import Collection
+from ..support.collection import CollectionRepo
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
     with_tree, get_most_obscure_supported_name, ok_clean_git
@@ -32,16 +32,16 @@ local_flavors = ['network-clone' if on_windows else 'local']
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_Collection_constructor(clean_path, clean_path2, broken_path):
-    # Just a brand new collection:
-    clt = Collection(clean_path)
+def test_CollectionRepo_constructor(clean_path, clean_path2, broken_path):
+    # Just a brand new CollectionRepo:
+    clt = CollectionRepo(clean_path)
     # ok_clean_git(clean_path, annex=False)
     # TODO: ok_clean_git doesn't work on empty repo, due to
     # repo.head.is_valid() returns False
     assert_equal(os.path.basename(os.path.normpath(clean_path)),
                  clt.name)
 
-    clt2 = Collection(clean_path2, name='different')
+    clt2 = CollectionRepo(clean_path2, name='different')
     assert_equal('different', clt2.name)
     with open(opj(clean_path2, 'collection'), 'r') as f:
         assert_equal(f.readline(), "New collection: different")
@@ -53,17 +53,17 @@ def test_Collection_constructor(clean_path, clean_path2, broken_path):
         f.write("something")
     git.git_add(filename)
     git.git_commit("add a file")
-    assert_raises(CollectionBrokenError, Collection, broken_path)
+    assert_raises(CollectionBrokenError, CollectionRepo, broken_path)
 
     # TODO: provide a minimal test collection, that contains something valid
 
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
 @with_tempfile
-def test_Collection_add_handle(annex_path, clone_path, clt_path):
+def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
 
     handle = Handle(clone_path, annex_path)
-    clt = Collection(clt_path)
+    clt = CollectionRepo(clt_path)
     clt.add_handle(handle, "first handle")
     ok_clean_git(clt_path, annex=False)
     os.path.exists(opj(clt_path, "first handle"))
@@ -82,10 +82,10 @@ def test_Collection_add_handle(annex_path, clone_path, clt_path):
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
 @with_tempfile
-def test_Collection_remove_handle(annex_path, handle_path, clt_path):
+def test_CollectionRepo_remove_handle(annex_path, handle_path, clt_path):
 
     handle = Handle(handle_path, annex_path)
-    collection = Collection(clt_path)
+    collection = CollectionRepo(clt_path)
     collection.add_handle(handle, "MyHandle")
     collection.remove_handle("MyHandle")
     ok_clean_git(clt_path, annex=False)
@@ -100,12 +100,12 @@ def test_Collection_remove_handle(annex_path, handle_path, clt_path):
 @with_tempfile
 @with_tempfile
 @with_tempfile
-def test_Collection_get_handles(annex_path, handle_path,
+def test_CollectionRepo_get_handles(annex_path, handle_path,
                                 handle_path2, clt_path):
 
     handle1 = Handle(handle_path, annex_path)
     handle2 = Handle(handle_path2, annex_path)
-    collection = Collection(clt_path)
+    collection = CollectionRepo(clt_path)
     collection.add_handle(handle1, "First Handle")
     collection.add_handle(handle2, "Second Handle")
 
@@ -127,9 +127,9 @@ def test_Collection_get_handles(annex_path, handle_path,
 
 @with_tempfile
 @with_tempfile
-def test_Collection_metadata_cache(h_path, c_path):
+def test_CollectionRepo_metadata_cache(h_path, c_path):
     handle = Handle(h_path)
-    collection = Collection(c_path)
+    collection = CollectionRepo(c_path)
     collection.add_handle(handle, "MyHandle")
 
     # initial metadata:
