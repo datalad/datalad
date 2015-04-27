@@ -360,9 +360,12 @@ def test_AnnexRepo_get_file_backend(src, dst):
     assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
     if not ar.is_direct_mode():
         # no migration in direct mode
-        ok_annex_get(ar, 'test-annex.dat')
+        ok_annex_get(ar, 'test-annex.dat', network=False)
         ar.migrate_backend('test-annex.dat', backend='SHA1')
         assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA1')
+    else:
+        assert_raises(CommandNotAvailableError, ar.migrate_backend,
+                      'test-annex.dat', backend='SHA1')
 
 # TODO:
 #def annex_initremote(self, name, options):
