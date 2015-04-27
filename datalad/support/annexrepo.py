@@ -151,10 +151,13 @@ class AnnexRepo(GitRepo):
 
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
-        cmd_list = ['git'] + git_options +\
-                   ['annex', annex_cmd] +\
-                   backend + debug +\
-                   annex_options
+
+        if git_options:
+            cmd_list = ['git'] + git_options + ['annex']
+        else:
+            cmd_list = ['git-annex']
+        cmd_list += [annex_cmd] + backend + debug + annex_options
+
         try:
             return self.cmd_call_wrapper.run(cmd_list,
                                              log_stdout=log_stdout,
