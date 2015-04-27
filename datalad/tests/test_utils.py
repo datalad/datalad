@@ -10,9 +10,13 @@
 
 """
 
-import os, shutil
+import os
+import shutil
+import sys
+import logging
+
 from os.path import join as opj
-from ..utils import rotree
+from ..utils import rotree, swallow_outputs, swallow_logs
 
 from nose.tools import ok_, eq_, assert_false, assert_raises
 from .utils import with_tempfile
@@ -36,3 +40,27 @@ def test_rotree(d):
     rotree(d, False)
     os.unlink(f)
     shutil.rmtree(d)
+
+
+def test_swallow_outputs():
+    with swallow_outputs() as cm:
+        eq_(cm.out, '')
+        sys.stdout.write("out normal")
+        sys.stderr.write("out error")
+        eq_(cm.out, 'out normal')
+        sys.stdout.write(" and more")
+        eq_(cm.out, 'out normal and more')  # incremental
+        eq_(cm.err, 'out error')
+        eq_(cm.err, 'out error')  # the same value if multiple times
+
+
+def test_swallow_logs():
+    lgr = logging.getLogger('datalad')
+    with swallow_logs(new_level=9) as cm:
+        eq_(cm.out, '')
+        lgr.log(8, "very heavy debug")
+        eq_(cm.out, '')  # not even visible at level 9
+        lgr.log(9, "debug1")
+        eq_(cm.out, 'debug1\n')  # not even visible at level 9
+        lgr.info("info")
+        eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9

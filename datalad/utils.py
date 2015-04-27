@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import __builtin__
+
 import logging
 import shutil, stat, os, sys
 import tempfile
@@ -117,6 +119,24 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     rotree(path, ro=False, chmod_files=chmod_files)
     shutil.rmtree(path, *args, **kwargs)
 
+
+def rmtemp(f, *args, **kwargs):
+    """Wrapper to centralize removing of temp files so we could keep them around
+
+    It will not remove the temporary file/directory if DATALAD_TESTS_KEEPTEMP
+    environment variable is defined
+    """
+    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        lgr.log(5, "Removing temp file: %s" % f)
+        # Can also be a directory
+        if os.path.isdir(f):
+            rmtree(f, *args, **kwargs)
+        else:
+            os.unlink(f)
+    else:
+        lgr.info("Keeping temp file: %s" % f)
+
+
 #
 # Decorators
 #
@@ -149,9 +169,173 @@ def optional_args(decorator):
 
     return wrapper
 
+
+# TODO: just provide decorators for tempfile.mk* functions. This is ugly!
+def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
+    """Updates kwargs to be passed to tempfile. calls depending on env vars
+    """
+    # operate on a copy of tkwargs to avoid any side-effects
+    tkwargs_ = tkwargs.copy()
+
+    # TODO: don't remember why I had this one originally
+    # if len(targs)<2 and \
+    if not 'prefix' in tkwargs_:
+        tkwargs_['prefix'] = '_'.join(
+            ['datalad_temp'] +
+            ([prefix] if prefix else []) +
+            ([''] if (on_windows or not wrapped)
+                  else [wrapped.func_name]))
+
+    directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
+    if directory and 'dir' not in tkwargs_:
+        tkwargs_['dir'] = directory
+
+    return tkwargs_
+
+
 #
 # Context Managers
 #
+
+from contextlib import contextmanager
+
+@contextmanager
+def swallow_outputs():
+    """Context manager to help consuming both stdout and stderr, and print()
+
+    stdout is available as cm.out and stderr as cm.err whenever cm is the
+    yielded context manager.
+    Internally uses temporary files to guarantee absent side-effects of swallowing
+    into StringIO which lacks .fileno.
+
+    print mocking is necessary for some uses where sys.stdout was already bound
+    to original sys.stdout, thus mocking it later had no effect. Overriding
+    print function had desired effect
+    """
+
+    class StringIOAdapter(object):
+        """Little adapter to help getting out/err values
+        """
+        def __init__(self):
+            kw = get_tempfile_kwargs({}, prefix="outputs")
+
+            self._out = open(tempfile.mktemp(**kw), 'w')
+            self._err = open(tempfile.mktemp(**kw), 'w')
+
+        def _read(self, h):
+            with open(h.name) as f:
+                return f.read()
+
+        @property
+        def out(self):
+            self._out.flush()
+            return self._read(self._out)
+
+        @property
+        def err(self):
+            self._err.flush()
+            return self._read(self._err)
+
+        @property
+        def handles(self):
+            return self._out, self._err
+
+        def cleanup(self):
+            self._out.close()
+            self._err.close()
+            rmtemp(self._out.name)
+            rmtemp(self._err.name)
+
+
+
+    # preserve -- they could have been mocked already
+    oldprint = getattr(__builtin__, 'print')
+    oldout, olderr = sys.stdout, sys.stderr
+    adapter = StringIOAdapter()
+    sys.stdout, sys.stderr = adapter.handles
+
+    def fake_print(*args, **kwargs):
+        sep = kwargs.pop('sep', ' ')
+        end = kwargs.pop('end', '\n')
+        file = kwargs.pop('file', sys.stdout)
+
+        if file in (oldout, olderr, sys.stdout, sys.stderr):
+            # we mock
+            sys.stdout.write(sep.join(args) + end)
+        else:
+            # must be some other file one -- leave it alone
+            oldprint(*args, sep=sep, end=end, file=file)
+    setattr(__builtin__, 'print', fake_print)
+
+    try:
+        yield adapter
+    finally:
+        sys.stdout, sys.stderr = oldout, olderr
+        setattr(__builtin__, 'print',  oldprint)
+        adapter.cleanup()
+
+
+@contextmanager
+def swallow_logs(new_level=None):
+    """Context manager to consume all logs.
+
+    """
+    lgr = logging.getLogger("datalad")
+
+    # Keep old settings
+    old_level = lgr.level
+    old_handlers = lgr.handlers
+
+    # Let's log everything into a string
+    # TODO: generalize with the one for swallow_outputs
+    class StringIOAdapter(object):
+        """Little adapter to help getting out values
+
+        And to stay consistent with how swallow_outputs behaves
+        """
+        def __init__(self):
+            kw = dict()
+            get_tempfile_kwargs(kw, prefix="logs")
+
+            self._out = open(tempfile.mktemp(**kw), 'w')
+
+        def _read(self, h):
+            with open(h.name) as f:
+                return f.read()
+
+        @property
+        def out(self):
+            self._out.flush()
+            return self._read(self._out)
+
+        @property
+        def lines(self):
+            return self.out.split('\n')
+
+        @property
+        def handle(self):
+            return self._out
+
+        def cleanup(self):
+            self._out.close()
+            rmtemp(self._out.name)
+
+    adapter = StringIOAdapter()
+    lgr.handlers = [logging.StreamHandler(adapter.handle)]
+    if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
+        lgr.handlers += old_handlers
+    if isinstance(new_level, basestring):
+        new_level = getattr(logging, new_level)
+
+    if new_level is not None:
+        lgr.setLevel(new_level)
+
+    try:
+        yield adapter
+    finally:
+        lgr.handlers, lgr.level = old_handlers, old_level
+        adapter.cleanup()
+
 
 #
 # Additional handlers

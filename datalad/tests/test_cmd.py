@@ -11,6 +11,7 @@
 
 from mock import patch
 import os
+from os.path import dirname, join as opj
 import sys
 import logging
 
@@ -159,7 +160,7 @@ def check_runner_heavy_output(log_online):
     # TODO: again, no automatic detection of this resulting in being stucked yet.
 
     runner = Runner()
-    cmd = '%s -c "import datalad.tests.heavyoutput;"' % sys.executable
+    cmd = '%s %s' % (sys.executable, opj(dirname(__file__), "heavyoutput.py"))
     with swallow_outputs() as cm:
         ret = runner.run(cmd, log_stderr=False, log_stdout=False, expect_stderr=True)
         eq_(cm.err, cm.out)  # they are identical in that script
@@ -234,7 +235,7 @@ def test_link_file_load(tempfile):
 def test_runner_failure(dir):
 
     runner = Runner()
-    failing_cmd = ['git', 'annex', 'add', 'notexistent.dat']
+    failing_cmd = ['git-annex', 'add', 'notexistent.dat']
     assert_raises(CommandError, runner.run, failing_cmd, cwd=dir)
 
     try:

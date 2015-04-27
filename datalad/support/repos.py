@@ -41,7 +41,7 @@ def _enc(filename):
     else:
         return filename
 
-class AnnexRepo(object):
+class AnnexRepoOld(object):
     """Helper to deal with git-annex'ed repositories
     """
     def __init__(self, path, runner=None, description=None):
@@ -230,7 +230,7 @@ def annex_file(href,
                 _call(os.makedirs, temp_annex_dir)
                 _call(decompress_file,
                      full_incoming_filename, temp_annex_dir,
-                     directories=archives_directories)
+                     leading_directories=archives_directories)
             except Exception, e:
                 lgr.error("Extraction of %s under %s failed: %s. Skipping."
                           % (full_incoming_filename, temp_annex_dir, e))

@@ -6,8 +6,10 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Miscellaneous utilities to assist with testing"""
 
 import glob, shutil, stat, os
+from os.path import realpath
 import tempfile
 import platform
 
@@ -22,36 +24,24 @@ from nose.tools import \
 from nose import SkipTest
 
 from ..cmd import Runner
-from ..support.repos import AnnexRepo
+from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
+from ..support.archives import compress_files
 
-def rmtemp(f, *args, **kwargs):
-    """Wrapper to centralize removing of temp files so we could keep them around
 
-    It will not remove the temporary file/directory if DATALAD_TESTS_KEEPTEMP
-    environment variable is defined
+def create_tree_archive(path, name, load, overwrite=False):
+    """Given an archive `name`, create under `path` with specified `load` tree
     """
-    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-        lgr.log(5, "Removing temp file: %s" % f)
-        # Can also be a directory
-        if os.path.isdir(f):
-            rmtree(f, *args, **kwargs)
-        else:
-            os.unlink(f)
-    else:
-        lgr.info("Keeping temp file: %s" % f)
-
-def create_archive(path, name, load):
     dirname = name[:-7]
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
     # create archive
-    output = Runner().run('tar -czvf %(name)s %(dirname)s' % locals(),
-                          cwd=path, expect_stderr=True)
+    compress_files([dirname], name, path=path, overwrite=overwrite)
     # remove original tree
     shutil.rmtree(full_dirname)
+
 
 def create_tree(path, tree):
     """Given a list of tuples (name, load) create such a tree
@@ -66,7 +56,7 @@ def create_tree(path, tree):
         full_name = opj(path, name)
         if isinstance(load, tuple):
             if name.endswith('.tar.gz'):
-                create_archive(path, name, load)
+                create_tree_archive(path, name, load)
             else:
                 create_tree(full_name, load)
         else:
@@ -85,7 +75,7 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
-from datalad.support.annexrepo import AnnexRepo as AnnexRepoNew
+from datalad.support.annexrepo import AnnexRepo
 
 
 def ok_clean_git_annex_proxy(path):
@@ -93,7 +83,7 @@ def ok_clean_git_annex_proxy(path):
     """
     # TODO: May be let's make a method of AnnexRepo for this purpose
 
-    ar = AnnexRepoNew(path)
+    ar = AnnexRepo(path)
     cwd = os.getcwd()
     os.chdir(path)
 
@@ -118,31 +108,76 @@ def ok_clean_git(path, annex=True, untracked=[]):
         ok_(exists(join(path, '.git', 'annex')))
     repo = git.Repo(path)
 
-    ok_(repo.head.is_valid())
+    if repo.index.entries.keys():
+        ok_(repo.head.is_valid())
 
-    # get string representations of diffs with index to ease troubleshooting
-    index_diffs = [str(d) for d in repo.index.diff(None)]
-    head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
+        # get string representations of diffs with index to ease
+        # troubleshooting
+        index_diffs = [str(d) for d in repo.index.diff(None)]
+        head_diffs = [str(d) for d in repo.index.diff(repo.head.commit)]
 
-    eq_(sorted(repo.untracked_files), sorted(untracked))
-    eq_(index_diffs, [])
-    eq_(head_diffs, [])
+        eq_(sorted(repo.untracked_files), sorted(untracked))
+        eq_(index_diffs, [])
+        eq_(head_diffs, [])
+
 
 def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepo(path)
+    repo = AnnexRepoOld(path)
     assert(filename in repo.get_indexed_files())  # file is known to Git
     assert(annexed == os.path.islink(opj(path, filename)))
+
+
+def ok_symlink(path):
+    try:
+        link = os.readlink(path)
+    except OSError:
+        raise AssertionError("Path %s seems not to be a symlink" % path)
+    ok_(link)
+    path_ = realpath(path)
+    ok_(path != link)
+    # TODO anything else?
+
+
+def ok_good_symlink(path):
+    ok_symlink(path)
+    ok_(exists(realpath(path)),
+        msg="Path %s seems to be missing.  Symlink %s is broken "
+            % (realpath(path), path))
+
+
+def ok_broken_symlink(path):
+    ok_symlink(path)
+    assert_false(exists(realpath(path)),
+                 msg="Path %s seems to be present.  Symlink %s is not broken"
+                 % (realpath(path), path))
 
 
 def ok_startswith(s, prefix):
     ok_(s.startswith(prefix),
         msg="String %r doesn't start with %r" % (s, prefix))
 
+
 def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
 
 
+def ok_annex_get(ar, files):
+    """Helper to run .annex_get decorated checking for correct operation
+
+    annex_get passes through stderr from the ar to the user, which pollutes
+    screen while running tests
+    """
+    with swallow_outputs() as cmo:
+        ar.annex_get(files)
+        # wget or curl - just verify that annex spits out expected progress bar
+        ok_('100%' in cmo.err or '100.0%' in cmo.err)
+    # verify that load was fetched
+    has_content = ar.file_has_content(files)
+    if isinstance(has_content, bool):
+        ok_(has_content)
+    else:
+        ok_(all(has_content))
 #
 # Decorators
 #
@@ -219,29 +254,6 @@ def serve_path_via_http():
         newfunc = make_decorator(func)(newfunc)
         return newfunc
     return decorate
-
-
-# TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
-    """Updates kwargs to be passed to tempfile. calls depending on env vars
-    """
-    # operate on a copy of tkwargs to avoid any side-effects
-    tkwargs_ = tkwargs.copy()
-
-    # TODO: don't remember why I had this one originally
-    # if len(targs)<2 and \
-    if not 'prefix' in tkwargs_:
-        tkwargs_['prefix'] = '_'.join(
-            ['datalad_temp'] +
-            ([prefix] if prefix else []) +
-            ([''] if (on_windows or not wrapped)
-                  else [wrapped.func_name]))
-
-    directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
-    if directory and 'dir' not in tkwargs_:
-        tkwargs_['dir'] = directory
-
-    return tkwargs_
 
 
 @optional_args
@@ -515,120 +527,3 @@ def get_most_obscure_supported_name(tdir):
 #
 # Context Managers
 #
-import StringIO, sys
-from contextlib import contextmanager
-
-@contextmanager
-def swallow_outputs():
-    """Context manager to help consuming both stdout and stderr.
-
-    stdout is available as cm.out and stderr as cm.err whenever cm is the
-    yielded context manager.
-    Internally uses temporary files to guarantee absent side-effects of swallowing
-    into StringIO which lacks .fileno
-    """
-
-    class StringIOAdapter(object):
-        """Little adapter to help getting out/err values
-        """
-        def __init__(self):
-            kw = get_tempfile_kwargs({}, prefix="outputs")
-
-            self._out = open(tempfile.mktemp(**kw), 'w')
-            self._err = open(tempfile.mktemp(**kw), 'w')
-
-        def _read(self, h):
-            with open(h.name) as f:
-                return f.read()
-
-        @property
-        def out(self):
-            self._out.flush()
-            return self._read(self._out)
-
-        @property
-        def err(self):
-            self._err.flush()
-            return self._read(self._err)
-
-        @property
-        def handles(self):
-            return self._out, self._err
-
-        def cleanup(self):
-            self._out.close()
-            self._err.close()
-            rmtemp(self._out.name)
-            rmtemp(self._err.name)
-
-    # preserve -- they could have been mocked already
-    oldout, olderr = sys.stdout, sys.stderr
-    adapter = StringIOAdapter()
-    sys.stdout, sys.stderr = adapter.handles
-
-    try:
-        yield adapter
-    finally:
-        sys.stdout, sys.stderr = oldout, olderr
-        adapter.cleanup()
-
-@contextmanager
-def swallow_logs(new_level=None):
-    """Context manager to consume all logs.
-
-    """
-    lgr = logging.getLogger("datalad")
-
-    # Keep old settings
-    old_level = lgr.level
-    old_handlers = lgr.handlers
-
-    # Let's log everything into a string
-    # TODO: generalize with the one for swallow_outputs
-    class StringIOAdapter(object):
-        """Little adapter to help getting out values
-
-        And to stay consistent with how swallow_outputs behaves
-        """
-        def __init__(self):
-            kw = dict()
-            get_tempfile_kwargs(kw, prefix="logs")
-
-            self._out = open(tempfile.mktemp(**kw), 'w')
-
-        def _read(self, h):
-            with open(h.name) as f:
-                return f.read()
-
-        @property
-        def out(self):
-            self._out.flush()
-            return self._read(self._out)
-
-        @property
-        def lines(self):
-            return self.out.split('\n')
-
-        @property
-        def handle(self):
-            return self._out
-
-        def cleanup(self):
-            self._out.close()
-            rmtemp(self._out.name)
-
-    adapter = StringIOAdapter()
-    lgr.handlers = [logging.StreamHandler(adapter.handle)]
-    if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
-        lgr.handlers += old_handlers
-    if isinstance(new_level, basestring):
-        new_level = getattr(logging, new_level)
-
-    if new_level is not None:
-        lgr.setLevel(new_level)
-
-    try:
-        yield adapter
-    finally:
-        lgr.handlers, lgr.level = old_handlers, old_level
-        adapter.cleanup()

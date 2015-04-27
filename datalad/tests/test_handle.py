@@ -11,19 +11,17 @@
 """
 
 import os.path
-import platform
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_is_not_none, assert_not_equal, assert_in
-from nose import SkipTest
 from git.exc import GitCommandError
 
-from datalad.support.handle import Handle
-from datalad.tests.utils import with_tempfile, with_testrepos, \
-    assert_cwd_unchanged, ignore_nose_capturing_stdout, \
+from ..support.handle import Handle
+from ..support.exceptions import FileInGitError
+from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
+    ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
-    get_most_obscure_supported_name, ok_
-from datalad.support.exceptions import FileInGitError
+    get_most_obscure_supported_name, swallow_outputs, ok_
 
 
 # For now (at least) we would need to clone from the network
@@ -85,9 +83,10 @@ def test_Handle_get(src, dst):
     assert_is_instance(ds, Handle, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = os.path.join(dst, testfile)
-    assert_false(ds.file_has_content("test-annex.dat")[0][1])
-    ds.get(testfile)
-    assert_true(ds.file_has_content("test-annex.dat")[0][1])
+    assert_false(ds.file_has_content("test-annex.dat"))
+    with swallow_outputs() as cmo:
+        ds.get(testfile)
+    assert_true(ds.file_has_content("test-annex.dat"))
     f = open(testfile_abs, 'r')
     assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
 
