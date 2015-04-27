@@ -276,7 +276,7 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    @normalize_paths
+    @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, cwd=None, env=None,
