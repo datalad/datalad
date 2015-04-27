@@ -363,6 +363,9 @@ def test_AnnexRepo_get_file_backend(src, dst):
         ok_annex_get(ar, 'test-annex.dat')
         ar.migrate_backend('test-annex.dat', backend='SHA1')
         assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA1')
+    else:
+        assert_raises(CommandNotAvailableError, ar.migrate_backend,
+                      'test-annex.dat', backend='SHA1')
 
 # TODO:
 #def annex_initremote(self, name, options):
