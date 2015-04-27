@@ -34,6 +34,8 @@ lgr = logging.getLogger('datalad.gitrepo')
 
 # TODO: Check whether it makes sense to unify passing of options in a way
 # similar to paths. See options_decorator in annexrepo.py
+# Note: GitPython is doing something similar already with **kwargs.
+# TODO: Figure this out in detail.
 
 
 def _normalize_path(base_dir, path):
@@ -248,6 +250,23 @@ class GitRepo(object):
         else:
             lgr.warning("git_add was called with empty file list.")
 
+    @normalize_paths
+    def git_remove(self, files, **kwargs):
+        """Remove files.
+
+        Parameters:
+        -----------
+        files: str
+          list of paths to remove
+        Returns:
+        --------
+        [str]
+          list of successfully removed files.
+        """
+
+        return self.repo.index.remove(files, working_tree=True, **kwargs)
+
+
     def git_commit(self, msg=None, options=None):
         """Commit changes to git.
 
@@ -262,7 +281,7 @@ class GitRepo(object):
         if not msg:
             msg = "What would be a good default message?"
 
-        self.cmd_call_wrapper(self.repo.index.commit ,msg)
+        self.cmd_call_wrapper(self.repo.index.commit, msg)
 
     def get_indexed_files(self):
         """Get a list of files in git's index
@@ -275,6 +294,16 @@ class GitRepo(object):
 
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
+
+    def git_get_branches(self):
+        """Get all branches of the repo.
+
+        Returns:
+        -----------
+        [str]
+            Names of all branches of this repository.
+        """
+        return [branch.name for branch in self.repo.branches]
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
@@ -310,13 +339,6 @@ class GitRepo(object):
 # May be better: fetch the remotes -> query branch remote/master
 
 
-    @normalize_paths
-    def git_remove(self, files):
-        """git rm
-        """
-
-        return self._git_custom_command(files, 'git rm')
-
     def git_remote_add(self, name, url, options=''):
         """
         """
@@ -338,14 +360,6 @@ class GitRepo(object):
         out, err = self._git_custom_command('', 'git remote %s show %s' %
                                             (v, name))
         return out.rstrip(linesep).split(linesep)
-
-    def git_branch(self):
-        """Return a list of branches as returned by `git branch`
-
-        The indicator for the current branch is stripped.
-        """
-        out, err = self._git_custom_command('', 'git branch')
-        return [o.lstrip('*').strip() for o in out.rstrip(linesep).split(linesep)]
 
     def git_remote_update(self, name='', verbose=False):
         """
@@ -388,3 +402,40 @@ class GitRepo(object):
         """
 
         self._git_custom_command('', 'git checkout %s %s' % (options, name))
+
+    def git_get_files(self, branch=None):
+        """Get a list of files in git.
+
+        Lists the files in the (remote) branch.
+
+        Parameters:
+        -----------
+        branch: str
+          Name of the branch to query.
+        Returns:
+        --------
+        [str]
+          list of files.
+        """
+
+        # TODO: This does not work as expected. Figure out!
+        # For now keep it as is, since it nevertheless provides
+        # the info needed for collections.
+        cmd_str = 'git ls-files' + \
+                  (' --with-tree %s' % branch if branch else '')
+        out, err = self._git_custom_command(
+            '', cmd_str)
+        return out.rstrip(linesep).split(linesep)
+
+    def git_get_file_content(self, file_, branch=None):
+        """
+
+        Returns:
+        --------
+        [str]
+          content of file_ as a list of lines.
+        """
+
+        out, err = self._git_custom_command(
+            '', 'git cat-file blob %s:%s' % (branch, file_))
+        return out.rstrip(linesep).split(linesep)

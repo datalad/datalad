@@ -58,19 +58,11 @@ class Collection(dict):
 
     def _load_handle_files(self, branch):
         out = {}
-        out_ls_files, err = \
-                self._colrepo._git_custom_command(
-                        '',
-                        'git ls-files --with-tree %s' % branch)
 
         # load handle from local branch
-        for filename in out_ls_files.rstrip(os.linesep).split(os.linesep):
+        for filename in self._colrepo.git_get_files(branch):
             if filename != 'collection':
-                out_cat, err = \
-                    self._colrepo._git_custom_command(
-                            '',
-                            'git cat-file blob %s:%s' % (branch, filename))
-                for line in out_cat.rstrip(os.linesep).split(os.linesep):
+                for line in self._colrepo.git_get_file_content(filename, branch):
                     if line.startswith("handle_id = "):
                         id_ = line[12:]
                     elif line.startswith("last_seen = "):
@@ -93,7 +85,7 @@ class Collection(dict):
                 continue
             remote_dict = remotes.get(remote, {})
             head_branch = None
-            for remote_branch in self._colrepo.git_branch():
+            for remote_branch in self._colrepo.git_get_branches():
                 head = re.findall(r'-> (.*)', remote_branch)
 
                 if len(head):

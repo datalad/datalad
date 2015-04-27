@@ -347,8 +347,39 @@ def test_GitRepo_remote_update(path1, path2, path3):
     git1.git_checkout('branch2')
     git1.git_checkout('branch3')
 
-    branches1 = git1.git_branch()
+    branches1 = git1.git_get_branches()
     assert_equal({'branch2', 'branch3'}, set(branches1))
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+def test_GitRepo_get_files(src, path, path2clone):
+
+    # TODO: THIS DOES NOT WORK AS EXPECTED! SEE gitrepo.py!
+
+    gr = GitRepo(path, src)
+    assert_equal({'INFO.txt', 'test-annex.dat', 'test.dat'},
+                 set(gr.git_get_files()))
+    gr.git_checkout('new_branch', '-b')
+    #filename = get_most_obscure_supported_name()
+    filename = 'another_file.dat'
+    with open(opj(path, filename), 'w') as f:
+        f.write("something")
+    gr.git_add(filename)
+    gr.git_commit("Added.")
+    assert_equal({'INFO.txt', 'test-annex.dat', 'test.dat', filename},
+                 set(gr.git_get_files()))
+    assert_equal({'INFO.txt', 'test-annex.dat', 'test.dat'},
+                 set(gr.git_get_files('master')),
+                 "return value: %s" % gr.git_get_files('master'))
+    #gr2 = GitRepo(path2clone, src)
+    #gr2.git_remote_add('remoterepo', path)
+    #gr2.git_fetch('remoterepo')
+
+
+
+
 
 
 # TODO:
