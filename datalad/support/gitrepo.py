@@ -163,6 +163,26 @@ def normalize_paths(func, match_return_type=True):
     return newfunc
 
 
+def _fix_paths_list(files):
+    """Remove empty entries from list
+
+    This is needed, since some functions of GitPython may convert
+    an empty entry to '.', when used with a list of paths.
+
+    Parameter:
+    ----------
+    files: list of str
+
+    Returns:
+    list of str
+    """
+    if not isinstance(files, list):
+        lgr.warning(
+            "_fix_paths_list() called with non-list type: %s" % type(files))
+        return files
+    return [file_ for file_ in files if file_]
+
+
 class GitRepo(object):
     """Representation of a git repository
 
@@ -235,6 +255,7 @@ class GitRepo(object):
         """
 
         if files:
+            files = _fix_paths_list(files)
             try:
                 self.cmd_call_wrapper(self.repo.index.add, files, write=True)
                 # TODO: May be make use of 'fprogress'-option to indicate progress
@@ -263,6 +284,8 @@ class GitRepo(object):
         [str]
           list of successfully removed files.
         """
+
+        files = _fix_paths_list(files)
 
         return self.repo.index.remove(files, working_tree=True, **kwargs)
 
@@ -326,6 +349,7 @@ class GitRepo(object):
         --------
         stdout, stderr
         """
+        
         cmd = shlex.split(cmd_str + " " + " ".join(files))
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
