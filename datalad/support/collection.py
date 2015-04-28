@@ -260,11 +260,14 @@ class CollectionRepo(GitRepo):
           name of the handle. This is required to be unique with respect to the
           collection.
          """
-        # TODO: Does a handle have a default name? => repo's name
+
+        # default name of the handle:
+        if not name:
+            name = basename(handle.path)
 
         # Writing plain text for now. This is supposed to change to use
         # rdflib or sth.
-        with open(opj(self.path, name), 'w') as f:
+        with open(opj(self.path, self._key2filename(name)), 'w') as f:
             f.write("handle_id = %s\n" % handle.get_datalad_id())
             f.write("last_seen = %s\n" % handle.path)
             f.write("metadata = %s\n" % handle.get_metadata())

@@ -88,23 +88,24 @@ def test_CollectionRepo_get_handles(annex_path, handle_path,
     assert handle2 == t_list[0] or handle2 == t_list[1]
 
 
-# @with_tempfile
-# @with_tempfile
-# def test_CollectionRepo_metadata_cache(h_path, c_path):
-#     handle = Handle(h_path)
-#     collection = CollectionRepo(c_path)
-#     collection.add_handle(handle, "MyHandle")
-#
-#     # initial metadata:
-#     assert_equal(collection.handles[0][3], ["Metadata not available yet.\n"])
-#
-#     # edit handle's metadata:
-#     handle.set_metadata("Fresh Metadata.\n")
-#     assert_equal(handle.get_metadata(), ["Fresh Metadata.\n"])
-#     # without updating the cache, collection still has initial metadata:
-#     assert_equal(collection.handles[0][3], ["Metadata not available yet.\n"])
-#     collection.update_metadata_cache(handle)
-#     assert_equal(collection.handles[0][3], ["Fresh Metadata.\n"])
+@with_tempfile
+@with_tempfile
+def test_CollectionRepo_metadata_cache(h_path, c_path):
+    handle = Handle(h_path)
+    col_repo = CollectionRepo(c_path)
+    col_repo.add_handle(handle, "MyHandle")
+    col = Collection(col_repo)
+
+    # initial metadata:
+    assert_equal(col['MyHandle'][2], "['Metadata not available yet.']")
+
+    # edit handle's metadata:
+    handle.set_metadata("Fresh Metadata.\n")
+    assert_equal(handle.get_metadata(), ['Fresh Metadata.'])
+    # without updating the cache, collection still has initial metadata:
+    assert_equal(col["MyHandle"][2], "['Metadata not available yet.']")
+    # TODO: Update cache from Handle! (not just from file of course!)
+    # assert_equal(col["MyHandle"][2], "['Fresh Metadata.']", "collection:\n%s" % col)
 
 
 @with_testrepos(flavors=local_flavors)

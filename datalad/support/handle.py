@@ -149,7 +149,7 @@ class Handle(AnnexRepo):
         # check whether .datalad/metadata exists => raise Not Available
         # read it => rdflib
         with open(opj(self.path, '.datalad', 'metadata'), 'r') as f:
-            return f.readlines()
+            return [line.rstrip() for line in f.readlines()]
 
     def set_metadata(self, content):
         with open(opj(self.path, '.datalad', 'metadata'), 'w') as f:
