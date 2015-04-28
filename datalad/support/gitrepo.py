@@ -163,7 +163,7 @@ def normalize_paths(func, match_return_type=True):
     return newfunc
 
 
-def _fix_paths_list(files):
+def _remove_empty_items(list_):
     """Remove empty entries from list
 
     This is needed, since some functions of GitPython may convert
@@ -176,11 +176,11 @@ def _fix_paths_list(files):
     Returns:
     list of str
     """
-    if not isinstance(files, list):
+    if not isinstance(list_, list):
         lgr.warning(
-            "_fix_paths_list() called with non-list type: %s" % type(files))
+            "_remove_empty_items() called with non-list type: %s" % type(files))
         return files
-    return [file_ for file_ in files if file_]
+    return [file_ for file_ in list_ if file_]
 
 
 class GitRepo(object):
@@ -254,8 +254,8 @@ class GitRepo(object):
             list of paths to add
         """
 
+        files = _remove_empty_items(files)
         if files:
-            files = _fix_paths_list(files)
             try:
                 self.cmd_call_wrapper(self.repo.index.add, files, write=True)
                 # TODO: May be make use of 'fprogress'-option to indicate progress
@@ -285,7 +285,7 @@ class GitRepo(object):
           list of successfully removed files.
         """
 
-        files = _fix_paths_list(files)
+        files = _remove_empty_items(files)
 
         return self.repo.index.remove(files, working_tree=True, **kwargs)
 
