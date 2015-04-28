@@ -162,7 +162,7 @@ def nok_startswith(s, prefix):
         msg="String %r starts with %r" % (s, prefix))
 
 
-def ok_annex_get(ar, files):
+def ok_annex_get(ar, files, network=True):
     """Helper to run .annex_get decorated checking for correct operation
 
     annex_get passes through stderr from the ar to the user, which pollutes
@@ -170,8 +170,9 @@ def ok_annex_get(ar, files):
     """
     with swallow_outputs() as cmo:
         ar.annex_get(files)
-        # wget or curl - just verify that annex spits out expected progress bar
-        ok_('100%' in cmo.err or '100.0%' in cmo.err)
+        if network:
+            # wget or curl - just verify that annex spits out expected progress bar
+            ok_('100%' in cmo.err or '100.0%' in cmo.err)
     # verify that load was fetched
     has_content = ar.file_has_content(files)
     if isinstance(has_content, bool):
