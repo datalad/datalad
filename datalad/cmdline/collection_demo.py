@@ -89,3 +89,19 @@ def install_handle(dest, col_name=None, handle_name=None, url=None):
     handle = Handle(dest, url)
     get_local_collection().add_handle(handle, handle_name if handle_name
                                       else basename(handle.path))
+
+
+def publish(src, target):
+        # Q: Is this even a class method or just a datalad command?
+
+        # TODO: lintian check for all handles and may be the collection itself,
+
+        # TODO: Figure out uploading procedure
+        #   => target should be some Uploader-Interface and (may be) an url, ...
+
+        # especially cross-platform checks
+        # first (try to) upload handles
+        # check all is fine
+        # update location for uploaded handles
+        # upload collection itself
+        pass

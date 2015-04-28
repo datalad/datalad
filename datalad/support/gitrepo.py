@@ -328,6 +328,10 @@ class GitRepo(object):
         """
         return [branch.name for branch in self.repo.branches]
 
+    def git_get_active_branch(self):
+
+        return self.repo.active_branch.name
+
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
