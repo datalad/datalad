@@ -157,6 +157,26 @@ def normalize_paths(func, match_return_type=True):
     return newfunc
 
 
+def _remove_empty_items(list_):
+    """Remove empty entries from list
+
+    This is needed, since some functions of GitPython may convert
+    an empty entry to '.', when used with a list of paths.
+
+    Parameter:
+    ----------
+    files: list of str
+
+    Returns:
+    list of str
+    """
+    if not isinstance(list_, list):
+        lgr.warning(
+            "_remove_empty_items() called with non-list type: %s" % type(files))
+        return files
+    return [file_ for file_ in list_ if file_]
+
+
 class GitRepo(object):
     """Representation of a git repository
 
@@ -228,6 +248,7 @@ class GitRepo(object):
             list of paths to add
         """
 
+        files = _remove_empty_items(files)
         if files:
             try:
                 self.cmd_call_wrapper(self.repo.index.add, files, write=True)
@@ -271,3 +292,4 @@ class GitRepo(object):
 
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
+
