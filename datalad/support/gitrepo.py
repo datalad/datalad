@@ -455,7 +455,7 @@ class GitRepo(object):
             '', cmd_str)
         return out.rstrip(linesep).split(linesep)
 
-    def git_get_file_content(self, file_, branch=None):
+    def git_get_file_content(self, file_, branch='HEAD'):
         """
 
         Returns:

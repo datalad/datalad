@@ -120,7 +120,6 @@ class CollectionRepo(GitRepo):
         """
 
         super(CollectionRepo, self).__init__(path, url, runner=runner)
-        #self.handles = []
 
         if not self.get_indexed_files():
             # it's a brand new collection repo.
@@ -192,7 +191,7 @@ class CollectionRepo(GitRepo):
                 out[self._filename2key(filename)] = (id_, url, md)
         return out
 
-    def get_remotes_data(self):
+    def get_remotes_data(self, name=None):
         """Get the metadata of all remotes.
 
         Returns:
@@ -201,6 +200,8 @@ class CollectionRepo(GitRepo):
         """
 
         remotes = dict()
+
+        # TODO: name! None->all
 
         for remote in self.git_remote_show():
             # TODO: This shouldn't happen here:
@@ -246,7 +247,7 @@ class CollectionRepo(GitRepo):
         self.git_commit(msg)
 
     def add_handle(self, handle, name):
-        """Adds a handle to the collection
+        """Adds a handle to the collection repository.
 
         Parameters:
         -----------
