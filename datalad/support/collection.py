@@ -60,7 +60,7 @@ class Collection(dict):
         if not self._colrepo:
             return None
 
-        return self._colrepo.get_handles(branch)
+        return self._colrepo.get_handles_data(branch)
 
     def _load_remotes(self):
         if not self._colrepo:
@@ -167,7 +167,7 @@ class CollectionRepo(GitRepo):
         """
         return key
 
-    def get_handles(self, branch):
+    def get_handles_data(self, branch):
         """Get the metadata of all handles.
 
         Returns:
@@ -208,7 +208,7 @@ class CollectionRepo(GitRepo):
                 continue
             remote_dict = remotes.get(remote, {})
             for remote_branch in self.git_get_branches():
-                remote_dict[remote_branch] = self.get_handles(remote_branch)
+                remote_dict[remote_branch] = self.get_handles_data(remote_branch)
             # TODO: head_branch: git_get_active_branch
             remotes[remote] = remote_dict
         return remotes
@@ -233,14 +233,16 @@ class CollectionRepo(GitRepo):
                 self.git_remove(gone)
 
         # update everything else to be safe
+        files_to_add = []
         for k, v in collection.iteritems():
             with open(opj(self.path, self._key2filename(k)), 'w') as ofile:
                 ofile.write('\n'.join(['%s = %s' % (cat, val)
                                       for cat, val in zip(('handle_id',
                                                            'last_seen',
                                                            'metadata'), v)]))
-            self.git_add(self._key2filename(k))
+            files_to_add.append(self._key2filename(k))
 
+        self.git_add(files_to_add)
         self.git_commit(msg)
 
     def add_handle(self, handle, name):
