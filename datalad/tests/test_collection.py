@@ -58,39 +58,36 @@ def test_CollectionRepo_constructor(clean_path, clean_path2, broken_path):
     # TODO: provide a minimal test collection, that contains something valid
 
 
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_CollectionRepo_get_handles(annex_path, handle_path,
+                                handle_path2, clt_path):
+
+    handle1 = Handle(handle_path, annex_path)
+    handle2 = Handle(handle_path2, annex_path)
+    col_repo = CollectionRepo(clt_path)
+    col_repo.add_handle(handle1, "FirstHandle")
+    col_repo.add_handle(handle2, "SecondHandle")
+    collection = Collection(col_repo)
+
+    # get a single handle instance:
+    t_handle = col_repo.get_handle("SecondHandle")
+    assert_equal((t_handle.get_datalad_id(), t_handle.path,
+                  str(t_handle.get_metadata())),
+        collection["SecondHandle"])
+    assert_equal(t_handle.path, handle_path2)
+    assert_equal(t_handle.get_datalad_id(), handle2.get_datalad_id())
+    assert_equal(t_handle.get_metadata(), handle2.get_metadata())
+
+    # now get a list:
+    t_list = col_repo.get_handles()
+    assert_equal(len(t_list), 2)
+    assert handle1 == t_list[0] or handle1 == t_list[1]
+    assert handle2 == t_list[0] or handle2 == t_list[1]
 
 
-
-#
-# @with_testrepos(flavors=local_flavors)
-# @with_tempfile
-# @with_tempfile
-# @with_tempfile
-# def test_CollectionRepo_get_handles(annex_path, handle_path,
-#                                 handle_path2, clt_path):
-#
-#     handle1 = Handle(handle_path, annex_path)
-#     handle2 = Handle(handle_path2, annex_path)
-#     collection = CollectionRepo(clt_path)
-#     collection.add_handle(handle1, "First Handle")
-#     collection.add_handle(handle2, "Second Handle")
-#
-#     # get a single handle instance:
-#     t_handle = collection.get_handle("Second Handle")
-#     assert_in(("Second Handle", t_handle.get_datalad_id(),
-#                t_handle.path, t_handle.get_metadata()),
-#               collection.handles)
-#     assert_equal(t_handle.path, handle_path2)
-#     assert_equal(t_handle.get_datalad_id(), handle2.get_datalad_id())
-#     assert_equal(t_handle.get_metadata(), handle2.get_metadata())
-#
-#     # now get a list:
-#     t_list = collection.get_handles()
-#     assert_equal(len(t_list), 2)
-#     assert_equal(t_list[0], handle1)
-#     assert_equal(t_list[1], handle2)
-#
-#
 # @with_tempfile
 # @with_tempfile
 # def test_CollectionRepo_metadata_cache(h_path, c_path):
@@ -108,46 +105,48 @@ def test_CollectionRepo_constructor(clean_path, clean_path2, broken_path):
 #     assert_equal(collection.handles[0][3], ["Metadata not available yet.\n"])
 #     collection.update_metadata_cache(handle)
 #     assert_equal(collection.handles[0][3], ["Fresh Metadata.\n"])
-#
-#
-#
-# @with_testrepos(flavors=local_flavors)
-# @with_tempfile
-# @with_tempfile
-# def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
-#
-#     handle = Handle(clone_path, annex_path)
-#     clt = CollectionRepo(clt_path)
-#     clt.add_handle(handle, "first handle")
-#     ok_clean_git(clt_path, annex=False)
-#     os.path.exists(opj(clt_path, "first handle"))
-#     assert_in("first handle", clt.get_indexed_files())
-#     with open(opj(clt_path, "first handle"), 'r') as f:
-#         assert_equal(f.readline().rstrip(), "handle_id = %s" %
-#                                             handle.get_datalad_id())
-#         assert_equal(f.readline().rstrip(), "last_seen = %s" % handle.path)
-#         assert_equal(f.readline().rstrip(), "metadata = %s" %
-#                                             handle.get_metadata())
-#         assert_equal(f.readline(), "")
-#     assert_equal(clt.handles, [("first handle", handle.get_datalad_id(),
-#                                 handle.path, handle.get_metadata())])
-#
-#
-# @with_testrepos(flavors=local_flavors)
-# @with_tempfile
-# @with_tempfile
-# def test_CollectionRepo_remove_handle(annex_path, handle_path, clt_path):
-#
-#     handle = Handle(handle_path, annex_path)
-#     collection = CollectionRepo(clt_path)
-#     collection.add_handle(handle, "MyHandle")
-#     collection.remove_handle("MyHandle")
-#     ok_clean_git(clt_path, annex=False)
-#     assert_false(os.path.exists(opj(clt_path, "MyHandle")))
-#     assert_equal(collection.handles, [])
-#     # reminder:
-#     # last statemant means: instance lost any knowledge of
-#     # handle's name, id, path, metadata
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
+
+    handle = Handle(clone_path, annex_path)
+    clt = CollectionRepo(clt_path)
+    clt.add_handle(handle, "first_handle")
+    ok_clean_git(clt_path, annex=False)
+    os.path.exists(opj(clt_path, "first_handle"))
+    assert_in("first_handle", clt.get_indexed_files())
+    with open(opj(clt_path, "first_handle"), 'r') as f:
+        assert_equal(f.readline().rstrip(), "handle_id = %s" %
+                                            handle.get_datalad_id())
+        assert_equal(f.readline().rstrip(), "last_seen = %s" % handle.path)
+        assert_equal(f.readline().rstrip(), "metadata = %s" %
+                                            handle.get_metadata())
+        assert_equal(f.readline(), "")
+    col_dict = Collection(clt)
+    assert_equal(col_dict["first_handle"],
+                 (handle.get_datalad_id(), handle.path,
+                  str(handle.get_metadata())))
+
+
+@with_testrepos(flavors=local_flavors)
+@with_tempfile
+@with_tempfile
+def test_CollectionRepo_remove_handle(annex_path, handle_path, clt_path):
+
+    handle = Handle(handle_path, annex_path)
+    collection = CollectionRepo(clt_path)
+    collection.add_handle(handle, "MyHandle")
+    collection.remove_handle("MyHandle")
+    ok_clean_git(clt_path, annex=False)
+    assert_false(os.path.exists(opj(clt_path, "MyHandle")))
+    assert_equal(collection.get_handles_data(), dict())
+    # reminder:
+    # last statemant means: instance lost any knowledge of
+    # handle's name, id, path, metadata
+
 
 @with_tempfile
 def test_Collection_constructor(path):
@@ -173,6 +172,7 @@ def test_Collection_constructor(path):
     assert_equal(col, col2)
 
     assert_raises(TypeError, Collection, 1)
+
 
 @with_tempfile
 def test_Collection_commit(path):

@@ -23,6 +23,12 @@ lgr = logging.getLogger('datalad.collection')
 
 
 class Collection(dict):
+    # TODO: For now it represents just a branch of a collection repo with
+    # no access to other branches. But then it has (kind of) "remotes"
+    # including all of their branches. This is not exactly consistent.
+    # So we should either make all branches of the repo itself available as
+    # well or remove the remotes, let a Collection represent a single branch
+    # and let a repository represent a "Meta-Collection".
 
     def __init__(self, src=None, branch='HEAD', load_remotes=False):
 
@@ -49,25 +55,12 @@ class Collection(dict):
         if not self._colrepo:
             return
 
-        self.update(self._load_handle_files(self._branch))
+        self.update(self._colrepo.get_handles_data(self._branch))
 
         if self._load_remotes_flag:
-            self.remote_collections = self._load_remotes()
+            self.remote_collections = self._colrepo.get_remotes_data()
 
         self.meta = 'rdf thingie later'
-
-    def _load_handle_files(self, branch):
-        if not self._colrepo:
-            return None
-
-        return self._colrepo.get_handles_data(branch)
-
-    def _load_remotes(self):
-        if not self._colrepo:
-            return None
-
-        return self._colrepo.get_remotes_data()
-
 
     def query(self):
         pass
@@ -77,7 +70,7 @@ class Collection(dict):
         if not self._colrepo:
             raise RuntimeError("cannot commit -- have relationship issues")
 
-        self._colrepo.save_collection(self, branch, msg)
+        self._colrepo.commit_collection(self, branch, msg)
 
 
 class CollectionRepo(GitRepo):
@@ -166,7 +159,7 @@ class CollectionRepo(GitRepo):
         """
         return key
 
-    def get_handles_data(self, branch):
+    def get_handles_data(self, branch='HEAD'):
         """Get the metadata of all handles.
 
         Returns:
@@ -174,7 +167,7 @@ class CollectionRepo(GitRepo):
         dictionary
 
         """
-        out = {}
+        out = dict()
 
         # load handle from local branch
         for filename in self.git_get_files(branch):
@@ -203,19 +196,29 @@ class CollectionRepo(GitRepo):
 
         # TODO: name! None->all
 
-        for remote in self.git_remote_show():
-            # TODO: This shouldn't happen here:
-            if remote.strip() == "":
-                continue
+        for remote in self.git_remote_show(verbose=False):
             remote_dict = remotes.get(remote, {})
-            for remote_branch in self.git_get_branches():
-                remote_dict[remote_branch] = self.get_handles_data(remote_branch)
-            # TODO: head_branch: git_get_active_branch
+            head_branch = None
+            for remote_branch in self.git_get_remote_branches():
+                head = re.findall(r'-> (.*)', remote_branch)
+
+                if len(head):
+                    # found the HEAD pointer
+                    head_branch = head[0]
+                    continue
+
+                # TODO: By now these branches are named 'remote/branch',
+                # so split and integrate outer loop.
+                remote_dict[remote_branch] = \
+                    self.get_handles_data(remote_branch)
+            # Add entry 'HEAD':
+            remote_dict['HEAD'] = remote_dict[head_branch]
             remotes[remote] = remote_dict
+
         return remotes
 
-    def save_collection(self, collection, branch=None,
-                        msg="Collection saved."):
+    def commit_collection(self, collection, branch=None,
+                          msg="Collection saved."):
         # TODO: branch is not used yet.
 
         # TODO: What about remotes?
@@ -276,18 +279,15 @@ class CollectionRepo(GitRepo):
     def remove_handle(self, key):
 
         # TODO: also accept a Handle instead of a name
-        # TODO: remove stuff from collection file
+        # TODO: remove stuff from collection file (if there is going to be any)
         self.git_remove(self._key2filename(key))
         self.git_commit("Removed handle %s." % key)
 
+    def get_handles(self):
+        handles_data = self.get_handles_data()
+        return [Handle(handles_data[x][1]) for x in handles_data]
 
-    # TODO: -----------------------------------------------------------
-    # def get_handles(self):
-    #
-    #     return [Handle(x[2]) for x in self.handles]
-    #
-    # def get_handle(self, name):
-    #
-    #     return [Handle(x[2]) for x in self.handles if x[0] == name][0]
+    def get_handle(self, name):
+        return Handle(self.get_handles_data()[name][1])
 
 

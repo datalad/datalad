@@ -326,7 +326,24 @@ class GitRepo(object):
         [str]
             Names of all branches of this repository.
         """
+
         return [branch.name for branch in self.repo.branches]
+
+    def git_get_remote_branches(self):
+        """Get all branches of all remotes of the repo.
+
+        Returns:
+        -----------
+        [str]
+            Names of all remote branches.
+        """
+
+        return [branch.strip() for branch in
+                self.repo.git.branch(r=True).split(linesep)]
+
+    def git_get_remotes(self):
+        Repo().remotes[0]
+
 
     def git_get_active_branch(self):
 
