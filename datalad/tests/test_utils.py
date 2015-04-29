@@ -15,6 +15,7 @@ import shutil
 import sys
 import logging
 import pdb
+import traceback
 
 from os.path import join as opj
 from ..utils import (rotree, swallow_outputs, swallow_logs, setup_exceptionhook,
@@ -82,16 +83,18 @@ def _check_setup_exceptionhook(interactive):
     utils.is_interactive = lambda: interactive
     #old = pdb.post_mortem
     pdb.post_mortem = our_post_mortem
-    _tb = None
     with swallow_logs() as cml, swallow_outputs() as cmo:
         # we need to call our_exceptionhook explicitly b/c nose
         # swallows all Exceptions and hook never gets executed
-        # TODO throw real exception and use real args for type
-        # value and traceback (tb) for this call:
-        our_exceptionhook(None, None, _tb)
-        assert_in('None', cmo.err)
+        try:
+            raise RuntimeError
+        except RuntimeError:
+            type_, value_, tb_ = sys.exc_info()
+        our_exceptionhook(type_, value_, tb_)
+        assert_in('Traceback (most recent call last)', cmo.err)
+        assert_in('in _check_setup_exceptionhook', cmo.err)
         if interactive:
-            assert_equal(post_mortem_tb[0], _tb)
+            assert_equal(post_mortem_tb[0], tb_)
         else:
             assert_equal(post_mortem_tb, [])
             assert_in('We cannot setup exception hook', cml.out)
