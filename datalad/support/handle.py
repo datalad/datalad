@@ -12,7 +12,7 @@ This layer makes the difference between an arbitrary annex and a datalad-managed
 """
 
 import os
-from os.path import join as opj, exists
+from os.path import join as opj, exists, basename
 import logging
 
 from annexrepo import AnnexRepo
@@ -29,7 +29,8 @@ class Handle(AnnexRepo):
 
     """
 
-    def __init__(self, path, url=None, direct=False, runner=None, backend=None):
+    def __init__(self, path, url=None, direct=False, runner=None, backend=None,
+                 name=None):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -44,11 +45,17 @@ class Handle(AnnexRepo):
           valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
         direct: bool
           if True, force git-annex to operate in direct mode
-
+        runner: Runner
+        backend: str
+        name: str
         """
 
         super(Handle, self).__init__(path, url, direct=direct, runner=runner,
                                      backend=backend)
+
+        # default name: repo's basename
+        # TODO: Does this make sense at all? Name -> collection!
+        self.name = name or basename(self.path)
 
         datalad_path = opj(self.path, '.datalad')
         if not exists(datalad_path):

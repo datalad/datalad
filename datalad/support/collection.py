@@ -30,6 +30,10 @@ class Collection(dict):
     # well or remove the remotes, let a Collection represent a single branch
     # and let a repository represent a "Meta-Collection".
 
+    # Note: Agreed with Michael, to have a collection per (remote) branch.
+    # local Master collection knows a lot of them and somehow joins rdf-metadata
+    # to big db, which is used for queries.
+
     def __init__(self, src=None, branch='HEAD', load_remotes=False):
 
         super(Collection, self).__init__()
@@ -85,8 +89,7 @@ class CollectionRepo(GitRepo):
     Being present is not sufficient!
     """
 
-    __slots__ = ['name']
-    # TODO: check how __slots__ work with derived classes
+    __slots__ = GitRepo.__slots__ + ['name']
 
     def __init__(self, path, url=None, name=None, runner=None):
         """
@@ -207,7 +210,8 @@ class CollectionRepo(GitRepo):
                     head_branch = head[0]
                     continue
 
-                # TODO: By now these branches are named 'remote/branch',
+                # TODO: By now these branches are named 'remote/branch';
+                # correct for get_handles_data, but not in dict-representation,
                 # so split and integrate outer loop.
                 remote_dict[remote_branch] = \
                     self.get_handles_data(remote_branch)
@@ -259,7 +263,7 @@ class CollectionRepo(GitRepo):
         name: str
           name of the handle. This is required to be unique with respect to the
           collection.
-         """
+        """
 
         # default name of the handle:
         if not name:
@@ -292,5 +296,25 @@ class CollectionRepo(GitRepo):
 
     def get_handle(self, name):
         return Handle(self.get_handles_data()[name][1])
+
+    # Reintroduce:
+    # TODO: Delay and wait for checking rdflib
+    def update_meta_data_cache(self, handle):
+
+        # TODO: All handles?
+
+        # if isinstance(handle, basestring):
+        #     key = handle
+        # elif isinstance(handle, Handle):
+        #     key = handle.name
+        # else:
+        #     raise TypeError("can't update from handle given by %s (%s)." %
+        #                     (handle, type(handle)))
+
+
+        # with open(opj(self.path, self._key2filename(handle)), 'w') as f:
+
+
+        pass
 
 

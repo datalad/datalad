@@ -462,15 +462,14 @@ class GitRepo(object):
         [str]
           list of files.
         """
+        # cmd_str = 'git ls-tree -r ' + branch
+        # return out.rstrip(linesep).split(linesep)
 
-        # TODO: This does not work as expected. Figure out!
-        # For now keep it as is, since it nevertheless provides
-        # the info needed for collections.
-        cmd_str = 'git ls-files' + \
-                  (' --with-tree %s' % branch if branch else '')
-        out, err = self._git_custom_command(
-            '', cmd_str)
-        return out.rstrip(linesep).split(linesep)
+        head = self.repo.head if branch == "HEAD" else self.repo.heads[branch]
+
+        return [item.path for item in list(head.commit.tree.traverse())]
+        # if isinstance(item, git.objects.blob.Blob)
+
 
     def git_get_file_content(self, file_, branch='HEAD'):
         """
