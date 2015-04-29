@@ -172,6 +172,40 @@ def test_traverse_and_do_fully_empty(d):
     eq_(ls_tree(d), [])
 
 
+@with_tree([
+    ('loaded.txt', 'abracadabra'),
+    ('empty.txt', ''),
+    ('d1', (
+        ('loaded2.txt', '1 f load'),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d3', (
+        ('empty', ''),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d4', (
+        ('loaded3', 'load'),
+        )),
+    ])
+def test_traverse_and_do_annex_repo(d):
+    from ..support.annexrepo import AnnexRepo
+    ar = AnnexRepo(d)
+    kw = {'matcher': ar.file_has_content,
+          'pass_all_files': True}
+    # since none of the files was added to annex yet -- should be all "empty"
+    # for the beast
+    ok_(not traverse_and_do(d, **kw))
+    # but should report empty for
+    eq_(traverse_and_do(opj(d, 'd1', 'd2')), False)
+    eq_(traverse_and_do(opj(d, 'd3')), False)
+    # but not upstairs for d1 since of loaded2.txt
+    ok_(traverse_and_do(opj(d, 'd1')))
+    ok_(traverse_and_do(opj(d, 'd4')))
+
 def test_swallow_outputs():
     with swallow_outputs() as cm:
         eq_(cm.out, '')

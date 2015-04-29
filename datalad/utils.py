@@ -212,6 +212,7 @@ def traverse_and_do(path,
                     do_some=None,
                     do_all=None,
                     matcher=has_content,
+                    pass_all_files=False,
                     exclude=(),
                     pass_hits=False,
                     pass_misses=False,
@@ -241,6 +242,9 @@ def traverse_and_do(path,
              Passed only if pass_misses=True
     matcher: callable, optional
         Given the path (to a file) should return the bool result
+    pass_all_files: bool, optional
+        Either matcher could process all files at once, and output a list
+        of result per each file
     exclude: iterable or regexp, optional
         Files/directories to exclude from consideration. If an iterable (e.g.
         list or string) -- checked for presence in that iterable, otherwise --
@@ -292,10 +296,13 @@ def traverse_and_do(path,
     # only do_all -- no need to matcher files.  For now -- KISS
 
     # Now verify all the files
-    status_files = [
-        matcher(os.path.join(root, f))
-        for f in files
-    ]
+    if pass_all_files:
+        status_files = matcher([os.path.join(root, f) for f in files])
+    else:
+        status_files = [
+            matcher(os.path.join(root, f))
+            for f in files
+        ]
 
     status_all = status_dirs + status_files
 
