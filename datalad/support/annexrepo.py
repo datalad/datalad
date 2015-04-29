@@ -66,8 +66,10 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
+    __slots__ = GitRepo.__slots__ + ['always_commit']
+
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None):
+                 direct=False, backend=None, always_commit=True):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -98,6 +100,8 @@ class AnnexRepo(GitRepo):
             that are 'getted' afterwards.
         """
         super(AnnexRepo, self).__init__(path, url, runner=runner)
+
+        self.always_commit = always_commit
 
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
@@ -151,6 +155,9 @@ class AnnexRepo(GitRepo):
 
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
+
+        if not self.always_commit:
+            git_options.extend(['-c', 'annex.alwayscommit=false'])
 
         if git_options:
             cmd_list = ['git'] + git_options + ['annex']
@@ -244,7 +251,6 @@ class AnnexRepo(GitRepo):
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
 
-    @kwargs_to_options
     @normalize_paths
     def annex_get(self, files, options=[]):
         """Get the actual content of files
