@@ -348,17 +348,20 @@ def setup_exceptionhook():
        If interactive, our exceptionhook handler will invoke
        pdb.post_mortem; if not interactive, then invokes default handler.
     """
+
     def _datalad_pdb_excepthook(type, value, tb):
-        if not is_interactive:
+
+        if is_interactive():
+            import traceback, pdb
+            traceback.print_exception(type, value, tb)
+            print
+            pdb.post_mortem(tb)
+        else:
             lgr.warn("We cannot setup exception hook since not in interactive mode")
             # we are in interactive mode or we don't have a tty-like
             # device, so we call the default hook
             #sys.__excepthook__(type, value, tb)
             _sys_excepthook(type, value, tb)
-        else:
-            import traceback, pdb
-            traceback.print_exception(type, value, tb)
-            print
-            pdb.post_mortem(tb)
+
     sys.excepthook = _datalad_pdb_excepthook
 

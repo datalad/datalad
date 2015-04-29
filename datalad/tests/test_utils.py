@@ -22,6 +22,7 @@ from ..utils import (rotree, swallow_outputs, swallow_logs, setup_exceptionhook,
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in
+from .. import utils
 
 
 @with_tempfile(mkdir=True)
@@ -77,7 +78,9 @@ def test_setup_exceptionhook():
     post_mortem_tb = []
     def our_post_mortem(tb):
         post_mortem_tb.append(tb)
- 
+
+    utils.is_interactive = lambda: True
+    #old = pdb.post_mortem
     pdb.post_mortem = our_post_mortem
     _tb = None
     with swallow_outputs() as cmo:
@@ -89,3 +92,13 @@ def test_setup_exceptionhook():
         assert_in('None', cmo.err)
 
     assert_equal(post_mortem_tb[0], _tb)
+
+    post_mortem_tb = []
+    utils.is_interactive = lambda: False
+    with swallow_logs() as cml, swallow_outputs() as cmo:
+        our_exceptionhook(None, None, _tb)
+        assert_equal(post_mortem_tb, [])
+        assert_in('We cannot setup exception hook', cml.out)
+        assert_in('None', cmo.err)
+
+
