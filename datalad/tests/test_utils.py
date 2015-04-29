@@ -69,7 +69,7 @@ def test_swallow_logs():
         eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
 
 
-def test_setup_exceptionhook():
+def _check_setup_exceptionhook(interactive):
     old_exceptionhook = sys.excepthook
     setup_exceptionhook()
     our_exceptionhook = sys.excepthook
@@ -79,26 +79,24 @@ def test_setup_exceptionhook():
     def our_post_mortem(tb):
         post_mortem_tb.append(tb)
 
-    utils.is_interactive = lambda: True
+    utils.is_interactive = lambda: interactive
     #old = pdb.post_mortem
     pdb.post_mortem = our_post_mortem
     _tb = None
-    with swallow_outputs() as cmo:
+    with swallow_logs() as cml, swallow_outputs() as cmo:
         # we need to call our_exceptionhook explicitly b/c nose
         # swallows all Exceptions and hook never gets executed
         # TODO throw real exception and use real args for type
         # value and traceback (tb) for this call:
         our_exceptionhook(None, None, _tb)
         assert_in('None', cmo.err)
+        if interactive:
+            assert_equal(post_mortem_tb[0], _tb)
+        else:
+            assert_equal(post_mortem_tb, [])
+            assert_in('We cannot setup exception hook', cml.out)
+            
 
-    assert_equal(post_mortem_tb[0], _tb)
-
-    post_mortem_tb = []
-    utils.is_interactive = lambda: False
-    with swallow_logs() as cml, swallow_outputs() as cmo:
-        our_exceptionhook(None, None, _tb)
-        assert_equal(post_mortem_tb, [])
-        assert_in('We cannot setup exception hook', cml.out)
-        assert_in('None', cmo.err)
-
-
+def test_setup_exceptionhook():
+    for tval in [True, False]:
+        yield _check_setup_exceptionhook, tval
