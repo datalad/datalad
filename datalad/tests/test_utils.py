@@ -14,12 +14,14 @@ import os
 import shutil
 import sys
 import logging
+import pdb
 
 from os.path import join as opj
-from ..utils import rotree, swallow_outputs, swallow_logs
+from ..utils import (rotree, swallow_outputs, swallow_logs, setup_exceptionhook,
+                    is_interactive)
 
-from nose.tools import ok_, eq_, assert_false, assert_raises
-from .utils import with_tempfile
+from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
+from .utils import with_tempfile, assert_in
 
 
 @with_tempfile(mkdir=True)
@@ -64,3 +66,26 @@ def test_swallow_logs():
         eq_(cm.out, 'debug1\n')  # not even visible at level 9
         lgr.info("info")
         eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+
+
+def test_setup_exceptionhook():
+    old_exceptionhook = sys.excepthook
+    setup_exceptionhook()
+    our_exceptionhook = sys.excepthook
+    ok_(old_exceptionhook != our_exceptionhook)
+
+    post_mortem_tb = []
+    def our_post_mortem(tb):
+        post_mortem_tb.append(tb)
+ 
+    pdb.post_mortem = our_post_mortem
+    _tb = None
+    with swallow_outputs() as cmo:
+        # we need to call our_exceptionhook explicitly b/c nose
+        # swallows all Exceptions and hook never gets executed
+        # TODO throw real exception and use real args for type
+        # value and traceback (tb) for this call:
+        our_exceptionhook(None, None, _tb)
+        assert_in('None', cmo.err)
+
+    assert_equal(post_mortem_tb[0], _tb)
