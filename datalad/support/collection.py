@@ -22,6 +22,50 @@ from ..cmd import Runner
 lgr = logging.getLogger('datalad.collection')
 
 
+class MasterCollection(object):
+    """ Needs a better name;
+        Provides all (remote) branches of a collection repository.
+        May be could serve as a meta collection in general (let's see how
+        this works out).
+    """
+
+    def __init__(self, src=None):
+
+        if isinstance(src, CollectionRepo):
+            self._repo = src
+
+            # TODO: May be don't separate local and remote branches,
+            # but use "remote/branch" as key, which is the branches name anyway.
+            # For THE local master collection we may be need instead to somehow
+            # differentiate locally available remotes and actually remote
+            # remotes of the repository.
+
+            self.local_collections = dict()
+            for branch in src.git_get_branches():  # TODO: 'HEAD' missing.
+                self.local_collections[branch] = Collection(src=self._repo,
+                                                            branch=branch)
+
+            self.remote_collections = self._repo.get_remotes_data()
+
+            # TODO: load and join the metadata ...:
+
+        else:
+            lgr.error('Unknown source for MasterCollection(): %s' % type(src))
+            raise TypeError('Unknown source for MasterCollection(): %s' % type(src))
+
+    def update(self, remote=None, branch=None):
+        # reload (all) branches
+        pass
+
+    def query(self):
+        """ Perform query on (what?) collections.
+
+        Returns:
+        --------
+        list of handles? (names => remote/branch/handle?)
+        """
+
+
 class Collection(dict):
     # TODO: For now it represents just a branch of a collection repo with
     # no access to other branches. But then it has (kind of) "remotes"
@@ -34,15 +78,15 @@ class Collection(dict):
     # local Master collection knows a lot of them and somehow joins rdf-metadata
     # to big db, which is used for queries.
 
-    def __init__(self, src=None, branch='HEAD', load_remotes=False):
+    def __init__(self, src=None, branch='HEAD'):
 
         super(Collection, self).__init__()
-        self.remote_collections = None
         self._branch = branch
-        self._load_remotes_flag = load_remotes
 
         if isinstance(src, Collection):
             self._colrepo = None
+            # TODO: confirm this is correct behaviour and document it.
+
             self.update(src)
             # XXX most likely a copy
             self.meta = src.meta
@@ -52,29 +96,31 @@ class Collection(dict):
         elif src is None:
             self._colrepo = None
             self.meta = 'rdf thingie later'
+            # TODO: None, empty rdflib.Graph(), whatever ...
         else:
-            raise TypeError('unknown source for Collection(): %s' % type(src))
+            lgr.error("Unknown source for Collection(): %s" % type(src))
+            raise TypeError('Unknown source for Collection(): %s' % type(src))
 
     def _reload(self):
         if not self._colrepo:
+            lgr.warning("_reload(): Missing repository.")
             return
 
         self.update(self._colrepo.get_handles_data(self._branch))
-
-        if self._load_remotes_flag:
-            self.remote_collections = self._colrepo.get_remotes_data()
-
         self.meta = 'rdf thingie later'
 
     def query(self):
+        # Not sure yet whether we need to have a query
+        # on a single Collection instance.
         pass
 
-    def commit(self, branch=None, msg="Cheers!"):
+    def commit(self, msg="Cheers!"):
 
         if not self._colrepo:
-            raise RuntimeError("cannot commit -- have relationship issues")
+            lgr.error("commit(): Missing repository.")
+            raise RuntimeError("commit(): Missing repository.")
 
-        self._colrepo.commit_collection(self, branch, msg)
+        self._colrepo.commit_collection(self, self._branch, msg)
 
 
 class CollectionRepo(GitRepo):
@@ -172,7 +218,7 @@ class CollectionRepo(GitRepo):
         """
         out = dict()
 
-        # load handle from local branch
+        # load handles from local branch
         for filename in self.git_get_files(branch):
             if filename != 'collection':
                 for line in self.git_get_file_content(filename, branch):
@@ -199,7 +245,7 @@ class CollectionRepo(GitRepo):
 
         # TODO: name! None->all
 
-        for remote in self.git_remote_show(verbose=False):
+        for remote in self.git_get_remotes():
             remote_dict = remotes.get(remote, {})
             head_branch = None
             for remote_branch in self.git_get_remote_branches():
@@ -221,15 +267,17 @@ class CollectionRepo(GitRepo):
 
         return remotes
 
-    def commit_collection(self, collection, branch=None,
+    def commit_collection(self, collection, branch='HEAD',
                           msg="Collection saved."):
         # TODO: branch is not used yet.
-
-        # TODO: What about remotes?
 
         if not isinstance(collection, Collection):
             raise TypeError("Can't save non-collection type: %s" %
                             type(collection))
+
+        # save current branch and switch to the one to be changed:
+        current_branch = self.git_get_active_branch()
+        self.git_checkout(branch)
 
         # handle we no longer have
         no_more = set(self.get_indexed_files()).difference(
@@ -252,6 +300,9 @@ class CollectionRepo(GitRepo):
 
         self.git_add(files_to_add)
         self.git_commit(msg)
+
+        # restore repo's active branch on disk
+        self.git_checkout(current_branch)
 
     def add_handle(self, handle, name):
         """Adds a handle to the collection repository.

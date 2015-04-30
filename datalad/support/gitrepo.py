@@ -337,12 +337,13 @@ class GitRepo(object):
         [str]
             Names of all remote branches.
         """
-
+        # TODO: treat entries like this: origin/HEAD -> origin/master'
+        # currently this is done in collection
         return [branch.strip() for branch in
                 self.repo.git.branch(r=True).split(linesep)]
 
     def git_get_remotes(self):
-        Repo().remotes[0]
+        return [remote.name for remote in self.repo.remotes]
 
 
     def git_get_active_branch(self):
@@ -448,7 +449,7 @@ class GitRepo(object):
 
         self._git_custom_command('', 'git checkout %s %s' % (options, name))
 
-    def git_get_files(self, branch=None):
+    def git_get_files(self, branch="HEAD"):
         """Get a list of files in git.
 
         Lists the files in the (remote) branch.
@@ -462,13 +463,15 @@ class GitRepo(object):
         [str]
           list of files.
         """
-        # cmd_str = 'git ls-tree -r ' + branch
-        # return out.rstrip(linesep).split(linesep)
+        cmd_str = 'git ls-tree -r ' + branch
+        out, err = self._git_custom_command('', cmd_str)
+        return [line.split('\t')[1] for line in out.rstrip(linesep).split(linesep)]
 
-        head = self.repo.head if branch == "HEAD" else self.repo.heads[branch]
 
-        return [item.path for item in list(head.commit.tree.traverse())]
-        # if isinstance(item, git.objects.blob.Blob)
+        # Only local branches: How to get from remote branches in a similar way?
+        #head = self.repo.head if branch == "HEAD" else self.repo.heads[branch]
+        # return [item.path for item in list(head.commit.tree.traverse())]
+        # #if isinstance(item, git.objects.blob.Blob)
 
 
     def git_get_file_content(self, file_, branch='HEAD'):
