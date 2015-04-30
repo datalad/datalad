@@ -22,7 +22,9 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
     rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
-    on_windows, assert_raises, assert_cwd_unchanged
+    on_windows, assert_raises, assert_cwd_unchanged, \
+    ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
+
 
 
 #
@@ -162,6 +164,37 @@ def test_keeptemp_via_env_variable():
     ok_(    exists(files[1]), msg="File %s not exists" % files[1])
 
     rmtemp(files[-1])
+
+
+@with_tempfile
+def test_ok_symlink_helpers(tmpfile):
+
+    if on_windows:
+        raise SkipTest("no sylmlinks on windows")
+
+    assert_raises(AssertionError, ok_symlink, tmpfile)
+    assert_raises(AssertionError, ok_good_symlink, tmpfile)
+    assert_raises(AssertionError, ok_broken_symlink, tmpfile)
+
+    tmpfile_symlink = tmpfile + '_symlink'
+    os.symlink(tmpfile, tmpfile_symlink)  
+
+    # broken symlink
+    ok_symlink(tmpfile_symlink)
+    ok_broken_symlink(tmpfile_symlink)
+    assert_raises(AssertionError, ok_good_symlink, tmpfile_symlink)
+
+    with open(tmpfile, 'w') as tf:
+        tf.write('test text')
+    
+    # tmpfile is still not a symlink here
+    assert_raises(AssertionError, ok_symlink, tmpfile)
+    assert_raises(AssertionError, ok_good_symlink, tmpfile)
+    assert_raises(AssertionError, ok_broken_symlink, tmpfile)
+
+    ok_symlink(tmpfile_symlink)
+    ok_good_symlink(tmpfile_symlink)
+    assert_raises(AssertionError, ok_broken_symlink, tmpfile_symlink)
 
 
 def test_ok_startswith():
