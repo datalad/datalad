@@ -14,6 +14,8 @@ import os
 from os.path import join as opj
 
 from nose.tools import assert_raises, assert_equal, assert_false, assert_in
+from rdflib import Graph, Literal
+from rdflib.namespace import FOAF
 
 from ..support.gitrepo import GitRepo
 from ..support.handle import Handle
@@ -74,12 +76,15 @@ def test_CollectionRepo_get_handles(annex_path, handle_path,
 
     # get a single handle instance:
     t_handle = col_repo.get_handle("SecondHandle")
-    assert_equal((t_handle.get_datalad_id(), t_handle.path,
-                  str(t_handle.get_metadata())),
-        collection["SecondHandle"])
+
+    assert_equal(collection["SecondHandle"][0], t_handle.get_datalad_id())
+    assert_equal(collection["SecondHandle"][1], t_handle.path)
+    assert_equal(set(Graph().parse(data=collection["SecondHandle"][2])),
+                 set(t_handle.get_metadata()))
+
     assert_equal(t_handle.path, handle_path2)
     assert_equal(t_handle.get_datalad_id(), handle2.get_datalad_id())
-    assert_equal(t_handle.get_metadata(), handle2.get_metadata())
+    assert_equal(set(t_handle.get_metadata()), set(handle2.get_metadata()))
 
     # now get a list:
     t_list = col_repo.get_handles()
@@ -97,13 +102,22 @@ def test_CollectionRepo_metadata_cache(h_path, c_path):
     col = Collection(col_repo)
 
     # initial metadata:
-    assert_equal(col['MyHandle'][2], "['Metadata not available yet.']")
+    meta_initial = handle.get_metadata()
+    assert_equal(set(Graph().parse(data=col['MyHandle'][2])), set(meta_initial))
 
     # edit handle's metadata:
-    handle.set_metadata("Fresh Metadata.\n")
-    assert_equal(handle.get_metadata(), ['Fresh Metadata.'])
+    meta_new = handle.get_metadata()
+    list_ = list(meta_new.subject_objects(FOAF.name))
+    assert_equal(len(list_), 1)
+    s = list_[0][0]
+    o = list_[0][1]
+    tuple_ = (s, FOAF.name, Literal("New Name"))
+    meta_new.remove((s, FOAF.name, o))
+    meta_new.add(tuple_)
+    handle.set_metadata(meta_new)
+    assert_equal(set(handle.get_metadata()), set(meta_new))
     # without updating the cache, collection still has initial metadata:
-    assert_equal(col["MyHandle"][2], "['Metadata not available yet.']")
+    assert_equal(set(Graph().parse(data=col['MyHandle'][2])), set(meta_initial))
     # TODO: Update cache from Handle! (not just from file of course!)
     # assert_equal(col["MyHandle"][2], "['Fresh Metadata.']", "collection:\n%s" % col)
 
@@ -123,13 +137,15 @@ def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
         assert_equal(f.readline().rstrip(), "handle_id = %s" %
                                             handle.get_datalad_id())
         assert_equal(f.readline().rstrip(), "last_seen = %s" % handle.path)
-        assert_equal(f.readline().rstrip(), "metadata = %s" %
-                                            handle.get_metadata())
-        assert_equal(f.readline(), "")
+        assert_equal(
+            set(Graph().parse(data=''.join(f.readlines()).lstrip(
+                "metadata = "))),
+            set(handle.get_metadata()))
     col_dict = Collection(clt)
-    assert_equal(col_dict["first_handle"],
-                 (handle.get_datalad_id(), handle.path,
-                  str(handle.get_metadata())))
+    assert_equal(col_dict["first_handle"][0], handle.get_datalad_id())
+    assert_equal(col_dict["first_handle"][1], handle.path)
+    assert_equal(set(Graph().parse(data=col_dict["first_handle"][2])),
+                 set(handle.get_metadata()))
 
 
 @with_testrepos(flavors=local_flavors)

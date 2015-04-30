@@ -14,6 +14,8 @@ import os
 from os.path import join as opj, basename
 import logging
 
+from rdflib import Graph
+
 from .gitrepo import GitRepo
 from .handle import Handle
 from .exceptions import CollectionBrokenError
@@ -48,6 +50,15 @@ class MasterCollection(object):
             self.remote_collections = self._repo.get_remotes_data()
 
             # TODO: load and join the metadata ...:
+            # to be refined; For now just join everything as is, to see how this works.
+            # Reminder: Joining different branches probably won't work as is.
+            # Especially there is the question of how to reconstruct the branch, we found something in?
+            self.huge_graph = Graph()
+            for collection in self.local_collections:
+                self.huge_graph +=self.local_collections[collection].meta
+            for collection in self.remote_collections:
+                for branch in self.remote_collections[collection]:
+                    self.huge_graph += self.remote_collections[collection][branch].meta
 
         else:
             lgr.error('Unknown source for MasterCollection(): %s' % type(src))
@@ -95,8 +106,7 @@ class Collection(dict):
             self._reload()
         elif src is None:
             self._colrepo = None
-            self.meta = 'rdf thingie later'
-            # TODO: None, empty rdflib.Graph(), whatever ...
+            self.meta = Graph()
         else:
             lgr.error("Unknown source for Collection(): %s" % type(src))
             raise TypeError('Unknown source for Collection(): %s' % type(src))
@@ -107,7 +117,13 @@ class Collection(dict):
             return
 
         self.update(self._colrepo.get_handles_data(self._branch))
-        self.meta = 'rdf thingie later'
+        self.meta = Graph()
+        for handle in self:
+            try:
+                self.meta += Graph().parse(data=self[handle][2])
+            except Exception, e:
+                lgr.error("Data:\n%s" % self[handle][2])
+                raise e
 
     def query(self):
         # Not sure yet whether we need to have a query
@@ -229,7 +245,7 @@ class CollectionRepo(GitRepo):
                     elif line.startswith("metadata = "):
                         md = line[11:]
                     else:
-                        continue
+                        md += line
                 out[self._filename2key(filename)] = (id_, url, md)
         return out
 
@@ -325,7 +341,7 @@ class CollectionRepo(GitRepo):
         with open(opj(self.path, self._key2filename(name)), 'w') as f:
             f.write("handle_id = %s\n" % handle.get_datalad_id())
             f.write("last_seen = %s\n" % handle.path)
-            f.write("metadata = %s\n" % handle.get_metadata())
+            f.write("metadata = %s\n" % handle.get_metadata().serialize())
             # what else? maybe default view or sth.
 
         # TODO: write to collection file:
