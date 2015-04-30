@@ -15,6 +15,9 @@ import os
 from os.path import join as opj, exists, basename
 import logging
 
+from rdflib import Graph, URIRef, Literal
+from rdflib.namespace import RDF, FOAF
+
 from annexrepo import AnnexRepo
 
 lgr = logging.getLogger('datalad.dataset')
@@ -65,9 +68,12 @@ class Handle(AnnexRepo):
                 f.write(self.repo.config_reader().get_value("annex", "uuid"))
             self.add_to_git(opj('.datalad', 'handle_id'),
                             "Created datalad handle id.")
-
-            with open(opj(datalad_path, 'metadata'), 'w') as f:
-                f.write("Metadata not available yet.\n")
+            meta = Graph()
+            # For now, just something to add:
+            this_handle = URIRef(self.path)
+            meta.add((this_handle, RDF.type, Literal('Datalad Handle')))
+            meta.add((this_handle, FOAF.name, Literal(self.name)))
+            meta.serialize(opj(datalad_path, 'metadata'))
             self.add_to_git(opj('.datalad', 'metadata'),
                             "Initialized metadata.")
 
@@ -153,13 +159,16 @@ class Handle(AnnexRepo):
         """whatever this may return at the end
             => rdflib?!
         """
-        # check whether .datalad/metadata exists => raise Not Available
-        # read it => rdflib
-        with open(opj(self.path, '.datalad', 'metadata'), 'r') as f:
-            return [line.rstrip() for line in f.readlines()]
 
-    def set_metadata(self, content):
-        with open(opj(self.path, '.datalad', 'metadata'), 'w') as f:
-            f.write(content)
-        self.add_to_git(opj('.datalad', 'metadata'),
+        meta = Graph()
+        meta.parse(opj(self.path, '.datalad', 'metadata'))
+        return meta
+
+    def set_metadata(self, meta):
+        if isinstance(meta, Graph):
+            meta.serialize(opj(self.path, '.datalad', 'metadata'))
+            self.add_to_git(opj('.datalad', 'metadata'),
                         "Updated metadata.")
+        else:
+            lgr.error("Can't save meta data of type: %s" % type(meta))
+            raise TypeError("Can't save meta data of type: %s" % type(meta))

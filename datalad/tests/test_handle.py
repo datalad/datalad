@@ -10,11 +10,13 @@
 
 """
 
-import os.path
+from os.path import join as opj, exists, basename, islink
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_is_not_none, assert_not_equal, assert_in
 from git.exc import GitCommandError
+from rdflib import Graph, URIRef, Literal
+from rdflib.namespace import RDF, FOAF
 
 from ..support.handle import Handle
 from ..support.exceptions import FileInGitError
@@ -37,7 +39,7 @@ def test_Handle(src, dst):
 
     ds = Handle(dst, src)
     assert_is_instance(ds, Handle, "Handle was not created.")
-    assert_true(os.path.exists(os.path.join(dst, '.datalad')))
+    assert_true(exists(opj(dst, '.datalad')))
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
     assert_raises(GitCommandError, Handle, dst, src)
@@ -50,7 +52,7 @@ def test_Handle_direct(src, dst):
 
     ds = Handle(dst, src, direct=True)
     assert_is_instance(ds, Handle, "Handle was not created.")
-    assert_true(os.path.exists(os.path.join(dst, '.datalad')))
+    assert_true(exists(opj(dst, '.datalad')))
     assert_true(ds.is_direct_mode(), "Forcing direct mode failed.")
     
 
@@ -61,7 +63,7 @@ def test_Handle_instance_from_existing(path):
 
     gr = Handle(path)
     assert_is_instance(gr, Handle, "Handle was not created.")
-    assert_true(os.path.exists(os.path.join(path, '.datalad')))
+    assert_true(exists(opj(path, '.datalad')))
 
 
 @ignore_nose_capturing_stdout
@@ -71,7 +73,7 @@ def test_Handle_instance_brand_new(path):
 
     gr = Handle(path)
     assert_is_instance(gr, Handle, "Handle was not created.")
-    assert_true(os.path.exists(os.path.join(path, '.datalad')))
+    assert_true(exists(opj(path, '.datalad')))
 
 
 @ignore_nose_capturing_stdout
@@ -82,7 +84,7 @@ def test_Handle_get(src, dst):
     ds = Handle(dst, src)
     assert_is_instance(ds, Handle, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
-    testfile_abs = os.path.join(dst, testfile)
+    testfile_abs = opj(dst, testfile)
     assert_false(ds.file_has_content("test-annex.dat"))
     with swallow_outputs() as cmo:
         ds.get(testfile)
@@ -98,16 +100,16 @@ def test_Handle_add_to_annex(src, dst):
 
     ds = Handle(dst, src)
     filename = get_most_obscure_supported_name()
-    filename_abs = os.path.join(dst, filename)
+    filename_abs = opj(dst, filename)
     with open(filename_abs, 'w') as f:
         f.write("What to write?")
     ds.add_to_annex(filename)
 
     if not ds.is_direct_mode():
-        assert_true(os.path.islink(filename_abs), "Annexed file is not a link.")
+        assert_true(islink(filename_abs), "Annexed file is not a link.")
         ok_clean_git(dst, annex=True)
     else:
-        assert_false(os.path.islink(filename_abs), "Annexed file is link in direct mode.")
+        assert_false(islink(filename_abs), "Annexed file is link in direct mode.")
         ok_clean_git_annex_proxy(dst)
 
     key = ds.get_file_key(filename)
@@ -124,7 +126,7 @@ def test_Handle__add_to_git(src, dst):
     ds = Handle(dst, src)
 
     filename = get_most_obscure_supported_name()
-    filename_abs = os.path.join(dst, filename)
+    filename_abs = opj(dst, filename)
     with open(filename_abs, 'w') as f:
         f.write("What to write?")
     ds.add_to_git(filename_abs)
@@ -142,7 +144,7 @@ def test_Handle__add_to_git(src, dst):
 def test_Handle_commit(src, path):
 
     ds = Handle(path, src)
-    filename = os.path.join(path, get_most_obscure_supported_name())
+    filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
     ds.annex_add(filename)
@@ -193,11 +195,11 @@ def test_Handle_metadata(path):
 
     handle = Handle(path)
     md = handle.get_metadata()
-    assert_equal(len(md), 1)
-    assert_in("Metadata not available yet.\n", md)
-
-    handle.set_metadata("line 1\nline 2\n")
-    md = handle.get_metadata()
-    assert_equal(len(md), 2)
-    assert_in("line 1\n", md)
-    assert_in("line 2\n", md)
+    # TODO: Currently saved default subject in Handle()
+    # is generated bei URIRef(path). Stored as is, but if reloaded
+    # is not equal to URIRef(path) but prefixed by "file://"
+    # Therefore not a straightforward test:
+    is_datalad_handle = list(md.subjects(RDF.type, Literal('Datalad Handle')))
+    assert_equal(len(is_datalad_handle), 1)
+    assert_in(path, is_datalad_handle[0])
+    assert_in((is_datalad_handle[0], FOAF.name, Literal(basename(path))), md)
