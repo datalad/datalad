@@ -222,39 +222,42 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         lgr.debug("HTTP: " + format % args)
 
 
-def serve_path_via_http():
+@optional_args
+def serve_path_via_http(tfunc):
     """Decorator which serves content of a directory via http url
     """
-    def decorate(func):
-        def newfunc(*arg, **kw):
-            port = random.randint(8000, 8500)
-            # TODO: ATM we are relying on path being local so we could
-            # start HTTP server in the same directory.  FIX IT!
-            SocketServer.TCPServer.allow_reuse_address = True
-            httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
-            server_thread = Thread(target=httpd.serve_forever)
-            arg, path = arg[:-1], arg[-1]
-            # There is a problem with Haskell on wheezy trying to
-            # fetch via IPv6 whenever there is a ::1 localhost entry in
-            # /etc/hosts.  Apparently fixing that docker image reliably
-            # is not that straightforward, although see
-            # http://jasonincode.com/customizing-hosts-file-in-docker/
-            # so we just force to use 127.0.0.1 while on wheezy
-            hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-            url = 'http://%s:%d/%s/' % (hostname, port, path)
-            lgr.debug("HTTP: serving %s under %s", path, url)
-            server_thread.start()
+    
+    @wraps(tfunc)
+    def newfunc(*arg, **kw):
+        #import pdb
+        #pdb.set_trace()
+        port = random.randint(8000, 8500)
+        # TODO: ATM we are relying on path being local so we could
+        # start HTTP server in the same directory.  FIX IT!
+        SocketServer.TCPServer.allow_reuse_address = True
+        httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
+        server_thread = Thread(target=httpd.serve_forever)
+        arg, path = arg[:-1], arg[-1]
+        # There is a problem with Haskell on wheezy trying to
+        # fetch via IPv6 whenever there is a ::1 localhost entry in
+        # /etc/hosts.  Apparently fixing that docker image reliably
+        # is not that straightforward, although see
+        # http://jasonincode.com/customizing-hosts-file-in-docker/
+        # so we just force to use 127.0.0.1 while on wheezy
+        hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
+        url = 'http://%s:%d/%s/' % (hostname, port, path)
+        lgr.debug("HTTP: serving %s under %s", path, url)
+        server_thread.start()
 
-            #time.sleep(1)               # just give it few ticks
-            try:
-                func(*(arg + (path, url,)), **kw)
-            finally:
-                lgr.debug("HTTP: stopping server")
-                httpd.shutdown()
-                server_thread.join()
-        newfunc = make_decorator(func)(newfunc)
-        return newfunc
-    return decorate
+        #time.sleep(1)               # just give it few ticks
+        try:
+            tfunc(*(arg + (path, url,)), **kw)
+        finally:
+            lgr.debug("HTTP: stopping server")
+            httpd.shutdown()
+            server_thread.join()
+    return newfunc
+
 
 
 @optional_args
@@ -265,8 +268,8 @@ def with_tempfile(t, *targs, **tkwargs):
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    *args, **kwargs:
-        All other arguments are passed into the call to tempfile.mk{t,d}emp(),
+    *targs, **tkwargs:
+        All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
         the function t.  If no 'prefix' argument is provided, it will be
         constructed using module and function names ('.' replaced with
