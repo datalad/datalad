@@ -343,15 +343,25 @@ def swallow_logs(new_level=None):
 _sys_excepthook = sys.excepthook # Just in case we ever need original one
 
 def setup_exceptionhook():
+    """Overloads default sys.excepthook with our exceptionhook handler.
+
+       If interactive, our exceptionhook handler will invoke
+       pdb.post_mortem; if not interactive, then invokes default handler.
+    """
+
     def _datalad_pdb_excepthook(type, value, tb):
-        if not is_interactive:
-            lgr.warn("We cannot setup exception hook since not in interactive mode")
-            # we are in interactive mode or we don't have a tty-like
-            # device, so we call the default hook
-            sys.__excepthook__(type, value, tb)
-        else:
+
+        if is_interactive():
             import traceback, pdb
             traceback.print_exception(type, value, tb)
             print
             pdb.post_mortem(tb)
+        else:
+            lgr.warn("We cannot setup exception hook since not in interactive mode")
+            # we are in interactive mode or we don't have a tty-like
+            # device, so we call the default hook
+            #sys.__excepthook__(type, value, tb)
+            _sys_excepthook(type, value, tb)
+
     sys.excepthook = _datalad_pdb_excepthook
+

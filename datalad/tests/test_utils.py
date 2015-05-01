@@ -14,12 +14,17 @@ import os
 import shutil
 import sys
 import logging
+import pdb
+from mock import patch
+from contextlib import nested
 
 from os.path import join as opj
-from ..utils import rotree, swallow_outputs, swallow_logs
+from ..utils import (rotree, swallow_outputs, swallow_logs, setup_exceptionhook,
+                    is_interactive)
 
-from nose.tools import ok_, eq_, assert_false, assert_raises
-from .utils import with_tempfile
+from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
+from .utils import with_tempfile, assert_in
+from .. import utils
 
 
 @with_tempfile(mkdir=True)
@@ -64,3 +69,42 @@ def test_swallow_logs():
         eq_(cm.out, 'debug1\n')  # not even visible at level 9
         lgr.info("info")
         eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+
+
+def _check_setup_exceptionhook(interactive):
+    old_exceptionhook = sys.excepthook
+
+    post_mortem_tb = []
+    def our_post_mortem(tb):
+        post_mortem_tb.append(tb)
+
+    with nested(
+            patch('sys.excepthook'), 
+            patch('datalad.utils.is_interactive', lambda: interactive),
+            patch('pdb.post_mortem', our_post_mortem)):
+        setup_exceptionhook()
+        our_exceptionhook = sys.excepthook
+        ok_(old_exceptionhook != our_exceptionhook)
+
+        with swallow_logs() as cml, swallow_outputs() as cmo:
+            # we need to call our_exceptionhook explicitly b/c nose
+            # swallows all Exceptions and hook never gets executed
+            try:
+                raise RuntimeError
+            except RuntimeError:
+                type_, value_, tb_ = sys.exc_info()
+            our_exceptionhook(type_, value_, tb_)
+            assert_in('Traceback (most recent call last)', cmo.err)
+            assert_in('in _check_setup_exceptionhook', cmo.err)
+            if interactive:
+                assert_equal(post_mortem_tb[0], tb_)
+            else:
+                assert_equal(post_mortem_tb, [])
+                assert_in('We cannot setup exception hook', cml.out)
+            
+    eq_(old_exceptionhook, sys.excepthook)
+
+
+def test_setup_exceptionhook():
+    for tval in [True, False]:
+        yield _check_setup_exceptionhook, tval
