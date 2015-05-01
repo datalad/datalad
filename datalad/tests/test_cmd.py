@@ -215,11 +215,12 @@ def test_link_file_load(tempfile):
         # above call should result in the hardlink
         assert_equal(inode(tempfile), inode(tempfile2))
         assert_equal(stats(tempfile), stats(tempfile2))
+
         # and if we mock absence of .link
-        class raise_AttributeError:
-            def __call__(*args):
-                raise AttributeError("TEST")
-        with patch('os.link', new_callable=raise_AttributeError):
+        def raise_AttributeError(*args):
+            raise AttributeError("TEST")
+
+        with patch('os.link', raise_AttributeError):
             with swallow_logs(logging.WARNING) as cm:
                 link_file_load(tempfile, tempfile2)  # should still work
                 ok_("failed (TEST), copying file" in cm.out)
