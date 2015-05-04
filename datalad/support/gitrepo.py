@@ -165,15 +165,15 @@ def _remove_empty_items(list_):
 
     Parameter:
     ----------
-    files: list of str
+    list_: list of str
 
     Returns:
     list of str
     """
     if not isinstance(list_, list):
         lgr.warning(
-            "_remove_empty_items() called with non-list type: %s" % type(files))
-        return files
+            "_remove_empty_items() called with non-list type: %s" % type(list_))
+        return list_
     return [file_ for file_ in list_ if file_]
 
 
