@@ -20,7 +20,8 @@ from nose.tools import ok_, eq_, assert_is, assert_equal, assert_false, \
 
 from ..cmd import Runner, link_file_load
 from ..support.exceptions import CommandError
-from ..support.protocol import DryRunProtocol
+from ..support.protocol import DryRunProtocol, ExecutionTimeProtocol
+from ..support.gitrepo import GitRepo
 from .utils import with_tempfile, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
     on_linux, on_osx, on_windows, with_testrepos
@@ -248,3 +249,43 @@ def test_runner_failure(dir):
     except CommandError, e:
         assert_equal(1, e.code)
         assert_in('notexistent.dat not found', e.stderr)
+
+
+@with_tempfile
+@with_tempfile
+def test_runner_ExecutionTimeProtocol(path1, path2):
+
+    timer_protocol = ExecutionTimeProtocol()
+    runner = Runner(protocol=timer_protocol)
+
+    cmd = ['git', 'init']
+    os.mkdir(path1)
+    runner.run(cmd, cwd=path1)
+    lines = timer_protocol.get_protocol().rstrip(os.linesep).split(os.linesep)
+    assert_equal(len(lines), 3, str(lines))
+    assert_equal('Command: git init', lines[1])
+    assert_in('Execution time: ', lines[2])
+
+    # now with exception, since path2 doesn't exist yet:
+    try:
+        runner.run(cmd, cwd=path2)
+    except Exception, e:
+        catched_type = type(e)
+        catched_message = str(e)
+    finally:
+        lines = timer_protocol.get_protocol().rstrip(os.linesep).split(os.linesep)
+        assert_equal(len(lines), 6, str(lines))
+        assert_equal('Command: git init', lines[3])
+        assert_in('Execution time: ', lines[4])
+        assert_equal('Exception (%s): %s' % (catched_type, catched_message),
+                     lines[5])
+
+    new_runner = Runner(cwd=path2, protocol=timer_protocol)
+    git_repo = GitRepo(path2, runner=new_runner)
+    lines = timer_protocol.get_protocol().rstrip(os.linesep).split(os.linesep)
+    assert_in('init', lines[6])
+    assert_in('git.repo.base.Repo', lines[6])
+    assert_in("args=('%s'" % path2, lines[6])
+    assert_in("kwargs={}", lines[6])
+    assert_in('Execution time: ', lines[7])
+    assert_equal(len(lines), 8)

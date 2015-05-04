@@ -294,9 +294,9 @@ class Runner(object):
             finally:
                 if self.protocol.write_callables():
                     prot_time = time.time() - t_start
-                    self.protocol.write_section(["%s" % f,
-                                                 "args=%s" % args,
-                                                 "kwargs=%s" % kwargs],
+                    self.protocol.write_section([str(f),
+                                                 "args=%s" % args.__str__(),
+                                                 "kwargs=%s" % kwargs.__str__()],
                                                 prot_time, prot_exc)
         else:
             if self.protocol.write_callables():
