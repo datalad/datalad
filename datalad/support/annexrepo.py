@@ -156,10 +156,8 @@ class AnnexRepo(GitRepo):
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
 
-        if git_options is None:
-            git_options = []
-        if annex_options is None:
-            annex_options = []
+        git_options = git_options[:] if git_options else []
+        annex_options = annex_options[:] if annex_options else []
 
         if not self.always_commit:
             git_options += ['-c', 'annex.alwayscommit=false']
@@ -269,8 +267,7 @@ class AnnexRepo(GitRepo):
             For example `from='myremote'` translates to
             annex option "--from=myremote".
         """
-        if options is None:
-            options = []
+        options = options[:] if options else []
 
         # don't capture stderr, since it provides progress display
         self._run_annex_command('get', annex_options=options + files,
@@ -286,8 +283,7 @@ class AnnexRepo(GitRepo):
         files: list of str
             list of paths to add to the annex
         """
-        if options is None:
-            options = []
+        options = options[:] if options else []
 
         self._run_annex_command('add', annex_options=options + files,
                                 backend=backend)
@@ -464,8 +460,7 @@ class AnnexRepo(GitRepo):
         options: list
             options to the annex command
         """
-        if options is None:
-            options = []
+        options = options[:] if options else []
 
         annex_options = ['--file=%s' % file_] + options + [url]
         self._run_annex_command('addurl', annex_options=annex_options,
@@ -484,8 +479,7 @@ class AnnexRepo(GitRepo):
         options: list
             options to the annex command
         """
-        if options is None:
-            options = []
+        options = options[:] if options else []
 
         self._run_annex_command('addurl', annex_options=options + urls,
                                 backend=backend, log_online=True,
@@ -517,8 +511,7 @@ class AnnexRepo(GitRepo):
         -----------
         files: list of str
         """
-        if options is None:
-            options = []
+        options = options[:] if options else []
 
         self._run_annex_command('drop', annex_options=files + options)
 

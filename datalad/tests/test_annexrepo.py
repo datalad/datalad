@@ -379,7 +379,7 @@ def test_AnnexRepo_always_commit(path):
     with open(opj(path, file2), 'w') as f:
         f.write("Second file.")
 
-    repo.always_commit = True
+    # always_commit == True is expected to be default
     repo.annex_add(file1)
 
     # Now git-annex log should show the addition:
@@ -393,16 +393,16 @@ def test_AnnexRepo_always_commit(path):
 
     repo.always_commit = True
 
-    # Still one commit only in log:
+    # Still one commit only in log,
+    # but 'git annex log' was called when always_commit was true again,
+    # so it should commit the addition at the end. Calling it again should then
+    # show two commits.
     out, err = repo._run_annex_command('log')
     out_list = out.rstrip(os.linesep).split(os.linesep)
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in("recording state in git", out_list[1])
 
-    # but 'git annex log' was called when always_commit was true again,
-    # so it committed the addition at the end. Calling it again should show
-    # two commits now:
     out, err = repo._run_annex_command('log')
     out_list = out.rstrip(os.linesep).split(os.linesep)
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
