@@ -18,11 +18,12 @@ import logging
 from nose.tools import ok_, eq_, assert_is, assert_equal, assert_false, \
     assert_true, assert_greater, assert_raises, assert_in
 
-from datalad.cmd import Runner, link_file_load
-from datalad.tests.utils import with_tempfile, assert_cwd_unchanged, \
+from ..cmd import Runner, link_file_load
+from ..support.exceptions import CommandError
+from ..support.protocol import DryRunProtocol
+from .utils import with_tempfile, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
     on_linux, on_osx, on_windows, with_testrepos
-from datalad.support.exceptions import CommandError
 
 
 @ignore_nose_capturing_stdout
@@ -30,21 +31,22 @@ from datalad.support.exceptions import CommandError
 @with_tempfile
 def test_runner_dry(tempfile):
 
-    runner = Runner(dry=True)
+    dry = DryRunProtocol()
+    runner = Runner(protocol=dry)
 
     # test dry command call
     cmd = 'echo Testing dry run > %s' % tempfile
     ret = runner.run(cmd)
-    assert_equal(("DRY", "DRY"), ret, "Dry run of: %s resulted in output %s" % (cmd, ret))
-    assert_greater(runner.commands.__str__().find('echo Testing dry run'), -1,
-                 "Dry run of: %s resulted in buffer: %s" % (cmd, runner.commands.__str__()))
+    assert_equal(("DRY", "DRY"), ret, "Output of dry run (%s): %s" % (cmd, ret))
+    assert_in('echo Testing dry run', dry.get_protocol())
     assert_false(os.path.exists(tempfile))
 
     # test dry python function call
     output = runner.call(os.path.join, 'foo', 'bar')
-    assert_is(None, output, "Drycall of: os.path.join, 'foo', 'bar' returned %s" % output)
-    assert_greater(runner.commands.__str__().find('join'), -1,
-                   "Drycall of: os.path.join, 'foo', 'bar' resulted in buffer: %s" % runner.commands.__str__())
+    assert_is(None, output, "Dry call of: os.path.join, 'foo', 'bar' "
+                            "returned: %s" % output)
+    assert_in('join', dry.get_protocol())
+    assert_in("args=('foo', 'bar')", dry.get_protocol())
 
 
 
@@ -71,24 +73,26 @@ def test_runner(tempfile):
 @ignore_nose_capturing_stdout
 def test_runner_instance_callable_dry():
 
+    dry = DryRunProtocol()
     cmd_ = ['echo', 'Testing __call__ with string']
     for cmd in [cmd_, ' '.join(cmd_)]:
-        runner = Runner(dry=True)
+        runner = Runner(protocol=dry)
         ret = runner(cmd)
-        eq_(ret, ("DRY", "DRY"))  # (stdout, stderr) is returned.  But in dry -- ("DRY","DRY")
-        assert_equal(runner.commands.__str__(), ("[%r]" % cmd),
-                     "Dry run of Runner.__call__ didn't record command: %s.\n"
-                     "Buffer: %s" % (cmd, runner.commands.__str__()))
+        # (stdout, stderr) is returned.  But in dry -- ("DRY","DRY")
+        eq_(ret, ("DRY", "DRY"))
+        assert_in(' '.join(cmd_), dry.get_protocol(),
+                  "Dry run of Runner.__call__ didn't record command: %s.\n"
+                  "Buffer: %s" % (cmd, dry.get_protocol()))
 
     ret = runner(os.path.join, 'foo', 'bar')
     eq_(ret, None)
 
-    assert_greater(runner.commands.__str__().find('join'), -1,
-                   "Dry run of Runner.__call__ didn't record function join()."
-                   "Buffer: %s" % runner.commands.__str__())
-    assert_greater(runner.commands.__str__().find('args='), -1,
-                   "Dry run of Runner.__call__ didn't record function join()."
-                   "Buffer: %s" % runner.commands.__str__())
+    assert_in('join', dry.get_protocol(),
+              "Dry run of Runner.__call__ didn't record function join()."
+              "Buffer: %s" % dry.get_protocol())
+    assert_in("args=('foo', 'bar')", dry.get_protocol(),
+              "Dry run of Runner.__call__ didn't record function join()."
+              "Buffer: %s" % dry.get_protocol())
 
 
 @ignore_nose_capturing_stdout
