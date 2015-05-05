@@ -19,8 +19,7 @@ import os
 import shutil
 import shlex
 from .support.exceptions import CommandError
-from .support.protocol import ProtocolInterface, NoProtocol
-import time
+from .support.protocol import NullProtocol
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -61,7 +60,7 @@ class Runner(object):
 
         self.cwd = cwd
         self.env = env
-        self.protocol = protocol or NoProtocol()
+        self.protocol = protocol or NullProtocol()
 
         # to delete:
         self.commands = []
@@ -201,14 +200,17 @@ class Runner(object):
 
         self.log("Running: %s" % (cmd,))
 
-        if self.protocol.do_execute():
+        if self.protocol.do_execute_ext_commands:
 
             if shell is None:
                 shell = isinstance(cmd, basestring)
 
-            if self.protocol.write_ext_commands():
+            if self.protocol.records_ext_commands:
                 prot_exc = None
-                t_start = time.time()
+                prot_id = self.protocol.start_section(shlex.split(cmd)
+                                                      if isinstance(cmd,
+                                                                    basestring)
+                                                      else cmd)
 
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream,
@@ -229,11 +231,8 @@ class Runner(object):
                 raise
 
             finally:
-                if self.protocol.write_ext_commands():
-                    prot_time = time.time() - t_start
-                    self.protocol.write_section(
-                        shlex.split(cmd) if isinstance(cmd, basestring)
-                        else cmd, prot_time, prot_exc)
+                if self.protocol.records_ext_commands:
+                    self.protocol.end_section(prot_id, prot_exc)
 
             if log_online:
                 out = self._get_output_online(proc, log_stdout, log_stderr,
@@ -263,10 +262,10 @@ class Runner(object):
                          level=8)
 
         else:
-            if self.protocol.write_ext_commands():
-                self.protocol.write_section(shlex.split(cmd)
+            if self.protocol.records_ext_commands:
+                self.protocol.add_section(shlex.split(cmd)
                                             if isinstance(cmd, basestring)
-                                            else cmd, 0, None)
+                                            else cmd, None)
             out = ("DRY", "DRY")
 
         return out
@@ -281,10 +280,12 @@ class Runner(object):
         *args, **kwargs:
           Callable arguments
         """
-        if self.protocol.do_execute():
-            if self.protocol.write_callables():
+        if self.protocol.do_execute_callables:
+            if self.protocol.records_callables:
                 prot_exc = None
-                t_start = time.time()
+                prot_id = self.protocol.start_section([str(f),
+                                                 "args=%s" % args.__str__(),
+                                                 "kwargs=%s" % kwargs.__str__()])
 
             try:
                 return f(*args, **kwargs)
@@ -292,28 +293,23 @@ class Runner(object):
                 prot_exc = e
                 raise
             finally:
-                if self.protocol.write_callables():
-                    prot_time = time.time() - t_start
-                    self.protocol.write_section([str(f),
-                                                 "args=%s" % args.__str__(),
-                                                 "kwargs=%s" % kwargs.__str__()],
-                                                prot_time, prot_exc)
+                if self.protocol.records_callables:
+                    self.protocol.end_section(prot_id, prot_exc)
         else:
-            if self.protocol.write_callables():
-                self.protocol.write_section([str(f),
+            if self.protocol.records_callables:
+                self.protocol.add_section([str(f),
                                              "args=%s" % args.__str__(),
                                              "kwargs=%s" % kwargs.__str__()],
-                                            0, None)
+                                          None)
 
     def log(self, msg, level=logging.DEBUG):
         """log helper
 
-        Logs at DEBUG-level by default and adds "DRY:"-prefix for dry runs.
+        Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
+        log the used protocol.
         """
-        if not self.protocol.do_execute():
-            lgr.log(level, "DRY: %s" % msg)
-        else:
-            lgr.log(level, msg)
+        lgr.log(level, "Protocol: %s: %s" % (self.protocol.__class__.__name__,
+                                             msg))
 
 
 # ####
