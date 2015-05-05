@@ -18,7 +18,7 @@ from ..support.repos import *
 from ..support.network import collect_urls, filter_urls, \
       urljoin, download_url_to_incoming
 from ..support.pprint import pprint_indent
-from ..support.protocol import DryRunProtocol
+from ..support.protocol import DryRunProtocol, NullProtocol
 
 
 class DoubleAnnexRepo(object):
@@ -60,8 +60,7 @@ class DoubleAnnexRepo(object):
 
         # TODO: should it be a local 'runner' so we do not augment
         # bound runner humidity permanently
-        if dry_run:
-            self.runner.protocol = DryRunProtocol()
+        self.runner.protocol = DryRunProtocol() if dry_run else NullProtocol()
 
         # convenience shortcuts
         _call = self.runner.call
