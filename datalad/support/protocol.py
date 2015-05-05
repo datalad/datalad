@@ -24,7 +24,7 @@ class ProtocolInterface:
     __metaclass__ = ABCMeta
 
     def __init__(self):
-        self._sections = [{}]
+        self._sections = []
         self._title = ''
 
     def __iter__(self):
@@ -162,13 +162,14 @@ class NullProtocol(ProtocolInterface):
     def __init__(self):
         super(NullProtocol, self).__init__()
         self._title = "No protocol available." + linesep
-        self._sections[0] = {'NullProtocol': None}
 
     def start_section(self, cmd):
+        self._sections = [{}]
         return 0
 
     def end_section(self, id_, exception):
-        pass
+        if id_ != 0:
+            raise IndexError("NullProtocol has no entry %d" % id_)
 
     def add_section(self, cmd, exception):
         pass
