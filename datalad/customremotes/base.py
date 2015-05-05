@@ -18,6 +18,7 @@ from os.path import exists, join as opj, basename, realpath, dirname
 from traceback import format_exc
 
 from ..cmd import Runner
+from ..support.protocol import ProtocolInterface
 
 import logging
 
@@ -33,7 +34,7 @@ DEFAULT_AVAILABILITY = "local"
 class AnnexRemoteQuit(Exception):
     pass
 
-class AnnexExchangeProtocol(object):
+class AnnexExchangeProtocol(ProtocolInterface):
     """A little helper to protocol interactions of custom remote with annex
     """
 
@@ -66,6 +67,7 @@ send () {
 """
 
     def __init__(self, repopath, url_prefix):
+        super(AnnexExchangeProtocol, self).__init__()
         self.repopath = repopath
         self.url_prefix = url_prefix
         self._file = None
@@ -124,6 +126,33 @@ send () {
             f.write(entry + os.linesep)
         return self
 
+    def start_section(self, cmd):
+        self._sections.append({'command': cmd})
+        self.write_section(cmd)
+        return len(self._sections) - 1
+
+    def end_section(self, id_, exception):
+        # raise exception in case of invalid id_ for consistency:
+        self._sections.__getitem__(id_)
+
+    def add_section(self, cmd, exception):
+        self.start_section(cmd)
+
+    @property
+    def records_callables(self):
+        return False
+
+    @property
+    def records_ext_commands(self):
+        return True
+
+    @property
+    def do_execute_ext_commands(self):
+        return True
+
+    @property
+    def do_execute_callables(self):
+        return True
 
 class AnnexCustomRemote(object):
     """Base class to provide custom special remotes for git-annex

@@ -17,7 +17,7 @@ import time
 lgr = logging.getLogger('datalad.protocol')
 
 
-class ProtocolInterface:
+class ProtocolInterface(object):
     """Interface class for protocols used by the Runner.
     """
 
