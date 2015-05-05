@@ -33,6 +33,9 @@ class ProtocolInterface:
     def __getitem__(self, item):
         return self._sections.__getitem__(item)
 
+    def __len__(self):
+        return len(self._sections)
+
     def __str__(self):
         protocol_str = self._title
         for section in self._sections:

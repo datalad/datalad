@@ -60,7 +60,7 @@ class Runner(object):
 
         self.cwd = cwd
         self.env = env
-        self.protocol = protocol or NullProtocol()
+        self.protocol = NullProtocol() if protocol is None else protocol
 
         # to delete:
         self.commands = []
