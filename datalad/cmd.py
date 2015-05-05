@@ -40,7 +40,7 @@ class Runner(object):
 
     __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
 
-    def __init__(self, dry=False, cwd=None, env=None, protocol=None):
+    def __init__(self, cwd=None, env=None, protocol=None):
         """
         Parameters
         ----------
@@ -55,15 +55,10 @@ class Runner(object):
         protocol: ProtocolInterface
             Protocol to write to.
         """
-        # to delete:
-        self.dry = dry
 
         self.cwd = cwd
         self.env = env
         self.protocol = NullProtocol() if protocol is None else protocol
-
-        # to delete:
-        self.commands = []
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
