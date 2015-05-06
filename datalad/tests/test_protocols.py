@@ -72,8 +72,8 @@ def test_ExecutionTimeProtocol(path1, path2):
     runner.run(cmd, cwd=path1)
     assert_equal(len(timer_protocol), 1, str(runner.protocol))
     assert_equal(cmd, timer_protocol[0]['command'])
-    assert_greater(timer_protocol[0]['end'], timer_protocol[0]['start'])
-    assert_greater(timer_protocol[0]['duration'], 0)
+    ok_(timer_protocol[0]['end'] >= timer_protocol[0]['start'])
+    ok_(timer_protocol[0]['duration'] >= 0)
     assert_is(timer_protocol[0]['exception'], None)
 
     # now with exception, since path2 doesn't exist yet:
@@ -84,8 +84,8 @@ def test_ExecutionTimeProtocol(path1, path2):
     finally:
         assert_equal(len(timer_protocol), 2)
         assert_equal(cmd, timer_protocol[1]['command'])
-        assert_greater(timer_protocol[1]['end'], timer_protocol[1]['start'])
-        assert_greater(timer_protocol[1]['duration'], 0)
+        ok_(timer_protocol[1]['end'] >= timer_protocol[1]['start'])
+        ok_(timer_protocol[1]['duration'] >= 0)
         assert_is(timer_protocol[1]['exception'], catched_exception)
 
     # test callable:
@@ -96,8 +96,8 @@ def test_ExecutionTimeProtocol(path1, path2):
     assert_in('git.repo.base.Repo', timer_protocol[2]['command'][0])
     assert_in("args=('%s'" % path2, timer_protocol[2]['command'][1])
     assert_in("kwargs={}", timer_protocol[2]['command'][2])
-    assert_greater(timer_protocol[2]['end'], timer_protocol[2]['start'])
-    assert_greater(timer_protocol[2]['duration'], 0)
+    ok_(timer_protocol[2]['end'] >= timer_protocol[2]['start'])
+    ok_(timer_protocol[2]['duration'] >= 0)
 
 
 @with_tempfile
@@ -113,8 +113,8 @@ def test_ExecutionTimeExternalsProtocol(path1, path2):
     runner.run(cmd, cwd=path1)
     assert_equal(len(timer_protocol), 1, str(runner.protocol))
     assert_equal(cmd, timer_protocol[0]['command'])
-    assert_greater(timer_protocol[0]['end'], timer_protocol[0]['start'])
-    assert_greater(timer_protocol[0]['duration'], 0)
+    ok_(timer_protocol[0]['end'] >= timer_protocol[0]['start'])
+    ok_(timer_protocol[0]['duration'] >= 0)
     assert_is(timer_protocol[0]['exception'], None)
 
     # now with exception, since path2 doesn't exist yet:
@@ -125,8 +125,8 @@ def test_ExecutionTimeExternalsProtocol(path1, path2):
     finally:
         assert_equal(len(timer_protocol), 2)
         assert_equal(cmd, timer_protocol[1]['command'])
-        assert_greater(timer_protocol[1]['end'], timer_protocol[1]['start'])
-        assert_greater(timer_protocol[1]['duration'], 0)
+        ok_(timer_protocol[1]['end'] >= timer_protocol[1]['start'])
+        ok_(timer_protocol[1]['duration'] >= 0)
         assert_is(timer_protocol[1]['exception'], catched_exception)
 
     # test callable (no entry added):
