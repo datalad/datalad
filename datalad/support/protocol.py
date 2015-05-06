@@ -19,6 +19,12 @@ lgr = logging.getLogger('datalad.protocol')
 
 class ProtocolInterface(object):
     """Interface class for protocols used by the Runner.
+
+    Implementations of this interface are supposed to store one section per
+    recorded command call in `self._sections` as a dictionary. Default
+    implementation of __str__ has to be overridden otherwise.
+
+    ProtocolInterface is iterable as a list of sections.
     """
 
     __metaclass__ = ABCMeta
@@ -196,6 +202,11 @@ class NullProtocol(ProtocolInterface):
 
 class DryRunProtocol(ProtocolInterface):
     """Protocol for dry runs.
+
+    Neither callables nor external commands are executed, when using this
+    protocol. Each recorded call results in a section, which is a dictionary
+    containing only the key 'command'. Its value is the list passed to
+    start_section() or add_section() respectively.
     """
     def __init__(self):
         super(DryRunProtocol, self).__init__()
@@ -231,6 +242,9 @@ class DryRunProtocol(ProtocolInterface):
 
 class DryRunExternalsProtocol(DryRunProtocol):
     """Protocol for dry runs of external commands only.
+
+    Same as DryRunProtocol, but only affects (and records) external command
+    calls.
     """
     def __init__(self):
         super(DryRunExternalsProtocol, self).__init__()
@@ -247,6 +261,13 @@ class DryRunExternalsProtocol(DryRunProtocol):
 class ExecutionTimeProtocol(ProtocolInterface):
     """Protocol to record execution times of callables as well as of external
     commands.
+
+    Each recorded call results in a section, which is a dictionary
+    containing the keys 'command', 'start', 'end', 'duration' and 'exception'.
+    The value of 'command' is the list passed to start_section() or
+    add_section() respectively. The value of 'exception' is the instance of the
+    exception raised by the call or `None`. Times are stored as floating point
+    value in seconds.
     """
 
     def __init__(self):
@@ -288,6 +309,9 @@ class ExecutionTimeProtocol(ProtocolInterface):
 
 class ExecutionTimeExternalsProtocol(ExecutionTimeProtocol):
     """Protocol to record execution time of external commands only.
+
+    Same as ExecutionTimeProtocol, but only affects (and records) external
+    command calls.
     """
 
     @property

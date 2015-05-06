@@ -28,14 +28,14 @@ class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
     An object of this class provides a methods calls shell commands or python
-    functions, allowing for dry runs and output handling.
+    functions, allowing for protocolling the calls and output handling.
 
     Outputs (stdout and stderr) can be either logged or streamed to system's
     stdout/stderr during execution.
     This can be enabled or disabled for both of them independently.
-    Additionally allows for dry runs. This is achieved by initializing the
-    `Runner` with `dry=True`.
-    The Runner will then collect all calls as strings in `commands`.
+    Additionally, a protocol object can be a used with the Runner. Such a
+    protocol has to implement datalad.support.protocol.ProtocolInterface, is
+    able to record calls and allows for dry runs.
     """
 
     __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
@@ -44,8 +44,6 @@ class Runner(object):
         """
         Parameters
         ----------
-        dry: bool, optional
-             If True, none of the commands is actually ran
         cwd: string, optional
              Base current working directory for commands.  Could be overridden
              per run call via cwd option
@@ -53,7 +51,7 @@ class Runner(object):
              Custom environment to use for calls. Could be overridden per run
              call via env option
         protocol: ProtocolInterface
-            Protocol to write to.
+            Protocol object to write to.
         """
 
         self.cwd = cwd
