@@ -27,6 +27,7 @@ from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, on_windows
 from .. import utils
 from ..cmd import Runner
+from ..support.annexrepo import AnnexRepo
 
 
 @with_tempfile(mkdir=True)
@@ -72,17 +73,17 @@ def test_swallow_logs():
         lgr.info("info")
         eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
 
-
-def test_windows_gc_issue():
+@with_tempfile
+def test_windows_gc_issue(path):
     if not on_windows:
         raise SkipTest
     else:
-        runner = Runner()
+        ar = AnnexRepo(path)
         for i in range(10):
             try:
                 with swallow_outputs() as cm:
                     x = str(list(range(1000))) + '\n'
-                    runner.run(['echo', x], log_online=True, log_stdout=False)
+                    ar.cmd_call_wrapper.run(['echo', x], log_online=True, log_stdout=False)
             except WindowsError, e:
                 assert False, "Issue #147 probably not solved: %s" % e
 
