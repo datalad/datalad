@@ -396,7 +396,7 @@ def test_AnnexRepo_always_commit(path):
     num_commits = len([commit
                        for commit in out.rstrip(os.linesep).split(os.linesep)
                        if commit.startswith('commit')])
-    assert_equal(num_commits, 3)
+    assert_equal(num_commits, 3, "catched output:\n%s" % out.rstrip(os.linesep).split(os.linesep))
 
     repo.always_commit = False
     repo.annex_add(file2)
