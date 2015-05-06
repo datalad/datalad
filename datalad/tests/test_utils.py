@@ -22,8 +22,9 @@ from os.path import join as opj
 from ..utils import (rotree, swallow_outputs, swallow_logs, setup_exceptionhook,
                     is_interactive)
 
+from nose import SkipTest
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
-from .utils import with_tempfile, assert_in
+from .utils import with_tempfile, assert_in, on_windows
 from .. import utils
 
 
@@ -69,6 +70,19 @@ def test_swallow_logs():
         eq_(cm.out, 'debug1\n')  # not even visible at level 9
         lgr.info("info")
         eq_(cm.out, 'debug1\ninfo\n')  # not even visible at level 9
+
+
+def test_windows_gc_issue():
+
+    if not on_windows:
+        raise SkipTest
+    else:
+        for i in range(10):
+            try:
+                test_swallow_logs()
+                test_swallow_outputs()
+            except WindowsError, e:
+                assert False, "Issue #147 probably not solved: %s" % e
 
 
 def _check_setup_exceptionhook(interactive):
