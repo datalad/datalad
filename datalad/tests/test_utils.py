@@ -79,8 +79,9 @@ def test_windows_gc_issue():
     else:
         for i in range(10):
             try:
-                test_swallow_logs()
-                test_swallow_outputs()
+                with swallow_outputs() as cm:
+                    x = str(list(range(100))) + '\n'
+                    [sys.stdout.writelines(x) for i in xrange(100)]
             except WindowsError, e:
                 assert False, "Issue #147 probably not solved: %s" % e
 
