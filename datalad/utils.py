@@ -13,9 +13,11 @@ import logging
 import shutil, stat, os, sys
 import tempfile
 import platform
+import gc
 
 from functools import wraps
 from os.path import exists, join as opj
+from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -132,7 +134,16 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            os.unlink(f)
+            for i in range(10):
+                try:
+                    os.unlink(f)
+                except OSError, e:
+                    if i < 9:
+                        sleep(0.5)
+                        continue
+                    else:
+                        raise
+                break
     else:
         lgr.info("Keeping temp file: %s" % f)
 
@@ -247,6 +258,7 @@ def swallow_outputs():
             err_name = self._err.name
             del self._out
             del self._err
+            gc.collect()
             rmtemp(out_name)
             rmtemp(err_name)
 
@@ -324,6 +336,7 @@ def swallow_logs(new_level=None):
             self._out.close()
             out_name = self._out.name
             del self._out
+            gc.collect()
             rmtemp(out_name)
 
     adapter = StringIOAdapter()
