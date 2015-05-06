@@ -31,6 +31,9 @@ class MasterCollection(object):
         this works out).
     """
 
+    # TODO: There is a ConjunctiveGraph in rdflib! May be use this one? Or the Dataset?
+
+
     def __init__(self, src=None):
 
         if isinstance(src, CollectionRepo):
