@@ -243,8 +243,12 @@ def swallow_outputs():
         def cleanup(self):
             self._out.close()
             self._err.close()
-            rmtemp(self._out.name)
-            rmtemp(self._err.name)
+            out_name = self._out.name
+            err_name = self._err.name
+            del self._out
+            del self._err
+            rmtemp(out_name)
+            rmtemp(err_name)
 
 
 
@@ -318,7 +322,9 @@ def swallow_logs(new_level=None):
 
         def cleanup(self):
             self._out.close()
-            rmtemp(self._out.name)
+            out_name = self._out.name
+            del self._out
+            rmtemp(out_name)
 
     adapter = StringIOAdapter()
     lgr.handlers = [logging.StreamHandler(adapter.handle)]
