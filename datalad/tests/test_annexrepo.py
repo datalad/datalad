@@ -404,7 +404,7 @@ def test_AnnexRepo_always_commit(path):
     # No additional git commit:
     out, err = runner.run(['git', 'log', 'git-annex'])
     num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split(os.linesep)
+                       for commit in out.rstrip(os.linesep).split('\n')
                        if commit.startswith('commit')])
     assert_equal(num_commits, 3)
 
@@ -429,7 +429,7 @@ def test_AnnexRepo_always_commit(path):
     # Now git knows as well:
     out, err = runner.run(['git', 'log', 'git-annex'])
     num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split(os.linesep)
+                       for commit in out.rstrip(os.linesep).split('\n')
                        if commit.startswith('commit')])
     assert_equal(num_commits, 4)
 
