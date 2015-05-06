@@ -82,7 +82,7 @@ def test_windows_gc_issue():
             try:
                 with swallow_outputs() as cm:
                     x = str(list(range(1000))) + '\n'
-                    runner.run(['echo', x], log_online=True)
+                    runner.run(['echo', x], log_stdout=False)
             except WindowsError, e:
                 assert False, "Issue #147 probably not solved: %s" % e
 
