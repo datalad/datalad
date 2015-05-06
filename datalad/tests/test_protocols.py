@@ -13,7 +13,7 @@ Note: DryRunProtocol and NullProtocol are already (kind of) tested within
 """
 
 import os
-from os.path import basename, normpath
+from os.path import normpath
 from nose.tools import ok_, eq_, assert_is, assert_equal, assert_greater, \
     assert_raises, assert_in, assert_is_instance, assert_true, assert_false
 
@@ -22,7 +22,7 @@ from ..support.protocol import DryRunProtocol, DryRunExternalsProtocol, \
     ProtocolInterface
 from ..support.gitrepo import GitRepo
 from ..cmd import Runner
-from .utils import with_tempfile, on_windows
+from .utils import with_tempfile
 
 
 @with_tempfile
@@ -96,11 +96,13 @@ def test_ExecutionTimeProtocol(path1, path2):
     assert_in('init', timer_protocol[2]['command'][0])
     assert_in('git.repo.base.Repo', timer_protocol[2]['command'][0])
 
+    # extract path from args and compare
+    # note: simple string concatenation for comparison doesn't work
+    # on windows due to path conversion taking place
     ok_(timer_protocol[2]['command'][1].startswith("args=('"))
     extracted_path = timer_protocol[2]['command'][1].split(',')[0][7:-1]
     assert_equal(normpath(extracted_path), normpath(path2))
 
-    #    assert_in("args=('%s'" % path2, timer_protocol[2]['command'][1])
     assert_in("kwargs={}", timer_protocol[2]['command'][2])
     ok_(timer_protocol[2]['end'] >= timer_protocol[2]['start'])
     ok_(timer_protocol[2]['duration'] >= 0)
