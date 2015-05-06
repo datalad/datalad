@@ -394,9 +394,9 @@ def test_AnnexRepo_always_commit(path):
     # update (by annex log)
     out, err = runner.run(['git', 'log', 'git-annex'])
     num_commits = len([commit
-                       for commit in out.rstrip(os.linesep).split(os.linesep)
+                       for commit in out.rstrip(os.linesep).split('\n')
                        if commit.startswith('commit')])
-    assert_equal(num_commits, 3, "catched output:\n%s" % out.rstrip(os.linesep).split(os.linesep))
+    assert_equal(num_commits, 3)
 
     repo.always_commit = False
     repo.annex_add(file2)
