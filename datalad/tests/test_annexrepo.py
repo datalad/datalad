@@ -17,6 +17,7 @@ from nose.tools import assert_raises, assert_is_instance, assert_true, \
 from ..support.annexrepo import AnnexRepo, kwargs_to_options
 from ..support.exceptions import CommandNotAvailableError, \
     FileInGitError, FileNotInAnnexError, CommandError
+from ..cmd import Runner
 from .utils import *
 
 # For now (at least) we would need to clone from the network
@@ -372,6 +373,7 @@ def test_AnnexRepo_get_file_backend(src, dst):
 def test_AnnexRepo_always_commit(path):
 
     repo = AnnexRepo(path)
+    runner = Runner(cwd=path)
     file1 = get_most_obscure_supported_name() + "_1"
     file2 = get_most_obscure_supported_name() + "_2"
     with open(opj(path, file1), 'w') as f:
@@ -387,13 +389,28 @@ def test_AnnexRepo_always_commit(path):
     out_list = out.rstrip(os.linesep).split(os.linesep)
     assert_equal(len(out_list), 1)
     assert_in(file1, out_list[0])
+    # check git log of git-annex branch:
+    # expected: initial creation, update (by annex add) and another
+    # update (by annex log)
+    out, err = runner.run(['git', 'log', 'git-annex'])
+    num_commits = len([commit
+                       for commit in out.rstrip(os.linesep).split(os.linesep)
+                       if commit.startswith('commit')])
+    assert_equal(num_commits, 3)
 
     repo.always_commit = False
     repo.annex_add(file2)
 
+    # No additional git commit:
+    out, err = runner.run(['git', 'log', 'git-annex'])
+    num_commits = len([commit
+                       for commit in out.rstrip(os.linesep).split(os.linesep)
+                       if commit.startswith('commit')])
+    assert_equal(num_commits, 3)
+
     repo.always_commit = True
 
-    # Still one commit only in log,
+    # Still one commit only in git-annex log,
     # but 'git annex log' was called when always_commit was true again,
     # so it should commit the addition at the end. Calling it again should then
     # show two commits.
@@ -408,6 +425,13 @@ def test_AnnexRepo_always_commit(path):
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in(file2, out_list[1])
+
+    # Now git knows as well:
+    out, err = runner.run(['git', 'log', 'git-annex'])
+    num_commits = len([commit
+                       for commit in out.rstrip(os.linesep).split(os.linesep)
+                       if commit.startswith('commit')])
+    assert_equal(num_commits, 4)
 
 
 # TODO:
