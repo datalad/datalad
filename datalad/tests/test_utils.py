@@ -26,6 +26,7 @@ from nose import SkipTest
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, on_windows
 from .. import utils
+from ..cmd import Runner
 
 
 @with_tempfile(mkdir=True)
@@ -73,15 +74,15 @@ def test_swallow_logs():
 
 
 def test_windows_gc_issue():
-
     if not on_windows:
         raise SkipTest
     else:
+        runner = Runner()
         for i in range(10):
             try:
                 with swallow_outputs() as cm:
                     x = str(list(range(100))) + '\n'
-                    [sys.stdout.writelines(x) for i in xrange(100)]
+                    [runner(sys.stdout.writelines, x) for i in range(10)]
                     access_dummy = cm.out.rstrip().split('\n')
             except WindowsError, e:
                 assert False, "Issue #147 probably not solved: %s" % e
