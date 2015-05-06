@@ -82,6 +82,7 @@ def test_windows_gc_issue():
                 with swallow_outputs() as cm:
                     x = str(list(range(100))) + '\n'
                     [sys.stdout.writelines(x) for i in xrange(100)]
+                    access_dummy = cm.out.rstrip().split('\n')
             except WindowsError, e:
                 assert False, "Issue #147 probably not solved: %s" % e
 
