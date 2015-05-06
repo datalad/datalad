@@ -81,9 +81,8 @@ def test_windows_gc_issue():
         for i in range(10):
             try:
                 with swallow_outputs() as cm:
-                    x = str(list(range(100))) + '\n'
-                    [runner(sys.stdout.writelines, x) for i in range(10)]
-                    access_dummy = cm.out.rstrip().split('\n')
+                    x = str(list(range(1000))) + '\n'
+                    runner.run(['echo', x], log_online=True, log_stdout=False)
             except WindowsError, e:
                 assert False, "Issue #147 probably not solved: %s" % e
 
