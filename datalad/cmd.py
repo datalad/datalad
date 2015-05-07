@@ -51,7 +51,7 @@ class Runner(object):
              Custom environment to use for calls. Could be overridden per run
              call via env option
         protocol: ProtocolInterface
-            Protocol object to write to.
+             Protocol object to write to.
         """
 
         self.cwd = cwd
@@ -136,6 +136,11 @@ class Runner(object):
         Allows for separately logging stdout and stderr  or streaming it to
         system's stdout or stderr respectively.
 
+        Note: Using a string as `cmd` and shell=True allows for piping,
+              multiple commands, etc., but that implies shlex.split() is not
+              used. This is considered to be a security hazard.
+              So be careful with input.
+
         Parameters
         ----------
         cmd : str, list
@@ -211,12 +216,7 @@ class Runner(object):
                                         shell=shell,
                                         cwd=cwd or self.cwd,
                                         env=env or self.env)
-                # shell=True allows for piping, multiple commands, etc.,
-                # but that implies to not use shlex.split()
-                # and is considered to be a security hazard.
-                # So be careful with input.
-                # Alternatively we would have to parse `cmd` and create
-                # multiple subprocesses.
+
             except Exception, e:
                 prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
@@ -277,8 +277,8 @@ class Runner(object):
             if self.protocol.records_callables:
                 prot_exc = None
                 prot_id = self.protocol.start_section([str(f),
-                                                 "args=%s" % args.__str__(),
-                                                 "kwargs=%s" % kwargs.__str__()])
+                                                 "args=%s" % str(args),
+                                                 "kwargs=%s" % str(kwargs)])
 
             try:
                 return f(*args, **kwargs)
@@ -291,8 +291,8 @@ class Runner(object):
         else:
             if self.protocol.records_callables:
                 self.protocol.add_section([str(f),
-                                             "args=%s" % args.__str__(),
-                                             "kwargs=%s" % kwargs.__str__()],
+                                             "args=%s" % str(args),
+                                             "kwargs=%s" % str(kwargs)],
                                           None)
 
     def log(self, msg, level=logging.DEBUG):

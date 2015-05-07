@@ -55,6 +55,7 @@ class ProtocolInterface(object):
     def start_section(self, cmd):
         """Starts a new section of the protocol.
 
+        To call before the command call to be recorded.
         To be used with a corresponding call of end_section().
 
         Parameters:
@@ -74,6 +75,7 @@ class ProtocolInterface(object):
     def end_section(self, id_, exception):
         """Ends the section `id`.
 
+        To call after the command call to be recorded.
         This ends the section defined by `id` as returned by start_section().
 
         Parameters:
@@ -94,6 +96,7 @@ class ProtocolInterface(object):
         """Adds a section to the protocol.
 
         This is an alternative to the use of start_section() and end_section().
+        In opposition to start_section, this one can be called anytime.
 
         Parameters:
         -----------
