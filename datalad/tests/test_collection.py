@@ -77,13 +77,13 @@ def test_CollectionRepo_get_handles(annex_path, handle_path,
     # get a single handle instance:
     t_handle = col_repo.get_handle("SecondHandle")
 
-    assert_equal(collection["SecondHandle"][0], t_handle.get_datalad_id())
+    assert_equal(collection["SecondHandle"][0], t_handle.datalad_id())
     assert_equal(collection["SecondHandle"][1], t_handle.path)
     assert_equal(set(Graph().parse(data=collection["SecondHandle"][2])),
                  set(t_handle.get_metadata()))
 
     assert_equal(t_handle.path, handle_path2)
-    assert_equal(t_handle.get_datalad_id(), handle2.get_datalad_id())
+    assert_equal(t_handle.datalad_id(), handle2.datalad_id())
     assert_equal(set(t_handle.get_metadata()), set(handle2.get_metadata()))
 
     # now get a list:
@@ -135,14 +135,14 @@ def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
     assert_in("first_handle", clt.get_indexed_files())
     with open(opj(clt_path, "first_handle"), 'r') as f:
         assert_equal(f.readline().rstrip(), "handle_id = %s" %
-                                            handle.get_datalad_id())
+                                            handle.datalad_id())
         assert_equal(f.readline().rstrip(), "last_seen = %s" % handle.path)
         assert_equal(
             set(Graph().parse(data=''.join(f.readlines()).lstrip(
                 "metadata = "))),
             set(handle.get_metadata()))
     col_dict = Collection(clt)
-    assert_equal(col_dict["first_handle"][0], handle.get_datalad_id())
+    assert_equal(col_dict["first_handle"][0], handle.datalad_id())
     assert_equal(col_dict["first_handle"][1], handle.path)
     assert_equal(set(Graph().parse(data=col_dict["first_handle"][2])),
                  set(handle.get_metadata()))

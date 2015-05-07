@@ -11,15 +11,20 @@ This layer makes the difference between an arbitrary annex and a
 datalad-managed dataset.
 
 """
+# TODO: where to document definition of a valid handle?
+# - Annex
+# - .datalad directory:
+#   - handle.cfg
+#   - metadata file(s)
 
 import os
 from os.path import join as opj, exists, basename
 import logging
+from ConfigParser import SafeConfigParser
 
-from rdflib import Graph, URIRef, Literal
-from rdflib.namespace import RDF, FOAF
 
 from annexrepo import AnnexRepo
+from .metadatahandler import MetadataHandler, DefaultHandler
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -56,30 +61,57 @@ class Handle(AnnexRepo):
         backend: str
         name: str
         """
+        # TODO: More doc. See above.
 
         super(Handle, self).__init__(path, url, direct=direct, runner=runner,
                                      backend=backend)
 
-        # default name: repo's basename
-        # TODO: Does this make sense at all? Name -> collection!
-        self.name = name or basename(self.path)
-
         datalad_path = opj(self.path, '.datalad')
         if not exists(datalad_path):
             os.mkdir(datalad_path)
-            # create ID file:
-            with open(opj(datalad_path, 'handle_id'), 'w') as f:
-                f.write(self.repo.config_reader().get_value("annex", "uuid"))
-            self.add_to_git(opj('.datalad', 'handle_id'),
-                            "Created datalad handle id.")
-            meta = Graph()
-            # For now, just something to add:
-            this_handle = URIRef(self.path)
-            meta.add((this_handle, RDF.type, Literal('Datalad Handle')))
-            meta.add((this_handle, FOAF.name, Literal(self.name)))
-            meta.serialize(opj(datalad_path, 'metadata'))
-            self.add_to_git(opj('.datalad', 'metadata'),
-                            "Initialized metadata.")
+
+        # Read configuration as far as it is available already.
+        # Set defaults, wherever there's nothing available.
+        self.config_file = opj(datalad_path, 'handle.cfg')
+        self._cfg_parser = SafeConfigParser()
+
+        if exists(self.config_file):
+            self._cfg_parser.read(self.config_file)
+        if not self._cfg_parser.has_section('Handle'):
+            self._cfg_parser.add_section('Handle')
+        # By now, the datalad id is the uuid of the original annex that handle
+        # was created from. Since that config file is added to git, the id is
+        # kept, whenever the repository is cloned.
+        if not self._cfg_parser.has_option('Handle', 'id'):
+            self._cfg_parser.set('Handle', 'id',
+                                 self.repo.config_reader().get_value("annex",
+                                                                     "uuid"))
+        # Constructors parameter 'name' has priority to be used with this
+        # instance as well as to be used as default name, if there is no
+        # default name in config file already. If nothing is available at all,
+        # the repository's name in the filesystem is used as default.
+        if not self._cfg_parser.has_option('Handle', 'name'):
+            self._cfg_parser.set('Handle', 'name', name or basename(self.path))
+        self.name = name or self._cfg_parser.get('Handle', 'name')
+        # TODO: if name is set during runtime, how to treat this? Rethink,
+        # whether this means to set the default name
+
+        # By now, we distinguish between metadata explicitly supported by
+        # datalad (option 'standard') in order to ease queries, and additional,
+        # metadata (option 'custom'), that takes more effort to query.
+        # However, this distinction is done inside the handler.
+        # TODO: As soon as we are sure about this, have better documentation.
+
+        if not self._cfg_parser.has_section('Metadata'):
+            self._cfg_parser.add_section('Metadata')
+        if not self._cfg_parser.has_option('Metadata', 'handler'):
+            self._cfg_parser.set('MetadataHandler', 'handler',
+                                 'DefaultHandler')
+
+    def __del__(self):
+        with open(self.config_file) as f:
+            self._cfg_parser.write(f)
+        self.add_to_git(self.config_file, "Update config file.")
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
@@ -92,16 +124,25 @@ class Handle(AnnexRepo):
         """
         return self.path == obj.path
 
-    def get_datalad_id(self):
+    @property
+    def datalad_id(self):
         """Get the identifier of the handle.
 
         Returns
         -------
         str
         """
+        return self._cfg_parser.get('Handle', 'id')
 
-        with open(opj(self.path, '.datalad', 'handle_id'), 'r') as f:
-            return f.readline()
+    def set_metadata_handler(self, handler=DefaultHandler):
+        """
+        std: subclass of MetadataHandler
+        custom: subclass of MetadataHandler
+        """
+        if not issubclass(handler, MetadataHandler):
+            raise TypeError("%s is not a MetadataHandler." % type(std))
+
+        self._cfg_parser.set('MetadataHandler', 'handler', handler.__name__)
 
     def get(self, files):
         """get the actual content of files
@@ -109,8 +150,6 @@ class Handle(AnnexRepo):
         This command gets the actual content of the files in `list`.
         """
         self.annex_get(files)
-        # For now just pass
-        # TODO:
 
     def _commit(self, msg):
         """Commit changes to repository
@@ -159,22 +198,35 @@ class Handle(AnnexRepo):
         self.annex_add_to_git(files)
         self._commit(commit_msg)
 
-# TODO: --------------------------------------------------------------------
-
     def get_metadata(self):
-        """whatever this may return at the end
-            => rdflib?!
         """
+        Returns:
+        --------
+        datalad.support.metadatahandler.Graph (currently just rdflib.Graph)
+        """
+        name = self._cfg_parser.get('MetadataHandler', 'handler')
+        import datalad.support.metadatahandler as mdh
+        try:
+            handler = getattr(mdh, name)(opj(self.path, '.datalad'))
+        except AttributeError, e:
+            lgr.error("'%s' is an unknown metadata handler." % name)
+            raise ValueError("'%s' is an unknown metadata handler." % name)
 
-        meta = Graph()
-        meta.parse(opj(self.path, '.datalad', 'metadata'))
-        return meta
+        return handler.getGraph()
 
     def set_metadata(self, meta):
-        if isinstance(meta, Graph):
-            meta.serialize(opj(self.path, '.datalad', 'metadata'))
-            self.add_to_git(opj('.datalad', 'metadata'),
-                        "Updated metadata.")
-        else:
-            lgr.error("Can't save meta data of type: %s" % type(meta))
-            raise TypeError("Can't save meta data of type: %s" % type(meta))
+        """
+        Parameters:
+        -----------
+        meta: datalad.support.metadatahandler.Graph
+          (currently just rdflib.Graph)
+        """
+        name = self._cfg_parser.get('MetadataHandler', 'handler')
+        import datalad.support.metadatahandler as mdh
+        try:
+            handler = getattr(mdh, name)(opj(self.path, '.datalad'))
+        except AttributeError, e:
+            lgr.error("'%s' is an unknown metadata handler." % name)
+            raise ValueError("'%s' is an unknown metadata handler." % name)
+
+        handler.set(meta)

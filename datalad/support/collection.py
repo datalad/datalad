@@ -342,7 +342,7 @@ class CollectionRepo(GitRepo):
         # Writing plain text for now. This is supposed to change to use
         # rdflib or sth.
         with open(opj(self.path, self._key2filename(name)), 'w') as f:
-            f.write("handle_id = %s\n" % handle.get_datalad_id())
+            f.write("handle_id = %s\n" % handle.datalad_id())
             f.write("last_seen = %s\n" % handle.path)
             f.write("metadata = %s\n" % handle.get_metadata().serialize())
             # what else? maybe default view or sth.

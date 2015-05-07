@@ -167,7 +167,7 @@ def test_Handle_id(path1, path2):
 
     # check id is generated:
     handle1 = Handle(path1)
-    id1 = handle1.get_datalad_id()
+    id1 = handle1.datalad_id()
     assert_is_not_none(id1)
     assert_is_instance(id1, basestring)
     assert_equal(id1,
@@ -175,7 +175,7 @@ def test_Handle_id(path1, path2):
 
     # check clone has same id:
     handle2 = Handle(path2, path1)
-    assert_equal(id1, handle2.get_datalad_id())
+    assert_equal(id1, handle2.datalad_id())
 
 
 @with_tempfile
