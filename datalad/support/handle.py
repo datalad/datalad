@@ -7,7 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
-This layer makes the difference between an arbitrary annex and a datalad-managed dataset.
+This layer makes the difference between an arbitrary annex and a
+datalad-managed dataset.
 
 """
 
@@ -26,10 +27,11 @@ lgr = logging.getLogger('datalad.dataset')
 class Handle(AnnexRepo):
     """Representation of a dataset handled by datalad.
 
-    Implementations of datalad commands are supposed to use this rather than AnnexRepo or GitRepo directly,
-    since any restrictions on annexes required by datalad due to its cross-platform distribution approach are handled
-    within this class. Also an AnnexRepo has no idea of any datalad configuration needs, of course.
-
+    Implementations of datalad commands are supposed to use this rather than
+    AnnexRepo or GitRepo directly, since any restrictions on annexes required
+    by datalad due to its cross-platform distribution approach are handled
+    within this class. Also an AnnexRepo has no idea of any datalad
+    configuration needs, of course.
     """
 
     def __init__(self, path, url=None, direct=False, runner=None, backend=None,
@@ -37,15 +39,17 @@ class Handle(AnnexRepo):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
-        If `url` is given, it is expected to point to a git repository to create a clone from.
+        If `url` is given, it is expected to point to a git repository to
+        create a clone from.
 
         Parameters
         ----------
         path : str
           path to repository
         url: str
-          url to the to-be-cloned repository.
-          valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
+          url to the to-be-cloned repository. Valid git url according to
+          http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS
+          required.
         direct: bool
           if True, force git-annex to operate in direct mode
         runner: Runner
@@ -82,9 +86,9 @@ class Handle(AnnexRepo):
 
         This is done by comparing the base repository path.
         Note: There is a second meaning of 'equal' handles, meaning that
-        they have the same datalad id. However, at the level of instances
-        'equal' means, that the both of them are representing the very same
-        repository.
+        they have the same datalad id. However, at the level of instances of
+        this class, 'equal' means, that the both of them are representing the
+        very same repository.
         """
         return self.path == obj.path
 
@@ -132,7 +136,8 @@ class Handle(AnnexRepo):
         commit_msg: str
             commit message
         files: list
-            list of paths to add to the annex; Can also be a str, in case of a single path.
+            list of paths to add to the annex; Can also be a str, in case of a
+            single path.
         """
 
         self.annex_add(files)
@@ -148,7 +153,8 @@ class Handle(AnnexRepo):
         commit_msg: str
             commit message
         files: list
-            list of paths to add to git; Can also be a str, in case of a single path.
+            list of paths to add to git; Can also be a str, in case of a single
+            path.
         """
         self.annex_add_to_git(files)
         self._commit(commit_msg)
