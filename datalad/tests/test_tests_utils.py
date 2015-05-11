@@ -22,7 +22,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
     rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
-    on_windows, assert_raises, assert_cwd_unchanged
+    on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http
 
 
 #
@@ -237,3 +237,9 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         eq_(orig_dir, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
         assert_not_in("Mitigating and changing back", cml.out)
+
+
+
+def test_serve_path_via_http():
+    serve_path_via_http()
+    
