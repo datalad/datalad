@@ -8,13 +8,21 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Miscellaneous utilities to assist with testing"""
 
-import glob, shutil, stat, os
-from os.path import realpath
+import glob
+import shutil
+import stat
+import os
 import tempfile
 import platform
+import multiprocessing
+import logging
+import random
+import socket
+import SimpleHTTPServer
+import SocketServer
 
 from functools import wraps
-from os.path import exists, join as opj
+from os.path import exists, realpath, join as opj
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
@@ -179,14 +187,14 @@ def ok_annex_get(ar, files, network=True):
         ok_(has_content)
     else:
         ok_(all(has_content))
+
 #
 # Decorators
 #
 
-from ..utils import optional_args
-
 @optional_args
 def with_tree(t, tree=None, **tkwargs):
+
     @wraps(t)
     def newfunc(*arg, **kw):
         tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
@@ -199,15 +207,8 @@ def with_tree(t, tree=None, **tkwargs):
     return newfunc
 
 
-# GRRR -- this one is crippled since path where HTTPServer is serving
-# from can't be changed without pain.
-import logging
-import random
-import SimpleHTTPServer
-import SocketServer
-from threading import Thread
-
 lgr = logging.getLogger('datalad.tests')
+
 
 class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     """A little adapter to silence the handler
@@ -222,6 +223,29 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         lgr.debug("HTTP: " + format % args)
 
 
+#def _multiproc_serve_path_via_http(port, path_to_serve_from):
+    #cmd = 'python -m SimpleHTTPServer {}'.format(port)
+    #runner = Runner(cwd=path_to_serve_from)
+    #runner(cmd, log_online=True)
+
+def _multiproc_serve_path_via_http(port, path_to_serve_from):
+    os.chdir(path_to_serve_from)
+    SocketServer.TCPServer.allow_reuse_address = True
+    httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
+    httpd.serve_forever()
+
+# in order to get something like this going i need to better understand 
+# what is happening in those layers of decorators since those args gets
+# pass into that tfunc stuff
+#def _multiproc_serve_path_via_http(hostname, path_to_serve_from):
+    #os.chdir(path_to_serve_from)
+    #SocketServer.TCPServer.allow_reuse_address = True
+    #httpd = SocketServer.TCPServer((hostname, 0), SilentHTTPHandler)
+    #ip, port = httpd.server_address 
+    #print '++++++++++', port
+    #httpd.serve_forever()
+
+
 @optional_args
 def serve_path_via_http(tfunc):
     """Decorator which serves content of a directory via http url
@@ -229,15 +253,9 @@ def serve_path_via_http(tfunc):
     
     @wraps(tfunc)
     def newfunc(*arg, **kw):
-        #import pdb
-        #pdb.set_trace()
-        port = random.randint(8000, 8500)
-        # TODO: ATM we are relying on path being local so we could
-        # start HTTP server in the same directory.  FIX IT!
-        SocketServer.TCPServer.allow_reuse_address = True
-        httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
-        server_thread = Thread(target=httpd.serve_forever)
+
         arg, path = arg[:-1], arg[-1]
+
         # There is a problem with Haskell on wheezy trying to
         # fetch via IPv6 whenever there is a ::1 localhost entry in
         # /etc/hosts.  Apparently fixing that docker image reliably
@@ -245,19 +263,36 @@ def serve_path_via_http(tfunc):
         # http://jasonincode.com/customizing-hosts-file-in-docker/
         # so we just force to use 127.0.0.1 while on wheezy
         hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-        url = 'http://%s:%d/%s/' % (hostname, port, path)
-        lgr.debug("HTTP: serving %s under %s", path, url)
-        server_thread.start()
+        port = random.randint(8000, 8500)
+        #print '++++++++++', port
 
-        #time.sleep(1)               # just give it few ticks
+        # FIXME do a check to make sure port choosen isn't already being used 
+        # though could change the way the server is created and let the server pick
+        # the port instead like here:  http://pymotw.com/2/SocketServer
+        #while True:
+            #port = random.randint(8000, 8500)
+            #sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            #ret_val = sock.connect_ex((hostname, port))
+            #if ret_val:
+                #continue
+            #else:
+                #sock.shutdown(1)
+                #sock.close()
+                #break
+
+        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, args=(port, path))
+        #multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, args=(hostname, path))
+        multi_proc.start()
+
+        url = 'http://{}:{}/'.format(hostname, port)
+        lgr.debug("HTTP: serving {} under {}".format(path, url))
+
         try:
             tfunc(*(arg + (path, url,)), **kw)
         finally:
             lgr.debug("HTTP: stopping server")
-            httpd.shutdown()
-            server_thread.join()
+            multi_proc.terminate()
     return newfunc
-
 
 
 @optional_args
