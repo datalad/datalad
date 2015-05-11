@@ -31,8 +31,7 @@ tree1args = dict(
         ('1.tar.gz', (
             ('1 f.txt', '1 f load'),
             ('d', (('1d', ''),)), ))),
-    dir=os.curdir,
-    prefix='.tmp-page2annex-')
+         )
 
 def verify_files_content(d, files, dangling=[]):
     for f in files:
@@ -373,9 +372,8 @@ tree2args = dict(
             )),
         ('1.tar.gz', (
             ('1 f.txt', '1 f load'),
-            ('d', (('1d', ''),)), ))),
-    dir=os.curdir,
-    prefix='.tmp-page2annex-')
+            ('d', (('1d', ''),)), )))
+        )
 
 @with_tree(**tree2args)
 @serve_path_via_http()
