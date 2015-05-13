@@ -18,8 +18,9 @@ import multiprocessing
 import logging
 import random
 import socket
-import SimpleHTTPServer
 import SocketServer
+import SimpleHTTPServer
+import BaseHTTPServer
 
 from functools import wraps
 from os.path import exists, realpath, join as opj
@@ -223,27 +224,11 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         lgr.debug("HTTP: " + format % args)
 
 
-#def _multiproc_serve_path_via_http(port, path_to_serve_from):
-    #cmd = 'python -m SimpleHTTPServer {}'.format(port)
-    #runner = Runner(cwd=path_to_serve_from)
-    #runner(cmd, log_online=True)
-
-def _multiproc_serve_path_via_http(port, path_to_serve_from):
+def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue):
     os.chdir(path_to_serve_from)
-    SocketServer.TCPServer.allow_reuse_address = True
-    httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
+    httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
+    queue.put(httpd.server_port)
     httpd.serve_forever()
-
-# in order to get something like this going i need to better understand 
-# what is happening in those layers of decorators since those args gets
-# pass into that tfunc stuff
-#def _multiproc_serve_path_via_http(hostname, path_to_serve_from):
-    #os.chdir(path_to_serve_from)
-    #SocketServer.TCPServer.allow_reuse_address = True
-    #httpd = SocketServer.TCPServer((hostname, 0), SilentHTTPHandler)
-    #ip, port = httpd.server_address 
-    #print '++++++++++', port
-    #httpd.serve_forever()
 
 
 @optional_args
@@ -252,9 +237,9 @@ def serve_path_via_http(tfunc):
     """
     
     @wraps(tfunc)
-    def newfunc(*arg, **kw):
+    def newfunc(*args, **kw):
 
-        arg, path = arg[:-1], arg[-1]
+        args, path = args[:-1], args[-1]
 
         # There is a problem with Haskell on wheezy trying to
         # fetch via IPv6 whenever there is a ::1 localhost entry in
@@ -263,32 +248,18 @@ def serve_path_via_http(tfunc):
         # http://jasonincode.com/customizing-hosts-file-in-docker/
         # so we just force to use 127.0.0.1 while on wheezy
         hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-        port = random.randint(8000, 8500)
-        #print '++++++++++', port
-
-        # FIXME do a check to make sure port choosen isn't already being used 
-        # though could change the way the server is created and let the server pick
-        # the port instead like here:  http://pymotw.com/2/SocketServer
-        #while True:
-            #port = random.randint(8000, 8500)
-            #sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            #ret_val = sock.connect_ex((hostname, port))
-            #if ret_val:
-                #continue
-            #else:
-                #sock.shutdown(1)
-                #sock.close()
-                #break
-
-        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, args=(port, path))
-        #multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, args=(hostname, path))
+        
+        queue = multiprocessing.Queue()
+        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+                                             args=(hostname, path, queue))
         multi_proc.start()
+        port = queue.get(timeout=90)
 
         url = 'http://{}:{}/'.format(hostname, port)
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
-            tfunc(*(arg + (path, url,)), **kw)
+            tfunc(*(args + (path, url)), **kw)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
