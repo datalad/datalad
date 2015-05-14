@@ -28,7 +28,7 @@ from os.path import exists, realpath, join as opj
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_in as in_, \
-    raises, ok_, eq_, make_decorator, assert_true
+    raises, ok_, eq_, make_decorator
 
 from nose import SkipTest
 
@@ -135,30 +135,31 @@ def ok_file_under_git(path, filename, annexed=False):
     assert(filename in repo.get_indexed_files())  # file is known to Git
     assert(annexed == os.path.islink(opj(path, filename)))
 
+#
+# Helpers to test symlinks
+#
 
 def ok_symlink(path):
-    try:
-        link = os.readlink(path)
-    except OSError:
-        raise AssertionError("Path %s seems not to be a symlink" % path)
-    ok_(link)
-    path_ = realpath(path)
-    ok_(path != link)
-    # TODO anything else?
+    """Checks whether path is either a working or broken symlink"""
+    link_path = os.path.islink(path)
+    if not link_path: 
+        raise AssertionError("Path {} seems not to be a symlink".format(path))
 
 
 def ok_good_symlink(path):
     ok_symlink(path)
-    ok_(exists(realpath(path)),
-        msg="Path %s seems to be missing.  Symlink %s is broken "
-            % (realpath(path), path))
+    rpath = realpath(path)
+    ok_(exists(rpath),
+        msg="Path {} seems to be missing.  Symlink {} is broken".format(
+                rpath, path))
 
 
 def ok_broken_symlink(path):
     ok_symlink(path)
-    assert_false(exists(realpath(path)),
-                 msg="Path %s seems to be present.  Symlink %s is not broken"
-                 % (realpath(path), path))
+    rpath = realpath(path)
+    assert_false(exists(rpath),
+            msg="Path {} seems to be present.  Symlink {} is not broken".format(
+                    rpath, path))
 
 
 def ok_startswith(s, prefix):

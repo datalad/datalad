@@ -120,7 +120,7 @@ class AnnexRepoOld(object):
         full_annex_filename = join(self.path, annex_filename)
         if git_add:
             # TODO: reflect in stats.  Now it would add to _annex_updates
-            if not self.runner.dry:
+            if not self.runner.protocol.__class__.__name__ == 'DryRunProtocol':
                 assert(os.path.exists(full_annex_filename))
             return self.run([annex_filename], git_cmd="add")
 
@@ -128,7 +128,7 @@ class AnnexRepoOld(object):
         if add_mode == 'auto':
             if exists(full_annex_filename):
                 add_mode = "download"
-            elif self.runner.dry:
+            elif self.runner.protocol.__class__.__name__ == 'DryRunProtocol':
                 add_mode = "fast"
                 lgr.warning("Cannot deduce auto mode in 'dry' mode. So some actions "
                             "might differ -- assuming 'fast' mode")
@@ -248,7 +248,7 @@ def annex_file(href,
             #       implemented git_add would not be in effect for content extracted
             #       from archives
             public_annex.add_file(public_filename, add_mode='download', git_add=git_add)
-            if not runner.dry:
+            if not runner.protocol.__class__.__name__ == 'DryRunProtocol':
                 public_annex_updated = True
 
         else:
@@ -270,12 +270,12 @@ def annex_file(href,
                     raise ValueError("Link %s exists but broken -- should have not happened"
                                      % full_incoming_filename)
                 else:
-                    assert(fast_mode or runner.dry)
+                    assert(fast_mode or runner.protocol.__class__.__name__ == 'DryRunProtocol')
 
             if (incoming_annex is not public_annex) or fast_mode:
                 public_annex.rm_indexed_file(public_filename)
                 public_annex.add_file(public_filename, href=href, add_mode=add_mode, git_add=git_add)
-                if not runner.dry:
+                if not runner.protocol.__class__.__name__ == 'DryRunProtocol':
                     public_annex_updated = True
 
     # And after all decide on the incoming destiny
@@ -301,7 +301,7 @@ def annex_file(href,
                     incoming_annex.add_file(incoming_filename, href=href, add_mode=add_mode, git_add=git_add)
             if incoming_destiny == 'drop' and exists(full_incoming_filename):
                 incoming_annex.run(["drop", incoming_filename])
-            if not runner.dry:
+            if not runner.protocol.__class__.__name__ == 'DryRunProtocol':
                 incoming_annex_updated = True
         elif incoming_destiny == 'keep':
             pass  # do nothing more
