@@ -18,7 +18,8 @@ import logging
 import os
 import shutil
 import shlex
-from datalad.support.exceptions import CommandError
+from .support.exceptions import CommandError
+from .support.protocol import NullProtocol
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -27,37 +28,35 @@ class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
     An object of this class provides a methods calls shell commands or python
-    functions, allowing for dry runs and output handling.
+    functions, allowing for protocolling the calls and output handling.
 
     Outputs (stdout and stderr) can be either logged or streamed to system's
     stdout/stderr during execution.
     This can be enabled or disabled for both of them independently.
-    Additionally allows for dry runs. This is achieved by initializing the
-    `Runner` with `dry=True`.
-    The Runner will then collect all calls as strings in `commands`.
+    Additionally, a protocol object can be a used with the Runner. Such a
+    protocol has to implement datalad.support.protocol.ProtocolInterface, is
+    able to record calls and allows for dry runs.
     """
 
     __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
 
-    def __init__(self, dry=False, cwd=None, env=None, protocol=None):
+    def __init__(self, cwd=None, env=None, protocol=None):
         """
         Parameters
         ----------
-        dry: bool, optional
-             If True, none of the commands is actually ran
         cwd: string, optional
              Base current working directory for commands.  Could be overridden
              per run call via cwd option
         env: dict, optional
              Custom environment to use for calls. Could be overridden per run
              call via env option
+        protocol: ProtocolInterface
+             Protocol object to write to.
         """
-        self.dry = dry
+
         self.cwd = cwd
         self.env = env
-        self.protocol = protocol
-
-        self.commands = []
+        self.protocol = NullProtocol() if protocol is None else protocol
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
@@ -77,7 +76,7 @@ class Runner(object):
 
         Raises
         ------
-        ValueError if cmd is neither a string nor a callable.
+        TypeError if cmd is neither a string nor a callable.
         """
 
         if isinstance(cmd, basestring) or isinstance(cmd, list):
@@ -85,7 +84,7 @@ class Runner(object):
         elif callable(cmd):
             return self.call(cmd, *args, **kwargs)
         else:
-            raise ValueError("Argument 'command' is neither a string, "
+            raise TypeError("Argument 'command' is neither a string, "
                              "nor a list nor a callable.")
 
     # Two helpers to encapsulate formatting/output
@@ -136,6 +135,11 @@ class Runner(object):
         actually executed otherwise.
         Allows for separately logging stdout and stderr  or streaming it to
         system's stdout or stderr respectively.
+
+        Note: Using a string as `cmd` and shell=True allows for piping,
+              multiple commands, etc., but that implies shlex.split() is not
+              used. This is considered to be a security hazard.
+              So be careful with input.
 
         Parameters
         ----------
@@ -194,30 +198,34 @@ class Runner(object):
 
         self.log("Running: %s" % (cmd,))
 
-        if not self.dry:
+        if self.protocol.do_execute_ext_commands:
 
             if shell is None:
                 shell = isinstance(cmd, basestring)
 
-            if self.protocol:
-                self.protocol.write_section(
-                    shlex.split(cmd) if isinstance(cmd, basestring) else cmd)
+            if self.protocol.records_ext_commands:
+                prot_exc = None
+                prot_id = self.protocol.start_section(shlex.split(cmd)
+                                                      if isinstance(cmd,
+                                                                    basestring)
+                                                      else cmd)
+
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream,
                                         stderr=errstream,
                                         shell=shell,
                                         cwd=cwd or self.cwd,
                                         env=env or self.env)
+
             except Exception, e:
+                prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
                           (cmd, " under %r" % cwd if cwd else '', e))
                 raise
-            # shell=True allows for piping, multiple commands, etc.,
-            # but that implies to not use shlex.split()
-            # and is considered to be a security hazard.
-            # So be careful with input.
-            # Alternatively we would have to parse `cmd` and create multiple
-            # subprocesses.
+
+            finally:
+                if self.protocol.records_ext_commands:
+                    self.protocol.end_section(prot_id, prot_exc)
 
             if log_online:
                 out = self._get_output_online(proc, log_stdout, log_stderr,
@@ -247,7 +255,10 @@ class Runner(object):
                          level=8)
 
         else:
-            self.commands.append(cmd)
+            if self.protocol.records_ext_commands:
+                self.protocol.add_section(shlex.split(cmd)
+                                            if isinstance(cmd, basestring)
+                                            else cmd, None)
             out = ("DRY", "DRY")
 
         return out
@@ -262,20 +273,36 @@ class Runner(object):
         *args, **kwargs:
           Callable arguments
         """
-        if self.dry:
-            self.commands.append("%s args=%s kwargs=%s" % (f, args, kwargs))
+        if self.protocol.do_execute_callables:
+            if self.protocol.records_callables:
+                prot_exc = None
+                prot_id = self.protocol.start_section([str(f),
+                                                 "args=%s" % str(args),
+                                                 "kwargs=%s" % str(kwargs)])
+
+            try:
+                return f(*args, **kwargs)
+            except Exception, e:
+                prot_exc = e
+                raise
+            finally:
+                if self.protocol.records_callables:
+                    self.protocol.end_section(prot_id, prot_exc)
         else:
-            return f(*args, **kwargs)
+            if self.protocol.records_callables:
+                self.protocol.add_section([str(f),
+                                             "args=%s" % str(args),
+                                             "kwargs=%s" % str(kwargs)],
+                                          None)
 
     def log(self, msg, level=logging.DEBUG):
         """log helper
 
-        Logs at DEBUG-level by default and adds "DRY:"-prefix for dry runs.
+        Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
+        log the used protocol.
         """
-        if self.dry:
-            lgr.log(level, "DRY: %s" % msg)
-        else:
-            lgr.log(level, msg)
+        lgr.log(level, "Protocol: %s: %s" % (self.protocol.__class__.__name__,
+                                             msg))
 
 
 # ####

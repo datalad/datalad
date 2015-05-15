@@ -69,8 +69,10 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
+    __slots__ = GitRepo.__slots__ + ['always_commit']
+
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None):
+                 direct=False, backend=None, always_commit=True):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -102,6 +104,8 @@ class AnnexRepo(GitRepo):
         """
         super(AnnexRepo, self).__init__(path, url, runner=runner)
 
+        self.always_commit = always_commit
+
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
             lgr.debug('No annex found in %s.'
@@ -118,7 +122,7 @@ class AnnexRepo(GitRepo):
         if backend:
             self.repo.config_writer().set_value("annex", "backends", backend)
 
-    def _run_annex_command(self, annex_cmd, git_options=[], annex_options=[],
+    def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, expect_fail=False,
                            backend=None):
@@ -154,10 +158,19 @@ class AnnexRepo(GitRepo):
 
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
-        cmd_list = ['git'] + git_options +\
-                   ['annex', annex_cmd] +\
-                   backend + debug +\
-                   annex_options
+
+        git_options = git_options[:] if git_options else []
+        annex_options = annex_options[:] if annex_options else []
+
+        if not self.always_commit:
+            git_options += ['-c', 'annex.alwayscommit=false']
+
+        if git_options:
+            cmd_list = ['git'] + git_options + ['annex']
+        else:
+            cmd_list = ['git-annex']
+        cmd_list += [annex_cmd] + backend + debug + annex_options
+
         try:
             return self.cmd_call_wrapper.run(cmd_list,
                                              log_stdout=log_stdout,
@@ -244,9 +257,8 @@ class AnnexRepo(GitRepo):
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
 
-    @kwargs_to_options
     @normalize_paths
-    def annex_get(self, files, options=[]):
+    def annex_get(self, files, options=None):
         """Get the actual content of files
 
         Parameters:
@@ -258,6 +270,7 @@ class AnnexRepo(GitRepo):
             For example `from='myremote'` translates to
             annex option "--from=myremote".
         """
+        options = options[:] if options else []
 
         # don't capture stderr, since it provides progress display
         self._run_annex_command('get', annex_options=options + files,
@@ -265,7 +278,7 @@ class AnnexRepo(GitRepo):
                                 log_online=True, expect_stderr=True)
 
     @normalize_paths
-    def annex_add(self, files, backend=None, options=[]):
+    def annex_add(self, files, backend=None, options=None):
         """Add file(s) to the annex.
 
         Parameters
@@ -273,6 +286,7 @@ class AnnexRepo(GitRepo):
         files: list of str
             list of paths to add to the annex
         """
+        options = options[:] if options else []
 
         self._run_annex_command('add', annex_options=options + files,
                                 backend=backend)
@@ -433,7 +447,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('enableremote', annex_options=[name])
 
     @normalize_path
-    def annex_addurl_to_file(self, file_, url, options=[], backend=None):
+    def annex_addurl_to_file(self, file_, url, options=None, backend=None):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -449,6 +463,7 @@ class AnnexRepo(GitRepo):
         options: list
             options to the annex command
         """
+        options = options[:] if options else []
 
         annex_options = ['--file=%s' % file_] + options + [url]
         self._run_annex_command('addurl', annex_options=annex_options,
@@ -457,7 +472,7 @@ class AnnexRepo(GitRepo):
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
 
-    def annex_addurls(self, urls, options=[], backend=None):
+    def annex_addurls(self, urls, options=None, backend=None):
         """Downloads each url to its own file, which is added to the annex.
 
         Parameters:
@@ -467,6 +482,7 @@ class AnnexRepo(GitRepo):
         options: list
             options to the annex command
         """
+        options = options[:] if options else []
 
         self._run_annex_command('addurl', annex_options=options + urls,
                                 backend=backend, log_online=True,
@@ -488,7 +504,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
     @normalize_paths
-    def annex_drop(self, files, options=[]):
+    def annex_drop(self, files, options=None):
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -498,6 +514,7 @@ class AnnexRepo(GitRepo):
         -----------
         files: list of str
         """
+        options = options[:] if options else []
 
         self._run_annex_command('drop', annex_options=files + options)
 

@@ -314,7 +314,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             # Command could have fail to run if key was not present locally yet
             # Thus retrieve the key using annex
             try:
-                self.runner(["git", "annex", "get", "--key", akey],
+                self.runner(["git-annex", "get", "--key", akey],
                             cwd=self.path)
                 akey_path = self._get_key_path(akey)
                 assert(exists(akey_path))
