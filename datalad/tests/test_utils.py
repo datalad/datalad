@@ -14,17 +14,14 @@ import os
 import shutil
 import sys
 import logging
-import pdb
 from mock import patch
 from contextlib import nested
 
 from os.path import join as opj
-from ..utils import (rotree, swallow_outputs, swallow_logs, setup_exceptionhook,
-                    is_interactive)
+from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in
-from .. import utils
 
 
 @with_tempfile(mkdir=True)
