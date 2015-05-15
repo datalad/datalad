@@ -254,7 +254,7 @@ def serve_path_via_http(tfunc):
         multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
                                              args=(hostname, path, queue))
         multi_proc.start()
-        port = queue.get(timeout=90)
+        port = queue.get(timeout=300)
 
         url = 'http://{}:{}/'.format(hostname, port)
         lgr.debug("HTTP: serving {} under {}".format(path, url))
