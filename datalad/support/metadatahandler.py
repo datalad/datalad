@@ -13,11 +13,11 @@ import logging
 from os.path import join as opj
 from abc import ABCMeta, abstractmethod, abstractproperty
 
-from rdflib import Graph, URIRef, Literal
-from rdflib.namespace import RDF, FOAF
-import rdflib.namespace
+from rdflib import Graph, URIRef, Literal, Namespace, BNode
+from rdflib.namespace import RDF, FOAF, RDFS
 
-
+# define datalad namespace:
+DLNS = Namespace('http://www.datalad.org/terms/')
 
 lgr = logging.getLogger('datalad.metadata')
 
@@ -40,7 +40,7 @@ class MetadataHandler(object):
         self._path = path
 
     @abstractmethod
-    def get_graph(self):
+    def get_handle_graph(self):
         pass
 
     @abstractmethod
@@ -53,7 +53,13 @@ class DefaultHandler(MetadataHandler):
     def __init__(self, path):
         super(DefaultHandler, self).__init__(path)
 
-    def get_graph(self):
+    def get_handle_graph(self, handle_path):
+        # handle_path: by now, it's just self._path + '..'
+        # But not sure yet, whether a Handler should know about a handle or be
+        # more general. Let's see how this works with collections.
+        # self._path could also be just some dir with metadata and no connection
+        # to an actual handle.
+
         meta = Graph()
         # look for standard files and
         # and build triples to add to the graph
@@ -61,15 +67,34 @@ class DefaultHandler(MetadataHandler):
         # either take all other files or a specific one like 'metadata'
         # and try whether we can read it.
 
-        ######temporarily do just something valid:
-        meta.parse(opj(self._path, 'metadata'))
+        # The following would read arbitrary rdf files, but how to connect this
+        # general graph to the handle node, since we know nothing about it?
+        try:
+            meta.parse(opj(self._path, 'metadata'))
+        except IOError:
+            # File is not mandatory, so just ignore if it can't be read.
+            pass
 
-        # add to the graph (join at handles' node?! => in Handle-class)
-        # TODO: How to this? Check rdflib for such operations.
+        # For now create a dummy graph for proof of concept:
+        handle = URIRef(handle_path)
+        meta.add((handle, RDF.type, DLNS.Handle))
+        meta.add((handle, RDFS.comment, Literal("A handle with a dummy "
+                                                  "metadata set.")))
+
+        author = BNode()
+        meta.add((author, RDF.type, FOAF.Person))
+        meta.add((author, FOAF.name, Literal("Benjamin Poldrack")))
+        meta.add((author, FOAF.mbox, URIRef("mailto:benjaminpoldrack@gmail.com")))
+
+        meta.add((handle, FOAF.made, author))
+        meta.add((author, FOAF.maker, handle))
 
         return meta
 
     def set(self, meta):
+        # TODO: Useful at all? For now, it seems to be needed for the internal
+        # metadata cache only.
+
         if not isinstance(meta, Graph):
             lgr.error("Argument is not a Graph: %s" % type(meta))
             raise TypeError("Argument is not a Graph: %s" % type(meta))
@@ -78,5 +103,6 @@ class DefaultHandler(MetadataHandler):
         # what to store where.
         meta.serialize(opj(self._path, 'metadata'), format="turtle")
 
-        # TODO: Where to commit?
+        # TODO: Where to commit? => would need knowledge about hte handle itself.
+        # But then other uses of these handlers are at least a little bit inconsistent.
 

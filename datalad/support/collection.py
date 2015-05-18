@@ -14,12 +14,15 @@ import os
 from os.path import join as opj, basename
 import logging
 
-from rdflib import Graph
+from rdflib import Graph, URIRef, Namespace
+from rdflib.namespace import RDF
 
 from .gitrepo import GitRepo
 from .handle import Handle
 from .exceptions import CollectionBrokenError
-from ..cmd import Runner
+
+# define datalad namespace:
+DLNS = Namespace('http://www.datalad.org/terms/')
 
 lgr = logging.getLogger('datalad.collection')
 
@@ -121,12 +124,22 @@ class Collection(dict):
 
         self.update(self._colrepo.get_handles_data(self._branch))
         self.meta = Graph()
+
+        # Create node for collection itself:
+        collection_node = URIRef(self._colrepo.path)
+        self.meta.add((collection_node, RDF.type, DLNS.Collection))
+
         for handle in self:
             try:
-                self.meta += Graph().parse(data=self[handle][2])
+                handle_graph = Graph().parse(data=self[handle][2])
             except Exception, e:
                 lgr.error("Data:\n%s" % self[handle][2])
                 raise e
+            # join the handle's graph into the collection's one and connect
+            # collection node to handle node:
+            handle_node = handle_graph.value(predicate=RDF.type, object=DLNS.Handle)
+            self.meta += handle_graph
+            self.meta.add((collection_node, DLNS.contains, handle_node))
 
     def query(self):
         # Not sure yet whether we need to have a query
@@ -323,7 +336,7 @@ class CollectionRepo(GitRepo):
         # restore repo's active branch on disk
         self.git_checkout(current_branch)
 
-    def add_handle(self, handle, name):
+    def add_handle(self, handle, name=None):
         """Adds a handle to the collection repository.
 
         Parameters:
@@ -342,7 +355,7 @@ class CollectionRepo(GitRepo):
         # Writing plain text for now. This is supposed to change to use
         # rdflib or sth.
         with open(opj(self.path, self._key2filename(name)), 'w') as f:
-            f.write("handle_id = %s\n" % handle.datalad_id())
+            f.write("handle_id = %s\n" % handle.datalad_id)
             f.write("last_seen = %s\n" % handle.path)
             f.write("metadata = %s\n" % handle.get_metadata().serialize())
             # what else? maybe default view or sth.

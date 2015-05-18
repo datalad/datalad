@@ -105,11 +105,14 @@ class Handle(AnnexRepo):
         if not self._cfg_parser.has_section('Metadata'):
             self._cfg_parser.add_section('Metadata')
         if not self._cfg_parser.has_option('Metadata', 'handler'):
-            self._cfg_parser.set('MetadataHandler', 'handler',
+            self._cfg_parser.set('Metadata', 'handler',
                                  'DefaultHandler')
 
     def __del__(self):
-        with open(self.config_file) as f:
+        # TODO: destructor seems to not be called when python program just ends.
+        # Check what this is about.
+
+        with open(self.config_file, 'w') as f:
             self._cfg_parser.write(f)
         self.add_to_git(self.config_file, "Update config file.")
 
@@ -142,7 +145,7 @@ class Handle(AnnexRepo):
         if not issubclass(handler, MetadataHandler):
             raise TypeError("%s is not a MetadataHandler." % type(std))
 
-        self._cfg_parser.set('MetadataHandler', 'handler', handler.__name__)
+        self._cfg_parser.set('Metadata', 'handler', handler.__name__)
 
     def get(self, files):
         """get the actual content of files
@@ -204,7 +207,7 @@ class Handle(AnnexRepo):
         --------
         datalad.support.metadatahandler.Graph (currently just rdflib.Graph)
         """
-        name = self._cfg_parser.get('MetadataHandler', 'handler')
+        name = self._cfg_parser.get('Metadata', 'handler')
         import datalad.support.metadatahandler as mdh
         try:
             handler = getattr(mdh, name)(opj(self.path, '.datalad'))
@@ -212,7 +215,7 @@ class Handle(AnnexRepo):
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
 
-        return handler.getGraph()
+        return handler.get_handle_graph(self.path)
 
     def set_metadata(self, meta):
         """
@@ -221,7 +224,7 @@ class Handle(AnnexRepo):
         meta: datalad.support.metadatahandler.Graph
           (currently just rdflib.Graph)
         """
-        name = self._cfg_parser.get('MetadataHandler', 'handler')
+        name = self._cfg_parser.get('Metadata', 'handler')
         import datalad.support.metadatahandler as mdh
         try:
             handler = getattr(mdh, name)(opj(self.path, '.datalad'))
