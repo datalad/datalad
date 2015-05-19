@@ -80,7 +80,10 @@ class DefaultHandler(MetadataHandler):
 
         # For now create a dummy graph for proof of concept:
         handle = URIRef(handle_path)
+        # Note: This statement can be added anyway, but to be done within
+        # Handle class:
         meta.add((handle, RDF.type, DLNS.Handle))
+
         meta.add((handle, RDFS.comment, Literal("A handle with a dummy "
                                                   "metadata set.")))
 
@@ -113,7 +116,7 @@ class DefaultHandler(MetadataHandler):
 
 
 # DefaultHandler may should scan for file types and instantiate a Handler for
-# each; then join the graphs.
+# each; then join the graphs. Would need a method to read a single file.
 
 # class JSONHandler
 # class RDFHandler

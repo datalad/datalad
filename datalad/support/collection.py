@@ -12,9 +12,11 @@
 import re
 import os
 from os.path import join as opj, basename
+from copy import deepcopy
 import logging
 
 from rdflib import Graph, URIRef, Namespace
+from rdflib.plugins.memory import IOMemory
 from rdflib.namespace import RDF
 
 from .gitrepo import GitRepo
@@ -118,12 +120,17 @@ class Collection(dict):
             self.update(src)
             # XXX most likely a copy
             self.meta = src.meta
+            # TODO: Do we need 'meta' to point to the conjunctive graph or the collection graph?
+            # Either way we could retrieve it from store instead.
+            self.store = deepcopy(src.store)
+
         elif isinstance(src, CollectionBackend):
             self._backend = src
             self._reload()
         elif src is None:
             self._backend = None
             self.meta = Graph()
+            # TODO: 'meta' is probably not just a rdflib.Graph
         else:
             lgr.error("Unknown source for Collection(): %s" % type(src))
             raise TypeError('Unknown source for Collection(): %s' % type(src))
@@ -134,10 +141,18 @@ class Collection(dict):
         # if source is another collection: this has to be a copy of the whole store.
         # => copy.deepcopy()
 
+    def __delitem__(self, key):
+        super(Collection, self).__delitem__(key)
+        # TODO: + update metadata
+
+    def __setitem__(self, key, value):
+        super(Collection, self).__setitem__(key, value)
+        # TODO: + update metadat
+
 
     def _reload(self):
         if not self._backend:
-            lgr.warning("_reload(): Missing repository.")
+            lgr.warning("_reload(): Missing backend.")
             return
 
         self.update(self._backend.get_collection_data())
@@ -502,15 +517,24 @@ class CollectionBackend(object):
 class CollectionRepoBranchBackend(CollectionBackend):
     # TODO: Better name
 
-    def __init__(self, repo, branch='HEAD'):
+    def __init__(self, repo, branch=None):
         """
         Parameters:
         -----------
-        repo: CollectionRepo
+        repo: CollectionRepo or str
+          in case of a string it's interpreted as being the path to the
+          repository in question.
         branch: str
         """
-        self.branch = branch
-        self.repo = repo
+        if isinstance(repo, CollectionRepo):
+            self.repo = repo
+        elif isinstance(repo, basestring):
+            self.repo = CollectionRepo(repo)
+        else:
+            msg = "Invalid repo type: %s" % type(repo)
+            lgr.error(msg)
+            raise TypeError(msg)
+        self.branch = branch or self.repo.git_get_active_branch()
 
     def get_collection_data(self):
         return self.repo.get_handles_data(self.branch)
@@ -518,6 +542,11 @@ class CollectionRepoBranchBackend(CollectionBackend):
     def get_uri_ref(self):
         # TODO: How to differentiate several branches here?
         return URIRef(self.repo.path)
+
+    def get_name(self):
+        # Whether this is needed probably depends on decision about
+        # get_uri_ref().
+        return self.repo.name + '/' + self.branch
 
     def commit_collection(self, collection, msg):
         self.repo.commit_collection(collection, self.branch, msg)
