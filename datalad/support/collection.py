@@ -26,8 +26,15 @@ DLNS = Namespace('http://www.datalad.org/terms/')
 
 lgr = logging.getLogger('datalad.collection')
 
+# TODO: Add/remove for Collections and MetaCollections.
+# Collection => done. It's a dictionary.
+# So, let a meta collection be a dictionary of collections?
+# Actually, that way the meta data isn't updated. So, add/remove handle
+# probably still necessary.
+#
+# => just override __setitem__ and __delitem__!
 
-class MasterCollection(object):
+class MetaCollection(object):
     """ Needs a better name;
         Provides all (remote) branches of a collection repository.
         May be could serve as a meta collection in general (let's see how
@@ -38,6 +45,11 @@ class MasterCollection(object):
 
 
     def __init__(self, src=None):
+
+        # - a list of collection backends? or no backend at all? Let the Collections care for it.
+        # - a list of collections
+        # - another MetaCollection
+        # -
 
         if isinstance(src, CollectionRepo):
             self._repo = src
@@ -67,8 +79,8 @@ class MasterCollection(object):
                     self.huge_graph += self.remote_collections[collection][branch].meta
 
         else:
-            lgr.error('Unknown source for MasterCollection(): %s' % type(src))
-            raise TypeError('Unknown source for MasterCollection(): %s' % type(src))
+            lgr.error('Unknown source for MetaCollection(): %s' % type(src))
+            raise TypeError('Unknown source for MetaCollection(): %s' % type(src))
 
     def update(self, remote=None, branch=None):
         # reload (all) branches
@@ -116,6 +128,13 @@ class Collection(dict):
             lgr.error("Unknown source for Collection(): %s" % type(src))
             raise TypeError('Unknown source for Collection(): %s' % type(src))
 
+        # TODO: Collection has a store, containing named graphs for all handles
+        # plus one for itself. So, empty source means: store with the empty,
+        # named graph of the collection.
+        # if source is another collection: this has to be a copy of the whole store.
+        # => copy.deepcopy()
+
+
     def _reload(self):
         if not self._backend:
             lgr.warning("_reload(): Missing repository.")
@@ -157,7 +176,7 @@ class Collection(dict):
 
 
 class CollectionRepo(GitRepo):
-    """Representation of a datalad collection.
+    """Representation of a datalad collection repository.
 
     A Collection is represented as a git-repository containing:
         a) a file named 'collection', which stores metadata of the collection
@@ -167,6 +186,10 @@ class CollectionRepo(GitRepo):
     Attention: files are valid only if in git.
     Being present is not sufficient!
     """
+
+    # TODO: Change to two files per handle/collection:
+    # 'collection' and ${key2filename} with ids, names, default layout
+    # and a directory 'metadatacache' containing, again, one file per each item
 
     __slots__ = GitRepo.__slots__ + ['name']
 
