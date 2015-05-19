@@ -95,42 +95,43 @@ class Collection(dict):
     # local Master collection knows a lot of them and somehow joins rdf-metadata
     # to big db, which is used for queries.
 
-    def __init__(self, src=None, branch='HEAD'):
+    def __init__(self, src=None):
 
         super(Collection, self).__init__()
-        self._branch = branch
 
         if isinstance(src, Collection):
-            self._colrepo = None
+            self._backend = None
             # TODO: confirm this is correct behaviour and document it.
 
             self.update(src)
             # XXX most likely a copy
             self.meta = src.meta
-        elif isinstance(src, CollectionRepo):
-            self._colrepo = src
+        elif isinstance(src, CollectionBackend):
+            self._backend = src
             self._reload()
         elif src is None:
-            self._colrepo = None
+            self._backend = None
             self.meta = Graph()
         else:
             lgr.error("Unknown source for Collection(): %s" % type(src))
             raise TypeError('Unknown source for Collection(): %s' % type(src))
 
     def _reload(self):
-        if not self._colrepo:
+        if not self._backend:
             lgr.warning("_reload(): Missing repository.")
             return
 
-        self.update(self._colrepo.get_handles_data(self._branch))
+        self.update(self._backend.get_collection_data())
         self.meta = Graph()
 
         # Create node for collection itself:
-        collection_node = URIRef(self._colrepo.path)
+        collection_node = self._backend.get_uri_ref()
         self.meta.add((collection_node, RDF.type, DLNS.Collection))
 
         for handle in self:
             try:
+                # TODO: Ask backend here. And add named graph to collection's store.
+                # => is this "reload" at all? Yes. self.update() did the job above.
                 handle_graph = Graph().parse(data=self[handle][2])
             except Exception, e:
                 lgr.error("Data:\n%s" % self[handle][2])
@@ -148,11 +149,11 @@ class Collection(dict):
 
     def commit(self, msg="Cheers!"):
 
-        if not self._colrepo:
-            lgr.error("commit(): Missing repository.")
-            raise RuntimeError("commit(): Missing repository.")
+        if not self._backend:
+            lgr.error("commit(): Missing collection backend.")
+            raise RuntimeError("commit(): Missing collection backend.")
 
-        self._colrepo.commit_collection(self, self._branch, msg)
+        self._backend.commit_collection(self, msg)
 
 
 class CollectionRepo(GitRepo):
@@ -240,8 +241,18 @@ class CollectionRepo(GitRepo):
         """
         return key
 
+    def get_metadata(self, branch):
+        # TODO: need collection-level metadata
+        # Also rethink the next two methods
+
+        # May a) get the metadata of a who9le branch including collection-level
+        # and b) get the same for all branches => metacollection
+        # But: What exactly to return, since the collection should manage the store?
+        # Does it? Returning the dictionary is needed either way.
+        pass
+
     def get_handles_data(self, branch='HEAD'):
-        """Get the metadata of all handles.
+        """Get the metadata of all handles in `branch`.
 
         Returns:
         --------
@@ -250,7 +261,7 @@ class CollectionRepo(GitRepo):
         """
         out = dict()
 
-        # load handles from local branch
+        # load handles from branch
         for filename in self.git_get_files(branch):
             if filename != 'collection':
                 for line in self.git_get_file_content(filename, branch):
@@ -397,7 +408,93 @@ class CollectionRepo(GitRepo):
 
         # with open(opj(self.path, self._key2filename(handle)), 'w') as f:
 
-
         pass
 
+    def get_backend_from_branch(self, branch='HEAD'):
+        return CollectionRepoBranchBackend(self, branch)
 
+from abc import ABCMeta, abstractmethod, abstractproperty
+
+
+class CollectionBackend(object):
+    # How to pass the branch (especially on reload) without the collection
+    # knowing anything about branches? => Let the backend store it. But then we
+    # different backend instances for the same repo.
+    # => 'name'; just treat it as a name, the backend is asked for.
+
+
+    # get_handles_data(name('branch')) => get_collection_data?
+
+    # + get_all_collection_data()?
+
+    # get_uri_ref('name')? => path (or url of remotes?), what about single branches?
+
+    # get_name()
+
+    # commit_collection('name')
+    # => name: problem: if it designates a branch what's its uri?
+    #                   additionally: What about the metacollection then?
+    #                   The latter represents the repo as a whole, so should have
+    #                   the repos uri. But a single branch? Just 'collectionname/branch'?
+
+
+    # CollectionRepo returns a backend-instance (per branch), so that object knows,
+    # how to query the repo. No, let's treat it as a store, ask for a collection's
+    # data by name. => Collection has to know that name (corresponds to the branch)
+
+
+    # may be even better: Just two methods:
+    #                     - get collection data (including uri, name) as dict => src
+    #                     - store data (name) => branch's name is extracted by CollectionRepo itself
+    #                      -> no 'backend' at all? But needs that store/commit-method + reload?
+    # => back to a backend instance provided by the repo (per branch)
+
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def get_collection_data(self):
+        """
+
+        Returns:
+        --------
+        dictionary
+        """
+        pass
+
+    @abstractmethod
+    def get_uri_ref(self):
+        pass
+
+    @abstractmethod
+    def commit_collection(self, collection, msg):
+        """
+
+        Parameters:
+        -----------
+        collection: Collection
+        msg: str
+        """
+
+
+class CollectionRepoBranchBackend(CollectionBackend):
+    # TODO: Better name
+
+    def __init__(self, repo, branch='HEAD'):
+        """
+        Parameters:
+        -----------
+        repo: CollectionRepo
+        branch: str
+        """
+        self.branch = branch
+        self.repo = repo
+
+    def get_collection_data(self):
+        return self.repo.get_handles_data(self.branch)
+
+    def get_uri_ref(self):
+        # TODO: How to differentiate several branches here?
+        return URIRef(self.repo.path)
+
+    def commit_collection(self, collection, msg):
+        self.repo.commit_collection(collection, self.branch, msg)

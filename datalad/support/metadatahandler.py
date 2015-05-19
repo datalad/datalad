@@ -40,7 +40,7 @@ class MetadataHandler(object):
         self._path = path
 
     @abstractmethod
-    def get_handle_graph(self):
+    def get_graph(self):
         pass
 
     @abstractmethod
@@ -53,12 +53,15 @@ class DefaultHandler(MetadataHandler):
     def __init__(self, path):
         super(DefaultHandler, self).__init__(path)
 
-    def get_handle_graph(self, handle_path):
+    def get_graph(self, handle_path):
         # handle_path: by now, it's just self._path + '..'
         # But not sure yet, whether a Handler should know about a handle or be
         # more general. Let's see how this works with collections.
         # self._path could also be just some dir with metadata and no connection
         # to an actual handle.
+
+        # TODO handle_path: Not needed. Just return a graph. It's name is needed
+        # only at collection-level within its store.
 
         meta = Graph()
         # look for standard files and
@@ -104,5 +107,15 @@ class DefaultHandler(MetadataHandler):
         meta.serialize(opj(self._path, 'metadata'), format="turtle")
 
         # TODO: Where to commit? => would need knowledge about hte handle itself.
+        # Commit in the handle!
         # But then other uses of these handlers are at least a little bit inconsistent.
 
+
+
+# DefaultHandler may should scan for file types and instantiate a Handler for
+# each; then join the graphs.
+
+# class JSONHandler
+# class RDFHandler
+# class PlainTextHandler
+# class W3CDescriptorHandler

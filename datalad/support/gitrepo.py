@@ -380,11 +380,6 @@ class GitRepo(object):
 
 # TODO: --------------------------------------------------------------------
 
-# THE local collection:
-# operations on remotes like looking for certain files, list files, git cat?
-# May be better: fetch the remotes -> query branch remote/master
-
-
     def git_remote_add(self, name, url, options=''):
         """
         """

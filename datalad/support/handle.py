@@ -109,7 +109,7 @@ class Handle(AnnexRepo):
                                  'DefaultHandler')
 
     def __del__(self):
-        # TODO: destructor seems to not be called when python program just ends.
+        # TODO: destructor seems to not be called when python program just exits.
         # Check what this is about.
 
         with open(self.config_file, 'w') as f:
@@ -215,7 +215,7 @@ class Handle(AnnexRepo):
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
 
-        return handler.get_handle_graph(self.path)
+        return handler.get_graph(self.path)
 
     def set_metadata(self, meta):
         """
@@ -233,3 +233,5 @@ class Handle(AnnexRepo):
             raise ValueError("'%s' is an unknown metadata handler." % name)
 
         handler.set(meta)
+
+        # TODO: commit '.datalad/metadata/*'
