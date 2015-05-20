@@ -15,6 +15,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 
 from rdflib import Graph, URIRef, Literal, Namespace, BNode
 from rdflib.namespace import RDF, FOAF, RDFS
+from rdflib.exceptions import ParserError
 
 # define datalad namespace:
 DLNS = Namespace('http://www.datalad.org/terms/')
@@ -45,80 +46,57 @@ class MetadataHandler(object):
 
     @abstractmethod
     def set(self, meta):
+        # TODO: Useful at all? For now, it seems to be needed for the internal
+        # metadata cache only.
         pass
 
 
 class DefaultHandler(MetadataHandler):
+    # DefaultHandler may be should scan for file types and instantiate a
+    # Handler for each; then join the graphs. Would probably need a method to
+    # read a single file in the handler interface.
 
     def __init__(self, path):
         super(DefaultHandler, self).__init__(path)
 
-    def get_graph(self, handle_path):
-        # handle_path: by now, it's just self._path + '..'
-        # But not sure yet, whether a Handler should know about a handle or be
-        # more general. Let's see how this works with collections.
-        # self._path could also be just some dir with metadata and no connection
-        # to an actual handle.
+    def get_graph(self):
+        return Graph()
 
-        # TODO handle_path: Not needed. Just return a graph. It's name is needed
-        # only at collection-level within its store.
+    def set(self, meta):
+        pass
 
+
+class RDFHandler(MetadataHandler):
+    """By now accepts a file named 'metadata' containing arbitrary rdf-data.
+    """
+
+    def __init__(self, path):
+        super(RDFHandler, self).__init__(path)
+
+    def get_graph(self):
         meta = Graph()
-        # look for standard files and
-        # and build triples to add to the graph
 
-        # either take all other files or a specific one like 'metadata'
-        # and try whether we can read it.
-
-        # The following would read arbitrary rdf files, but how to connect this
-        # general graph to the handle node, since we know nothing about it?
+        # TODO: May be (try to) read all files in self._path and join the
+        # graphs:
         try:
             meta.parse(opj(self._path, 'metadata'))
-        except IOError:
-            # File is not mandatory, so just ignore if it can't be read.
-            pass
-
-        # For now create a dummy graph for proof of concept:
-        handle = URIRef(handle_path)
-        # Note: This statement can be added anyway, but to be done within
-        # Handle class:
-        meta.add((handle, RDF.type, DLNS.Handle))
-
-        meta.add((handle, RDFS.comment, Literal("A handle with a dummy "
-                                                  "metadata set.")))
-
-        author = BNode()
-        meta.add((author, RDF.type, FOAF.Person))
-        meta.add((author, FOAF.name, Literal("Benjamin Poldrack")))
-        meta.add((author, FOAF.mbox, URIRef("mailto:benjaminpoldrack@gmail.com")))
-
-        meta.add((handle, FOAF.made, author))
-        meta.add((author, FOAF.maker, handle))
+        except IOError, ioe:
+            lgr.warning("Failed to read metadata file: %s" % ioe)
+        except ParserError, pe:
+            lgr.error("Failed to parse metadata file: %s" % pe)
 
         return meta
 
     def set(self, meta):
-        # TODO: Useful at all? For now, it seems to be needed for the internal
-        # metadata cache only.
-
         if not isinstance(meta, Graph):
             lgr.error("Argument is not a Graph: %s" % type(meta))
             raise TypeError("Argument is not a Graph: %s" % type(meta))
 
-        # as above: just store for now. Has to be refined later on, regarding
-        # what to store where.
+        # TODO: Check whether it is possible to get the format detected by
+        # Graph.parse() and use it here.
         meta.serialize(opj(self._path, 'metadata'), format="turtle")
 
-        # TODO: Where to commit? => would need knowledge about hte handle itself.
-        # Commit in the handle!
-        # But then other uses of these handlers are at least a little bit inconsistent.
-
-
-
-# DefaultHandler may should scan for file types and instantiate a Handler for
-# each; then join the graphs. Would need a method to read a single file.
 
 # class JSONHandler
-# class RDFHandler
 # class PlainTextHandler
 # class W3CDescriptorHandler

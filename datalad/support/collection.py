@@ -14,10 +14,12 @@ import os
 from os.path import join as opj, basename
 from copy import deepcopy
 import logging
+import gc
 
-from rdflib import Graph, URIRef, Namespace
+from rdflib import Graph, URIRef, Namespace, ConjunctiveGraph
 from rdflib.plugins.memory import IOMemory
 from rdflib.namespace import RDF
+from rdflib.exceptions import ParserError
 
 from .gitrepo import GitRepo
 from .handle import Handle
@@ -98,18 +100,16 @@ class MetaCollection(object):
 
 
 class Collection(dict):
-    # TODO: For now it represents just a branch of a collection repo with
-    # no access to other branches. But then it has (kind of) "remotes"
-    # including all of their branches. This is not exactly consistent.
-    # So we should either make all branches of the repo itself available as
-    # well or remove the remotes, let a Collection represent a single branch
-    # and let a repository represent a "Meta-Collection".
+    """A collection of handles.
 
-    # Note: Agreed with Michael, to have a collection per (remote) branch.
-    # local Master collection knows a lot of them and somehow joins rdf-metadata
-    # to big db, which is used for queries.
+    This is a dictionary, which's keys are the handles' names.
+
+    TODO: Describe structure of values, once we are sure about this.
+    """
 
     def __init__(self, src=None):
+        # TODO: What about a 'name' option? How to treat it, in case src
+        # provides a name already?
 
         super(Collection, self).__init__()
 
@@ -130,62 +130,95 @@ class Collection(dict):
         elif src is None:
             self._backend = None
             self.meta = Graph()
-            # TODO: 'meta' is probably not just a rdflib.Graph
+            # TODO: 'meta' is probably not just a rdflib.Graph. See above.
         else:
             lgr.error("Unknown source for Collection(): %s" % type(src))
             raise TypeError('Unknown source for Collection(): %s' % type(src))
 
-        # TODO: Collection has a store, containing named graphs for all handles
-        # plus one for itself. So, empty source means: store with the empty,
-        # named graph of the collection.
-        # if source is another collection: this has to be a copy of the whole store.
-        # => copy.deepcopy()
-
     def __delitem__(self, key):
         super(Collection, self).__delitem__(key)
-        # TODO: + update metadata
+        # TODO: + update metadata (self.meta references all the handles graphs)
 
     def __setitem__(self, key, value):
         super(Collection, self).__setitem__(key, value)
-        # TODO: + update metadat
-
+        # TODO: + update metadata (self.meta references all the handles graphs)
 
     def _reload(self):
         if not self._backend:
-            lgr.warning("_reload(): Missing backend.")
+            # TODO: Error or warning? Depends on when we want to call this one.
+            # By now this should be an error (or even an exception).
+            lgr.error("Missing collection backend.")
             return
 
-        self.update(self._backend.get_collection_data())
-        self.meta = Graph()
+        #########################################################
+        # Note (to be implemented in backend):
+        # Backend should provide data and metadata by separated methods.
+        # - data is a dictionary, which is used to update the collection
+        #   dictionary containing the 'datalad-collection-data',
+        #   i.e. handles' names, ids, paths
+        # - metadata is dictionary as well; keys are the names of the graphs,
+        #   value are the graphs. These graphs have to be copied to the store
+        #   of the collection and referenced by an additional entry in the
+        #   collection dictionary (self[handle_name][meta]).
+        #   the collection's own graph is referenced by self.meta
+        # - finally the conjunctive graph is referenced by
+        #   self.conjunctive_graph
+        #
+        # Additional Note: Also to be implemented in special cases of
+        # the constructor.
+        #########################################################
 
-        # Create node for collection itself:
-        collection_node = self._backend.get_uri_ref()
-        self.meta.add((collection_node, RDF.type, DLNS.Collection))
+        self.update(self._backend.get_collection())
+
+        # cleanup old store, if exists
+        if self.store:
+            self.store.gc()
+            del self.store
+            gc.collect()
+        # create new store for the graphs:
+        self.store = IOMemory()
+
+        # get dictionary with metadata graphs:
+        metadata = self._backend.get_metadata()
+        # TODO: May be sanity check: collection's name and the handles' names
+        # have to be present as keys in metadata
+
+        # create collection's own graph:
+        self.name = self._backend.get_name()
+        self.meta = Graph(store=self.store, identifier=URIRef(self.name))
+
+        # copy collection level metadata into this graph:
+        for triple in metadata[self.name]:
+            self.meta.add(triple)
+
+        # now copy the handles' graphs and add a reference to the
+        # collection's graph:
 
         for handle in self:
-            try:
-                # TODO: Ask backend here. And add named graph to collection's store.
-                # => is this "reload" at all? Yes. self.update() did the job above.
-                handle_graph = Graph().parse(data=self[handle][2])
-            except Exception, e:
-                lgr.error("Data:\n%s" % self[handle][2])
-                raise e
-            # join the handle's graph into the collection's one and connect
-            # collection node to handle node:
-            handle_node = handle_graph.value(predicate=RDF.type, object=DLNS.Handle)
-            self.meta += handle_graph
-            self.meta.add((collection_node, DLNS.contains, handle_node))
+            self[handle]['meta'] = Graph(store=self.store,
+                                         identifier=URIRef(handle))
+            for triple in metadata[handle]:
+                self[handle]['meta'].add(triple)
+
+            # TODO: check whether this referencing works as intended:
+            self.meta.add((URIRef(self.name), DLNS.contains, URIRef(handle)))
+
+        self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
     def query(self):
         # Not sure yet whether we need to have a query
-        # on a single Collection instance.
+        # on a single Collection instance, but think so.
+
+        # - provide general querying of the collection's store
+        # - may be additionally have methods to query single graphs or
+        #   the collection graph only
         pass
 
-    def commit(self, msg="Cheers!"):
+    def commit(self, msg="Collection updated."):
 
         if not self._backend:
-            lgr.error("commit(): Missing collection backend.")
-            raise RuntimeError("commit(): Missing collection backend.")
+            lgr.error("Missing collection backend.")
+            raise RuntimeError("Missing collection backend.")
 
         self._backend.commit_collection(self, msg)
 
@@ -205,6 +238,9 @@ class CollectionRepo(GitRepo):
     # TODO: Change to two files per handle/collection:
     # 'collection' and ${key2filename} with ids, names, default layout
     # and a directory 'metadatacache' containing, again, one file per each item
+
+
+    # TODO: collection level metadata; include statement (self.get_uri_ref(), RDF.type, DLNS.Collection)
 
     __slots__ = GitRepo.__slots__ + ['name']
 
@@ -311,6 +347,7 @@ class CollectionRepo(GitRepo):
                         md = line[11:]
                     else:
                         md += line
+                # TODO: dict instead of tuple:
                 out[self._filename2key(filename)] = (id_, url, md)
         return out
 
@@ -458,49 +495,29 @@ class CollectionBackend(object):
     # How to pass the branch (especially on reload) without the collection
     # knowing anything about branches? => Let the backend store it. But then we
     # different backend instances for the same repo.
-    # => 'name'; just treat it as a name, the backend is asked for.
-
-
-    # get_handles_data(name('branch')) => get_collection_data?
-
-    # + get_all_collection_data()?
-
-    # get_uri_ref('name')? => path (or url of remotes?), what about single branches?
-
-    # get_name()
-
-    # commit_collection('name')
-    # => name: problem: if it designates a branch what's its uri?
-    #                   additionally: What about the metacollection then?
-    #                   The latter represents the repo as a whole, so should have
-    #                   the repos uri. But a single branch? Just 'collectionname/branch'?
-
-
-    # CollectionRepo returns a backend-instance (per branch), so that object knows,
-    # how to query the repo. No, let's treat it as a store, ask for a collection's
-    # data by name. => Collection has to know that name (corresponds to the branch)
-
-
-    # may be even better: Just two methods:
-    #                     - get collection data (including uri, name) as dict => src
-    #                     - store data (name) => branch's name is extracted by CollectionRepo itself
-    #                      -> no 'backend' at all? But needs that store/commit-method + reload?
-    # => back to a backend instance provided by the repo (per branch)
 
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def get_collection_data(self):
-        """
+    def get_uri_ref(self):
+        # TODO: get_uri_ref('name')? => path (or url of remotes?),
+        # what about single branches?
+        pass
 
-        Returns:
-        --------
-        dictionary
+    @abstractmethod
+    def get_name(self):
+        # TODO: May be a property with set/get
+        # or integrate uri_ref+name in get_collection's return format.
+        pass
+
+    @abstractmethod
+    def get_collection(self):
+        """
         """
         pass
 
     @abstractmethod
-    def get_uri_ref(self):
+    def get_metadata(self, handle):
         pass
 
     @abstractmethod

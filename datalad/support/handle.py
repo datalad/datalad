@@ -24,7 +24,7 @@ from ConfigParser import SafeConfigParser
 
 
 from annexrepo import AnnexRepo
-from .metadatahandler import MetadataHandler, DefaultHandler
+from .metadatahandler import MetadataHandler, DefaultHandler, URIRef, RDF, DLNS
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -66,13 +66,16 @@ class Handle(AnnexRepo):
         super(Handle, self).__init__(path, url, direct=direct, runner=runner,
                                      backend=backend)
 
-        datalad_path = opj(self.path, '.datalad')
-        if not exists(datalad_path):
-            os.mkdir(datalad_path)
+        self.datalad_path = opj(self.path, '.datalad')
+        self.metadata_path = opj(self.datalad_path, 'metadata')
+        if not exists(self.datalad_path):
+            os.mkdir(self.datalad_path)
+        if not exists(self.metadata_path):
+            os.mkdir(self.metadata_path)
 
         # Read configuration as far as it is available already.
         # Set defaults, wherever there's nothing available.
-        self.config_file = opj(datalad_path, 'handle.cfg')
+        self.config_file = opj(self.datalad_path, 'handle.cfg')
         self._cfg_parser = SafeConfigParser()
 
         if exists(self.config_file):
@@ -101,6 +104,7 @@ class Handle(AnnexRepo):
         # metadata (option 'custom'), that takes more effort to query.
         # However, this distinction is done inside the handler.
         # TODO: As soon as we are sure about this, have better documentation.
+        # Note: This comment is outdated but kept as a reminder. To be replaced.
 
         if not self._cfg_parser.has_section('Metadata'):
             self._cfg_parser.add_section('Metadata')
@@ -110,7 +114,7 @@ class Handle(AnnexRepo):
 
     def __del__(self):
         # TODO: destructor seems to not be called when python program just exits.
-        # Check what this is about.
+        # Check what this is about and how to solve it.
 
         with open(self.config_file, 'w') as f:
             self._cfg_parser.write(f)
@@ -210,12 +214,15 @@ class Handle(AnnexRepo):
         name = self._cfg_parser.get('Metadata', 'handler')
         import datalad.support.metadatahandler as mdh
         try:
-            handler = getattr(mdh, name)(opj(self.path, '.datalad'))
-        except AttributeError, e:
+            handler = getattr(mdh, name)(self.metadata_path)
+        except AttributeError:
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
+        
+        meta = handler.get_graph()
+        meta.add((URIRef(self.path), RDF.type, DLNS.Handle))
 
-        return handler.get_graph(self.path)
+        return meta
 
     def set_metadata(self, meta):
         """
@@ -227,11 +234,10 @@ class Handle(AnnexRepo):
         name = self._cfg_parser.get('Metadata', 'handler')
         import datalad.support.metadatahandler as mdh
         try:
-            handler = getattr(mdh, name)(opj(self.path, '.datalad'))
-        except AttributeError, e:
+            handler = getattr(mdh, name)(self.metadata_path)
+        except AttributeError:
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
 
         handler.set(meta)
-
-        # TODO: commit '.datalad/metadata/*'
+        self.add_to_git(opj(self.metadata_path, '*'), "Metadata updated.")
