@@ -40,6 +40,18 @@ lgr = logging.getLogger('datalad.collection')
 # Done for collections.
 
 
+# #############################################
+# TODO: May it's possible to have only one graph store and use
+# ReadOnlyGraphAggregate instead of ConjunctiveGraph for
+# Collections/MetaCollections. Could save time and space. But need to figure
+# out how general queries work with that one.
+#
+# Nope. ReadOnlyGraphAggregate doesn't limit query()-method to its scope.
+# Still queries the whole store. At least when querying for a
+# certain graph(i.e. handle/collection)
+# #############################################
+
+
 class Collection(dict):
     """A collection of handles.
 
@@ -233,9 +245,6 @@ class MetaCollection(dict):
             self.name = src.name  #? See Collection: How to treat names in case of a copy?
             self.store = deepcopy(src.store)
 
-            # TODO: update graph references
-
-
         elif isinstance(src, list):
             for item in src:
                 if isinstance(item, Collection):
@@ -246,8 +255,6 @@ class MetaCollection(dict):
                     e_msg = "Can't retrieve collection from %s." % type(item)
                     lgr.error(e_msg)
                     raise TypeError(e_msg)
-
-            # TODO: update graph references
 
         elif isinstance(src, dict):
             for key in src:
@@ -261,8 +268,6 @@ class MetaCollection(dict):
                     lgr.error(e_msg)
                     raise TypeError(e_msg)
 
-            # TODO: update graph references
-
         elif src is None:
             pass
         else:
@@ -270,12 +275,33 @@ class MetaCollection(dict):
             lgr.error(e_msg)
             raise TypeError(e_msg)
 
-        # correct graph references from store:
-        for graph in self.store:
-            # TODO !
-            # now we need to solve name conflicts of handles, since their names
-            # are unique within a collection only.
-            pass
+        # join the stores:
+        for collection in self:
+            for graph in self[collection].store.contexts():
+                # need to avoid conflicts with handles' names,
+                # therefore name them 'collection/handle'
+                # TODO: This needs further investigation on how it can be dealt
+                # with in a reasonable way. May be handle names always need to
+                # be created that way for consistency.
+                identifier = graph.identifier \
+                    if graph.identifier == collection \
+                    else collection + '/' + graph.identifier
+
+                # create a copy of the graph in self.store:
+                new_graph = Graph(store=self.store, identifier=identifier)
+                for triple in graph:
+                    new_graph.add(triple)
+
+                if identifier == collection:
+                    # correct references of collection graph:
+                    for old_handle_identifier in new_graph.objects(
+                            URIRef(collection), DLNS.contains):
+                        new_graph.add((URIRef(collection), DLNS.contains,
+                                       URIRef(collection + '/' +
+                                              old_handle_identifier)))
+                        new_graph.remove((URIRef(collection), DLNS.contains,
+                                          old_handle_identifier))
+
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
     def __setitem__(self, key, value):
@@ -293,11 +319,9 @@ class MetaCollection(dict):
         pass
 
     def query(self):
-        """ Perform query on (what?) collections.
-
-        Returns:
-        --------
-        list of handles? (names => remote/branch/handle?)
+        """ Perform query on the meta collection.
+        Note: It's self.conjunctive_graph or self.store respectively,
+        what is to be queried here.
         """
 
 
