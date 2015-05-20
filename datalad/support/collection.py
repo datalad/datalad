@@ -55,6 +55,7 @@ class Collection(dict):
     store:              IOMemory
     meta:               (named) Graph
     conjunctive_graph:  ConjunctiveGraph
+    _backend:           CollectionBackend
     """
 
     def __init__(self, src=None, name=None):
@@ -115,6 +116,10 @@ class Collection(dict):
         self[key]['meta'] = new_graph
 
     def _reload(self):
+        # TODO: When do we need to reload outside of the constructor?
+        # May be override self.update() to additionally reload in case
+        # there is a backend.
+
         if not self._backend:
             # TODO: Error or warning? Depends on when we want to call this one.
             # By now this should be an error (or even an exception).
@@ -180,9 +185,9 @@ class Collection(dict):
 
     def query(self):
         # Note: As long as we use general SPARQL-Queries, no method is needed,
-        # since this is a method of rdflib.Graph. But we will need some kind of
-        # prepared queries here.
-        # Also depends on the implementation of the 'ontology translator layer'
+        # since this is a method of rdflib.Graph/rdflib.Store.
+        # But we will need some kind of prepared queries here.
+        # Also depends on the implementation of the 'ontology translation layer'
         pass
 
     def commit(self, msg="Collection updated."):
@@ -192,6 +197,108 @@ class Collection(dict):
             raise RuntimeError("Missing collection backend.")
 
         self._backend.commit_collection(self, msg)
+
+
+# #######################
+# TODO: MetaCollection is a Collection of Collections. So, how to reflect this
+# in implementation? Is it a dictionary too? Or is it a Collection?
+# Or is a Collection a special MetaCollection?
+# #######################
+
+class MetaCollection(dict):
+    """A collection of collections.
+
+    This is a dictionary, which's keys are the collections' names.
+    Values are Collection instances.
+
+    TODO: This possibly leads to unnecessary copies of the graphs, in case
+    those Collection instances aren't used otherwise anyway.
+    Think about a better way to do it.
+    (not just another way, a better one! ;-) )
+
+    Attributes of a MetaCollection:
+    name:               str
+    store:              IOMemory
+    conjunctive_graph:  ConjunctiveGraph
+    """
+
+    def __init__(self, src=None, name=None):
+        super(MetaCollection, self).__init__()
+
+        self.name = name
+        self.store = IOMemory()
+
+        if isinstance(src, MetaCollection):
+            self.update(src)
+            self.name = src.name  #? See Collection: How to treat names in case of a copy?
+            self.store = deepcopy(src.store)
+
+            # TODO: update graph references
+
+
+        elif isinstance(src, list):
+            for item in src:
+                if isinstance(item, Collection):
+                    self[item.name] = item
+                elif isinstance(item, CollectionBackend):
+                    self[item.get_name] = Collection(src=item)
+                else:
+                    e_msg = "Can't retrieve collection from %s." % type(item)
+                    lgr.error(e_msg)
+                    raise TypeError(e_msg)
+
+            # TODO: update graph references
+
+        elif isinstance(src, dict):
+            for key in src:
+                if isinstance(src[key], Collection):
+                    self[key] = src[key]
+                elif isinstance(src[key], CollectionBackend):
+                    self[key] = Collection(src=src[key])
+                else:
+                    e_msg = "Can't retrieve collection from %s." % \
+                            type(src[key])
+                    lgr.error(e_msg)
+                    raise TypeError(e_msg)
+
+            # TODO: update graph references
+
+        elif src is None:
+            pass
+        else:
+            e_msg = "Invalid source type for MetaCollection: %s" % type(src)
+            lgr.error(e_msg)
+            raise TypeError(e_msg)
+
+        # correct graph references from store:
+        for graph in self.store:
+            # TODO !
+            # now we need to solve name conflicts of handles, since their names
+            # are unique within a collection only.
+            pass
+        self.conjunctive_graph = ConjunctiveGraph(store=self.store)
+
+    def __setitem__(self, key, value):
+        # TODO: See collections
+        pass
+
+    def __delitem__(self, key):
+        # TODO: See collections
+        pass
+
+    def update(self, remote=None, branch=None):
+        # reload (all) branches
+        # TODO: In that sense, it's obsolete.
+
+        pass
+
+    def query(self):
+        """ Perform query on (what?) collections.
+
+        Returns:
+        --------
+        list of handles? (names => remote/branch/handle?)
+        """
 
 
 class CollectionBackend(object):
@@ -219,7 +326,7 @@ class CollectionBackend(object):
         pass
 
     @abstractmethod
-    def get_metadata(self, handle):
+    def get_metadata(self):
         """
         Returns:
         --------
@@ -237,9 +344,21 @@ class CollectionBackend(object):
         msg: str
         """
 
+    # TODO: We'll probably need a method to get a url of the collection.
+    # Since collections are branches of repos in case of a repo-backend,
+    # just the url won't be sufficient. On the other hand, by now it remains
+    # unclear whether or not "installing" a collection (cloning the repo) will
+    # be needed. Nevertheless: Think how to obtain a clone/checkout of a certain
+    # collection. Even if someone wants to do it without datalad he needs a way
+    # to retrieve all needed information. Depending on desired API to this, it
+    # could simply be done via the CollectionRepo instance instead of a
+    # Collection instance.
+
 
 class CollectionRepoBranchBackend(CollectionBackend):
     # TODO: Better name
+
+    # TODO: This has to deal with remote branches too!
 
     def __init__(self, repo, branch=None):
         """
@@ -260,16 +379,14 @@ class CollectionRepoBranchBackend(CollectionBackend):
             raise TypeError(msg)
         self.branch = branch or self.repo.git_get_active_branch()
 
-    def get_collection_data(self):
+    def get_collection(self):
         return self.repo.get_handles_data(self.branch)
 
-    def get_uri_ref(self):
-        # TODO: How to differentiate several branches here?
-        return URIRef(self.repo.path)
+    def get_metadata(self):
+        return self.repo.get_metadata(self.branch)
 
     def get_name(self):
-        # Whether this is needed probably depends on decision about
-        # get_uri_ref().
+        # TODO: Not sure yet, whether this naming is the way to go.
         return self.repo.name + '/' + self.branch
 
     def commit_collection(self, collection, msg):
@@ -543,68 +660,3 @@ class CollectionRepo(GitRepo):
         return CollectionRepoBranchBackend(self, branch)
 
 
-# #######################
-# TODO: MetaCollection is a Collection of Collections. So, how to reflect this
-# in implementation? Is it a dictionary too? Or is it a Collection?
-# Or is a Collection a special MetaCollection?
-# #######################
-
-class MetaCollection(object):
-    """ Needs a better name;
-        Provides all (remote) branches of a collection repository.
-        May be could serve as a meta collection in general (let's see how
-        this works out).
-    """
-
-    # TODO: There is a ConjunctiveGraph in rdflib! May be use this one? Or the Dataset?
-
-
-    def __init__(self, src=None):
-
-        # - a list of collection backends? or no backend at all? Let the Collections care for it.
-        # - a list of collections
-        # - another MetaCollection
-        # -
-
-        if isinstance(src, CollectionRepo):
-            self._repo = src
-
-            # TODO: May be don't separate local and remote branches,
-            # but use "remote/branch" as key, which is the branches name anyway.
-            # For THE local master collection we may be need instead to somehow
-            # differentiate locally available remotes and actually remote
-            # remotes of the repository.
-
-            self.local_collections = dict()
-            for branch in src.git_get_branches():  # TODO: 'HEAD' missing.
-                self.local_collections[branch] = Collection(src=self._repo,
-                                                            branch=branch)
-
-            self.remote_collections = self._repo.get_remotes_data()
-
-            # TODO: load and join the metadata ...:
-            # to be refined; For now just join everything as is, to see how this works.
-            # Reminder: Joining different branches probably won't work as is.
-            # Especially there is the question of how to reconstruct the branch, we found something in?
-            self.huge_graph = Graph()
-            for collection in self.local_collections:
-                self.huge_graph +=self.local_collections[collection].meta
-            for collection in self.remote_collections:
-                for branch in self.remote_collections[collection]:
-                    self.huge_graph += self.remote_collections[collection][branch].meta
-
-        else:
-            lgr.error('Unknown source for MetaCollection(): %s' % type(src))
-            raise TypeError('Unknown source for MetaCollection(): %s' % type(src))
-
-    def update(self, remote=None, branch=None):
-        # reload (all) branches
-        pass
-
-    def query(self):
-        """ Perform query on (what?) collections.
-
-        Returns:
-        --------
-        list of handles? (names => remote/branch/handle?)
-        """
