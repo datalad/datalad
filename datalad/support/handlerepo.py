@@ -55,6 +55,7 @@ class HandleBackend(object):
 
     @abstractmethod
     def get_metadata(self):
+        print "Oha"
         pass
 
     @abstractmethod
@@ -69,6 +70,10 @@ class Handle(object):
 
     Independent on its physical representation.
     """
+
+    # TODO: May be all the data like url, id should directly go into the
+    # metadata graph. If we need them without a desire to query/build the
+    # metadata graph we would likely use HandleRepo instead of Handle anyway.
 
     def __init__(self, src=None, name=None):
         # TODO: Handling of 'name' option. See Collections.
@@ -109,8 +114,6 @@ class HandleRepoBranchBackend(HandleBackend):
     # TODO: Name. See corresponding naming for CollectionBackend.
 
     def __init__(self, repo, branch):
-        # TODO: Convenience method in HandleRepo:
-        # get_handle_backend(branch=None)
 
         # TODO: Check whether the branch handling is reasonable,
         # especially whether this works on windows.
@@ -127,9 +130,11 @@ class HandleRepoBranchBackend(HandleBackend):
 
         self._branch = branch
 
+    @property
     def id(self):
         return self._repo.datalad_id
 
+    @property
     def url(self):
         return self._repo.path
 
@@ -140,11 +145,15 @@ class HandleRepoBranchBackend(HandleBackend):
         self._repo.name = name
         # TODO: By now, this is not written to file.
 
+    name = property(get_name, set_name)
+
     def get_metadata(self):
         return self._repo.get_metadata()
 
     def set_metadata(self, meta):
         self._repo.set_metadata(meta)
+
+    metadata = property(get_metadata, set_metadata)
 
 
 class HandleRepo(AnnexRepo):
@@ -359,3 +368,9 @@ class HandleRepo(AnnexRepo):
 
         handler.set(meta)
         self.add_to_git(opj(self.metadata_path, '*'), "Metadata updated.")
+
+    def get_handle(self, branch=None):
+        """Convenience method to create a Handle instance.
+        """
+        # TODO: set branch option in action
+        return Handle(HandleRepoBranchBackend(self, branch))

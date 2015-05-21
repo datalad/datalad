@@ -23,7 +23,7 @@ from rdflib.namespace import RDF
 from rdflib.exceptions import ParserError
 
 from .gitrepo import GitRepo
-from .handlerepo import HandleRepo
+from .handlerepo import HandleRepo, Handle
 from .exceptions import CollectionBrokenError
 from .metadatahandler import DLNS
 
@@ -56,11 +56,11 @@ class Collection(dict):
     """A collection of handles.
 
     This is a dictionary, which's keys are the handles' names.
+    TODO: Describe how this is a representation of a collection's metadata
+    and therefore different from the representation of a collection repository.
 
     TODO: Describe structure of values, once we are sure about this.
-    By now it's: self[handle_name]['id']:   str
-                                  ['url']:  str
-                                  ['meta']: (named) Graph
+    By now it's: self[handle_name]: Handle
 
     Attributes of a collection:
     name:               str
@@ -86,17 +86,13 @@ class Collection(dict):
 
             self.update(src)
             self.name = src.name
-            self.store = deepcopy(src.store)
-
-            # get references of the store's named graphs
-            for graph in self.store.contexts():
+            self.store = IOMemory()
+            for graph in src.store.contexts():
+                self.store.add_graph(graph)
                 if graph.identifier == self.name:
                     self.meta = graph
-                elif graph.identifier in self:
-                    self[graph.identifier]['meta'] = graph
                 else:
-                    lgr.warning("Invalid Graph identifier: %s" %
-                                graph.identifier)
+                    self[graph.identifier].meta = graph
 
             self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
@@ -122,10 +118,7 @@ class Collection(dict):
     def __setitem__(self, key, value):
         super(Collection, self).__setitem__(key, value)
         self.meta.add((URIRef(self.name), DLNS.contains, URIRef(key)))
-        new_graph = Graph(store=self.store, identifier=URIRef(key))
-        for triple in value['meta']:
-            new_graph.add(triple)
-        self[key]['meta'] = new_graph
+        self.store.add_graph(self[key].meta)
 
     def _reload(self):
         # TODO: When do we need to reload outside of the constructor?
@@ -138,27 +131,23 @@ class Collection(dict):
             lgr.error("Missing collection backend.")
             return
 
-        #########################################################
-        # Note (to be implemented in backend):
-        # Backend should provide data and metadata by separated methods.
-        # - data is a dictionary, which is used to update the collection
-        #   dictionary containing the 'datalad-collection-data',
-        #   i.e. handles' names, ids, paths
-        # - metadata is dictionary as well; keys are the names of the graphs,
-        #   value are the graphs. These graphs have to be copied to the store
-        #   of the collection and referenced by an additional entry in the
-        #   collection dictionary (self[handle_name]['meta']).
-        #   the collection's own graph is referenced by self.meta
-        # - finally the conjunctive graph is referenced by
-        #   self.conjunctive_graph
-        #########################################################
+        # get the handles as instances of class Handle:
+        self.update(self._backend.get_handles())
+
+        # get collection level data:
+        collection_data = self._backend.get_collection()
+        self.name = collection_data['name']
+
         # TODO: May be a backend can just pass a newly created store containing
         # all the needed graphs. Would save us time and space for copy, but
-        # is less flexible in case we find another way to store a set of named
-        # graphs and their conjunctive graph without the need of every
+        # seems to be less flexible in case we find another way to store a set
+        # of named graphs and their conjunctive graph without the need of every
         # collection to have its own store.
-
-        self.update(self._backend.get_collection())
+        # Note: By using store.add() there seems to be copy at all.
+        # Need to check in detail, how this is stored and whether it still
+        # works as intended.
+        # Note 2: Definitely not a copy and seems to work. Need more querie to
+        # check.
 
         # cleanup old store, if exists
         if self.store:
@@ -168,31 +157,21 @@ class Collection(dict):
         # create new store for the graphs:
         self.store = IOMemory()
 
-        # get dictionary with metadata graphs:
-        metadata = self._backend.get_metadata()
-        # TODO: May be sanity check: collection's name and the handles' names
-        # have to be present as keys in metadata
+        # add collection's own graph:
+        self.store.add_graph(collection_data['meta'])
+        self.meta = collection_data['meta']
 
-        # create collection's own graph:
-        self.name = self._backend.get_name()
-        self.meta = Graph(store=self.store, identifier=URIRef(self.name))
-
-        # copy collection level metadata into this graph:
-        for triple in metadata[self.name]:
-            self.meta.add(triple)
-
-        # now copy the handles' graphs and add a reference to the
-        # collection's graph:
-
+        # add handles' graphs:
         for handle in self:
-            self[handle]['meta'] = Graph(store=self.store,
-                                         identifier=URIRef(handle))
-            for triple in metadata[handle]:
-                self[handle]['meta'].add(triple)
-
+            self.store.add_graph(self[handle].meta)
+            # add reference in collection graph:
+            # TODO: Is this still needed or is it correct if it's done by
+            # the backend?
+            # Either way:
             # TODO: check whether this referencing works as intended:
             self.meta.add((URIRef(self.name), DLNS.contains, URIRef(handle)))
 
+        # reference to the conjunctive graph to be queried:
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
     def query(self):
@@ -332,10 +311,21 @@ class CollectionBackend(object):
 
     __metaclass__ = ABCMeta
 
+    # @abstractmethod
+    # def get_name(self):
+    #     # TODO: May be a property with set/get
+    #     # or integrate uri_ref+name in get_collection's return format.
+    #     pass
+
     @abstractmethod
-    def get_name(self):
-        # TODO: May be a property with set/get
-        # or integrate uri_ref+name in get_collection's return format.
+    def get_handles(self):
+        """
+        Returns:
+        --------
+        dictionary of Handle
+          keys are the handles' names, values the corresponding Handle
+          instances
+        """
         pass
 
     @abstractmethod
@@ -343,21 +333,20 @@ class CollectionBackend(object):
         """
         Returns:
         --------
-        dictionary of dictionary
-          first level keys are the handles' names. Second level keys are
-          'id' and 'url'
+        dictionary
+          collection level data: 'name' and 'meta'
         """
-        pass
 
-    @abstractmethod
-    def get_metadata(self):
-        """
-        Returns:
-        --------
-        dictionary of Graph
-          keys are the handles' names, values are the handles' metadata graphs.
-        """
-        pass
+    # @abstractmethod
+    # def get_metadata(self):
+    #     """
+    #     Returns:
+    #     --------
+    #     dictionary of Graph
+    #       keys are the handles' names, values are the handles' metadata
+    #       graphs.
+    #     """
+    #     pass
 
     @abstractmethod
     def commit_collection(self, collection, msg):
@@ -383,6 +372,14 @@ class CollectionRepoBranchBackend(CollectionBackend):
     # TODO: Better name
 
     # TODO: This has to deal with remote branches too!
+
+    # TODO: Changed structures:
+    #       - get_handles has to deliver a dictionary of Handles
+    #       - get_collection a dictionary with keys 'name' and 'meta'
+    #
+    #       In any case the graphs identifiers have to be provided by the
+    #       backend. Also check whether links in collection's graph can be set
+    #       here (or even CollectionRepo).
 
     def __init__(self, repo, branch=None):
         """
