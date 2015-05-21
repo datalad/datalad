@@ -29,7 +29,7 @@ from .metadatahandler import MetadataHandler, DefaultHandler, URIRef, RDF, DLNS
 lgr = logging.getLogger('datalad.dataset')
 
 
-class Handle(AnnexRepo):
+class HandleRepo(AnnexRepo):
     """Representation of a dataset handled by datalad.
 
     Implementations of datalad commands are supposed to use this rather than
@@ -63,7 +63,7 @@ class Handle(AnnexRepo):
         """
         # TODO: More doc. See above.
 
-        super(Handle, self).__init__(path, url, direct=direct, runner=runner,
+        super(HandleRepo, self).__init__(path, url, direct=direct, runner=runner,
                                      backend=backend)
 
         self.datalad_path = opj(self.path, '.datalad')
@@ -80,22 +80,22 @@ class Handle(AnnexRepo):
 
         if exists(self.config_file):
             self._cfg_parser.read(self.config_file)
-        if not self._cfg_parser.has_section('Handle'):
-            self._cfg_parser.add_section('Handle')
+        if not self._cfg_parser.has_section('HandleRepo'):
+            self._cfg_parser.add_section('HandleRepo')
         # By now, the datalad id is the uuid of the original annex that handle
         # was created from. Since that config file is added to git, the id is
         # kept, whenever the repository is cloned.
-        if not self._cfg_parser.has_option('Handle', 'id'):
-            self._cfg_parser.set('Handle', 'id',
+        if not self._cfg_parser.has_option('HandleRepo', 'id'):
+            self._cfg_parser.set('HandleRepo', 'id',
                                  self.repo.config_reader().get_value("annex",
                                                                      "uuid"))
         # Constructors parameter 'name' has priority to be used with this
         # instance as well as to be used as default name, if there is no
         # default name in config file already. If nothing is available at all,
         # the repository's name in the filesystem is used as default.
-        if not self._cfg_parser.has_option('Handle', 'name'):
-            self._cfg_parser.set('Handle', 'name', name or basename(self.path))
-        self.name = name or self._cfg_parser.get('Handle', 'name')
+        if not self._cfg_parser.has_option('HandleRepo', 'name'):
+            self._cfg_parser.set('HandleRepo', 'name', name or basename(self.path))
+        self.name = name or self._cfg_parser.get('HandleRepo', 'name')
         # TODO: if name is set during runtime, how to treat this? Rethink,
         # whether this means to set the default name
 
@@ -139,7 +139,7 @@ class Handle(AnnexRepo):
         -------
         str
         """
-        return self._cfg_parser.get('Handle', 'id')
+        return self._cfg_parser.get('HandleRepo', 'id')
 
     def set_metadata_handler(self, handler=DefaultHandler):
         """

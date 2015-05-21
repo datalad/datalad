@@ -23,7 +23,7 @@ from rdflib.namespace import RDF
 from rdflib.exceptions import ParserError
 
 from .gitrepo import GitRepo
-from .handle import Handle
+from .handlerepo import HandleRepo
 from .exceptions import CollectionBrokenError
 from .metadatahandler import DLNS
 
@@ -622,7 +622,7 @@ class CollectionRepo(GitRepo):
 
         Parameters:
         -----------
-        handle: Handle
+        handle: HandleRepo
           For now, this has to be a locally available handle.
         name: str
           name of the handle. This is required to be unique with respect to the
@@ -649,17 +649,17 @@ class CollectionRepo(GitRepo):
 
     def remove_handle(self, key):
 
-        # TODO: also accept a Handle instead of a name
+        # TODO: also accept a HandleRepo instead of a name
         # TODO: remove stuff from collection file (if there is going to be any)
         self.git_remove(self._key2filename(key))
         self.git_commit("Removed handle %s." % key)
 
     def get_handles(self):
         handles_data = self.get_handles_data()
-        return [Handle(handles_data[x][1]) for x in handles_data]
+        return [HandleRepo(handles_data[x][1]) for x in handles_data]
 
     def get_handle(self, name):
-        return Handle(self.get_handles_data()[name][1])
+        return HandleRepo(self.get_handles_data()[name][1])
 
     # Reintroduce:
     # TODO: Delay and wait for checking rdflib
@@ -669,7 +669,7 @@ class CollectionRepo(GitRepo):
 
         # if isinstance(handle, basestring):
         #     key = handle
-        # elif isinstance(handle, Handle):
+        # elif isinstance(handle, HandleRepo):
         #     key = handle.name
         # else:
         #     raise TypeError("can't update from handle given by %s (%s)." %

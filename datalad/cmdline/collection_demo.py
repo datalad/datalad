@@ -17,7 +17,7 @@ from os.path import join as opj, expanduser, basename
 
 from ..support.collection import Collection, CollectionRepo, \
     CollectionBrokenError
-from ..support.handle import Handle
+from ..support.handlerepo import HandleRepo
 
 
 def get_local_collection():
@@ -83,7 +83,7 @@ def install_handle(dest, col_name=None, handle_name=None, url=None):
             "Unexpected argument values:\ndest:\t%s\ncol_name:\t%s\n"
             "handle_name:\t%s\nurl:\t%s" % (dest, col_name, handle_name, url))
 
-    handle = Handle(dest, url)
+    handle = HandleRepo(dest, url)
     loc_col_repo.add_handle(handle, handle_name
                             if handle_name else basename(handle.path))
 

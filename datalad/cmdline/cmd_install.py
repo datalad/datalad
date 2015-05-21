@@ -59,12 +59,12 @@ def setup_parser(parser):
     #parser_add_common_args(parser, opt=('log_level'))
     
 def run(args):
-    from datalad.api import Handle
+    from datalad.api import HandleRepo
     from datalad.log import lgr
 
     lgr.debug("Command line arguments: %r" % args)
 
     path = os.path.expandvars(os.path.expanduser(args.destination))
-    ds = Handle(path, args.source, direct=args.direct)
+    ds = HandleRepo(path, args.source, direct=args.direct)
 
 

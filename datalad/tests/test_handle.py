@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class Handle
+"""Test implementation of class HandleRepo
 
 """
 
@@ -18,7 +18,7 @@ from git.exc import GitCommandError
 from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, FOAF
 
-from ..support.handle import Handle
+from ..support.handlerepo import HandleRepo
 from ..support.exceptions import FileInGitError
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, \
@@ -37,12 +37,12 @@ local_flavors = ['network-clone' if on_windows else 'local']
 @with_tempfile
 def test_Handle(src, dst):
 
-    ds = Handle(dst, src)
-    assert_is_instance(ds, Handle, "Handle was not created.")
+    ds = HandleRepo(dst, src)
+    assert_is_instance(ds, HandleRepo, "HandleRepo was not created.")
     assert_true(exists(opj(dst, '.datalad')))
 
     #do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    assert_raises(GitCommandError, Handle, dst, src)
+    assert_raises(GitCommandError, HandleRepo, dst, src)
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -50,8 +50,8 @@ def test_Handle(src, dst):
 @with_tempfile
 def test_Handle_direct(src, dst):
 
-    ds = Handle(dst, src, direct=True)
-    assert_is_instance(ds, Handle, "Handle was not created.")
+    ds = HandleRepo(dst, src, direct=True)
+    assert_is_instance(ds, HandleRepo, "HandleRepo was not created.")
     assert_true(exists(opj(dst, '.datalad')))
     assert_true(ds.is_direct_mode(), "Forcing direct mode failed.")
     
@@ -61,8 +61,8 @@ def test_Handle_direct(src, dst):
 @with_testrepos(flavors=local_flavors)
 def test_Handle_instance_from_existing(path):
 
-    gr = Handle(path)
-    assert_is_instance(gr, Handle, "Handle was not created.")
+    gr = HandleRepo(path)
+    assert_is_instance(gr, HandleRepo, "HandleRepo was not created.")
     assert_true(exists(opj(path, '.datalad')))
 
 
@@ -71,8 +71,8 @@ def test_Handle_instance_from_existing(path):
 @with_tempfile
 def test_Handle_instance_brand_new(path):
 
-    gr = Handle(path)
-    assert_is_instance(gr, Handle, "Handle was not created.")
+    gr = HandleRepo(path)
+    assert_is_instance(gr, HandleRepo, "HandleRepo was not created.")
     assert_true(exists(opj(path, '.datalad')))
 
 
@@ -81,8 +81,8 @@ def test_Handle_instance_brand_new(path):
 @with_tempfile
 def test_Handle_get(src, dst):
 
-    ds = Handle(dst, src)
-    assert_is_instance(ds, Handle, "AnnexRepo was not created.")
+    ds = HandleRepo(dst, src)
+    assert_is_instance(ds, HandleRepo, "AnnexRepo was not created.")
     testfile = 'test-annex.dat'
     testfile_abs = opj(dst, testfile)
     assert_false(ds.file_has_content("test-annex.dat"))
@@ -98,7 +98,7 @@ def test_Handle_get(src, dst):
 @with_tempfile
 def test_Handle_add_to_annex(src, dst):
 
-    ds = Handle(dst, src)
+    ds = HandleRepo(dst, src)
     filename = get_most_obscure_supported_name()
     filename_abs = opj(dst, filename)
     with open(filename_abs, 'w') as f:
@@ -123,7 +123,7 @@ def test_Handle_add_to_annex(src, dst):
 @with_tempfile
 def test_Handle__add_to_git(src, dst):
 
-    ds = Handle(dst, src)
+    ds = HandleRepo(dst, src)
 
     filename = get_most_obscure_supported_name()
     filename_abs = opj(dst, filename)
@@ -143,7 +143,7 @@ def test_Handle__add_to_git(src, dst):
 @with_tempfile
 def test_Handle_commit(src, path):
 
-    ds = Handle(path, src)
+    ds = HandleRepo(path, src)
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
@@ -166,7 +166,7 @@ def test_Handle_commit(src, path):
 def test_Handle_id(path1, path2):
 
     # check id is generated:
-    handle1 = Handle(path1)
+    handle1 = HandleRepo(path1)
     id1 = handle1.datalad_id()
     assert_is_not_none(id1)
     assert_is_instance(id1, basestring)
@@ -174,7 +174,7 @@ def test_Handle_id(path1, path2):
                  handle1.repo.config_reader().get_value("annex", "uuid"))
 
     # check clone has same id:
-    handle2 = Handle(path2, path1)
+    handle2 = HandleRepo(path2, path1)
     assert_equal(id1, handle2.datalad_id())
 
 
@@ -182,24 +182,24 @@ def test_Handle_id(path1, path2):
 @with_tempfile
 def test_Handle_equals(path1, path2):
 
-    handle1 = Handle(path1)
-    handle2 = Handle(path1)
+    handle1 = HandleRepo(path1)
+    handle2 = HandleRepo(path1)
     ok_(handle1 == handle2)
     assert_equal(handle1, handle2)
-    handle2 = Handle(path2)
+    handle2 = HandleRepo(path2)
     assert_not_equal(handle1, handle2)
     ok_(handle1 != handle2)
 
 @with_tempfile
 def test_Handle_metadata(path):
 
-    handle = Handle(path)
+    handle = HandleRepo(path)
     md = handle.get_metadata()
-    # TODO: Currently saved default subject in Handle()
+    # TODO: Currently saved default subject in HandleRepo()
     # is generated bei URIRef(path). Stored as is, but if reloaded
     # is not equal to URIRef(path) but prefixed by "file://"
     # Therefore not a straightforward test:
-    is_datalad_handle = list(md.subjects(RDF.type, Literal('Datalad Handle')))
+    is_datalad_handle = list(md.subjects(RDF.type, Literal('Datalad HandleRepo')))
     assert_equal(len(is_datalad_handle), 1)
     assert_in(path, is_datalad_handle[0])
     assert_in((is_datalad_handle[0], FOAF.name, Literal(basename(path))), md)

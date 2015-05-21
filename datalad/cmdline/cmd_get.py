@@ -55,7 +55,7 @@ def run(args):
     import os
     import os.path
 
-    from datalad.api import Handle
+    from datalad.api import HandleRepo
     from datalad.log import lgr
 
     lgr.debug("Command line arguments: %r" % args)
@@ -75,7 +75,7 @@ def run(args):
                 os.chdir(os.pardir)
                 cwd = os.getcwd()
 
-    ds = Handle(cwd)
+    ds = HandleRepo(cwd)
     os.chdir(cwd_before)
 
     # args.path comes as a list

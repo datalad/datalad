@@ -18,7 +18,7 @@ from rdflib import Graph, Literal
 from rdflib.namespace import FOAF
 
 from ..support.gitrepo import GitRepo
-from ..support.handle import Handle
+from ..support.handlerepo import HandleRepo
 from ..support.collection import CollectionRepo, Collection
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
@@ -67,8 +67,8 @@ def test_CollectionRepo_constructor(clean_path, clean_path2, broken_path):
 def test_CollectionRepo_get_handles(annex_path, handle_path,
                                 handle_path2, clt_path):
 
-    handle1 = Handle(handle_path, annex_path)
-    handle2 = Handle(handle_path2, annex_path)
+    handle1 = HandleRepo(handle_path, annex_path)
+    handle2 = HandleRepo(handle_path2, annex_path)
     col_repo = CollectionRepo(clt_path)
     col_repo.add_handle(handle1, "FirstHandle")
     col_repo.add_handle(handle2, "SecondHandle")
@@ -96,7 +96,7 @@ def test_CollectionRepo_get_handles(annex_path, handle_path,
 @with_tempfile
 @with_tempfile
 def test_CollectionRepo_metadata_cache(h_path, c_path):
-    handle = Handle(h_path)
+    handle = HandleRepo(h_path)
     col_repo = CollectionRepo(c_path)
     col_repo.add_handle(handle, "MyHandle")
     col = Collection(col_repo)
@@ -118,7 +118,7 @@ def test_CollectionRepo_metadata_cache(h_path, c_path):
     assert_equal(set(handle.get_metadata()), set(meta_new))
     # without updating the cache, collection still has initial metadata:
     assert_equal(set(Graph().parse(data=col['MyHandle'][2])), set(meta_initial))
-    # TODO: Update cache from Handle! (not just from file of course!)
+    # TODO: Update cache from HandleRepo! (not just from file of course!)
     # assert_equal(col["MyHandle"][2], "['Fresh Metadata.']", "collection:\n%s" % col)
 
 
@@ -127,7 +127,7 @@ def test_CollectionRepo_metadata_cache(h_path, c_path):
 @with_tempfile
 def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
 
-    handle = Handle(clone_path, annex_path)
+    handle = HandleRepo(clone_path, annex_path)
     clt = CollectionRepo(clt_path)
     clt.add_handle(handle, "first_handle")
     ok_clean_git(clt_path, annex=False)
@@ -153,7 +153,7 @@ def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
 @with_tempfile
 def test_CollectionRepo_remove_handle(annex_path, handle_path, clt_path):
 
-    handle = Handle(handle_path, annex_path)
+    handle = HandleRepo(handle_path, annex_path)
     collection = CollectionRepo(clt_path)
     collection.add_handle(handle, "MyHandle")
     collection.remove_handle("MyHandle")
