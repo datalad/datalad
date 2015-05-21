@@ -21,12 +21,130 @@ import os
 from os.path import join as opj, exists, basename
 import logging
 from ConfigParser import SafeConfigParser
+from abc import ABCMeta, abstractmethod, abstractproperty
 
 
 from annexrepo import AnnexRepo
-from .metadatahandler import MetadataHandler, DefaultHandler, URIRef, RDF, DLNS
+from .metadatahandler import MetadataHandler, DefaultHandler, URIRef, RDF, \
+    DLNS, Graph
 
-lgr = logging.getLogger('datalad.dataset')
+lgr = logging.getLogger('datalad.handle')
+
+
+class HandleBackend(object):
+
+    __metaclass__ = ABCMeta
+
+    @abstractproperty
+    def id(self):
+        pass
+
+    @abstractproperty
+    def url(self):
+        pass
+
+    @abstractmethod
+    def get_name(self):
+        pass
+
+    @abstractmethod
+    def set_name(self, name):
+        pass
+
+    name = abstractproperty(get_name, set_name)
+
+    @abstractmethod
+    def get_metadata(self):
+        pass
+
+    @abstractmethod
+    def set_metadata(self, meta):
+        pass
+
+    metadata = abstractproperty(get_metadata, set_metadata)
+
+
+class Handle(object):
+    """Representation of a Handle's metadata.
+
+    Independent on its physical representation.
+    """
+
+    def __init__(self, src=None, name=None):
+        # TODO: Handling of 'name' option. See Collections.
+
+        if isinstance(src, HandleBackend):
+            self._backend = src
+            self.id = self._backend.id
+            self.url = self._backend.url
+            self.name = self._backend.name
+            self.metadata = self._backend.metadata
+
+        elif isinstance(src, Handle):
+            # TODO: Correct behaviour of copy constructor?
+            # Does this mean, Handle is also a HandleBackend?
+            # Additionally think about pure runtime handles, without any
+            # backend. They would need to store the data, instead of linking
+            # to a backend. But do we need such?
+            self._backend = src
+            self.id = self._backend.id
+            self.url = self._backend.url
+            self.name = self._backend.name
+            self.metadata = self._backend.metadata
+
+        elif src is None:
+            self._backend = None
+            self.id = None
+            self.url = None
+            self.name = name
+            self.metadata = Graph(identifier=URIRef(self.name))
+
+        else:
+            e_msg = "Invalid source for Handle: %s." % type(src)
+            lgr.error(e_msg)
+            raise TypeError(e_msg)
+
+
+class HandleRepoBranchBackend(HandleBackend):
+    # TODO: Name. See corresponding naming for CollectionBackend.
+
+    def __init__(self, repo, branch):
+        # TODO: Convenience method in HandleRepo:
+        # get_handle_backend(branch=None)
+
+        # TODO: Check whether the branch handling is reasonable,
+        # especially whether this works on windows.
+
+        # Note: By now 'branch' has no effect at all. Just a reminder.
+
+        if not isinstance(repo, HandleRepo):
+            e_msg = "Can't deal with type '%s' to access a handle repository." \
+                    % type(repo)
+            lgr.error(e_msg)
+            raise TypeError(e_msg)
+        else:
+            self._repo = repo
+
+        self._branch = branch
+
+    def id(self):
+        return self._repo.datalad_id
+
+    def url(self):
+        return self._repo.path
+
+    def get_name(self):
+        return self._repo.name
+
+    def set_name(self, name):
+        self._repo.name = name
+        # TODO: By now, this is not written to file.
+
+    def get_metadata(self):
+        return self._repo.get_metadata()
+
+    def set_metadata(self, meta):
+        self._repo.set_metadata(meta)
 
 
 class HandleRepo(AnnexRepo):
