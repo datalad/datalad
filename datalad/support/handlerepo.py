@@ -33,6 +33,10 @@ lgr = logging.getLogger('datalad.handlerepo')
 
 
 class HandleRepoBranchBackend(HandleBackend):
+    """HandleBackend for handle repositories.
+
+    Implements a HandleBackend pointing to a handle repository branch.
+    """
     # TODO: Name. See corresponding naming for CollectionBackend.
 
     def __init__(self, repo, branch):

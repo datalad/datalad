@@ -24,12 +24,20 @@ lgr = logging.getLogger('datalad.collection')
 
 
 class CollectionBackend(object):
+    """Interface to be implemented by backends for collections.
+
+    Abstract class defining an interface, that needs to be implemented
+    by any class that aims to provide a backend for collections.
+    """
 
     __metaclass__ = ABCMeta
 
     @abstractmethod
     def get_handles(self):
-        """
+        """Get a dictionary of Handle instances.
+
+        The dictionary contains the handles that belong to the collection.
+
         Returns:
         --------
         dictionary of Handle
@@ -40,16 +48,23 @@ class CollectionBackend(object):
 
     @abstractmethod
     def get_collection(self):
-        """
+        """Get the metadata of the collection itself.
+
         Returns:
         --------
         dictionary
-          collection level data: 'name' and 'meta'
+          By now there are just two keys:
+            'name': str
+            'meta': rdflib.Graph
         """
 
     @abstractmethod
     def commit_collection(self, collection, msg):
-        """
+        """Commit a collection.
+
+        Commits changes of the runtime representation `collection` to the
+        backend. Accepts a commit message.
+
         Parameters:
         -----------
         collection: Collection
@@ -92,19 +107,25 @@ class CollectionBackend(object):
 class Collection(dict):
     """A collection of handles.
 
-    This is a dictionary, which's keys are the handles' names.
-    TODO: Describe how this is a representation of a collection's metadata
-    and therefore different from the representation of a collection repository.
+    Runtime representation of a collection's metadata. This is independent on
+    its physical representation and therefore uses any CollectionBackend to set
+    and/or retrieve the data.
 
-    TODO: Describe structure of values, once we are sure about this.
-    By now it's: self[handle_name]: Handle
+    A Collection is a dictionary, which's keys are the handles' names.
+    The values are Handle instances representing the metadata of these handles.
+    Additionally, a Collection has attributes to store data about the
+    collection itself:
 
     Attributes of a collection:
     name:               str
     store:              IOMemory
     meta:               (named) Graph
     conjunctive_graph:  ConjunctiveGraph
-    _backend:           CollectionBackend
+
+    To represent the metadata, Collections use a named graph per handle and an
+    additional named graph for collection level metadata. These graphs can be
+    queried via the collection's graph store and its corresponding conjunctive
+    graph.
     """
 
     def __init__(self, src=None, name=None):
@@ -239,10 +260,9 @@ class MetaCollection(dict):
     This is a dictionary, which's keys are the collections' names.
     Values are Collection instances.
 
-    TODO: This possibly leads to unnecessary copies of the graphs, in case
-    those Collection instances aren't used otherwise anyway.
-    Think about a better way to do it.
-    (not just another way, a better one! ;-) )
+    Like Collections this class collects the named metadata graphs of its items
+    in a graph store (and its conjunctive graph), that can be queried.
+    Additionally, a MetaCollection can have a name.
 
     Attributes of a MetaCollection:
     name:               str

@@ -24,64 +24,84 @@ from .collection import Collection, CollectionBackend
 
 lgr = logging.getLogger('datalad.collectionrepo')
 
+
 class CollectionRepoBranchHandleBackend(HandleBackend):
+    """HandleBackend for collection repositories.
 
-        def __init__(self, repo, branch, key):
-            self.repo = repo
-            self.branch = branch
-            self.key = key
-            self.cache = dict()
-            self.update()
+    Implements a HandleBackend retrieving its data from a branch of a
+    collection repository. This is a read-only backend for Handle.
+    """
+    # TODO: raise proper Exceptions on write access
+    # TODO: Better name of these classes
 
-        def update(self):
-            """Reloads data from git.
+    def __init__(self, repo, branch, key):
+        self.repo = repo
+        self.branch = branch
+        self.key = key
+        self.cache = dict()
+        self.update()
 
-            Calls to backend interface methods return cached data.
-            TODO: Maybe make an explicit update() mandatory for backends.
-            """
-            for line in self.repo.git_get_file_content(
-                    self.repo._key2filename(self.key),
-                    self.branch):
-                if line.startswith("handle_id = "):
-                    self.cache['id'] = line[12:]
-                elif line.startswith("last_seen = "):
-                    self.cache['url'] = line[12:]
-                else:
-                    pass
+    def update(self):
+        """Reloads data from git.
 
-            self.cache['meta'] = Graph(identifier=self.key).parse(
-                self.repo.git_get_file_content(
-                    opj('metadata/', self.repo._key2filename(self.key)),
-                    self.branch))
+        Calls to backend interface methods return cached data.
+        TODO: Maybe make an explicit update() mandatory for backends.
+        """
+        for line in self.repo.git_get_file_content(
+                self.repo._key2filename(self.key),
+                self.branch):
+            if line.startswith("handle_id = "):
+                self.cache['id'] = line[12:]
+            elif line.startswith("last_seen = "):
+                self.cache['url'] = line[12:]
+            else:
+                pass
 
-        @property
-        def id(self):
-            return self.cache['id']
+        self.cache['meta'] = Graph(identifier=self.key).parse(
+            self.repo.git_get_file_content(
+                opj('metadata/', self.repo._key2filename(self.key)),
+                self.branch))
 
-        @property
-        def url(self):
-            return self.cache['url']
+    @property
+    def id(self):
+        return self.cache['id']
 
-        def get_name(self):
-            return self.key
+    @property
+    def url(self):
+        return self.cache['url']
 
-        def set_name(self, name):
-            lgr.warning("Can't write handle data from within %s" +
-                        str(self.__class__))
+    def get_name(self):
+        return self.key
 
-        name = property(get_name, set_name)
+    def set_name(self, name):
+        lgr.warning("Can't write handle data from within %s" +
+                    str(self.__class__))
 
-        def get_metadata(self):
-            return self.cache['meta']
+    name = property(get_name, set_name)
 
-        def set_metadata(self, meta):
-            lgr.warning("Can't write handle data from within %s" +
-                        str(self.__class__))
+    def get_metadata(self):
+        return self.cache['meta']
 
-        metadata = property(get_metadata, set_metadata)
+    def set_metadata(self, meta):
+        lgr.warning("Can't write handle data from within %s" +
+                    str(self.__class__))
+
+    metadata = property(get_metadata, set_metadata)
+
 
 class CollectionRepoBranchBackend(CollectionBackend):
+    """CollectionBackend for collection repositories.
+
+    Implements a CollectionBackend that is connected to a branch of collection
+    repository.
+    """
     # TODO: Better name
+
+    # Note (reminder): If it's a remote branch: Should writing data imply a
+    # push or sth.?
+    # Probably not, but it should it be well documented, since 'saving' a
+    # collection with a remote url and then it's just locally done, could be
+    # confusing to users not familiar with git.
 
     def __init__(self, repo, branch=None):
         """
