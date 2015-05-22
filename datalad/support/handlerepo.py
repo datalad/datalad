@@ -374,3 +374,60 @@ class HandleRepo(AnnexRepo):
         """
         # TODO: set branch option in action
         return Handle(HandleRepoBranchBackend(self, branch))
+
+
+class CollectionRepoBranchHandleBackend(HandleBackend):
+
+        def __init__(self, repo, branch, key):
+            self.repo = repo
+            self.branch = branch
+            self.key = key
+            self.cache = dict()
+            self.update()
+
+        def update(self):
+            """Reloads data from git.
+
+            Calls to backend interface methods return cached data.
+            TODO: Maybe make an explicit update() mandatory for backends.
+            """
+            for line in self.repo.git_get_file_content(
+                    self.repo._key2filename(self.key),
+                    self.branch):
+                if line.startswith("handle_id = "):
+                    self.cache['id'] = line[12:]
+                elif line.startswith("last_seen = "):
+                    self.cache['url'] = line[12:]
+                else:
+                    pass
+
+            self.cache['meta'] = Graph(identifier=self.key).parse(
+                self.repo.git_get_file_content(
+                    opj('metadata/', self.repo._key2filename(self.key)),
+                    self.branch))
+
+        @property
+        def id(self):
+            return self.cache['id']
+
+        @property
+        def url(self):
+            return self.cache['url']
+
+        def get_name(self):
+            return self.key
+
+        def set_name(self, name):
+            lgr.warning("Can't write handle data from within %s" +
+                        str(self.__class__))
+
+        name = property(get_name, set_name)
+
+        def get_metadata(self):
+            return self.cache['meta']
+
+        def set_metadata(self, meta):
+            lgr.warning("Can't write handle data from within %s" +
+                        str(self.__class__))
+
+        metadata = property(get_metadata, set_metadata)

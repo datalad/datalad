@@ -23,7 +23,7 @@ from rdflib.namespace import RDF
 from rdflib.exceptions import ParserError
 
 from .gitrepo import GitRepo
-from .handlerepo import HandleRepo, Handle
+from .handlerepo import HandleRepo, Handle, CollectionRepoBranchHandleBackend
 from .exceptions import CollectionBrokenError
 from .metadatahandler import DLNS
 
@@ -143,7 +143,7 @@ class Collection(dict):
         # seems to be less flexible in case we find another way to store a set
         # of named graphs and their conjunctive graph without the need of every
         # collection to have its own store.
-        # Note: By using store.add() there seems to be copy at all.
+        # Note: By using store.add() there seems to be no copy at all.
         # Need to check in detail, how this is stored and whether it still
         # works as intended.
         # Note 2: Definitely not a copy and seems to work. Need more querie to
@@ -305,17 +305,8 @@ class MetaCollection(dict):
 
 
 class CollectionBackend(object):
-    # How to pass the branch (especially on reload) without the collection
-    # knowing anything about branches? => Let the backend store it. But then we
-    # need different backend instances for the same repo.
 
     __metaclass__ = ABCMeta
-
-    # @abstractmethod
-    # def get_name(self):
-    #     # TODO: May be a property with set/get
-    #     # or integrate uri_ref+name in get_collection's return format.
-    #     pass
 
     @abstractmethod
     def get_handles(self):
@@ -336,17 +327,6 @@ class CollectionBackend(object):
         dictionary
           collection level data: 'name' and 'meta'
         """
-
-    # @abstractmethod
-    # def get_metadata(self):
-    #     """
-    #     Returns:
-    #     --------
-    #     dictionary of Graph
-    #       keys are the handles' names, values are the handles' metadata
-    #       graphs.
-    #     """
-    #     pass
 
     @abstractmethod
     def commit_collection(self, collection, msg):
@@ -371,16 +351,6 @@ class CollectionBackend(object):
 class CollectionRepoBranchBackend(CollectionBackend):
     # TODO: Better name
 
-    # TODO: This has to deal with remote branches too!
-
-    # TODO: Changed structures:
-    #       - get_handles has to deliver a dictionary of Handles
-    #       - get_collection a dictionary with keys 'name' and 'meta'
-    #
-    #       In any case the graphs identifiers have to be provided by the
-    #       backend. Also check whether links in collection's graph can be set
-    #       here (or even CollectionRepo).
-
     def __init__(self, repo, branch=None):
         """
         Parameters:
@@ -398,17 +368,14 @@ class CollectionRepoBranchBackend(CollectionBackend):
             msg = "Invalid repo type: %s" % type(repo)
             lgr.error(msg)
             raise TypeError(msg)
-        self.branch = branch or self.repo.git_get_active_branch()
+
+        self.branch = branch
+
+    def get_handles(self):
+        return self.repo.get_handles(self.branch)
 
     def get_collection(self):
-        return self.repo.get_handles_data(self.branch)
-
-    def get_metadata(self):
-        return self.repo.get_metadata(self.branch)
-
-    def get_name(self):
-        # TODO: Not sure yet, whether this naming is the way to go.
-        return self.repo.name + '/' + self.branch
+        return self.repo.get_collection(self.branch)
 
     def commit_collection(self, collection, msg):
         self.repo.commit_collection(collection, self.branch, msg)
@@ -476,7 +443,7 @@ class CollectionRepo(GitRepo):
             #     (Q: implicitly requires a list of handles?
             #      This would give an additional consistency check)
             with open(opj(self.path, 'collection'), 'w') as f:
-                f.write("New collection: %s" % self.name)
+                f.write("name = %s" % self.name)
             self.git_add('collection')
             self.git_commit("Collection initialized.")
 
@@ -487,17 +454,22 @@ class CollectionRepo(GitRepo):
             # may be read the collection file/handle infos
             # or may be do it on demand?
             with open(opj(self.path, 'collection'), 'r') as f:
-                self.name = f.readline()[18:]
+                self.name = f.readline()[7:]
 
             # For now read a list of handles' names, ids, paths and metadata
             # as a proof of concept:
             # self._update_handle_data()
+
+    # ### helper functions:
 
     def _filename2key(self, fname):
         """Placeholder
 
         For now just returns input.
         """
+
+        # TODO: self.name = self.repo.name + '/' + branch + '/' + self.key
+
         return fname
 
     def _key2filename(self, key):
@@ -507,41 +479,8 @@ class CollectionRepo(GitRepo):
         """
         return key
 
-    def get_metadata(self, branch):
-        # TODO: need collection-level metadata
-        # Also rethink the next two methods
 
-        # May a) get the metadata of a who9le branch including collection-level
-        # and b) get the same for all branches => metacollection
-        # But: What exactly to return, since the collection should manage the store?
-        # Does it? Returning the dictionary is needed either way.
-        pass
-
-    def get_handles_data(self, branch='HEAD'):
-        """Get the metadata of all handles in `branch`.
-
-        Returns:
-        --------
-        dictionary
-
-        """
-        out = dict()
-
-        # load handles from branch
-        for filename in self.git_get_files(branch):
-            if filename != 'collection':
-                for line in self.git_get_file_content(filename, branch):
-                    if line.startswith("handle_id = "):
-                        id_ = line[12:]
-                    elif line.startswith("last_seen = "):
-                        url = line[12:]
-                    elif line.startswith("metadata = "):
-                        md = line[11:]
-                    else:
-                        md += line
-                # TODO: dict instead of tuple:
-                out[self._filename2key(filename)] = (id_, url, md)
-        return out
+    # ### ############################# ###
 
     def get_remotes_data(self, name=None):
         """Get the metadata of all remotes.
@@ -577,42 +516,6 @@ class CollectionRepo(GitRepo):
 
         return remotes
 
-    def commit_collection(self, collection, branch='HEAD',
-                          msg="Collection saved."):
-        # TODO: branch is not used yet.
-
-        if not isinstance(collection, Collection):
-            raise TypeError("Can't save non-collection type: %s" %
-                            type(collection))
-
-        # save current branch and switch to the one to be changed:
-        current_branch = self.git_get_active_branch()
-        self.git_checkout(branch)
-
-        # handle we no longer have
-        no_more = set(self.get_indexed_files()).difference(
-            [self._key2filename(k) for k in collection.keys()])
-        for gone in no_more:
-            # collection meta data is treated differently
-            # TODO: Actually collection meta data isn't treated yet at all!
-            if gone != 'collection':
-                self.git_remove(gone)
-
-        # update everything else to be safe
-        files_to_add = []
-        for k, v in collection.iteritems():
-            with open(opj(self.path, self._key2filename(k)), 'w') as ofile:
-                ofile.write('\n'.join(['%s = %s' % (cat, val)
-                                      for cat, val in zip(('handle_id',
-                                                           'last_seen',
-                                                           'metadata'), v)]))
-            files_to_add.append(self._key2filename(k))
-
-        self.git_add(files_to_add)
-        self.git_commit(msg)
-
-        # restore repo's active branch on disk
-        self.git_checkout(current_branch)
 
     def add_handle(self, handle, name=None):
         """Adds a handle to the collection repository.
@@ -651,11 +554,11 @@ class CollectionRepo(GitRepo):
         self.git_remove(self._key2filename(key))
         self.git_commit("Removed handle %s." % key)
 
-    def get_handles(self):
+    def get_handle_repos(self):
         handles_data = self.get_handles_data()
         return [HandleRepo(handles_data[x][1]) for x in handles_data]
 
-    def get_handle(self, name):
+    def get_handle_repo(self, name):
         return HandleRepo(self.get_handles_data()[name][1])
 
     # Reintroduce:
@@ -677,7 +580,101 @@ class CollectionRepo(GitRepo):
 
         pass
 
-    def get_backend_from_branch(self, branch='HEAD'):
-        return CollectionRepoBranchBackend(self, branch)
+    # ### Implementation of collection backend:
 
+    def get_collection(self, branch=None):
+        """Get collection level metadata of a branch
+        """
+        out = dict()
+        if branch is None:
+            branch = self.git_get_active_branch()
+        out['name'] = self.name + '/' + branch
+        out['meta'] = Graph(identifier=out['name']).parse(
+            self.git_get_file_content(opj('metadata', 'collection'), branch))
+
+        return out
+
+    def get_handles(self, branch=None):
+        """Get the metadata of all handles in `branch`.
+
+        Returns:
+        --------
+        dictionary of Handle
+
+        """
+        out = dict()
+        if branch is None:
+            branch = self.git_get_active_branch()
+
+        # load handles from branch
+        for filename in self.git_get_files(branch):
+            if filename != 'collection':
+                out[self._filename2key(filename)] = \
+                    Handle(src=CollectionRepoBranchHandleBackend(
+                        self, branch, self._filename2key(filename)))
+        return out
+
+    def commit_collection(self, collection, branch=None,
+                          msg="Collection saved."):
+
+        if not isinstance(collection, Collection):
+            raise TypeError("Can't save non-collection type: %s" %
+                            type(collection))
+
+        # save current branch ...
+        current_branch = self.git_get_active_branch()
+
+        if branch is None:
+            branch = current_branch
+
+        if branch != current_branch:
+            # ... and switch to the one to be changed:
+            self.git_checkout(branch)
+
+        # handle we no longer have
+        no_more = set(self.get_indexed_files()).difference(
+            [self._key2filename(k) for k in collection.keys()])
+        for gone in no_more:
+            # collection meta data is treated differently
+            # TODO: Actually collection meta data isn't treated yet at all!
+            # => rewrite file 'collection'
+            if gone != 'collection':
+                self.git_remove(gone)
+
+        # update everything else to be safe
+        files_to_add = []
+        for k, v in collection.iteritems():
+            with open(opj(self.path, self._key2filename(k)), 'w') as ofile:
+                ofile.write('\n'.join(['%s = %s' % (cat, val)
+                                      for cat, val in (('handle_id', v.id),
+                                                       ('last_seen', v.url))]))
+            files_to_add.append(self._key2filename(k))
+            # write metadata cache:
+            meta_file = opj(self.path, 'metadata', self._key2filename(k))
+            v.meta.serialize(meta_file, format="turtle")
+            files_to_add.append(meta_file)
+
+        # write collection files:
+        with open(opj(self.path, 'collection'), 'w') as f:
+            f.write("name = " + collection.name)
+        files_to_add.append(opj(self.path, 'collection'))
+        collection.meta.serialize(opj(self.path, 'metadata', 'collection'),
+                                  format="turtle")
+        files_to_add.append(opj(self.path, 'metadata', 'collection'))
+
+        self.git_add(files_to_add)
+        self.git_commit(msg)
+
+        if branch != current_branch:
+            # switch back to repo's active branch on disk
+            self.git_checkout(current_branch)
+
+    def get_backend_from_branch(self, branch=None):
+        """Convenience function to get a backend from a branch of this repo.
+
+        By default a backend to the active branch is returned.
+        """
+        if branch is None:
+            branch = self.git_get_active_branch()
+        return CollectionRepoBranchBackend(self, branch)
 
