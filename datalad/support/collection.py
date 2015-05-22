@@ -22,7 +22,7 @@ from rdflib.plugins.memory import IOMemory
 from rdflib.namespace import RDF
 from rdflib.exceptions import ParserError
 
-from .gitrepo import GitRepo
+from .gitrepo import GitRepo, _remove_empty_items
 from .handlerepo import HandleRepo, Handle, CollectionRepoBranchHandleBackend
 from .exceptions import CollectionBrokenError
 from .metadatahandler import DLNS
@@ -400,6 +400,11 @@ class CollectionRepo(GitRepo):
     # TODO: collection level metadata; include statement
     # (self.get_uri_ref(), RDF.type, DLNS.Collection)
     # But: get_uri_ref: How to distinct branches? Just '/branch'?
+    # Note: This may change the layout within a collection:
+    # dedicated directory for collection level metadata and additionally a
+    # directory for the metadata cache.
+
+    # TODO: instead of writing own plain text, just use ConfigParser
 
     __slots__ = GitRepo.__slots__ + ['name']
 
@@ -462,23 +467,22 @@ class CollectionRepo(GitRepo):
 
     # ### helper functions:
 
-    def _filename2key(self, fname):
+    def _filename2key(self, fname, branch):
         """Placeholder
 
         For now just returns input.
         """
 
-        # TODO: self.name = self.repo.name + '/' + branch + '/' + self.key
-
-        return fname
+        return self.name + '/' + branch + '/' + fname
 
     def _key2filename(self, key):
         """Placeholder
 
         For now just returns input.
         """
-        return key
-
+        # TODO: Rethink whether ignoring the collection/branch part
+        # is appropriate herein.
+        return _remove_empty_items(key.split('/'))[-1:][0]
 
     # ### ############################# ###
 
