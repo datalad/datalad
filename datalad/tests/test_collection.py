@@ -19,7 +19,7 @@ from rdflib.namespace import FOAF
 
 from ..support.gitrepo import GitRepo
 from ..support.handlerepo import HandleRepo
-from ..support.collection import CollectionRepo, Collection
+from ..support.collectionrepo import CollectionRepo, Collection
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
     with_tree, get_most_obscure_supported_name, ok_clean_git

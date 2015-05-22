@@ -15,7 +15,7 @@
 
 from os.path import join as opj, expanduser, basename
 
-from ..support.collection import Collection, CollectionRepo, \
+from ..support.collectionrepo import Collection, CollectionRepo, \
     CollectionBrokenError
 from ..support.handlerepo import HandleRepo
 

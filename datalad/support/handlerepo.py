@@ -7,9 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
+Implements a datalad handle repository.
+
 This layer makes the difference between an arbitrary annex and a
 datalad-managed dataset.
-
 """
 # TODO: where to document definition of a valid handle?
 # - Annex
@@ -21,93 +22,14 @@ import os
 from os.path import join as opj, exists, basename
 import logging
 from ConfigParser import SafeConfigParser
-from abc import ABCMeta, abstractmethod, abstractproperty
 
 
-from annexrepo import AnnexRepo
+from .annexrepo import AnnexRepo
 from .metadatahandler import MetadataHandler, DefaultHandler, URIRef, RDF, \
     DLNS, Graph
+from .handle import HandleBackend
 
-lgr = logging.getLogger('datalad.handle')
-
-
-class HandleBackend(object):
-
-    __metaclass__ = ABCMeta
-
-    @abstractproperty
-    def id(self):
-        pass
-
-    @abstractproperty
-    def url(self):
-        pass
-
-    @abstractmethod
-    def get_name(self):
-        pass
-
-    @abstractmethod
-    def set_name(self, name):
-        pass
-
-    name = abstractproperty(get_name, set_name)
-
-    @abstractmethod
-    def get_metadata(self):
-        print "Oha"
-        pass
-
-    @abstractmethod
-    def set_metadata(self, meta):
-        pass
-
-    metadata = abstractproperty(get_metadata, set_metadata)
-
-
-class Handle(object):
-    """Representation of a Handle's metadata.
-
-    Independent on its physical representation.
-    """
-
-    # TODO: May be all the data like url, id should directly go into the
-    # metadata graph. If we need them without a desire to query/build the
-    # metadata graph we would likely use HandleRepo instead of Handle anyway.
-
-    def __init__(self, src=None, name=None):
-        # TODO: Handling of 'name' option. See Collections.
-
-        if isinstance(src, HandleBackend):
-            self._backend = src
-            self.id = self._backend.id
-            self.url = self._backend.url
-            self.name = self._backend.name
-            self.metadata = self._backend.metadata
-
-        elif isinstance(src, Handle):
-            # TODO: Correct behaviour of copy constructor?
-            # Does this mean, Handle is also a HandleBackend?
-            # Additionally think about pure runtime handles, without any
-            # backend. They would need to store the data, instead of linking
-            # to a backend. But do we need such?
-            self._backend = src
-            self.id = self._backend.id
-            self.url = self._backend.url
-            self.name = self._backend.name
-            self.metadata = self._backend.metadata
-
-        elif src is None:
-            self._backend = None
-            self.id = None
-            self.url = None
-            self.name = name
-            self.metadata = Graph(identifier=URIRef(self.name))
-
-        else:
-            e_msg = "Invalid source for Handle: %s." % type(src)
-            lgr.error(e_msg)
-            raise TypeError(e_msg)
+lgr = logging.getLogger('datalad.handlerepo')
 
 
 class HandleRepoBranchBackend(HandleBackend):
@@ -374,60 +296,3 @@ class HandleRepo(AnnexRepo):
         """
         # TODO: set branch option in action
         return Handle(HandleRepoBranchBackend(self, branch))
-
-
-class CollectionRepoBranchHandleBackend(HandleBackend):
-
-        def __init__(self, repo, branch, key):
-            self.repo = repo
-            self.branch = branch
-            self.key = key
-            self.cache = dict()
-            self.update()
-
-        def update(self):
-            """Reloads data from git.
-
-            Calls to backend interface methods return cached data.
-            TODO: Maybe make an explicit update() mandatory for backends.
-            """
-            for line in self.repo.git_get_file_content(
-                    self.repo._key2filename(self.key),
-                    self.branch):
-                if line.startswith("handle_id = "):
-                    self.cache['id'] = line[12:]
-                elif line.startswith("last_seen = "):
-                    self.cache['url'] = line[12:]
-                else:
-                    pass
-
-            self.cache['meta'] = Graph(identifier=self.key).parse(
-                self.repo.git_get_file_content(
-                    opj('metadata/', self.repo._key2filename(self.key)),
-                    self.branch))
-
-        @property
-        def id(self):
-            return self.cache['id']
-
-        @property
-        def url(self):
-            return self.cache['url']
-
-        def get_name(self):
-            return self.key
-
-        def set_name(self, name):
-            lgr.warning("Can't write handle data from within %s" +
-                        str(self.__class__))
-
-        name = property(get_name, set_name)
-
-        def get_metadata(self):
-            return self.cache['meta']
-
-        def set_metadata(self, meta):
-            lgr.warning("Can't write handle data from within %s" +
-                        str(self.__class__))
-
-        metadata = property(get_metadata, set_metadata)
