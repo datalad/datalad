@@ -276,7 +276,7 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         assert_not_in("Mitigating and changing back", cml.out)
 
 
-def _test_serve_path_via_http(tree_args):
+def _test_serve_path_via_http(tree_args): # pragma: no cover
 
     #treeargs = tree1args
     #treeargs = tree2args
