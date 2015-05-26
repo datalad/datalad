@@ -11,12 +11,15 @@ import platform
 import sys
 import logging
 import os
+import urllib2
 
 from os.path import exists, join as opj, basename
 from glob import glob
 from mock import patch
-from nose.tools import assert_in, assert_not_in
+from nose.tools import assert_in, assert_not_in, assert_true
 from nose import SkipTest
+
+from bs4 import BeautifulSoup as BS
 
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
@@ -24,6 +27,8 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     swallow_outputs, swallow_logs, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
+
+from test_main import tree1args, tree2args
 
 
 
@@ -215,7 +220,6 @@ def test_nok_startswith():
 
 
 def test_assert_cwd_unchanged():
-
     orig_dir = os.getcwd()
 
     @assert_cwd_unchanged
@@ -272,7 +276,32 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         assert_not_in("Mitigating and changing back", cml.out)
 
 
+def _test_serve_path_via_http(tree_args):
+
+    #treeargs = tree1args
+    #treeargs = tree2args
+
+    @with_tree(**tree_args)
+    @serve_path_via_http
+    def test_path_and_url(path, url):
+        #print
+        #print path, url
+
+        # will break if url points to an index.html (or a dir redirect) 
+        assert_true(urllib2.urlopen(url))
+        u = urllib2.urlopen(url)
+        assert_true(u.getcode() == 200)
+        html = u.read()
+        soup = BS(html)
+        links = [urllib2.unquote(txt.get('href')).rstrip('/') 
+                                        for txt in soup.find_all('a')]
+        for tup in tree_args['tree']:
+            tmp_created = tup[0]
+            assert_in(tmp_created, links) 
+
+    test_path_and_url()
+
 
 def test_serve_path_via_http():
-    serve_path_via_http()
-    
+    for treeargs in [tree1args, tree2args]:
+        yield _test_serve_path_via_http, treeargs

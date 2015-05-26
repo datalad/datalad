@@ -238,8 +238,13 @@ def serve_path_via_http(tfunc):
     """
     
     @wraps(tfunc)
-    def newfunc(*args, **kw):
+    def newfunc(*args, **kwargs):
 
+        #print '\n============================'
+        #print 'In serve_path_via_http'
+        #print args
+        #print kwargs
+        #print '============================'
         args, path = args[:-1], args[-1]
 
         # There is a problem with Haskell on wheezy trying to
@@ -256,11 +261,11 @@ def serve_path_via_http(tfunc):
         multi_proc.start()
         port = queue.get(timeout=300)
 
-        url = 'http://{}:{}/'.format(hostname, port)
+        url = 'http://{}:{}'.format(hostname, port)
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
-            tfunc(*(args + (path, url)), **kw)
+            tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
@@ -476,8 +481,8 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
         if exc_info is not None:
             raise exc_info[0], exc_info[1], exc_info[2]
 
-
     return newfunc
+
 
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
