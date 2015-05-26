@@ -261,7 +261,7 @@ def serve_path_via_http(tfunc):
         multi_proc.start()
         port = queue.get(timeout=300)
 
-        url = 'http://{}:{}'.format(hostname, port)
+        url = 'http://{}:{}/'.format(hostname, port)
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
@@ -451,7 +451,6 @@ with_testrepos.__test__ = False
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
-
     """
 
     @wraps(func)
