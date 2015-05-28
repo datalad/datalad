@@ -226,17 +226,17 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         lgr.debug("HTTP: " + format % args)
 
 
-#def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
-    #os.chdir(path_to_serve_from)
-    #httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
-    #queue.put(httpd.server_port)
-    #httpd.serve_forever()
-
-def _multiproc_serve_path_via_http(hostname, path_to_serve_from, managed_dict): # pragma: no cover
+def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
     os.chdir(path_to_serve_from)
     httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
-    managed_dict['port'] = httpd.server_port 
+    queue.put(httpd.server_port)
     httpd.serve_forever()
+
+#def _multiproc_serve_path_via_http(hostname, path_to_serve_from, managed_dict): # pragma: no cover
+    #os.chdir(path_to_serve_from)
+    #httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
+    #managed_dict['port'] = httpd.server_port 
+    #httpd.serve_forever()
 
 
 @optional_args
@@ -262,26 +262,26 @@ def serve_path_via_http(tfunc):
         # so we just force to use 127.0.0.1 while on wheezy
         #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
         hostname = '127.0.0.1'
-        
-        #queue = multiprocessing.Queue()
-        #multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
-                                             #args=(hostname, path, queue))
-        #multi_proc.start()
-        #port = queue.get(timeout=300)
 
-        manager = multiprocessing.Manager()
-        managed_dict = manager.dict()
+        queue = multiprocessing.Queue()
         multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
-                                             args=(hostname, path, managed_dict))
+                                            args=(hostname, path, queue))
         multi_proc.start()
-        start = time.time()
-        while True:
-            if (time.time() - start) < 300:
-                if managed_dict.has_key('port'):
-                    port = managed_dict['port']
-                    break
-            else:
-                raise Exception("Port never received from managed_dict")
+        port = queue.get(timeout=300)
+
+        #manager = multiprocessing.Manager()
+        #managed_dict = manager.dict()
+        #multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+                                             #args=(hostname, path, managed_dict))
+        #multi_proc.start()
+        #start = time.time()
+        #while True:
+            #if (time.time() - start) < 300:
+                #if managed_dict.has_key('port'):
+                    #port = managed_dict['port']
+                    #break
+            #else:
+                #raise Exception("Port never received from managed_dict")
 
         url = 'http://{}:{}/'.format(hostname, port)
         lgr.debug("HTTP: serving {} under {}".format(path, url))
