@@ -228,7 +228,8 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
     os.chdir(path_to_serve_from)
     httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
-    queue.put(httpd.server_port)
+    port_used = httpd.server_port
+    queue.put(port_used)
     httpd.serve_forever()
 
 
