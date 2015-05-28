@@ -287,7 +287,7 @@ def _test_serve_path_via_http(tree_args): # pragma: no cover
         #print
         #print path, url
 
-        # will break if url points to an index.html (or a dir redirect) 
+        # will break if url points to an index.html (or a redirect) 
         assert_true(urllib2.urlopen(url))
         u = urllib2.urlopen(url)
         assert_true(u.getcode() == 200)

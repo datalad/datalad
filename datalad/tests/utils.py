@@ -253,7 +253,8 @@ def serve_path_via_http(tfunc):
         # is not that straightforward, although see
         # http://jasonincode.com/customizing-hosts-file-in-docker/
         # so we just force to use 127.0.0.1 while on wheezy
-        hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
+        #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
+        hostname = '127.0.0.1'
         
         queue = multiprocessing.Queue()
         multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
