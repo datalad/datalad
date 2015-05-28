@@ -281,7 +281,7 @@ def serve_path_via_http(tfunc):
         print __name__
         print '****************************************'
         if on_windows:
-            if __name__ != '__main__':
+            if __name__ == '__main__':
                 queue = multiprocessing.Queue()
                 multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
                                                      args=(hostname, path, queue))
