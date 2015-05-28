@@ -263,11 +263,22 @@ def serve_path_via_http(tfunc):
         #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
         hostname = '127.0.0.1'
 
-        queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
-                                            args=(hostname, path, queue))
-        multi_proc.start()
-        port = queue.get(timeout=300)
+        print '\n****************************************'
+        print __name__
+        print '****************************************'
+        if on_windows:
+            if __name__ == '__main__':
+                queue = multiprocessing.Queue()
+                multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+                                                    args=(hostname, path, queue))
+                multi_proc.start()
+                port = queue.get(timeout=300)
+        else:
+                queue = multiprocessing.Queue()
+                multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+                                                    args=(hostname, path, queue))
+                multi_proc.start()
+                port = queue.get(timeout=300)
 
         #manager = multiprocessing.Manager()
         #managed_dict = manager.dict()
