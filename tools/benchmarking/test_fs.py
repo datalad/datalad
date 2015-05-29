@@ -66,7 +66,8 @@ def wipe_drives(drives):
 
 
 class FS(object):
-    def __init__(self, mountpoint):
+    def __init__(self, drives, mountpoint):
+        self.drives = drives
         self.mountpoint = mountpoint
 
     def kill(self):
@@ -93,10 +94,9 @@ def test_get_pairs():
 
 
 class ZFS(FS):
-    def __init__(self, mountpoint, pool_options=["ashift=12"], compression=True, tank='testtank', layout="raid6"):
-        super(ZFS, self).__init__(mountpoint)
+    def __init__(self, drives, mountpoint, pool_options=["ashift=12"], compression=True, tank='testtank', layout="raid6"):
+        super(ZFS, self).__init__(drives, mountpoint)
         self.tank = tank
-        self.drives = None
         self.pool_options = pool_options[:]
         self.zfs_options = ['sync=standard']
         if compression:
@@ -108,9 +108,9 @@ class ZFS(FS):
                                    + sorted(self.zfs_options
                                             + self.pool_options))
 
-    def create(self, drives):
-        self.drives = drives
+    def create(self):
         self.kill()
+        drives = self.drives()
         lgr.info("Creating GPT labels on %s" % drives)
         for drive in drives:
             dryrun("parted -s /dev/%s mklabel gpt" % drive)
@@ -144,6 +144,75 @@ class ZFS(FS):
         lgr.info("Destroying ZFS pool %s" % self.tank)
         dryrun("zpool destroy %s" % self.tank)
         self.wipe(drives=drives)
+
+
+class MD(object):
+    """Just a base class for anything interested to use software raid as the base storage
+    """
+    def __init__(self, drives, layout="raid6", recreate=False):
+        self.layout = layout
+        self.drives = drives
+        self.recreate = recreate
+
+    def __str__(self):
+        return "MD_%s" % self.layout
+
+    def create(self):
+        if not self.recreate:
+            # if exists -- we just skip
+            try:
+                _ = run("grep '^md10 ' /proc/mdstat")
+                lgr.info("md10 exists -- skipping lengthy recreation")
+                return "/dev/md10"
+            except:
+                pass
+
+        self.kill()
+        drives = self.drives
+        dryrun(["mdadm", "--create", "--verbose", "/dev/md10",
+                "--level=6", "--raid-devices=%d" % len(drives)]
+                + drives, cwd="/dev")
+        lgr.info("Now we will wait until it finishes generating the bloody RAID")
+        while True:
+            with open("/proc/mdstat") as f:
+                if "%" in str(f.read()):
+                    time.sleep(10)
+                    #print '.',
+                    continue
+                break
+        return "/dev/md10"
+
+    def kill(self):
+        try:
+            _ = run("grep '^md10 ' /proc/mdstat")
+            try:
+                _ = run("umount /dev/md10")
+            except:
+                pass
+            dryrun("mdadm --stop /dev/md10")
+        except:
+            pass
+        if self.drives:
+            wipe_drives(self.drives)
+
+
+class Ext4(FS):
+    def __init__(self, drives, mountpoint):
+        super(Ext4, self).__init__(drives, mountpoint)
+
+    def __str__(self):
+        return "EXT4_%s" % self.drives[0]
+
+    def create(self):
+        drives = self.drives
+        assert(len(drives) == 1)
+        drive = drives[0]
+        if isinstance(drive, MD):
+            # so we were given the MD, let's create it as well
+            drive = drive.create()
+        dryrun("mkfs.ext4 %s" % drive)
+        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+
 
 def make_test_repo(d, nfiles=100, ndirs=1, git_options=[], annex_options=[]):
     lgr.info("Creating test repo %s with %d dirs with %d files each"
@@ -260,14 +329,15 @@ def main(action):
     mountpoint = "/mnt/test"
     if action == 'benchmark':
         for fs in [
-            # ZFS(mountpoint=mountpoint, layout='raid10'),
-            # ZFS(mountpoint=mountpoint, layout='raid6'),
-            ZFS(mountpoint=mountpoint, layout='raid6', pool_options=[])
+            # ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
+            # ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
+            #ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
+            Ext4(drives=[MD(drives)], mountpoint=mountpoint)
         ]:
             lgr.info("Working on FS=%s with following drives: %s"
                      % (fs, " ".join(drives)))
 
-            fs.create(drives)
+            fs.create()
             benchmark_fs(fs)
     elif action == 'wipe':
         wipe_drives(drives)
