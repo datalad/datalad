@@ -23,10 +23,10 @@ from os.path import join as opj, exists, basename
 import logging
 from ConfigParser import SafeConfigParser
 
+from rdflib import URIRef, RDF
 
 from .annexrepo import AnnexRepo
-from .metadatahandler import MetadataHandler, DefaultHandler, URIRef, RDF, \
-    DLNS, Graph
+from .metadatahandler import MetadataHandler, DefaultHandler, DLNS
 from .handle import HandleBackend, Handle
 
 lgr = logging.getLogger('datalad.handlerepo')
@@ -168,6 +168,8 @@ class HandleRepo(AnnexRepo):
         if not self._cfg_parser.has_option('Metadata', 'handler'):
             self._cfg_parser.set('Metadata', 'handler',
                                  'DefaultHandler')
+
+        self.save_config()
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.

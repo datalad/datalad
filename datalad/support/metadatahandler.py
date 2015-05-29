@@ -48,7 +48,7 @@ class MetadataHandler(object):
         self._res = resource
 
     @abstractmethod
-    def get_graph(self, file_=None):
+    def get_graph(self, file_=None, identifier=None, data=None):
         """Get a representation of the metadata of a resource.
 
         This should return a rdflib.Graph containing the metadata. In case the
@@ -62,6 +62,12 @@ class MetadataHandler(object):
         -----------
         file_: str
             optionally read a certain file instead of just looking into `path`
+        identifier: str
+            optionally used to create a named graph
+        data: str
+            optionally parse `data` instead of any file
+
+        Note: This interface may need some refining.
         """
         pass
 
@@ -121,12 +127,15 @@ class JSONExampleHandler(MetadataHandler):
     def __init__(self, path, resource):
         super(JSONExampleHandler, self).__init__(path, resource)
 
-    def get_graph(self, file_='metadata.json'):
-        meta = Graph()
+    def get_graph(self, file_='metadata.json', identifier=None, data=None):
+        meta = Graph(identifier=identifier)
         meta.bind('dlns', DLNS)
         meta.bind('foaf', FOAF)
 
-        json_dict = json.load(open(opj(self._path, file_), 'r'))
+        if data is None:
+            json_dict = json.load(open(opj(self._path, file_), 'r'))
+        else:
+            json_dict = json.loads(data)
 
         for author in json_dict['authors']:
             # Create a node for the author;
@@ -166,15 +175,21 @@ class RDFExampleHandler(MetadataHandler):
     def __init__(self, path, resource):
         super(RDFExampleHandler, self).__init__(path, resource)
 
-    def get_graph(self, file_='metadata.rdf'):
-        meta = Graph()
+    def get_graph(self, file_='metadata.rdf', identifier=None, data=None):
+        meta = Graph(identifier=identifier)
 
-        try:
-            meta.parse(opj(self._path, file_), format="turtle")
-        except IOError, ioe:
-            lgr.warning("Failed to read metadata file: %s" % ioe)
-        except ParserError, pe:
-            lgr.error("Failed to parse metadata file: %s" % pe)
+        if data is None:
+            try:
+                meta.parse(opj(self._path, file_), format="turtle")
+            except IOError, ioe:
+                lgr.warning("Failed to read metadata file: %s" % ioe)
+            except ParserError, pe:
+                lgr.error("Failed to parse metadata file: %s" % pe)
+        else:
+            try:
+                meta.parse(data=data, format="turtle")
+            except ParserError, pe:
+                lgr.error("Failed to parse metadata file: %s" % pe)
 
         return meta
 
@@ -194,8 +209,8 @@ class DefaultHandler(MetadataHandler):
     def __init__(self, path, resource):
         super(DefaultHandler, self).__init__(path, resource)
 
-    def get_graph(self, file_=None):
-        return Graph()
+    def get_graph(self, file_=None, identifier=None, data=None):
+        return Graph(identifier=identifier)
 
     def set(self, meta, file_=None):
         pass
@@ -213,8 +228,13 @@ class CacheHandler(MetadataHandler):
     def __init__(self, path, resource):
         super(CacheHandler, self).__init__(path, resource)
 
-    def get_graph(self, file_=None):
-        return Graph().parse(opj(self._path, file_), format="xml")
+    def get_graph(self, file_=None, identifier=None, data=None):
+        meta = Graph(identifier=identifier)
+        if data is None:
+            meta.parse(opj(self._path, file_), format="xml")
+        else:
+            meta.parse(data=data, format="xml")
+        return meta
 
     def set(self, meta, file_=None):
         meta.serialize(opj(self._path, file_), format="xml")

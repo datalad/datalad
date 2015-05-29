@@ -204,7 +204,7 @@ class Collection(dict):
         # Note: By using store.add() there seems to be no copy at all.
         # Need to check in detail, how this is stored and whether it still
         # works as intended.
-        # Note 2: Definitely not a copy and seems to work. Need more querie to
+        # Note 2: Definitely not a copy and seems to work. Need more queries to
         # check.
 
         # cleanup old store, if exists
@@ -225,8 +225,6 @@ class Collection(dict):
             # add reference in collection graph:
             # TODO: Is this still needed or is it correct if it's done by
             # the backend?
-            # Either way:
-            # TODO: check whether this referencing works as intended:
             self.meta.add((URIRef(self.name), DLNS.contains, URIRef(handle)))
 
         # reference to the conjunctive graph to be queried:
@@ -247,12 +245,6 @@ class Collection(dict):
 
         self._backend.commit_collection(self, msg)
 
-
-# #######################
-# TODO: MetaCollection is a Collection of Collections. So, how to reflect this
-# in implementation? Is it a dictionary too? Or is it a Collection?
-# Or is a Collection a special MetaCollection?
-# #######################
 
 class MetaCollection(dict):
     """A collection of collections.
@@ -278,7 +270,8 @@ class MetaCollection(dict):
 
         if isinstance(src, MetaCollection):
             self.update(src)
-            self.name = src.name  #? See Collection: How to treat names in case of a copy?
+            self.name = src.name
+            # TODO: See Collection: How to treat names in case of a copy?
             self.store = deepcopy(src.store)
 
         elif isinstance(src, list):
@@ -286,7 +279,8 @@ class MetaCollection(dict):
                 if isinstance(item, Collection):
                     self[item.name] = item
                 elif isinstance(item, CollectionBackend):
-                    self[item.get_name] = Collection(src=item)
+                    new_item = Collection(src=item)
+                    self[new_item.name] = new_item
                 else:
                     e_msg = "Can't retrieve collection from %s." % type(item)
                     lgr.error(e_msg)
@@ -314,29 +308,11 @@ class MetaCollection(dict):
         # join the stores:
         for collection in self:
             for graph in self[collection].store.contexts():
-                # need to avoid conflicts with handles' names,
-                # therefore name them 'collection/handle'
-                # TODO: This needs further investigation on how it can be dealt
-                # with in a reasonable way. May be handle names always need to
-                # be created that way for consistency.
-                identifier = graph.identifier \
-                    if graph.identifier == collection \
-                    else collection + '/' + graph.identifier
-
-                # create a copy of the graph in self.store:
-                new_graph = Graph(store=self.store, identifier=identifier)
-                for triple in graph:
-                    new_graph.add(triple)
-
-                if identifier == collection:
-                    # correct references of collection graph:
-                    for old_handle_identifier in new_graph.objects(
-                            URIRef(collection), DLNS.contains):
-                        new_graph.add((URIRef(collection), DLNS.contains,
-                                       URIRef(collection + '/' +
-                                              old_handle_identifier)))
-                        new_graph.remove((URIRef(collection), DLNS.contains,
-                                          old_handle_identifier))
+                self.store.add_graph(graph)
+                # Note: Removed all the copying of the graphs and correcting
+                # their references, since we now always use
+                # 'collection/branch/handle' as key. But: Implementation of
+                # this changed behaviour is not well tested yet.
 
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
