@@ -12,7 +12,6 @@ DRIVES_PREFIX = "ata-ST4000NM0033-9ZM170_S1Z0"
 lgr = logging.getLogger("datalad.benchmarking")
 
 run = Runner()
-dryrun = Runner(protocol=DryRunProtocol())
 dryrun = Runner()
 
 
@@ -70,11 +69,14 @@ class FS(object):
         self.drives = drives
         self.mountpoint = mountpoint
 
-    def kill(self):
+    def umount(self):
         try:
             dryrun("umount %s" % self.mountpoint)
         except:
             pass
+
+    def kill(self):
+        self.umount()
 
     def wipe(self):
         wipe_drives(self.drives)
@@ -149,6 +151,10 @@ class ZFS(FS):
 class MD(object):
     """Just a base class for anything interested to use software raid as the base storage
     """
+    # TODO:  do not build on top of entire drive, just generate about 100GB partition
+    # and use it -- otherwise way too long process!  I know that it wouldn't be
+    # exactly fair to ZFS though, so may be should be optional?  would be nice to compare
+    # actually
     def __init__(self, drives, layout="raid6", recreate=False):
         self.layout = layout
         self.drives = drives
@@ -210,7 +216,8 @@ class Ext4(FS):
         if isinstance(drive, MD):
             # so we were given the MD, let's create it as well
             drive = drive.create()
-        dryrun("mkfs.ext4 %s" % drive)
+        self.umount()  # just to make sure it is not mounted
+        dryrun("mkfs.ext4 -E lazy_itable_init=0,lazy_journal_init=0 %s" % drive)
         dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
 
 
@@ -263,10 +270,10 @@ class BMRunner(Runner):
             'warm': dt_warm
         })
 
-def run_tests_ondir(d):
+def run_tests_ondir(testpath):
     wait_till_low_load(0.1)
-    testdir = os.path.basename(d)
-    bmrun = BMRunner(cwd=os.path.dirname(d))
+    testdir = os.path.basename(testpath)
+    bmrun = BMRunner(cwd=os.path.dirname(testpath), protocol=dryrun.protocol)
     bmrun("du -scm " + testdir)
     bmrun("tar -cf %s.tar %s" % (testdir, testdir), expect_stderr=True)
     bmrun("pigz %s.tar" % (testdir), run_warm=False)
@@ -283,13 +290,17 @@ def run_tests_ondir(d):
     return bmrun.protocol
 run_tests_ondir.__test__ = False
 
-def benchmark_fs(fs):
+def save_protocols(protocols, fname):
+    with open(fname, 'w') as f:
+        json.dump(protocols, f, indent=True)
+
+def benchmark_fs(fs, skip_existing="TODO upstairs before even FS created"):
     """Benchmark given FS
 
     TODO: parametrize the test_repo
     """
     nfiles = 10; ndirs = 2; nruns = 1
-    nfiles = 100; ndirs=20; nruns = 10
+    nfiles = 100; ndirs=20; nruns = 100
     test_descr = {
         "fs": str(fs),
         "test_repo": "simpleannex_ndirs=%d_nfiles=%d" % (ndirs, nfiles)
@@ -301,7 +312,7 @@ def benchmark_fs(fs):
         testdir = "test%d" % d
         testpath = os.path.join(fs.mountpoint, testdir)
 
-        make_test_repo(testpath, nfiles=nfiles, ndirs=ndirs)
+        dryrun(make_test_repo, testpath, nfiles=nfiles, ndirs=ndirs)
 
         protocol = {
             'times': run_tests_ondir(testpath),
@@ -311,15 +322,17 @@ def benchmark_fs(fs):
         protocols.append(protocol)
 
     fname = '%(test_repo)s-%(fs)s.json' % test_descr # -'.join("%s:%s.json" % (k, test_descr[k]) for k in sorted(test_descr))
-    # print protocols
-    with open(os.path.join('test_fs_protocols', fname), 'w') as f:
-        json.dump(protocols, f, indent=True)
+    fullfname = os.path.join('test_fs_protocols', fname)
+    dryrun(save_protocols, protocols, fullfname)
+
 
 
 def parse_args(args=None):
     parser = argparse.ArgumentParser(description="A little benchmarker of file systems")
     parser.add_argument('action', choices=["benchmark", "wipe"], default="benchmark",
                         help='Action to perform')
+    parser.add_argument('-n', '--dry-run', action='store_true',
+                        help='Perform dry run')
     # Parse command line options
     return parser.parse_args(args)
 
@@ -347,4 +360,6 @@ def main(action):
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.dry_run:
+        dryrun.protocol = DryRunProtocol()
     main(args.action)
