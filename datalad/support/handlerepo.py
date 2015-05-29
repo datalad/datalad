@@ -27,24 +27,26 @@ from ConfigParser import SafeConfigParser
 from .annexrepo import AnnexRepo
 from .metadatahandler import MetadataHandler, DefaultHandler, URIRef, RDF, \
     DLNS, Graph
-from .handle import HandleBackend
+from .handle import HandleBackend, Handle
 
 lgr = logging.getLogger('datalad.handlerepo')
 
 
 class HandleRepoBranchBackend(HandleBackend):
+    # TODO: Name. See corresponding naming for CollectionBackend and find
+    # a solution for both of them
     """HandleBackend for handle repositories.
 
     Implements a HandleBackend pointing to a handle repository branch.
     """
-    # TODO: Name. See corresponding naming for CollectionBackend.
 
-    def __init__(self, repo, branch):
+    # TODO: Currently the branch is always the active branch of the handle.
+    # So, the branch-option of the constructor has no effect and is just a
+    # placeholder, serving as a reminder. Implementing it may be involves some
+    # changes in the HandleRepo-class, so it's returning infos from the
+    # branch's config file.
 
-        # TODO: Check whether the branch handling is reasonable,
-        # especially whether this works on windows.
-
-        # Note: By now 'branch' has no effect at all. Just a reminder.
+    def __init__(self, repo, branch=None):
 
         if not isinstance(repo, HandleRepo):
             e_msg = "Can't deal with type '%s' to access a handle repository." \
@@ -54,7 +56,7 @@ class HandleRepoBranchBackend(HandleBackend):
         else:
             self._repo = repo
 
-        self._branch = branch
+        self._branch = branch or self._repo.git_get_active_branch()
 
     @property
     def id(self):
@@ -83,8 +85,12 @@ class HandleRepoBranchBackend(HandleBackend):
 
 
 class HandleRepo(AnnexRepo):
-    """Representation of a dataset handled by datalad.
+    """Representation of a handle repository.
 
+    This is to be used, if you have to perform operations on the repository
+    rather than just a handle's metadata. Otherwise use `Handle` instead of
+    `HandleRepo`. Keep in mind, that a repository can have several branches,
+    each in fact representing a dataset.
     Implementations of datalad commands are supposed to use this rather than
     AnnexRepo or GitRepo directly, since any restrictions on annexes required
     by datalad due to its cross-platform distribution approach are handled
@@ -114,10 +120,10 @@ class HandleRepo(AnnexRepo):
         backend: str
         name: str
         """
-        # TODO: More doc. See above.
+        # TODO: More doc.
 
-        super(HandleRepo, self).__init__(path, url, direct=direct, runner=runner,
-                                     backend=backend)
+        super(HandleRepo, self).__init__(path, url, direct=direct,
+                                         runner=runner, backend=backend)
 
         self.datalad_path = opj(self.path, '.datalad')
         self.metadata_path = opj(self.datalad_path, 'metadata')
@@ -133,24 +139,22 @@ class HandleRepo(AnnexRepo):
 
         if exists(self.config_file):
             self._cfg_parser.read(self.config_file)
-        if not self._cfg_parser.has_section('HandleRepo'):
-            self._cfg_parser.add_section('HandleRepo')
+        if not self._cfg_parser.has_section('Handle'):
+            self._cfg_parser.add_section('Handle')
         # By now, the datalad id is the uuid of the original annex that handle
         # was created from. Since that config file is added to git, the id is
         # kept, whenever the repository is cloned.
-        if not self._cfg_parser.has_option('HandleRepo', 'id'):
-            self._cfg_parser.set('HandleRepo', 'id',
+        # Note: Not sure yet, whether this is needed at all.
+        if not self._cfg_parser.has_option('Handle', 'id'):
+            self._cfg_parser.set('Handle', 'id',
                                  self.repo.config_reader().get_value("annex",
                                                                      "uuid"))
         # Constructors parameter 'name' has priority to be used with this
         # instance as well as to be used as default name, if there is no
         # default name in config file already. If nothing is available at all,
         # the repository's name in the filesystem is used as default.
-        if not self._cfg_parser.has_option('HandleRepo', 'name'):
-            self._cfg_parser.set('HandleRepo', 'name', name or basename(self.path))
-        self.name = name or self._cfg_parser.get('HandleRepo', 'name')
-        # TODO: if name is set during runtime, how to treat this? Rethink,
-        # whether this means to set the default name
+        if not self._cfg_parser.has_option('Handle', 'name'):
+            self._cfg_parser.set('Handle', 'name', name or basename(self.path))
 
         # By now, we distinguish between metadata explicitly supported by
         # datalad (option 'standard') in order to ease queries, and additional,
@@ -165,14 +169,6 @@ class HandleRepo(AnnexRepo):
             self._cfg_parser.set('Metadata', 'handler',
                                  'DefaultHandler')
 
-    def __del__(self):
-        # TODO: destructor seems to not be called when python program just exits.
-        # Check what this is about and how to solve it.
-
-        with open(self.config_file, 'w') as f:
-            self._cfg_parser.write(f)
-        self.add_to_git(self.config_file, "Update config file.")
-
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
 
@@ -184,15 +180,30 @@ class HandleRepo(AnnexRepo):
         """
         return self.path == obj.path
 
+    def get_name(self):
+        return self._cfg_parser.get('Handle', 'name')
+
+    def set_name(self, name):
+        self._cfg_parser.set('Handle', 'name', name)
+
+    name = property(get_name, set_name)
+
+    def save_config(self):
+        with open(self.config_file, 'w') as f:
+            self._cfg_parser.write(f)
+        self.add_to_git(self.config_file, "Update config file.")
+
     @property
     def datalad_id(self):
-        """Get the identifier of the handle.
+        """Get the datalad identifier of the handle.
+
+        This is a read-only property.
 
         Returns
         -------
         str
         """
-        return self._cfg_parser.get('HandleRepo', 'id')
+        return self._cfg_parser.get('Handle', 'id')
 
     def set_metadata_handler(self, handler=DefaultHandler):
         """
@@ -200,7 +211,7 @@ class HandleRepo(AnnexRepo):
         custom: subclass of MetadataHandler
         """
         if not issubclass(handler, MetadataHandler):
-            raise TypeError("%s is not a MetadataHandler." % type(std))
+            raise TypeError("%s is not a MetadataHandler." % type(handler))
 
         self._cfg_parser.set('Metadata', 'handler', handler.__name__)
 
@@ -259,10 +270,11 @@ class HandleRepo(AnnexRepo):
         self._commit(commit_msg)
 
     def get_metadata(self):
-        """
+        """Get the metadata of a handle.
+
         Returns:
         --------
-        datalad.support.metadatahandler.Graph (currently just rdflib.Graph)
+        rdflib.Graph
         """
         name = self._cfg_parser.get('Metadata', 'handler')
         import datalad.support.metadatahandler as mdh
@@ -273,16 +285,18 @@ class HandleRepo(AnnexRepo):
             raise ValueError("'%s' is an unknown metadata handler." % name)
         
         meta = handler.get_graph()
+
+        # Add datalad statement:
         meta.add((URIRef(self.path), RDF.type, DLNS.Handle))
 
         return meta
 
     def set_metadata(self, meta):
-        """
+        """Write the metadata of a handle.
+
         Parameters:
         -----------
-        meta: datalad.support.metadatahandler.Graph
-          (currently just rdflib.Graph)
+        meta: rdflib.Graph
         """
         name = self._cfg_parser.get('Metadata', 'handler')
         import datalad.support.metadatahandler as mdh
@@ -296,7 +310,6 @@ class HandleRepo(AnnexRepo):
         self.add_to_git(opj(self.metadata_path, '*'), "Metadata updated.")
 
     def get_handle(self, branch=None):
-        """Convenience method to create a Handle instance.
+        """Convenience method to create a `Handle` instance.
         """
-        # TODO: set branch option in action
         return Handle(HandleRepoBranchBackend(self, branch))
