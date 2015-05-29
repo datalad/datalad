@@ -283,11 +283,12 @@ class HandleRepo(AnnexRepo):
         except AttributeError:
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
-        
-        meta = handler.get_graph()
+
+        self_node = URIRef(self.path)
+        meta = handler.get_graph(self_node)
 
         # Add datalad statement:
-        meta.add((URIRef(self.path), RDF.type, DLNS.Handle))
+        meta.add((self_node, RDF.type, DLNS.Handle))
 
         return meta
 
