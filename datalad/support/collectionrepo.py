@@ -9,9 +9,9 @@
 """Implements datalad collection repositories.
 """
 
-import re
 import logging
-from os.path import join as opj, basename, split as ops
+import os
+from os.path import join as opj, basename, split as ops, exists
 from ConfigParser import SafeConfigParser
 
 from rdflib import Graph, URIRef
@@ -59,7 +59,10 @@ class CollectionRepoBranchHandleBackend(HandleBackend):
                 self.it = iter(self.content)
 
             def readline(self):
-                return self.it.next()
+                try:
+                    return self.it.next()
+                except StopIteration:
+                    return ''
 
         file_ = ParseableListOfLines(
             self.repo.git_get_file_content(filename, self.branch))
@@ -71,7 +74,7 @@ class CollectionRepoBranchHandleBackend(HandleBackend):
 
         # TODO: See CollectionRepo.get_collection()
         path = self.repo._cfg_parser.get('Collection', 'cache_path')
-        handler = CacheHandler(path, URIRef(self.cache['url']))
+        handler = CacheHandler(path, URIRef(self.cache['last_seen']))
         self.cache['meta'] = handler.get_graph(
             identifier=self.key,
             data=self.repo.git_get_file_content(opj(path, filename),
@@ -220,7 +223,12 @@ class CollectionRepo(GitRepo):
                                  name or basename(self.path))
         if not self._cfg_parser.has_option('Collection', 'cache_path'):
             self._cfg_parser.set('Collection', 'cache_path',
-                                 opj(self.path, 'collection'))
+                                 opj(self.path, 'metadatacache'))
+        # make sure configured dir exists:
+        if not exists(opj(self.path,
+                          self._cfg_parser.get('Collection', 'cache_path'))):
+            os.mkdir(opj(self.path,
+                         self._cfg_parser.get('Collection', 'cache_path')))
 
         # collection-level metadata:
         if not self._cfg_parser.has_section('Metadata'):
@@ -228,6 +236,12 @@ class CollectionRepo(GitRepo):
         if not self._cfg_parser.has_option('Metadata', 'path'):
             self._cfg_parser.set('Metadata', 'path',
                                  opj(self.path, 'collection'))
+        # make sure configured dir exists:
+        if not exists(opj(self.path,
+                          self._cfg_parser.get('Metadata', 'path'))):
+            os.mkdir(opj(self.path,
+                         self._cfg_parser.get('Metadata', 'path')))
+
         if not self._cfg_parser.has_option('Metadata', 'handler'):
             self._cfg_parser.set('Metadata', 'handler',
                                  'DefaultHandler')
@@ -239,7 +253,8 @@ class CollectionRepo(GitRepo):
             # self._update_handle_data()
 
     def save_config(self):
-        self._cfg_parser.write(open(self._cfg_file, 'w'))
+        with open(opj(self.path, self._cfg_file), 'w') as f:
+            self._cfg_parser.write(f)
         self.git_add(self._cfg_file)
         self.git_commit("Update config file.")
 
@@ -317,7 +332,7 @@ class CollectionRepo(GitRepo):
 
         key = self.name + '/' + branch + '/' + name
         filename = self._key2filename(key)
-        cache_path = self._cfg_parser.get('Metadata', 'path')
+        cache_path = self._cfg_parser.get('Collection', 'cache_path')
 
         # create the handle's config file:
         cfg = SafeConfigParser()
@@ -331,7 +346,7 @@ class CollectionRepo(GitRepo):
         # holding it's handles:
         cfg.set('Handle', 'default_target', name)
 
-        with open(filename, 'w') as f:
+        with open(opj(self.path, filename), 'w') as f:
             cfg.write(f)
 
         # metadata cache:
@@ -344,7 +359,7 @@ class CollectionRepo(GitRepo):
     def remove_handle(self, key):
 
         filename = self._key2filename(key)
-        cache_path = self._cfg_parser.get('Metadata', 'path')
+        cache_path = self._cfg_parser.get('Collection', 'cache_path')
         self.git_remove([opj(cache_path, filename), filename])
         self.git_commit("Removed handle %s." % key)
 
@@ -409,7 +424,7 @@ class CollectionRepo(GitRepo):
             if filename != self._cfg_file:
                 out[self._filename2key(filename)] = \
                     Handle(src=CollectionRepoBranchHandleBackend(
-                        self, branch, self._filename2key(filename)))
+                        self, branch, self._filename2key(filename, branch)))
         return out
 
     def commit_collection(self, collection, branch=None,
@@ -456,18 +471,18 @@ class CollectionRepo(GitRepo):
 
             # write metadata cache:
             CacheHandler(
-                self._cfg_parser.get('Metadata', 'path'), URIRef(v.url)).set(
+                self._cfg_parser.get('Collection', 'cache_path'), URIRef(v.url)).set(
                 v.meta, self._key2filename(k)
             )
-            files_to_add.append(opj(self._cfg_parser.get('Metadata', 'path'),
+            files_to_add.append(opj(self._cfg_parser.get('Collection', 'cache_path'),
                                     self._key2filename(k)))
 
         # write collection files:
         CacheHandler(
-            self._cfg_parser.get('Metadata', 'path'), URIRef(self.path)).set(
+            self._cfg_parser.get('Collection', 'cache_path'), URIRef(self.path)).set(
             collection.meta, 'collection'
         )
-        files_to_add.append(opj(self._cfg_parser.get('Metadata', 'path'),
+        files_to_add.append(opj(self._cfg_parser.get('Collection', 'cache_path'),
                                 'collection'))
         self.git_add(files_to_add)
         self.git_commit(msg)

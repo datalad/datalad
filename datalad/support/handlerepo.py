@@ -279,15 +279,16 @@ class HandleRepo(AnnexRepo):
         rdflib.Graph
         """
         name = self._cfg_parser.get('Metadata', 'handler')
+        self_node = URIRef(self.path)
         import datalad.support.metadatahandler as mdh
         try:
-            handler = getattr(mdh, name)(self.metadata_path)
+            handler = getattr(mdh, name)(self.metadata_path, self_node)
         except AttributeError:
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
 
-        self_node = URIRef(self.path)
-        meta = handler.get_graph(self_node)
+
+        meta = handler.get_graph(identifier=self.name)
 
         # Add datalad statement:
         meta.add((self_node, RDF.type, DLNS.Handle))
