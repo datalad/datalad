@@ -96,7 +96,8 @@ def test_get_pairs():
 
 
 class ZFS(FS):
-    def __init__(self, drives, mountpoint, pool_options=["ashift=12"], compression=True, tank='testtank', layout="raid6"):
+    def __init__(self, drives, mountpoint, pool_options=["ashift=12"],
+                 compression=True, tank='testtank', layout="raid6"):
         super(ZFS, self).__init__(drives, mountpoint)
         self.tank = tank
         self.pool_options = pool_options[:]
@@ -203,11 +204,15 @@ class MD(object):
 
 
 class Ext4(FS):
-    def __init__(self, drives, mountpoint):
+    def __init__(self, drives, mountpoint, options=[]):
         super(Ext4, self).__init__(drives, mountpoint)
+        self.options = options
 
     def __str__(self):
-        return "EXT4_%s" % self.drives[0]
+        options_str = "_".join(sorted([x.replace(' ', '') for x in self.options]))
+        if options_str:
+            options_str = "_" + options_str
+        return "EXT4_%s%s" % (self.drives[0], options_str)
 
     def create(self):
         drives = self.drives
@@ -294,7 +299,7 @@ def save_protocols(protocols, fname):
     with open(fname, 'w') as f:
         json.dump(protocols, f, indent=True)
 
-def benchmark_fs(fs, skip_existing="TODO upstairs before even FS created"):
+def benchmark_fs(fs):
     """Benchmark given FS
 
     TODO: parametrize the test_repo
@@ -305,6 +310,7 @@ def benchmark_fs(fs, skip_existing="TODO upstairs before even FS created"):
         "fs": str(fs),
         "test_repo": "simpleannex_ndirs=%d_nfiles=%d" % (ndirs, nfiles)
     }
+
     # make a list of protocols which will be self sufficient dictionaries, so
     # later we could easily load into pandas
     protocols = []
@@ -321,9 +327,7 @@ def benchmark_fs(fs, skip_existing="TODO upstairs before even FS created"):
         protocol.update(test_descr)
         protocols.append(protocol)
 
-    fname = '%(test_repo)s-%(fs)s.json' % test_descr # -'.join("%s:%s.json" % (k, test_descr[k]) for k in sorted(test_descr))
-    fullfname = os.path.join('test_fs_protocols', fname)
-    dryrun(save_protocols, protocols, fullfname)
+    return test_descr, protocols
 
 
 
@@ -340,18 +344,30 @@ def parse_args(args=None):
 def main(action):
     drives = get_drives(DRIVES_PREFIX)
     mountpoint = "/mnt/test"
+    mdraid_chunksize = 512  # k -- was the ones created by mdadm by default
+    ext4_bs = 512  # k -- explored actually a range 1, 4, 128, 256, 512
+    stride_size = (mdraid_chunksize/ext4_bs)
     if action == 'benchmark':
         for fs in [
             # ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
             # ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
             #ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
-            Ext4(drives=[MD(drives)], mountpoint=mountpoint)
+            #Ext4(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint)
+                Ext4(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint,
+                 options=['-E stride=%d' % stride_size,
+                          '-E stripe_width=%d' % ((len(drives)-2)*stride_size),
+                          '-b %d' % (ext4_bs*1024)])
         ]:
             lgr.info("Working on FS=%s with following drives: %s"
                      % (fs, " ".join(drives)))
 
             fs.create()
-            benchmark_fs(fs)
+            # TODO: move test_descr/test case out of benchmark_fs
+            test_descr, protocols = benchmark_fs(fs)
+            protocols_fname = '%(test_repo)s-%(fs)s.json' % test_descr # -'.join("%s:%s.json" % (k, test_descr[k]) for k in sorted(test_descr))
+            protocols_path = os.path.join('test_fs_protocols', protocols_fname)
+            dryrun(save_protocols, protocols, protocols_path)
+
     elif action == 'wipe':
         wipe_drives(drives)
     else:
