@@ -278,14 +278,10 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
 def _test_serve_path_via_http(tree_args): # pragma: no cover
 
-    #treeargs = tree1args
-    #treeargs = tree2args
-
+    #FIXME do something other than using tree_args like this  
     @with_tree(**tree_args)
     @serve_path_via_http
     def test_path_and_url(path, url):
-        #print
-        #print path, url
 
         # will break if url points to an index.html (or a redirect) 
         assert_true(urllib2.urlopen(url))

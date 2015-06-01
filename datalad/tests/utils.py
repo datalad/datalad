@@ -191,6 +191,7 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+
 #
 # Decorators
 #
@@ -232,12 +233,6 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
     queue.put(httpd.server_port)
     httpd.serve_forever()
 
-#def _multiproc_serve_path_via_http(hostname, path_to_serve_from, managed_dict): # pragma: no cover
-    #os.chdir(path_to_serve_from)
-    #httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
-    #managed_dict['port'] = httpd.server_port 
-    #httpd.serve_forever()
-
 
 @optional_args
 def serve_path_via_http(tfunc):
@@ -247,11 +242,6 @@ def serve_path_via_http(tfunc):
     @wraps(tfunc)
     def newfunc(*args, **kwargs):
 
-        #print '\n============================'
-        #print 'In serve_path_via_http'
-        #print args
-        #print kwargs
-        #print '============================'
         args, path = args[:-1], args[-1]
 
         # There is a problem with Haskell on wheezy trying to
@@ -263,52 +253,19 @@ def serve_path_via_http(tfunc):
         #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
         hostname = '127.0.0.1'
 
-        #manager = multiprocessing.Manager()
-        #managed_dict = manager.dict()
-        #multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
-                                             #args=(hostname, path, managed_dict))
-        #multi_proc.start()
-        #start = time.time()
-        #while True:
-            #if (time.time() - start) < 300:
-                #if managed_dict.has_key('port'):
-                    #port = managed_dict['port']
-                    #break
-            #else:
-                #raise Exception("Port never received from managed_dict")
+        queue = multiprocessing.Queue()
+        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+                                                args=(hostname, path, queue))
+        multi_proc.start()
+        port = queue.get(timeout=300)
+        url = 'http://{}:{}/'.format(hostname, port)
+        lgr.debug("HTTP: serving {} under {}".format(path, url))
 
-        print '\n****************************************'
-        print __name__
-        print '****************************************'
-        if on_windows:
-            if __name__ == '__main__':
-                queue = multiprocessing.Queue()
-                multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
-                                                     args=(hostname, path, queue))
-                multi_proc.start()
-                port = queue.get(timeout=300)
-                url = 'http://{}:{}/'.format(hostname, port)
-                lgr.debug("HTTP: serving {} under {}".format(path, url))
-
-                try:
-                    tfunc(*(args + (path, url)), **kwargs)
-                finally:
-                    lgr.debug("HTTP: stopping server")
-                    multi_proc.terminate()
-        else:
-            queue = multiprocessing.Queue()
-            multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
-                                                    args=(hostname, path, queue))
-            multi_proc.start()
-            port = queue.get(timeout=300)
-            url = 'http://{}:{}/'.format(hostname, port)
-            lgr.debug("HTTP: serving {} under {}".format(path, url))
-
-            try:
-                tfunc(*(args + (path, url)), **kwargs)
-            finally:
-                lgr.debug("HTTP: stopping server")
-                multi_proc.terminate()
+        try:
+            tfunc(*(args + (path, url)), **kwargs)
+        finally:
+            lgr.debug("HTTP: stopping server")
+            multi_proc.terminate()
 
     return newfunc
 
