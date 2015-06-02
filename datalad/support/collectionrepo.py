@@ -170,9 +170,6 @@ class CollectionRepo(GitRepo):
     ./collection/     collection-level metadata
     """
 
-    # TODO: Provide helper functions for the config files of handles and
-    # collection itself => clean code and avoid concurrency conflicts
-
     # TODO: Collection level metadata:
     #       - get/set like for handles
     #       - include statement (self.get_uri_ref(), RDF.type, DLNS.Collection)
@@ -209,10 +206,6 @@ class CollectionRepo(GitRepo):
 
         self._cfg_file = 'collection.cfg'
         self._initialize_config(name)
-
-            # For now read a list of handles' names, ids, paths and metadata
-            # as a proof of concept:
-            # self._update_handle_data()
 
     def _initialize_config(self, name=None):
         cfg_parser = SafeConfigParser()
@@ -396,14 +389,23 @@ class CollectionRepo(GitRepo):
         return HandleRepo(self.get_handles_data()[name][1])
 
     def update_meta_data_cache(self, key=None):
-        # TODO: All handles?
+        """Rewrite the collection's metadata cache.
+        """
+        files = self._get_handle_files() if key is None \
+            else [self._key2filename(key)]
 
-        cfg = SafeConfigParser()
-        cfg.read(self._key2filename(key))
-        repo = HandleRepo(cfg.get('Handle', 'last_seen'))
-        CacheHandler(opj(self.path, self._get_cfg('Metadata', 'cache_path')),
-                     URIRef(repo.path)).set(repo.get_metadata(),
-                                            self._key2filename(key))
+        for handle_file in files:
+            cfg = SafeConfigParser()
+            cfg.read(opj(self.path, handle_file))
+            handle_path = cfg.get('Handle', 'last_seen')
+
+            # update from locally available handles only:
+            if exists(handle_path):
+                repo = HandleRepo()
+                CacheHandler(opj(self.path,
+                                 self._get_cfg('Metadata', 'cache_path')),
+                             URIRef(repo.path)).set(repo.get_metadata(),
+                                                    handle_file)
 
     # ### Implementation of collection backend:
 
