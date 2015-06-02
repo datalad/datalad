@@ -28,6 +28,7 @@ from rdflib import URIRef, RDF
 from .annexrepo import AnnexRepo
 from .metadatahandler import MetadataHandler, DefaultHandler, DLNS
 from .handle import HandleBackend, Handle
+from ..utils import assure_dir
 
 lgr = logging.getLogger('datalad.handlerepo')
 
@@ -125,36 +126,35 @@ class HandleRepo(AnnexRepo):
         super(HandleRepo, self).__init__(path, url, direct=direct,
                                          runner=runner, backend=backend)
 
-        self.datalad_path = opj(self.path, '.datalad')
-        self.metadata_path = opj(self.datalad_path, 'metadata')
-        if not exists(self.datalad_path):
-            os.mkdir(self.datalad_path)
-        if not exists(self.metadata_path):
-            os.mkdir(self.metadata_path)
+        self.datalad_path = '.datalad'
+        self._cfg_file = opj(self.datalad_path, 'handle.cfg')
+
+    def _initialize_config(self, name):
+
+        assure_dir(self.path, self.datalad_path)
+        cfg_parser = SafeConfigParser()
+
+        # ignore config file, if it's not in git:
+        if self._cfg_file in self.get_indexed_files():
+            cfg_parser.read(opj(self.path, self._cfg_file))
 
         # Read configuration as far as it is available already.
         # Set defaults, wherever there's nothing available.
-        self.config_file = opj(self.datalad_path, 'handle.cfg')
-        self._cfg_parser = SafeConfigParser()
-
-        if exists(self.config_file):
-            self._cfg_parser.read(self.config_file)
-        if not self._cfg_parser.has_section('Handle'):
-            self._cfg_parser.add_section('Handle')
+        if not cfg_parser.has_section('Handle'):
+            cfg_parser.add_section('Handle')
         # By now, the datalad id is the uuid of the original annex that handle
         # was created from. Since that config file is added to git, the id is
         # kept, whenever the repository is cloned.
         # Note: Not sure yet, whether this is needed at all.
-        if not self._cfg_parser.has_option('Handle', 'id'):
-            self._cfg_parser.set('Handle', 'id',
-                                 self.repo.config_reader().get_value("annex",
-                                                                     "uuid"))
+        if not cfg_parser.has_option('Handle', 'id'):
+            cfg_parser.set('Handle', 'id',
+                           self.repo.config_reader().get_value("annex", "uuid"))
         # Constructors parameter 'name' has priority to be used with this
         # instance as well as to be used as default name, if there is no
         # default name in config file already. If nothing is available at all,
         # the repository's name in the filesystem is used as default.
-        if not self._cfg_parser.has_option('Handle', 'name'):
-            self._cfg_parser.set('Handle', 'name', name or basename(self.path))
+        if not cfg_parser.has_option('Handle', 'name'):
+            cfg_parser.set('Handle', 'name', name or basename(self.path))
 
         # By now, we distinguish between metadata explicitly supported by
         # datalad (option 'standard') in order to ease queries, and additional,
@@ -163,13 +163,34 @@ class HandleRepo(AnnexRepo):
         # TODO: As soon as we are sure about this, have better documentation.
         # Note: This comment is outdated but kept as a reminder. To be replaced.
 
-        if not self._cfg_parser.has_section('Metadata'):
-            self._cfg_parser.add_section('Metadata')
-        if not self._cfg_parser.has_option('Metadata', 'handler'):
-            self._cfg_parser.set('Metadata', 'handler',
-                                 'DefaultHandler')
+        if not cfg_parser.has_section('Metadata'):
+            cfg_parser.add_section('Metadata')
+        if not cfg_parser.has_option('Metadata', 'handler'):
+            cfg_parser.set('Metadata', 'handler', 'DefaultHandler')
+        if not cfg_parser.has_option('Metadata', 'path'):
+            cfg_parser.set('Metadata', 'path', 'metadata')
+        assure_dir(self.path, cfg_parser.get('Metadata', 'path'))
 
-        self.save_config()
+        with open(opj(self.path, self._cfg_file), 'w') as f:
+            cfg_parser.write(f)
+        self.git_add(self._cfg_file)
+        self.git_commit("Initialized config file.")
+
+    def _get_cfg(self, section, option):
+        parser = SafeConfigParser()
+        parser.read(opj(self.path, self._cfg_file))
+        return parser.get(section, option)
+
+    def _set_cfg(self, section, option, value):
+        filename = opj(self.path, self._cfg_file)
+        parser = SafeConfigParser()
+        parser.read(filename)
+        parser.set(section, option, value)
+        with open(filename, 'w') as f:
+            parser.write(f)
+        self.git_add(self._cfg_file)
+        self.git_commit("Updated config file.")
+
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
@@ -180,20 +201,16 @@ class HandleRepo(AnnexRepo):
         this class, 'equal' means, that the both of them are representing the
         very same repository.
         """
+        # TODO: Move this to GitRepo, since it is true for all the repositories
         return self.path == obj.path
 
     def get_name(self):
-        return self._cfg_parser.get('Handle', 'name')
+        return self._get_cfg('Handle', 'name')
 
     def set_name(self, name):
-        self._cfg_parser.set('Handle', 'name', name)
+        self._set_cfg('Handle', 'name', name)
 
     name = property(get_name, set_name)
-
-    def save_config(self):
-        with open(self.config_file, 'w') as f:
-            self._cfg_parser.write(f)
-        self.add_to_git(self.config_file, "Update config file.")
 
     @property
     def datalad_id(self):
@@ -205,7 +222,7 @@ class HandleRepo(AnnexRepo):
         -------
         str
         """
-        return self._cfg_parser.get('Handle', 'id')
+        return self._get_cfg('Handle', 'id')
 
     def set_metadata_handler(self, handler=DefaultHandler):
         """
@@ -215,7 +232,7 @@ class HandleRepo(AnnexRepo):
         if not issubclass(handler, MetadataHandler):
             raise TypeError("%s is not a MetadataHandler." % type(handler))
 
-        self._cfg_parser.set('Metadata', 'handler', handler.__name__)
+        self._set_cfg('Metadata', 'handler', handler.__name__)
 
     def get(self, files):
         """get the actual content of files
@@ -278,21 +295,21 @@ class HandleRepo(AnnexRepo):
         --------
         rdflib.Graph
         """
-        name = self._cfg_parser.get('Metadata', 'handler')
+        name = self._get_cfg('Metadata', 'handler')
         self_node = URIRef(self.path)
         import datalad.support.metadatahandler as mdh
         try:
-            handler = getattr(mdh, name)(self.metadata_path, self_node)
+            handler = getattr(mdh, name)(opj(self.path,
+                                             self._get_cfg('Metadata', 'path')),
+                                         self_node)
         except AttributeError:
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
-
 
         meta = handler.get_graph(identifier=self.name)
 
         # Add datalad statement:
         meta.add((self_node, RDF.type, DLNS.Handle))
-
         return meta
 
     def set_metadata(self, meta):
@@ -302,16 +319,18 @@ class HandleRepo(AnnexRepo):
         -----------
         meta: rdflib.Graph
         """
-        name = self._cfg_parser.get('Metadata', 'handler')
+        name = self._get_cfg('Metadata', 'handler')
         import datalad.support.metadatahandler as mdh
         try:
-            handler = getattr(mdh, name)(self.metadata_path)
+            handler = getattr(mdh, name)(opj(self.path,
+                                             self._get_cfg('Metadata', 'path')))
         except AttributeError:
             lgr.error("'%s' is an unknown metadata handler." % name)
             raise ValueError("'%s' is an unknown metadata handler." % name)
 
         handler.set(meta)
-        self.add_to_git(opj(self.metadata_path, '*'), "Metadata updated.")
+        self.add_to_git(opj(self._get_cfg('Metadata', 'path'), '*'),
+                        "Metadata updated.")
 
     def get_handle(self, branch=None):
         """Convenience method to create a `Handle` instance.
