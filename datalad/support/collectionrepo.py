@@ -273,6 +273,20 @@ class CollectionRepo(GitRepo):
 
     name = property(get_name, set_name)
 
+    def _get_handle_files(self, branch=None):
+        """Get a list of the handle files in `branch`
+        """
+        return [ops(f)[1] for f in self.git_get_files(branch)
+                if ops(f)[0] == '' and ops(f)[1] != self._cfg_file]
+
+    def get_handle_list(self, branch=None):
+        """Get a list of the names of the handles in `branch`
+
+        If `branch` is not provided, the active one is used.
+        """
+        return [self._filename2key(f, branch)
+                for f in self._get_handle_files(branch)]
+
     def set_metadata_handler(self, handler=DefaultHandler):
         """Set the handler for collection-level metadata
         """
@@ -381,7 +395,7 @@ class CollectionRepo(GitRepo):
         # To be changed when ConfigParser helper functions are implemented
         return HandleRepo(self.get_handles_data()[name][1])
 
-    def update_meta_data_cache(self, key):
+    def update_meta_data_cache(self, key=None):
         # TODO: All handles?
 
         cfg = SafeConfigParser()
@@ -427,11 +441,9 @@ class CollectionRepo(GitRepo):
             branch = self.git_get_active_branch()
 
         # load handles from branch
-        for filename in self.git_get_files(branch):
-            if filename != self._cfg_file:
-                out[self._filename2key(filename)] = \
-                    Handle(src=CollectionRepoBranchHandleBackend(
-                        self, branch, self._filename2key(filename, branch)))
+        for key in self.get_handle_list(branch):
+            out[key] = Handle(src=CollectionRepoBranchHandleBackend(
+                self, branch, key))
         return out
 
     def commit_collection(self, collection, branch=None,
