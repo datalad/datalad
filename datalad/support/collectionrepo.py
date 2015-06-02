@@ -22,6 +22,7 @@ from .handle import Handle, HandleBackend
 from .exceptions import CollectionBrokenError
 from .collection import Collection, CollectionBackend
 from .metadatahandler import MetadataHandler, DefaultHandler, CacheHandler
+from ..utils import assure_dir
 
 lgr = logging.getLogger('datalad.collectionrepo')
 
@@ -222,25 +223,17 @@ class CollectionRepo(GitRepo):
             self._cfg_parser.set('Collection', 'name',
                                  name or basename(self.path))
         if not self._cfg_parser.has_option('Collection', 'cache_path'):
-            self._cfg_parser.set('Collection', 'cache_path',
-                                 opj(self.path, 'metadatacache'))
+            self._cfg_parser.set('Collection', 'cache_path', 'metadatacache')
         # make sure configured dir exists:
-        if not exists(opj(self.path,
-                          self._cfg_parser.get('Collection', 'cache_path'))):
-            os.mkdir(opj(self.path,
-                         self._cfg_parser.get('Collection', 'cache_path')))
+        assure_dir(self.path, self._cfg_parser.get('Collection', 'cache_path'))
 
         # collection-level metadata:
         if not self._cfg_parser.has_section('Metadata'):
             self._cfg_parser.add_section('Metadata')
         if not self._cfg_parser.has_option('Metadata', 'path'):
-            self._cfg_parser.set('Metadata', 'path',
-                                 opj(self.path, 'collection'))
+            self._cfg_parser.set('Metadata', 'path', 'collection')
         # make sure configured dir exists:
-        if not exists(opj(self.path,
-                          self._cfg_parser.get('Metadata', 'path'))):
-            os.mkdir(opj(self.path,
-                         self._cfg_parser.get('Metadata', 'path')))
+        assure_dir(self.path, self._cfg_parser.get('Metadata', 'path'))
 
         if not self._cfg_parser.has_option('Metadata', 'handler'):
             self._cfg_parser.set('Metadata', 'handler',
@@ -350,7 +343,7 @@ class CollectionRepo(GitRepo):
             cfg.write(f)
 
         # metadata cache:
-        handler = CacheHandler(cache_path, URIRef(handle.path))
+        handler = CacheHandler(opj(self.path, cache_path), URIRef(handle.path))
         handler.set(handle.get_metadata(), filename)
 
         self.git_add([opj(cache_path, filename), filename])
@@ -380,7 +373,7 @@ class CollectionRepo(GitRepo):
         cfg = SafeConfigParser()
         cfg.read(self._key2filename(key))
         repo = HandleRepo(cfg.get('Handle', 'last_seen'))
-        CacheHandler(self._cfg_parser.get('Metadata', 'cache_path'),
+        CacheHandler(opj(self.path, self._cfg_parser.get('Metadata', 'cache_path')),
                      URIRef(repo.path)).set(repo.get_metadata(),
                                             self._key2filename(key))
 
@@ -401,7 +394,7 @@ class CollectionRepo(GitRepo):
         # Note: Same counts for handle backend
         path = self._cfg_parser.get('Metadata', 'path')
         filename = 'metadata.rdf'
-        handler = self.get_metadata_handler()(path, URIRef(self.path))
+        handler = self.get_metadata_handler()(opj(self.path, path), URIRef(self.path))
         out['meta'] = handler.get_graph(identifier=out['name'],
                                         data=self.git_get_file_content(
                                             opj(path, filename), branch))
@@ -470,19 +463,19 @@ class CollectionRepo(GitRepo):
             files_to_add.append(self._key2filename(k))
 
             # write metadata cache:
-            CacheHandler(
-                self._cfg_parser.get('Collection', 'cache_path'), URIRef(v.url)).set(
-                v.meta, self._key2filename(k)
-            )
-            files_to_add.append(opj(self._cfg_parser.get('Collection', 'cache_path'),
+            CacheHandler(opj(self.path,
+                             self._cfg_parser.get('Collection', 'cache_path')),
+                         URIRef(v.url)).set(v.meta, self._key2filename(k))
+            files_to_add.append(opj(self._cfg_parser.get('Collection',
+                                                         'cache_path'),
                                     self._key2filename(k)))
 
         # write collection files:
-        CacheHandler(
-            self._cfg_parser.get('Collection', 'cache_path'), URIRef(self.path)).set(
-            collection.meta, 'collection'
-        )
-        files_to_add.append(opj(self._cfg_parser.get('Collection', 'cache_path'),
+        CacheHandler(opj(self.path,
+                         self._cfg_parser.get('Collection', 'cache_path')),
+                     URIRef(self.path)).set(collection.meta, 'collection')
+        files_to_add.append(opj(self._cfg_parser.get('Collection',
+                                                     'cache_path'),
                                 'collection'))
         self.git_add(files_to_add)
         self.git_commit(msg)
