@@ -5,3 +5,4 @@ joblib
 testtools
 mock
 nose>=1.3.4
+rdflib
