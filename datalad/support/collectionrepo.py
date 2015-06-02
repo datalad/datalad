@@ -377,16 +377,35 @@ class CollectionRepo(GitRepo):
         self.git_remove([opj(cache_path, filename), filename])
         self.git_commit("Removed handle %s." % key)
 
-    def get_handle_repos(self):
-        # TODO: doesn't work anymore.
-        # To be changed when ConfigParser helper functions are implemented
-        handles_data = self.get_handles_data()
-        return [HandleRepo(handles_data[x][1]) for x in handles_data]
+    def get_handle_repos(self, branch=None):
+        """Get a list of HandleRepo instances.
 
-    def get_handle_repo(self, name):
-        # TODO: doesn't work anymore.
-        # To be changed when ConfigParser helper functions are implemented
-        return HandleRepo(self.get_handles_data()[name][1])
+        Returns a list containing HandleRepo instances representing locally
+        available handle repositories, that are part of the collection
+        in `branch`. If no branch is given, the active branch is used.
+        """
+        repo_list = []
+        for handle in self._get_handle_files(branch):
+            parser = SafeConfigParser()
+            parser.read(opj(self.path, handle))
+            path = parser.get('Handle', 'last_seen')
+            if exists(path):
+                repo_list.append(HandleRepo(path))
+        return repo_list
+
+    def get_handle_repo(self, key):
+        """Get a HandleRepo instance for handle `key`.
+
+        If the handle isn't locally available, returns None.
+        """
+        # TODO: branch-option?
+        parser = SafeConfigParser()
+        parser.read(opj(self.path, self._key2filename(key)))
+        path = parser.get('Handle', 'last_seen')
+        if exists(path):
+            return HandleRepo(path)
+        else:
+            return None
 
     def update_meta_data_cache(self, key=None):
         """Rewrite the collection's metadata cache.
