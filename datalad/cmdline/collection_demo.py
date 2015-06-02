@@ -92,6 +92,10 @@ def query_local_collection(sparql_str):
 
     # let's look only within a certain collection 'foo':
     result = universe['foo'].store.query(sparql_str)
+    # But if this is the only query to perform, we don't need to build the
+    # graphs of the entire universe:
+    result = Collection(src=master_repo.get_backend_from_branch(
+        'foo')).store.query(sparql_str)
 
     # or let's say we have a list of collection names and want to look only
     # within these collections:
