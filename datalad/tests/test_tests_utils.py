@@ -29,8 +29,6 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
-from test_main import tree1args, tree2args
-
 
 
 #
@@ -280,8 +278,8 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 @with_tempfile(mkdir=True)
 def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
 
-    test_fpath_full = os.path.join(tmp_dir, test_fpath)
-    test_fpath_dir = os.path.dirname(test_fpath_full)
+    test_fpath_full = unicode(os.path.join(tmp_dir, test_fpath))
+    test_fpath_dir = unicode(os.path.dirname(test_fpath_full))
 
     if not os.path.exists(test_fpath_dir):
         os.makedirs(test_fpath_dir)
