@@ -235,14 +235,22 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
 
 
 @optional_args
-def serve_path_via_http(tfunc):
+def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
     """
     
     @wraps(tfunc)
     def newfunc(*args, **kwargs):
 
-        args, path = args[:-1], args[-1]
+        if targs:
+            # if a path is passed into serve_path_via_http, then it's in targs
+            assert len(targs) == 1
+            path = targs[0] 
+
+        elif len(args) > 1:
+            args, path = args[:-1], args[-1]
+        else:
+            args, path = (), args[0]
 
         # There is a problem with Haskell on wheezy trying to
         # fetch via IPv6 whenever there is a ::1 localhost entry in
