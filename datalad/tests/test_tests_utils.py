@@ -281,9 +281,13 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
     # First verify that filesystem layer can encode this filename
     # verify first that we could encode file name in this environment
     try:
-        _ = test_fpath.encode(sys.getfilesystemencoding())
+        filesysencoding = sys.getfilesystemencoding()
+        test_fpath_encoded = test_fpath.encode(filesysencoding)
     except UnicodeEncodeError:
         raise SkipTest("Environment doesn't support unicode filenames")
+    if test_fpath_encoded.decode(filesysencoding) != test_fpath:
+        raise SkipTest("Can't convert back/forth using %s encoding"
+                       % filesysencoding)
 
     test_fpath_full = unicode(os.path.join(tmp_dir, test_fpath))
     test_fpath_dir = unicode(os.path.dirname(test_fpath_full))
@@ -294,12 +298,12 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
     with open(test_fpath_full, 'w') as f:
         test_txt = 'some txt and a randint {}'.format(random.randint(1, 10)) 
         f.write(test_txt)
-    
+
 
     @serve_path_via_http(tmp_dir)
     def test_path_and_url(path, url):
 
-        url += os.path.dirname(test_fpath)
+        url = url + os.path.dirname(test_fpath)
         assert_true(urlopen(url))
         u = urlopen(url)
         assert_true(u.getcode() == 200)
@@ -308,7 +312,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
 
-        url = os.path.join(url, href_links[0])
+        url = "{}/{}".format(url, href_links[0])
         u = urlopen(url)
         html = u.read()
         assert(test_txt == html)
