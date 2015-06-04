@@ -278,6 +278,13 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 @with_tempfile(mkdir=True)
 def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
 
+    # First verify that filesystem layer can encode this filename
+    # verify first that we could encode file name in this environment
+    try:
+        _ = test_fpath.encode(sys.getfilesystemencoding())
+    except UnicodeEncodeError:
+        raise SkipTest("Environment doesn't support unicode filenames")
+
     test_fpath_full = unicode(os.path.join(tmp_dir, test_fpath))
     test_fpath_dir = unicode(os.path.dirname(test_fpath_full))
 
