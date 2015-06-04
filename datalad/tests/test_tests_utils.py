@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -11,18 +11,22 @@ import platform
 import sys
 import logging
 import os
+import random
 
+from urllib2 import urlopen, unquote
 from os.path import exists, join as opj, basename
 from glob import glob
 from mock import patch
-from nose.tools import assert_in, assert_not_in
+from nose.tools import assert_in, assert_not_in, assert_true
 from nose import SkipTest
+
+from bs4 import BeautifulSoup as BS
 
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
     rmtemp, OBSCURE_FILENAMES, get_most_obscure_supported_name, \
     swallow_outputs, swallow_logs, \
-    on_windows, assert_raises, assert_cwd_unchanged, \
+    on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
 
@@ -215,7 +219,6 @@ def test_nok_startswith():
 
 
 def test_assert_cwd_unchanged():
-
     orig_dir = os.getcwd()
 
     @assert_cwd_unchanged
@@ -270,3 +273,51 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         eq_(orig_dir, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
         assert_not_in("Mitigating and changing back", cml.out)
+
+
+@with_tempfile(mkdir=True)
+def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
+
+    test_fpath_full = unicode(os.path.join(tmp_dir, test_fpath))
+    test_fpath_dir = unicode(os.path.dirname(test_fpath_full))
+
+    if not os.path.exists(test_fpath_dir):
+        os.makedirs(test_fpath_dir)
+
+    with open(test_fpath_full, 'w') as f:
+        test_txt = 'some txt and a randint {}'.format(random.randint(1, 10)) 
+        f.write(test_txt)
+    
+
+    @serve_path_via_http(tmp_dir)
+    def test_path_and_url(path, url):
+
+        url += os.path.dirname(test_fpath)
+        assert_true(urlopen(url))
+        u = urlopen(url)
+        assert_true(u.getcode() == 200)
+        html = u.read()
+        soup = BS(html)
+        href_links = [txt.get('href') for txt in soup.find_all('a')]
+        assert_true(len(href_links) == 1)
+
+        url = os.path.join(url, href_links[0])
+        u = urlopen(url)
+        html = u.read()
+        assert(test_txt == html)
+
+    test_path_and_url()
+
+
+def test_serve_path_via_http():
+    for test_fpath in ['test1.txt',
+                       'test_dir/test2.txt',
+                       'test_dir/d2/d3/test3.txt',
+                       'file with space test4',
+                       u'Джэйсон',
+                       get_most_obscure_supported_name(),
+                      ]:
+
+        yield _test_serve_path_via_http, test_fpath
+
+

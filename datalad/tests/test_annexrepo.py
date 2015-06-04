@@ -326,7 +326,7 @@ tree1args = dict(
         ('secondfile', 'something else'),
         ('remotefile', 'pretends to be remote'),
         ('faraway', 'incredibly remote')),
-    dir=os.curdir)
+)
 
 
 @with_tree(**tree1args)
