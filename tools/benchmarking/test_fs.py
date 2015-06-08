@@ -203,16 +203,16 @@ class MD(object):
             wipe_drives(self.drives)
 
 
-class Ext4(FS):
+class BaseFS(FS):
     def __init__(self, drives, mountpoint, options=[]):
-        super(Ext4, self).__init__(drives, mountpoint)
+        super(BaseFS, self).__init__(drives, mountpoint)
         self.options = options
 
     def __str__(self):
         options_str = "_".join(sorted([x.replace(' ', '') for x in self.options]))
         if options_str:
             options_str = "_" + options_str
-        return "EXT4_%s%s" % (self.drives[0], options_str)
+        return "%s_%s%s" % (self.__class__.__name__, self.drives[0], options_str)
 
     def create(self):
         drives = self.drives
@@ -222,7 +222,34 @@ class Ext4(FS):
             # so we were given the MD, let's create it as well
             drive = drive.create()
         self.umount()  # just to make sure it is not mounted
-        dryrun("mkfs.ext4 -E lazy_itable_init=0,lazy_journal_init=0 %s" % drive)
+        self._create(drive)
+
+    def _create(self):
+        raise NotImplementedError
+
+
+class EXT4(BaseFS):
+    def _create(self, drive):
+        dryrun("mkfs.ext4 -E lazy_itable_init=0,lazy_journal_init=0 %s %s" %
+               (' '.join(self.options), drive))
+        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+
+class XFS(BaseFS):
+    def _create(self, drive):
+        dryrun("mkfs.xfs -f %s %s" %
+               (' '.join(self.options), drive))
+        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+
+class BTRFS(BaseFS):
+    def _create(self, drive):
+        dryrun("mkfs.btrfs -f %s %s" %
+               (' '.join(self.options), drive))
+        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+
+class ReiserFS(BaseFS):
+    def _create(self, drive):
+        dryrun("mkfs.reiserfs -f -f %s %s" %
+               (' '.join(self.options), drive))
         dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
 
 
@@ -344,26 +371,38 @@ def parse_args(args=None):
 def main(action):
     drives = get_drives(DRIVES_PREFIX)
     mountpoint = "/mnt/test"
-    mdraid_chunksize = 512  # k -- was the ones created by mdadm by default
-    ext4_bs = 512  # k -- explored actually a range 1, 4, 128, 256, 512
-    stride_size = (mdraid_chunksize/ext4_bs)
+
+    #mdraid_chunksize = 512  # k -- was the ones created by mdadm by default
+    def mk_ext4(ext4_bs, mdraid_chunksize=512):
+        """Just a helper to generate ext4 partitions with varying bs"""
+        stride_size = (mdraid_chunksize/ext4_bs)
+        return EXT4(drives=[MD(drives, layout='raid6')],
+                    mountpoint=mountpoint,
+                    options=['-E stride=%d' % stride_size,
+                             '-E stripe_width=%d' % ((len(drives)-2)*stride_size),
+                             #'-b %d' % (ext4_bs*1024)
+                             ])
+
     if action == 'benchmark':
         for fs in [
-            # ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
-            # ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
-            #ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
-            #Ext4(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint)
-                Ext4(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint,
-                 options=['-E stride=%d' % stride_size,
-                          '-E stripe_width=%d' % ((len(drives)-2)*stride_size),
-                          '-b %d' % (ext4_bs*1024)])
-        ]:
+                # ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
+                # ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
+                #ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
+                #EXT4(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
+                #XFS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
+                #BTRFS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
+                ReiserFS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
+                ] + [
+                #mk_ext4(bs) for bs in (1, 4, 16, 128)
+                ]:
             lgr.info("Working on FS=%s with following drives: %s"
                      % (fs, " ".join(drives)))
 
             fs.create()
             # TODO: move test_descr/test case out of benchmark_fs
             test_descr, protocols = benchmark_fs(fs)
+            # TODO: record
+            #   - versions of kernel, git, git-annex
             protocols_fname = '%(test_repo)s-%(fs)s.json' % test_descr # -'.join("%s:%s.json" % (k, test_descr[k]) for k in sorted(test_descr))
             protocols_path = os.path.join('test_fs_protocols', protocols_fname)
             dryrun(save_protocols, protocols, protocols_path)
