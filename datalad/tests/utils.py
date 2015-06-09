@@ -527,8 +527,7 @@ OBSCURE_FILENAMES = (
 
 @with_tempfile(mkdir=True)
 def get_most_obscure_supported_name(tdir):
-    """Return the most obscure filename which the filesystem under TEMPDIR 
-       could support
+    """Return the most obscure filename which the filesystem would support
 
     TODO: we might want to use it as a function where we would provide tdir
     """
