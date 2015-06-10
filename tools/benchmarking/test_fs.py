@@ -149,7 +149,15 @@ class ZFS(FS):
         self.wipe(drives=drives)
 
 
-class MD(object):
+class BlockDevice(object):
+    """Class for any BlockDevice (software raid, LVM)"""
+    def create(self):
+        pass
+
+    def kill(self):
+        pass
+
+class MD(BlockDevice):
     """Just a base class for anything interested to use software raid as the base storage
     """
     # TODO:  do not build on top of entire drive, just generate about 100GB partition
@@ -199,8 +207,47 @@ class MD(object):
             dryrun("mdadm --stop /dev/md10")
         except:
             pass
+        # TODO: abstract drives away so we could kill all the nested things
         if self.drives:
             wipe_drives(self.drives)
+
+
+class LVM(BlockDevice):
+    def __init__(self, drives, vgname="vgtest", lvname="lvtest"):
+        self.drives = drives
+        self.vgname = vgname
+        self.lvname = lvname
+
+    def __str__(self):
+        return "LVM_%s" % '+'.join(map(str, self.drives))
+
+    def create(self):
+        self.kill()
+        drives = []
+        for drive in self.drives:
+            if isinstance(drive, BlockDevice):
+                # so we were given the MD, let's create it as well
+                drives.append(drive.create())
+            else:
+                drives.append(drive)
+        drives_paths = " ".join(drives)
+        dryrun("pvcreate %s" % " ".join(drives))
+        dryrun("vgcreate %s %s" % (self.vgname, drives_paths))
+        dryrun("lvcreate -l 100%%FREE -n %s %s" % (self.lvname, self.vgname))
+        self.device = "/dev/mapper/%s-%s" % (self.vgname, self.lvname)
+        return self.device
+
+    def kill(self):
+        try:
+            _ = run("lvdisplay %s/%s" % (self.vgname, self.lvname))
+            try:
+                _ = run("umount %s" % self.device)
+            except:
+                pass
+            dryrun("lvremove -f %s/%s || :" % (self.vgname, self.lvname), shell=True)
+            dryrun("vgremove %s || :" % self.vgname, shell=True)
+        except:
+            pass
 
 
 class BaseFS(FS):
@@ -218,7 +265,7 @@ class BaseFS(FS):
         drives = self.drives
         assert(len(drives) == 1)
         drive = drives[0]
-        if isinstance(drive, MD):
+        if isinstance(drive, BlockDevice):
             # so we were given the MD, let's create it as well
             drive = drive.create()
         self.umount()  # just to make sure it is not mounted
@@ -383,18 +430,27 @@ def main(action):
                              #'-b %d' % (ext4_bs*1024)
                              ])
 
+    zfs_raid6_drives = [
+                ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
+                ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
+                ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
+                ]
+    fs_md_raid6_drives = [FS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint)
+                          for FS in (EXT4, BTRFS, ReiserFS, XFS)]
+    fs_ext4_var_bs = [
+                mk_ext4(bs) for bs in (1, 4, 16, 128)
+                ]
+
+    fs_lvm_md_raid6_drives = [FS(drives=[LVM(drives=[MD(drives, layout='raid6')])],
+                                 mountpoint=mountpoint)
+                              for FS in (#EXT4,
+                                         BTRFS, ReiserFS, XFS)]
+
     if action == 'benchmark':
-        for fs in [
-                # ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
-                # ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
-                #ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
-                #EXT4(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
-                #XFS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
-                #BTRFS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
-                ReiserFS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint),
-                ] + [
-                #mk_ext4(bs) for bs in (1, 4, 16, 128)
-                ]:
+        for fs in (
+            #zfs_raid6_drives + fs_md_raid6_drives + fs_ext4_var_bs +
+            fs_lvm_md_raid6_drives
+                  ):
             lgr.info("Working on FS=%s with following drives: %s"
                      % (fs, " ".join(drives)))
 
@@ -406,6 +462,9 @@ def main(action):
             protocols_fname = '%(test_repo)s-%(fs)s.json' % test_descr # -'.join("%s:%s.json" % (k, test_descr[k]) for k in sorted(test_descr))
             protocols_path = os.path.join('test_fs_protocols', protocols_fname)
             dryrun(save_protocols, protocols, protocols_path)
+            dryrun("unmount %s" % fs.mountpoint)
+            # TODO:
+            # we should kill it altogether but now we are reusing md so we should stop there
 
     elif action == 'wipe':
         wipe_drives(drives)
