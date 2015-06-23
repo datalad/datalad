@@ -444,7 +444,8 @@ def main(action):
     fs_lvm_md_raid6_drives = [FS(drives=[LVM(drives=[MD(drives, layout='raid6')])],
                                  mountpoint=mountpoint)
                               for FS in (#EXT4,
-                                         BTRFS, ReiserFS, XFS)]
+                                         #BTRFS, 
+                                         ReiserFS, XFS)]
 
     if action == 'benchmark':
         for fs in (
@@ -462,7 +463,7 @@ def main(action):
             protocols_fname = '%(test_repo)s-%(fs)s.json' % test_descr # -'.join("%s:%s.json" % (k, test_descr[k]) for k in sorted(test_descr))
             protocols_path = os.path.join('test_fs_protocols', protocols_fname)
             dryrun(save_protocols, protocols, protocols_path)
-            dryrun("unmount %s" % fs.mountpoint)
+            dryrun("umount %s" % fs.mountpoint)
             # TODO:
             # we should kill it altogether but now we are reusing md so we should stop there
 
