@@ -156,7 +156,11 @@ class DoubleAnnexRepo(object):
             if '..' in top_url:
                 raise ValueError("Some logic would fail with relative paths in urls, "
                                  "please adjust %s" % scfg['url'])
-            urls_all = collect_urls(top_url, recurse=scfg['recurse'], hot_cache=hot_cache, cache=cache)
+            sengine = scfg.get('engine', 'html')
+            if sengine == 'html':
+                urls_all = collect_urls(top_url, recurse=scfg['recurse'], hot_cache=hot_cache, cache=cache)
+            else:
+                raise ValueError("Know nothing about %s engine")
             #import pdb; pdb.set_trace()
 
             #lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))

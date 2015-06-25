@@ -198,11 +198,14 @@ class AnnexCustomRemote(object):
                          if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
                          else None
 
+
+    # Just an obscure way to provide "Abstract attribute"
     @property
     def PREFIX(self):
         """Just a helper to guarantee that PREFIX gets assigned in derived class
         """
         raise ValueError("Each derived class should carry its own PREFIX")
+
 
     def send(self, *args):
         """Send a message to git-annex
@@ -232,6 +235,7 @@ class AnnexCustomRemote(object):
 
     def send_unsupported(self):
         self.send("UNSUPPORTED-REQUEST")
+
 
     def read(self, req=None, n=1):
         """Read a message from git-annex
