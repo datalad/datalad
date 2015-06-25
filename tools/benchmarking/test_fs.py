@@ -35,6 +35,11 @@ def get_drive_size(drive):
     with open('/sys/block/%s/size' % drive) as f:
         return int(f.read())
 
+def get_fqdrives(drives):
+    """Return list pointing to drives under /dev
+    """
+    return [("/dev/%s" % d) if not d.startswith("/dev") else d
+            for d in drives]
 
 def flush():
     dryrun("sudo sync; sudo sh -c 'echo 3 >/proc/sys/vm/drop_caches'", shell=True)
@@ -213,13 +218,17 @@ class MD(BlockDevice):
 
 
 class LVM(BlockDevice):
-    def __init__(self, drives, vgname="vgtest", lvname="lvtest"):
+    def __init__(self, drives, vgname="vgtest", lvname="lvtest", layout="linear"):
         self.drives = drives
+        # TODO: allow for RAID5/6 via LVM
+        assert(layout in ("linear", "raid6"))
+        self.layout = layout
         self.vgname = vgname
         self.lvname = lvname
 
     def __str__(self):
-        return "LVM_%s" % '+'.join(map(str, self.drives))
+        layout_str = "" if self.layout == "linear" else ("_" + self.layout)
+        return "LVM%s_%s" % (layout_str, '+'.join(map(str, self.drives)))
 
     def create(self):
         self.kill()
@@ -230,10 +239,16 @@ class LVM(BlockDevice):
                 drives.append(drive.create())
             else:
                 drives.append(drive)
-        drives_paths = " ".join(drives)
-        dryrun("pvcreate %s" % " ".join(drives))
+        drives_paths = " ".join(get_fqdrives(drives))
+        dryrun("pvcreate %s" % drives_paths)
         dryrun("vgcreate %s %s" % (self.vgname, drives_paths))
-        dryrun("lvcreate -l 100%%FREE -n %s %s" % (self.lvname, self.vgname))
+        if self.layout == "linear":
+            lvcreate_opts = ""
+        elif self.layout == "raid6":
+            lvcreate_opts = "-i%d --type raid6" % (len(self.drives) - 2)
+        else:
+            raise ValueError(self.layout)
+        dryrun("lvcreate -l 100%%FREE %s -n %s %s" % (lvcreate_opts, self.lvname, self.vgname))
         self.device = "/dev/mapper/%s-%s" % (self.vgname, self.lvname)
         return self.device
 
@@ -251,53 +266,76 @@ class LVM(BlockDevice):
 
 
 class BaseFS(FS):
-    def __init__(self, drives, mountpoint, options=[]):
+    def __init__(self, drives, mountpoint, options=[], mount_options=[]):
         super(BaseFS, self).__init__(drives, mountpoint)
         self.options = options
+        self.mount_options = mount_options
 
     def __str__(self):
         options_str = "_".join(sorted([x.replace(' ', '') for x in self.options]))
         if options_str:
             options_str = "_" + options_str
-        return "%s_%s%s" % (self.__class__.__name__, self.drives[0], options_str)
+        return "%s_%s%s%s" % (self.__class__.__name__, self.drives[0], options_str,
+                              self.get_mount_options_str('_'))
+
+    def get_mount_options_str(self, prefix):
+        mount_options_str = ",".join(sorted([x.replace(' ', '') for x in self.mount_options]))
+        if mount_options_str:
+            mount_options_str = prefix + mount_options_str
+        return mount_options_str
 
     def create(self):
-        drives = self.drives
-        assert(len(drives) == 1)
-        drive = drives[0]
-        if isinstance(drive, BlockDevice):
-            # so we were given the MD, let's create it as well
-            drive = drive.create()
         self.umount()  # just to make sure it is not mounted
-        self._create(drive)
+        drives = []
+        for drive in self.drives:
+            if isinstance(drive, BlockDevice):
+                # so we were given the MD, let's create it as well
+                drive = drive.create()
+            drives.append(drive)
+        if len(drives) == 1:
+            self._create(drives[0])
+        elif len(drives) > 1:
+            self._create(drives)
+        else:
+            raise ValueError("need at least 1 drive")
 
     def _create(self):
         raise NotImplementedError
+
+    def _mount(self, drive):
+        dryrun("mount -o relatime%s %s %s"
+               % (self.get_mount_options_str(','), drive, self.mountpoint))
+
 
 
 class EXT4(BaseFS):
     def _create(self, drive):
         dryrun("mkfs.ext4 -E lazy_itable_init=0,lazy_journal_init=0 %s %s" %
                (' '.join(self.options), drive))
-        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+        self._mount(drive)
 
 class XFS(BaseFS):
     def _create(self, drive):
         dryrun("mkfs.xfs -f %s %s" %
                (' '.join(self.options), drive))
-        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+        self._mount(drive)
 
 class BTRFS(BaseFS):
-    def _create(self, drive):
+    def _create(self, drives):
+        # quick ugly for now
+        if not isinstance(drives, list):
+            drives = [ drives ]
+        drives = get_fqdrives(drives)
+        drives_str = " ".join(drives)
         dryrun("mkfs.btrfs -f %s %s" %
-               (' '.join(self.options), drive))
-        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+               (' '.join(self.options), drives_str))
+        self._mount(drives[0])
 
 class ReiserFS(BaseFS):
     def _create(self, drive):
         dryrun("mkfs.reiserfs -f -f %s %s" %
                (' '.join(self.options), drive))
-        dryrun("mount -o relatime %s %s" % (drive, self.mountpoint))
+        self._mount(drive)
 
 
 def make_test_repo(d, nfiles=100, ndirs=1, git_options=[], annex_options=[]):
@@ -328,17 +366,21 @@ class BMRunner(Runner):
         super(BMRunner, self).__init__(*args, **kwargs)
         self.protocol = []
 
-    def __call__(self, cmd, name=None, run_warm=True, **kwargs):
+    def __call__(self, cmd, name=None, run_warm=True, args=[], **kwargs):
         if name is None:
             name = str(cmd)
         flush()
         wait_till_low_load()
         time0 = time.time()
-        dryrun(cmd, cwd=self.cwd, **kwargs)
+        kwargs_ = kwargs.copy()
+        # TODO: ad-hoc/ugly for now
+        if not cmd is make_test_repo:
+            kwargs_['cwd'] = self.cwd
+        dryrun(cmd, *args, **kwargs_)
         dt = time.time() - time0
         if run_warm:
             time0 = time.time()
-            dryrun(cmd, cwd=self.cwd, **kwargs)
+            dryrun(cmd, *args, **kwargs_)
             dt_warm = time.time() - time0
         else:
             dt_warm = -10
@@ -348,21 +390,27 @@ class BMRunner(Runner):
             'cold': dt,
             'warm': dt_warm
         })
+        # TODO: I guess we could run some bonnie++ on it as well since we have got
+        # so far already
 
-def run_tests_ondir(testpath):
-    wait_till_low_load(0.1)
+def run_tests_ondir(testpath, nfiles, ndirs):
+    wait_till_low_load(0.4)
     testdir = os.path.basename(testpath)
     bmrun = BMRunner(cwd=os.path.dirname(testpath), protocol=dryrun.protocol)
+    bmrun(make_test_repo, args=[testpath], run_warm=False, nfiles=nfiles, ndirs=ndirs)
     bmrun("du -scm " + testdir)
     bmrun("tar -cf %s.tar %s" % (testdir, testdir), expect_stderr=True)
     bmrun("pigz %s.tar" % (testdir), run_warm=False)
-    if os.path.exists(os.path.join(testpath, ".git/annex/objects")):
-        bmrun("chmod +w -R %s/.git/annex/objects" % testdir)
     if os.path.exists(os.path.join(testpath, ".git")):
         bmrun("git clone %s %s.clone" % (testdir, testdir), run_warm=False, expect_stderr=True)
         bmrun("cd %s.clone; git annex get . " % testdir, run_warm=False)
         bmrun("cd %s.clone; git annex drop . " % testdir, run_warm=False)
         bmrun("du -scm %s.clone" % testdir)
+    if os.path.exists(os.path.join(testpath, ".git/annex/objects")):
+        bmrun("cd %s; git annex direct" % testdir)
+        bmrun("du  -scm " + testdir)
+        bmrun("cd %s; git annex indirect" % testdir)
+        bmrun("chmod +w -R %s/.git/annex/objects" % testdir)
     bmrun("rm -rf %s" % testdir, run_warm=False)
     bmrun("rm -rf %s.clone" % testdir, run_warm=False)
     bmrun("tar -xzf %s.tar.gz" % testdir, run_warm=False)
@@ -379,10 +427,11 @@ def benchmark_fs(fs):
     TODO: parametrize the test_repo
     """
     nfiles = 10; ndirs = 2; nruns = 1
-    nfiles = 100; ndirs=20; nruns = 100
+    #nfiles = 100; ndirs = 20; nruns = 100
+    nfiles = 1000; ndirs = 100; nruns = 10
     test_descr = {
         "fs": str(fs),
-        "test_repo": "simpleannex_ndirs=%d_nfiles=%d" % (ndirs, nfiles)
+        "test_repo": "simpleannex-big_ndirs=%d_nfiles=%d" % (ndirs, nfiles)
     }
 
     # make a list of protocols which will be self sufficient dictionaries, so
@@ -392,10 +441,10 @@ def benchmark_fs(fs):
         testdir = "test%d" % d
         testpath = os.path.join(fs.mountpoint, testdir)
 
-        dryrun(make_test_repo, testpath, nfiles=nfiles, ndirs=ndirs)
+        #dryrun(make_test_repo, testpath, nfiles=nfiles, ndirs=ndirs)
 
         protocol = {
-            'times': run_tests_ondir(testpath),
+            'times': run_tests_ondir(testpath, nfiles=nfiles, ndirs=ndirs),
             'run': d
         }
         protocol.update(test_descr)
@@ -411,11 +460,14 @@ def parse_args(args=None):
                         help='Action to perform')
     parser.add_argument('-n', '--dry-run', action='store_true',
                         help='Perform dry run')
+    parser.add_argument('--assume-created', action='store_true',
+                        help='Assume that FS was created and mounted (e.g. manually outside)')
+
     # Parse command line options
     return parser.parse_args(args)
 
 
-def main(action):
+def main(action, assume_created=False):
     drives = get_drives(DRIVES_PREFIX)
     mountpoint = "/mnt/test"
 
@@ -430,32 +482,44 @@ def main(action):
                              #'-b %d' % (ext4_bs*1024)
                              ])
 
-    zfs_raid6_drives = [
-                ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
-                ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
-                ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
-                ]
-    fs_md_raid6_drives = [FS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint)
-                          for FS in (EXT4, BTRFS, ReiserFS, XFS)]
-    fs_ext4_var_bs = [
-                mk_ext4(bs) for bs in (1, 4, 16, 128)
-                ]
-
-    fs_lvm_md_raid6_drives = [FS(drives=[LVM(drives=[MD(drives, layout='raid6')])],
-                                 mountpoint=mountpoint)
-                              for FS in (#EXT4,
-                                         #BTRFS, 
-                                         ReiserFS, XFS)]
-
     if action == 'benchmark':
+        zfs_raid6_drives = [
+                    ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
+                    ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
+                    ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
+                    ]
+        fs_md_raid6_drives = [FS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint)
+                              for FS in (EXT4, BTRFS, ReiserFS, XFS)]
+        fs_ext4_var_bs = [
+                    mk_ext4(bs) for bs in (1, 4, 16, 128)
+                    ]
+
+        fs_lvm_md_raid6_drives = [FS(drives=[LVM(drives=[MD(drives, layout='raid6')])],
+                                     mountpoint=mountpoint)
+                                  for FS in (#EXT4,
+                                             #BTRFS,
+                                             ReiserFS, XFS)]
+
+        fs_lvm_raid6_drives = [FS(drives=[LVM(drives=drives, layout='raid6')],
+                                     mountpoint=mountpoint)
+                               for FS in (BTRFS, ReiserFS)]
+        fs_btrfs_raid6_drives = [#BTRFS(drives=drives, options=["-m raid6"], mountpoint=mountpoint),
+                                 BTRFS(drives=drives, options=["-m raid6"], mount_options=["compress=lzo"], mountpoint=mountpoint),
+                                 ]
+
         for fs in (
             #zfs_raid6_drives + fs_md_raid6_drives + fs_ext4_var_bs +
-            fs_lvm_md_raid6_drives
+            #fs_lvm_md_raid6_drives
+            #FAILED TO OPERATE CORRECT  fs_lvm_raid6_drives # while trying to "lvcreate -l 100%FREE -i4 --type raid6 -n lvtest vgtest"  I am getting "device-mapper: reload ioctl on  failed: Device or resource busy"  why is that? (debian jessie with 3.16.0-4-amd64)
+            fs_btrfs_raid6_drives
                   ):
             lgr.info("Working on FS=%s with following drives: %s"
                      % (fs, " ".join(drives)))
 
-            fs.create()
+            if not assume_created:
+                fs.create()
+            else:
+                lgr.info("Not creating FS since asked not to")
             # TODO: move test_descr/test case out of benchmark_fs
             test_descr, protocols = benchmark_fs(fs)
             # TODO: record
@@ -477,4 +541,4 @@ if __name__ == "__main__":
     args = parse_args()
     if args.dry_run:
         dryrun.protocol = DryRunProtocol()
-    main(args.action)
+    main(args.action, assume_created=args.assume_created)
