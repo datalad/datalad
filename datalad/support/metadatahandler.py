@@ -33,59 +33,56 @@ class MetadataHandler(object):
     """
     __metaclass__ = ABCMeta
 
-    def __init__(self, path, resource):
-        """
-        Parameters:
-        -----------
-        path: str
-          directory to look for metadata files in.
-        resource: rdflib.URIRef
-          the resource, the metadata is about. This is needed to have this
-          as a node (kind of a root) in the graph. Will usually be the path to
-          a repository.
-        """
-        self._path = path
-        self._res = resource
-
     @abstractmethod
-    def get_graph(self, file_=None, identifier=None, data=None):
+    def get_graph(self, uri=None, class_=None, file_=None, identifier=None,
+                  data=None):
         """Get a representation of the metadata of a resource.
 
-        This should return a rdflib.Graph containing the metadata. In case the
-        implemented format contains rdf-like data already, the handler is
-        responsible for additionally providing triples, reflecting the
-        'translation' into datalad-known triples, using datalad namespace
-        (http://www.datalad.org/terms/).
-        This namespace is already available as a rdflib.namespace `DLNS`.
+        This should return a (named) rdflib.Graph containing the metadata. This
+        graph is required to contain a certain set of statements, that are
+        defined as the "datalad handle descriptor" or
+        "datalad collection descriptor" respectively in
+        'docs/datalad-metadata.rst'.
+        The datalad namespace (http://www.datalad.org/terms/) is available as
+        a rdflib.namespace `DLNS`.
 
         Parameters:
         -----------
-        file_: str
-            optionally read a certain file instead of just looking into `path`
+        uri: rdflib.URIRef
+            the resource, the metadata is about. This is needed to have this
+            as a node (kind of a root) in the graph. Will usually be the uri of
+            a collection or handle repository.
+        class_: rdflib.term.URIRef
+            the class of the resource at `uri`, i.e. the term to be used to
+            describe this resource. For now, it's either `DLNS.Handle` or
+            `DLNS.Collection`.
+        file_: str or list of str
+            path to the file or directory containing the metadata. May also be
+            a list of files.
         identifier: str
             optionally used to create a named graph
         data: str
             optionally parse `data` instead of any file
 
-        Note: This interface may need some refining.
+        Note: Either `file_` or `data` must be provided.
         """
         pass
 
-    def set(self, meta, file_=None):
+    def set(self, meta, file_):
         """Write metadata to file.
 
         Note: By now, this doesn't need to be implemented, since the metadata
         is provided by the handle/collection publisher/maintainer in the very
         format the handler is implementing. So, changes should probably be done
-        without datalad.
+        without datalad. The only thing datalad writes metadata to, is a cache.
         This may change once we discover it's needed.
 
         Parameters:
         -----------
         meta: rdflib.Graph
-        file_: str
-            optionally write to certain file instead of default.
-            a default value has to be provided by the derived class.
+        file_: str or list of str
+            path to the file or directory containing the metadata. May also be
+            a list of files.
         """
         raise NotImplementedError
 
@@ -124,8 +121,8 @@ class JSONExampleHandler(MetadataHandler):
     See also RDFExampleHandler for comparison.
     """
 
-    def __init__(self, path, resource):
-        super(JSONExampleHandler, self).__init__(path, resource)
+    def __init__(self, uri, class_):
+        super(JSONExampleHandler, self).__init__(uri, class_)
 
     def get_graph(self, file_='metadata.json', identifier=None, data=None):
         meta = Graph(identifier=identifier)
@@ -133,7 +130,7 @@ class JSONExampleHandler(MetadataHandler):
         meta.bind('foaf', FOAF)
 
         if data is None:
-            json_dict = json.load(open(opj(self._path, file_), 'r'))
+            json_dict = json.load(open(opj(self._uri, file_), 'r'))
         else:
             json_dict = json.loads(data)
 
@@ -145,22 +142,22 @@ class JSONExampleHandler(MetadataHandler):
             meta.add((authors_node, FOAF.name, Literal(author)))
 
             # make it a author of the thing (to be queried for):
-            meta.add((self._res, DLNS.authoredBy, authors_node))
+            meta.add((self._class, DLNS.authoredBy, authors_node))
             # Note: Actually, needs to be a rdf list (first, rest)
             # Not important for now.
 
         if json_dict['comment']:
-            meta.add((self._res, DLNS.description,
+            meta.add((self._class, DLNS.description,
                       Literal(json_dict['comment'])))
         if json_dict['date']:
             date = dateutil.parser.parse(json_dict['date'])
-            meta.add((self._res, DLNS.released, Literal(date)))
+            meta.add((self._class, DLNS.released, Literal(date)))
         if json_dict['name']:
-            meta.add((self._res, DLNS.title, Literal(json_dict['name'])))
+            meta.add((self._class, DLNS.title, Literal(json_dict['name'])))
         if json_dict['release']:
-            meta.add((self._res, DLNS.version, Literal(json_dict['release'])))
+            meta.add((self._class, DLNS.version, Literal(json_dict['release'])))
         for t in json_dict['topic']:
-            meta.add((self._res, DLNS.tag, Literal(json_dict['topic'])))
+            meta.add((self._class, DLNS.tag, Literal(json_dict['topic'])))
 
         return meta
 
@@ -172,15 +169,15 @@ class RDFExampleHandler(MetadataHandler):
     'datalad descriptor' implicitly defined in `JSONExampleHandler`.
     """
 
-    def __init__(self, path, resource):
-        super(RDFExampleHandler, self).__init__(path, resource)
+    def __init__(self, uri, class_):
+        super(RDFExampleHandler, self).__init__(uri, class_)
 
     def get_graph(self, file_='metadata.rdf', identifier=None, data=None):
         meta = Graph(identifier=identifier)
 
         if data is None:
             try:
-                meta.parse(opj(self._path, file_), format="turtle")
+                meta.parse(opj(self._uri, file_), format="turtle")
             except IOError, ioe:
                 lgr.warning("Failed to read metadata file: %s" % ioe)
             except ParserError, pe:
@@ -198,7 +195,7 @@ class RDFExampleHandler(MetadataHandler):
             lgr.error("Argument is not a Graph: %s" % type(meta))
             raise TypeError("Argument is not a Graph: %s" % type(meta))
 
-        meta.serialize(opj(self._path, file_), format="turtle")
+        meta.serialize(opj(self._uri, file_), format="turtle")
 
 
 class DefaultHandler(MetadataHandler):
@@ -206,8 +203,8 @@ class DefaultHandler(MetadataHandler):
     # Handler for each; then join the graphs. Would probably need a method to
     # read a single file in the handler interface.
 
-    def __init__(self, path, resource):
-        super(DefaultHandler, self).__init__(path, resource)
+    def __init__(self, uri, class_):
+        super(DefaultHandler, self).__init__(uri, class_)
 
     def get_graph(self, file_=None, identifier=None, data=None):
         return Graph(identifier=identifier)
@@ -219,28 +216,40 @@ class DefaultHandler(MetadataHandler):
 class CacheHandler(MetadataHandler):
     """Handler to care for collection's metadata cache, managed by datalad
 
-    By now stores the cached graph just as rdf/xml. This may change, depending
-    on what turns out to be the fastest parseable format.
+    By now stores the cached graph just as a turtle-file. This may change,
+    depending on what turns out to be the fastest parseable format.
     """
     # TODO: May be to be (re-)implemented, once we decided about a
     # 'datalad descriptor'
 
-    def __init__(self, path, resource):
-        super(CacheHandler, self).__init__(path, resource)
+    def __init__(self):
+        super(CacheHandler, self).__init__()
 
-    def get_graph(self, file_=None, identifier=None, data=None):
+    def get_graph(self, uri=None, class_=None, file_=None, identifier=None,
+                  data=None):
         meta = Graph(identifier=identifier)
         if data is None:
-            meta.parse(opj(self._path, file_), format="xml")
+            meta.parse(file_, format="turtle")
         else:
-            meta.parse(data=data, format="xml")
+            meta.parse(data=data, format="turtle")
         return meta
 
     def set(self, meta, file_=None):
-        meta.serialize(opj(self._path, file_), format="xml")
+        meta.serialize(file_, format="turtle")
+
+
+class PlainTextHandler(MetadataHandler):
+
+    def __init__(self, uri, class_):
+        super(PlainTextHandler, self).__init__(uri, class_)
+
+    def get_graph(self, file_=None, identifier=None, data=None):
+        meta = Graph(identifier=identifier)
+
+        self._uri
+        self._class
+
 
 # TODO: Things probably to add:
 # class 'real' JSONHandler
-# class PlainTextHandler
 # class W3CDescriptorHandler
-# ...
