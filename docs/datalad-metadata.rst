@@ -1,8 +1,17 @@
 datalad metadata
 ================
 
-This is a documentation on how the RDF metadata datalad uses currently looks
-like. Of course, this is still open to discussion and not set in stone yet.
+This is a documentation on datalad's approach to metadata. Especially on how
+the metadata representation currently looks like.
+
+Datalad uses RDF to represent metadata. However, this kind of representation is
+required by datalad within collections only. A handle may or may not contain
+metadata, which is prepared that way. A collection's metadata about a handle
+can be imported from any location (within or not within the handle itself) and
+various metadata formats (rdf as well as non-rdf). This allows for different
+collections containing the very same handle but different metadata. It also
+means, that any git-annex repository can be a handle contained in a collection
+without the need to be touched by datalad before.
 
 handle metadata
 ---------------
@@ -29,6 +38,8 @@ datalad handle descriptor
 
 This is the set of statements currently considered to be the datalad handle
 descriptor.
+Note: There may be some minor changes or extensions soon.
+
 Used prefixes::
 
 rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
@@ -41,6 +52,7 @@ dct: <http://purl.org/dc/terms/>
 pav: <http://purl.org/pav/>
 foaf: <http://xmlns.com/foaf/0.1/>
 dlns: <http://datalad.org/terms/>
+: <>
 
 Using RDF we are talking about describing resources. The handle is a
 repository, so the resource is the path to (or the URL of) the repository.
@@ -48,25 +60,31 @@ Therefore, the first statement is to declare this resource is a datalad handle::
 
 <path/to/handle> a dlns:Handle .
 
-We also use the URI of the handle as a prefix to identify resources within the
-context of that handle, like persons that play a role described in the metadata::
+However, in case of a handle descriptor, that is stored within the handle itself,
+this cannot be done this way for various reasons. In that case we use the
+'special resource' dlns:this instead. When imported to a collection, it is
+replaced by the URI, the collection uses to point to the handle anyway.
 
-@prefix : <path/to/handle#>
+To identify resources within the context of that handle, like persons that play
+a role described in the metadata, we use an 'empty prefix'::
+
+@prefix : <>
+
+Note: This will most likely slightly change, since it doesn't behave as
+expected with rdflib.
 
 So, we can now state who created the handle. Note: We may call this the
 "author" of a handle, but this is not necessarily an author of the actual
 content of the handle::
 
-:someone a prov:Person ;
-    foaf:name "some one"^^xsd:string;
+:someone a prov:Person, foaf:Person ;
+    foaf:name "someone"^^xsd:string;
 .
 
 :datalad a prov:SoftwareAgent ;
     rdfs:label "datalad"^^xsd:string;
+    pav:version "1.0a"^^xsd:string;
 .
-
-# Note: Most likely this should be replaced by "datalad" in datalad namespace,
-# which also provides information about version for example.
 
 <path/to/handle> a dlns:Handle ;
     pav:createdBy :someone ;
@@ -117,6 +135,5 @@ content of the handle.
 collection metadata
 -------------------
 
-#todo
-#very similar ;)
-
+(TODO)
+(very similar)
