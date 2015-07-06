@@ -118,7 +118,7 @@ class ZFS(FS):
 
     def create(self):
         self.kill()
-        drives = self.drives()
+        drives = self.drives
         lgr.info("Creating GPT labels on %s" % drives)
         for drive in drives:
             dryrun("parted -s /dev/%s mklabel gpt" % drive)
@@ -303,6 +303,7 @@ class BaseFS(FS):
         raise NotImplementedError
 
     def _mount(self, drive):
+        lgr.debug("Mounting %s" % self)
         dryrun("mount -o relatime%s %s %s"
                % (self.get_mount_options_str(','), drive, self.mountpoint))
 
@@ -321,6 +322,12 @@ class XFS(BaseFS):
         self._mount(drive)
 
 class BTRFS(BaseFS):
+
+    def __str__(self):
+        ostr = BaseFS.__str__(self)
+        ostr = ostr.replace("BTRFS", "BTRFSv4")
+        return ostr
+
     def _create(self, drives):
         # quick ugly for now
         if not isinstance(drives, list):
@@ -486,32 +493,90 @@ def main(action, assume_created=False):
         zfs_raid6_drives = [
                     ZFS(mountpoint=mountpoint, drives=drives, layout='raid10'),
                     ZFS(mountpoint=mountpoint, drives=drives, layout='raid6'),
-                    ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
+                    #ZFS(mountpoint=mountpoint, drives=drives, layout='raid6', pool_options=[])
                     ]
+        """ZFS benchmarks on even raid10 showed to be too slow on our sizeable testcase
+           to carry out in full and were terminated
+
+2015-07-02 12:06:19,567 [INFO   ] Creating test repo /mnt/test/test0 with 100 dirs with 1000 files each (test_fs.py:350)
+<function make_test_repo at 0x7fbcec6b7ed8>: 1.14e+03
+du -scm test0: 2.19e+03 2.1e+03
+tar -cf test0.tar test0: 5.26e+03 4.88e+03
+pigz test0.tar: 14.9
+git clone test0 test0.clone: 94.2
+cd test0.clone; git annex get . : 8.44e+03
+cd test0.clone; git annex drop . : 1.35e+04
+du -scm test0.clone: 227 39.9
+cd test0; git annex direct: 1.44e+03 0.0251
+du  -scm test0: 3.89e+03 3.78e+03
+cd test0; git annex indirect: 1.46e+03 0.0294
+chmod +w -R test0/.git/annex/objects: 4.15e+03 4.01e+03
+rm -rf test0: 6.1e+03
+rm -rf test0.clone: 3.63e+03
+
+Compare to MD+LVM+BTRFS
+
+2015-07-01 17:40:57,773 [INFO   ] Creating test repo /mnt/test/test4 with 100 dirs with 1000 files each (test_fs.py:350)
+<function make_test_repo at 0x7f3de6240ed8>: 985
+du -scm test4: 171 2.35
+tar -cf test4.tar test4: 228 5.12
+pigz test4.tar: 4.3
+git clone test4 test4.clone: 114
+cd test4.clone; git annex get . : 823
+cd test4.clone; git annex drop . : 830
+du -scm test4.clone: 144 0.973
+cd test4; git annex direct: 153 0.0103
+du  -scm test4: 161 2.53
+cd test4; git annex indirect: 196 0.0126
+chmod +w -R test4/.git/annex/objects: 55.5 2.28
+rm -rf test4: 201
+rm -rf test4.clone: 275
+tar -xzf test4.tar.gz: 27.6
+
+        """
         fs_md_raid6_drives = [FS(drives=[MD(drives, layout='raid6')], mountpoint=mountpoint)
                               for FS in (EXT4, BTRFS, ReiserFS, XFS)]
         fs_ext4_var_bs = [
                     mk_ext4(bs) for bs in (1, 4, 16, 128)
                     ]
 
-        fs_lvm_md_raid6_drives = [FS(drives=[LVM(drives=[MD(drives, layout='raid6')])],
-                                     mountpoint=mountpoint)
-                                  for FS in (#EXT4,
-                                             #BTRFS,
-                                             ReiserFS, XFS)]
+        fs_lvm_md_raid6_drives = [FS[0](drives=[LVM(drives=[MD(drives, layout='raid6')])],
+                                     mountpoint=mountpoint, **FS[1])
+                                  for FS in (#(EXT4, {}),
+                                             #(BTRFS, {}),
+                                             (BTRFS, {'mount_options': ['compress=lzo',
+                                                                        #'compress=zlib',
+                                                                        ]}),
+                                             #(ReiserFS, {}),
+                                             #(XFS, {}),
+                                             )]
 
-        fs_lvm_raid6_drives = [FS(drives=[LVM(drives=drives, layout='raid6')],
-                                     mountpoint=mountpoint)
-                               for FS in (BTRFS, ReiserFS)]
+        fs_lvm_raid6_drives = [
+             BTRFS(drives=[LVM(drives=drives, layout='raid6')], mountpoint=mountpoint),
+             # BTRFS(drives=[LVM(drives=drives, layout='raid6')], mountpoint=mountpoint,  mount_options=["compress=lzo"]),  # didn't run
+             ReiserFS(drives=[LVM(drives=drives, layout='raid6')], mountpoint=mountpoint),
+             ]
         fs_btrfs_raid6_drives = [#BTRFS(drives=drives, options=["-m raid6"], mountpoint=mountpoint),
                                  BTRFS(drives=drives, options=["-m raid6"], mount_options=["compress=lzo"], mountpoint=mountpoint),
                                  ]
-
+        """
+        2015-06-29 09:22:29,001 [ERROR  ] Failed to run 'zpool list testtank' under '.'. Exit code=1 (cmd.py:251)
+Traceback (most recent call last):
+  File "test_fs.py", line 547, in <module>
+    main(args.action, assume_created=args.assume_created)
+  File "test_fs.py", line 523, in main
+    fs.create()
+  File "test_fs.py", line 121, in create
+    drives = self.drives()
+TypeError: 'list' object is not callable
+"""
         for fs in (
-            #zfs_raid6_drives + fs_md_raid6_drives + fs_ext4_var_bs +
-            #fs_lvm_md_raid6_drives
+            fs_lvm_md_raid6_drives
+            # zfs_raid6_drives
+            #TODO: fixup zfs_raid6_drives
+            ##  fs_md_raid6_drives + fs_ext4_var_bs +
             #FAILED TO OPERATE CORRECT  fs_lvm_raid6_drives # while trying to "lvcreate -l 100%FREE -i4 --type raid6 -n lvtest vgtest"  I am getting "device-mapper: reload ioctl on  failed: Device or resource busy"  why is that? (debian jessie with 3.16.0-4-amd64)
-            fs_btrfs_raid6_drives
+            # fs_btrfs_raid6_drives
                   ):
             lgr.info("Working on FS=%s with following drives: %s"
                      % (fs, " ".join(drives)))
