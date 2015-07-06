@@ -10,7 +10,7 @@
 """
 
 import logging
-from os.path import join as opj, isdir
+from os.path import join as opj, isdir, basename
 from os import listdir
 from abc import ABCMeta, abstractmethod
 
@@ -128,8 +128,8 @@ class MetadataImporter(object):
         Parameters:
         -----------
         files: str or list of str
-          a path to the file or directory to be imported or a list containing
-          such paths.
+          Either a path to the file or directory to be imported or a list
+          containing paths to the files.
         data: dict of list of str
           a dictionary containing the metadata to be imported. The key is
           expected to be the file name and the value its content as a list of
@@ -304,4 +304,58 @@ class PlainTextImporter(MetadataImporter):
                                          Literal(''.join(license_))))
 
 
+class CustomImporter(MetadataImporter):
+    # TODO: Better name
+    """Importer for metadata editing
 
+    This class somewhat bends the idea of an importer.
+    Its import routine can read datalad metadata only (this is what other
+    importers generate), but then allows for direct editing of the resulting
+    graphs within python. This intended to be used, when "importing" or editing
+    metadata by (may be interactive) datalad commands.
+
+    Note: For any datalad metadata file, there is a separate graph. So, this is
+    not the representation as a named graph!
+    """
+    # TODO: This needs more extensive doc, I guess. Should be done, once the
+    # documentation of file layout can be referred to.
+
+    def __init__(self, target, about_class=None, about_uri=None):
+        super(CustomImporter, self).__init__(target, about_class, about_uri)
+
+    def import_data(self, files=None, data=None):
+        """import existing metadata
+        """
+        if files is not None:
+            if not isinstance(files, list):  # single path
+                if isdir(files):
+                    files = listdir(files)
+
+            for file_ in files:
+                self._graphs[basename(file_).rstrip('.ttl')] = \
+                    Graph().parse(file_, format="turtle")
+
+        if data is not None:
+            for key in data:
+                self._graphs[basename(key).rstrip('.ttl')] = \
+                    Graph().parse(data=data[key], format="turtle")
+
+    def get_graphs(self):
+        """gets the imported data
+
+        Returns:
+        --------
+        dict of rdflib.Graph
+        """
+        return self._graphs
+
+    def set_graphs(self, graphs):
+        """sets the metadata
+
+        Parameters:
+        -----------
+        graphs: dict of rdflib.Graph
+            the keys are expected to be the filenames without ending as
+            returned by `get_graphs`.
+        """
+        self._graphs = graphs
