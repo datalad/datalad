@@ -86,6 +86,7 @@ content of the handle::
     pav:version "1.0a"^^xsd:string;
 .
 
+
 <path/to/handle> a dlns:Handle ;
     pav:createdBy :someone ;
     pav:createdWith :datalad ;

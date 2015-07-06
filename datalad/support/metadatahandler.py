@@ -10,12 +10,16 @@
 """
 
 import logging
-from os.path import join as opj
+from os.path import join as opj, isdir
+from os import listdir
 from abc import ABCMeta, abstractmethod
 
 from rdflib import Graph, Literal, Namespace, BNode, URIRef
 from rdflib.namespace import RDF, RDFS, FOAF, XSD, DCTERMS
 from rdflib.exceptions import ParserError
+
+from .handlerepo import HandleRepo
+from .collectionrepo import CollectionRepo
 
 # define needed namespaces:
 DLNS = Namespace('http://www.datalad.org/terms/')
@@ -44,7 +48,7 @@ class MetadataImporter(object):
     Note: If you are about to implement a derivation from this class, make sure
     you read datalad-metadata.rst first for a description of the
     'datalad descriptor' and the general approach to metadata in datalad.
-    Furthermore, be aware that only `import_data` lacks a default implementation.
+    Furthermore, be aware, that only `import_data` lacks a default implementation.
     """
 
     __metaclass__ = ABCMeta
@@ -80,7 +84,7 @@ class MetadataImporter(object):
         """
         self._target = target
         self._about_class = about_class
-        self._about_uri = about_uri
+        self._about_uri = URIRef(about_uri)
 
         self._graphs = dict()
         if self._about_class == 'Handle' or self._about_class == 'Collection':
@@ -103,21 +107,22 @@ class MetadataImporter(object):
         # it was stored in!
 
         if self._about_class == 'Handle':
-            self._graphs['datalad'].add((URIRef(self._about_uri),
-                                         RDF.type, DLNS.Handle))
+            self._graphs['datalad'].add((self._about_uri, RDF.type,
+                                         DLNS.Handle))
         elif self._about_class == 'Collection':
-            self._graphs['datalad'].add((URIRef(self._about_uri),
-                                         RDF.type, DLNS.Collection))
+            self._graphs['datalad'].add((self._about_uri, RDF.type,
+                                         DLNS.Collection))
 
     @abstractmethod
     def import_data(self, files=None, data=None):
         """The actual import routine
 
+        Importing means to read the data and generate a rdf-representation,
+        that can be stored by calling `store_data`.
         Has to be able to import data from files, given their paths, as well as
         just the content of the files provided as strings. The latter is
         necessary, in case the actual files are accessible via a remote of a
-        repository only.
-
+        repository only, for example.
         This means: Either `files` or `data` has to be provided by the caller.
 
         Parameters:
@@ -125,11 +130,13 @@ class MetadataImporter(object):
         files: str or list of str
           a path to the file or directory to be imported or a list containing
           such paths.
-        data: str or list of str
+        data: dict of list of str
+          a dictionary containing the metadata to be imported. The key is
+          expected to be the file name and the value its content as a list of
+          the file's lines as returned by `readlines()`.
         """
         pass
 
-    @abstractmethod
     def store_data(self, path):
         """Store the imported metadata within a given directory
 
@@ -155,3 +162,146 @@ class MetadataImporter(object):
         for key in self._graphs:
             self._graphs[key].serialize(opj(path, key + '.ttl'),
                                         format="turtle")
+
+
+class PlainTextImporter(MetadataImporter):
+    """Implements a simple plain text format
+
+    An importer to provide support for basic metadata, based on simple text
+    files. These files are:
+
+    1. Any file, starting with "LICENSE". If there is a single line only, it is
+    assumed to be an URI of the actual license. Otherwise it is treated as the
+    text containing the actual license.
+
+    2. Any file, starting with "README". This considered to be the description
+    of the handle or collection. No further parsing is taking place at all.
+
+    3. Any file, starting with "AUTHORS" or "CONTRIBUTORS".
+    These file are expected to contain one author per line. This line is
+    expected contain a name, optionally followed by an url or email address
+    within '<' and '>'. If provided, the latter is treated as the identifier
+    and therefore allows for identification across handles/collections.
+    """
+
+    def __init__(self, target, about_class=None, about_uri=None):
+        super(PlainTextImporter, self).__init__(target, about_class, about_uri)
+
+    def import_data(self, files=None, data=None):
+        """Parses the data and generates a rdf-representation
+
+
+
+        Parameters:
+        -----------
+        files: str or list of str
+          a path to the file or directory to be imported or a list containing
+          such paths.
+        data: dict of list of str
+          a dictionary containing the metadata to be imported. The key is
+          expected to be the file name and the value its content as a list of
+          the file's lines as returned by `readlines()`.
+        """
+
+        authors = None
+        readme = None
+        license_ = None
+
+        if files is not None:
+            if not isinstance(files, list):  # single path
+                if isdir(files):
+                    files = listdir(files)
+
+            for file_ in files:
+                if not isdir(file_):
+                    if file_.startswith(("AUTHORS", "CONTRIBUTORS")):
+                        with open(file_, 'r') as f:
+                            authors = f.readlines()
+                    if file_.startswith("README"):
+                        with open(file_, 'r') as f:
+                            readme = f.readlines()
+                    if file_.startswith("LICENSE"):
+                        with open(file_, 'r') as f:
+                            license_ = f.readlines()
+
+        if data is not None:
+            for key in data:
+                if key.startswith(("AUTHORS", "CONTRIBUTORS")):
+                    authors = data[key]
+                if key.startswith("README"):
+                    readme = data[key]
+                if key.startswith("LICENSE"):
+                    license_ = data[key]
+
+        # now, creating the required rdf-statements:
+
+        # if we are importing a repo's metadata into the repo itself,
+        # this handle or collection is considered to be 'created' with datalad.
+        # TODO: This behaviour is open to discussion, of course.
+        # Not entirely sure yet, whether or not this is reasonable.
+        if (self._about_class == 'Handle'
+            and isinstance(self._target, HandleRepo)) or \
+                (self._about_class == 'Handle'
+                 and isinstance(self._target, CollectionRepo)):
+
+            self._graphs['datalad'].add((self._about_uri, PAV.createdWith,
+                                         EMP.datalad))
+            self._graphs['datalad'].add((EMP.datalad, RDFS.label,
+                                         Literal("datalad")))
+            # TODO: datalad version and may be creation time
+
+        # If the metadata is about a handle, we need to add a 'data entity',
+        # that is contained in that handle. Due to the simplicity of this
+        # format, we don't know about possibly existing sub-entities.
+        # So, we are just stating: "There is something in it,
+        # and it's some kind of dataset."
+        if self._about_class == 'Handle':
+            self._graphs['datalad'].add((EMP.content, RDF.type,
+                                         DCTYPES.Dataset))
+            self._graphs['datalad'].add((self._about_uri, DCTERMS.hasPart,
+                                         EMP.content))
+
+        # authors:
+        i = 1
+        for author in authors:
+            parts = author.split()
+
+            # create author's node:
+            if parts[-1].startswith('<') and parts[-1].endswith('>'):
+                node = URIRef(parts[-1][1:-1])
+            else:
+                node = EMP.__getattribute__("author" + str(i))
+                i += 1
+
+            name = Literal(' '.join(parts[0:-1]))
+
+            self._graphs['datalad'].add((node, RDF.type, PROV.Person))
+            self._graphs['datalad'].add((node, RDF.type, FOAF.Person))
+            self._graphs['datalad'].add((node, FOAF.name, name))
+
+            # the actual 'authoring' relation:
+            self._graphs['datalad'].add((self._about_uri, PAV.createdBy, node))
+
+            # same condition as above: If this is about a handle and therefore
+            # a node 'EMP.content' was created, consider any author of the
+            # handle also an author of its content:
+            if self._about_class == 'Handle':
+                self._graphs['datalad'].add((EMP.content, PAV.createdBy, node))
+
+        # description:
+        self._graphs['datalad'].add((self._about_uri, DCTERMS.description,
+                                     ''.join(readme)))
+
+        # license:
+        if license_.__len__() == 1:
+            # file contains a single line. Treat it as URI of the license:
+            # TODO: How restrictive we want to be? Check for valid url?
+            self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
+                                         URIRef(license_[0])))
+        else:
+            # file is assumed to contain the actual license
+            self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
+                                         Literal(''.join(license_))))
+
+
+
