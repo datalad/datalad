@@ -247,7 +247,7 @@ class Runner(object):
 
             if status not in [0, None]:
                 msg = "Failed to run %r%s. Exit code=%d" \
-                    % (cmd, " under %r" % (cwd or self.cwd), status)
+                    % (cmd, " under %r" % (cwd or self.cwd or os.curdir), status)
                 (lgr.debug if expect_fail else lgr.error)(msg)
                 raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
