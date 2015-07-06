@@ -33,6 +33,11 @@ This sums up to a set of statements datalad expects to be present in the
 metadata or has to generate respectively. I'll call this set of statements the
 "datalad handle descriptor".
 
+Note: To be clear - "expects" means: If the information is available it is
+provided by using this terms. It doesn't mean that certain information
+necessarily is available, nor does it mean, that these information aren't
+provided using other terms, too.
+
 datalad handle descriptor
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
