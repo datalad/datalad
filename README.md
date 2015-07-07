@@ -5,7 +5,6 @@ a platform for harvesting data from online portals and
 exposing collected data in a readily-usable form from [Git-annex]
 repositories, while fetching data load from the original data providers.
 
-
 # Status
 
 It is currently in a "prototype" state, i.e. **a mess**.  Codebase is
