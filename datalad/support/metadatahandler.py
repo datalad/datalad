@@ -18,9 +18,6 @@ from rdflib import Graph, Literal, Namespace, BNode, URIRef
 from rdflib.namespace import RDF, RDFS, FOAF, XSD, DCTERMS
 from rdflib.exceptions import ParserError
 
-from .handlerepo import HandleRepo
-from .collectionrepo import CollectionRepo
-
 # define needed namespaces:
 DLNS = Namespace('http://www.datalad.org/terms/')
 """Namespace for datalad terms.
@@ -53,7 +50,7 @@ class MetadataImporter(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, target, about_class=None, about_uri=None):
+    def __init__(self, target_class, about_class=None, about_uri=None):
         """Constructor
 
         Note: In case the metadata to be imported is about a handle or
@@ -64,7 +61,7 @@ class MetadataImporter(object):
 
         Parameters:
         -----------
-        target_class: HandleRepo or CollectionRepo
+        target_class: str
           the type of repo, the metadata is to be imported to;
           either "Handle" or "Collection"
           Note (todo): It may become handy at some point to have no target repo
@@ -82,7 +79,7 @@ class MetadataImporter(object):
           its url, if it is known by the caller. If it is about a collection or
           handle importing metadata about itself, it uses `DLNS.this` instead.
         """
-        self._target = target
+        self._target_class = target_class
         self._about_class = about_class
         self._about_uri = URIRef(about_uri)
 
@@ -184,8 +181,9 @@ class PlainTextImporter(MetadataImporter):
     and therefore allows for identification across handles/collections.
     """
 
-    def __init__(self, target, about_class=None, about_uri=None):
-        super(PlainTextImporter, self).__init__(target, about_class, about_uri)
+    def __init__(self, target_class, about_class=None, about_uri=None):
+        super(PlainTextImporter, self).__init__(target_class, about_class,
+                                                about_uri)
 
     def import_data(self, files=None, data=None):
         """Parses the data and generates a rdf-representation
@@ -239,11 +237,7 @@ class PlainTextImporter(MetadataImporter):
         # this handle or collection is considered to be 'created' with datalad.
         # TODO: This behaviour is open to discussion, of course.
         # Not entirely sure yet, whether or not this is reasonable.
-        if (self._about_class == 'Handle'
-            and isinstance(self._target, HandleRepo)) or \
-                (self._about_class == 'Handle'
-                 and isinstance(self._target, CollectionRepo)):
-
+        if self._about_class == self._target_class:
             self._graphs['datalad'].add((self._about_uri, PAV.createdWith,
                                          EMP.datalad))
             self._graphs['datalad'].add((EMP.datalad, RDFS.label,
@@ -320,8 +314,9 @@ class CustomImporter(MetadataImporter):
     # TODO: This needs more extensive doc, I guess. Should be done, once the
     # documentation of file layout can be referred to.
 
-    def __init__(self, target, about_class=None, about_uri=None):
-        super(CustomImporter, self).__init__(target, about_class, about_uri)
+    def __init__(self, target_class, about_class=None, about_uri=None):
+        super(CustomImporter, self).__init__(target_class, about_class,
+                                             about_uri)
 
     def import_data(self, files=None, data=None):
         """import existing metadata
