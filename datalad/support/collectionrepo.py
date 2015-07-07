@@ -21,7 +21,7 @@ from .handlerepo import HandleRepo
 from .handle import Handle, HandleBackend
 from .exceptions import CollectionBrokenError
 from .collection import Collection, CollectionBackend
-from .metadatahandler import MetadataHandler, DefaultHandler, CacheHandler
+from .metadatahandler import CustomImporter, DLNS, RDFS, Literal
 from ..utils import assure_dir
 
 lgr = logging.getLogger('datalad.collectionrepo')
@@ -74,7 +74,7 @@ class CollectionRepoBranchHandleBackend(HandleBackend):
         self.cache['last_seen'] = cfg.get('Handle', 'last_seen')
 
         # TODO: See CollectionRepo.get_collection()
-        path = self.repo._cfg_parser.get('Collection', 'cache_path')
+        path = self.repo._get_cfg('Collection', 'cache_path')
         handler = CacheHandler(path, URIRef(self.cache['last_seen']))
         self.cache['meta'] = handler.get_graph(
             identifier=self.key,
@@ -204,69 +204,51 @@ class CollectionRepo(GitRepo):
 
         super(CollectionRepo, self).__init__(path, url, runner=runner)
 
-        self._cfg_file = 'collection.cfg'
+        self._cfg_file = 'config.ttl'
         self._initialize_config(name)
 
     def _initialize_config(self, name=None):
-        cfg_parser = SafeConfigParser()
 
         # ignore config file, if it's not in git:
         if self._cfg_file in self.get_indexed_files():
-            cfg_parser.read(opj(self.path, self._cfg_file))
+            graph = self._get_cfg()
+        else:
+            graph = Graph()
 
         # collection settings:
-        if not cfg_parser.has_section('Collection'):
-            cfg_parser.add_section('Collection')
-        if not cfg_parser.has_option('Collection', 'name'):
-            # If no name is configured yet, parameter is used.
-            # If there is no, use the name of repo's dir:
-            cfg_parser.set('Collection', 'name',
-                           name or basename(self.path))
-        if not cfg_parser.has_option('Collection', 'cache_path'):
-            cfg_parser.set('Collection', 'cache_path', 'metadatacache')
-        # make sure configured dir exists:
-        assure_dir(self.path, cfg_parser.get('Collection', 'cache_path'))
+        # if there is no name statement, add it:
+        if len([subj for subj in graph.objects(DLNS.this, RDFS.label)]) == 0:
+            graph.add((DLNS.this, RDFS.label, name or basename(self.path)))
 
-        # collection-level metadata:
-        if not cfg_parser.has_section('Metadata'):
-            cfg_parser.add_section('Metadata')
-        if not cfg_parser.has_option('Metadata', 'path'):
-            cfg_parser.set('Metadata', 'path', 'collection')
-        # make sure configured dir exists:
-        assure_dir(self.path, cfg_parser.get('Metadata', 'path'))
+        self._set_cfg(graph, commit_msg="Initialized config file.")
 
-        if not cfg_parser.has_option('Metadata', 'handler'):
-            cfg_parser.set('Metadata', 'handler', 'DefaultHandler')
+    def _get_cfg(self):
+        config_handler = CustomImporter('Collection')
+        config_handler.import_data(self._cfg_file)
+        return config_handler.get_graphs()['config']
 
-        with open(opj(self.path, self._cfg_file), 'w') as f:
-            cfg_parser.write(f)
+    def _set_cfg(self, graph, commit_msg="Updated config file."):
+        config_handler = CustomImporter('Collection')
+        graph_dict = dict()
+        graph_dict['config'] = graph
+        config_handler.set_graphs(graph_dict)
+        config_handler.store_data(self.path)
         self.git_add(self._cfg_file)
-        self.git_commit("Initialized config file.")
+        self.git_commit(commit_msg)
 
-    def _get_cfg(self, section, option):
-        parser = SafeConfigParser()
-        parser.read(opj(self.path, self._cfg_file))
-        return parser.get(section, option)
-
-    def _set_cfg(self, section, option, value):
-        filename = opj(self.path, self._cfg_file)
-        parser = SafeConfigParser()
-        parser.read(filename)
-        parser.set(section, option, value)
-        with open(filename, 'w') as f:
-            parser.write(f)
-        self.git_add(self._cfg_file)
-        self.git_commit("Updated config file.")
-
+    # TODO: Consider using preferred label for the name
     def get_name(self):
-        return self._get_cfg('Collection', 'name')
+        return [x for x in self._get_cfg().objects(DLNS.this, RDFS.label)][0]
 
     def set_name(self, name):
-        self._set_cfg('Collection', 'name', name)
+        graph = self._get_cfg()
+        for old_name in graph.objects(DLNS.this, RDFS.label):
+            graph.remove(DLNS.this, RDFS.label, old_name)
+        graph.add(DLNS.this, RDFS.label, Literal(name))
 
     name = property(get_name, set_name)
 
-    def _get_handle_files(self, branch=None):
+    def _get_handle_files(self, branch="HEAD"):
         """Get a list of the handle files in `branch`
         """
         return [ops(f)[1] for f in self.git_get_files(branch)
@@ -280,13 +262,14 @@ class CollectionRepo(GitRepo):
         return [self._filename2key(f, branch)
                 for f in self._get_handle_files(branch)]
 
-    def set_metadata_handler(self, handler=DefaultHandler):
+    def set_metadata_handler(self, handler):
         """Set the handler for collection-level metadata
         """
-        if not issubclass(handler, MetadataHandler):
-            raise TypeError("%s is not a MetadataHandler." % type(handler))
+        #if not issubclass(handler, MetadataHandler):
+        #    raise TypeError("%s is not a MetadataHandler." % type(handler))
 
-        self._set_cfg('Metadata', 'handler', handler.__name__)
+        #self._set_cfg('Metadata', 'handler', handler.__name__)
+        raise NotImplementedError
 
     # ### helper functions:
 
@@ -294,14 +277,15 @@ class CollectionRepo(GitRepo):
         """Helper to return the correct class of the metadata handler
         """
         # TODO: Add this one also to handlerepo
-        name = self._get_cfg('Metadata', 'handler')
-        import datalad.support.metadatahandler as mdh
-        try:
-            handler = getattr(mdh, name)
-        except AttributeError:
-            lgr.error("'%s' is an unknown metadata handler." % name)
-            raise ValueError("'%s' is an unknown metadata handler." % name)
-        return handler
+        # name = self._get_cfg('Metadata', 'handler')
+        # import datalad.support.metadatahandler as mdh
+        # try:
+        #     handler = getattr(mdh, name)
+        # except AttributeError:
+        #     lgr.error("'%s' is an unknown metadata handler." % name)
+        #     raise ValueError("'%s' is an unknown metadata handler." % name)
+        # return handler
+        raise NotImplementedError
 
     def _filename2key(self, fname, branch):
         """Placeholder
@@ -364,8 +348,9 @@ class CollectionRepo(GitRepo):
             cfg.write(f)
 
         # metadata cache:
-        handler = CacheHandler(opj(self.path, cache_path), URIRef(handle.path))
-        handler.set(handle.get_metadata(), filename)
+        handler = CacheHandler()
+        handler.set(handle.get_metadata(), opj(self.path, cache_path,
+                                               filename))
 
         self.git_add([opj(cache_path, filename), filename])
         self.git_commit("Added handle %s." % name)

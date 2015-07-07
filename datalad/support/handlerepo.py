@@ -197,7 +197,7 @@ class HandleRepo(AnnexRepo):
         """
         raise NotImplementedError("datalad id not used anymore")
 
-    def set_metadata_handler(self, handler=DefaultHandler):
+    def set_metadata_handler(self, handler):
         """
         std: subclass of MetadataHandler
         custom: subclass of MetadataHandler
