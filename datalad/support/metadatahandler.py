@@ -24,7 +24,7 @@ DLNS = Namespace('http://www.datalad.org/terms/')
 """
 PROV = Namespace('http://www.w3.org/ns/prov#')
 DCAT = Namespace('http://www.w3.org/ns/dcat#')
-DCTYPES = Namespace('http://purl.org/dc/dcmitype/>')
+DCTYPES = Namespace('http://purl.org/dc/dcmitype/')
 PAV = Namespace('http://purl.org/pav/')
 EMP = Namespace('#')
 
@@ -238,10 +238,12 @@ class PlainTextImporter(MetadataImporter):
         # TODO: This behaviour is open to discussion, of course.
         # Not entirely sure yet, whether or not this is reasonable.
         if self._about_class == self._target_class:
-            self._graphs['datalad'].add((self._about_uri, PAV.createdWith,
-                                         EMP.datalad))
+            self._graphs['datalad'].add((EMP.datalad, RDF.type,
+                                         PROV.SoftwareAgent))
             self._graphs['datalad'].add((EMP.datalad, RDFS.label,
                                          Literal("datalad")))
+            self._graphs['datalad'].add((self._about_uri, PAV.createdWith,
+                                         EMP.datalad))
             # TODO: datalad version and may be creation time
 
         # If the metadata is about a handle, we need to add a 'data entity',
@@ -258,13 +260,15 @@ class PlainTextImporter(MetadataImporter):
         # authors:
         i = 1
         for author in authors:
+            if author.strip().startswith('#') or author.strip() == '':
+                continue
             parts = author.split()
 
             # create author's node:
             if parts[-1].startswith('<') and parts[-1].endswith('>'):
                 node = URIRef(parts[-1][1:-1])
             else:
-                node = EMP.__getattribute__("author" + str(i))
+                node = EMP.__getattr__("author" + str(i))
                 i += 1
 
             name = Literal(' '.join(parts[0:-1]))
@@ -283,19 +287,21 @@ class PlainTextImporter(MetadataImporter):
                 self._graphs['datalad'].add((EMP.content, PAV.createdBy, node))
 
         # description:
-        self._graphs['datalad'].add((self._about_uri, DCTERMS.description,
-                                     ''.join(readme)))
+        if readme is not None:
+            self._graphs['datalad'].add((self._about_uri, DCTERMS.description,
+                                         Literal(''.join(readme))))
 
         # license:
-        if license_.__len__() == 1:
-            # file contains a single line. Treat it as URI of the license:
-            # TODO: How restrictive we want to be? Check for valid url?
-            self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
-                                         URIRef(license_[0])))
-        else:
-            # file is assumed to contain the actual license
-            self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
-                                         Literal(''.join(license_))))
+        if license_ is not None:
+            if license_.__len__() == 1:
+                # file contains a single line. Treat it as URI of the license:
+                # TODO: How restrictive we want to be? Check for valid url?
+                self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
+                                             URIRef(license_[0])))
+            else:
+                # file is assumed to contain the actual license
+                self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
+                                             Literal(''.join(license_))))
 
 
 class CustomImporter(MetadataImporter):
