@@ -85,12 +85,13 @@ class MetadataImporter(object):
 
         self._graphs = dict()
         if self._about_class == 'Handle' or self._about_class == 'Collection':
-            self._init_datalad_graph()
+            self._init_datalad_graphs()
 
-    def _init_datalad_graph(self):
+    def _init_datalad_graphs(self):
         """Convenience method to init the datalad descriptor graph"""
 
         self._graphs['datalad'] = Graph()
+        self._graphs['config'] = Graph()
         self._graphs['datalad'].bind('prov', PROV)
         self._graphs['datalad'].bind('dcat', DCAT)
         self._graphs['datalad'].bind('dctypes', DCTYPES)
@@ -98,7 +99,10 @@ class MetadataImporter(object):
         self._graphs['datalad'].bind('pav', PAV)
         self._graphs['datalad'].bind('foaf', FOAF)
         self._graphs['datalad'].bind('dlns', DLNS)
+        self._graphs['config'].bind('dlns', DLNS)
         self._graphs['datalad'].bind('', EMP)
+        self._graphs['config'].bind('', EMP)
+
         # TODO: Find a better prefix than ''. When stored, then parsed with
         # rdflib and stored again, it turns to the path of the file,
         # it was stored in!
@@ -179,6 +183,7 @@ class PlainTextImporter(MetadataImporter):
     expected contain a name, optionally followed by an url or email address
     within '<' and '>'. If provided, the latter is treated as the identifier
     and therefore allows for identification across handles/collections.
+    However, lines starting with '#' are ignored.
     """
 
     def __init__(self, target_class, about_class=None, about_uri=None):

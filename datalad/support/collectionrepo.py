@@ -21,7 +21,8 @@ from .handlerepo import HandleRepo
 from .handle import Handle, HandleBackend
 from .exceptions import CollectionBrokenError
 from .collection import Collection, CollectionBackend
-from .metadatahandler import CustomImporter, DLNS, RDFS, Literal
+from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
+    MetadataImporter, DCTERMS
 from ..utils import assure_dir
 
 lgr = logging.getLogger('datalad.collectionrepo')
@@ -207,6 +208,8 @@ class CollectionRepo(GitRepo):
         self._cfg_file = 'config.ttl'
         self._initialize_config(name)
 
+        # TODO: init datalad.ttl
+
     def _initialize_config(self, name=None):
 
         # ignore config file, if it's not in git:
@@ -218,17 +221,17 @@ class CollectionRepo(GitRepo):
         # collection settings:
         # if there is no name statement, add it:
         if len([subj for subj in graph.objects(DLNS.this, RDFS.label)]) == 0:
-            graph.add((DLNS.this, RDFS.label, name or basename(self.path)))
+            graph.add((DLNS.this, RDFS.label, Literal(name or basename(self.path))))
 
         self._set_cfg(graph, commit_msg="Initialized config file.")
 
     def _get_cfg(self):
-        config_handler = CustomImporter('Collection')
+        config_handler = CustomImporter('Collection', 'Collection', DLNS.this)
         config_handler.import_data(self._cfg_file)
         return config_handler.get_graphs()['config']
 
     def _set_cfg(self, graph, commit_msg="Updated config file."):
-        config_handler = CustomImporter('Collection')
+        config_handler = CustomImporter('Collection', 'Collection', DLNS.this)
         graph_dict = dict()
         graph_dict['config'] = graph
         config_handler.set_graphs(graph_dict)
@@ -251,8 +254,11 @@ class CollectionRepo(GitRepo):
     def _get_handle_files(self, branch="HEAD"):
         """Get a list of the handle files in `branch`
         """
-        return [ops(f)[1] for f in self.git_get_files(branch)
-                if ops(f)[0] == '' and ops(f)[1] != self._cfg_file]
+        # Invalid:
+        #return [ops(f)[1] for f in self.git_get_files(branch)
+        #        if ops(f)[0] == '' and ops(f)[1] != self._cfg_file]
+
+        raise NotImplementedError
 
     def get_handle_list(self, branch=None):
         """Get a list of the names of the handles in `branch`
@@ -308,52 +314,6 @@ class CollectionRepo(GitRepo):
 
     # TODO: add and remove are inconsistent in use of name/key of a handle;
     # Will figure out, what's needed while writing the test cases:
-    def add_handle(self, handle, name=None):
-        """Adds a handle to the collection repository.
-
-        Parameters:
-        -----------
-        handle: HandleRepo
-          For now, this has to be a locally available handle.
-        name: str
-          name of the handle. This is required to be unique with respect to the
-          collection.
-        """
-        # TODO: What about branch? For now, just active one.
-        # This means, the branch to add the handle to, has to be checked out.
-        # Is there a point in providing anything else?
-        branch = self.git_get_active_branch()
-
-        # default name of the handle:
-        if not name:
-            name = handle.name
-
-        key = self.name + '/' + branch + '/' + name
-        filename = self._key2filename(key)
-        cache_path = self._get_cfg('Collection', 'cache_path')
-
-        # create the handle's config file:
-        cfg = SafeConfigParser()
-        cfg.add_section('Handle')
-        # Again, not sure yet, whether this id is needed:
-        cfg.set('Handle', 'id', handle.datalad_id)
-        # 'last_seen' for now holds the local path;
-        # to be replaced by an url on publishing for example:
-        cfg.set('Handle', 'last_seen', handle.path)
-        # default installation dir beneath the collection dir,
-        # holding it's handles:
-        cfg.set('Handle', 'default_target', name)
-
-        with open(opj(self.path, filename), 'w') as f:
-            cfg.write(f)
-
-        # metadata cache:
-        handler = CacheHandler()
-        handler.set(handle.get_metadata(), opj(self.path, cache_path,
-                                               filename))
-
-        self.git_add([opj(cache_path, filename), filename])
-        self.git_commit("Added handle %s." % name)
 
     def remove_handle(self, key):
 
@@ -434,6 +394,7 @@ class CollectionRepo(GitRepo):
                                             opj(path, filename), branch))
         return out
 
+    # May be a getHandles(class), returning a list of class instead?
     def get_handles(self, branch=None):
         """Get the metadata of all handles in `branch`.
 
@@ -525,9 +486,147 @@ class CollectionRepo(GitRepo):
             branch = self.git_get_active_branch()
         return CollectionRepoBranchBackend(self, branch)
 
+    # #######################################
+    # TODO (adapting to new design):
+    # add/remove handle
+    # add/remove(?) metadata sources
+    # update metadata sources
+    # adapting backends and may be Handle/Collection interfaces
+    # test cases
+
+    def add_metadata_src_to_handle(self, importer, key, files=None,
+                                   data=None):
+        """Imports a new metadata source
+
+        Parameters:
+        ___________
+        importer: class
+          the importer to be used; has to be a subclass of MetadataImporter
+        key: str
+          the handle's key in the collection
+        files: str or list of str
+          either a path to the file or directory to be imported or a list
+          containing paths to the files.
+        data: dict of list of str
+          a dictionary containing the metadata to be imported. The key is
+          expected to be the file name and the value its content as a list of
+          the file's lines as returned by `readlines()`.
+        """
+
+        if not issubclass(importer, MetadataImporter):
+            raise TypeError("Not a MetadataImporter: " + str(importer))
+
+        handle = CollectionRepoBranchHandleBackend(
+            self, self.git_get_active_branch(), key)
+        handle_cfg = handle.get_metadata('config')
+
+        # TODO: CollectionRepoBranchHandleBackend.get_metadata('config')
+
+        # check for existing metadata sources to determine the name for the
+        # new one:
+        src_name = "%s_import%d" % (key,
+                                    len([src for src in
+                                         handle_cfg.objects(URIRef(handle.url),
+                                                            DLNS.usesSrc)])
+                                    + 1)
+
+        im = importer(target_class='Collection', about_class='Handle',
+                      about_uri=URIRef(handle.url), name=src_name)
+        # => TODO: add this 'name'-parameter and write handle-config in importer class!
+        im.import_data(files=files, data=data)
+
+        # create import branch:
+        active_branch = self.git_get_active_branch()
+        self.git_checkout(name=src_name, options='-b')
+
+        im.store_data(opj(self.path, self._key2filename(key)))
+        self.git_commit("New import branch created.")
+
+        # switching back and merge:
+        self.git_checkout(active_branch)
+        self.git_merge(ref=src_name)  # TODO!
+
+    # TODO: following methods similar to 'add_metadata_src_to_handle'
+    def add_metadata_src_to_collection(self):
+        raise NotImplementedError
+
+    def add_metadata_src_to_entity(self):
+        # But: also needs handle or collection
+        # So may be add parameters to the other methods for importing data
+        # about a sub-entity instead of an dedicated method for that.
+        raise NotImplementedError
+
+    def add_handle(self, handle, name):
+        """Adds a handle to the collection repository.
+
+        Parameters:
+        -----------
+        handle: str or HandleRepo or HandleBackend
+          URL of the handle or an instance of either HandleRepo or HandleBackend.
+        name: str
+          name of the handle within the collection. This name is required to be
+          unique with respect to the collection. If a HandleRepo or
+          HandleBackend is passed, the name stored therein is the default.
+          If `handle` is just an URL, a name is required.
+        """
+        if isinstance(handle, HandleBackend):
+            uri = URIRef(handle.url)
+            name = name or handle.name
+
+        if isinstance(handle, HandleRepo):
+            uri = URIRef(handle.path)
+            name = name or handle.name
+
+        if isinstance(handle, basestring):
+            uri = URIRef(handle)
+            if name is None:
+                raise ValueError("Argument 'name' is None.")
+
+        # TODO: What about branch? For now, just active one.
+        # This means, the branch to add the handle to, has to be checked out.
+        # Is there a point in providing anything else?
+        branch = self.git_get_active_branch()
+        key = self.name + '/' + branch + '/' + name
+
+        path = opj(self.path, self._key2filename(key))
+        # TODO: What's the desired behaviour in case a handle with that name
+        # already exists?
+        if exists(path):
+            raise RuntimeError("Handle '%s' already exists." % name)
+        os.mkdir(path)
+
+        md_handle = CustomImporter(target_class='Collection',
+                                    about_class='Handle',
+                                    about_uri=uri)
+        graphs = md_handle.get_graphs()
+
+        # handle config:
+        # default name:
+        graphs['config'].add((uri, RDFS.label, Literal(name)))
+        # default dir name:
+        graphs['config'].add((uri, DLNS.defaultTarget, Literal(name)))
+        # TODO: anything else?
+        md_handle.set_graphs(graphs)
+        md_handle.store_data(path)
+
+        # collection graph:
+        # TODO: helper functions
+        md_collection = CustomImporter(target_class='Collection',
+                                       about_class='Collection',
+                                       about_uri=DLNS.this)
+        md_collection.import_data(self.path)
+        graphs = md_collection.get_graphs()
+        graphs['datalad'].add((DLNS.this, DCTERMS.hasPart, uri))
+        # TODO: anything else? any config needed?
+        md_collection.set_graphs(graphs)
+        md_collection.store_data(self.path)
+
+        self.git_add([opj(self.path, 'datalad.ttl'),
+                      opj(path, 'config.ttl')])
+        self.git_commit("Added handle '%s'" % name)
 
     # old stuff; just outcommented for now:
-        # def get_remotes_data(self, name=None):
+    # def get_remotes_data(self, name=None):
     #     """Get the metadata of all remotes.
     #
     #     Returns:
@@ -560,3 +659,54 @@ class CollectionRepo(GitRepo):
     #         remotes[remote] = remote_dict
     #
     #     return remotes
+
+    # def add_handle(self, handle, name=None):
+    #     """Adds a handle to the collection repository.
+    #
+    #     Parameters:
+    #     -----------
+    #     handle: HandleRepo
+    #       For now, this has to be a locally available handle.
+    #     name: str
+    #       name of the handle. This is required to be unique with respect to the
+    #       collection.
+    #     """
+    #     # TODO: What about branch? For now, just active one.
+    #     # This means, the branch to add the handle to, has to be checked out.
+    #     # Is there a point in providing anything else?
+    #     branch = self.git_get_active_branch()
+    #
+    #     # default name of the handle:
+    #     if not name:
+    #         name = handle.name
+    #
+    #     key = self.name + '/' + branch + '/' + name
+    #     filename = self._key2filename(key)
+    #
+    #     # old:
+    #     # cache_path = self._get_cfg('Collection', 'cache_path')
+    #     # incomplete adaption:
+    #     cache_path = opj(self.path, filename)
+    #
+    #     # create the handle's config file:
+    #     cfg = SafeConfigParser()
+    #     cfg.add_section('Handle')
+    #     # Again, not sure yet, whether this id is needed:
+    #     cfg.set('Handle', 'id', handle.datalad_id)
+    #     # 'last_seen' for now holds the local path;
+    #     # to be replaced by an url on publishing for example:
+    #     cfg.set('Handle', 'last_seen', handle.path)
+    #     # default installation dir beneath the collection dir,
+    #     # holding it's handles:
+    #     cfg.set('Handle', 'default_target', name)
+    #
+    #     with open(opj(self.path, filename), 'w') as f:
+    #         cfg.write(f)
+    #
+    #     # metadata cache:
+    #     handler = CacheHandler()
+    #     handler.set(handle.get_metadata(), opj(self.path, cache_path,
+    #                                            filename))
+    #
+    #     self.git_add([opj(cache_path, filename), filename])
+    #     self.git_commit("Added handle %s." % name)
