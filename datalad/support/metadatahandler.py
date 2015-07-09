@@ -336,6 +336,8 @@ class CustomImporter(MetadataImporter):
             if not isinstance(files, list):  # single path
                 if isdir(files):
                     files = listdir(files)
+                else:
+                    files = [files]
 
             for file_ in files:
                 self._graphs[basename(file_).rstrip('.ttl')] = \

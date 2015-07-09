@@ -22,7 +22,7 @@ from .handle import Handle, HandleBackend
 from .exceptions import CollectionBrokenError
 from .collection import Collection, CollectionBackend
 from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
-    MetadataImporter, DCTERMS
+    MetadataImporter, DCTERMS, RDF
 from ..utils import assure_dir
 
 lgr = logging.getLogger('datalad.collectionrepo')
@@ -227,7 +227,7 @@ class CollectionRepo(GitRepo):
 
     def _get_cfg(self):
         config_handler = CustomImporter('Collection', 'Collection', DLNS.this)
-        config_handler.import_data(self._cfg_file)
+        config_handler.import_data(opj(self.path, self._cfg_file))
         return config_handler.get_graphs()['config']
 
     def _set_cfg(self, graph, commit_msg="Updated config file."):
@@ -315,12 +315,6 @@ class CollectionRepo(GitRepo):
     # TODO: add and remove are inconsistent in use of name/key of a handle;
     # Will figure out, what's needed while writing the test cases:
 
-    def remove_handle(self, key):
-
-        filename = self._key2filename(key)
-        cache_path = self._get_cfg('Collection', 'cache_path')
-        self.git_remove([opj(cache_path, filename), filename])
-        self.git_commit("Removed handle %s." % key)
 
     def get_handle_repos(self, branch=None):
         """Get a list of HandleRepo instances.
@@ -489,10 +483,11 @@ class CollectionRepo(GitRepo):
     # #######################################
     # TODO (adapting to new design):
     # add/remove handle
-    # add/remove(?) metadata sources
-    # update metadata sources
+    # add metadata sources
     # adapting backends and may be Handle/Collection interfaces
     # test cases
+    # update metadata sources
+    # remove metadata sources ?
 
     def add_metadata_src_to_handle(self, importer, key, files=None,
                                    data=None):
@@ -596,8 +591,8 @@ class CollectionRepo(GitRepo):
         os.mkdir(path)
 
         md_handle = CustomImporter(target_class='Collection',
-                                    about_class='Handle',
-                                    about_uri=uri)
+                                   about_class='Handle',
+                                   about_uri=uri)
         graphs = md_handle.get_graphs()
 
         # handle config:
@@ -624,6 +619,23 @@ class CollectionRepo(GitRepo):
         self.git_add([opj(self.path, 'datalad.ttl'),
                       opj(path, 'config.ttl')])
         self.git_commit("Added handle '%s'" % name)
+
+    def remove_handle(self, key):
+
+        dir_ = self._key2filename(key)
+
+        # remove handle from collection descriptor:
+        uri = Graph().parse(opj(dir_, 'datalad.ttl')).value(predicate=RDF.type,
+                                                            object=DLNS.Handle)
+        col_graph = Graph().parse(opj(self.path, 'datalad.ttl'))
+        col_graph.remove((DLNS.this, DCTERMS.hasPart, uri))
+        col_graph.serialize(opj(self.path, 'datalad.ttl'), format="turtle")
+
+        # remove handle's directory:
+        # TODO: delete it or only git rm?
+        self.git_remove(dir_)
+        self.git_commit("Removed handle %s." % key)
+
 
     # old stuff; just outcommented for now:
     # def get_remotes_data(self, name=None):
@@ -710,3 +722,9 @@ class CollectionRepo(GitRepo):
     #
     #     self.git_add([opj(cache_path, filename), filename])
     #     self.git_commit("Added handle %s." % name)
+    # def remove_handle(self, key):
+    #
+    #     filename = self._key2filename(key)
+    #     cache_path = self._get_cfg('Collection', 'cache_path')
+    #     self.git_remove([opj(cache_path, filename), filename])
+    #     self.git_commit("Removed handle %s." % key)
