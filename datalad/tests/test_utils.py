@@ -15,7 +15,6 @@ import shutil
 import sys
 import logging
 from mock import patch
-from contextlib import nested
 
 from os.path import join as opj
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook
@@ -72,13 +71,13 @@ def _check_setup_exceptionhook(interactive):
     old_exceptionhook = sys.excepthook
 
     post_mortem_tb = []
+
     def our_post_mortem(tb):
         post_mortem_tb.append(tb)
 
-    with nested(
-            patch('sys.excepthook'), 
-            patch('datalad.utils.is_interactive', lambda: interactive),
-            patch('pdb.post_mortem', our_post_mortem)):
+    with patch('sys.excepthook'), \
+            patch('datalad.utils.is_interactive', lambda: interactive), \
+            patch('pdb.post_mortem', our_post_mortem):
         setup_exceptionhook()
         our_exceptionhook = sys.excepthook
         ok_(old_exceptionhook != our_exceptionhook)

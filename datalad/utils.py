@@ -7,7 +7,11 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import __builtin__
+from six import PY2
+if PY2:
+    import __builtin__
+else:
+    import builtins as __builtin__
 
 import logging
 import shutil, stat, os, sys
@@ -137,7 +141,7 @@ def rmtemp(f, *args, **kwargs):
             for i in range(10):
                 try:
                     os.unlink(f)
-                except OSError, e:
+                except OSError as e:
                     if i < 9:
                         sleep(0.5)
                         continue
