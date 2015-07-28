@@ -258,7 +258,7 @@ class GitRepo(object):
                 # TODO: Is write=True a reasonable way to do it?
                 # May be should not write until success of operation is confirmed?
                 # What's best in case of a list of files?
-            except OSError, e:
+            except OSError as e:
                 lgr.error("git_add: %s" % e)
                 raise
 

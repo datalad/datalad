@@ -15,7 +15,7 @@ import os
 from os.path import join, exists
 import logging
 
-from annexrepo import AnnexRepo
+from .annexrepo import AnnexRepo
 
 lgr = logging.getLogger('datalad.dataset')
 

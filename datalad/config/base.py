@@ -7,7 +7,6 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from ConfigParser import NoOptionError
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 from ..support.archives import DECOMPRESSORS

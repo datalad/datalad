@@ -18,7 +18,6 @@ import multiprocessing
 import logging
 import random
 import socket
-import SocketServer
 import SimpleHTTPServer
 import BaseHTTPServer
 import time
@@ -99,7 +98,7 @@ def ok_clean_git_annex_proxy(path):
 
     try:
         out = ar.annex_proxy("git status")
-    except CommandNotAvailableError, e:
+    except CommandNotAvailableError as e:
         raise SkipTest
     finally:
         os.chdir(cwd)
@@ -484,7 +483,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            raise exc_info[0], exc_info[1], exc_info[2]
+            raise exc_info[0](exc_info[1], exc_info[2])
 
     return newfunc
 
@@ -502,7 +501,7 @@ def ignore_nose_capturing_stdout(func):
     def newfunc(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except AttributeError, e:
+        except AttributeError as e:
             if e.message.find('StringIO') > -1 and e.message.find('fileno') > -1:
                 pass
             else:

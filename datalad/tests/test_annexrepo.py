@@ -163,7 +163,6 @@ def test_AnnexRepo_annex_add(src, annex_path):
 @with_testrepos(flavors=local_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
-
     ar = AnnexRepo(annex_path, src)
     ar.set_direct_mode(True)
     ok_clean_git_annex_proxy(path=annex_path)
@@ -266,7 +265,7 @@ def test_AnnexRepo_web_remote(src, dst):
             ar.annex_drop(testfile)
             assert_in('ERROR', cml.out)
             assert_in('drop: 1 failed', cml.out)
-    except CommandError, e:
+    except CommandError as e:
         assert_equal(e.code, 1)
         assert_in('Could only verify the '
                   'existence of 0 out of 1 necessary copies', e.stdout)

@@ -92,7 +92,6 @@ def test_with_testrepos():
     eq_(len(repos), 4)
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):
-            print repo
             # either it is a "local" or a removed clone
             ok_(exists(opj(repo, '.git'))
                 or

@@ -23,4 +23,4 @@ try:
 except ImportError:
     def test(*args, **kwargs):
         lgr.warning('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
-test.__test__ = False
+    test.__test__ = False

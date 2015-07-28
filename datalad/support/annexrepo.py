@@ -175,7 +175,7 @@ class AnnexRepo(GitRepo):
                                              log_online=log_online,
                                              expect_stderr=expect_stderr,
                                              expect_fail=expect_fail)
-        except CommandError, e:
+        except CommandError as e:
             if "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
                                                "Unknown command:"

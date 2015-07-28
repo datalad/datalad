@@ -217,7 +217,7 @@ class Runner(object):
                                         cwd=cwd or self.cwd,
                                         env=env or self.env)
 
-            except Exception, e:
+            except Exception as e:
                 prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
                           (cmd, " under %r" % cwd if cwd else '', e))

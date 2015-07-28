@@ -102,7 +102,7 @@ send () {
                       % (realpath(self.repopath), _file[len(self.repopath)+1:]))
         with open(_file, 'a') as f:
             f.write(self.HEADER)
-        os.chmod(_file, 0755)
+        os.chmod(_file, 0o755)
 
     def write_section(self, cmd):
         self.initiate()

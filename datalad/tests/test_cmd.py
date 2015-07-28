@@ -251,6 +251,6 @@ def test_runner_failure(dir_):
 
     try:
         runner.run(failing_cmd, cwd=dir_)
-    except CommandError, e:
+    except CommandError as e:
         assert_equal(1, e.code)
         assert_in('notexistent.dat not found', e.stderr)
