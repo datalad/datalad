@@ -191,11 +191,11 @@ class ConfigManager(SafeConfigParser):
 
         try:
             return SafeConfigParser.get(self, section, option, **kwargs)
-        except ValueError, e:
+        except ValueError as e:
             # provide somewhat descriptive error
-            raise ValueError, \
-                  "Failed to obtain value from configuration for %s.%s. " \
-                  "Original exception was: %s" % (section, option, e)
+            raise ValueError(
+                  "Failed to obtain value from configuration for %s.%s. "
+                  "Original exception was: %s" % (section, option, e))
 
 
     def getboolean(self, section, option, default=None):
