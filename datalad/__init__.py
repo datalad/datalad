@@ -11,7 +11,7 @@ distribution with the convenience of git-annex repositories as a backend."""
 
 from .version import __version__
 
-import datalad.log
+from datalad.log import lgr
 
 # be friendly on systems with ancient numpy -- no tests, but at least
 # importable
@@ -22,4 +22,5 @@ try:
     del Tester
 except ImportError:
     def test(*args, **kwargs):
-        raise RuntimeError('Need numpy >= 1.2 for datalad.tests()')
+        lgr.warning('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
+test.__test__ = False
