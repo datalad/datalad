@@ -28,23 +28,6 @@ class HandleBackend(object):
     __metaclass__ = ABCMeta
 
     @abstractproperty
-    def id(self):
-        """id of handle.
-
-        This is a read-only property, since an id can only be provided by a
-        physically existing handle. It doesn't make sense to tell a backend to
-        change it.
-
-        Note: For now, this id is provided but not used anywhere. It's not
-        clear yet whether to keep it at all.
-
-        Returns:
-        --------
-        str
-        """
-        pass
-
-    @abstractproperty
     def url(self):
         """url of the physical representation of a handle.
 
@@ -138,7 +121,6 @@ class Handle(object):
 
         if isinstance(src, HandleBackend):
             self._backend = src
-            self.id = self._backend.id
             self.url = self._backend.url
             self.name = self._backend.name
             self.metadata = self._backend.metadata
@@ -150,14 +132,12 @@ class Handle(object):
             # backend. They would need to store the data, instead of linking
             # to a backend. But do we need such?
             self._backend = src
-            self.id = self._backend.id
             self.url = self._backend.url
             self.name = self._backend.name
             self.metadata = self._backend.metadata
 
         elif src is None:
             self._backend = None
-            self.id = None
             self.url = None
             self.name = name
             self.metadata = Graph(identifier=URIRef(self.name))

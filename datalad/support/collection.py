@@ -52,10 +52,7 @@ class CollectionBackend(object):
 
         Returns:
         --------
-        dictionary
-          By now there are just two keys:
-            'name': str
-            'meta': rdflib.Graph
+        rdflib.Graph
         """
 
     @abstractmethod
@@ -143,7 +140,6 @@ class Collection(dict):
             # update from backend.
 
             self.update(src)
-            self.name = src.name
             self.store = IOMemory()
             for graph in src.store.contexts():
                 self.store.add_graph(graph)
@@ -159,22 +155,29 @@ class Collection(dict):
             self._reload()
         elif src is None:
             self._backend = None
-            self.name = name
             self.store = IOMemory()
-            self.meta = Graph(store=self.store, identifier=URIRef(self.name))
+            self.meta = Graph(store=self.store, identifier=URIRef(name))
             self.conjunctive_graph = ConjunctiveGraph(store=self.store)
+
 
         else:
             lgr.error("Unknown source for Collection(): %s" % type(src))
             raise TypeError('Unknown source for Collection(): %s' % type(src))
 
+    @property
+    def name(self):
+        return self.meta.identifier
+
     def __delitem__(self, key):
         super(Collection, self).__delitem__(key)
+
+        # TODO: adapt to current terms DCTERMS.hasPart:
         self.meta.remove((URIRef(self.name), DLNS.contains, URIRef(key)))
         self.store.remove_graph(URIRef(key))
 
     def __setitem__(self, key, value):
         super(Collection, self).__setitem__(key, value)
+        # TODO: adapt to current terms:
         self.meta.add((URIRef(self.name), DLNS.contains, URIRef(key)))
         self.store.add_graph(self[key].meta)
 
