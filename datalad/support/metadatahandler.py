@@ -335,13 +335,14 @@ class CustomImporter(MetadataImporter):
         if files is not None:
             if not isinstance(files, list):  # single path
                 if isdir(files):
-                    files = listdir(files)
+                    files = [opj(files, file_) for file_ in listdir(files)]
                 else:
                     files = [files]
 
             for file_ in files:
-                self._graphs[basename(file_).rstrip('.ttl')] = \
-                    Graph().parse(file_, format="turtle")
+                if not isdir(file_):
+                    self._graphs[basename(file_).rstrip('.ttl')] = \
+                        Graph().parse(file_, format="turtle")
 
         if data is not None:
             for key in data:
