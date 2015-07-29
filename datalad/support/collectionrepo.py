@@ -43,9 +43,9 @@ class CollectionRepoBranchHandleBackend(HandleBackend):
         self.branch = branch
         self.key = key
         self.cache = dict()
-        self.update()
+        self.update()  # files
 
-    def update(self):
+    def update(self, files=None):
         """Reloads data from git.
 
         Calls to backend interface methods return cached data.
@@ -82,9 +82,18 @@ class CollectionRepoBranchHandleBackend(HandleBackend):
             data=self.repo.git_get_file_content(opj(path, filename),
                                                 self.branch))
 
-    @property
-    def id(self):
-        return self.cache['id']
+    def get_metadata(self, file_=None):
+        """
+        Gets metadata graph for the handle (all files in collection or just
+        `file_`)
+        :param file_:
+        :return: rdflib.Graph
+        """
+        #importer = CustomImporter('Handle', 'Handle', ...)  # target=Handle?or Collection?
+        if file_ is None:
+            pass
+        else:
+            pass
 
     @property
     def url(self):
@@ -519,35 +528,39 @@ class CollectionRepo(GitRepo):
         if not issubclass(importer, MetadataImporter):
             raise TypeError("Not a MetadataImporter: " + str(importer))
 
-        handle = CollectionRepoBranchHandleBackend(
-            self, self.git_get_active_branch(), key)
-        handle_cfg = handle.get_metadata('config')
-
-        # TODO: CollectionRepoBranchHandleBackend.get_metadata('config')
+        cfg_graph = Graph().parse(opj(self.path, self._key2filename(key),
+                                      "config.ttl"), format="turtle")
+        url = cfg_graph.value(predicate=RDFS.label, object=Literal(key))
 
         # check for existing metadata sources to determine the name for the
         # new one:
         src_name = "%s_import%d" % (key,
                                     len([src for src in
-                                         handle_cfg.objects(URIRef(handle.url),
-                                                            DLNS.usesSrc)])
+                                         cfg_graph.objects(url, DLNS.usesSrc)])
                                     + 1)
-
+        src_node = URIRef(src_name)
         im = importer(target_class='Collection', about_class='Handle',
-                      about_uri=URIRef(handle.url), name=src_name)
-        # => TODO: add this 'name'-parameter and write handle-config in importer class!
+                      about_uri=url)
         im.import_data(files=files, data=data)
+
+        # add config-entries for that source:
+        cfg_graph.add((url, DLNS.usesSrc, src_node))
+        # TODO: specify that source (used files, ..):
+        # cfg_graph.add((src_node, ))
 
         # create import branch:
         active_branch = self.git_get_active_branch()
         self.git_checkout(name=src_name, options='-b')
 
         im.store_data(opj(self.path, self._key2filename(key)))
+        cfg_graph.serialize(opj(self.path, self._key2filename(key),
+                                "config.ttl"), format="turtle")
+        self.git_add(self._key2filename(key))
         self.git_commit("New import branch created.")
 
         # switching back and merge:
         self.git_checkout(active_branch)
-        self.git_merge(ref=src_name)  # TODO!
+        self.git_merge(src_name)  # TODO!
 
     # TODO: following methods similar to 'add_metadata_src_to_handle'
     def add_metadata_src_to_collection(self):
@@ -624,8 +637,8 @@ class CollectionRepo(GitRepo):
         md_collection.set_graphs(graphs)
         md_collection.store_data(self.path)
 
-        self.git_add([opj(self.path, 'datalad.ttl'),
-                      opj(path, 'config.ttl')])
+        self.git_add(['datalad.ttl', self._key2filename(key)])
+                      #opj(self._key2filename(key), 'config.ttl')])
         self.git_commit("Added handle '%s'" % name)
 
     def remove_handle(self, key):

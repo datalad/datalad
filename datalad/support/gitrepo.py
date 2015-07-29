@@ -468,7 +468,6 @@ class GitRepo(object):
         # return [item.path for item in list(head.commit.tree.traverse())]
         # #if isinstance(item, git.objects.blob.Blob)
 
-
     def git_get_file_content(self, file_, branch='HEAD'):
         """
 
@@ -481,3 +480,6 @@ class GitRepo(object):
         out, err = self._git_custom_command(
             '', 'git cat-file blob %s:%s' % (branch, file_))
         return out.rstrip(linesep).split(linesep)
+
+    def git_merge(self, name):
+        self._git_custom_command('', 'git merge %s' % name)

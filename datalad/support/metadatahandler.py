@@ -213,19 +213,23 @@ class PlainTextImporter(MetadataImporter):
         if files is not None:
             if not isinstance(files, list):  # single path
                 if isdir(files):
-                    files = listdir(files)
+                    files = [opj(files, file_) for file_ in listdir(files)]
 
             for file_ in files:
                 if not isdir(file_):
-                    if file_.startswith(("AUTHORS", "CONTRIBUTORS")):
+                    if basename(file_).startswith(("AUTHORS", "CONTRIBUTORS")):
                         with open(file_, 'r') as f:
                             authors = f.readlines()
-                    if file_.startswith("README"):
+                    if basename(file_).startswith("README"):
                         with open(file_, 'r') as f:
                             readme = f.readlines()
-                    if file_.startswith("LICENSE"):
+                    if basename(file_).startswith("LICENSE"):
                         with open(file_, 'r') as f:
                             license_ = f.readlines()
+
+        print "authors:\n%s" % authors
+        print "readme:\n%s" % readme
+        print "license:\n%s" % license_
 
         if data is not None:
             for key in data:
