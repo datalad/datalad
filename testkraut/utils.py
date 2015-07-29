@@ -385,8 +385,8 @@ def get_cmd_prov_strace(cmd, match_argv=None):
     # wait() sets the returncode
     cmd_exec.wait()
     # do not return stderr, as this was used by strace
-    import StringIO
-    return procs, cmd_exec.returncode, cmd_exec.stdout, StringIO.StringIO('')
+    from six.moves import StringIO
+    return procs, cmd_exec.returncode, cmd_exec.stdout, StringIO('')
 
 def guess_file_tags(fname):
     """Try to guess file type tags from an existing file.

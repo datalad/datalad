@@ -10,7 +10,9 @@
 
 __docformat__ = 'restructuredtext'
 
-from ConfigParser import SafeConfigParser
+from six.moves.configparser import SafeConfigParser
+from six import iteritems
+
 import os.path
 from os.path import join as opj
 
@@ -92,9 +94,9 @@ class ConfigManager(SafeConfigParser):
             self.__cfg_filenames = []
 
         # set critical defaults
-        for sec, vars in ConfigManager._DEFAULTS.iteritems():
+        for sec, vars in iteritems(ConfigManager._DEFAULTS):
             self.add_section(sec)
-            for key, value in vars.iteritems():
+            for key, value in iteritems(vars):
                 self.set(sec, key, value)
 
         # now get the setting

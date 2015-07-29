@@ -296,7 +296,7 @@ class TestFromSPEC(TestCase):
             sys.stderr = capture_stderr = StringIO()
             try:
                 if 'code' in testspec:
-                    exec testspec['code'] in {}, {}
+                    exec(testspec['code'], {}, {})
                 elif 'file' in testspec:
                     execfile(testspec['file'], {}, {})
                 else:

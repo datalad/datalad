@@ -28,17 +28,11 @@ class _SingletonType(type):
             mcs._instances[sid] = instance
         return mcs._instances[sid]
 
-class __Singleton:
-    """To ensure single instance of a class instantiation (object)
-
-    """
-
-    __metaclass__ = _SingletonType
-    def __init__(self, *args):
-        pass
-    # Provided __call__ just to make silly pylint happy
-    def __call__(self):
-        raise NotImplementedError
+# Awkward way to define Python2 and Python3 compatible use of metaclasses
+# Ref: https://wiki.python.org/moin/PortingToPy3k/BilingualQuickRef#metaclasses
+__Singleton = _SingletonType(str('__Singleton'), (), {
+        '__doc__': "To ensure single instance of a class instantiation (object)"
+    })
 
 #
 # As the very first step: Setup configuration registry instance and
