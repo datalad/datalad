@@ -292,7 +292,7 @@ class AnnexCustomRemote(object):
             pass # no harm
         except KeyboardInterrupt:
             self.stop("Interrupted by user")
-        except Exception, e:
+        except Exception as e:
             self.stop(str(e))
         finally:
             self._in_the_loop = False
@@ -329,7 +329,7 @@ class AnnexCustomRemote(object):
 
             try:
                 method(*req_load)
-            except Exception, e:
+            except Exception as e:
                 self.error("Problem processing %r with parameters %r: %r"
                            % (req, req_load, e))
                 lgr.error("Caught exception detail: %s" % format_exc())
@@ -343,7 +343,7 @@ class AnnexCustomRemote(object):
 
         try:
             self._initremote(*args)
-        except Exception, e:
+        except Exception as e:
             self.error("Failed to initialize %s due to %s" % (self, e),
                        "INITREMOTE-FAILURE")
         else:
@@ -357,7 +357,7 @@ class AnnexCustomRemote(object):
          """
         try:
             self._prepare(*args)
-        except Exception, e:
+        except Exception as e:
             self.error("Failed to prepare %s due to %s" % (self, e),
                        "PREPARE-FAILURE")
         else:

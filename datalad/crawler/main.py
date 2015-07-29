@@ -240,7 +240,7 @@ class DoubleAnnexRepo(object):
                                        db_incoming=db_incoming,
                                        dry_run=self.runner.protocol.__class__.__name__ == 'DryRunProtocol',  # TODO -- use runner?
                                        add_mode=add_mode)
-                    except Exception, e:
+                    except Exception as e:
                         lgr.warning("Skipping %(href_full)s due to error: %(e)s" % locals())
                         urls_errored.append(((href, href_a), e))
                         continue

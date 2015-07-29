@@ -9,18 +9,18 @@
 
 import platform
 import sys
-import logging
 import os
 import random
 
-from urllib2 import urlopen, unquote
-from os.path import exists, join as opj, basename
+from bs4 import BeautifulSoup
 from glob import glob
+from os.path import exists, join as opj, basename
+
+from six.moves.urllib.request import urlopen
+
 from mock import patch
 from nose.tools import assert_in, assert_not_in, assert_true
 from nose import SkipTest
-
-from bs4 import BeautifulSoup as BS
 
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
@@ -307,7 +307,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         u = urlopen(url)
         assert_true(u.getcode() == 200)
         html = u.read()
-        soup = BS(html)
+        soup = BeautifulSoup(html, "html.parser")
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
 

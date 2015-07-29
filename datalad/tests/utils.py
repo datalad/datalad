@@ -18,9 +18,16 @@ import multiprocessing
 import logging
 import random
 import socket
-import SimpleHTTPServer
-import BaseHTTPServer
+from six import PY2
 import time
+
+if PY2:
+    from SimpleHTTPServer import SimpleHTTPRequestHandler
+    from BaseHTTPServer import HTTPServer
+else:
+    from http.server import SimpleHTTPRequestHandler
+    from http.server import HTTPServer
+
 
 from functools import wraps
 from os.path import exists, realpath, join as opj
@@ -213,12 +220,12 @@ def with_tree(t, tree=None, **tkwargs):
 lgr = logging.getLogger('datalad.tests')
 
 
-class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class SilentHTTPHandler(SimpleHTTPRequestHandler):
     """A little adapter to silence the handler
     """
     def __init__(self, *args, **kwargs):
         self._silent = lgr.getEffectiveLevel() > logging.DEBUG
-        SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
+        SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
 
     def log_message(self, format, *args):
         if self._silent:
@@ -228,7 +235,7 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
     os.chdir(path_to_serve_from)
-    httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
+    httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
     queue.put(httpd.server_port)
     httpd.serve_forever()
 

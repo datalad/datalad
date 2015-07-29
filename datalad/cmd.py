@@ -282,7 +282,7 @@ class Runner(object):
 
             try:
                 return f(*args, **kwargs)
-            except Exception, e:
+            except Exception as e:
                 prot_exc = e
                 raise
             finally:
@@ -326,7 +326,7 @@ def link_file_load(src, dst, dry_run=False):
 
     try:
         os.link(src_realpath, dst)
-    except  AttributeError, e:
+    except  AttributeError as e:
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)

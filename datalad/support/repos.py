@@ -231,7 +231,7 @@ def annex_file(href,
                 _call(decompress_file,
                      full_incoming_filename, temp_annex_dir,
                      leading_directories=archives_directories)
-            except Exception, e:
+            except Exception as e:
                 lgr.error("Extraction of %s under %s failed: %s. Skipping."
                           % (full_incoming_filename, temp_annex_dir, e))
                 return False, False
