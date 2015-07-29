@@ -139,7 +139,7 @@ def discover_specs(paths=None):
         # TODO: provide configuration variable allowing to avoid this
         # swallow-everything catcher to troubleshoot problems in the code
         # inside
-        except Exception, e:
+        except Exception as e:
             # not a valid SPEC
             lgr.warning("ignoring '%s': no a valid SPEC file: %s (%s)"
                       % (spec_fname, str(e), e.__class__.__name__))
@@ -301,7 +301,7 @@ class TestFromSPEC(TestCase):
                     execfile(testspec['file'], {}, {})
                 else:
                     raise ValueError("no test code found")
-            except Exception, e:
+            except Exception as e:
                 execinfo['exception'] = dict(type=e.__class__.__name__,
                                              info=str(e))
                 if not 'shouldfail' in testspec or testspec['shouldfail'] == False:
@@ -350,7 +350,7 @@ class TestFromSPEC(TestCase):
                 texec.returncode,
                 Annotate("test shell command '%s' yielded non-zero exit code" % cmd,
                          Equals(0)))
-        except OSError, e:
+        except OSError as e:
             lgr.error("%s: %s" % (e.__class__.__name__, str(e)))
             if not 'shouldfail' in testspec or testspec['shouldfail'] == False:
                 self.assertThat(e,
@@ -381,7 +381,7 @@ class TestFromSPEC(TestCase):
         locals = dict()
         try:
             execfile(testwffilepath, dict(), locals)
-        except Exception, e:
+        except Exception as e:
             lgr.error("%s: %s" % (e.__class__.__name__, str(e)))
             self.assertThat(e,
                 Annotate("test workflow setup failed: %s (%s)"
@@ -405,7 +405,7 @@ class TestFromSPEC(TestCase):
             sys.stderr = capture_stderr = StringIO()
             try:
                 exec_graph = workflow.run()
-            except Exception, e:
+            except Exception as e:
                 execinfo['exception'] = dict(type=e.__class__.__name__,
                                              info=str(e))
                 if not 'shouldfail' in testspec or testspec['shouldfail'] == False:

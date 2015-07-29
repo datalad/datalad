@@ -13,16 +13,20 @@ __docformat__ = 'restructuredtext'
 import os
 import re
 import subprocess
+import logging
 import select
 import datetime
 import hashlib
-import urllib2
 import platform
-from .pkg_mngr import PkgManager
 import testkraut
 from os.path import join as opj
+
+from six.moves.urllib.request import urlopen
+from six.moves.urllib.error import URLError, HTTPError
+
+from .pkg_mngr import PkgManager
 from .spec import SPEC
-import logging
+
 lgr = logging.getLogger(__name__)
 
 def which(program):
@@ -124,7 +128,7 @@ def run_command(cmdline, cwd=None, env=None, timeout=0.01):
     def _process(drain=0):
         try:
             res = select.select(streams, [], [], timeout)
-        except select.error, e:
+        except select.error as e:
             if e[0] == errno.EINTR:
                 return
             else:
@@ -589,7 +593,7 @@ def describe_python_module(type_, location, entities, pkgdb=None):
     modfind = ModuleFinder()
     try:
         modfind.run_script(location)
-    except ImportError, e:
+    except ImportError as e:
         lgr.warning("cannot determine Python module dependencies of %s (%s)"
                     % (fpath, e))
 
@@ -675,7 +679,7 @@ def download_file(url, dst):
       None is returned whenever the download failed.
     """
     try:
-        urip = urllib2.urlopen(url)
+        urip = urlopen(url)
         if os.path.exists(dst) or os.path.lexists(dst):
             lgr.debug("removing existing file/link at '%s'" % dst)
             os.remove(dst)
@@ -684,9 +688,9 @@ def download_file(url, dst):
         fp.write(urip.read())
         fp.close()
         return dst
-    except urllib2.HTTPError:
+    except HTTPError:
         lgr.debug("cannot find '%s' at '%s'" % (sha1, hp))
-    except urllib2.URLError:
+    except URLError:
         lgr.debug("cannot connect to at '%s'" % hp)
     return None
 
