@@ -127,36 +127,43 @@ class HandleRepo(AnnexRepo):
                                          runner=runner, backend=backend)
 
         self.datalad_path = '.datalad'
-        self._cfg_file = opj(self.datalad_path, 'config.ttl')
-        self._initialize_config(name)
-
-    def _initialize_config(self, name):
-
         assure_dir(self.path, self.datalad_path)
+        self._cfg_file = opj(self.datalad_path, 'config.ttl')
+        self._md_file = opj(self.datalad_path, 'datalad.ttl')
 
-        # ignore config file, if it's not in git:
+        importer = CustomImporter('Handle', 'Handle', DLNS.this)
+        # load existing files:
         if self._cfg_file in self.get_indexed_files():
-            graph = self._get_cfg()
-        else:
-            graph = Graph()
+            importer.import_data(opj(self.path, self._cfg_file))
+        if self._md_file in self.get_indexed_files():
+            importer.import_data(opj(self.path, self._md_file))
+        graphs = importer.get_graphs()
 
+        # collection settings:
         # if there is no name statement, add it:
-        if len([subj for subj in graph.objects(DLNS.this, RDFS.label)]) == 0:
-            graph.add((DLNS.this, RDFS.label, name or basename(self.path)))
+        if len([subj for subj in graphs['config'].objects(DLNS.this,
+                                                          RDFS.label)]) == 0:
+            graphs['config'].add((DLNS.this, RDFS.label,
+                                  Literal(name or basename(self.path))))
 
-        self._set_cfg(graph, commit_msg="Initialized config file.")
+        importer.set_graphs(graphs)  # necessary?
+        importer.store_data(opj(self.path, self.datalad_path))
+        # TODO: How do we know something has changed?
+        # => check git status?
+        self.git_add([self._cfg_file, self._md_file])
+        self.git_commit("Initialized config file.")
 
     def _get_cfg(self):
-        config_handler = CustomImporter('Handle')
+        config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
         config_handler.import_data(self._cfg_file)
         return config_handler.get_graphs()['config']
 
     def _set_cfg(self, graph, commit_msg="Updated config file."):
-        config_handler = CustomImporter('Handle')
+        config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
         graph_dict = dict()
         graph_dict['config'] = graph
         config_handler.set_graphs(graph_dict)
-        config_handler.store_data(self.datalad_path)
+        config_handler.store_data(opj(self.path, self.datalad_path))
         self.git_add(self._cfg_file)
         self.git_commit(commit_msg)
 
