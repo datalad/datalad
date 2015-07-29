@@ -20,10 +20,10 @@ import shlex
 
 from functools import wraps
 
-from ConfigParser import NoOptionError
+from six.moves.configparser import NoOptionError
 
-from gitrepo import GitRepo, normalize_path, normalize_paths
-from exceptions import CommandNotAvailableError, CommandError, \
+from .gitrepo import GitRepo, normalize_path, normalize_paths
+from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 
 lgr = logging.getLogger('datalad.annex')
@@ -46,7 +46,7 @@ def kwargs_to_options(func):
     @wraps(func)
     def newfunc(self, *args, **kwargs):
         option_list = []
-        for key in kwargs.keys():
+        for key in kwargs:
             option_list.extend([" --%s=%s" % (key, kwargs.get(key))])
 
         return func(self, *args, options=option_list)

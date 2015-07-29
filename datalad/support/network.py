@@ -17,11 +17,11 @@ import time
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
+from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
 from six.moves.urllib.error import URLError
+from six.moves import StringIO
 
 from bs4 import BeautifulSoup
-from StringIO import StringIO
-from urlparse import urljoin, urlparse, urlsplit, urlunsplit
 
 import logging
 lgr = logging.getLogger('datalad.network')

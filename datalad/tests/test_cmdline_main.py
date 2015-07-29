@@ -9,7 +9,7 @@
 """Test functioning of the datalad main cmdline utility """
 
 import re
-from StringIO import StringIO
+from six.moves import StringIO
 from mock import patch
 
 import datalad

@@ -7,11 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from six import PY2
-if PY2:
-    import __builtin__
-else:
-    import builtins as __builtin__
+import collections
+import six.moves.builtins as __builtin__
 
 import logging
 import shutil, stat, os, sys
@@ -174,7 +171,7 @@ def optional_args(decorator):
         def dec(f):
             return decorator(f, *args, **kwargs)
 
-        is_decorating = not kwargs and len(args) == 1 and callable(args[0])
+        is_decorating = not kwargs and len(args) == 1 and isinstance(args[0], collections.Callable)
         if is_decorating:
             f = args[0]
             args = []
@@ -199,7 +196,7 @@ def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
             ['datalad_temp'] +
             ([prefix] if prefix else []) +
             ([''] if (on_windows or not wrapped)
-                  else [wrapped.func_name]))
+                  else [wrapped.__name__]))
 
     directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
     if directory and 'dir' not in tkwargs_:
@@ -347,7 +344,7 @@ def swallow_logs(new_level=None):
     lgr.handlers = [logging.StreamHandler(adapter.handle)]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
-    if isinstance(new_level, basestring):
+    if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 
     if new_level is not None:
@@ -377,7 +374,7 @@ def setup_exceptionhook():
         if is_interactive():
             import traceback, pdb
             traceback.print_exception(type, value, tb)
-            print
+            print()
             pdb.post_mortem(tb)
         else:
             lgr.warn("We cannot setup exception hook since not in interactive mode")
