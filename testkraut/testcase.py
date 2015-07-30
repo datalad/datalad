@@ -16,6 +16,8 @@ from os.path import join as opj
 from json import dumps as jds
 from functools import wraps
 
+from six import string_types, iteritems
+
 import logging
 lgr = logging.getLogger(__name__)
 
@@ -144,7 +146,7 @@ def discover_specs(paths=None):
             lgr.warning("ignoring '%s': no a valid SPEC file: %s (%s)"
                       % (spec_fname, str(e), e.__class__.__name__))
     # wrap spec file locations in TestArgs
-    return dict([(k, TestArgs(v)) for k, v in discovered.iteritems()])
+    return dict([(k, TestArgs(v)) for k, v in iteritems(discovered)])
 
 
 class TestFromSPEC(TestCase):
@@ -607,7 +609,7 @@ class TestFromSPEC(TestCase):
                 # unset if null
                 if env in os.environ:
                     del os.environ[env]
-            elif isinstance(env_spec[env], basestring):
+            elif isinstance(env_spec[env], string_types):
                 # set if string
                 # set the new one
                 os.environ[env] = str(env_spec[env])

@@ -21,6 +21,7 @@ import platform
 import testkraut
 from os.path import join as opj
 
+from six import string_types
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError, HTTPError
 
@@ -695,7 +696,7 @@ def download_file(url, dst):
     return None
 
 def _resolve_metric_value(val, metrics):
-    if isinstance(val, basestring) and val.startswith('@metric:'):
+    if isinstance(val, string_types) and val.startswith('@metric:'):
         mid = val[8:]
         val = metrics[mid]
     return val

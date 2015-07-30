@@ -14,6 +14,8 @@ import json
 import difflib
 from uuid import uuid1 as uuid
 
+from six import string_types
+
 __allowed_spec_keys__ = [
         'assertions',
         'authors',
@@ -72,7 +74,7 @@ class SPEC(dict):
         dict.__init__(self)
         if isinstance(src, file):
             self.update(json.load(src))
-        elif isinstance(src, basestring):
+        elif isinstance(src, string_types):
             self.update(json.loads(src))
         elif isinstance(src, dict):
             self.update(src)
@@ -201,7 +203,7 @@ def diff(fr, to, recursive_list=False, min_abs_numdiff=None,
             return dtree
         else:
             return None
-    elif isinstance(fr, basestring):
+    elif isinstance(fr, string_types):
         # any string
         if not fr == to:
             return {'ndiff': difflib.ndiff(('%s\n' % fr).splitlines(True),
