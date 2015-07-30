@@ -14,7 +14,7 @@ import json
 import difflib
 from uuid import uuid1 as uuid
 
-from six import string_types
+from six import string_types, iteritems
 
 __allowed_spec_keys__ = [
         'assertions',
@@ -120,7 +120,7 @@ class SPEC(dict):
         spec_file = open(filename, 'w')
         if minimize:
             # don't write empty containers
-            towrite = dict([(k, v) for k, v in self.iteritems()
+            towrite = dict([(k, v) for k, v in iteritems(self)
                                 if not (isSequenceType(v) or isMappingType(v)) \
                                    or len(v)])
         else:

@@ -21,7 +21,7 @@ import platform
 import testkraut
 from os.path import join as opj
 
-from six import string_types
+from six import string_types, iteritems
 from six.moves.urllib.request import urlopen
 from six.moves.urllib.error import URLError, HTTPError
 
@@ -333,7 +333,7 @@ def get_cmd_prov_strace(cmd, match_argv=None):
     if not root_pid is None:
         # merge the info of root_pid with the mother's
         rproc = procs[root_pid]
-        for pid, proc in procs.iteritems():
+        for pid, proc in iteritems(procs):
             if pid.startswith('mother'):
                 for attr in ('generates', 'uses'):
                     proc[attr] += rproc[attr]
@@ -345,14 +345,14 @@ def get_cmd_prov_strace(cmd, match_argv=None):
                     proc[attr] = proc[attr].replace('mother', root_pid)
             #REPLACE ALL MOTHER REFERENCES IN ALL ATTRS
         del procs[root_pid]
-        procs = dict([(pid.replace('mother', root_pid), info) for pid, info in procs.iteritems()])
+        procs = dict([(pid.replace('mother', root_pid), info) for pid, info in iteritems(procs)])
     # uniquify
-    for pid, proc in procs.iteritems():
+    for pid, proc in iteritems(procs):
         for attr in ('generates', 'uses'):
             proc[attr] = set(proc[attr])
     # rewrite inter-proc dependencies to point to processes with cmdinfo
     pid_mapper = {}
-    for pid, proc in procs.iteritems():
+    for pid, proc in iteritems(procs):
         if proc['started_by'] is None:
             # cache pid of the mother
             if 'argv' in proc:
@@ -600,7 +600,7 @@ def describe_python_module(type_, location, entities, pkgdb=None):
 
     if len(modfind.modules):
         spec['depmods'] = []
-    for modname, mod in modfind.modules.iteritems():
+    for modname, mod in iteritems(modfind.modules):
         if not mod.__file__:
             # probably builtin
             continue

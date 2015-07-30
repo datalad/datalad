@@ -16,7 +16,7 @@ from os.path import join as opj
 from json import dumps as jds
 from functools import wraps
 
-from six import string_types, iteritems
+from six import string_types, iteritems, viewitems
 
 import logging
 lgr = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class TemplateTestCase(type):
             if hasattr(attr[method_name], "template"):
                 source = attr[method_name]
                 source_name = method_name.lstrip("_")
-                for test_name, args in source.template.items():
+                for test_name, args in viewitems(source.template):
                     parg, kwargs = args
                     new_name = "test_%s" % test_name
                     new_methods[new_name] = _method_partial(source, *parg, **kwargs)
@@ -454,7 +454,7 @@ class TestFromSPEC(TestCase):
             elif ospectype == 'string' and ospec_id.startswith('tests'):
                 execinfo = self._details['exec_info']
                 sec, idx, field = ospec_id.split('::')
-                for f, matcher in __spec_matchers__.iteritems():
+                for f, matcher in iteritems(__spec_matchers__):
                     if f in ospec:
                         # allow for multiple target values (given a matcher) being
                         # specified.  For some matchers it might make no sense
@@ -478,7 +478,7 @@ class TestFromSPEC(TestCase):
 
     def _compute_metrics(self, spec, info):
         metricspecs = spec.get('metrics', {})
-        for mid, mspec in metricspecs.iteritems():
+        for mid, mspec in iteritems(metricspecs):
             metric = mspec.get('metric', None)
             if metric is None:
                 lgr.warning("broken metric spec '%s': no metric given" % mid)
@@ -503,7 +503,7 @@ class TestFromSPEC(TestCase):
 
     def _check_assertions(self, spec, metric_info):
         specs = spec.get('assertions', {})
-        for aid, aspec in specs.iteritems():
+        for aid, aspec in iteritems(specs):
             lgr.debug("check assertion '%s'" % aid)
             # preconditions
             self.assertThat(aspec, Contains('value'))
@@ -529,7 +529,7 @@ class TestFromSPEC(TestCase):
                 assertion = matcher(
                         **dict(
                             zip([(k, _resolve_metric_value(v, metric_info))
-                                            for k, v in args.iteritems()])))
+                                            for k, v in iteritems(args)])))
             else:
                 assertion = matcher(_resolve_metric_value(args, metric_info))
             # value to match
@@ -579,7 +579,7 @@ class TestFromSPEC(TestCase):
         return TestFromSPEC._system_info
 
     def _verify_dependencies(self, spec):
-        for dep_id, depspec in spec.get('dependencies', {}).iteritems():
+        for dep_id, depspec in iteritems(spec.get('dependencies', {})):
             if not 'type' in depspec or not 'location' in depspec:
                 raise ValueError("dependency SPEC '%s' contains no 'type' or no 'location' field"
                                  % dep_id)
@@ -631,7 +631,7 @@ class TestFromSPEC(TestCase):
     def _restore_environment(self):
         if self._environ_restore is None:
             return
-        for env, val in self._environ_restore.iteritems():
+        for env, val in iteritems(self._environ_restore):
             if val is None:
                 if env in os.environ:
                     del os.environ[env]
@@ -646,7 +646,7 @@ class TestFromSPEC(TestCase):
                           default=False):
             return
         spec = self._cur_spec
-        for dep_id, depspec in spec.get('dependencies', {}).iteritems():
+        for dep_id, depspec in iteritems(spec.get('dependencies', {})):
             if not 'type' in depspec or not 'location' in depspec:
                 raise ValueError("dependency SPEC '%s' contains no 'type' or no 'location' field"
                                  % dep_id)
