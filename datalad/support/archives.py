@@ -17,6 +17,7 @@ assert(StrictVersion(patoolib.__version__) >= "1.7")
 
 import os
 from os.path import join as opj, exists
+from six import next
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -124,12 +125,12 @@ def decompress_file(archive, dir_, leading_directories='strip'):
             lgr.debug("patool gave stderr:\n%s" % cmo.err)
 
     if leading_directories == 'strip':
-        _, dirs, files = os.walk(dir_).next()
+        _, dirs, files = next(os.walk(dir_))
         if not len(files) and len(dirs) == 1:
             # move all the content under dirs[0] up 1 level
             widow_dir = opj(dir_, dirs[0])
             lgr.debug("Moving content within %s upstairs" % widow_dir)
-            subdir, subdirs_, files_ = os.walk(opj(dir_, dirs[0])).next()
+            subdir, subdirs_, files_ = next(os.walk(opj(dir_, dirs[0])))
             for f in subdirs_ + files_:
                 os.rename(opj(subdir, f), opj(dir_, f))
             os.rmdir(widow_dir)

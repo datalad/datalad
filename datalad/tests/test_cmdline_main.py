@@ -9,12 +9,13 @@
 """Test functioning of the datalad main cmdline utility """
 
 import re
+import sys
 from six.moves import StringIO
 from mock import patch
 
 import datalad
-from datalad.cmdline.main import main, get_commands
-from datalad.tests.utils import assert_equal, ok_, assert_raises
+from ..cmdline.main import main, get_commands
+from .utils import assert_equal, ok_, assert_raises, in_
 
 def run_main(args, exit_code=0, expect_stderr=False):
     """Run main() of the datalad, do basic checks and provide outputs
@@ -56,9 +57,12 @@ def test_version():
     stdout, stderr = run_main(['--version'], expect_stderr=True)
 
     # and output should contain our version, copyright, license
-    ok_(stderr.startswith('datalad %s\n' % datalad.__version__))
-    ok_("Copyright" in stderr)
-    ok_("Permission is hereby granted" in stderr)
+
+    # https://hg.python.org/cpython/file/default/Doc/whatsnew/3.4.rst#l1952
+    out = stdout if sys.version_info >= (3, 4) else stderr
+    ok_(out.startswith('datalad %s\n' % datalad.__version__))
+    in_("Copyright", out)
+    in_("Permission is hereby granted", out)
 
 def test_get_commands():
     assert('cmd_crawl' in get_commands())
@@ -69,6 +73,6 @@ def test_help():
     stdout, stderr = run_main(['--help'])
 
     # Let's extract section titles:
-    sections = filter(re.compile('[a-zA-Z ]{4,50}:').match, stdout.split('\n'))
+    sections = list(filter(re.compile('[a-zA-Z ]{4,50}:').match, stdout.split('\n')))
     ok_(sections[0].startswith('Usage:'))  # == Usage: nosetests [-h] if running using nose
     assert_equal(sections[1:], ['Positional arguments:', 'Options:'])
