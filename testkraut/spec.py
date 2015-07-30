@@ -15,6 +15,7 @@ import difflib
 from uuid import uuid1 as uuid
 
 from six import string_types, iteritems
+from six.moves import xrange
 
 __allowed_spec_keys__ = [
         'assertions',

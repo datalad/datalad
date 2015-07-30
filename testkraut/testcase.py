@@ -16,7 +16,7 @@ from os.path import join as opj
 from json import dumps as jds
 from functools import wraps
 
-from six import string_types, iteritems, viewitems
+from six import string_types, iteritems, viewitems, text_type
 
 import logging
 lgr = logging.getLogger(__name__)
@@ -461,7 +461,7 @@ class TestFromSPEC(TestCase):
                         # (e.g. "endswith")
                         targets = ospec[f]
                         for target in (targets if isinstance(targets, list) else [targets]):
-                            target = unicode.replace(target, "<NEWLINE>", os.linesep)
+                            target = text_type.replace(target, "<NEWLINE>", os.linesep)
                             # TODO: This replacement may be should be done elsewhere
                             # to have a general solution. It's now affecting string-type only.
                             # Additionally, "<NEWLINE>" may appear in some output intentionally,
