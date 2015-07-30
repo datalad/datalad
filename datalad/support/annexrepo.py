@@ -117,6 +117,7 @@ class AnnexRepo(GitRepo):
         # TODO: Should the backend option of __init__() also migrate
         # the annex, in case there are annexed files already?
         if backend:
+            lgr.debug("Setting annex backend to %s", backend)
             self.repo.config_writer().set_value("annex", "backends", backend)
 
     def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,

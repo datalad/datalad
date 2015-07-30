@@ -173,6 +173,11 @@ def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
 
+def ok_git_config_not_empty(ar):
+    """Helper to verify that nothing rewritten the config file"""
+    # TODO: we don't support bare -- do we?
+    assert_true(os.stat(opj(ar.path, '.git', 'config')).st_size)
+
 
 def ok_annex_get(ar, files, network=True):
     """Helper to run .annex_get decorated checking for correct operation
@@ -180,12 +185,14 @@ def ok_annex_get(ar, files, network=True):
     annex_get passes through stderr from the ar to the user, which pollutes
     screen while running tests
     """
+    ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
         ar.annex_get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
             ok_('100%' in cmo.err or '100.0%' in cmo.err)
     # verify that load was fetched
+    ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
     if isinstance(has_content, bool):
         ok_(has_content)

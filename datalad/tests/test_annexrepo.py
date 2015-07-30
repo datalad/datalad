@@ -10,7 +10,10 @@
 
 """
 
+import gc
 from git.exc import GitCommandError
+from six import PY3
+
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
 
@@ -292,6 +295,17 @@ def test_AnnexRepo_web_remote(src, dst):
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo(dst, src, backend='MD5')
+    # GitPython has a bug which causes .git/config being wiped out
+    # under Python3, triggered by collecting its config instance I guess
+    gc.collect()
+    try:
+        ok_git_config_not_empty(ar)
+    except AssertionError as e:
+        if PY3:
+            raise SkipTest("Known issue with GitPython 1.0.1. "
+                           "https://github.com/gitpython-developers/GitPython/issues/333")
+        else:
+            raise
 
     filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(dst, filename)
