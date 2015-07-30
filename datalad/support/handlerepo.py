@@ -33,7 +33,7 @@ from ..utils import assure_dir
 lgr = logging.getLogger('datalad.handlerepo')
 
 
-class HandleRepoBranchBackend(HandleBackend):
+class HandleRepoBackend(HandleBackend):
     # TODO: Name. See corresponding naming for CollectionBackend and find
     # a solution for both of them
     """HandleBackend for handle repositories.
@@ -58,10 +58,6 @@ class HandleRepoBranchBackend(HandleBackend):
             self._repo = repo
 
         self._branch = branch or self._repo.git_get_active_branch()
-
-    @property
-    def id(self):
-        return self._repo.datalad_id
 
     @property
     def url(self):
@@ -320,4 +316,4 @@ class HandleRepo(AnnexRepo):
     def get_handle(self, branch=None):
         """Convenience method to create a `Handle` instance.
         """
-        return Handle(HandleRepoBranchBackend(self, branch))
+        return Handle(HandleRepoBackend(self, branch))

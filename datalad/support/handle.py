@@ -41,8 +41,8 @@ class HandleBackend(object):
         """
         pass
 
-    @abstractmethod
-    def get_name(self):
+    @abstractproperty
+    def name(self):
         """Get the (default) name of handle.
 
         A handle's name is defined by and unique within a collection.
@@ -56,40 +56,22 @@ class HandleBackend(object):
         --------
         str
         """
+        # TODO: Add doc for changed property: read-only!
         pass
 
     @abstractmethod
-    def set_name(self, name):
-        """Set a handle's name.
-
-        Whether it's the handle's default name to be set or a collection's name
-        for the handle depends on the backend.
-
-        A backend can deny to write handle data. In that case is should raise
-        an exception.
-
-        TODO: Define a ReadOnlyException or sth.
-
-        Parameters:
-        -----------
-        name: str
-        """
-        pass
-
-    name = abstractproperty(get_name, set_name)
-
-    @abstractmethod
-    def get_metadata(self):
+    def get_metadata(self, files=None):
         """Get a graph containing the handle's metadata.
 
         Returns:
         --------
         rdflib.Graph
         """
+        # TODO: doc `files` and may be find a more general name
         pass
 
     @abstractmethod
-    def set_metadata(self, meta):
+    def set_metadata(self, meta, msg=None):
         """Set the metadata of a handle.
 
         A backend can deny to write handle data. In that case is should raise
@@ -100,18 +82,7 @@ class HandleBackend(object):
         Parameters:
         -----------
         meta: rdflib.Graph
-        """
-        pass
-
-    metadata = abstractproperty(get_metadata, set_metadata)
-
-    @abstractmethod
-    def commit_handle(self, msg="Handle updated."):
-        """
-        commit changes to persistence.
-        => behaviour of set_metadata to be changed to save only to runtime
-        representation.
-        :param msg:
+        msg: optionally a "commit-message"
         """
         pass
 
@@ -131,24 +102,19 @@ class Handle(object):
 
         if isinstance(src, HandleBackend):
             self._backend = src
-            self.url = self._backend.url
             self.name = self._backend.name
-            self.metadata = self._backend.metadata
+            self.url = self._backend.url
+            self.metadata = self._backend.get_metadata()
 
         elif isinstance(src, Handle):
             # TODO: Correct behaviour of copy constructor?
-            # Does this mean, Handle is also a HandleBackend?
-            # Additionally think about pure runtime handles, without any
-            # backend. They would need to store the data, instead of linking
-            # to a backend. But do we need such?
-            self._backend = src
-            self.url = self._backend.url
-            self.name = self._backend.name
-            self.metadata = self._backend.metadata
+            self._backend = src._backend
+            self.name = src.name
+            self.metadata = src.metadata
+            self.url = src.url
 
         elif src is None:
             self._backend = None
-            self.url = None
             self.name = name
             self.metadata = Graph(identifier=URIRef(self.name))
 
@@ -163,4 +129,4 @@ class Handle(object):
             lgr.error("Missing handle backend.")
             raise RuntimeError("Missing handle backend.")
 
-        self._backend.commit_handle(self, msg)
+        self._backend.set_metadata(self.metadata, msg)

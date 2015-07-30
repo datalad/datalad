@@ -110,9 +110,13 @@ class MetadataImporter(object):
         if self._about_class == 'Handle':
             self._graphs['datalad'].add((self._about_uri, RDF.type,
                                          DLNS.Handle))
+            self._graphs['config'].add((self._about_uri, RDF.type,
+                                        DLNS.Handle))
         elif self._about_class == 'Collection':
             self._graphs['datalad'].add((self._about_uri, RDF.type,
                                          DLNS.Collection))
+            self._graphs['config'].add((self._about_uri, RDF.type,
+                                        DLNS.Collection))
 
     @abstractmethod
     def import_data(self, files=None, data=None):

@@ -28,7 +28,7 @@ from ..utils import assure_dir
 lgr = logging.getLogger('datalad.collectionrepo')
 
 
-class CollectionRepoBranchHandleBackend(HandleBackend):
+class CollectionRepoHandleBackend(HandleBackend):
     """HandleBackend for collection repositories.
 
     Implements a HandleBackend retrieving its data from a branch of a
@@ -37,85 +37,89 @@ class CollectionRepoBranchHandleBackend(HandleBackend):
     """
     # TODO: raise proper Exceptions on write access
     # TODO: Better name of these classes
+    # TODO: Update docs!
 
-    def __init__(self, repo, branch, key):
+    def __init__(self, repo, branch, key, ):
         self.repo = repo
         self.branch = branch
         self.key = key
-        self.cache = dict()
-        self.update()  # files
+        self._path = opj(self.repo.path, self.repo._key2filename(self.key))
+        self._cfg_file = opj(self._path, "config.ttl")
+        self._std_file = opj(self._path, "datalad.ttl")
 
-    def update(self, files=None):
-        """Reloads data from git.
+        # remote branch? => read-only
+        if self.branch.split('/')[0] in self.repo.git_get_remotes():
+            self.is_read_only = True
+        else:
+            self.is_read_only = False
 
-        Calls to backend interface methods return cached data.
-        TODO: Maybe make an explicit update() mandatory for backends.
-        """
-        filename = self.repo._key2filename(self.key)
-
-        # We need an object with readline() to parse:
-        # TODO: More testing and may be provide this one outside, if successful
-        class ParseableListOfLines(object):
-            def __init__(self, listOfLines):
-                self.content = listOfLines
-                self.it = iter(self.content)
-
-            def readline(self):
-                try:
-                    return self.it.next()
-                except StopIteration:
-                    return ''
-
-        file_ = ParseableListOfLines(
-            self.repo.git_get_file_content(filename, self.branch))
-        cfg = SafeConfigParser()
-        cfg.readfp(file_)
-
-        self.cache['id'] = cfg.get('Handle', 'id')
-        self.cache['last_seen'] = cfg.get('Handle', 'last_seen')
-
-        # TODO: See CollectionRepo.get_collection()
-        path = self.repo._get_cfg('Collection', 'cache_path')
-        handler = CacheHandler(path, URIRef(self.cache['last_seen']))
-        self.cache['meta'] = handler.get_graph(
-            identifier=self.key,
-            data=self.repo.git_get_file_content(opj(path, filename),
-                                                self.branch))
-
-    def get_metadata(self, file_=None):
+    def get_metadata(self, files=None):
         """
         Gets metadata graph for the handle (all files in collection or just
-        `file_`)
-        :param file_:
-        :return: rdflib.Graph
+        `files`)
+        Parameters:
+        -----------
+        files: list of str
+
+        Returns:
+        --------
+        rdflib.Graph
         """
-        #importer = CustomImporter('Handle', 'Handle', ...)  # target=Handle?or Collection?
-        if file_ is None:
-            pass
-        else:
-            pass
+        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
+                                                           self.branch))
+        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+
+        h_node = cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
+        h_name = cfg_graph.value(subject=h_node, predicate=RDFS.label)
+
+        # additional files in handle's dir:
+        files = [file_ for file_ in self.repo.git_get_files(branch=self.branch)
+                 if file_.startswith(self.repo._key2filename(self.key))
+                 and basename(file_) != "config.ttl"]
+
+        out = Graph(identifier=h_name)
+        for file_ in files:
+            file_str = '\n'.join(self.repo.git_get_file_content(file_,
+                                                                self.branch))
+            out.parse(data=file_str, format="turtle")
+
+        # Note: See note in CollectionRepoBackend.get_collection
+        return out
+
+    def set_metadata(self, meta, msg="Handle metadata updated."):
+
+        if self.is_read_only:
+            raise RuntimeWarning("Can't write to read-only handle.")
+
+        # save current branch ...
+        current_branch = self.repo.git_get_active_branch()
+
+        if self.branch != current_branch:
+            # ... and switch to the one to be changed:
+            self.repo.git_checkout(self.branch)
+
+        assure_dir(self._path)
+        meta.serialize(self._std_file, format="turtle")
+        self.repo.git_add(self._std_file)
+        self.repo.git_commit(msg=msg)
+
+        if self.branch != current_branch:
+            self.repo.git_checkout(current_branch)
+
+    @property
+    def name(self):
+        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
+                                                           self.branch))
+        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+        h_node = cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
+        return cfg_graph.value(subject=h_node, predicate=RDFS.label)
 
     @property
     def url(self):
-        return self.cache['url']
-
-    def get_name(self):
-        return self.key
-
-    def set_name(self, name):
-        lgr.warning("Can't write handle data from within %s" +
-                    str(self.__class__))
-
-    name = property(get_name, set_name)
-
-    def get_metadata(self):
-        return self.cache['meta']
-
-    def set_metadata(self, meta):
-        lgr.warning("Can't write handle data from within %s" +
-                    str(self.__class__))
-
-    metadata = property(get_metadata, set_metadata)
+        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
+                                                           self.branch))
+        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+        return cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
 
 
 class CollectionRepoBackend(CollectionBackend):
@@ -132,6 +136,9 @@ class CollectionRepoBackend(CollectionBackend):
     # collection with a remote url and then it's just locally done, could be
     # confusing to users not familiar with git.
     # To be worked out when implementing such commands.
+    #
+    # Better to not allow to commit to remote branches and force the user to
+    # clone it first.
 
     def __init__(self, repo, branch=None):
         """
@@ -154,6 +161,12 @@ class CollectionRepoBackend(CollectionBackend):
         self.branch = branch if branch is not None \
             else repo.git_get_active_branch()
 
+        # remote branch? => read-only
+        if self.branch.split('/')[0] in self.repo.git_get_remotes():
+            self.is_read_only = True
+        else:
+            self.is_read_only = False
+
     def get_handles(self):
         """Get the metadata of all handles in `branch`.
 
@@ -166,7 +179,7 @@ class CollectionRepoBackend(CollectionBackend):
 
         # load handles from branch
         for key in self.repo.get_handle_list(self.branch):
-            out[key] = Handle(src=CollectionRepoBranchHandleBackend(
+            out[key] = Handle(src=CollectionRepoHandleBackend(
                 self.repo, self.branch, key))
         return out
 
@@ -176,11 +189,7 @@ class CollectionRepoBackend(CollectionBackend):
         # read standard files:
         cfg_str = '\n'.join(self.repo.git_get_file_content("config.ttl",
                                                            self.branch))
-        dat_str = '\n'.join(self.repo.git_get_file_content("datalad.ttl",
-                                                           self.branch))
-        std = Graph()
-        std.parse(data=cfg_str, format="turtle")
-        std.parse(data=dat_str, format="turtle")
+        std = Graph().parse(data=cfg_str, format="turtle")
 
         col_node = std.value(predicate=RDF.type, object=DLNS.Collection)
         col_name = std.value(subject=col_node, predicate=RDFS.label)
@@ -202,6 +211,9 @@ class CollectionRepoBackend(CollectionBackend):
         return out
 
     def commit_collection(self, collection, msg):
+
+        if self.is_read_only:
+            raise RuntimeWarning("Can't commit remote collection.")
 
         if not isinstance(collection, Collection):
             raise TypeError("Can't save non-collection type: %s" %
@@ -231,11 +243,13 @@ class CollectionRepoBackend(CollectionBackend):
 
         # handles:
         for k, v in collection.iteritems():
-            assure_dir(opj(self.repo.path, self.repo._key2filename(k)))
-            # todo: move line above to handle-commit
-            v.commit()
 
-            files_to_add.append(self.repo._key2filename(k))  # correct?
+            v.commit()
+            # files_to_add.append(self.repo._key2filename(k))
+            # Actually, this shouldn't be necessary, since it was
+            # committed above. On the other hand, that's a lot of commits.
+            # May be don't commit the handles but just write_to_file and commit
+            # herein.
 
         self.repo.git_add(files_to_add)
         self.repo.git_commit(msg)

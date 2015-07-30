@@ -441,6 +441,7 @@ class GitRepo(object):
     def git_checkout(self, name, options=''):
         """
         """
+        # TODO: May be check for the need of -b options herein?
 
         self._git_custom_command('', 'git checkout %s %s' % (options, name))
 
