@@ -105,6 +105,16 @@ class HandleBackend(object):
 
     metadata = abstractproperty(get_metadata, set_metadata)
 
+    @abstractmethod
+    def commit_handle(self, msg="Handle updated."):
+        """
+        commit changes to persistence.
+        => behaviour of set_metadata to be changed to save only to runtime
+        representation.
+        :param msg:
+        """
+        pass
+
 
 class Handle(object):
     """Representation of a Handle's metadata.
@@ -146,3 +156,11 @@ class Handle(object):
             e_msg = "Invalid source for Handle: %s." % type(src)
             lgr.error(e_msg)
             raise TypeError(e_msg)
+
+    def commit(self, msg="Handle updated."):
+
+        if not self._backend:
+            lgr.error("Missing handle backend.")
+            raise RuntimeError("Missing handle backend.")
+
+        self._backend.commit_handle(self, msg)

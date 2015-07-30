@@ -174,24 +174,26 @@ class CollectionRepoBackend(CollectionBackend):
         """Get collection level metadata of a branch
         """
         # read standard files:
-        std = Graph().parse(data=self.repo.git_get_file_content("config.ttl",
-                                                                self.branch),
-                            format="turtle")
-        std.parse(data=self.repo.git_get_file_content("datalad.ttl",
-                                                      self.branch),
-                  format="turtle")
+        cfg_str = '\n'.join(self.repo.git_get_file_content("config.ttl",
+                                                           self.branch))
+        dat_str = '\n'.join(self.repo.git_get_file_content("datalad.ttl",
+                                                           self.branch))
+        std = Graph()
+        std.parse(data=cfg_str, format="turtle")
+        std.parse(data=dat_str, format="turtle")
 
         col_node = std.value(predicate=RDF.type, object=DLNS.Collection)
         col_name = std.value(subject=col_node, predicate=RDFS.label)
 
         # additional files in collection's basedir:
         files = [file_ for file_ in self.repo.git_get_files(branch=self.branch)
-                 if file_ == basename(file_)]
+                 if file_ == basename(file_) and file_ != "config.ttl"]
 
         out = Graph(identifier=col_name)
         for file_ in files:
-            out.parse(data=self.repo.git_get_file_content(file_, self.branch),
-                      format="turtle")
+            file_str = '\n'.join(self.repo.git_get_file_content(file_,
+                                                                self.branch))
+            out.parse(data=file_str, format="turtle")
 
         # Note: By now we parse config.ttl and datalad.ttl two times here.
         # The issue is to determine the identifier of hte graph, which can't be
@@ -200,11 +202,6 @@ class CollectionRepoBackend(CollectionBackend):
         return out
 
     def commit_collection(self, collection, msg):
-        # TODO: implement the shit herein instead of CollectionRepo
-        # self.repo.commit_collection(collection, self.branch, msg)
-
-        #   def commit_collection(self, collection, branch=None,
-        #                  msg="Collection saved."):
 
         if not isinstance(collection, Collection):
             raise TypeError("Can't save non-collection type: %s" %
@@ -226,43 +223,26 @@ class CollectionRepoBackend(CollectionBackend):
 
         # update everything else to be safe
         files_to_add = []
+
+        # collection level:
+        collection.meta.serialize(opj(self.repo.path, self.repo._md_file),
+                                  format="turtle")
+        files_to_add.append(self.repo._md_file)
+
+        # handles:
         for k, v in collection.iteritems():
-            assure_dir(opj(self.repo.path, self._key2filename(k)))
+            assure_dir(opj(self.repo.path, self.repo._key2filename(k)))
+            # todo: move line above to handle-commit
+            v.commit()
 
+            files_to_add.append(self.repo._key2filename(k))  # correct?
 
-            ######################################
-            # TODO: doesn't work that way anymore!
-            ######################################
+        self.repo.git_add(files_to_add)
+        self.repo.git_commit(msg)
 
-            cfg = SafeConfigParser()
-            cfg.read(opj(self.path, self._key2filename(k)))
-            cfg.set('Handle', 'id', v.id)
-            cfg.set('Handle', 'last_seen', v.url)
-            # TODO: Do we need 'default_target' in Handle?
-            cfg.write(open(opj(self.path, self._key2filename(k)), 'w'))
-            files_to_add.append(self._key2filename(k))
-
-            # write metadata cache:
-            CacheHandler(opj(self.path,
-                             self._get_cfg('Collection', 'cache_path')),
-                         URIRef(v.url)).set(v.meta, self._key2filename(k))
-            files_to_add.append(opj(self._get_cfg('Collection', 'cache_path'),
-                                    self._key2filename(k)))
-
-        # write collection files:
-        CacheHandler(opj(self.path,
-                         self._get_cfg('Collection', 'cache_path')),
-                     URIRef(self.path)).set(collection.meta, 'collection')
-        files_to_add.append(opj(self._get_cfg('Collection', 'cache_path'),
-                                'collection'))
-        self.git_add(files_to_add)
-        self.git_commit(msg)
-
-        self.name = collection.name
-
-        if branch != current_branch:
+        if self.branch != current_branch:
             # switch back to repo's active branch on disk
-            self.git_checkout(current_branch)
+            self.repo.git_checkout(current_branch)
 
 
 class CollectionRepo(GitRepo):
