@@ -16,7 +16,7 @@ from os.path import join as opj
 from json import dumps as jds
 from functools import wraps
 
-from six import string_types, iteritems, viewitems, text_type
+from six import string_types, iteritems, text_type
 
 import logging
 lgr = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class TemplateTestCase(type):
             if hasattr(attr[method_name], "template"):
                 source = attr[method_name]
                 source_name = method_name.lstrip("_")
-                for test_name, args in viewitems(source.template):
+                for test_name, args in list(source.template.items()):
                     parg, kwargs = args
                     new_name = "test_%s" % test_name
                     new_methods[new_name] = _method_partial(source, *parg, **kwargs)
