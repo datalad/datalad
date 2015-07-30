@@ -18,10 +18,10 @@ from mock import patch
 from six import PY3
 
 from os.path import join as opj
-from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook
+from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
-from .utils import with_tempfile, assert_in
+from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 
 
@@ -109,3 +109,13 @@ def _check_setup_exceptionhook(interactive):
 def test_setup_exceptionhook():
     for tval in [True, False]:
         yield _check_setup_exceptionhook, tval
+
+def test_md5sum():
+    # just a smoke (encoding/decoding) test for md5sum
+    _ = md5sum(__file__)
+
+
+@with_tree([('1.tar.gz', (('1 f.txt', '1 f load'),))])
+def test_md5sum_archive(d):
+    # just a smoke (encoding/decoding) test for md5sum
+    _ = md5sum(opj(d, '1.tar.gz'))

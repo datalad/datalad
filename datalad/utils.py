@@ -47,9 +47,8 @@ def is_interactive():
 
 import hashlib
 def md5sum(filename):
-    with open(filename) as f:
+    with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
-
 
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
