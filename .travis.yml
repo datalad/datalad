@@ -9,7 +9,8 @@ python:
   - "2.7"
   - "3.3"
   - "3.4"
-  - "3.5"
+# not there -- don't try!
+# - "3.5"
 # can't since coverage doesn't support it yet: https://bitbucket.org/ned/coveragepy/issues/391/getargspec-was-finally-removed-will-not-be
 #  - "nightly"
 
