@@ -217,14 +217,14 @@ class AnnexCustomRemote(object):
         *args: list of strings
            arguments to be joined by a space and passed to git-annex
         """
-        msg = " ".join(map(str, args)).encode()
+        msg = " ".join(map(str, args))
         if not self._in_the_loop:
             lgr.debug("We are not yet in the loop, thus should not send to annex"
-                     " anything.  Got: %s" % msg)
+                     " anything.  Got: %s" % msg.encode())
             return
         try:
             self.heavydebug("Sending %r" % msg)
-            self.fout.write("%s\n" % msg)
+            self.fout.write(msg + "\n")#.encode())
             self.fout.flush()
             if self._protocol is not None:
                 self._protocol += "send %s" % msg
@@ -460,7 +460,7 @@ class AnnexCustomRemote(object):
         """Gets URL(s) associated with a Key.
 
         """
-        assert(self.url_prefix.encode() == self.url_prefix)
+        assert(self.url_prefix == self.url_prefix)
         # FIXME: there seems to be a bug
         # http://git-annex.branchable.com/bugs/GETURLS_doesn__39__t_return_URLs_if_prefix_is_provided/?updated
         # thus for now requesting without prefix and filtering manually
