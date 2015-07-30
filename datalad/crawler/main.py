@@ -13,6 +13,8 @@
 
 from os.path import dirname, exists, join, sep as pathsep
 
+from six import iteritems
+
 from ..db import load_db, save_db
 from ..support.repos import *
 from ..support.network import collect_urls, filter_urls, \
@@ -125,7 +127,7 @@ class DoubleAnnexRepo(object):
         # TODO: look what is in incoming for this "repository", so if
         # some urls are gone or changed so previous file is not there
         # we would clean-up upon exit
-        db_incoming_urls = dict([(v['url'], i) for i,v in db_incoming.iteritems()])
+        db_incoming_urls = dict([(v['url'], i) for i, v in iteritems(db_incoming)])
 
         # each section defines a separate download setup
         for section in self.cfg.sections():

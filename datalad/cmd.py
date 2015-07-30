@@ -237,7 +237,7 @@ class Runner(object):
             else:
                 out = proc.communicate()
 
-            out = tuple(map(binary_type.decode, out))
+            #TODO for PY3 out = tuple(map(binary_type.decode, out))
 
             status = proc.poll()
 

@@ -7,6 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from six import iteritems
+
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 from ..support.archives import DECOMPRESSORS
@@ -70,10 +72,10 @@ class EnhancedConfigParser(SafeConfigParserWithIncludes):
             ))
         # TODO: verify correct input config.  Currently would not fail if some
         # unknown option (e.g. add_git) is used
-        for section, options in sections.iteritems():
+        for section, options in iteritems(sections):
             if section != 'DEFAULT':
                 cfg.add_section(section)
-            for opt, value in options.iteritems():
+            for opt, value in iteritems(options):
                 cfg.set(section, opt, value)
         return cfg
 
