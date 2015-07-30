@@ -41,24 +41,6 @@ class HandleBackend(object):
         """
         pass
 
-    @abstractproperty
-    def name(self):
-        """Get the (default) name of handle.
-
-        A handle's name is defined by and unique within a collection.
-        Nevertheless it has a default name it knows about by itself.
-        This method is supposed to return the "most valid" name the backend
-        knows. So, a backend that is somehow connected to a collection should
-        return the handle's name with respect to this collection instead of its
-        default name.
-
-        Returns:
-        --------
-        str
-        """
-        # TODO: Add doc for changed property: read-only!
-        pass
-
     @abstractmethod
     def get_metadata(self, files=None):
         """Get a graph containing the handle's metadata.
@@ -102,21 +84,18 @@ class Handle(object):
 
         if isinstance(src, HandleBackend):
             self._backend = src
-            self.name = self._backend.name
             self.url = self._backend.url
-            self.metadata = self._backend.get_metadata()
+            self.meta = self._backend.get_metadata()
 
         elif isinstance(src, Handle):
             # TODO: Correct behaviour of copy constructor?
             self._backend = src._backend
-            self.name = src.name
-            self.metadata = src.metadata
+            self.meta = src.meta
             self.url = src.url
 
         elif src is None:
             self._backend = None
-            self.name = name
-            self.metadata = Graph(identifier=URIRef(self.name))
+            self.meta = Graph(identifier=URIRef(name))
 
         else:
             e_msg = "Invalid source for Handle: %s." % type(src)
@@ -129,4 +108,9 @@ class Handle(object):
             lgr.error("Missing handle backend.")
             raise RuntimeError("Missing handle backend.")
 
-        self._backend.set_metadata(self.metadata, msg)
+        self._backend.set_metadata(self.meta, msg)
+
+    @property
+    def name(self):
+        return self.meta.identifier
+

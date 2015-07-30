@@ -9,7 +9,7 @@
 """Implements datalad collection metadata representation.
 """
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, abstractproperty
 from copy import deepcopy
 import logging
 import gc
@@ -18,7 +18,7 @@ from rdflib import Graph, URIRef, ConjunctiveGraph
 from rdflib.plugins.memory import IOMemory
 
 from .handle import Handle
-from .metadatahandler import DLNS
+from .metadatahandler import DLNS, RDF, DCTERMS
 
 lgr = logging.getLogger('datalad.collection')
 
@@ -50,6 +50,8 @@ class CollectionBackend(object):
     def get_collection(self):
         """Get the metadata of the collection itself.
 
+        Returns named Graph.
+
         Returns:
         --------
         rdflib.Graph
@@ -67,6 +69,14 @@ class CollectionBackend(object):
         collection: Collection
         msg: str
         """
+
+    @abstractproperty
+    def url(self):
+        """
+
+        :return:
+        """
+
 
     # TODO: We'll probably need a method to get a url of the collection.
     # Since collections are branches of repos in case of a repo-backend,
@@ -159,7 +169,6 @@ class Collection(dict):
             self.meta = Graph(store=self.store, identifier=URIRef(name))
             self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
-
         else:
             lgr.error("Unknown source for Collection(): %s" % type(src))
             raise TypeError('Unknown source for Collection(): %s' % type(src))
@@ -169,16 +178,18 @@ class Collection(dict):
         return self.meta.identifier
 
     def __delitem__(self, key):
-        super(Collection, self).__delitem__(key)
 
-        # TODO: adapt to current terms DCTERMS.hasPart:
-        self.meta.remove((URIRef(self.name), DLNS.contains, URIRef(key)))
-        self.store.remove_graph(URIRef(key))
+        self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
+        key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
+        self.meta.remove((self_uri, DCTERMS.hasPart, key_uri))
+        self.store.remove_graph(self[key].name)
+        super(Collection, self).__delitem__(key)
 
     def __setitem__(self, key, value):
         super(Collection, self).__setitem__(key, value)
-        # TODO: adapt to current terms:
-        self.meta.add((URIRef(self.name), DLNS.contains, URIRef(key)))
+        self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
+        key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
+        self.meta.add((self_uri, DCTERMS.hasPart, key_uri))
         self.store.add_graph(self[key].meta)
 
     def _reload(self):
@@ -197,7 +208,6 @@ class Collection(dict):
 
         # get collection level data:
         collection_data = self._backend.get_collection()
-        self.name = collection_data['name']
 
         # TODO: May be a backend can just pass a newly created store containing
         # all the needed graphs. Would save us time and space for copy, but
@@ -219,16 +229,12 @@ class Collection(dict):
         self.store = IOMemory()
 
         # add collection's own graph:
-        self.store.add_graph(collection_data['meta'])
-        self.meta = collection_data['meta']
+        self.store.add_graph(collection_data)
+        self.meta = collection_data
 
         # add handles' graphs:
         for handle in self:
             self.store.add_graph(self[handle].meta)
-            # add reference in collection graph:
-            # TODO: Is this still needed or is it correct if it's done by
-            # the backend?
-            self.meta.add((URIRef(self.name), DLNS.contains, URIRef(handle)))
 
         # reference to the conjunctive graph to be queried:
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)

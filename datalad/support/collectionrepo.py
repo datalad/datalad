@@ -39,11 +39,12 @@ class CollectionRepoHandleBackend(HandleBackend):
     # TODO: Better name of these classes
     # TODO: Update docs!
 
-    def __init__(self, repo, branch, key, ):
+    def __init__(self, repo, key, branch=None):
         self.repo = repo
-        self.branch = branch
+        self.branch = branch if branch is not None \
+            else self.repo.git_get_active_branch()
         self.key = key
-        self._path = opj(self.repo.path, self.repo._key2filename(self.key))
+        self._path = self.repo._key2filename(self.key)
         self._cfg_file = opj(self._path, "config.ttl")
         self._std_file = opj(self._path, "datalad.ttl")
 
@@ -73,9 +74,11 @@ class CollectionRepoHandleBackend(HandleBackend):
         h_name = cfg_graph.value(subject=h_node, predicate=RDFS.label)
 
         # additional files in handle's dir:
-        files = [file_ for file_ in self.repo.git_get_files(branch=self.branch)
-                 if file_.startswith(self.repo._key2filename(self.key))
-                 and basename(file_) != "config.ttl"]
+        if files is None:
+            files = [file_
+                     for file_ in self.repo.git_get_files(branch=self.branch)
+                     if file_.startswith(self.repo._key2filename(self.key))
+                     and basename(file_) != "config.ttl"]
 
         out = Graph(identifier=h_name)
         for file_ in files:
@@ -98,7 +101,7 @@ class CollectionRepoHandleBackend(HandleBackend):
             # ... and switch to the one to be changed:
             self.repo.git_checkout(self.branch)
 
-        assure_dir(self._path)
+        assure_dir(opj(self.repo.path, self._path))
         meta.serialize(self._std_file, format="turtle")
         self.repo.git_add(self._std_file)
         self.repo.git_commit(msg=msg)
@@ -107,19 +110,16 @@ class CollectionRepoHandleBackend(HandleBackend):
             self.repo.git_checkout(current_branch)
 
     @property
-    def name(self):
-        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                           self.branch))
-        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-        h_node = cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
-        return cfg_graph.value(subject=h_node, predicate=RDFS.label)
-
-    @property
     def url(self):
-        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                           self.branch))
-        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-        return cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
+        if self.is_read_only:
+            # remote repo:
+            cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
+                                                               self.branch))
+            cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+            return cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
+        else:
+            # available repo:
+            return self.repo.path
 
 
 class CollectionRepoBackend(CollectionBackend):
@@ -257,6 +257,18 @@ class CollectionRepoBackend(CollectionBackend):
         if self.branch != current_branch:
             # switch back to repo's active branch on disk
             self.repo.git_checkout(current_branch)
+
+    @property
+    def url(self):
+        if self.is_read_only:
+            # remote repo:
+            cfg_str = '\n'.join(self.repo.git_get_file_content("config.ttl",
+                                                               self.branch))
+            cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+            return cfg_graph.value(predicate=RDF.type, object=DLNS.Collection)
+        else:
+            # available repo:
+            return self.repo.path
 
 
 class CollectionRepo(GitRepo):
