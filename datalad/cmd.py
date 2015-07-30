@@ -19,6 +19,7 @@ import os
 import shutil
 import shlex
 
+from six import PY3
 from six import string_types, text_type, binary_type
 
 from .support.exceptions import CommandError
@@ -26,6 +27,7 @@ from .support.protocol import NullProtocol
 
 lgr = logging.getLogger('datalad.cmd')
 
+_TEMP_std = sys.stdout, sys.stderr
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
@@ -237,7 +239,11 @@ class Runner(object):
             else:
                 out = proc.communicate()
 
-            #TODO for PY3 out = tuple(map(binary_type.decode, out))
+            if PY3:
+                def decode_if_not_None(x):
+                    return "" if x is None else binary_type.decode(x)
+                # TODO: check if we can avoid PY3 specific here
+                out = tuple(map(decode_if_not_None, out))
 
             status = proc.poll()
 

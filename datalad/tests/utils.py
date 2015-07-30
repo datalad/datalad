@@ -21,13 +21,8 @@ import socket
 from six import PY2, text_type
 import time
 
-if PY2:
-    from SimpleHTTPServer import SimpleHTTPRequestHandler
-    from BaseHTTPServer import HTTPServer
-else:
-    from http.server import SimpleHTTPRequestHandler
-    from http.server import HTTPServer
-
+from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
+from six.moves.BaseHTTPServer import HTTPServer
 
 from functools import wraps
 from os.path import exists, realpath, join as opj
@@ -509,7 +504,9 @@ def ignore_nose_capturing_stdout(func):
         try:
             func(*args, **kwargs)
         except AttributeError as e:
-            if e.message.find('StringIO') > -1 and e.message.find('fileno') > -1:
+            # Use args instead of .message which is PY2 specific
+            message = e.args[0] if e.args else ""
+            if message.find('StringIO') > -1 and message.find('fileno') > -1:
                 pass
             else:
                 raise

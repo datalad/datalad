@@ -17,6 +17,8 @@ import sys
 from os.path import exists, join as opj, basename, realpath, dirname
 from traceback import format_exc
 
+from six.moves import xrange
+
 from ..cmd import Runner
 from ..support.protocol import ProtocolInterface
 

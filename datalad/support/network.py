@@ -81,7 +81,7 @@ def __download(url, filename=None, filename_only=False):
     return filename
 
 def retry_urlopen(url, retries=3):
-    for t in xrange(retries):
+    for t in range(retries):
         try:
             return urlopen(url)
         except URLError as e:
@@ -96,7 +96,7 @@ def retry_urlopen(url, retries=3):
 def _fetch_page(url, retries=3):
     lgr.debug("Fetching %s" % url)
     openurl = retry_urlopen(url, retries=retries)
-    for t in xrange(retries):
+    for t in range(retries):
         try:
             page = openurl.read()
             break
