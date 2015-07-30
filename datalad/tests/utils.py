@@ -72,7 +72,7 @@ def create_tree(path, tree):
                 create_tree(full_name, load)
         else:
             #encoding = sys.getfilesystemencoding()
-            #if isinstance(full_name, unicode):
+            #if isinstance(full_name, text_type):
             #    import pydb; pydb.debugger()
             with open(full_name, 'w') as f:
                 if PY2 and isinstance(load, text_type):

@@ -19,6 +19,7 @@ import time
 import sys
 
 from os.path import join, exists, lexists
+from six import text_type
 
 from ..cmd import Runner, link_file_load, lgr
 from .archives import decompress_file
@@ -36,7 +37,7 @@ def _esc(filename):
 def _enc(filename):
     """Encode unicode filename
     """
-    if isinstance(filename, unicode):
+    if isinstance(filename, text_type):
         return filename.encode(sys.getfilesystemencoding())
     else:
         return filename
