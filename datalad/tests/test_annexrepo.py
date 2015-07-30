@@ -215,8 +215,9 @@ def test_AnnexRepo_options_decorator():
     def decorated(self, whatever, options=[]):
         return options
 
-    assert_equal(decorated(1, 2, someoption='first', someotheroption='second'),
-                 [' --someoption=first', ' --someotheroption=second'])
+    # Order is not guaranteed so use sets
+    assert_equal(set(decorated(1, 2, someoption='first', someotheroption='second')),
+                 {' --someoption=first', ' --someotheroption=second'})
 
 
 @assert_cwd_unchanged

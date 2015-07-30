@@ -15,6 +15,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 from os import getcwd
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
+from six import string_types
 
 from functools import wraps
 
@@ -132,7 +133,7 @@ def normalize_paths(func, match_return_type=True):
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
-        if isinstance(files, basestring):
+        if isinstance(files, string_types):
             files_new = [_normalize_path(self.path, files)]
             single_file = True
         elif isinstance(files, list):

@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 from glob import glob
 from os.path import exists, join as opj, basename
 
+from six import text_type
 from six.moves.urllib.request import urlopen
 
 from mock import patch
@@ -288,8 +289,8 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         raise SkipTest("Can't convert back/forth using %s encoding"
                        % filesysencoding)
 
-    test_fpath_full = unicode(os.path.join(tmp_dir, test_fpath))
-    test_fpath_dir = unicode(os.path.dirname(test_fpath_full))
+    test_fpath_full = text_type(os.path.join(tmp_dir, test_fpath))
+    test_fpath_dir = text_type(os.path.dirname(test_fpath_full))
 
     if not os.path.exists(test_fpath_dir):
         os.makedirs(test_fpath_dir)
@@ -313,7 +314,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
 
         url = "{}/{}".format(url, href_links[0])
         u = urlopen(url)
-        html = u.read()
+        html = u.read().decode()
         assert(test_txt == html)
 
     test_path_and_url()

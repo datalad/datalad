@@ -30,19 +30,6 @@ __docformat__ = 'restructuredtext'
 # man: -*- % crawl the website to collect/extract data for git-annex
 
 
-import calendar
-import os
-import re
-import shutil
-import time
-
-import argparse
-import os
-import sys
-
-import datalad.log
-from .helpers import parser_add_common_args
-
 def setup_parser(parser):
 
     # common options

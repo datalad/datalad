@@ -15,6 +15,7 @@ import re
 import shutil
 import time
 
+from six import string_types
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
@@ -158,9 +159,9 @@ def same_website(url_rec, u_rec):
     u_rec: ParseResult
       record for new url
     """
-    if isinstance(url_rec, basestring):
+    if isinstance(url_rec, string_types):
         url_rec = urlparse(url_rec)
-    if isinstance(u_rec, basestring):
+    if isinstance(u_rec, string_types):
         u_rec = urlparse(u_rec)
     return (url_rec.netloc == u_rec.netloc)
     # todo: collect more of sample cases.

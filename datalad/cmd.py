@@ -18,6 +18,9 @@ import logging
 import os
 import shutil
 import shlex
+
+from six import string_types, text_type, binary_type
+
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol
 
@@ -79,7 +82,7 @@ class Runner(object):
         TypeError if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, basestring) or isinstance(cmd, list):
+        if isinstance(cmd, string_types) or isinstance(cmd, list):
             return self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             return self.call(cmd, *args, **kwargs)
@@ -103,7 +106,7 @@ class Runner(object):
         stdout, stderr = [], []
         while proc.poll() is None:
             if log_stdout:
-                line = proc.stdout.readline()
+                line = proc.stdout.readline().decode()
                 if line != '':
                     stdout += line
                     self._log_out(line)
@@ -201,13 +204,13 @@ class Runner(object):
         if self.protocol.do_execute_ext_commands:
 
             if shell is None:
-                shell = isinstance(cmd, basestring)
+                shell = isinstance(cmd, string_types)
 
             if self.protocol.records_ext_commands:
                 prot_exc = None
                 prot_id = self.protocol.start_section(shlex.split(cmd)
                                                       if isinstance(cmd,
-                                                                    basestring)
+                                                                    string_types)
                                                       else cmd)
 
             try:
@@ -234,6 +237,8 @@ class Runner(object):
             else:
                 out = proc.communicate()
 
+            out = tuple(map(binary_type.decode, out))
+
             status = proc.poll()
 
             # needs to be done after we know status
@@ -257,7 +262,7 @@ class Runner(object):
         else:
             if self.protocol.records_ext_commands:
                 self.protocol.add_section(shlex.split(cmd)
-                                            if isinstance(cmd, basestring)
+                                            if isinstance(cmd, string_types)
                                             else cmd, None)
             out = ("DRY", "DRY")
 

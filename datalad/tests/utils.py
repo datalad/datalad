@@ -18,7 +18,7 @@ import multiprocessing
 import logging
 import random
 import socket
-from six import PY2
+from six import PY2, text_type
 import time
 
 if PY2:
@@ -80,7 +80,7 @@ def create_tree(path, tree):
             #if isinstance(full_name, unicode):
             #    import pydb; pydb.debugger()
             with open(full_name, 'w') as f:
-                if isinstance(load, unicode):
+                if PY2 and isinstance(load, text_type):
                     load = load.encode('utf-8')
                 f.write(load)
 

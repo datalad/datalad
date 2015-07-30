@@ -80,7 +80,7 @@ def _main(args, backend=None):
     #           e.g. for archive --key KEY(archive) --file FILE
     command = args.command
     if command == 'get-uri-prefix':
-        print remote.url_prefix
+        print(remote.url_prefix)
     elif args.command is None:
         # If no command - run the special remote
         remote.main()

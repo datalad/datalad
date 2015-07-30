@@ -225,6 +225,7 @@ def swallow_outputs():
     print function had desired effect
     """
 
+    debugout = sys.stdout
     class StringIOAdapter(object):
         """Little adapter to help getting out/err values
         """
@@ -265,12 +266,6 @@ def swallow_outputs():
 
 
 
-    # preserve -- they could have been mocked already
-    oldprint = getattr(__builtin__, 'print')
-    oldout, olderr = sys.stdout, sys.stderr
-    adapter = StringIOAdapter()
-    sys.stdout, sys.stderr = adapter.handles
-
     def fake_print(*args, **kwargs):
         sep = kwargs.pop('sep', ' ')
         end = kwargs.pop('end', '\n')
@@ -282,9 +277,16 @@ def swallow_outputs():
         else:
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
-    setattr(__builtin__, 'print', fake_print)
+
+    # preserve -- they could have been mocked already
+    oldprint = getattr(__builtin__, 'print')
+    oldout, olderr = sys.stdout, sys.stderr
+    adapter = StringIOAdapter()
 
     try:
+        sys.stdout, sys.stderr = adapter.handles
+        setattr(__builtin__, 'print', fake_print)
+
         yield adapter
     finally:
         sys.stdout, sys.stderr = oldout, olderr
@@ -361,7 +363,6 @@ def swallow_logs(new_level=None):
 # Additional handlers
 #
 _sys_excepthook = sys.excepthook # Just in case we ever need original one
-
 def setup_exceptionhook():
     """Overloads default sys.excepthook with our exceptionhook handler.
 
@@ -370,7 +371,6 @@ def setup_exceptionhook():
     """
 
     def _datalad_pdb_excepthook(type, value, tb):
-
         if is_interactive():
             import traceback, pdb
             traceback.print_exception(type, value, tb)
