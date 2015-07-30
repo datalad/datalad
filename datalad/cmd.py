@@ -105,13 +105,13 @@ class Runner(object):
 
     def _get_output_online(self, proc, log_stdout, log_stderr,
                            expect_stderr=False, expect_fail=False):
-        stdout, stderr = [], []
+        stdout, stderr = binary_type(), binary_type()
         while proc.poll() is None:
             if log_stdout:
-                line = proc.stdout.readline().decode()
-                if line != '':
+                line = proc.stdout.readline()
+                if line:
                     stdout += line
-                    self._log_out(line)
+                    self._log_out(line.decode())
                     # TODO: what level to log at? was: level=5
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stdout()
@@ -120,9 +120,9 @@ class Runner(object):
 
             if log_stderr:
                 line = proc.stderr.readline()
-                if line != '':
+                if line:
                     stderr += line
-                    self._log_err(line, expect_stderr or expect_fail)
+                    self._log_err(line.decode(), expect_stderr or expect_fail)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -240,6 +240,7 @@ class Runner(object):
                 out = proc.communicate()
 
             if PY3:
+                # Decoding was delayed to this point
                 def decode_if_not_None(x):
                     return "" if x is None else binary_type.decode(x)
                 # TODO: check if we can avoid PY3 specific here
@@ -257,8 +258,8 @@ class Runner(object):
                     self._log_err(out[1], expected=expect_stderr)
 
             if status not in [0, None]:
-                msg = "Failed to run %r%s. Exit code=%d" \
-                    % (cmd, " under %r" % (cwd or self.cwd), status)
+                msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
+                    % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
                 (lgr.debug if expect_fail else lgr.error)(msg)
                 raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
