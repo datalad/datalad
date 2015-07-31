@@ -298,14 +298,7 @@ def test_AnnexRepo_migrating_backends(src, dst):
     # GitPython has a bug which causes .git/config being wiped out
     # under Python3, triggered by collecting its config instance I guess
     gc.collect()
-    try:
-        ok_git_config_not_empty(ar)
-    except AssertionError as e:
-        if PY3:
-            raise SkipTest("Known issue with GitPython 1.0.1. "
-                           "https://github.com/gitpython-developers/GitPython/issues/333")
-        else:
-            raise
+    ok_git_config_not_empty(ar)  # Must not blow, see https://github.com/gitpython-developers/GitPython/issues/333
 
     filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(dst, filename)

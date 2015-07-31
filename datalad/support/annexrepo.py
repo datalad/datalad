@@ -118,7 +118,12 @@ class AnnexRepo(GitRepo):
         # the annex, in case there are annexed files already?
         if backend:
             lgr.debug("Setting annex backend to %s", backend)
-            self.repo.config_writer().set_value("annex", "backends", backend)
+            # Must be done with explicit release, otherwise on Python3 would end up
+            # with .git/config wiped out
+            # see https://github.com/gitpython-developers/GitPython/issues/333#issuecomment-126633757
+            writer = self.repo.config_writer()
+            writer.set_value("annex", "backends", backend)
+            writer.release()
 
     def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
                            log_stdout=True, log_stderr=True, log_online=False,
