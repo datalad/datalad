@@ -11,7 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
-import cmd_crawl
-import cmd_install
-import cmd_test
-import cmd_get
+from . import cmd_crawl
+from . import cmd_install
+from . import cmd_test
+from . import cmd_get

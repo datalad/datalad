@@ -1,7 +1,11 @@
 *.egg-info
 /.idea
 /.coverage
-/venv
-/venv-test
+/venv*
 /build
 *.pyc
+.noseids
+*.bak
+.#*
+/repos
+/tmp

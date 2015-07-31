@@ -24,8 +24,7 @@ v2_e = str(1+2)
 # Simple string interpolations
 v4 = %(var)s
 # mixing both string interpolations and evaluation
-exec = import numpy as np
-       from math import e
+exec = from math import e
 
        func = lambda x: "fun^%%d" %% x
 # Function to be evaluated with some local variable substitution
@@ -36,7 +35,7 @@ funccall_e = func(%(l)s)
 v5_e = "%%.2f(%(v1)s)" %% (var+1)
 var_e = "%%.2f" %% (var+2)
 e_e = e
-v1_array_e = np.array([%(v1)s])
+v1_array_e = [%(v1)s]
 l = 3
 
 [section2]

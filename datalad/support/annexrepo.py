@@ -20,10 +20,10 @@ import shlex
 
 from functools import wraps
 
-from ConfigParser import NoOptionError
+from six.moves.configparser import NoOptionError
 
-from gitrepo import GitRepo, normalize_path, normalize_paths
-from exceptions import CommandNotAvailableError, CommandError, \
+from .gitrepo import GitRepo, normalize_path, normalize_paths
+from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 
 lgr = logging.getLogger('datalad.annex')
@@ -46,7 +46,7 @@ def kwargs_to_options(func):
     @wraps(func)
     def newfunc(self, *args, **kwargs):
         option_list = []
-        for key in kwargs.keys():
+        for key in kwargs:
             option_list.extend([" --%s=%s" % (key, kwargs.get(key))])
 
         return func(self, *args, options=option_list)
@@ -117,7 +117,13 @@ class AnnexRepo(GitRepo):
         # TODO: Should the backend option of __init__() also migrate
         # the annex, in case there are annexed files already?
         if backend:
-            self.repo.config_writer().set_value("annex", "backends", backend)
+            lgr.debug("Setting annex backend to %s", backend)
+            # Must be done with explicit release, otherwise on Python3 would end up
+            # with .git/config wiped out
+            # see https://github.com/gitpython-developers/GitPython/issues/333#issuecomment-126633757
+            writer = self.repo.config_writer()
+            writer.set_value("annex", "backends", backend)
+            writer.release()
 
     def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
                            log_stdout=True, log_stderr=True, log_online=False,
@@ -175,7 +181,7 @@ class AnnexRepo(GitRepo):
                                              log_online=log_online,
                                              expect_stderr=expect_stderr,
                                              expect_fail=expect_fail)
-        except CommandError, e:
+        except CommandError as e:
             if "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
                                                "Unknown command:"
@@ -194,7 +200,7 @@ class AnnexRepo(GitRepo):
 
         try:
             return self.repo.config_reader().get_value("annex", "direct")
-        except NoOptionError, e:
+        except NoOptionError as e:
             # If .git/config lacks an entry "direct",
             # it's actually indirect mode.
             return False
@@ -211,7 +217,7 @@ class AnnexRepo(GitRepo):
         try:
             return self.repo.config_reader().get_value("annex",
                                                        "crippledfilesystem")
-        except NoOptionError, e:
+        except NoOptionError as e:
             # If .git/config lacks an entry "crippledfilesystem",
             # it's actually not crippled.
             return False
@@ -341,7 +347,7 @@ class AnnexRepo(GitRepo):
             out, err = self._run_annex_command('lookupkey',
                                                annex_options=[file_],
                                                expect_fail=True)
-        except CommandError, e:
+        except CommandError as e:
             if e.code == 1:
                 if not exists(opj(self.path, file_)):
                     raise IOError(e.code, "File not found.", file_)
@@ -367,7 +373,7 @@ class AnnexRepo(GitRepo):
     def file_has_content(self, files):
         """ Check whether files have their content present under annex.
 
-        Parameters:
+        Parameters:tes
         -----------
         files: list of str
             file(s) to check for being actually present.
@@ -382,7 +388,7 @@ class AnnexRepo(GitRepo):
         try:
             out, err = self._run_annex_command('find', annex_options=files,
                                                expect_fail=True)
-        except CommandError, e:
+        except CommandError as e:
             if e.code == 1 and "not found" in e.stderr:
                 if len(files) > 1:
                     lgr.debug("One of the files was not found, so performing "
@@ -540,7 +546,7 @@ class AnnexRepo(GitRepo):
             out, err = self._run_annex_command(
                 'whereis',
                 annex_options=['--json'] + files)
-        except CommandError, e:
+        except CommandError as e:
             # if multiple files, whereis may technically fail,
             # but still returns correct response
             if e.code == 1 and e.stdout.startswith('{'):

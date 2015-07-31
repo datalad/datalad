@@ -80,7 +80,7 @@ def test_ExecutionTimeProtocol(path1, path2):
     # now with exception, since path2 doesn't exist yet:
     try:
         runner.run(cmd, cwd=path2)
-    except Exception, e:
+    except Exception as e:
         catched_exception = e
     finally:
         assert_equal(len(timer_protocol), 2)
@@ -128,7 +128,7 @@ def test_ExecutionTimeExternalsProtocol(path1, path2):
     # now with exception, since path2 doesn't exist yet:
     try:
         runner.run(cmd, cwd=path2)
-    except Exception, e:
+    except Exception as e:
         catched_exception = e
     finally:
         assert_equal(len(timer_protocol), 2)

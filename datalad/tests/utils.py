@@ -18,10 +18,11 @@ import multiprocessing
 import logging
 import random
 import socket
-import SocketServer
-import SimpleHTTPServer
-import BaseHTTPServer
+from six import PY2, text_type
 import time
+
+from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
+from six.moves.BaseHTTPServer import HTTPServer
 
 from functools import wraps
 from os.path import exists, realpath, join as opj
@@ -71,10 +72,10 @@ def create_tree(path, tree):
                 create_tree(full_name, load)
         else:
             #encoding = sys.getfilesystemencoding()
-            #if isinstance(full_name, unicode):
+            #if isinstance(full_name, text_type):
             #    import pydb; pydb.debugger()
             with open(full_name, 'w') as f:
-                if isinstance(load, unicode):
+                if PY2 and isinstance(load, text_type):
                     load = load.encode('utf-8')
                 f.write(load)
 
@@ -99,7 +100,7 @@ def ok_clean_git_annex_proxy(path):
 
     try:
         out = ar.annex_proxy("git status")
-    except CommandNotAvailableError, e:
+    except CommandNotAvailableError as e:
         raise SkipTest
     finally:
         os.chdir(cwd)
@@ -172,6 +173,11 @@ def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
 
+def ok_git_config_not_empty(ar):
+    """Helper to verify that nothing rewritten the config file"""
+    # TODO: we don't support bare -- do we?
+    assert_true(os.stat(opj(ar.path, '.git', 'config')).st_size)
+
 
 def ok_annex_get(ar, files, network=True):
     """Helper to run .annex_get decorated checking for correct operation
@@ -179,12 +185,14 @@ def ok_annex_get(ar, files, network=True):
     annex_get passes through stderr from the ar to the user, which pollutes
     screen while running tests
     """
+    ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
         ar.annex_get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
             ok_('100%' in cmo.err or '100.0%' in cmo.err)
     # verify that load was fetched
+    ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
     if isinstance(has_content, bool):
         ok_(has_content)
@@ -214,12 +222,12 @@ def with_tree(t, tree=None, **tkwargs):
 lgr = logging.getLogger('datalad.tests')
 
 
-class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+class SilentHTTPHandler(SimpleHTTPRequestHandler):
     """A little adapter to silence the handler
     """
     def __init__(self, *args, **kwargs):
         self._silent = lgr.getEffectiveLevel() > logging.DEBUG
-        SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
+        SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
 
     def log_message(self, format, *args):
         if self._silent:
@@ -229,7 +237,7 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
     os.chdir(path_to_serve_from)
-    httpd = BaseHTTPServer.HTTPServer((hostname, 0), SilentHTTPHandler) 
+    httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
     queue.put(httpd.server_port)
     httpd.serve_forever()
 
@@ -484,7 +492,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            raise exc_info[0], exc_info[1], exc_info[2]
+            raise exc_info[0](exc_info[1], exc_info[2])
 
     return newfunc
 
@@ -502,8 +510,10 @@ def ignore_nose_capturing_stdout(func):
     def newfunc(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except AttributeError, e:
-            if e.message.find('StringIO') > -1 and e.message.find('fileno') > -1:
+        except AttributeError as e:
+            # Use args instead of .message which is PY2 specific
+            message = e.args[0] if e.args else ""
+            if message.find('StringIO') > -1 and message.find('fileno') > -1:
                 pass
             else:
                 raise
