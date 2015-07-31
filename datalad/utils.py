@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+
 import six.moves.builtins as __builtin__
 
 import logging
@@ -19,6 +20,7 @@ import gc
 from functools import wraps
 from os.path import exists, join as opj, realpath
 from time import sleep
+from six import next
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -275,7 +277,7 @@ def traverse_and_do(path,
     # Naive recursive implementation, still using os.walk though
 
     # Get all elements of current directory
-    root, dirs, files = os.walk(path).next()
+    root, dirs, files = next(os.walk(path))
     assert(root == path)
 
     if exclude:
