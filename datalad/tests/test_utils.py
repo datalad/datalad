@@ -92,8 +92,9 @@ def _check_setup_exceptionhook(interactive):
             except Exception as e: #RuntimeError:
                 type_, value_, tb_ = sys.exc_info()
             our_exceptionhook(type_, value_, tb_)
-            #out.write("AFTER EXCEPTION HOOK\n")
             if PY3:
+                # Happens under tox environment but not in manually crafted ones -- not yet sure
+                # what it is about but --dbg does work with python3 so lettting it skip for now
                 raise SkipTest("TODO: Not clear why in PY3 calls cleanup if we try to access the beast")
             assert_in('Traceback (most recent call last)', cmo.err)
             assert_in('in _check_setup_exceptionhook', cmo.err)
