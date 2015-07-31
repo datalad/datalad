@@ -164,6 +164,10 @@ git submodule update --init --recursive
 or do the original repository clone described above with the `--recursive` 
 option.
 
+Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
+file which sets up a few virtual environments for testing locally, which you can 
+later reuse like any other regular virtualenv for troubleshooting.
+
 
 ### Coverage
 

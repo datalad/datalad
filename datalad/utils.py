@@ -7,7 +7,8 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import __builtin__
+import collections
+import six.moves.builtins as __builtin__
 
 import logging
 import shutil, stat, os, sys
@@ -46,9 +47,8 @@ def is_interactive():
 
 import hashlib
 def md5sum(filename):
-    with open(filename) as f:
+    with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
-
 
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
@@ -137,7 +137,7 @@ def rmtemp(f, *args, **kwargs):
             for i in range(10):
                 try:
                     os.unlink(f)
-                except OSError, e:
+                except OSError as e:
                     if i < 9:
                         sleep(0.5)
                         continue
@@ -370,7 +370,7 @@ def optional_args(decorator):
         def dec(f):
             return decorator(f, *args, **kwargs)
 
-        is_decorating = not kwargs and len(args) == 1 and callable(args[0])
+        is_decorating = not kwargs and len(args) == 1 and isinstance(args[0], collections.Callable)
         if is_decorating:
             f = args[0]
             args = []
@@ -395,7 +395,7 @@ def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
             ['datalad_temp'] +
             ([prefix] if prefix else []) +
             ([''] if (on_windows or not wrapped)
-                  else [wrapped.func_name]))
+                  else [wrapped.__name__]))
 
     directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
     if directory and 'dir' not in tkwargs_:
@@ -424,6 +424,7 @@ def swallow_outputs():
     print function had desired effect
     """
 
+    debugout = sys.stdout
     class StringIOAdapter(object):
         """Little adapter to help getting out/err values
         """
@@ -464,12 +465,6 @@ def swallow_outputs():
 
 
 
-    # preserve -- they could have been mocked already
-    oldprint = getattr(__builtin__, 'print')
-    oldout, olderr = sys.stdout, sys.stderr
-    adapter = StringIOAdapter()
-    sys.stdout, sys.stderr = adapter.handles
-
     def fake_print(*args, **kwargs):
         sep = kwargs.pop('sep', ' ')
         end = kwargs.pop('end', '\n')
@@ -481,9 +476,16 @@ def swallow_outputs():
         else:
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
-    setattr(__builtin__, 'print', fake_print)
+
+    # preserve -- they could have been mocked already
+    oldprint = getattr(__builtin__, 'print')
+    oldout, olderr = sys.stdout, sys.stderr
+    adapter = StringIOAdapter()
 
     try:
+        sys.stdout, sys.stderr = adapter.handles
+        setattr(__builtin__, 'print', fake_print)
+
         yield adapter
     finally:
         sys.stdout, sys.stderr = oldout, olderr
@@ -543,7 +545,7 @@ def swallow_logs(new_level=None):
     lgr.handlers = [logging.StreamHandler(adapter.handle)]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
-    if isinstance(new_level, basestring):
+    if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 
     if new_level is not None:
@@ -560,7 +562,6 @@ def swallow_logs(new_level=None):
 # Additional handlers
 #
 _sys_excepthook = sys.excepthook # Just in case we ever need original one
-
 def setup_exceptionhook():
     """Overloads default sys.excepthook with our exceptionhook handler.
 
@@ -569,11 +570,10 @@ def setup_exceptionhook():
     """
 
     def _datalad_pdb_excepthook(type, value, tb):
-
         if is_interactive():
             import traceback, pdb
             traceback.print_exception(type, value, tb)
-            print
+            print()
             pdb.post_mortem(tb)
         else:
             lgr.warn("We cannot setup exception hook since not in interactive mode")

@@ -180,7 +180,7 @@ def check_runner_heavy_output(log_online):
         # We know it would get stuck in online mode
         cmd = '%s -c "import sys; x=str(list(range(1000))); ' \
               '[(sys.stdout.write(x), sys.stderr.write(x)) ' \
-              'for i in xrange(100)];"' % sys.executable
+              'for i in range(100)];"' % sys.executable
         ret = runner.run(cmd, log_stderr=True, log_stdout=True,
                          expect_stderr=True)
 
@@ -251,6 +251,6 @@ def test_runner_failure(dir_):
 
     try:
         runner.run(failing_cmd, cwd=dir_)
-    except CommandError, e:
+    except CommandError as e:
         assert_equal(1, e.code)
         assert_in('notexistent.dat not found', e.stderr)

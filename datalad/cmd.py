@@ -18,11 +18,16 @@ import logging
 import os
 import shutil
 import shlex
+
+from six import PY3
+from six import string_types, text_type, binary_type
+
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol
 
 lgr = logging.getLogger('datalad.cmd')
 
+_TEMP_std = sys.stdout, sys.stderr
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
@@ -79,7 +84,7 @@ class Runner(object):
         TypeError if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, basestring) or isinstance(cmd, list):
+        if isinstance(cmd, string_types) or isinstance(cmd, list):
             return self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             return self.call(cmd, *args, **kwargs)
@@ -100,13 +105,13 @@ class Runner(object):
 
     def _get_output_online(self, proc, log_stdout, log_stderr,
                            expect_stderr=False, expect_fail=False):
-        stdout, stderr = [], []
+        stdout, stderr = binary_type(), binary_type()
         while proc.poll() is None:
             if log_stdout:
                 line = proc.stdout.readline()
-                if line != '':
+                if line:
                     stdout += line
-                    self._log_out(line)
+                    self._log_out(line.decode())
                     # TODO: what level to log at? was: level=5
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stdout()
@@ -115,9 +120,9 @@ class Runner(object):
 
             if log_stderr:
                 line = proc.stderr.readline()
-                if line != '':
+                if line:
                     stderr += line
-                    self._log_err(line, expect_stderr or expect_fail)
+                    self._log_err(line.decode(), expect_stderr or expect_fail)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -201,13 +206,13 @@ class Runner(object):
         if self.protocol.do_execute_ext_commands:
 
             if shell is None:
-                shell = isinstance(cmd, basestring)
+                shell = isinstance(cmd, string_types)
 
             if self.protocol.records_ext_commands:
                 prot_exc = None
                 prot_id = self.protocol.start_section(shlex.split(cmd)
                                                       if isinstance(cmd,
-                                                                    basestring)
+                                                                    string_types)
                                                       else cmd)
 
             try:
@@ -217,7 +222,7 @@ class Runner(object):
                                         cwd=cwd or self.cwd,
                                         env=env or self.env)
 
-            except Exception, e:
+            except Exception as e:
                 prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
                           (cmd, " under %r" % cwd if cwd else '', e))
@@ -234,6 +239,13 @@ class Runner(object):
             else:
                 out = proc.communicate()
 
+            if PY3:
+                # Decoding was delayed to this point
+                def decode_if_not_None(x):
+                    return "" if x is None else binary_type.decode(x)
+                # TODO: check if we can avoid PY3 specific here
+                out = tuple(map(decode_if_not_None, out))
+
             status = proc.poll()
 
             # needs to be done after we know status
@@ -246,8 +258,8 @@ class Runner(object):
                     self._log_err(out[1], expected=expect_stderr)
 
             if status not in [0, None]:
-                msg = "Failed to run %r%s. Exit code=%d" \
-                    % (cmd, " under %r" % (cwd or self.cwd), status)
+                msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
+                    % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
                 (lgr.debug if expect_fail else lgr.error)(msg)
                 raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
@@ -257,7 +269,7 @@ class Runner(object):
         else:
             if self.protocol.records_ext_commands:
                 self.protocol.add_section(shlex.split(cmd)
-                                            if isinstance(cmd, basestring)
+                                            if isinstance(cmd, string_types)
                                             else cmd, None)
             out = ("DRY", "DRY")
 
@@ -282,7 +294,7 @@ class Runner(object):
 
             try:
                 return f(*args, **kwargs)
-            except Exception, e:
+            except Exception as e:
                 prot_exc = e
                 raise
             finally:
@@ -326,7 +338,7 @@ def link_file_load(src, dst, dry_run=False):
 
     try:
         os.link(src_realpath, dst)
-    except  AttributeError, e:
+    except  AttributeError as e:
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)

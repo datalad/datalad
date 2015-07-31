@@ -45,7 +45,7 @@ def test_download_url():
     dout = fname + '-d'
     # TODO move tempfile/tempdir setup/cleanup into fixture(s)
     os.mkdir(dout)
-    os.write(fd, "How do I know what to say?\n")
+    os.write(fd, "How do I know what to say?\n".encode())
     os.close(fd)
 
     furl = get_local_file_url(fname)

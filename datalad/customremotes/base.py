@@ -17,6 +17,8 @@ import sys
 from os.path import exists, join as opj, basename, realpath, dirname
 from traceback import format_exc
 
+from six.moves import xrange
+
 from ..cmd import Runner
 from ..support.protocol import ProtocolInterface
 
@@ -102,7 +104,7 @@ send () {
                       % (realpath(self.repopath), _file[len(self.repopath)+1:]))
         with open(_file, 'a') as f:
             f.write(self.HEADER)
-        os.chmod(_file, 0755)
+        os.chmod(_file, 0o755)
 
     def write_section(self, cmd):
         self.initiate()
@@ -198,11 +200,14 @@ class AnnexCustomRemote(object):
                          if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
                          else None
 
+
+    # Just an obscure way to provide "Abstract attribute"
     @property
     def PREFIX(self):
         """Just a helper to guarantee that PREFIX gets assigned in derived class
         """
         raise ValueError("Each derived class should carry its own PREFIX")
+
 
     def send(self, *args):
         """Send a message to git-annex
@@ -212,14 +217,14 @@ class AnnexCustomRemote(object):
         *args: list of strings
            arguments to be joined by a space and passed to git-annex
         """
-        msg = " ".join(map(str, args)).encode()
+        msg = " ".join(map(str, args))
         if not self._in_the_loop:
             lgr.debug("We are not yet in the loop, thus should not send to annex"
-                     " anything.  Got: %s" % msg)
+                     " anything.  Got: %s" % msg.encode())
             return
         try:
             self.heavydebug("Sending %r" % msg)
-            self.fout.write("%s\n" % msg)
+            self.fout.write(msg + "\n")#.encode())
             self.fout.flush()
             if self._protocol is not None:
                 self._protocol += "send %s" % msg
@@ -232,6 +237,7 @@ class AnnexCustomRemote(object):
 
     def send_unsupported(self):
         self.send("UNSUPPORTED-REQUEST")
+
 
     def read(self, req=None, n=1):
         """Read a message from git-annex
@@ -288,7 +294,7 @@ class AnnexCustomRemote(object):
             pass # no harm
         except KeyboardInterrupt:
             self.stop("Interrupted by user")
-        except Exception, e:
+        except Exception as e:
             self.stop(str(e))
         finally:
             self._in_the_loop = False
@@ -325,7 +331,7 @@ class AnnexCustomRemote(object):
 
             try:
                 method(*req_load)
-            except Exception, e:
+            except Exception as e:
                 self.error("Problem processing %r with parameters %r: %r"
                            % (req, req_load, e))
                 lgr.error("Caught exception detail: %s" % format_exc())
@@ -339,7 +345,7 @@ class AnnexCustomRemote(object):
 
         try:
             self._initremote(*args)
-        except Exception, e:
+        except Exception as e:
             self.error("Failed to initialize %s due to %s" % (self, e),
                        "INITREMOTE-FAILURE")
         else:
@@ -353,7 +359,7 @@ class AnnexCustomRemote(object):
          """
         try:
             self._prepare(*args)
-        except Exception, e:
+        except Exception as e:
             self.error("Failed to prepare %s due to %s" % (self, e),
                        "PREPARE-FAILURE")
         else:
@@ -454,7 +460,7 @@ class AnnexCustomRemote(object):
         """Gets URL(s) associated with a Key.
 
         """
-        assert(self.url_prefix.encode() == self.url_prefix)
+        assert(self.url_prefix == self.url_prefix)
         # FIXME: there seems to be a bug
         # http://git-annex.branchable.com/bugs/GETURLS_doesn__39__t_return_URLs_if_prefix_is_provided/?updated
         # thus for now requesting without prefix and filtering manually

@@ -8,13 +8,24 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Miscellaneous utilities to assist with testing"""
 
-import glob, shutil, stat, os
-from os.path import realpath
+import glob
+import shutil
+import stat
+import os
 import tempfile
 import platform
+import multiprocessing
+import logging
+import random
+import socket
+from six import PY2, text_type
+import time
+
+from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
+from six.moves.BaseHTTPServer import HTTPServer
 
 from functools import wraps
-from os.path import exists, join as opj
+from os.path import exists, realpath, join as opj
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
@@ -61,10 +72,10 @@ def create_tree(path, tree):
                 create_tree(full_name, load)
         else:
             #encoding = sys.getfilesystemencoding()
-            #if isinstance(full_name, unicode):
+            #if isinstance(full_name, text_type):
             #    import pydb; pydb.debugger()
             with open(full_name, 'w') as f:
-                if isinstance(load, unicode):
+                if PY2 and isinstance(load, text_type):
                     load = load.encode('utf-8')
                 f.write(load)
 
@@ -89,7 +100,7 @@ def ok_clean_git_annex_proxy(path):
 
     try:
         out = ar.annex_proxy("git status")
-    except CommandNotAvailableError, e:
+    except CommandNotAvailableError as e:
         raise SkipTest
     finally:
         os.chdir(cwd)
@@ -162,6 +173,11 @@ def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
 
+def ok_git_config_not_empty(ar):
+    """Helper to verify that nothing rewritten the config file"""
+    # TODO: we don't support bare -- do we?
+    assert_true(os.stat(opj(ar.path, '.git', 'config')).st_size)
+
 
 def ok_annex_get(ar, files, network=True):
     """Helper to run .annex_get decorated checking for correct operation
@@ -169,25 +185,28 @@ def ok_annex_get(ar, files, network=True):
     annex_get passes through stderr from the ar to the user, which pollutes
     screen while running tests
     """
+    ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
         ar.annex_get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
             ok_('100%' in cmo.err or '100.0%' in cmo.err)
     # verify that load was fetched
+    ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
     if isinstance(has_content, bool):
         ok_(has_content)
     else:
         ok_(all(has_content))
+
+
 #
 # Decorators
 #
 
-from ..utils import optional_args
-
 @optional_args
 def with_tree(t, tree=None, **tkwargs):
+
     @wraps(t)
     def newfunc(*arg, **kw):
         tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
@@ -200,22 +219,15 @@ def with_tree(t, tree=None, **tkwargs):
     return newfunc
 
 
-# GRRR -- this one is crippled since path where HTTPServer is serving
-# from can't be changed without pain.
-import logging
-import random
-import SimpleHTTPServer
-import SocketServer
-from threading import Thread
-
 lgr = logging.getLogger('datalad.tests')
 
-class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
+
+class SilentHTTPHandler(SimpleHTTPRequestHandler):
     """A little adapter to silence the handler
     """
     def __init__(self, *args, **kwargs):
         self._silent = lgr.getEffectiveLevel() > logging.DEBUG
-        SimpleHTTPServer.SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
+        SimpleHTTPRequestHandler.__init__(self, *args, **kwargs)
 
     def log_message(self, format, *args):
         if self._silent:
@@ -223,39 +235,55 @@ class SilentHTTPHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         lgr.debug("HTTP: " + format % args)
 
 
-def serve_path_via_http():
+def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
+    os.chdir(path_to_serve_from)
+    httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
+    queue.put(httpd.server_port)
+    httpd.serve_forever()
+
+
+@optional_args
+def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
     """
-    def decorate(func):
-        def newfunc(*arg, **kw):
-            port = random.randint(8000, 8500)
-            # TODO: ATM we are relying on path being local so we could
-            # start HTTP server in the same directory.  FIX IT!
-            SocketServer.TCPServer.allow_reuse_address = True
-            httpd = SocketServer.TCPServer(("", port), SilentHTTPHandler)
-            server_thread = Thread(target=httpd.serve_forever)
-            arg, path = arg[:-1], arg[-1]
-            # There is a problem with Haskell on wheezy trying to
-            # fetch via IPv6 whenever there is a ::1 localhost entry in
-            # /etc/hosts.  Apparently fixing that docker image reliably
-            # is not that straightforward, although see
-            # http://jasonincode.com/customizing-hosts-file-in-docker/
-            # so we just force to use 127.0.0.1 while on wheezy
-            hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
-            url = 'http://%s:%d/%s/' % (hostname, port, path)
-            lgr.debug("HTTP: serving %s under %s", path, url)
-            server_thread.start()
+    
+    @wraps(tfunc)
+    def newfunc(*args, **kwargs):
 
-            #time.sleep(1)               # just give it few ticks
-            try:
-                func(*(arg + (path, url,)), **kw)
-            finally:
-                lgr.debug("HTTP: stopping server")
-                httpd.shutdown()
-                server_thread.join()
-        newfunc = make_decorator(func)(newfunc)
-        return newfunc
-    return decorate
+        if targs:
+            # if a path is passed into serve_path_via_http, then it's in targs
+            assert len(targs) == 1
+            path = targs[0] 
+
+        elif len(args) > 1:
+            args, path = args[:-1], args[-1]
+        else:
+            args, path = (), args[0]
+
+        # There is a problem with Haskell on wheezy trying to
+        # fetch via IPv6 whenever there is a ::1 localhost entry in
+        # /etc/hosts.  Apparently fixing that docker image reliably
+        # is not that straightforward, although see
+        # http://jasonincode.com/customizing-hosts-file-in-docker/
+        # so we just force to use 127.0.0.1 while on wheezy
+        #hostname = '127.0.0.1' if on_debian_wheezy else 'localhost'
+        hostname = '127.0.0.1'
+
+        queue = multiprocessing.Queue()
+        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+                                                args=(hostname, path, queue))
+        multi_proc.start()
+        port = queue.get(timeout=300)
+        url = 'http://{}:{}/'.format(hostname, port)
+        lgr.debug("HTTP: serving {} under {}".format(path, url))
+
+        try:
+            tfunc(*(args + (path, url)), **kwargs)
+        finally:
+            lgr.debug("HTTP: stopping server")
+            multi_proc.terminate()
+
+    return newfunc
 
 
 @optional_args
@@ -266,8 +294,8 @@ def with_tempfile(t, *targs, **tkwargs):
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    *args, **kwargs:
-        All other arguments are passed into the call to tempfile.mk{t,d}emp(),
+    *targs, **tkwargs:
+        All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
         the function t.  If no 'prefix' argument is provided, it will be
         constructed using module and function names ('.' replaced with
@@ -439,7 +467,6 @@ with_testrepos.__test__ = False
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
-
     """
 
     @wraps(func)
@@ -467,10 +494,10 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            raise exc_info[0], exc_info[1], exc_info[2]
-
+            raise exc_info[0](exc_info[1], exc_info[2])
 
     return newfunc
+
 
 def ignore_nose_capturing_stdout(func):
     """Decorator workaround for nose's behaviour with redirecting sys.stdout
@@ -485,8 +512,10 @@ def ignore_nose_capturing_stdout(func):
     def newfunc(*args, **kwargs):
         try:
             func(*args, **kwargs)
-        except AttributeError, e:
-            if e.message.find('StringIO') > -1 and e.message.find('fileno') > -1:
+        except AttributeError as e:
+            # Use args instead of .message which is PY2 specific
+            message = e.args[0] if e.args else ""
+            if message.find('StringIO') > -1 and message.find('fileno') > -1:
                 pass
             else:
                 raise
@@ -510,7 +539,7 @@ OBSCURE_FILENAMES = (
 
 @with_tempfile(mkdir=True)
 def get_most_obscure_supported_name(tdir):
-    """Return the most filename which filesystem under TEMPDIR could support
+    """Return the most obscure filename that the filesystem would support under TEMPDIR
 
     TODO: we might want to use it as a function where we would provide tdir
     """
