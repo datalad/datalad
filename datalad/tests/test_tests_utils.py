@@ -30,7 +30,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
-
+from .utils import local_testrepo_flavors
 
 #
 # Test with_tempfile, especially nested invocations
@@ -64,7 +64,7 @@ def test_nested_with_tempfile_basic(f1, f2):
 @with_tree((('f1.txt', 'load'),))
 @with_tempfile(suffix='.cfg')
 @with_tempfile(suffix='.cfg.old')
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=local_testrepo_flavors)
 def check_nested_with_tempfile_parametrized_surrounded(
         param, f0, tree, f1, f2, repo):
     eq_(param, "param1")
@@ -74,7 +74,7 @@ def check_nested_with_tempfile_parametrized_surrounded(
     ok_(f1 != f2)
     ok_(f1.endswith('.cfg'), msg="got %s" % f1)
     ok_(f2.endswith('.cfg.old'), msg="got %s" % f2)
-    ok_('testrepos' in repo)
+    ok_(repo) # got some repo -- local or url
 
 
 def test_nested_with_tempfile_parametrized_surrounded():
