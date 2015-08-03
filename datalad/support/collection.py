@@ -191,6 +191,9 @@ class Collection(dict):
         super(Collection, self).__delitem__(key)
 
     def __setitem__(self, key, value):
+        if not isinstance(value, Handle):
+            raise TypeError("Can't add non-Handle object to a collection.")
+
         super(Collection, self).__setitem__(key, value)
         self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
         key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
@@ -286,7 +289,6 @@ class MetaCollection(dict):
             self.update(src)
             self.name = src.name
             # TODO: See Collection: How to treat names in case of a copy?
-            self.store = deepcopy(src.store)
 
         elif isinstance(src, list):
             for item in src:
@@ -323,7 +325,7 @@ class MetaCollection(dict):
         for collection in self:
             for graph in self[collection].store.contexts():
                 self.store.add_graph(graph)
-                # Note: Removed all the copying of the graphs and correcting
+                # TODO: Note: Removed all the copying of the graphs and correcting
                 # their references, since we now always use
                 # 'collection/branch/handle' as key. But: Implementation of
                 # this changed behaviour is not well tested yet.
@@ -331,21 +333,25 @@ class MetaCollection(dict):
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
     def __setitem__(self, key, value):
-        # TODO: See collections
-        pass
+        if not isinstance(value, Collection):
+            raise TypeError("Can't add non-Collection type to MetaCollection.")
+
+        super(MetaCollection, self).__setitem__(key, value)
+        for graph in value.store.contexts():
+            self.store.add_graph(graph)
 
     def __delitem__(self, key):
-        # TODO: See collections
-        pass
+        # delete the graphs of the collection and its handles:
+        graphs_to_remove = [g.identifier for g in self[key].store.contexts()]
+        for graph in graphs_to_remove:
+            self.store.remove_graph(graph)
 
-    def update(self, remote=None, branch=None):
-        # reload (all) branches
-        # TODO: In that sense, it's obsolete.
-
-        pass
+        # delete the entry itself:
+        super(MetaCollection, self).__delitem__(key)
 
     def query(self):
         """ Perform query on the meta collection.
         Note: It's self.conjunctive_graph or self.store respectively,
         what is to be queried here.
         """
+        pass
