@@ -11,7 +11,7 @@
 
 import logging
 import os
-from os.path import join as opj, basename, split as ops, exists
+from os.path import join as opj, basename, split as ops, exists, isdir
 from ConfigParser import SafeConfigParser
 
 from rdflib import Graph, URIRef
@@ -180,7 +180,7 @@ class CollectionRepoBackend(CollectionBackend):
         # load handles from branch
         for key in self.repo.get_handle_list(self.branch):
             out[key] = Handle(src=CollectionRepoHandleBackend(
-                self.repo, self.branch, key))
+                self.repo, key, self.branch))
         return out
 
     def get_collection(self):
@@ -387,8 +387,12 @@ class CollectionRepo(GitRepo):
 
         If `branch` is not provided, the active one is used.
         """
-        return [self._filename2key(f, branch)
-                for f in self._get_handle_files(branch)]
+
+        # TODO: see _filename2key:
+        # return set([self._filename2key(f.split(os.sep)[0], branch)
+        #             for f in self.git_get_files(branch) if f != basename(f)])
+        return set([f.split(os.sep)[0] for f in self.git_get_files(branch)
+                    if f != basename(f)])
 
     def set_metadata_handler(self, handler):
         """Set the handler for collection-level metadata
@@ -420,7 +424,7 @@ class CollectionRepo(GitRepo):
 
         This transformation of a filename to a handle's key may change.
         """
-
+        # TODO: Reconsider whether this kind of key is still needed
         return self.name + '/' + branch + '/' + fname
 
     def _key2filename(self, key):
@@ -431,6 +435,7 @@ class CollectionRepo(GitRepo):
         # TODO: Rethink whether ignoring the collection/branch part
         # is appropriate herein.
         return _remove_empty_items(key.split('/'))[-1:][0]
+
 
     # ### repo methods:
 

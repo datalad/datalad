@@ -162,6 +162,11 @@ class Collection(dict):
 
         elif isinstance(src, CollectionBackend):
             self._backend = src
+            self.store = None
+            # TODO: check for existence in reload() fails otherwise;
+            # If it turns out, that reload is never required outside of
+            # constructor, that check isn't needed!
+
             self._reload()
         elif src is None:
             self._backend = None
@@ -221,7 +226,7 @@ class Collection(dict):
         # check.
 
         # cleanup old store, if exists
-        if self.store:
+        if self.store is not None:
             self.store.gc()
             del self.store
             gc.collect()
