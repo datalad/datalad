@@ -356,6 +356,9 @@ _TESTREPOS = {'basic/r1': 'git://github.com/datalad/testrepo--basic--r1'}
 def _get_resolved_flavors(flavors):
     flavors_ = ['local', 'network', 'clone', 'network-clone'] if flavors=='auto' else flavors
 
+    if not isinstance(flavors_, list):
+        flavors_ = [flavors_]
+
     if os.environ.get('DATALAD_TESTS_NONETWORK'):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
     return flavors_
@@ -407,6 +410,20 @@ def _extend_globs(path, flavors):
 
     return globs_extended
 
+def get_testrepos_dir():
+    return opj(os.path.dirname(__file__), 'testrepos')
+
+def has_testrepos_dir():
+    return exists(get_testrepos_dir())
+
+# For now (at least) we would need to clone from the network
+# since there are troubles with submodules on Windows.
+# See: https://github.com/datalad/datalad/issues/44
+# TODO: redo  tools/testing/make_test_repo  as a python module which
+# could be reused here and test repos could be initialized in temp location if not present
+local_testrepo_flavors = ['network-clone'
+                 if (on_windows or not has_testrepos_dir())
+                 else 'local']
 
 @optional_args
 def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
@@ -448,7 +465,7 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     def newfunc(*arg, **kw):
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
-        toppath_ = opj(os.path.dirname(__file__), 'testrepos') \
+        toppath_ = get_testrepos_dir() \
             if toppath is None else toppath
 
         flavors_ = _get_resolved_flavors(flavors)
@@ -458,7 +475,7 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
             opj(toppath_, pardir, pardir, pardir, '.git')))
 
         if not len(globs_extended):
-            network_flavors = filter(lambda x: x.startswith('network'), flavors_)
+            network_flavors = list(filter(lambda x: x.startswith('network'), flavors_))
 
             if network_flavors:
                 # Let's just get through those which we know and
@@ -472,7 +489,7 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
 
             else:
                 raise (SkipTest if skip else AssertionError)(
-                    "Found no test repositories under %s, nor network* ones were requested"
+                    "Found no test repositories under %s, nor network* ones were requested."
                     % opj(toppath_, paths) +
                     (" Run git submodule update --init --recursive "
                      if (toppath is None and under_git) else ""))

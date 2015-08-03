@@ -12,8 +12,9 @@ import os
 
 from .utils import eq_, ok_, with_testrepos, with_tempfile
 from datalad.cmd import Runner
+from .utils import local_testrepo_flavors
 
-@with_testrepos(flavors=['local'])
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_having_annex(path):
     ok_(os.path.exists(os.path.join(path, '.git')))
     repo = git.Repo(path)

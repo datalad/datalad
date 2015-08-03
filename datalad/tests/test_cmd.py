@@ -26,6 +26,7 @@ from .utils import with_tempfile, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, swallow_outputs, swallow_logs, \
     on_linux, on_osx, on_windows, with_testrepos
 
+from .utils import local_testrepo_flavors
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -242,7 +243,7 @@ def test_link_file_load(tempfile):
     os.unlink(tempfile2)  # TODO: next two with_tempfile
 
 
-@with_testrepos(flavors='local')
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_runner_failure(dir_):
 
     runner = Runner()

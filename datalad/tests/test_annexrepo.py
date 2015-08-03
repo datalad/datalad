@@ -23,11 +23,6 @@ from ..support.exceptions import CommandNotAvailableError, \
 from ..cmd import Runner
 from .utils import *
 
-# For now (at least) we would need to clone from the network
-# since there are troubles with submodules on Windows.
-# See: https://github.com/datalad/datalad/issues/44
-local_flavors = ['network-clone' if on_windows else 'local']
-
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -48,7 +43,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)
@@ -102,7 +97,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
@@ -138,7 +133,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add(src, annex_path):
 
@@ -163,7 +158,7 @@ def test_AnnexRepo_annex_add(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo(annex_path, src)
@@ -172,7 +167,7 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_key(src, annex_path):
 
@@ -224,7 +219,7 @@ def test_AnnexRepo_options_decorator():
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add_to_git(src, dst):
 
@@ -240,7 +235,7 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
     assert_in(filename, ar.get_indexed_files())
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_web_remote(src, dst):
 
@@ -357,7 +352,7 @@ def test_AnnexRepo_backend_option(path, url):
     assert_true(ar.get_file_backend(f) == 'SHA1'
                 for f in ar.get_indexed_files() if 'faraway' in f)
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
     #init local test-annex before cloning:
