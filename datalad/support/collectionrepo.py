@@ -159,7 +159,7 @@ class CollectionRepoBackend(CollectionBackend):
             raise TypeError(msg)
 
         self.branch = branch if branch is not None \
-            else repo.git_get_active_branch()
+            else self.repo.git_get_active_branch()
 
         # remote branch? => read-only
         if self.branch.split('/')[0] in self.repo.git_get_remotes():
