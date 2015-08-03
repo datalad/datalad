@@ -138,8 +138,17 @@ In case the content's metadata doesn't provide data entities using certain terms
 already, we create one data entity of type 'dctypes:Dataset' to describe the
 content of the handle.
 
+# TODO reminders:
+
 collection metadata
 -------------------
 
 (TODO)
 (very similar)
+dct:hasPart => handle
+
+
+datalad config data
+-------------------
+
+dlns:usesSource
