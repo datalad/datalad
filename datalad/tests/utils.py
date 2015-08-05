@@ -18,14 +18,15 @@ import multiprocessing
 import logging
 import random
 import socket
-from six import PY2, text_type
+from six import PY2, text_type, iteritems
+from fnmatch import fnmatch
 import time
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
 
 from functools import wraps
-from os.path import exists, realpath, join as opj
+from os.path import exists, realpath, join as opj, pardir
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
@@ -350,52 +351,80 @@ def with_tempfile(t, *targs, **tkwargs):
     return newfunc
 
 
-def _extend_globs(paths, flavors):
-    globs = glob.glob(paths)
+_TESTREPOS = {'basic/r1': 'git://github.com/datalad/testrepo--basic--r1'}
 
+
+def _get_resolved_flavors(flavors):
     flavors_ = ['local', 'network', 'clone', 'network-clone'] if flavors=='auto' else flavors
+
+    if not isinstance(flavors_, list):
+        flavors_ = [flavors_]
 
     if os.environ.get('DATALAD_TESTS_NONETWORK'):
         flavors_ = [x for x in flavors_ if not x.startswith('network')]
+    return flavors_
 
-    # TODO: move away?
-    def get_repo_url(path):
-        """Return ultimate URL for this repo"""
-        if not exists(opj(path, '.git')):
-            # do the dummiest check so we know it is not git.Repo's fault
-            raise AssertionError("Path %s does not point to a git repository "
-                                 "-- missing .git" % path)
-        repo = git.Repo(path)
-        if len(repo.remotes) == 1:
-            remote = repo.remotes[0]
-        else:
-            remote = repo.remotes.origin
-        return remote.config_reader.get('url')
+def _get_repo_url(path):
+    """Return ultimate URL for this repo"""
 
-    def clone_url(url):
-        # delay import of our code until needed for certain
-        from ..cmd import Runner
-        runner = Runner()
-        tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
-        _ = runner(["git", "clone", url, tdir], expect_stderr=True)
-        open(opj(tdir, ".git", "remove-me"), "w").write("Please")  # signal for it to be removed after
-        return tdir
+    if path.startswith('http') or path.startswith('git'):
+        # We were given a URL, so let's just return it
+        return path
+
+    if not exists(opj(path, '.git')):
+        # do the dummiest check so we know it is not git.Repo's fault
+        raise AssertionError("Path %s does not point to a git repository "
+                             "-- missing .git" % path)
+    repo = git.Repo(path)
+    if len(repo.remotes) == 1:
+        remote = repo.remotes[0]
+    else:
+        remote = repo.remotes.origin
+    return remote.config_reader.get('url')
+
+
+def clone_url(url):
+    # delay import of our code until needed for certain
+    from ..cmd import Runner
+    runner = Runner()
+    tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
+    _ = runner(["git", "clone", url, tdir], expect_stderr=True)
+    open(opj(tdir, ".git", "remove-me"), "w").write("Please")  # signal for it to be removed after
+    return tdir
+
+
+def _extend_globs(path, flavors):
+    globs = glob.glob(path)
 
     globs_extended = []
-    if 'local' in flavors_:
+    if 'local' in flavors:
         globs_extended += globs
 
-    if 'network' in flavors_:
-        globs_extended += [get_repo_url(repo) for repo in globs]
+    if 'network' in flavors:
+        globs_extended += [_get_repo_url(repo) for repo in globs]
 
-    if 'clone' in flavors_:
+    if 'clone' in flavors:
         globs_extended += [clone_url(repo) for repo in globs]
 
-    if 'network-clone' in flavors_:
-        globs_extended += [clone_url(get_repo_url(repo)) for repo in globs]
+    if 'network-clone' in flavors:
+        globs_extended += [clone_url(_get_repo_url(repo)) for repo in globs]
 
     return globs_extended
 
+def get_testrepos_dir():
+    return opj(os.path.dirname(__file__), 'testrepos')
+
+def has_testrepos_dir():
+    return exists(get_testrepos_dir())
+
+# For now (at least) we would need to clone from the network
+# since there are troubles with submodules on Windows.
+# See: https://github.com/datalad/datalad/issues/44
+# TODO: redo  tools/testing/make_test_repo  as a python module which
+# could be reused here and test repos could be initialized in temp location if not present
+local_testrepo_flavors = ['network-clone'
+                 if (on_windows or not has_testrepos_dir())
+                 else 'local']
 
 @optional_args
 def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
@@ -437,16 +466,34 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     def newfunc(*arg, **kw):
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
-        toppath_ = os.path.join(os.path.dirname(__file__), 'testrepos') \
+        toppath_ = get_testrepos_dir() \
             if toppath is None else toppath
 
-        globs_extended = _extend_globs(os.path.join(toppath_, paths), flavors)
+        flavors_ = _get_resolved_flavors(flavors)
+
+        globs_extended = _extend_globs(opj(toppath_, paths), flavors_)
+        under_git = os.path.exists(realpath(
+            opj(toppath_, pardir, pardir, pardir, '.git')))
+
         if not len(globs_extended):
-            raise (SkipTest if skip else AssertionError)(
-                "Found no test repositories under %s."
-                % os.path.join(toppath_, paths) +
-                " Run git submodule update --init --recursive "
-                if toppath is None else "")
+            network_flavors = list(filter(lambda x: x.startswith('network'), flavors_))
+
+            if network_flavors:
+                # Let's just get through those which we know and
+                lgr.debug("No local test repositories were found.  Just cloning ones from the web")
+
+                urls = [u for p, u in iteritems(_TESTREPOS) if fnmatch(p, paths)]
+                if 'network' in network_flavors:
+                    globs_extended += urls
+                if 'network-clone' in network_flavors:
+                    globs_extended += [clone_url(url) for url in urls]
+
+            else:
+                raise (SkipTest if skip else AssertionError)(
+                    "Found no test repositories under %s, nor network* ones were requested."
+                    % opj(toppath_, paths) +
+                    (" Run git submodule update --init --recursive "
+                     if (toppath is None and under_git) else ""))
 
         # print globs_extended
         for d in globs_extended:
