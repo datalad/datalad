@@ -95,7 +95,7 @@ class Handle(object):
 
         elif src is None:
             self._backend = None
-            self.meta = Graph(identifier=URIRef(name))
+            self.meta = Graph(identifier=name)
 
         else:
             e_msg = "Invalid source for Handle: %s." % type(src)

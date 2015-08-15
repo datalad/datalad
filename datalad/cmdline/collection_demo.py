@@ -26,7 +26,7 @@ from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
 from ..support.handle import Handle, HandleBackend
 from ..support.handlerepo import HandleRepo, HandleRepoBackend
-from ..support.metadatahandler import DLNS
+from ..support.metadatahandler import DLNS, URIRef
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -38,10 +38,45 @@ def get_local_collection_repo():
                           name='local')
 
 
+def get_local_collection():
+    return Collection(src=CollectionRepoBackend(get_local_collection_repo()))
+
+
+def get_local_meta_collection():
+
+    repo = get_local_collection_repo()
+
+    # list of collections; tuple contains (remote) branch name and remote url:
+    # todo: check what about "HEAD" (git ls-tree -r ...)
+    collections = [(r + '/master', repo.repo.config_reader().get_value("remote \"%s\"" % r,
+                                                       "url"))
+                   for r in repo.git_get_remotes()]
+    # add local repo itself:
+    collections.append((None, repo.path))
+
+    mc = list()
+    for c, u in collections:
+        col = Collection(src=repo.get_backend_from_branch(c))
+        for (p, o) in col.meta.predicate_objects(DLNS.this):
+            col.meta.add((URIRef(u), p, o))
+            col.meta.remove((DLNS.this, p, o))
+        mc.append(col)
+
+    return MetaCollection(src=mc, name='localmeta')
+
+
 def register_collection(url, name):
-    # registering a collection with the master via its url:
+    # registering a collection with the master via its url;
+    # 'name' is the name of the to be created remote.
     local_col_repo = get_local_collection_repo()
     local_col_repo.git_remote_add(name, url)
+    local_col_repo.git_fetch(name)
+
+
+def unregister_collection(name):
+    #TODO: (pass url as an alternative?)
+    local_col_repo = get_local_collection_repo()
+    local_col_repo.git_remote_remove(name)
 
 
 def new_collection(path, name):
@@ -49,13 +84,15 @@ def new_collection(path, name):
     col_repo = CollectionRepo(path, name=name)
 
     # and registering it with the master:
-    loc_col_repo = get_local_collection_repo()
-    loc_col_repo.git_remote_add(name, path)
+    register_collection(path, name)
 
     return col_repo
 
 
-def new_handle(path, name):
+def new_handle(path, name=None):
+    # if name is not given, it's the name of destination:
+    if name is None:
+        name = basename(path)
     # Constructor of HandleRepo creates a handle repo at 'path' in case there
     # is none:
     hdl_repo = HandleRepo(path, name=name)
@@ -72,14 +109,18 @@ def query_coll_lvl(path, query):
     return Collection(src=CollectionRepoBackend(path)).meta.query(query)
 
 
-def query_collection(path, query):
-    # query the graphs of the collection in the repo at 'path', using the
-    # sparql query string 'query':
+def query_collection(col, query):
+    # query the graphs of 'col' or the collection in the repo at 'col',
+    # using the sparql query string 'query':
     # (That is one named graph per each handle the collection contains and one
     # named graph for collection level meta data)
+    # Note: This means either a Collection (or MetaCollection) or a path to a
+    #       collection repository is expected to be given by 'col'.
 
     # the metadata object:
-    col = Collection(src=CollectionRepoBackend(path))
+    if isinstance(col, basestring):
+        # assume a path is given
+        col = Collection(src=CollectionRepoBackend(path))
 
     # TODO: prefix bindings should be done elsewhere:
     col.conjunctive_graph.bind("dlns", DLNS)
@@ -99,20 +140,27 @@ def query_collection(path, query):
 def install_collection(name, dst):
     # "installing" a collection means to clone the collection's repository
     # in order to have a it locally available for applying changes
+
+    # TODO: check name/url; name may be ambigous?!
     local_col_repo = get_local_collection_repo()
     url = local_col_repo.git_get_remote_url(name)
     installed_clone = CollectionRepo(dst, url, name=name)
-
+    register_collection(dst, name)
     return installed_clone
 
-# TODOs:
-# def install_handle(dest, col_name=None, handle_name=None, url=None):
-#     # Basically, all we need is an url of a handle repo; once we got it
-#     # it's just:
-#     dst = "path/to/install"
-#     new_handle = HandleRepo(dst, url)
-#     master = get_local_collection_repo()
-#     master.add_handle(new_handle)
+
+def install_handle(url, dst):
+    # Basically, all we need is an url of a handle repo and a destination path;
+    # once we got it, it's just:
+    #
+    handle = HandleRepo(dst, url)
+    get_local_collection_repo().add_handle(handle)
+
+
+
+
+
+
 #
 #     # There a lot of ways to get such an url depending on what we know.
 #     # It could be the result of a query (see below), we can get it via its name

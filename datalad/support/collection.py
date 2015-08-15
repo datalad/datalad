@@ -171,7 +171,7 @@ class Collection(dict):
         elif src is None:
             self._backend = None
             self.store = IOMemory()
-            self.meta = Graph(store=self.store, identifier=URIRef(name))
+            self.meta = Graph(store=self.store, identifier=name)
             self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
         else:

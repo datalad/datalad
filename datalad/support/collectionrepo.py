@@ -198,7 +198,8 @@ class CollectionRepoBackend(CollectionBackend):
         files = [file_ for file_ in self.repo.git_get_files(branch=self.branch)
                  if file_ == basename(file_) and file_ != "config.ttl"]
 
-        out = Graph(identifier=col_name)
+        out = Graph(identifier=col_name)  # avoid type 'URIRef' or sth.
+
         for file_ in files:
             file_str = '\n'.join(self.repo.git_get_file_content(file_,
                                                                 self.branch))
@@ -208,6 +209,7 @@ class CollectionRepoBackend(CollectionBackend):
         # The issue is to determine the identifier of hte graph, which can't be
         # changed after creation. We probably also want to read certain files
         # only into the returned graph later on.
+
         return out
 
     def commit_collection(self, collection, msg):
@@ -265,7 +267,8 @@ class CollectionRepoBackend(CollectionBackend):
             cfg_str = '\n'.join(self.repo.git_get_file_content("config.ttl",
                                                                self.branch))
             cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-            return cfg_graph.value(predicate=RDF.type, object=DLNS.Collection)
+            return str(cfg_graph.value(predicate=RDF.type,
+                                       object=DLNS.Collection))
         else:
             # available repo:
             return self.repo.path
@@ -388,6 +391,9 @@ class CollectionRepo(GitRepo):
         If `branch` is not provided, the active one is used.
         """
 
+        if branch is None:
+            branch = self.git_get_active_branch()
+
         # TODO: see _filename2key:
         # return set([self._filename2key(f.split(os.sep)[0], branch)
         #             for f in self.git_get_files(branch) if f != basename(f)])
@@ -419,29 +425,35 @@ class CollectionRepo(GitRepo):
         # return handler
         raise NotImplementedError
 
-    def _filename2key(self, fname, branch):
+    def _filename2key(self, fname):
         """Placeholder
 
-        This transformation of a filename to a handle's key may change.
+        This transformation of a filename to a handle's key may change,
+        especially with respect to unicode keys.
         """
-        # TODO: Reconsider whether this kind of key is still needed
-        return self.name + '/' + branch + '/' + fname
+        # TODO: Check whether fname exists?
+        return fname
 
     def _key2filename(self, key):
         """Placeholder
 
         This transformation of a handle's key to a filename may change.
         """
-        # TODO: Rethink whether ignoring the collection/branch part
-        # is appropriate herein.
-        return _remove_empty_items(key.split('/'))[-1:][0]
+        parts = key.split('/')
+        if len(parts) > 2 or len(parts) < 1:
+            raise ValueError("Handle key '%s' invalid." % key)
+
+        if len(parts) == 2 and parts[0] != str(self.name):
+            # string cast needed for it possibly is a rdflib.Literal
+            raise ValueError("Collection name '%s' doesn't "
+                             "match active branch." % parts[0])
+        return parts[-1]
 
 
     # ### repo methods:
 
     # TODO: add and remove are inconsistent in use of name/key of a handle;
     # Will figure out, what's needed while writing the test cases:
-
 
     def get_handle_repos(self, branch=None):
         """Get a list of HandleRepo instances.
@@ -450,14 +462,15 @@ class CollectionRepo(GitRepo):
         available handle repositories, that are part of the collection
         in `branch`. If no branch is given, the active branch is used.
         """
-        repo_list = []
-        for handle in self._get_handle_files(branch):
-            parser = SafeConfigParser()
-            parser.read(opj(self.path, handle))
-            path = parser.get('Handle', 'last_seen')
-            if exists(path):
-                repo_list.append(HandleRepo(path))
-        return repo_list
+        # repo_list = []
+        # for handle in self._get_handle_files(branch):
+        #     parser = SafeConfigParser()
+        #     parser.read(opj(self.path, handle))
+        #     path = parser.get('Handle', 'last_seen')
+        #     if exists(path):
+        #         repo_list.append(HandleRepo(path))
+        # return repo_list
+        raise NotImplementedError
 
     def get_handle_repo(self, key):
         """Get a HandleRepo instance for handle `key`.
@@ -465,32 +478,14 @@ class CollectionRepo(GitRepo):
         If the handle isn't locally available, returns None.
         """
         # TODO: branch-option?
-        parser = SafeConfigParser()
-        parser.read(opj(self.path, self._key2filename(key)))
-        path = parser.get('Handle', 'last_seen')
-        if exists(path):
-            return HandleRepo(path)
-        else:
-            return None
-
-    def update_meta_data_cache(self, key=None):
-        """Rewrite the collection's metadata cache.
-        """
-        files = self._get_handle_files() if key is None \
-            else [self._key2filename(key)]
-
-        for handle_file in files:
-            cfg = SafeConfigParser()
-            cfg.read(opj(self.path, handle_file))
-            handle_path = cfg.get('Handle', 'last_seen')
-
-            # update from locally available handles only:
-            if exists(handle_path):
-                repo = HandleRepo()
-                CacheHandler(opj(self.path,
-                                 self._get_cfg('Metadata', 'cache_path')),
-                             URIRef(repo.path)).set(repo.get_metadata(),
-                                                    handle_file)
+        # parser = SafeConfigParser()
+        # parser.read(opj(self.path, self._key2filename(key)))
+        # path = parser.get('Handle', 'last_seen')
+        # if exists(path):
+        #     return HandleRepo(path)
+        # else:
+        #     return None
+        raise NotImplementedError
 
     def get_backend_from_branch(self, branch=None):
         """Convenience function to get a backend from a branch of this repo.
@@ -591,7 +586,7 @@ class CollectionRepo(GitRepo):
         """
         if isinstance(handle, HandleBackend):
             uri = URIRef(handle.url)
-            name = name or handle.name
+            name = name or handle.get_metadata().identifier
 
         if isinstance(handle, HandleRepo):
             uri = URIRef(handle.path)
@@ -606,7 +601,7 @@ class CollectionRepo(GitRepo):
         # This means, the branch to add the handle to, has to be checked out.
         # Is there a point in providing anything else?
         branch = self.git_get_active_branch()
-        key = self.name + '/' + branch + '/' + name
+        key = self.name + '/' + name
 
         path = opj(self.path, self._key2filename(key))
         # TODO: What's the desired behaviour in case a handle with that name
@@ -649,16 +644,24 @@ class CollectionRepo(GitRepo):
         dir_ = self._key2filename(key)
 
         # remove handle from collection descriptor:
-        uri = Graph().parse(opj(dir_, 'datalad.ttl')).value(predicate=RDF.type,
-                                                            object=DLNS.Handle)
-        col_graph = Graph().parse(opj(self.path, 'datalad.ttl'))
+        uri = Graph().parse(opj(self.path, dir_, 'datalad.ttl'),
+                            format="turtle").value(predicate=RDF.type,
+                                                   object=DLNS.Handle)
+        col_graph = Graph().parse(opj(self.path, 'datalad.ttl'),
+                                  format="turtle")
         col_graph.remove((DLNS.this, DCTERMS.hasPart, uri))
         col_graph.serialize(opj(self.path, 'datalad.ttl'), format="turtle")
 
         # remove handle's directory:
-        # TODO: delete it or only git rm?
-        self.git_remove(dir_)
+        # Note: Currently all files separatly due to issues with the
+        # normalize_path decorator in gitrepo.py. It expects one output per
+        # one input file. So, recursively removing the 'dir_' violates that
+        # assertion.
+        [self.git_remove(file_) for file_ in self.get_indexed_files()
+         if file_.startswith(dir_)]
+
         self.git_commit("Removed handle %s." % key)
+
 
 
     # old stuff; just outcommented for now:
@@ -695,60 +698,3 @@ class CollectionRepo(GitRepo):
     #         remotes[remote] = remote_dict
     #
     #     return remotes
-
-    # def add_handle(self, handle, name=None):
-    #     """Adds a handle to the collection repository.
-    #
-    #     Parameters:
-    #     -----------
-    #     handle: HandleRepo
-    #       For now, this has to be a locally available handle.
-    #     name: str
-    #       name of the handle. This is required to be unique with respect to the
-    #       collection.
-    #     """
-    #     # TODO: What about branch? For now, just active one.
-    #     # This means, the branch to add the handle to, has to be checked out.
-    #     # Is there a point in providing anything else?
-    #     branch = self.git_get_active_branch()
-    #
-    #     # default name of the handle:
-    #     if not name:
-    #         name = handle.name
-    #
-    #     key = self.name + '/' + branch + '/' + name
-    #     filename = self._key2filename(key)
-    #
-    #     # old:
-    #     # cache_path = self._get_cfg('Collection', 'cache_path')
-    #     # incomplete adaption:
-    #     cache_path = opj(self.path, filename)
-    #
-    #     # create the handle's config file:
-    #     cfg = SafeConfigParser()
-    #     cfg.add_section('Handle')
-    #     # Again, not sure yet, whether this id is needed:
-    #     cfg.set('Handle', 'id', handle.datalad_id)
-    #     # 'last_seen' for now holds the local path;
-    #     # to be replaced by an url on publishing for example:
-    #     cfg.set('Handle', 'last_seen', handle.path)
-    #     # default installation dir beneath the collection dir,
-    #     # holding it's handles:
-    #     cfg.set('Handle', 'default_target', name)
-    #
-    #     with open(opj(self.path, filename), 'w') as f:
-    #         cfg.write(f)
-    #
-    #     # metadata cache:
-    #     handler = CacheHandler()
-    #     handler.set(handle.get_metadata(), opj(self.path, cache_path,
-    #                                            filename))
-    #
-    #     self.git_add([opj(cache_path, filename), filename])
-    #     self.git_commit("Added handle %s." % name)
-    # def remove_handle(self, key):
-    #
-    #     filename = self._key2filename(key)
-    #     cache_path = self._get_cfg('Collection', 'cache_path')
-    #     self.git_remove([opj(cache_path, filename), filename])
-    #     self.git_commit("Removed handle %s." % key)
