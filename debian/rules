@@ -4,6 +4,10 @@
 %:
 	dh $@ --with python2 --buildsystem=python_distutils
 
-# for now simple in-source testing
 override_dh_auto_test:
-	nosetests -s -v datalad
+	: # will be performed after installation so we have access to generated entry points etc
+
+# for now just relying on providing python interface for a single version
+override_dh_auto_install:
+	dh_auto_install
+	cd debian/datalad; PATH=$$PATH:$(CURDIR)/debian/datalad/usr/bin/ nosetests -s -v usr/lib/*/*/datalad
