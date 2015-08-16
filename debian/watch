@@ -1,0 +1,4 @@
+version=3
+
+opts="filenamemangle=s/(?:.*\/)?(\d[\d\.]+)\.tar\.gz/datalad-$1.tar.gz/" \
+https://github.com/datalad/datalad/releases (?:.*/)?(\d[\d\.]+)\.tar\.gz

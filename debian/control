@@ -1,0 +1,49 @@
+Source: datalad
+Section: science
+Priority: optional
+Maintainer: Yaroslav Halchenko <debian@onerussian.com>
+Build-Depends:
+ debhelper (>= 9),
+ python,
+ git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
+ patool,
+ python-bs4,
+ python-git,
+ python-joblib,
+ python-testtools,
+ python-mock,
+ python-nose,
+Standards-Version: 3.9.6
+Homepage: http://datalad.org
+Vcs-Git: git://github.com/datalad/datalad -b debian
+Vcs-Browser: https://github.com/datalad/datalad/
+
+Package: datalad
+Architecture: all
+Depends:
+ ${python:Depends}, ${misc:Depends}
+ python,
+ git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
+ python-git,
+Recommends:
+ patool,
+ python-bs4,
+ python-joblib,
+ python-testtools,
+ python-mock,
+ python-nose,
+ python-numpy,
+Description: data distribution
+ DataLad is a data distribution providing access to a wide range of
+ data resources already available online (initially aiming for
+ neuroscience domain). Using git-annex as its backend for data
+ logistics it provides following facilities
+ .
+  - crawling of web sites to automatically prepare or update git-annex
+    repositories with content from online websites
+  - command line interface for manipulation of datasets
+    (search, install, uninstall, upgrade etc)
+ .
+ DISCLAIMER:  DataLad is Work-In-Progress and this package is not yet
+ for regular user consumption.  Primarily intended for demonstrations
+ and development.

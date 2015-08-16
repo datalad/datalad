@@ -1,0 +1,8 @@
+datalad for Debian
+------------------
+
+Project is in its early stages of development.  Future versions of the
+DataLad might lead to the heavy restructuring of the package.  We
+would recommend to follow datalad on its Twitter (@datalad) for the updates.
+
+ -- Yaroslav Halchenko <debian@onerussian.com>, Sun, 16 Aug 2015 14:22:07 -0400

@@ -1,0 +1,9 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE = 1
+
+%:
+	dh $@ --with python2
+
+# for now simple in-source testing
+override_dh_auto_test:
+	nosetests -s -v datalad
