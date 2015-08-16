@@ -5,6 +5,7 @@ Maintainer: Yaroslav Halchenko <debian@onerussian.com>
 Build-Depends:
  debhelper (>= 9),
  python,
+ python-setuptools,
  git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
  patool,
  python-bs4,
