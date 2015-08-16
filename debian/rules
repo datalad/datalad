@@ -10,4 +10,5 @@ override_dh_auto_test:
 # for now just relying on providing python interface for a single version
 override_dh_auto_install:
 	dh_auto_install
-	cd debian/datalad; PATH=$$PATH:$(CURDIR)/debian/datalad/usr/bin/ nosetests -s -v usr/lib/*/*/datalad
+	PYPATH=$$(find $(CURDIR)/debian/datalad/usr -iname datalad -type d | xargs dirname); \
+		cd debian/datalad; PYTHONPATH=$$PYPATH PATH=$$PATH:$(CURDIR)/debian/datalad/usr/bin/ nosetests -s -v $$PYPATH/datalad
