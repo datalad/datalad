@@ -49,9 +49,6 @@ def setup_parser(parser):
 
 def run(args):
     from datalad.api import Handle
-    from datalad.log import lgr
-
-    lgr.debug("Command line arguments: %r" % args)
 
     path = os.path.expandvars(os.path.expanduser(args.destination))
-    Handle(path, args.source, direct=args.direct)
+    return Handle, (path, args.source), dict(direct=args.direct)

@@ -22,4 +22,4 @@ def setup_parser(parser):
 
 def run(args):
     import datalad
-    datalad.test()
+    return datalad.test, [], {}

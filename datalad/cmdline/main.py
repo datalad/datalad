@@ -154,21 +154,27 @@ def setup_parser():
     return parser
 
 
-def main(args=None):
+def generate_api_call(cmdlineargs=None):
     parser = setup_parser()
     # parse cmd args
-    args = parser.parse_args(args)
+    cmdlineargs = parser.parse_args(cmdlineargs)
+    # convert cmdline args into API call spec
+    functor, args, kwargs = cmdlineargs.func(cmdlineargs)
+    return cmdlineargs, functor, args, kwargs
 
+
+def main(cmdlineargs=None):
+    cmdlineargs, functor, args, kwargs = generate_api_call(cmdlineargs)
     # run the function associated with the selected command
-    if args.common_debug:
+    if cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure
         setup_exceptionhook()
-        args.func(args)
+        functor(*args, **kwargs)
     else:
         # Otherwise - guard and only log the summary. Postmortem is not
         # as convenient if being caught in this ultimate except
         try:
-            args.func(args)
+            functor(*args, **kwargs)
         except Exception as exc:
             lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
             sys.exit(1)
