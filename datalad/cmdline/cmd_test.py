@@ -12,11 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 # magic line for manpage summary
-# man: -*- % get a dataset from a remote repository
-
-from .helpers import parser_add_common_args
-
-import nose
+# man: -*- % run DataLad's unit-tests
 
 def setup_parser(parser):
     # TODO -- pass options such as verbosity etc

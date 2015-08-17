@@ -24,14 +24,11 @@ from datalad.cmd import Runner
 
 from .utils import swallow_logs
 
-# For now (at least) we would need to clone from the network
-# since there are troubles with submodules on Windows.
-# See: https://github.com/datalad/datalad/issues/44
-local_flavors = ['network-clone' if on_windows else 'local']
+from .utils import local_testrepo_flavors
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_instance_from_clone(src, dst):
 
@@ -46,7 +43,7 @@ def test_GitRepo_instance_from_clone(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_GitRepo_instance_from_existing(path):
 
     gr = GitRepo(path)
@@ -65,7 +62,7 @@ def test_GitRepo_instance_brand_new(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_add(src, path):
 
@@ -92,7 +89,7 @@ def test_GitRepo_commit(path):
     ok_clean_git(path, annex=False, untracked=[])
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_get_indexed_files(src, path):
 

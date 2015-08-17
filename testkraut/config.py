@@ -10,7 +10,9 @@
 
 __docformat__ = 'restructuredtext'
 
-from ConfigParser import SafeConfigParser
+from six.moves.configparser import SafeConfigParser
+from six import iteritems
+
 import os.path
 from os.path import join as opj
 
@@ -92,9 +94,9 @@ class ConfigManager(SafeConfigParser):
             self.__cfg_filenames = []
 
         # set critical defaults
-        for sec, vars in ConfigManager._DEFAULTS.iteritems():
+        for sec, vars in iteritems(ConfigManager._DEFAULTS):
             self.add_section(sec)
-            for key, value in vars.iteritems():
+            for key, value in iteritems(vars):
                 self.set(sec, key, value)
 
         # now get the setting
@@ -191,11 +193,11 @@ class ConfigManager(SafeConfigParser):
 
         try:
             return SafeConfigParser.get(self, section, option, **kwargs)
-        except ValueError, e:
+        except ValueError as e:
             # provide somewhat descriptive error
-            raise ValueError, \
-                  "Failed to obtain value from configuration for %s.%s. " \
-                  "Original exception was: %s" % (section, option, e)
+            raise ValueError(
+                  "Failed to obtain value from configuration for %s.%s. "
+                  "Original exception was: %s" % (section, option, e))
 
 
     def getboolean(self, section, option, default=None):
@@ -215,7 +217,7 @@ class ConfigManager(SafeConfigParser):
                 else:
                     boolean_states = self.BOOLEAN_STATES
                 if default.lower() not in boolean_states:
-                    raise ValueError, 'Not a boolean: %s' % default
+                    raise ValueError('Not a boolean: %s' % default)
                 return boolean_states[default.lower()]
 
         return SafeConfigParser.getboolean(self, section, option)
@@ -235,8 +237,8 @@ class ConfigManager(SafeConfigParser):
             return default
         try:
             return SafeConfigParser._get(self, section, dtype, option)
-        except ValueError, e:
+        except ValueError as e:
             # provide somewhat descriptive error
-            raise ValueError, \
-                  "Failed to obtain value from configuration for %s.%s. " \
-                  "Original exception was: %s" % (section, option, e)
+            raise ValueError(
+                  "Failed to obtain value from configuration for %s.%s. "
+                  "Original exception was: %s" % (section, option, e))

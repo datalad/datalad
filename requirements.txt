@@ -6,3 +6,4 @@ testtools
 mock
 nose>=1.3.4
 rdflib
+six>=1.8.0

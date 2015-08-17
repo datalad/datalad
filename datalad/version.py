@@ -9,4 +9,4 @@
 """Defines version to be imported in the module and obtained from setup.py
 """
 
-__version__ = '0.0.1.dev'
+__version__ = '0.0.2.dev'

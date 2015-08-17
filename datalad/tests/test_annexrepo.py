@@ -10,19 +10,18 @@
 
 """
 
+import gc
 from git.exc import GitCommandError
+from six import PY3
+
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
 
 from ..support.annexrepo import AnnexRepo, kwargs_to_options
 from ..support.exceptions import CommandNotAvailableError, \
     FileInGitError, FileNotInAnnexError, CommandError
+from ..cmd import Runner
 from .utils import *
-
-# For now (at least) we would need to clone from the network
-# since there are troubles with submodules on Windows.
-# See: https://github.com/datalad/datalad/issues/44
-local_flavors = ['network-clone' if on_windows else 'local']
 
 
 @ignore_nose_capturing_stdout
@@ -44,7 +43,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)
@@ -99,7 +98,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
@@ -135,7 +134,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add(src, annex_path):
 
@@ -160,17 +159,16 @@ def test_AnnexRepo_annex_add(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
-
     ar = AnnexRepo(annex_path, src)
     ar.set_direct_mode(True)
     ok_clean_git_annex_proxy(path=annex_path)
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_key(src, annex_path):
 
@@ -216,12 +214,13 @@ def test_AnnexRepo_options_decorator():
     def decorated(self, whatever, options=[]):
         return options
 
-    assert_equal(decorated(1, 2, someoption='first', someotheroption='second'),
-                 [' --someoption=first', ' --someotheroption=second'])
+    # Order is not guaranteed so use sets
+    assert_equal(set(decorated(1, 2, someoption='first', someotheroption='second')),
+                 {' --someoption=first', ' --someotheroption=second'})
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add_to_git(src, dst):
 
@@ -237,7 +236,7 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
     assert_in(filename, ar.get_indexed_files())
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_web_remote(src, dst):
 
@@ -266,7 +265,7 @@ def test_AnnexRepo_web_remote(src, dst):
             ar.annex_drop(testfile)
             assert_in('ERROR', cml.out)
             assert_in('drop: 1 failed', cml.out)
-    except CommandError, e:
+    except CommandError as e:
         assert_equal(e.code, 1)
         assert_in('Could only verify the '
                   'existence of 0 out of 1 necessary copies', e.stdout)
@@ -292,6 +291,10 @@ def test_AnnexRepo_web_remote(src, dst):
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo(dst, src, backend='MD5')
+    # GitPython has a bug which causes .git/config being wiped out
+    # under Python3, triggered by collecting its config instance I guess
+    gc.collect()
+    ok_git_config_not_empty(ar)  # Must not blow, see https://github.com/gitpython-developers/GitPython/issues/333
 
     filename = get_most_obscure_supported_name()
     filename_abs = os.path.join(dst, filename)
@@ -326,7 +329,7 @@ tree1args = dict(
         ('secondfile', 'something else'),
         ('remotefile', 'pretends to be remote'),
         ('faraway', 'incredibly remote')),
-    dir=os.curdir)
+)
 
 
 @with_tree(**tree1args)
@@ -350,7 +353,7 @@ def test_AnnexRepo_backend_option(path, url):
     assert_true(ar.get_file_backend(f) == 'SHA1'
                 for f in ar.get_indexed_files() if 'faraway' in f)
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
     #init local test-annex before cloning:
@@ -367,6 +370,72 @@ def test_AnnexRepo_get_file_backend(src, dst):
     else:
         assert_raises(CommandNotAvailableError, ar.migrate_backend,
                       'test-annex.dat', backend='SHA1')
+
+
+@with_tempfile
+def test_AnnexRepo_always_commit(path):
+
+    repo = AnnexRepo(path)
+    runner = Runner(cwd=path)
+    file1 = get_most_obscure_supported_name() + "_1"
+    file2 = get_most_obscure_supported_name() + "_2"
+    with open(opj(path, file1), 'w') as f:
+        f.write("First file.")
+    with open(opj(path, file2), 'w') as f:
+        f.write("Second file.")
+
+    # always_commit == True is expected to be default
+    repo.annex_add(file1)
+
+    # Now git-annex log should show the addition:
+    out, err = repo._run_annex_command('log')
+    out_list = out.rstrip(os.linesep).split(os.linesep)
+    assert_equal(len(out_list), 1)
+    assert_in(file1, out_list[0])
+    # check git log of git-annex branch:
+    # expected: initial creation, update (by annex add) and another
+    # update (by annex log)
+    out, err = runner.run(['git', 'log', 'git-annex'])
+    num_commits = len([commit
+                       for commit in out.rstrip(os.linesep).split('\n')
+                       if commit.startswith('commit')])
+    assert_equal(num_commits, 3)
+
+    repo.always_commit = False
+    repo.annex_add(file2)
+
+    # No additional git commit:
+    out, err = runner.run(['git', 'log', 'git-annex'])
+    num_commits = len([commit
+                       for commit in out.rstrip(os.linesep).split('\n')
+                       if commit.startswith('commit')])
+    assert_equal(num_commits, 3)
+
+    repo.always_commit = True
+
+    # Still one commit only in git-annex log,
+    # but 'git annex log' was called when always_commit was true again,
+    # so it should commit the addition at the end. Calling it again should then
+    # show two commits.
+    out, err = repo._run_annex_command('log')
+    out_list = out.rstrip(os.linesep).split(os.linesep)
+    assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
+    assert_in(file1, out_list[0])
+    assert_in("recording state in git", out_list[1])
+
+    out, err = repo._run_annex_command('log')
+    out_list = out.rstrip(os.linesep).split(os.linesep)
+    assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
+    assert_in(file1, out_list[0])
+    assert_in(file2, out_list[1])
+
+    # Now git knows as well:
+    out, err = runner.run(['git', 'log', 'git-annex'])
+    num_commits = len([commit
+                       for commit in out.rstrip(os.linesep).split('\n')
+                       if commit.startswith('commit')])
+    assert_equal(num_commits, 4)
+
 
 # TODO:
 #def annex_initremote(self, name, options):

@@ -13,11 +13,14 @@
 
 from os.path import dirname, exists, join, sep as pathsep
 
+from six import iteritems
+
 from ..db import load_db, save_db
 from ..support.repos import *
 from ..support.network import collect_urls, filter_urls, \
       urljoin, download_url_to_incoming
 from ..support.pprint import pprint_indent
+from ..support.protocol import DryRunProtocol, NullProtocol
 
 
 class DoubleAnnexRepo(object):
@@ -59,7 +62,7 @@ class DoubleAnnexRepo(object):
 
         # TODO: should it be a local 'runner' so we do not augment
         # bound runner humidity permanently
-        self.runner.dry = dry_run
+        self.runner.protocol = DryRunProtocol() if dry_run else NullProtocol()
 
         # convenience shortcuts
         _call = self.runner.call
@@ -124,7 +127,7 @@ class DoubleAnnexRepo(object):
         # TODO: look what is in incoming for this "repository", so if
         # some urls are gone or changed so previous file is not there
         # we would clean-up upon exit
-        db_incoming_urls = dict([(v['url'], i) for i,v in db_incoming.iteritems()])
+        db_incoming_urls = dict([(v['url'], i) for i, v in iteritems(db_incoming)])
 
         # each section defines a separate download setup
         for section in self.cfg.sections():
@@ -155,7 +158,11 @@ class DoubleAnnexRepo(object):
             if '..' in top_url:
                 raise ValueError("Some logic would fail with relative paths in urls, "
                                  "please adjust %s" % scfg['url'])
-            urls_all = collect_urls(top_url, recurse=scfg['recurse'], hot_cache=hot_cache, cache=cache)
+            sengine = scfg.get('engine', 'html')
+            if sengine == 'html':
+                urls_all = collect_urls(top_url, recurse=scfg['recurse'], hot_cache=hot_cache, cache=cache)
+            else:
+                raise ValueError("Know nothing about %s engine")
             #import pdb; pdb.set_trace()
 
             #lgr.debug("%d urls:\n%s" % (len(urls_all), pprint_indent(urls_all, "    ", "[%s](%s)")))
@@ -232,9 +239,10 @@ class DoubleAnnexRepo(object):
                         incoming_filename, incoming_downloaded, incoming_updated, downloaded_size = \
                           download_url_to_incoming(href_full, incoming_annex.path,
                                        join(repo_sectiondir, href_dir),
-                                       db_incoming=db_incoming, dry_run=self.runner.dry,  # TODO -- use runner?
+                                       db_incoming=db_incoming,
+                                       dry_run=self.runner.protocol.__class__.__name__ == 'DryRunProtocol',  # TODO -- use runner?
                                        add_mode=add_mode)
-                    except Exception, e:
+                    except Exception as e:
                         lgr.warning("Skipping %(href_full)s due to error: %(e)s" % locals())
                         urls_errored.append(((href, href_a), e))
                         continue
@@ -263,7 +271,8 @@ class DoubleAnnexRepo(object):
                     incoming_filename_, incoming_downloaded, incoming_updated_, downloaded_size = \
                       download_url_to_incoming(href_full, incoming_annex.path,
                                    join(repo_sectiondir, href_dir),
-                                   db_incoming=db_incoming, dry_run=self.runner.dry,
+                                   db_incoming=db_incoming,
+                                   dry_run=self.runner.protocol.__class__.__name__ == 'DryRunProtocol',
                                    add_mode='download',
                                    force_download=True)
                     assert(incoming_filename == incoming_filename_)
@@ -345,8 +354,8 @@ class DoubleAnnexRepo(object):
 
         if dry_run and lgr.getEffectiveLevel() <= logging.INFO:
             # print all accumulated commands
-            for cmd in self.runner.commands:
-                 lgr.info("DRY: %s" % cmd)
+            for cmd in self.runner.protocol:
+                 lgr.info("DRY: %s" % cmd['command'])
         else:
             # Once again save the DB -- db might have been changed anyways
             save_db(db, db_path)

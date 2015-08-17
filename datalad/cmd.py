@@ -18,46 +18,50 @@ import logging
 import os
 import shutil
 import shlex
-from datalad.support.exceptions import CommandError
+
+from six import PY3
+from six import string_types, text_type, binary_type
+
+from .support.exceptions import CommandError
+from .support.protocol import NullProtocol
 
 lgr = logging.getLogger('datalad.cmd')
 
+_TEMP_std = sys.stdout, sys.stderr
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
     An object of this class provides a methods calls shell commands or python
-    functions, allowing for dry runs and output handling.
+    functions, allowing for protocolling the calls and output handling.
 
     Outputs (stdout and stderr) can be either logged or streamed to system's
     stdout/stderr during execution.
     This can be enabled or disabled for both of them independently.
-    Additionally allows for dry runs. This is achieved by initializing the
-    `Runner` with `dry=True`.
-    The Runner will then collect all calls as strings in `commands`.
+    Additionally, a protocol object can be a used with the Runner. Such a
+    protocol has to implement datalad.support.protocol.ProtocolInterface, is
+    able to record calls and allows for dry runs.
     """
 
     __slots__ = ['commands', 'dry', 'cwd', 'env', 'protocol']
 
-    def __init__(self, dry=False, cwd=None, env=None, protocol=None):
+    def __init__(self, cwd=None, env=None, protocol=None):
         """
         Parameters
         ----------
-        dry: bool, optional
-             If True, none of the commands is actually ran
         cwd: string, optional
              Base current working directory for commands.  Could be overridden
              per run call via cwd option
         env: dict, optional
              Custom environment to use for calls. Could be overridden per run
              call via env option
+        protocol: ProtocolInterface
+             Protocol object to write to.
         """
-        self.dry = dry
+
         self.cwd = cwd
         self.env = env
-        self.protocol = protocol
-
-        self.commands = []
+        self.protocol = NullProtocol() if protocol is None else protocol
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
@@ -77,15 +81,15 @@ class Runner(object):
 
         Raises
         ------
-        ValueError if cmd is neither a string nor a callable.
+        TypeError if cmd is neither a string nor a callable.
         """
 
-        if isinstance(cmd, basestring) or isinstance(cmd, list):
+        if isinstance(cmd, string_types) or isinstance(cmd, list):
             return self.run(cmd, *args, **kwargs)
         elif callable(cmd):
             return self.call(cmd, *args, **kwargs)
         else:
-            raise ValueError("Argument 'command' is neither a string, "
+            raise TypeError("Argument 'command' is neither a string, "
                              "nor a list nor a callable.")
 
     # Two helpers to encapsulate formatting/output
@@ -101,13 +105,13 @@ class Runner(object):
 
     def _get_output_online(self, proc, log_stdout, log_stderr,
                            expect_stderr=False, expect_fail=False):
-        stdout, stderr = [], []
+        stdout, stderr = binary_type(), binary_type()
         while proc.poll() is None:
             if log_stdout:
                 line = proc.stdout.readline()
-                if line != '':
+                if line:
                     stdout += line
-                    self._log_out(line)
+                    self._log_out(line.decode())
                     # TODO: what level to log at? was: level=5
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stdout()
@@ -116,9 +120,9 @@ class Runner(object):
 
             if log_stderr:
                 line = proc.stderr.readline()
-                if line != '':
+                if line:
                     stderr += line
-                    self._log_err(line, expect_stderr or expect_fail)
+                    self._log_err(line.decode(), expect_stderr or expect_fail)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -136,6 +140,11 @@ class Runner(object):
         actually executed otherwise.
         Allows for separately logging stdout and stderr  or streaming it to
         system's stdout or stderr respectively.
+
+        Note: Using a string as `cmd` and shell=True allows for piping,
+              multiple commands, etc., but that implies shlex.split() is not
+              used. This is considered to be a security hazard.
+              So be careful with input.
 
         Parameters
         ----------
@@ -194,30 +203,34 @@ class Runner(object):
 
         self.log("Running: %s" % (cmd,))
 
-        if not self.dry:
+        if self.protocol.do_execute_ext_commands:
 
             if shell is None:
-                shell = isinstance(cmd, basestring)
+                shell = isinstance(cmd, string_types)
 
-            if self.protocol:
-                self.protocol.write_section(
-                    shlex.split(cmd) if isinstance(cmd, basestring) else cmd)
+            if self.protocol.records_ext_commands:
+                prot_exc = None
+                prot_id = self.protocol.start_section(shlex.split(cmd)
+                                                      if isinstance(cmd,
+                                                                    string_types)
+                                                      else cmd)
+
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream,
                                         stderr=errstream,
                                         shell=shell,
                                         cwd=cwd or self.cwd,
                                         env=env or self.env)
-            except Exception, e:
+
+            except Exception as e:
+                prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
                           (cmd, " under %r" % cwd if cwd else '', e))
                 raise
-            # shell=True allows for piping, multiple commands, etc.,
-            # but that implies to not use shlex.split()
-            # and is considered to be a security hazard.
-            # So be careful with input.
-            # Alternatively we would have to parse `cmd` and create multiple
-            # subprocesses.
+
+            finally:
+                if self.protocol.records_ext_commands:
+                    self.protocol.end_section(prot_id, prot_exc)
 
             if log_online:
                 out = self._get_output_online(proc, log_stdout, log_stderr,
@@ -225,6 +238,13 @@ class Runner(object):
                                               expect_fail=expect_fail)
             else:
                 out = proc.communicate()
+
+            if PY3:
+                # Decoding was delayed to this point
+                def decode_if_not_None(x):
+                    return "" if x is None else binary_type.decode(x)
+                # TODO: check if we can avoid PY3 specific here
+                out = tuple(map(decode_if_not_None, out))
 
             status = proc.poll()
 
@@ -238,8 +258,8 @@ class Runner(object):
                     self._log_err(out[1], expected=expect_stderr)
 
             if status not in [0, None]:
-                msg = "Failed to run %r%s. Exit code=%d" \
-                    % (cmd, " under %r" % (cwd or self.cwd), status)
+                msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
+                    % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
                 (lgr.debug if expect_fail else lgr.error)(msg)
                 raise CommandError(str(cmd), msg, status, out[0], out[1])
             else:
@@ -247,7 +267,10 @@ class Runner(object):
                          level=8)
 
         else:
-            self.commands.append(cmd)
+            if self.protocol.records_ext_commands:
+                self.protocol.add_section(shlex.split(cmd)
+                                            if isinstance(cmd, string_types)
+                                            else cmd, None)
             out = ("DRY", "DRY")
 
         return out
@@ -262,20 +285,36 @@ class Runner(object):
         *args, **kwargs:
           Callable arguments
         """
-        if self.dry:
-            self.commands.append("%s args=%s kwargs=%s" % (f, args, kwargs))
+        if self.protocol.do_execute_callables:
+            if self.protocol.records_callables:
+                prot_exc = None
+                prot_id = self.protocol.start_section([str(f),
+                                                 "args=%s" % str(args),
+                                                 "kwargs=%s" % str(kwargs)])
+
+            try:
+                return f(*args, **kwargs)
+            except Exception as e:
+                prot_exc = e
+                raise
+            finally:
+                if self.protocol.records_callables:
+                    self.protocol.end_section(prot_id, prot_exc)
         else:
-            return f(*args, **kwargs)
+            if self.protocol.records_callables:
+                self.protocol.add_section([str(f),
+                                             "args=%s" % str(args),
+                                             "kwargs=%s" % str(kwargs)],
+                                          None)
 
     def log(self, msg, level=logging.DEBUG):
         """log helper
 
-        Logs at DEBUG-level by default and adds "DRY:"-prefix for dry runs.
+        Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
+        log the used protocol.
         """
-        if self.dry:
-            lgr.log(level, "DRY: %s" % msg)
-        else:
-            lgr.log(level, msg)
+        lgr.log(level, "Protocol: %s: %s" % (self.protocol.__class__.__name__,
+                                             msg))
 
 
 # ####
@@ -299,7 +338,7 @@ def link_file_load(src, dst, dry_run=False):
 
     try:
         os.link(src_realpath, dst)
-    except  AttributeError, e:
+    except  AttributeError as e:
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)

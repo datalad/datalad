@@ -109,7 +109,7 @@ after = 1.conf
 				parser.read(resource, encoding='utf-8')
 			else:
 				parser.read(resource)
-		except UnicodeDecodeError, e:
+		except UnicodeDecodeError as e:
 			logSys.error("Error decoding config file '%s': %s" % (resource, e))
 			return []
 		
