@@ -17,13 +17,13 @@ import sys
 import textwrap
 
 import datalad
-from datalad import log
 from datalad.log import lgr
 
 import datalad.cmdline as mvcmd
 from datalad.cmdline import helpers
 
 from ..utils import setup_exceptionhook
+
 
 def _license_info():
     return """\
@@ -48,31 +48,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
 
+
 def get_commands():
     return sorted([c for c in dir(mvcmd) if c.startswith('cmd_')])
+
 
 def setup_parser():
     # setup cmdline args parser
     # main parser
     parser = argparse.ArgumentParser(
-                    fromfile_prefix_chars='@',
-                    # usage="%(prog)s ...",
-                    description="""\
+        fromfile_prefix_chars='@',
+        # usage="%(prog)s ...",
+        description="""\
     DataLad aims to expose (scientific) data available online as a unified data distribution with the convenience of git-annex repositories as a backend.
 
     datalad command line tool facilitates initial construction and update of harvested online datasets.  It supports following commands
     """,
-                    epilog='"Geet My Data"',
-                    formatter_class=argparse.RawDescriptionHelpFormatter,
-                    add_help=False
-                )
+        epilog='"Geet My Data"',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False)
     # common options
     helpers.parser_add_common_opt(parser, 'help')
     helpers.parser_add_common_opt(parser, 'log_level')
-    helpers.parser_add_common_opt(parser,
-                                  'version',
-                                  version='datalad %s\n\n%s' % (datalad.__version__,
-                                                              _license_info()))
+    helpers.parser_add_common_opt(
+        parser,
+        'version',
+        version='datalad %s\n\n%s' % (datalad.__version__, _license_info()))
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
@@ -91,7 +92,6 @@ def setup_parser():
     #                    dest='common_verbose_level',
     #                    help="""level of verbosity of console output. By default
     #                         only warnings and errors are printed.""")
-
 
     # subparsers
     subparsers = parser.add_subparsers()
@@ -115,9 +115,9 @@ def setup_parser():
         subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
         # all subparser can report the version
         helpers.parser_add_common_opt(
-                subparser, 'version',
-                version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
-                                                 _license_info()))
+            subparser, 'version',
+            version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
+                                             _license_info()))
         # our own custom help for all commands
         helpers.parser_add_common_opt(subparser, 'help')
         helpers.parser_add_common_opt(subparser, 'log_level')
@@ -136,21 +136,23 @@ def setup_parser():
     # create command summary
     cmd_summary = []
     for cd in cmd_short_description:
-        cmd_summary.append('%s\n%s\n\n' \
+        cmd_summary.append('%s\n%s\n\n'
                            % (cd[0],
-                              textwrap.fill(cd[1], 75,
+                              textwrap.fill(
+                                  cd[1],
+                                  75,
                                   initial_indent=' ' * 4,
                                   subsequent_indent=' ' * 4)))
     parser.description = '%s\n%s\n\n%s' \
-            % (parser.description,
-               '\n'.join(cmd_summary),
-               textwrap.fill("""\
+        % (parser.description,
+           '\n'.join(cmd_summary),
+           textwrap.fill("""\
     Detailed usage information for individual commands is
     available via command-specific help options, i.e.:
     %s <command> --help""" % sys.argv[0],
-                                75, initial_indent='',
-                                subsequent_indent=''))
+                         75, initial_indent='', subsequent_indent=''))
     return parser
+
 
 def main(args=None):
     parser = setup_parser()
