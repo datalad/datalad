@@ -180,7 +180,7 @@ class Collection(dict):
 
     @property
     def name(self):
-        return self.meta.identifier
+        return str(self.meta.identifier)
 
     def __delitem__(self, key):
 
@@ -293,10 +293,10 @@ class MetaCollection(dict):
         elif isinstance(src, list):
             for item in src:
                 if isinstance(item, Collection):
-                    self[item.name] = item
+                    self[str(item.name)] = item
                 elif isinstance(item, CollectionBackend):
                     new_item = Collection(src=item)
-                    self[new_item.name] = new_item
+                    self[str(new_item.name)] = new_item
                 else:
                     e_msg = "Can't retrieve collection from %s." % type(item)
                     lgr.error(e_msg)

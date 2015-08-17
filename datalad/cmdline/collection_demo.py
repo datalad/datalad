@@ -46,6 +46,8 @@ def get_local_meta_collection():
 
     repo = get_local_collection_repo()
 
+    # TODO: When to fetch (local) remotes?
+
     # list of collections; tuple contains (remote) branch name and remote url:
     # todo: check what about "HEAD" (git ls-tree -r ...)
     collections = [(r + '/master', repo.repo.config_reader().get_value("remote \"%s\"" % r,

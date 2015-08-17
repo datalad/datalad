@@ -231,10 +231,6 @@ class PlainTextImporter(MetadataImporter):
                         with open(file_, 'r') as f:
                             license_ = f.readlines()
 
-        print "authors:\n%s" % authors
-        print "readme:\n%s" % readme
-        print "license:\n%s" % license_
-
         if data is not None:
             for key in data:
                 if key.startswith(("AUTHORS", "CONTRIBUTORS")):

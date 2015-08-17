@@ -400,31 +400,6 @@ class CollectionRepo(GitRepo):
         return set([f.split(os.sep)[0] for f in self.git_get_files(branch)
                     if f != basename(f)])
 
-    def set_metadata_handler(self, handler):
-        """Set the handler for collection-level metadata
-        """
-        #if not issubclass(handler, MetadataHandler):
-        #    raise TypeError("%s is not a MetadataHandler." % type(handler))
-
-        #self._set_cfg('Metadata', 'handler', handler.__name__)
-        raise NotImplementedError
-
-    # ### helper functions:
-
-    def get_metadata_handler(self):
-        """Helper to return the correct class of the metadata handler
-        """
-        # TODO: Add this one also to handlerepo
-        # name = self._get_cfg('Metadata', 'handler')
-        # import datalad.support.metadatahandler as mdh
-        # try:
-        #     handler = getattr(mdh, name)
-        # except AttributeError:
-        #     lgr.error("'%s' is an unknown metadata handler." % name)
-        #     raise ValueError("'%s' is an unknown metadata handler." % name)
-        # return handler
-        raise NotImplementedError
-
     def _filename2key(self, fname):
         """Placeholder
 
@@ -661,40 +636,3 @@ class CollectionRepo(GitRepo):
          if file_.startswith(dir_)]
 
         self.git_commit("Removed handle %s." % key)
-
-
-
-    # old stuff; just outcommented for now:
-    # def get_remotes_data(self, name=None):
-    #     """Get the metadata of all remotes.
-    #
-    #     Returns:
-    #     --------
-    #     dictionary
-    #     """
-    #
-    #     remotes = dict()
-    #
-    #     # TODO: name! None->all
-    #
-    #     for remote in self.git_get_remotes():
-    #         remote_dict = remotes.get(remote, {})
-    #         head_branch = None
-    #         for remote_branch in self.git_get_remote_branches():
-    #             head = re.findall(r'-> (.*)', remote_branch)
-    #
-    #             if len(head):
-    #                 # found the HEAD pointer
-    #                 head_branch = head[0]
-    #                 continue
-    #
-    #             # TODO: By now these branches are named 'remote/branch';
-    #             # correct for get_handles_data, but not in dict-representation,
-    #             # so split and integrate outer loop.
-    #             remote_dict[remote_branch] = \
-    #                 self.get_handles_data(remote_branch)
-    #         # Add entry 'HEAD':
-    #         remote_dict['HEAD'] = remote_dict[head_branch]
-    #         remotes[remote] = remote_dict
-    #
-    #     return remotes
