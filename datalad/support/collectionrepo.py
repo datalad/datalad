@@ -366,13 +366,15 @@ class CollectionRepo(GitRepo):
 
     # TODO: Consider using preferred label for the name
     def get_name(self):
-        return [x for x in self._get_cfg().objects(DLNS.this, RDFS.label)][0]
+        return str(self._get_cfg().value(subject=DLNS.this,
+                                         predicate=RDFS.label))
 
     def set_name(self, name):
         graph = self._get_cfg()
         for old_name in graph.objects(DLNS.this, RDFS.label):
-            graph.remove(DLNS.this, RDFS.label, old_name)
-        graph.add(DLNS.this, RDFS.label, Literal(name))
+            graph.remove((DLNS.this, RDFS.label, old_name))
+        graph.add((DLNS.this, RDFS.label, Literal(name)))
+        self._set_cfg(graph, "Changed name.")
 
     name = property(get_name, set_name)
 
@@ -397,8 +399,8 @@ class CollectionRepo(GitRepo):
         # TODO: see _filename2key:
         # return set([self._filename2key(f.split(os.sep)[0], branch)
         #             for f in self.git_get_files(branch) if f != basename(f)])
-        return set([f.split(os.sep)[0] for f in self.git_get_files(branch)
-                    if f != basename(f)])
+        return list(set([f.split(os.sep)[0] for f in self.git_get_files(branch)
+                    if f != basename(f)]))
 
     def _filename2key(self, fname):
         """Placeholder
@@ -415,7 +417,7 @@ class CollectionRepo(GitRepo):
         This transformation of a handle's key to a filename may change.
         """
         parts = key.split('/')
-        if len(parts) > 2 or len(parts) < 1:
+        if len(parts) > 2 or len(parts) < 1 or parts[-1] == "":
             raise ValueError("Handle key '%s' invalid." % key)
 
         if len(parts) == 2 and parts[0] != str(self.name):
@@ -595,6 +597,7 @@ class CollectionRepo(GitRepo):
         graphs['config'].add((uri, RDFS.label, Literal(name)))
         # default dir name:
         graphs['config'].add((uri, DLNS.defaultTarget, Literal(name)))
+        # TODO: Is this target actually correct?
         # TODO: anything else?
         md_handle.set_graphs(graphs)
         md_handle.store_data(path)
@@ -611,7 +614,7 @@ class CollectionRepo(GitRepo):
         md_collection.set_graphs(graphs)
         md_collection.store_data(self.path)
 
-        self.git_add(['datalad.ttl', self._key2filename(key)])
+        self.git_add(['datalad.ttl', 'config.ttl', self._key2filename(key)])
         self.git_commit("Added handle '%s'" % name)
 
     def remove_handle(self, key):
@@ -635,4 +638,5 @@ class CollectionRepo(GitRepo):
         [self.git_remove(file_) for file_ in self.get_indexed_files()
          if file_.startswith(dir_)]
 
+        self.git_add('datalad.ttl')
         self.git_commit("Removed handle %s." % key)

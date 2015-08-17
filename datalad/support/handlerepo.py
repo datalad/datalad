@@ -151,7 +151,7 @@ class HandleRepo(AnnexRepo):
 
     def _get_cfg(self):
         config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
-        config_handler.import_data(self._cfg_file)
+        config_handler.import_data(opj(self.path, self._cfg_file))
         return config_handler.get_graphs()['config']
 
     def _set_cfg(self, graph, commit_msg="Updated config file."):
@@ -185,6 +185,7 @@ class HandleRepo(AnnexRepo):
         for old_name in graph.objects(DLNS.this, RDFS.label):
             graph.remove(DLNS.this, RDFS.label, old_name)
         graph.add(DLNS.this, RDFS.label, Literal(name))
+        self._set_cfg(graph, "Changed name.")
 
     name = property(get_name, set_name)
 
