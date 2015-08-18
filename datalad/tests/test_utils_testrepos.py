@@ -17,15 +17,24 @@ from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
 from .utils import swallow_outputs
 
 
-@with_tempfile()
-def test_BasicTestRepo(repodir):
+def _test_BasicTestRepo(repodir):
     trepo = BasicTestRepo(repodir)
-    ok_clean_git(repodir)
-    ok_file_under_git(repodir, 'test.dat')
-    ok_file_under_git(repodir, 'test-annex.dat', annexed=True)
+    trepo.create()
+    ok_clean_git(trepo.path)
+    ok_file_under_git(trepo.path, 'test.dat')
+    ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
     if not trepo.repo.is_crippled_fs():
-        ok_broken_symlink(pathjoin(repodir, 'test-annex.dat'))
+        ok_broken_symlink(pathjoin(trepo.path, 'test-annex.dat'))
     with swallow_outputs():
         trepo.repo.annex_get('test-annex.dat')
     if not trepo.repo.is_crippled_fs():
-        ok_good_symlink(pathjoin(repodir, 'test-annex.dat'))
+        ok_good_symlink(pathjoin(trepo.path, 'test-annex.dat'))
+
+# Use of @with_tempfile() apparently is not friendly to test generators yet
+# so generating two tests manually
+def test_BasicTestRepo_random_location_generated():
+    _test_BasicTestRepo(None)  # without explicit path -- must be generated
+
+@with_tempfile()
+def test_BasicTestRepo(path):
+    yield _test_BasicTestRepo, path
