@@ -26,3 +26,11 @@ class CreateCollection(Interface):
 
     def __call__(self, path="here"):
         print 'creating a collection at %s' % path
+
+    def setup_parser(self, parser):
+        # XXX make this unnecessary with a smart default implementation
+        # in the base class
+        parser.add_argument(
+            "path", help="path for repo")
+
+

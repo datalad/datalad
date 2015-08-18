@@ -59,3 +59,14 @@ class Interface(object):
     """Base class for interface implementations"""
     def __init__(self):
         pass
+
+    def setup_parser(self, parser):
+        # XXX needs safety check for name collisions
+        pass
+
+    def call_from_parser(self, args):
+        # XXX needs safety check for name collisions
+        from inspect import getargspec
+        argnames = getargspec(self.__call__)[0]
+        kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
+        return self(**kwargs)

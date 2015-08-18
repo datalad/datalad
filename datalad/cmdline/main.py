@@ -19,7 +19,6 @@ import textwrap
 import datalad
 from datalad.log import lgr
 
-import datalad.cmdline as mvcmd
 from datalad.cmdline import helpers
 
 from ..utils import setup_exceptionhook
@@ -47,10 +46,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
-
-
-def get_commands():
-    return sorted([c for c in dir(mvcmd) if c.startswith('cmd_')])
 
 
 def setup_parser():
@@ -97,20 +92,28 @@ def setup_parser():
     subparsers = parser.add_subparsers()
     # for all subcommand modules it can find
     cmd_short_description = []
-    for cmd in get_commands():
-        cmd_name = cmd[4:]
-        subcmdmod = getattr(__import__('datalad.cmdline',
-                                       globals(), locals(),
-                                       [cmd], 0),
-                            cmd)
+    from ..interface.base import Interface as _Interface
+    from .. import interface as _interfaces
+
+    # auto detect all available interfaces and generate a function-based
+    # API from them
+    for _item in _interfaces.__dict__:
+        _intfcls = getattr(_interfaces, _item)
+        try:
+            if not issubclass(_intfcls, _Interface):
+                continue
+        except TypeError:
+            continue
+        _intf = _intfcls()
+
+        cmd_name = _intf.__module__.split('.')[-1]
         # deal with optional parser args
-        if 'parser_args' in subcmdmod.__dict__:
-            parser_args = subcmdmod.parser_args
+        if hasattr(_intf, 'parser_args'):
+            parser_args = _intf.parser_args
         else:
             parser_args = dict()
-        # use module description, if no explicit description is available
-        if not 'description' in parser_args:
-            parser_args['description'] = subcmdmod.__doc__
+        # use class description, if no explicit description is available
+            parser_args['description'] = _intf.__doc__
         # create subparser, use module suffix as cmd name
         subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
         # all subparser can report the version
@@ -122,14 +125,14 @@ def setup_parser():
         helpers.parser_add_common_opt(subparser, 'help')
         helpers.parser_add_common_opt(subparser, 'log_level')
         # let module configure the parser
-        subcmdmod.setup_parser(subparser)
+        _intf.setup_parser(subparser)
         # logger for command
 
         # configure 'run' function for this command
-        subparser.set_defaults(func=subcmdmod.run,
-                               logger=logging.getLogger('datalad.%s' % cmd))
+        subparser.set_defaults(func=_intf.call_from_parser,
+                               logger=logging.getLogger(_intf.__module__))
         # store short description for later
-        sdescr = getattr(subcmdmod, 'short_description',
+        sdescr = getattr(_intf, 'short_description',
                          parser_args['description'].split('\n')[0])
         cmd_short_description.append((cmd_name, sdescr))
 
@@ -164,17 +167,19 @@ def generate_api_call(cmdlineargs=None):
 
 
 def main(cmdlineargs=None):
-    cmdlineargs, functor, args, kwargs = generate_api_call(cmdlineargs)
+    parser = setup_parser()
+    # parse cmd args
+    cmdlineargs = parser.parse_args(cmdlineargs)
     # run the function associated with the selected command
     if cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure
         setup_exceptionhook()
-        functor(*args, **kwargs)
+        cmdlineargs.func(cmdlineargs)
     else:
         # Otherwise - guard and only log the summary. Postmortem is not
         # as convenient if being caught in this ultimate except
         try:
-            functor(*args, **kwargs)
+            cmdlineargs.func(cmdlineargs)
         except Exception as exc:
             lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
             sys.exit(1)
