@@ -178,13 +178,14 @@ class HandleRepo(AnnexRepo):
 
     # TODO: Consider using preferred label for the name
     def get_name(self):
-        return [x for x in self._get_cfg().objects(DLNS.this, RDFS.label)][0]
+        return str(self._get_cfg().value(subject=DLNS.this,
+                                         predicate=RDFS.label))
 
     def set_name(self, name):
         graph = self._get_cfg()
         for old_name in graph.objects(DLNS.this, RDFS.label):
-            graph.remove(DLNS.this, RDFS.label, old_name)
-        graph.add(DLNS.this, RDFS.label, Literal(name))
+            graph.remove((DLNS.this, RDFS.label, old_name))
+        graph.add((DLNS.this, RDFS.label, Literal(name)))
         self._set_cfg(graph, "Changed name.")
 
     name = property(get_name, set_name)
@@ -200,17 +201,6 @@ class HandleRepo(AnnexRepo):
         str
         """
         raise NotImplementedError("datalad id not used anymore")
-
-    def set_metadata_handler(self, handler):
-        """
-        std: subclass of MetadataHandler
-        custom: subclass of MetadataHandler
-        """
-        #if not issubclass(handler, MetadataHandler):
-        #    raise TypeError("%s is not a MetadataHandler." % type(handler))
-
-        # self._set_cfg('Metadata', 'handler', handler.__name__)
-        raise NotImplementedError
 
     def get(self, files):
         """get the actual content of files
@@ -265,54 +255,6 @@ class HandleRepo(AnnexRepo):
         """
         self.annex_add_to_git(files)
         self._commit(commit_msg)
-
-    def get_metadata(self):
-        """Get the metadata of a handle.
-
-        Returns:
-        --------
-        rdflib.Graph
-        """
-        # name = self._get_cfg('Metadata', 'handler')
-        # self_node = URIRef(self.path)
-        # import datalad.support.metadatahandler as mdh
-        # try:
-        #     handler = getattr(mdh, name)(opj(self.path,
-        #                                      self._get_cfg('Metadata', 'path')),
-        #                                  self_node)
-        # except AttributeError:
-        #     lgr.error("'%s' is an unknown metadata handler." % name)
-        #     raise ValueError("'%s' is an unknown metadata handler." % name)
-        #
-        # meta = handler.get_graph(identifier=self.name)
-
-        # meta = Graph(identifier=self.name)
-
-        # Add datalad statement:
-        # meta.add((self_node, RDF.type, DLNS.Handle))
-        # return meta
-        raise NotImplementedError
-
-    def set_metadata(self, meta):
-        """Write the metadata of a handle.
-
-        Parameters:
-        -----------
-        meta: rdflib.Graph
-        """
-        #name = self._get_cfg('Metadata', 'handler')
-        #import datalad.support.metadatahandler as mdh
-        #try:
-        #    handler = getattr(mdh, name)(opj(self.path,
-        #                                     self._get_cfg('Metadata', 'path')))
-        #except AttributeError:
-        #    lgr.error("'%s' is an unknown metadata handler." % name)
-        #    raise ValueError("'%s' is an unknown metadata handler." % name)
-
-        #handler.set(meta)
-        #self.add_to_git(opj(self._get_cfg('Metadata', 'path'), '*'),
-        #                "Metadata updated.")
-        raise NotImplementedError
 
     def get_handle(self, branch=None):
         """Convenience method to create a `Handle` instance.

@@ -192,3 +192,4 @@ def test_CollectionRepo_metadata_handle():
     """tests method add_metadata_src_to_handle"""
     raise SkipTest
 
+#CollectionRepoBackend
