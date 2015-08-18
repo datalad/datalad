@@ -21,7 +21,7 @@ class Parameter(object):
     """This class shall serve as a representation of a parameter.
     """
 
-    def __init__(self, constraints=None, doc=None, cmdarg_names=None):
+    def __init__(self, constraints=None, doc=None, *args, **kwargs):
         """Add contraints (validator) specifications and a docstring for
         a parameter.
 
@@ -30,11 +30,15 @@ class Parameter(object):
         constraints : callable
           A functor that takes any input value, performs checks or type
           conversions and finally returns a value that is appropriate for a
-          parameter or raises an exception.
+          parameter or raises an exception. This will also be used to set up
+          the ``type`` functionality of argparse.add_argument.
         doc : str
           Documentation about the purpose of this parameter.
-        cmdarg_names : tuple or None
-          Sequence of argument names to be used for cmdline interfaces.
+        *args :
+          Any additional positional args for argparser.add_argument. This is
+          most useful for assigned multiple alternative argument names.
+        **kwargs :
+          Any additional keyword args for argparser.add_argument.
 
         Examples
         --------
@@ -57,7 +61,8 @@ class Parameter(object):
         """
         self.constraints = expand_contraint_spec(constraints)
         self._doc = doc
-        self.cmdarg_names = cmdarg_names
+        self.cmd_args = args
+        self.cmd_kwargs = kwargs
 
     def get_autodoc(self, name, indent="  ", width=70, default=None, has_default=False):
         """Docstring for the parameter to be used in lists of parameters

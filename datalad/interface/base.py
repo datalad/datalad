@@ -62,6 +62,7 @@ class Interface(object):
 
     def setup_parser(self, parser):
         # XXX needs safety check for name collisions
+        # XXX allow for parser kwargs customization
         parser_kwargs = {}
         from inspect import getargspec
         # get the signature
@@ -74,14 +75,15 @@ class Interface(object):
                 continue
             param = self._params_[arg]
             defaults_idx = ndefaults - len(args) + i
-            if param.cmdarg_names is None:
+            if not len(param.cmd_args):
                 # use parameter name as default argument name
-                arg_names = ('--%s' % arg.replace('_', '-'),)
+                parser_args = ('--%s' % arg.replace('_', '-'),)
             else:
-                arg_names = param.cmdarg_names
+                parser_args = param.cmd_args
+            parser_kwargs = param.cmd_kwargs
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
-            help = param.__doc__
+            help = param._doc
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
                 # include value contraint description and default
@@ -92,7 +94,7 @@ class Interface(object):
                 help += ' Constraints: %s.' % cdoc
             # create the parameter, using the constraint instance for type
             # conversion
-            parser.add_argument(*arg_names, help=help,
+            parser.add_argument(*parser_args, help=help,
                                 **parser_kwargs)
 
     def call_from_parser(self, args):
