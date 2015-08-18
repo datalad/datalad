@@ -373,8 +373,8 @@ class AnnexRepo(GitRepo):
     def file_has_content(self, files):
         """ Check whether files have their content present under annex.
 
-        Parameters:tes
-        -----------
+        Parameters
+        ----------
         files: list of str
             file(s) to check for being actually present.
 
