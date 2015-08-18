@@ -116,7 +116,7 @@ class CollectionRepoHandleBackend(HandleBackend):
             cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
                                                                self.branch))
             cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-            return cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
+            return str(cfg_graph.value(predicate=RDF.type, object=DLNS.Handle))
         else:
             # available repo:
             return self.repo.path
@@ -378,15 +378,6 @@ class CollectionRepo(GitRepo):
 
     name = property(get_name, set_name)
 
-    def _get_handle_files(self, branch="HEAD"):
-        """Get a list of the handle files in `branch`
-        """
-        # Invalid:
-        #return [ops(f)[1] for f in self.git_get_files(branch)
-        #        if ops(f)[0] == '' and ops(f)[1] != self._cfg_file]
-
-        raise NotImplementedError
-
     def get_handle_list(self, branch=None):
         """Get a list of the names of the handles in `branch`
 
@@ -399,8 +390,9 @@ class CollectionRepo(GitRepo):
         # TODO: see _filename2key:
         # return set([self._filename2key(f.split(os.sep)[0], branch)
         #             for f in self.git_get_files(branch) if f != basename(f)])
-        return list(set([f.split(os.sep)[0] for f in self.git_get_files(branch)
-                    if f != basename(f)]))
+        return list(set([self._filename2key(f.split(os.sep)[0])
+                         for f in self.git_get_files(branch)
+                         if f != basename(f)]))
 
     def _filename2key(self, fname):
         """Placeholder
@@ -409,7 +401,7 @@ class CollectionRepo(GitRepo):
         especially with respect to unicode keys.
         """
         # TODO: Check whether fname exists?
-        return fname
+        return fname.replace('--', os.sep)
 
     def _key2filename(self, key):
         """Placeholder
@@ -417,14 +409,12 @@ class CollectionRepo(GitRepo):
         This transformation of a handle's key to a filename may change.
         """
         parts = key.split('/')
-        if len(parts) > 2 or len(parts) < 1 or parts[-1] == "":
-            raise ValueError("Handle key '%s' invalid." % key)
 
-        if len(parts) == 2 and parts[0] != str(self.name):
-            # string cast needed for it possibly is a rdflib.Literal
-            raise ValueError("Collection name '%s' doesn't "
-                             "match active branch." % parts[0])
-        return parts[-1]
+        if parts[0] in self.git_get_remotes() \
+                or parts[0] == self.name:
+            return key[len(parts[0]) + 1:].replace(os.sep, '--')
+        else:
+            return key.replace(os.sep, '--')
 
 
     # ### repo methods:
@@ -548,7 +538,7 @@ class CollectionRepo(GitRepo):
         # about a sub-entity instead of an dedicated method for that.
         raise NotImplementedError
 
-    def add_handle(self, handle, name):
+    def add_handle(self, handle, name=None):
         """Adds a handle to the collection repository.
 
         Parameters:
@@ -581,6 +571,7 @@ class CollectionRepo(GitRepo):
         key = self.name + '/' + name
 
         path = opj(self.path, self._key2filename(key))
+
         # TODO: What's the desired behaviour in case a handle with that name
         # already exists?
         if exists(path):
