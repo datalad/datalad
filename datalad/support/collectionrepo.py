@@ -12,7 +12,7 @@
 import logging
 import os
 from os.path import join as opj, basename, split as ops, exists, isdir
-from ConfigParser import SafeConfigParser
+from six import string_types
 
 from rdflib import Graph, URIRef
 
@@ -151,7 +151,7 @@ class CollectionRepoBackend(CollectionBackend):
         """
         if isinstance(repo, CollectionRepo):
             self.repo = repo
-        elif isinstance(repo, basestring):
+        elif isinstance(repo, string_types):
             self.repo = CollectionRepo(repo)
         else:
             msg = "Invalid repo type: %s" % type(repo)
@@ -569,7 +569,7 @@ class CollectionRepo(GitRepo):
             uri = URIRef(handle.path)
             name = name or handle.name
 
-        if isinstance(handle, basestring):
+        if isinstance(handle, string_types):
             uri = URIRef(handle)
             if name is None:
                 raise ValueError("Argument 'name' is None.")

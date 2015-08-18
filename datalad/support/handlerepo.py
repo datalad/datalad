@@ -21,7 +21,6 @@ datalad-managed dataset.
 import os
 from os.path import join as opj, exists, basename
 import logging
-from ConfigParser import SafeConfigParser
 
 from rdflib import URIRef, RDF
 

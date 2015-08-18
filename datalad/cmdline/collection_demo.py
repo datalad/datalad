@@ -18,6 +18,7 @@ The functions in this file are just there to separate topics.
 """
 
 from os.path import join as opj, expanduser, basename
+from six import string_types
 
 from appdirs import AppDirs
 
@@ -120,9 +121,9 @@ def query_collection(col, query):
     #       collection repository is expected to be given by 'col'.
 
     # the metadata object:
-    if isinstance(col, basestring):
+    if isinstance(col, string_types):
         # assume a path is given
-        col = Collection(src=CollectionRepoBackend(path))
+        col = Collection(src=CollectionRepoBackend(col))
 
     # TODO: prefix bindings should be done elsewhere:
     col.conjunctive_graph.bind("dlns", DLNS)
