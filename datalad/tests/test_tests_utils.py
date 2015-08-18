@@ -30,6 +30,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
+from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 
 #
@@ -333,3 +334,22 @@ def test_serve_path_via_http():
         yield _test_serve_path_via_http, test_fpath
 
 
+def test_assert_re_in():
+    assert_re_in(".*", "")
+    assert_re_in(".*", ["any"])
+
+    # should do match not search
+    assert_re_in("ab", "abc")
+    assert_raises(AssertionError, assert_re_in, "ab", "cab")
+    assert_raises(AssertionError, assert_re_in, "ab$", "abc")
+
+    # Sufficient to have one entry matching
+    assert_re_in("ab", ["", "abc", "laskdjf"])
+    assert_raises(AssertionError, assert_re_in, "ab$", ["ddd", ""])
+
+    # Tuples should be ok too
+    assert_re_in("ab", ("", "abc", "laskdjf"))
+    assert_raises(AssertionError, assert_re_in, "ab$", ("ddd", ""))
+
+    # shouldn't "match" the emty list
+    assert_raises(AssertionError, assert_re_in, "", [])

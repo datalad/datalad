@@ -12,6 +12,7 @@ import glob
 import shutil
 import stat
 import os
+import re
 import tempfile
 import platform
 import multiprocessing
@@ -543,6 +544,17 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
             raise exc_info[0](exc_info[1], exc_info[2])
 
     return newfunc
+
+
+def assert_re_in(regex, c, flags=0):
+    """Assert that container (list, str, etc) contains entry matching the regex
+    """
+    if not isinstance(c, (list, tuple)):
+        c = [c]
+    for e in c:
+        if re.match(regex, e, flags=flags):
+            return
+    raise AssertionError("Not a single entry matched %r in %r" % (regex, c))
 
 
 def ignore_nose_capturing_stdout(func):

@@ -25,6 +25,7 @@ from datalad.cmd import Runner
 from .utils import swallow_logs
 
 from .utils import local_testrepo_flavors
+from .utils import assert_re_in
 
 
 @assert_cwd_unchanged
@@ -251,9 +252,11 @@ def test_GitRepo_remote_show(orig_path, path):
     assert_equal(len(out), 4)
     assert_in('origin\t%s (fetch)' % orig_path, out)
     assert_in('origin\t%s (push)' % orig_path, out)
-    assert_in('github\tgit://github.com/datalad/testrepo--basic--r1 (fetch)',
+    # Some fellas might have some fancy rewrite rules for pushes, so we can't
+    # just check for specific protocol
+    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(fetch\)',
               out)
-    assert_in('github\tgit://github.com/datalad/testrepo--basic--r1 (push)',
+    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(push\)',
               out)
 
 
