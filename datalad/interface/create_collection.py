@@ -24,5 +24,5 @@ class CreateCollection(Interface):
             doc="path where to create the collection",
             constraints=EnsureStr()))
 
-    def __call__(self, path="here"):
+    def __call__(self, path):
         print 'creating a collection at %s' % path

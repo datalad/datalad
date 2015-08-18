@@ -21,7 +21,7 @@ class Parameter(object):
     """This class shall serve as a representation of a parameter.
     """
 
-    def __init__(self, constraints=None, doc=None, *args, **kwargs):
+    def __init__(self, constraints=None, doc=None, args=None, **kwargs):
         """Add contraints (validator) specifications and a docstring for
         a parameter.
 
@@ -34,9 +34,10 @@ class Parameter(object):
           the ``type`` functionality of argparse.add_argument.
         doc : str
           Documentation about the purpose of this parameter.
-        *args :
+        args : tuple or None
           Any additional positional args for argparser.add_argument. This is
-          most useful for assigned multiple alternative argument names.
+          most useful for assigned multiple alternative argument names or
+          create positional arguments.
         **kwargs :
           Any additional keyword args for argparser.add_argument.
 

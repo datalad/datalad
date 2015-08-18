@@ -75,11 +75,14 @@ class Interface(object):
                 continue
             param = self._params_[arg]
             defaults_idx = ndefaults - len(args) + i
-            if not len(param.cmd_args):
+            cmd_args = param.cmd_args
+            if cmd_args is None:
+                cmd_args = []
+            if not len(cmd_args):
                 # use parameter name as default argument name
                 parser_args = ('--%s' % arg.replace('_', '-'),)
             else:
-                parser_args = param.cmd_args
+                parser_args = cmd_args
             parser_kwargs = param.cmd_kwargs
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
