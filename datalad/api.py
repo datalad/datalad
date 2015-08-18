@@ -14,7 +14,7 @@ from .crawler.main import DoubleAnnexRepo
 from .support.handle import Handle
 
 from .interface.base import Interface as _Interface
-from .interface.base import update_docstring as _update_docstring
+from .interface.base import update_docstring_with_parameters as _update_docstring
 from . import interface as _interfaces
 
 # auto detect all available interfaces and generate a function-based

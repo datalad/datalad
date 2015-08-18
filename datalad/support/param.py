@@ -21,7 +21,7 @@ class Parameter(object):
     """This class shall serve as a representation of a parameter.
     """
 
-    def __init__(self, constraints=None, doc=None):
+    def __init__(self, constraints=None, doc=None, cmdarg_names=None):
         """Add contraints (validator) specifications and a docstring for
         a parameter.
 
@@ -33,6 +33,8 @@ class Parameter(object):
           parameter or raises an exception.
         doc : str
           Documentation about the purpose of this parameter.
+        cmdarg_names : tuple or None
+          Sequence of argument names to be used for cmdline interfaces.
 
         Examples
         --------
@@ -55,6 +57,7 @@ class Parameter(object):
         """
         self.constraints = expand_contraint_spec(constraints)
         self._doc = doc
+        self.cmdarg_names = cmdarg_names
 
     def get_autodoc(self, name, indent="  ", width=70, default=None, has_default=False):
         """Docstring for the parameter to be used in lists of parameters

@@ -13,7 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 
-def update_docstring(func, params):
+def update_docstring_with_parameters(func, params):
     """Generate a useful docstring from a parameter spec
 
     Amends any existing docstring of a callable with a textual
@@ -62,7 +62,38 @@ class Interface(object):
 
     def setup_parser(self, parser):
         # XXX needs safety check for name collisions
-        pass
+        parser_kwargs = {}
+        from inspect import getargspec
+        # get the signature
+        ndefaults = 0
+        args, varargs, varkw, defaults = getargspec(self.__call__)
+        if not defaults is None:
+            ndefaults = len(defaults)
+        for i, arg in enumerate(args):
+            if arg == 'self':
+                continue
+            param = self._params_[arg]
+            defaults_idx = ndefaults - len(args) + i
+            if param.cmdarg_names is None:
+                # use parameter name as default argument name
+                arg_names = ('--%s' % arg.replace('_', '-'),)
+            else:
+                arg_names = param.cmdarg_names
+            if defaults_idx >= 0:
+                parser_kwargs['default'] = defaults[defaults_idx]
+            help = param.__doc__
+            if param.constraints is not None:
+                parser_kwargs['type'] = param.constraints
+                # include value contraint description and default
+                # into the help string
+                cdoc = param.constraints.long_description()
+                if cdoc[0] == '(' and cdoc[-1] == ')':
+                    cdoc = cdoc[1:-1]
+                help += ' Constraints: %s.' % cdoc
+            # create the parameter, using the constraint instance for type
+            # conversion
+            parser.add_argument(*arg_names, help=help,
+                                **parser_kwargs)
 
     def call_from_parser(self, args):
         # XXX needs safety check for name collisions
