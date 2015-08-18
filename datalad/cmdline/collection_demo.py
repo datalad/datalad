@@ -133,9 +133,9 @@ def query_collection(col, query):
 
     # print it:
     for row in result:
-        print "---Result:---"
+        print("---Result:---")
         for key in row.asdict():
-            print "%s:\t%s" % (key, row[key])
+            print("%s:\t%s" % (key, row[key]))
 
     return result
 
