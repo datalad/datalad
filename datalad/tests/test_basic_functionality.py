@@ -11,7 +11,6 @@
 import os
 from os.path import join as opj
 
-from appdirs import AppDirs
 from nose import SkipTest
 from nose.tools import assert_raises, assert_equal, assert_false, assert_in, \
     assert_not_in
@@ -23,7 +22,7 @@ from ..utils import get_local_file_url
 
 # Note: For the actual commands use the following to determine paths to
 # the local master collection, configs, etc.:
-#
+# from appdirs import AppDirs
 # dirs = AppDirs("datalad", "datalad.org")
 # path_to_local_master = os.path.join(dirs.user_data_dir, 'localcollection')
 
