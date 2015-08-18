@@ -27,6 +27,8 @@ internals and/or contributing to the project.
 
 # Dependencies
 
+Although we now support Python 3 (>= 3.3), primarily we still use Python 2.7
+and thus instructions below are for python 2.7 deployments. 
 On Debian-based systems we recommend to enable
 [NeuroDebian](http://neuro.debian.net) since we use it to provide
 backports of recent fixed external modules we depend upon:

@@ -15,7 +15,14 @@ import os
 import logging
 import os.path as op
 
+from nose import SkipTest
 from .utils import on_windows
+
+
+try:
+    import testkraut
+except ImportError:
+    raise SkipTest("No testkraut found, tests here skipped")
 
 if 'TESTKRAUT_LOGGER_VERBOSE' in os.environ:
     lgr = logging.getLogger('testkraut')

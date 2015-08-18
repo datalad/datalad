@@ -14,6 +14,9 @@ import json
 import difflib
 from uuid import uuid1 as uuid
 
+from six import string_types, iteritems
+from six.moves import xrange
+
 __allowed_spec_keys__ = [
         'assertions',
         'authors',
@@ -72,7 +75,7 @@ class SPEC(dict):
         dict.__init__(self)
         if isinstance(src, file):
             self.update(json.load(src))
-        elif isinstance(src, basestring):
+        elif isinstance(src, string_types):
             self.update(json.loads(src))
         elif isinstance(src, dict):
             self.update(src)
@@ -118,7 +121,7 @@ class SPEC(dict):
         spec_file = open(filename, 'w')
         if minimize:
             # don't write empty containers
-            towrite = dict([(k, v) for k, v in self.iteritems()
+            towrite = dict([(k, v) for k, v in iteritems(self)
                                 if not (isSequenceType(v) or isMappingType(v)) \
                                    or len(v)])
         else:
@@ -201,7 +204,7 @@ def diff(fr, to, recursive_list=False, min_abs_numdiff=None,
             return dtree
         else:
             return None
-    elif isinstance(fr, basestring):
+    elif isinstance(fr, string_types):
         # any string
         if not fr == to:
             return {'ndiff': difflib.ndiff(('%s\n' % fr).splitlines(True),

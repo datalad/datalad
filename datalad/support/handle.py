@@ -14,6 +14,8 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 
 from rdflib import URIRef, Graph
 
+from .annexrepo import AnnexRepo
+
 
 lgr = logging.getLogger('datalad.handle')
 

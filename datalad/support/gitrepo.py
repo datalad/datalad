@@ -16,6 +16,7 @@ from os import getcwd, linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
 import shlex
+from six import string_types
 
 from functools import wraps
 
@@ -138,7 +139,7 @@ def normalize_paths(func, match_return_type=True):
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
-        if isinstance(files, basestring) or not files:
+        if isinstance(files, string_types) or not files:
             files_new = [_normalize_path(self.path, files)]
             single_file = True
         elif isinstance(files, list):
@@ -171,15 +172,15 @@ def _remove_empty_items(list_):
 
     Parameter:
     ----------
-    files: list of str
+    list_: list of str
 
     Returns:
     list of str
     """
     if not isinstance(list_, list):
         lgr.warning(
-            "_remove_empty_items() called with non-list type: %s" % type(files))
-        return files
+            "_remove_empty_items() called with non-list type: %s" % type(list_))
+        return list_
     return [file_ for file_ in list_ if file_]
 
 
@@ -264,7 +265,7 @@ class GitRepo(object):
                 # TODO: Is write=True a reasonable way to do it?
                 # May be should not write until success of operation is confirmed?
                 # What's best in case of a list of files?
-            except OSError, e:
+            except OSError as e:
                 lgr.error("git_add: %s" % e)
                 raise
 

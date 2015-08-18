@@ -24,14 +24,12 @@ from datalad.cmd import Runner
 
 from .utils import swallow_logs
 
-# For now (at least) we would need to clone from the network
-# since there are troubles with submodules on Windows.
-# See: https://github.com/datalad/datalad/issues/44
-local_flavors = ['network-clone' if on_windows else 'local']
+from .utils import local_testrepo_flavors
+from .utils import assert_re_in
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_instance_from_clone(src, dst):
 
@@ -46,7 +44,7 @@ def test_GitRepo_instance_from_clone(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 def test_GitRepo_instance_from_existing(path):
 
     gr = GitRepo(path)
@@ -65,7 +63,7 @@ def test_GitRepo_instance_brand_new(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_add(src, path):
 
@@ -92,7 +90,7 @@ def test_GitRepo_commit(path):
     ok_clean_git(path, annex=False, untracked=[])
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_get_indexed_files(src, path):
 
@@ -215,7 +213,7 @@ def test_GitRepo_files_decorator():
     assert_raises(ValueError, test_instance.decorated_one, 1)
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_remote_add(orig_path, path):
 
@@ -232,7 +230,7 @@ def test_GitRepo_remote_add(orig_path, path):
     assert_in('  Fetch URL: git://github.com/datalad/testrepo--basic--r1', out)
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_remote_remove(orig_path, path):
 
@@ -244,7 +242,7 @@ def test_GitRepo_remote_remove(orig_path, path):
     assert_in('origin', out)
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_remote_show(orig_path, path):
 
@@ -252,15 +250,17 @@ def test_GitRepo_remote_show(orig_path, path):
     gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
     out = gr.git_remote_show(verbose=True)
     assert_equal(len(out), 4)
-    assert_in('github\tgit://github.com/datalad/testrepo--basic--r1 (fetch)',
-              out)
-    assert_in('github\tgit://github.com/datalad/testrepo--basic--r1 (push)',
-              out)
     assert_in('origin\t%s (fetch)' % orig_path, out)
     assert_in('origin\t%s (push)' % orig_path, out)
+    # Some fellas might have some fancy rewrite rules for pushes, so we can't
+    # just check for specific protocol
+    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(fetch\)',
+              out)
+    assert_re_in('github\tgit(://|@)github.com[:/]datalad/testrepo--basic--r1 \(push\)',
+              out)
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_get_remote_url(orig_path, path):
 
@@ -271,7 +271,7 @@ def test_GitRepo_get_remote_url(orig_path, path):
                  'git://github.com/datalad/testrepo--basic--r1')
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 @with_tempfile
 def test_GitRepo_pull(test_path, orig_path, clone_path):
@@ -351,7 +351,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
     assert_equal({'branch2', 'branch3'}, set(branches1))
 
 
-@with_testrepos(flavors=local_flavors)
+@with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 @with_tempfile
 def test_GitRepo_get_files(src, path, path2clone):

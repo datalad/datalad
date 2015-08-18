@@ -7,15 +7,18 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import __builtin__
+import collections
+import six.moves.builtins as __builtin__
 
 import logging
 import shutil, stat, os, sys
 import tempfile
 import platform
+import gc
 
 from functools import wraps
 from os.path import exists, join as opj
+from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -44,9 +47,8 @@ def is_interactive():
 
 import hashlib
 def md5sum(filename):
-    with open(filename) as f:
+    with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
-
 
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
@@ -132,7 +134,16 @@ def rmtemp(f, *args, **kwargs):
         if os.path.isdir(f):
             rmtree(f, *args, **kwargs)
         else:
-            os.unlink(f)
+            for i in range(10):
+                try:
+                    os.unlink(f)
+                except OSError as e:
+                    if i < 9:
+                        sleep(0.5)
+                        continue
+                    else:
+                        raise
+                break
     else:
         lgr.info("Keeping temp file: %s" % f)
 
@@ -159,7 +170,7 @@ def optional_args(decorator):
         def dec(f):
             return decorator(f, *args, **kwargs)
 
-        is_decorating = not kwargs and len(args) == 1 and callable(args[0])
+        is_decorating = not kwargs and len(args) == 1 and isinstance(args[0], collections.Callable)
         if is_decorating:
             f = args[0]
             args = []
@@ -184,7 +195,7 @@ def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
             ['datalad_temp'] +
             ([prefix] if prefix else []) +
             ([''] if (on_windows or not wrapped)
-                  else [wrapped.func_name]))
+                  else [wrapped.__name__]))
 
     directory = os.environ.get('DATALAD_TESTS_TEMPDIR')
     if directory and 'dir' not in tkwargs_:
@@ -213,6 +224,7 @@ def swallow_outputs():
     print function had desired effect
     """
 
+    debugout = sys.stdout
     class StringIOAdapter(object):
         """Little adapter to help getting out/err values
         """
@@ -243,16 +255,15 @@ def swallow_outputs():
         def cleanup(self):
             self._out.close()
             self._err.close()
-            rmtemp(self._out.name)
-            rmtemp(self._err.name)
+            out_name = self._out.name
+            err_name = self._err.name
+            del self._out
+            del self._err
+            gc.collect()
+            rmtemp(out_name)
+            rmtemp(err_name)
 
 
-
-    # preserve -- they could have been mocked already
-    oldprint = getattr(__builtin__, 'print')
-    oldout, olderr = sys.stdout, sys.stderr
-    adapter = StringIOAdapter()
-    sys.stdout, sys.stderr = adapter.handles
 
     def fake_print(*args, **kwargs):
         sep = kwargs.pop('sep', ' ')
@@ -265,9 +276,16 @@ def swallow_outputs():
         else:
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
-    setattr(__builtin__, 'print', fake_print)
+
+    # preserve -- they could have been mocked already
+    oldprint = getattr(__builtin__, 'print')
+    oldout, olderr = sys.stdout, sys.stderr
+    adapter = StringIOAdapter()
 
     try:
+        sys.stdout, sys.stderr = adapter.handles
+        setattr(__builtin__, 'print', fake_print)
+
         yield adapter
     finally:
         sys.stdout, sys.stderr = oldout, olderr
@@ -318,13 +336,16 @@ def swallow_logs(new_level=None):
 
         def cleanup(self):
             self._out.close()
-            rmtemp(self._out.name)
+            out_name = self._out.name
+            del self._out
+            gc.collect()
+            rmtemp(out_name)
 
     adapter = StringIOAdapter()
     lgr.handlers = [logging.StreamHandler(adapter.handle)]
     if old_level < logging.DEBUG:  # so if HEAVYDEBUG etc -- show them!
         lgr.handlers += old_handlers
-    if isinstance(new_level, basestring):
+    if isinstance(new_level, str):
         new_level = getattr(logging, new_level)
 
     if new_level is not None:
@@ -341,19 +362,26 @@ def swallow_logs(new_level=None):
 # Additional handlers
 #
 _sys_excepthook = sys.excepthook # Just in case we ever need original one
-
 def setup_exceptionhook():
+    """Overloads default sys.excepthook with our exceptionhook handler.
+
+       If interactive, our exceptionhook handler will invoke
+       pdb.post_mortem; if not interactive, then invokes default handler.
+    """
+
     def _datalad_pdb_excepthook(type, value, tb):
-        if not is_interactive:
+        if is_interactive():
+            import traceback, pdb
+            traceback.print_exception(type, value, tb)
+            print()
+            pdb.post_mortem(tb)
+        else:
             lgr.warn("We cannot setup exception hook since not in interactive mode")
             # we are in interactive mode or we don't have a tty-like
             # device, so we call the default hook
-            sys.__excepthook__(type, value, tb)
-        else:
-            import traceback, pdb
-            traceback.print_exception(type, value, tb)
-            print
-            pdb.post_mortem(tb)
+            #sys.__excepthook__(type, value, tb)
+            _sys_excepthook(type, value, tb)
+
     sys.excepthook = _datalad_pdb_excepthook
 
 

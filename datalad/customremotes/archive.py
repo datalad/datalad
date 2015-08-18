@@ -10,15 +10,12 @@
 
 __docformat__ = 'restructuredtext'
 
-import errno
 import os
-import sys
-import urllib2
-
 from os.path import exists, join as opj, basename, abspath
 
-import logging
+from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 
+import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 
 
@@ -111,7 +108,7 @@ class AnnexArchiveCache(object):
         # filenames within archive are too obscure for local file system.
         # We could somehow adjust them while extracting and here channel back
         # "fixed" up names since they are only to point to the load
-        path = opj(self.get_extracted_archive(archive), urllib2.unquote(afile))
+        path = opj(self.get_extracted_archive(archive), urlunquote(afile))
         # TODO: make robust
         lgr.log(1, "Verifying that %s exists" % abspath(path))
         assert exists(path), "%s must exist" % path
@@ -160,7 +157,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             archive_key = self._get_file_key(archive_file)
         # todo (out, err) = annex('lookupkey a.tar.gz')
         assert(archive_key is not None)
-        file_quoted = urllib2.quote(file)
+        file_quoted = urlquote(file)
         return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
 
     @property

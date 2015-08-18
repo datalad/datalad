@@ -28,20 +28,6 @@ __docformat__ = 'restructuredtext'
 # magic line for manpage summary
 # man: -*- % get a dataset from a remote repository
 
-
-import calendar
-import os
-import re
-import shutil
-import time
-
-import argparse
-import os
-import sys
-
-import datalad.log
-from .helpers import parser_add_common_args
-
 def setup_parser(parser):
 
     parser.add_argument(

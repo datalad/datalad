@@ -14,11 +14,15 @@ import os
 import re
 import shutil
 import time
-import urllib2
+
+from six import string_types
+from six.moves.urllib.request import urlopen, Request
+from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
+from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
+from six.moves.urllib.error import URLError
+from six.moves import StringIO
 
 from bs4 import BeautifulSoup
-from StringIO import StringIO
-from urlparse import urljoin, urlparse, urlsplit, urlunsplit
 
 import logging
 lgr = logging.getLogger('datalad.network')
@@ -38,7 +42,7 @@ def get_response_deposition_filename(response_info):
     return None
 
 def get_url_deposition_filename(url):
-    request = urllib2.Request(url)
+    request = Request(url)
     r = retry_urlopen(request)
     try:
         return get_response_deposition_filename(r.info())
@@ -46,7 +50,7 @@ def get_url_deposition_filename(url):
         r.close()
 
 def get_url_straight_filename(url):
-    return os.path.basename(urllib2.unquote(urlsplit(url).path))
+    return os.path.basename(urlunquote(urlsplit(url).path))
 
 def get_url_response_stamp(url, response_info):
     size, mtime = None, None
@@ -59,15 +63,15 @@ def get_url_response_stamp(url, response_info):
 
 def __download(url, filename=None, filename_only=False):
     # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
-    request = urllib2.Request(url)
+    request = Request(url)
     request.add_header('Accept-encoding', 'gzip,deflate')
-    r = urllib2.urlopen(request)
+    r = urlopen(request)
     try:
         filename = filename or getFileName(url, r)
         if not filename_only:
             with open(filename, 'wb') as f:
                 if r.info().get('Content-Encoding') == 'gzip':
-                    buf = StringIO( r.read())
+                    buf = StringIO(r.read())
                     src = gzip.GzipFile(fileobj=buf)
                 else:
                     src = r
@@ -77,10 +81,10 @@ def __download(url, filename=None, filename_only=False):
     return filename
 
 def retry_urlopen(url, retries=3):
-    for t in xrange(retries):
+    for t in range(retries):
         try:
-            return urllib2.urlopen(url)
-        except urllib2.URLError, e:
+            return urlopen(url)
+        except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
             if t == retries - 1:
                 # if we have reached allowed number of retries -- reraise
@@ -92,11 +96,11 @@ def retry_urlopen(url, retries=3):
 def _fetch_page(url, retries=3):
     lgr.debug("Fetching %s" % url)
     openurl = retry_urlopen(url, retries=retries)
-    for t in xrange(retries):
+    for t in range(retries):
         try:
             page = openurl.read()
             break
-        except urllib2.URLError, e:
+        except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
             if t == retries - 1:
                 # if we have reached allowed number of retries -- reraise
@@ -114,7 +118,7 @@ def is_url_quoted(url):
     """Return either URL looks being already quoted
     """
     try:
-        url_ = urllib2.unquote(url)
+        url_ = urlunquote(url)
         return url != url_
     except:  # problem with unquoting -- then it must be wasn't quoted (correctly)
         return False
@@ -122,7 +126,7 @@ def is_url_quoted(url):
 
 def _parse_urls(page):
     lgr.debug("Parsing out urls")
-    soup = BeautifulSoup(page)
+    soup = BeautifulSoup(page, "html.parser")
     urls = []
     for link in soup.findAll('a'):
         href = link.get('href')
@@ -131,7 +135,7 @@ def _parse_urls(page):
             continue
         # we better bring it to canonical quoted form for consistency
         rec = urlsplit(href)
-        path_quoted = urllib2.quote(rec.path) if not is_url_quoted(rec.path) else rec.path
+        path_quoted = urlquote(rec.path) if not is_url_quoted(rec.path) else rec.path
         href = urlunsplit((rec.scheme, rec.netloc, path_quoted,
                            rec.query, rec.fragment))
         urls.append((href, link.text, link))
@@ -155,9 +159,9 @@ def same_website(url_rec, u_rec):
     u_rec: ParseResult
       record for new url
     """
-    if isinstance(url_rec, basestring):
+    if isinstance(url_rec, string_types):
         url_rec = urlparse(url_rec)
-    if isinstance(u_rec, basestring):
+    if isinstance(u_rec, string_types):
         u_rec = urlparse(u_rec)
     return (url_rec.netloc == u_rec.netloc)
     # todo: collect more of sample cases.
@@ -339,7 +343,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
         # TODO: add mode alike to 'relaxed' where we would not
         # care about content-deposition filename
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
-        request = urllib2.Request(url)
+        request = Request(url)
 
         # No traffic compression since we do not know how to identify
         # exactly either it has to be decompressed
@@ -474,7 +478,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                     downloaded = True
                 downloaded_size = os.stat(temp_full_filename).st_size
 
-            except Exception, e:
+            except Exception as e:
                 lgr.error("Failed to download: %s" % e)
                 if os.path.exists(temp_full_filename):
                     lgr.info("Removing %s" % temp_full_filename)

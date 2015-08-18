@@ -48,6 +48,7 @@ we outline the workflow used by the developers:
    local disk:
 
           git remote add gh-YourLogin git@github.com:YourLogin/datalad.git
+          git fetch gh-YourLogin
 
     To ease addition of other github repositories as remotes, here is
     a little bash function/script to add to your `~/.bashrc`:
@@ -95,7 +96,7 @@ we outline the workflow used by the developers:
 
 5. Push to GitHub with:
 
-          git push -u origin nf-my-feature
+          git push -u gh-YourLogin nf-my-feature
 
    Finally, go to the web page of your fork of the DataLad repo, and click
    'Pull request' (PR) to send your changes to the maintainers for review. This
@@ -162,6 +163,10 @@ git submodule update --init --recursive
 
 or do the original repository clone described above with the `--recursive` 
 option.
+
+Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
+file which sets up a few virtual environments for testing locally, which you can 
+later reuse like any other regular virtualenv for troubleshooting.
 
 
 ### Coverage
