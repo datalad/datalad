@@ -68,6 +68,7 @@ class AnnexRepo(GitRepo):
 
     __slots__ = GitRepo.__slots__ + ['always_commit']
 
+    # TODO: pass description
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None, always_commit=True):
         """Creates representation of git-annex repository at `path`.
