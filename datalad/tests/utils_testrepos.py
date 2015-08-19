@@ -25,6 +25,8 @@ class TestRepo(object):
 
     __metaclass__ = ABCMeta
 
+    REPO_CLASS = None # Assign to the class to be used in the subclass
+
     def __init__(self, path=None, puke_if_exists=True):
         if not path:
             from .utils import get_tempfile_kwargs
@@ -33,7 +35,7 @@ class TestRepo(object):
             _TEMP_PATHS_GENERATED.append(path)
         if puke_if_exists and exists(path):
             raise RuntimeError("Directory %s for test repo already exist" % path)
-        self.repo = AnnexRepo(path)
+        self.repo = self.REPO_CLASS(path)
         self.runner = Runner(cwd=self.repo.path)
         self._created = False
 
@@ -51,17 +53,6 @@ class TestRepo(object):
             f.write(content.encode())
         (self.repo.annex_add if annex else self.repo.git_add)(name)
 
-    def create_info_file(self):
-        runner = Runner()
-        annex_version = runner.run("git annex version")[0].split()[2]
-        git_version = runner.run("git --version")[0].split()[2]
-        self.create_file('INFO.txt',
-                         "git: %s\n"
-                         "annex: %s\n"
-                         "datalad: %s\n"
-                         % (git_version, annex_version, __version__),
-                         annex=False)
-
     def create(self):
         if self._created:
             assert(exists(self.path))
@@ -77,6 +68,9 @@ class TestRepo(object):
 
 class BasicTestRepo(TestRepo):
     """Creates a basic test repository"""
+
+    REPO_CLASS = AnnexRepo
+
     def populate(self):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
@@ -86,3 +80,15 @@ class BasicTestRepo(TestRepo):
             get_local_file_url(realpath(pathjoin(self.path, 'test.dat'))))
         self.repo.git_commit("Adding a rudimentary git-annex load file")
         self.repo.annex_drop("test-annex.dat")  # since available from URL
+
+    def create_info_file(self):
+        runner = Runner()
+        annex_version = runner.run("git annex version")[0].split()[2]
+        git_version = runner.run("git --version")[0].split()[2]
+        self.create_file('INFO.txt',
+                         "git: %s\n"
+                         "annex: %s\n"
+                         "datalad: %s\n"
+                         % (git_version, annex_version, __version__),
+                         annex=False)
+
