@@ -25,4 +25,4 @@ class CreateCollection(Interface):
             constraints=EnsureStr()))
 
     def __call__(self, path):
-        print 'creating a collection at %s' % path
+        print('creating a collection at %s' % path)
