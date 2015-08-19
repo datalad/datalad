@@ -118,6 +118,8 @@ class Interface(object):
                 if cdoc[0] == '(' and cdoc[-1] == ')':
                     cdoc = cdoc[1:-1]
                 help += ' Constraints: %s.' % cdoc
+            if defaults_idx >= 0:
+                help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type
             # conversion
             parser.add_argument(*parser_args, help=help,
