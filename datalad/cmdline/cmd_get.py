@@ -28,6 +28,7 @@ __docformat__ = 'restructuredtext'
 # magic line for manpage summary
 # man: -*- % get a dataset from a remote repository
 
+
 def setup_parser(parser):
 
     parser.add_argument(
@@ -35,7 +36,8 @@ def setup_parser(parser):
         help="path or pattern describing what to get")
 
     #parser_add_common_args(parser, opt=('log_level'))
-    
+
+
 def run(args):
     import glob
     import os
@@ -43,8 +45,6 @@ def run(args):
 
     from datalad.api import HandleRepo
     from datalad.log import lgr
-
-    lgr.debug("Command line arguments: %r" % args)
 
     # Since GitPython doesn't recognize we ar with in a repo, if we are
     # deeper down the tree, walk upwards and look for '.git':

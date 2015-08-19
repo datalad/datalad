@@ -30,8 +30,8 @@ __docformat__ = 'restructuredtext'
 
 import os
 
-def setup_parser(parser):
 
+def setup_parser(parser):
     parser.add_argument(
         "source", metavar='url',
         help="url to git repository")
@@ -45,14 +45,11 @@ def setup_parser(parser):
         help="Force git-annex to use direct mode.")
 
     #parser_add_common_args(parser, opt=('log_level'))
-    
-def run(args):
-    from datalad.api import HandleRepo
-    from datalad.log import lgr
 
-    lgr.debug("Command line arguments: %r" % args)
+
+def run(args):
+
+    from datalad.api import HandleRepo
 
     path = os.path.expandvars(os.path.expanduser(args.destination))
-    ds = HandleRepo(path, args.source, direct=args.direct)
-
-
+    return HandleRepo, (path, args.source), dict(direct=args.direct)
