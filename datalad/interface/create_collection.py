@@ -28,9 +28,13 @@ class CreateCollection(Interface):
     """Creates a new collection."""
     _params_ = dict(
         path=Parameter(
+            args=('path',),
+            nargs='?',
             doc="path where to create the collection",
             constraints=EnsureStr()),
         name=Parameter(
+            args=('name',),
+            nargs='?',
             doc="name of the collection; if no name is given the name of the "
                 "destination directory is used.",
             constraints=EnsureStr()))
