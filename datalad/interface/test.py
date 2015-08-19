@@ -11,15 +11,15 @@
 
 __docformat__ = 'restructuredtext'
 
-# magic line for manpage summary
-# man: -*- % run DataLad's unit-tests
+
+import datalad
+from .base import Interface
 
 
-def setup_parser(parser):
-    # TODO -- pass options such as verbosity etc
-    pass
+class Test(Interface):
+    """Run internal DataLad (unit)tests
 
-
-def run(args):
-    import datalad
-    return datalad.test, [], {}
+    This can be used to verify correct operation on the system
+    """
+    def __call__(self):
+        datalad.test()

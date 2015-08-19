@@ -15,3 +15,4 @@ __docformat__ = 'restructuredtext'
 # the following should be series of imports of interface implementations
 # the shall be exposed in the Python API and the cmdline interface
 from .create_collection import CreateCollection
+from .test import Test
