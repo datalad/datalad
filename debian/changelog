@@ -1,4 +1,4 @@
-datalad (0.0.3-1) unstable; urgency=low
+datalad (0.0.3-1) UNRELEASED; urgency=low
 
   * Initial Debian packaging
 
