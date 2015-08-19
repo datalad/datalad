@@ -71,7 +71,7 @@ def test_interface():
     parser = argparse.ArgumentParser()
 
     di.setup_parser(parser)
-    print parser.print_help()
+    print(parser.print_help())
     args = parser.parse_args(['42', '11', '1', '2', '--demoarg', '23'])
     assert_is(args.demoarg, 23)
     assert_equal(args.demoposarg, [42, 11])

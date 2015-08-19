@@ -287,7 +287,7 @@ class AltConstraints(Constraint):
         for c in self.constraints:
             try:
                 return c(value)
-            except Exception, e:
+            except Exception as e:
                 e_list.append(e)
         raise ValueError("all alternative constraints violated")
 
