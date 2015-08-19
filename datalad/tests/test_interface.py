@@ -9,7 +9,7 @@
 """Test command call wrapper
 """
 
-from nose.tools import assert_is, assert_equal, assert_true, assert_raises
+from nose.tools import assert_is, assert_equal, assert_raises, assert_true
 
 from datalad.support.param import Parameter
 import datalad.support.constraints as cnstr

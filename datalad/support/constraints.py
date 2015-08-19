@@ -10,6 +10,8 @@
 
 __docformat__ = 'restructuredtext'
 
+from six.moves import map as map
+
 
 class Constraint(object):
     """Base class for input value conversion/validation.
@@ -58,7 +60,7 @@ class EnsureDType(Constraint):
         if hasattr(value, '__iter__') and \
                 not (isinstance(value, binary_type)
                      or isinstance(value, text_type)):
-            return map(self._dtype, value)
+            return list(map(self._dtype, value))
         else:
             return self._dtype(value)
 
@@ -103,7 +105,7 @@ class EnsureListOf(Constraint):
         super(EnsureListOf, self).__init__()
 
     def __call__(self, value):
-        return map(self._dtype, value)
+        return list(map(self._dtype, value))
 
     def short_description(self):
         dtype_descr = str(self._dtype)
@@ -148,9 +150,10 @@ class EnsureBool(Constraint):
     True: '1', 'yes', 'on', 'enable', 'true'
     """
     def __call__(self, value):
+        from six import binary_type, text_type
         if isinstance(value, bool):
             return value
-        elif isinstance(value, basestring):
+        elif isinstance(value, binary_type) or isinstance(value, text_type):
             value = value.lower()
             if value in ('0', 'no', 'off', 'disable', 'false'):
                 return False
@@ -171,7 +174,8 @@ class EnsureStr(Constraint):
     No automatic conversion is attempted.
     """
     def __call__(self, value):
-        if not isinstance(value, basestring):
+        from six import binary_type, text_type
+        if not (isinstance(value, binary_type) or isinstance(value, text_type)):
             # do not perform a blind conversion ala str(), as almost
             # anything can be converted and the result is most likely
             # unintended
