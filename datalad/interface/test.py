@@ -6,7 +6,20 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""
-"""
+"""Run internal DataLad (unit)tests to verify correct operation on the system"""
+
 
 __docformat__ = 'restructuredtext'
+
+
+import datalad
+from .base import Interface
+
+
+class Test(Interface):
+    """Run internal DataLad (unit)tests
+
+    This can be used to verify correct operation on the system
+    """
+    def __call__(self):
+        datalad.test()

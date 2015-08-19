@@ -14,7 +14,7 @@ from six.moves import StringIO
 from mock import patch
 
 import datalad
-from ..cmdline.main import main, get_commands
+from ..cmdline.main import main
 from .utils import assert_equal, ok_, assert_raises, in_
 
 def run_main(args, exit_code=0, expect_stderr=False):
@@ -64,10 +64,6 @@ def test_version():
     in_("Copyright", out)
     in_("Permission is hereby granted", out)
 
-def test_get_commands():
-    assert('cmd_crawl' in get_commands())
-    assert('cmd_install' in get_commands())
-    assert('cmd_get' in get_commands())
 
 def test_help():
     stdout, stderr = run_main(['--help'])

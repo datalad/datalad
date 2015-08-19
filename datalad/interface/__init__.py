@@ -6,18 +6,16 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Run internal DataLad (unit)tests to verify correct operation on the system"""
+"""High-level interface definition
 
+"""
 
 __docformat__ = 'restructuredtext'
 
-# magic line for manpage summary
-# man: -*- % run DataLad's unit-tests
-
-def setup_parser(parser):
-    # TODO -- pass options such as verbosity etc
-    pass
-    
-def run(args):
-    import datalad
-    datalad.test()
+# the following should be series of imports of interface implementations
+# the shall be exposed in the Python API and the cmdline interface
+from .create_collection import CreateCollection
+from .test import Test
+from .get import Get
+from .install import Install
+from .crawl import Crawl
