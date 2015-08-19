@@ -16,3 +16,4 @@ __docformat__ = 'restructuredtext'
 # the shall be exposed in the Python API and the cmdline interface
 from .create_collection import CreateCollection
 from .test import Test
+from .get import Get
