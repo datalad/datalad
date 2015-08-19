@@ -10,5 +10,3 @@
 """
 
 __docformat__ = 'restructuredtext'
-
-from . import cmd_crawl
