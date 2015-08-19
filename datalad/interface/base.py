@@ -13,6 +13,21 @@
 __docformat__ = 'restructuredtext'
 
 
+def dedent_docstring(text):
+    import textwrap
+    """Remove uniform indentation from a multiline docstring"""
+    # Problem is that first line might often have no offset, so might
+    # need to be ignored from dedent call
+    if text is None:
+        return None
+    if not text.startswith(' '):
+        lines = text.split('\n')
+        text2 = '\n'.join(lines[1:])
+        return lines[0] + "\n" + textwrap.dedent(text2)
+    else:
+        return textwrap.dedent(text)
+
+
 def update_docstring_with_parameters(func, params):
     """Generate a useful docstring from a parameter spec
 
@@ -30,7 +45,9 @@ def update_docstring_with_parameters(func, params):
     doc = func.__doc__
     if doc is None:
         doc = u''
-    if len(args):
+    if len(args) > 1:
+        if len(doc):
+            doc += '\n'
         doc += "Parameters\n----------\n"
         for i, arg in enumerate(args):
             if arg == 'self':
@@ -58,7 +75,7 @@ def update_docstring_with_parameters(func, params):
 class Interface(object):
     """Base class for interface implementations"""
     def __init__(self):
-        pass
+        self.__call__.__func__.__doc__ = dedent_docstring(self.__doc__)
 
     def setup_parser(self, parser):
         # XXX needs safety check for name collisions

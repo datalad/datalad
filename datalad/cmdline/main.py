@@ -93,6 +93,7 @@ def setup_parser():
     # for all subcommand modules it can find
     cmd_short_description = []
     from ..interface.base import Interface as _Interface
+    from ..interface.base import dedent_docstring
     from .. import interface as _interfaces
 
     # auto detect all available interfaces and generate a function-based
@@ -111,9 +112,9 @@ def setup_parser():
         if hasattr(_intf, 'parser_args'):
             parser_args = _intf.parser_args
         else:
-            parser_args = dict()
+            parser_args = dict(formatter_class=argparse.RawDescriptionHelpFormatter)
         # use class description, if no explicit description is available
-            parser_args['description'] = _intf.__doc__
+            parser_args['description'] = dedent_docstring(_intf.__doc__)
         # create subparser, use module suffix as cmd name
         subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
         # all subparser can report the version

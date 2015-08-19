@@ -27,9 +27,9 @@ for _item in _interfaces.__dict__:
     except TypeError:
         continue
     _intf = _intfcls()
-    spec = getattr(_intf, '_params_', dict())
+    _spec = getattr(_intf, '_params_', dict())
     # convert the parameter SPEC into a docstring for the function
-    _update_docstring(_intf.__call__.__func__, spec)
+    _update_docstring(_intf.__call__.__func__, _spec)
     # register the function in the namespace, using the name of the
     # module it is defined in
     globals()[_intf.__module__.split('.')[-1]] = _intf.__call__
