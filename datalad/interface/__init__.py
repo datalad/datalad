@@ -17,3 +17,4 @@ __docformat__ = 'restructuredtext'
 from .create_collection import CreateCollection
 from .test import Test
 from .get import Get
+from .install import Install
