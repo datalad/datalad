@@ -21,7 +21,6 @@ class Demo(Interface):
     _params_ = dict(
 
         demoposarg=Parameter(
-            args=('demoposarg',),
             doc="demoposdoc",
             constraints=cnstr.EnsureInt(),
             nargs=2),

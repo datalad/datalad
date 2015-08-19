@@ -79,8 +79,14 @@ class Interface(object):
             if cmd_args is None:
                 cmd_args = []
             if not len(cmd_args):
+                if defaults_idx >= 0:
+                    # dealing with a kwarg
+                    template = '--%s'
+                else:
+                    # positional arg
+                    template = '%s'
                 # use parameter name as default argument name
-                parser_args = ('--%s' % arg.replace('_', '-'),)
+                parser_args = (template % arg.replace('_', '-'),)
             else:
                 parser_args = cmd_args
             parser_kwargs = param.cmd_kwargs
