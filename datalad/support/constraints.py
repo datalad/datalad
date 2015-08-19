@@ -54,7 +54,10 @@ class EnsureDType(Constraint):
         self._dtype = dtype
 
     def __call__(self, value):
-        if hasattr(value, '__iter__') and not isinstance(value, basestring):
+        from six import binary_type, text_type
+        if hasattr(value, '__iter__') and \
+                not (isinstance(value, binary_type)
+                     or isinstance(value, text_type)):
             return map(self._dtype, value)
         else:
             return self._dtype(value)
@@ -63,6 +66,8 @@ class EnsureDType(Constraint):
         dtype_descr = str(self._dtype)
         if dtype_descr[:7] == "<type '" and dtype_descr[-2:] == "'>":
             dtype_descr = dtype_descr[7:-2]
+        elif dtype_descr[:8] == "<class '" and dtype_descr[-2:] == "'>":
+            dtype_descr = dtype_descr[8:-2]
         return dtype_descr
 
     def long_description(self):
