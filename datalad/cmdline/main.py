@@ -20,7 +20,7 @@ import datalad
 from datalad.log import lgr
 
 from datalad.cmdline import helpers
-
+from ..interface.base import dedent_docstring
 from ..utils import setup_exceptionhook
 
 
@@ -54,11 +54,13 @@ def setup_parser():
     parser = argparse.ArgumentParser(
         fromfile_prefix_chars='@',
         # usage="%(prog)s ...",
-        description="""\
-    DataLad aims to expose (scientific) data available online as a unified data distribution with the convenience of git-annex repositories as a backend.
+        description=dedent_docstring("""\
+    DataLad aims to expose (scientific) data available online as a unified data
+    distribution with the convenience of git-annex repositories as a backend.
 
-    datalad command line tool facilitates initial construction and update of harvested online datasets.  It supports following commands
-    """,
+    datalad command line tool facilitates initial construction and update of
+    harvested online datasets.  It supports following commands
+    """),
         epilog='"Geet My Data"',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False)
@@ -93,7 +95,6 @@ def setup_parser():
     # for all subcommand modules it can find
     cmd_short_description = []
     from ..interface.base import Interface as _Interface
-    from ..interface.base import dedent_docstring
     from .. import interface as _interfaces
 
     # auto detect all available interfaces and generate a function-based
@@ -107,7 +108,7 @@ def setup_parser():
             continue
         _intf = _intfcls()
 
-        cmd_name = _intf.__module__.split('.')[-1]
+        cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
         # deal with optional parser args
         if hasattr(_intf, 'parser_args'):
             parser_args = _intf.parser_args
@@ -150,10 +151,10 @@ def setup_parser():
     parser.description = '%s\n%s\n\n%s' \
         % (parser.description,
            '\n'.join(cmd_summary),
-           textwrap.fill("""\
+           textwrap.fill(dedent_docstring("""\
     Detailed usage information for individual commands is
     available via command-specific help options, i.e.:
-    %s <command> --help""" % sys.argv[0],
+    %s <command> --help""") % sys.argv[0],
                          75, initial_indent='', subsequent_indent=''))
     return parser
 
