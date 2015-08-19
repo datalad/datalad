@@ -190,5 +190,32 @@ def test_unregister_collection(m_path):
     assert_equal(local_master.git_get_remotes(), [])
 
 
-def test_uninstall_handle():
-    raise SkipTest
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_uninstall_handle(m_path, c_path, h_path, install_path):
+
+    # setup (install the handle to be uninstalled):
+    m_path = opj(m_path, 'localcollection')
+    local_master = CollectionRepo(m_path, name='local')
+    collection = CollectionRepo(c_path, name="MyCollection")
+    handle = HandleRepo(h_path, name="MyHandle")
+    collection.add_handle(handle, handle.name)
+    local_master.git_remote_add(collection.name, collection.path)
+    local_master.git_fetch(collection.name)
+    installed_handle = HandleRepo(install_path, h_path)
+    local_master.add_handle(installed_handle, name="MyCollection/MyHandle")
+
+    # test setup:
+    ok_clean_git(local_master.path, annex=False)
+    ok_clean_git(collection.path, annex=False)
+    ok_clean_git(handle.path, annex=True)
+    assert_equal(collection.get_handle_list(), ["MyHandle"])
+    assert_equal(local_master.get_handle_list(), ["MyCollection/MyHandle"])
+
+    # uninstall handle:
+    local_master.remove_handle("MyCollection/MyHandle")
+
+    ok_clean_git(local_master.path, annex=False)
+    assert_equal(local_master.get_handle_list(), [])
