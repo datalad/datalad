@@ -11,7 +11,7 @@ from .config import load_config, EnhancedConfigParser
 from .db import load_db, save_db
 from .support.archives import decompress_file
 from .crawler.main import DoubleAnnexRepo
-from .support.handle import HandleRepo
+from .support.handlerepo import HandleRepo
 
 from .interface.base import Interface as _Interface
 from .interface.base import update_docstring_with_parameters as _update_docstring
