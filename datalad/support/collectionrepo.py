@@ -408,8 +408,10 @@ class CollectionRepo(GitRepo):
 
         This transformation of a handle's key to a filename may change.
         """
-        parts = key.split('/')
+        if key in self.get_handle_list():
+            return key.replace(os.sep, '--')
 
+        parts = key.split('/')
         if parts[0] in self.git_get_remotes() \
                 or parts[0] == self.name:
             return key[len(parts[0]) + 1:].replace(os.sep, '--')
