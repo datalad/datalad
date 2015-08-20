@@ -105,7 +105,7 @@ class Interface(object):
                 # use parameter name as default argument name
                 parser_args = (template % arg.replace('_', '-'),)
             else:
-                parser_args = cmd_args
+                parser_args = [c.replace('_', '-') for c in cmd_args]
             parser_kwargs = param.cmd_kwargs
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
@@ -129,5 +129,5 @@ class Interface(object):
         # XXX needs safety check for name collisions
         from inspect import getargspec
         argnames = getargspec(self.__call__)[0]
-        kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
+        kwargs = {k: getattr(args, k.replace('_', '-')) for k in argnames if k != 'self'}
         return self(**kwargs)
