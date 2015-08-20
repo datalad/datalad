@@ -36,7 +36,7 @@ class Get(Interface):
         import os
         import os.path
 
-        from datalad.api import Handle
+        from datalad.api import HandleRepo
         from datalad.log import lgr
 
         # Since GitPython doesn't recognize we ar with in a repo, if we are
@@ -54,7 +54,7 @@ class Get(Interface):
                     os.chdir(os.pardir)
                     cwd = os.getcwd()
 
-        ds = Handle(cwd)
+        ds = HandleRepo(cwd)
         os.chdir(cwd_before)
 
         # args.path comes as a list

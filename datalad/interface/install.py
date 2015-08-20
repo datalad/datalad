@@ -40,7 +40,7 @@ class Install(Interface):
 
     def __call__(source, destination, direct=False):
         import os
-        from datalad.api import Handle
+        from datalad.api import HandleRepo
 
         path = os.path.expandvars(os.path.expanduser(destination))
-        return Handle, (path, source), dict(direct=direct)
+        return HandleRepo, (path, source), dict(direct=direct)
