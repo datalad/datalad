@@ -1,0 +1,49 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""High-level interface for handle creation
+
+"""
+
+__docformat__ = 'restructuredtext'
+
+
+from os import curdir
+from os.path import join as opj, abspath
+from .base import Interface
+from datalad.support.param import Parameter
+from datalad.support.constraints import EnsureStr
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.handlerepo import HandleRepo
+from appdirs import AppDirs
+
+dirs = AppDirs("datalad", "datalad.org")
+
+
+class CreateHandle(Interface):
+    """Creates a new handle."""
+    _params_ = dict(
+        path=Parameter(
+            args=('path',),
+            nargs='?',
+            doc="path where to create the handle",
+            constraints=EnsureStr()),
+        name=Parameter(
+            args=('name',),
+            nargs='?',
+            doc="name of the handle; if no name is given the name of the "
+                "destination directory is used.",
+            constraints=EnsureStr()))
+
+    def __call__(self, path=curdir, name=None):
+
+        local_master = CollectionRepo(opj(dirs.user_data_dir,
+                                          'localcollection'))
+
+        new_handle = HandleRepo(abspath(path), name=name)
+        local_master.add_handle(new_handle, name=name)
