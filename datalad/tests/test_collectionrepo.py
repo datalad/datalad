@@ -6,8 +6,8 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class CollectionRepo
-
+"""Test implementation of classes CollectionRepo, CollectionRepoBackend and
+CollectionRepoHandleBackend.
 """
 
 import os
@@ -21,7 +21,7 @@ from rdflib.namespace import FOAF
 
 from ..support.gitrepo import GitRepo
 from ..support.handlerepo import HandleRepo
-from ..support.collectionrepo import CollectionRepo, Collection
+from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend
 from ..support.metadatahandler import DLNS, RDF, RDFS, DCTERMS
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     on_windows, on_linux, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
@@ -195,4 +195,42 @@ def test_CollectionRepo_metadata_handle():
     """tests method add_metadata_src_to_handle"""
     raise SkipTest
 
-#CollectionRepoBackend
+# testing CollectionRepoBackend:
+
+
+def test_CollectionRepoBackend_constructor():
+    raise SkipTest
+
+
+def test_CollectionRepoBackend_url():
+    raise SkipTest
+
+
+def test_CollectionRepoBackend_get_handles():
+    raise SkipTest
+
+
+def test_CollectionRepoBackend_get_collection():
+    raise SkipTest
+
+
+def test_CollectionRepoBackend_commit_collection():
+    raise SkipTest
+
+# testing CollectionRepoHandleBackend:
+
+
+def test_CollectionRepoHandleBackend_constructor():
+    raise SkipTest
+
+
+def test_CollectionRepoHandleBackend_url():
+    raise SkipTest
+
+
+def test_CollectionRepoHandleBackend_get_metadata():
+    raise SkipTest
+
+
+def test_CollectionRepoHandleBackend_set_metadata():
+    raise SkipTest
