@@ -21,6 +21,12 @@ from .utils import on_windows
 
 try:
     import testkraut
+    # TODO: do versioned check for a version which does support necessary
+    # functionality as of
+    # https://github.com/neurodebian/testkraut/pull/27
+    # meanwhile just skip!  Fixup whenever stock testkraut supports necessary
+    # features
+    raise SkipTest("Needs too fresh to be available testkraut -- skip for now")
 except ImportError:
     raise SkipTest("No testkraut found, tests here skipped")
 
