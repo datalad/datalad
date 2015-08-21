@@ -24,7 +24,7 @@ from ..support.handlerepo import HandleRepo
 from ..support.collectionrepo import CollectionRepo, Collection
 from ..support.metadatahandler import DLNS, RDF, RDFS, DCTERMS
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
-    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
+    on_windows, on_linux, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
     with_tree, get_most_obscure_supported_name, ok_clean_git, ok_
 from ..support.exceptions import CollectionBrokenError
 from ..utils import get_local_file_url
@@ -99,9 +99,13 @@ def test_CollectionRepo_filename2key(path):
     # currently does nothing than return the input:
     input = get_most_obscure_supported_name()
     assert_equal(input, clt._filename2key(input))
+    assert_equal("some/thing", clt._filename2key("some--thing"))
 
     # test _key2filename:
     assert_equal("handlename", clt._key2filename("collectionname/handlename"))
+    assert_equal("what--ever", clt._key2filename("what/ever"))
+    assert_raises(ValueError, clt._key2filename, "dsf\\dsfg")
+
 
 
 @with_testrepos(flavors=local_flavors)
@@ -176,10 +180,11 @@ def test_CollectionRepo_get_handle_list(clt_path, h1_path, h2_path):
 
     clt.add_handle(h1, "handle1")
     clt.add_handle(h2, "handle2")
-    assert_equal(list(set(["handle1", "handle2"])),
+    assert_equal(list({"handle1", "handle2"}),
                  clt.get_handle_list())
 
     # todo: query non-active (remote) branch
+
 
 def test_CollectionRepo_get_backend():
     """tests method get_backend_from_branch"""
