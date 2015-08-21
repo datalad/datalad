@@ -43,6 +43,7 @@ _group_handle = (
         CreateHandle,
         AddHandle,
         InstallHandle,
+        ListHandles,
     ])
 
 _group_misc = (
