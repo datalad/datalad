@@ -15,9 +15,6 @@ Files organization
       the `cmd_*.py` files here for an example
     - `crawler/` functionality relevant for `crawl`ing operation of DataLad
     - `tests/` all unit- and regression- tests
-        - `testrepos/` a git submodule pointing to the
-          [datalad/testrepos repository][gh-datalad]
-          intended to collate repositories used for testing
         - `utils.py` provides convenience helpers used by unit-tests such as
           `@with_tree`, `@serve_path_via_http` and other decorators
 - `tools/` contains helper utilities used during development, testing, and
@@ -35,10 +32,7 @@ we outline the workflow used by the developers:
 0. Have a clone of our main [project repository][gh-datalad] as `origin`
    remote in your git:
 
-          git clone --recursive git://github.com/datalad/datalad
-
-    `--recursive` is used to initialize any needed git submodules.  If you have 
-    cloned without it already, just run `git submodule update --init --recursive`
+          git clone git://github.com/datalad/datalad
 
 1. Fork the [project repository][gh-datalad]: click on the 'Fork'
    button near the top of the page.  This creates a copy of the code
@@ -153,17 +147,6 @@ then to later deactivate the virtualenv just simply enter
 deactivate
 ```
 
-Remember, some tests use testing repositories which are available as submodules
-under the `datalad/tests/testrepos` submodule (two tier- to not pollute
-top repository submodules namespace).  To enable those tests do:
-
-```sh
-git submodule update --init --recursive
-```
-
-or do the original repository clone described above with the `--recursive` 
-option.
-
 Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can 
 later reuse like any other regular virtualenv for troubleshooting.
@@ -210,24 +193,6 @@ provides built-in PEP8 checker and handy tools such as smart
 splits/joins making it easier to maintain code following the PEP8
 recommendations.  NeuroDebian provides `pycharm-community-sloppy`
 package to ease pycharm installation even further.
-
-
-### Test repositories
-
-`datalad/tests/testrepos/` is a submodule containing git/git-annex repositories
-(again as submodules), which are then used by various unit tests under
-`datalad/tests/`.  Creation of (some of) those test repositories is scripted in
-`tools/testing/make_test_repo`, and "protocoled" in
-`tools/testing/make_test_repos`.  Test repositories are organized under
-`testrepos/` in two-levels `flavor/sample`, e.g. `basic/r1` was created by
-running `make_test_repo basic r1`.  We could generate e.g. `r2` similarly on a
-different system.  Generated `info.txt` file provides information about
-git/git-annex versions used to generate the repository.
-
-Since those are linked to mainline the `datalad` repository as submodules of the
-`datalad/tests/testrepos` submodule, it requires committing/pushing at all 3
-levels. `make_test_repo` script, on example of `basic` flavor provides steps to
-achieve that.
 
 
 Easy Issues

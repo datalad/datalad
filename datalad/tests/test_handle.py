@@ -6,7 +6,20 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Defines version to be imported in the module and obtained from setup.py
+"""Test implementation of class Handle
+
 """
 
-__version__ = '0.0.3.dev0'
+from nose import SkipTest
+
+
+def test_Handle_constructor():
+    raise SkipTest
+
+
+def test_Handle_commit():
+    raise SkipTest
+
+
+def test_Handle_name():
+    raise SkipTest

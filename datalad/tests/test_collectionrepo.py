@@ -6,8 +6,8 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class CollectionRepo
-
+"""Test implementation of classes CollectionRepo, CollectionRepoBackend and
+CollectionRepoHandleBackend.
 """
 
 import os
@@ -21,10 +21,10 @@ from rdflib.namespace import FOAF
 
 from ..support.gitrepo import GitRepo
 from ..support.handlerepo import HandleRepo
-from ..support.collectionrepo import CollectionRepo, Collection
+from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend
 from ..support.metadatahandler import DLNS, RDF, RDFS, DCTERMS
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
-    on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
+    on_windows, on_linux, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
     with_tree, get_most_obscure_supported_name, ok_clean_git, ok_
 from ..support.exceptions import CollectionBrokenError
 from ..utils import get_local_file_url
@@ -99,9 +99,13 @@ def test_CollectionRepo_filename2key(path):
     # currently does nothing than return the input:
     input = get_most_obscure_supported_name()
     assert_equal(input, clt._filename2key(input))
+    assert_equal("some/thing", clt._filename2key("some--thing"))
 
     # test _key2filename:
     assert_equal("handlename", clt._key2filename("collectionname/handlename"))
+    assert_equal("what--ever", clt._key2filename("what/ever"))
+    assert_raises(ValueError, clt._key2filename, "dsf\\dsfg")
+
 
 
 @with_testrepos(flavors=local_flavors)
@@ -176,10 +180,11 @@ def test_CollectionRepo_get_handle_list(clt_path, h1_path, h2_path):
 
     clt.add_handle(h1, "handle1")
     clt.add_handle(h2, "handle2")
-    assert_equal(list(set(["handle1", "handle2"])),
+    assert_equal(list({"handle1", "handle2"}),
                  clt.get_handle_list())
 
     # todo: query non-active (remote) branch
+
 
 def test_CollectionRepo_get_backend():
     """tests method get_backend_from_branch"""
@@ -190,4 +195,80 @@ def test_CollectionRepo_metadata_handle():
     """tests method add_metadata_src_to_handle"""
     raise SkipTest
 
-#CollectionRepoBackend
+# testing CollectionRepoBackend:
+
+
+@with_tempfile
+@with_tempfile
+def test_CollectionRepoBackend_constructor(path1, path2):
+
+    # set up collection repo:
+    clt = CollectionRepo(path1, name='testcollection')
+    clt.git_checkout("another-branch", options="-b")
+    clt2 = CollectionRepo(path2, name='testcollection2')
+    clt.git_remote_add("remoterepo", path2)
+
+    # constructor from existing CollectionRepo instance:
+    clt_be_1 = CollectionRepoBackend(clt)
+    assert_equal(clt_be_1.branch, "another-branch")
+    assert_equal(clt, clt_be_1.repo)
+    assert_equal(clt_be_1.is_read_only, False)
+    clt_be_2 = CollectionRepoBackend(clt, "master")
+    assert_equal(clt_be_2.branch, "master")
+    assert_equal(clt, clt_be_2.repo)
+    assert_equal(clt_be_2.is_read_only, False)
+    clt_be_3 = CollectionRepoBackend(clt, "remoterepo/master")
+    assert_equal(clt_be_3.branch, "remoterepo/master")
+    assert_equal(clt, clt_be_3.repo)
+    assert_equal(clt_be_3.is_read_only, True)
+
+    # constructor from path to collection repo:
+    clt_be_4 = CollectionRepoBackend(path1)
+    assert_equal(clt.path, clt_be_4.repo.path)
+    assert_equal(clt_be_4.branch, "another-branch")
+    assert_equal(clt_be_4.is_read_only, False)
+
+
+@with_tempfile
+@with_tempfile
+def test_CollectionRepoBackend_url(path1, path2):
+
+    clt = CollectionRepo(path1, name='testcollection')
+    clt2 = CollectionRepo(path2, name='testcollection2')
+    clt.git_remote_add("remoterepo", path2)
+    clt.git_fetch("remoterepo")
+
+    backend1 = CollectionRepoBackend(clt)
+    assert_equal(backend1.url, path1)
+    backend2 = CollectionRepoBackend(clt, "remoterepo/master")
+    assert_equal(backend2.url, path2)
+
+
+def test_CollectionRepoBackend_get_handles():
+    raise SkipTest
+
+
+def test_CollectionRepoBackend_get_collection():
+    raise SkipTest
+
+
+def test_CollectionRepoBackend_commit_collection():
+    raise SkipTest
+
+# testing CollectionRepoHandleBackend:
+
+
+def test_CollectionRepoHandleBackend_constructor():
+    raise SkipTest
+
+
+def test_CollectionRepoHandleBackend_url():
+    raise SkipTest
+
+
+def test_CollectionRepoHandleBackend_get_metadata():
+    raise SkipTest
+
+
+def test_CollectionRepoHandleBackend_set_metadata():
+    raise SkipTest

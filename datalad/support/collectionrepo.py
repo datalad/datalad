@@ -264,11 +264,7 @@ class CollectionRepoBackend(CollectionBackend):
     def url(self):
         if self.is_read_only:
             # remote repo:
-            cfg_str = '\n'.join(self.repo.git_get_file_content("config.ttl",
-                                                               self.branch))
-            cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-            return str(cfg_graph.value(predicate=RDF.type,
-                                       object=DLNS.Collection))
+            return self.repo.git_get_remote_url(self.branch.split('/')[0])
         else:
             # available repo:
             return self.repo.path
@@ -400,23 +396,26 @@ class CollectionRepo(GitRepo):
         This transformation of a filename to a handle's key may change,
         especially with respect to unicode keys.
         """
-        # TODO: Check whether fname exists?
-        return fname.replace('--', os.sep)
+        return fname.replace('--', '/')
 
     def _key2filename(self, key):
         """Placeholder
 
         This transformation of a handle's key to a filename may change.
+        Note: No '\' allowed in handle or collection names. '--' is treated
+        as '/'.
         """
+        if '\\' in key:
+            raise ValueError("Invalid name: '%s'. No '\\' allowed.")
         if key in self.get_handle_list():
-            return key.replace(os.sep, '--')
+            return key.replace('/', '--')
 
         parts = key.split('/')
         if parts[0] in self.git_get_remotes() \
                 or parts[0] == self.name:
-            return key[len(parts[0]) + 1:].replace(os.sep, '--')
+            return key[len(parts[0]) + 1:].replace('/', '--')
         else:
-            return key.replace(os.sep, '--')
+            return key.replace('/', '--')
 
 
     # ### repo methods:
