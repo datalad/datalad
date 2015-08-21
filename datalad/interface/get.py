@@ -17,7 +17,7 @@ from datalad.support.constraints import EnsureStr
 
 
 class Get(Interface):
-    """Get a dataset from a remote repository
+    """Get dataset's content from a remote repository.
 
     Examples:
 

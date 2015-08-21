@@ -18,7 +18,7 @@ from datalad.support.constraints import EnsureStr
 
 
 class Install(Interface):
-    """Install a handle from a given URL to a given directory
+    """Install a handle from a given URL to a given directory.
 
     Examples:
 

@@ -61,7 +61,7 @@ def setup_parser():
     datalad command line tool facilitates initial construction and update of
     harvested online datasets.  It supports following commands
     """),
-        epilog='"Geet My Data"',
+        epilog='"Control Your Data"',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False)
     # common options
