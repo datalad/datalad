@@ -124,6 +124,8 @@ class Interface(object):
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
             help = param._doc
+            if help and help[-1] != '.':
+                help += '.'
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
                 # include value contraint description and default
