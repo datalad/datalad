@@ -17,7 +17,7 @@ from .base import Interface
 
 
 class Test(Interface):
-    """Run internal DataLad (unit)tests
+    """Run internal DataLad (unit)tests.
 
     This can be used to verify correct operation on the system
     """
