@@ -12,6 +12,7 @@ import glob
 import shutil
 import stat
 import os
+import re
 import tempfile
 import platform
 import multiprocessing
@@ -351,10 +352,11 @@ def with_tempfile(t, *targs, **tkwargs):
     return newfunc
 
 
-_TESTREPOS = {'basic/r1': 'git://github.com/datalad/testrepo--basic--r1'}
-
 def _get_resolved_flavors(flavors):
-    flavors_ = ['local', 'network', 'clone', 'network-clone'] if flavors=='auto' else flavors
+    #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
+    #           if flavors == 'auto' else flavors
+    flavors_ = (['local', 'clone', 'local-url'] if not on_windows else ['network', 'network-clone']) \
+               if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
         flavors_ = [flavors_]
@@ -392,41 +394,41 @@ def clone_url(url):
     return tdir
 
 
-def _extend_globs(path, flavors):
-    globs = glob.glob(path)
+if not on_windows:
+    local_testrepo_flavors = ['local'] # 'local-url'
+else:
+    local_testrepo_flavors = ['network-clone']
 
-    globs_extended = []
-    if 'local' in flavors:
-        globs_extended += globs
+from .utils_testrepos import BasicTestRepo, TestRepo
+_basic_test_repo = BasicTestRepo()
+_TESTREPOS = {'basic':
+                  {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                   'local': _basic_test_repo.path,
+                   'local-url': _basic_test_repo.url}}
 
-    if 'network' in flavors:
-        globs_extended += [_get_repo_url(repo) for repo in globs]
+def _get_testrepos_uris(regex, flavors):
+    uris = []
+    # assure that now we do have those test repos created -- delayed
+    # their creation until actually used
+    if not on_windows:
+        _basic_test_repo.create()
+    for name, spec in iteritems(_TESTREPOS):
+        if not re.match(regex, name):
+            continue
+        uris += [spec[x] for x in set(spec.keys()).intersection(flavors)]
 
-    if 'clone' in flavors:
-        globs_extended += [clone_url(repo) for repo in globs]
+        # additional flavors which might have not been
+        if 'clone' in flavors and 'clone' not in spec:
+            uris.append(clone_url(spec['local']))
 
-    if 'network-clone' in flavors:
-        globs_extended += [clone_url(_get_repo_url(repo)) for repo in globs]
+        if 'network-clone' in flavors and 'network-clone' not in spec:
+            uris.append(clone_url(spec['network']))
 
-    return globs_extended
+    return uris
 
-def get_testrepos_dir():
-    return opj(os.path.dirname(__file__), 'testrepos')
-
-def has_testrepos_dir():
-    return exists(get_testrepos_dir())
-
-# For now (at least) we would need to clone from the network
-# since there are troubles with submodules on Windows.
-# See: https://github.com/datalad/datalad/issues/44
-# TODO: redo  tools/testing/make_test_repo  as a python module which
-# could be reused here and test repos could be initialized in temp location if not present
-local_testrepo_flavors = ['network-clone'
-                 if (on_windows or not has_testrepos_dir())
-                 else 'local']
 
 @optional_args
-def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
+def with_testrepos(t, regex='.*', flavors='auto', skip=False):
     """Decorator to provide a test repository available locally and/or over the Internet
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
@@ -436,26 +438,20 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
 
     Parameters
     ----------
-    paths : string, optional
-      Glob paths to consider
-    toppath : string, optional
-      Path to the test repositories top directory.  If not provided,
-      `datalad/tests/testrepos` within datalad is used.
-    flavors : {'auto', 'local', 'clone', 'network', 'network-clone'} or list of thereof, optional
-      What URIs to provide.  E.g. 'local' would just provide path to that
-      submodule, while 'network' would provide url of the origin remote where
-      that submodule was originally fetched from.  'clone' would clone repository
+    regex : string, optional
+      Regex to select which test repos to use
+    flavors : {'auto', 'local', 'local-url', 'clone', 'network', 'network-clone'} or list of thereof, optional
+      What URIs to provide.  E.g. 'local' would just provide path to the
+      repository, while 'network' would provide url of the remote location
+      available on Internet containing the test repository.  'clone' would clone repository
       first to a temporary location. 'network-clone' would first clone from the network
       location. 'auto' would include the list of appropriate
       ones (e.g., no 'network*' flavors if network tests are "forbidden").
-    skip : bool, optional
-      Allow to skip if no repositories were found. Otherwise would raise
-      AssertionError
 
     Examples
     --------
 
-        @with_testrepos('basic/*')
+        @with_testrepos('basic')
         def test_write(repo):
             assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
@@ -465,46 +461,20 @@ def with_testrepos(t, paths='*/*', toppath=None, flavors='auto', skip=False):
     def newfunc(*arg, **kw):
         # TODO: would need to either avoid this "decorator" approach for
         # parametric tests or again aggregate failures like sweepargs does
-        toppath_ = get_testrepos_dir() \
-            if toppath is None else toppath
-
         flavors_ = _get_resolved_flavors(flavors)
 
-        globs_extended = _extend_globs(opj(toppath_, paths), flavors_)
-        under_git = os.path.exists(realpath(
-            opj(toppath_, pardir, pardir, pardir, '.git')))
+        testrepos_uris = _get_testrepos_uris(regex, flavors_)
+        assert(testrepos_uris)
 
-        if not len(globs_extended):
-            network_flavors = list(filter(lambda x: x.startswith('network'), flavors_))
-
-            if network_flavors:
-                # Let's just get through those which we know and
-                lgr.debug("No local test repositories were found.  Just cloning ones from the web")
-
-                urls = [u for p, u in iteritems(_TESTREPOS) if fnmatch(p, paths)]
-                if 'network' in network_flavors:
-                    globs_extended += urls
-                if 'network-clone' in network_flavors:
-                    globs_extended += [clone_url(url) for url in urls]
-
-            else:
-                raise (SkipTest if skip else AssertionError)(
-                    "Found no test repositories under %s, nor network* ones were requested."
-                    % opj(toppath_, paths) +
-                    (" Run git submodule update --init --recursive "
-                     if (toppath is None and under_git) else ""))
-
-        # print globs_extended
-        for d in globs_extended:
-            repo = d
+        for uri in testrepos_uris:
             if __debug__:
-                lgr.debug('Running %s on %s' % (t.__name__, repo))
+                lgr.debug('Running %s on %s' % (t.__name__, uri))
             try:
-                t(*(arg + (repo,)), **kw)
+                t(*(arg + (uri,)), **kw)
             finally:
                 # ad-hoc but works
-                if exists(repo) and exists(opj(repo, ".git", "remove-me")):
-                    rmtemp(repo)
+                if exists(uri) and exists(opj(uri, ".git", "remove-me")):
+                    rmtemp(uri)
                 pass  # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
