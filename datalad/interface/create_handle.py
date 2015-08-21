@@ -17,7 +17,7 @@ from os import curdir
 from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo
 from appdirs import AppDirs
@@ -38,7 +38,7 @@ class CreateHandle(Interface):
             nargs='?',
             doc="name of the handle; if no name is given the name of the "
                 "destination directory is used.",
-            constraints=EnsureStr()))
+            constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, path=curdir, name=None):
 
