@@ -9,16 +9,16 @@
 """Test invocation of datalad utilities "as is installed"
 """
 
+from os.path import join as opj
 from .utils import ok_startswith, eq_, \
     ignore_nose_capturing_stdout, assert_cwd_unchanged
-
 from datalad.cmd import Runner
 from datalad.support.exceptions import CommandError
 
 def check_run_and_get_output(cmd):
     runner = Runner()
     try:
-        output = runner.run(["datalad", "--help"])
+        output = runner.run([opj('bin', 'datalad'), "--help"])
     except CommandError as e:
         raise AssertionError("'datalad --help' failed to start normally. "
                              "Exited with %d and output %s" % (e.code, (e.stdout, e.stderr)))
