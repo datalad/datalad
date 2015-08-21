@@ -17,7 +17,7 @@ from os import curdir
 from os.path import join as opj, abspath
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo
 from appdirs import AppDirs
@@ -38,7 +38,7 @@ class InstallHandle(Interface):
             constraints=EnsureStr()),
         inst_name=Parameter(
             doc="local name of the installed handle",
-            constraints=EnsureStr()))
+            constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, orig_name, path=curdir, inst_name=None):
 

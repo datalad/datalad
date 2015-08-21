@@ -17,7 +17,7 @@ from os import curdir
 from os.path import join as opj, abspath
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo
 from appdirs import AppDirs
@@ -39,7 +39,7 @@ class AddHandle(Interface):
             nargs='?',
             doc="name of the handle in the collection. If no name is given, "
                 "the handle's default name is used.",
-            constraints=EnsureStr()))
+            constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, h_path, c_path, h_name=None):
 

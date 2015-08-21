@@ -20,7 +20,7 @@ import datalad
 from datalad.log import lgr
 
 from datalad.cmdline import helpers
-from ..interface.base import dedent_docstring
+from ..interface.base import dedent_docstring, get_interface_groups
 from ..utils import setup_exceptionhook
 
 
@@ -92,62 +92,64 @@ def setup_parser():
 
     # subparsers
     subparsers = parser.add_subparsers()
-    # for all subcommand modules it can find
-    cmd_short_description = []
-    from ..interface.base import Interface as _Interface
-    from .. import interface as _interfaces
 
     # auto detect all available interfaces and generate a function-based
     # API from them
-    for _item in _interfaces.__dict__:
-        _intfcls = getattr(_interfaces, _item)
-        try:
-            if not issubclass(_intfcls, _Interface):
-                continue
-        except TypeError:
-            continue
-        _intf = _intfcls()
+    grp_short_descriptions = []
+    interface_groups = get_interface_groups()
+    for grp_name, grp_descr, _interfaces in interface_groups:
+        # for all subcommand modules it can find
+        cmd_short_descriptions = []
 
-        cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
-        # deal with optional parser args
-        if hasattr(_intf, 'parser_args'):
-            parser_args = _intf.parser_args
-        else:
-            parser_args = dict(formatter_class=argparse.RawDescriptionHelpFormatter)
-        # use class description, if no explicit description is available
-            parser_args['description'] = dedent_docstring(_intf.__doc__)
-        # create subparser, use module suffix as cmd name
-        subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
-        # all subparser can report the version
-        helpers.parser_add_common_opt(
-            subparser, 'version',
-            version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
-                                             _license_info()))
-        # our own custom help for all commands
-        helpers.parser_add_common_opt(subparser, 'help')
-        helpers.parser_add_common_opt(subparser, 'log_level')
-        # let module configure the parser
-        _intf.setup_parser(subparser)
-        # logger for command
+        for _intfcls in _interfaces:
+            _intf = _intfcls()
 
-        # configure 'run' function for this command
-        subparser.set_defaults(func=_intf.call_from_parser,
-                               logger=logging.getLogger(_intf.__module__))
-        # store short description for later
-        sdescr = getattr(_intf, 'short_description',
-                         parser_args['description'].split('\n')[0])
-        cmd_short_description.append((cmd_name, sdescr))
+            cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
+            # deal with optional parser args
+            if hasattr(_intf, 'parser_args'):
+                parser_args = _intf.parser_args
+            else:
+                parser_args = dict(formatter_class=argparse.RawDescriptionHelpFormatter)
+            # use class description, if no explicit description is available
+                parser_args['description'] = dedent_docstring(_intf.__doc__)
+            # create subparser, use module suffix as cmd name
+            subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
+            # all subparser can report the version
+            helpers.parser_add_common_opt(
+                subparser, 'version',
+                version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
+                                                 _license_info()))
+            # our own custom help for all commands
+            helpers.parser_add_common_opt(subparser, 'help')
+            helpers.parser_add_common_opt(subparser, 'log_level')
+            # let module configure the parser
+            _intf.setup_parser(subparser)
+            # logger for command
+
+            # configure 'run' function for this command
+            subparser.set_defaults(func=_intf.call_from_parser,
+                                   logger=logging.getLogger(_intf.__module__))
+            # store short description for later
+            sdescr = getattr(_intf, 'short_description',
+                             parser_args['description'].split('\n')[0])
+            cmd_short_descriptions.append((cmd_name, sdescr))
+        grp_short_descriptions.append(cmd_short_descriptions)
 
     # create command summary
     cmd_summary = []
-    for cd in cmd_short_description:
-        cmd_summary.append('%s\n%s\n\n'
-                           % (cd[0],
-                              textwrap.fill(
-                                  cd[1],
-                                  75,
-                                  initial_indent=' ' * 4,
-                                  subsequent_indent=' ' * 4)))
+    for i, grp in enumerate(interface_groups):
+        grp_descr = grp[1]
+        grp_cmds = grp_short_descriptions[i]
+
+        cmd_summary.append('\n%s\n' % (grp_descr,))
+        for cd in grp_cmds:
+            cmd_summary.append('  %s\n%s\n\n'
+                               % (cd[0],
+                                  textwrap.fill(
+                                      cd[1],
+                                      75,
+                                      initial_indent=' ' * 4,
+                                      subsequent_indent=' ' * 4)))
     parser.description = '%s\n%s\n\n%s' \
         % (parser.description,
            '\n'.join(cmd_summary),
