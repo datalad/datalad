@@ -264,11 +264,7 @@ class CollectionRepoBackend(CollectionBackend):
     def url(self):
         if self.is_read_only:
             # remote repo:
-            cfg_str = '\n'.join(self.repo.git_get_file_content("config.ttl",
-                                                               self.branch))
-            cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-            return str(cfg_graph.value(predicate=RDF.type,
-                                       object=DLNS.Collection))
+            return self.repo.git_get_remote_url(self.branch.split('/')[0])
         else:
             # available repo:
             return self.repo.path
