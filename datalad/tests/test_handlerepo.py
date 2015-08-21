@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class HandleRepo
+"""Test implementation of class HandleRepo and HandleRepoBackend
 
 """
 
@@ -209,3 +209,21 @@ def test_HandleRepo_name(path):
                                                       predicate=RDFS.label),
                  Literal("new_name"))
     assert_equal(h.name, "new_name")
+
+# testing HandleRepoBackend:
+
+
+def test_HandleRepoBackend_constructor():
+    raise SkipTest
+
+
+def test_HandleRepoBackend_url():
+    raise SkipTest
+
+
+def test_HandleRepoBackend_name():
+    raise SkipTest
+
+
+def test_HandleRepoBackend_metadata():
+    raise SkipTest
