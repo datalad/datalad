@@ -14,10 +14,10 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath
+from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo
 from appdirs import AppDirs
@@ -38,12 +38,13 @@ class CreateHandle(Interface):
             nargs='?',
             doc="name of the handle; if no name is given the name of the "
                 "destination directory is used.",
-            constraints=EnsureStr() | EnsureNone()))
+            constraints=EnsureStr()))
 
     def __call__(self, path=curdir, name=None):
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))
 
-        new_handle = HandleRepo(abspath(path), name=name)
+        new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
+                                name=name)
         local_master.add_handle(new_handle, name=name)

@@ -17,7 +17,7 @@ from os import curdir
 from os.path import join as opj, abspath
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo
 from appdirs import AppDirs
 
@@ -35,11 +35,12 @@ class RegisterCollection(Interface):
             nargs='?',
             doc="name, the collection is registered with; if no name is given "
                 "the name is derived from the url.",
-            constraints=EnsureStr() | EnsureNone()))
+            constraints=EnsureStr()))
 
     def __call__(self, url, name=None):
 
         # TODO: Sanity/validity checks for url. Also constraint?
+        #       What's may be different in case it's a local path?
 
         # derive name from url:
         if name is None:

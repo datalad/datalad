@@ -14,11 +14,12 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath
+from os.path import join as opj, abspath, expanduser, expandvars
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.constraints import EnsureStr
+from datalad.support.collectionrepo import CollectionRepo, \
+    CollectionRepoHandleBackend
 from datalad.support.handlerepo import HandleRepo
 from appdirs import AppDirs
 
@@ -38,7 +39,7 @@ class InstallHandle(Interface):
             constraints=EnsureStr()),
         inst_name=Parameter(
             doc="local name of the installed handle",
-            constraints=EnsureStr() | EnsureNone()))
+            constraints=EnsureStr()))
 
     def __call__(self, orig_name, path=curdir, inst_name=None):
 
@@ -56,6 +57,7 @@ class InstallHandle(Interface):
                                                      branch=q_col + '/master')
 
         # install the handle:
-        installed_handle = HandleRepo(path, handle_backend.url)
+        installed_handle = HandleRepo(abspath(expandvars(expanduser(path))),
+                                      handle_backend.url)
         local_master.add_handle(installed_handle,
                                 name=inst_name or installed_handle.name)

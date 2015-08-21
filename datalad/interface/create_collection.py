@@ -14,10 +14,10 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath
+from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo
 from appdirs import AppDirs
 
@@ -37,14 +37,15 @@ class CreateCollection(Interface):
             nargs='?',
             doc="name of the collection; if no name is given the name of the "
                 "destination directory is used.",
-            constraints=EnsureStr() | EnsureNone()))
+            constraints=EnsureStr()))
 
     def __call__(self, path=curdir, name=None):
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))
         # create the collection:
-        new_collection = CollectionRepo(abspath(path), name=name)
+        new_collection = CollectionRepo(abspath(expandvars(expanduser(path))),
+                                        name=name)
         # TODO: Move the abspath conversion to a constraint!
         # Additionally (or instead?) check for validity: existing directory or
         # just non-existing.

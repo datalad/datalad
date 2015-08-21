@@ -14,10 +14,10 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath
+from os.path import join as opj, abspath, expanduser, expandvars
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo
 from appdirs import AppDirs
@@ -39,7 +39,7 @@ class AddHandle(Interface):
             nargs='?',
             doc="name of the handle in the collection. If no name is given, "
                 "the handle's default name is used.",
-            constraints=EnsureStr() | EnsureNone()))
+            constraints=EnsureStr()))
 
     def __call__(self, h_path, c_path, h_name=None):
 
@@ -48,8 +48,8 @@ class AddHandle(Interface):
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))
-        handle = HandleRepo(h_path)
-        collection = CollectionRepo(c_path)
+        handle = HandleRepo(expandvars(expanduser(h_path)))
+        collection = CollectionRepo(expandvars(expanduser(c_path)))
         collection.add_handle(handle, name=h_name)
 
         # TODO: More sophisticated: Check whether the collection is registered.
