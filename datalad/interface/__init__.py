@@ -25,3 +25,30 @@ from .test import Test
 from .get import Get
 from .install import Install
 from .crawl import Crawl
+
+# all interfaces should be associated with (at least) one of the groups below
+_group_collection = (
+    'Commands for collection handling',
+    [
+        CreateCollection,
+        RegisterCollection,
+        UnregisterCollection,
+        ListCollection,
+    ])
+
+_group_handle = (
+    'Commands for handle operations',
+    [
+        CreateHandle,
+        AddHandle,
+        InstallHandle,
+    ])
+
+_group_misc = (
+    'Miscellaneous commands',
+    [
+        Test,
+        Get,
+        Install,
+        Crawl,
+    ])
