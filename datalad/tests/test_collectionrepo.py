@@ -97,13 +97,11 @@ def test_CollectionRepo_filename2key(path):
 
     # test _filename2key:
     # currently does nothing than return the input:
-    input = get_most_obscure_supported_name
+    input = get_most_obscure_supported_name()
     assert_equal(input, clt._filename2key(input))
 
     # test _key2filename:
     assert_equal("handlename", clt._key2filename("collectionname/handlename"))
-    assert_raises(ValueError, clt._key2filename, "")
-    assert_raises(ValueError, clt._key2filename, "skdjn/ksjdnf/ksdjf")
 
 
 @with_testrepos(flavors=local_flavors)

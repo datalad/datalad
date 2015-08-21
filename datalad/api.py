@@ -13,7 +13,6 @@ from .support.archives import decompress_file
 from .crawler.main import DoubleAnnexRepo
 from .support.handlerepo import HandleRepo
 
-
 from .interface.base import Interface as _Interface
 from .interface.base import update_docstring_with_parameters as _update_docstring
 from . import interface as _interfaces
