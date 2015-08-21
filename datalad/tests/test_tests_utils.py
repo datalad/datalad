@@ -90,7 +90,7 @@ def test_with_testrepos():
 
     check_with_testrepos()
 
-    eq_(len(repos), 3)  # local, local-url, clone
+    eq_(len(repos), 2 if on_windows else 3)  # local, local-url, clone
 
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):
