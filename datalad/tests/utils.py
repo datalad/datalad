@@ -353,7 +353,10 @@ def with_tempfile(t, *targs, **tkwargs):
 
 
 def _get_resolved_flavors(flavors):
-    flavors_ = ['local', 'local-url', 'clone'] if flavors == 'auto' else flavors
+    #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
+    #           if flavors == 'auto' else flavors
+    flavors_ = (['local', 'clone', 'local-url'] if not on_windows else ['network', 'network-clone']) \
+               if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
         flavors_ = [flavors_]
@@ -391,8 +394,10 @@ def clone_url(url):
     return tdir
 
 
-
-local_testrepo_flavors = ['local'] # 'local-url'
+if not on_windows:
+    local_testrepo_flavors = ['local'] # 'local-url'
+else:
+    local_testrepo_flavors = ['network-clone']
 
 from .utils_testrepos import BasicTestRepo, TestRepo
 _basic_test_repo = BasicTestRepo()
@@ -405,7 +410,8 @@ def _get_testrepos_uris(regex, flavors):
     uris = []
     # assure that now we do have those test repos created -- delayed
     # their creation until actually used
-    _basic_test_repo.create()
+    if not on_windows:
+        _basic_test_repo.create()
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
             continue

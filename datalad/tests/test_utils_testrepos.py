@@ -15,7 +15,11 @@ from .utils_testrepos import BasicTestRepo
 from .utils import with_tempfile, assert_true, ok_clean_git
 from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
 from .utils import swallow_outputs
+from .utils import on_windows
+from .utils import SkipTest
 
+if on_windows:
+    raise SkipTest("experiencing issues on windows -- disabled for now")
 
 def _test_BasicTestRepo(repodir):
     trepo = BasicTestRepo(repodir)
