@@ -20,7 +20,7 @@ import datalad
 from datalad.log import lgr
 
 from datalad.cmdline import helpers
-from ..interface.base import dedent_docstring
+from ..interface.base import dedent_docstring, get_interface_groups
 from ..utils import setup_exceptionhook
 
 
@@ -46,21 +46,6 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
-
-
-def get_interface_groups():
-    from .. import interface as _interfaces
-
-    grps = []
-    # auto detect all available interfaces and generate a function-based
-    # API from them
-    for _item in _interfaces.__dict__:
-        if not _item.startswith('_group_'):
-            continue
-        grp_name = _item[7:]
-        grp = getattr(_interfaces, _item)
-        grps.append((grp_name,) + grp)
-    return grps
 
 
 def setup_parser():

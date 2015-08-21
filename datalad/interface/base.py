@@ -12,6 +12,20 @@
 
 __docformat__ = 'restructuredtext'
 
+def get_interface_groups():
+    from .. import interface as _interfaces
+
+    grps = []
+    # auto detect all available interfaces and generate a function-based
+    # API from them
+    for _item in _interfaces.__dict__:
+        if not _item.startswith('_group_'):
+            continue
+        grp_name = _item[7:]
+        grp = getattr(_interfaces, _item)
+        grps.append((grp_name,) + grp)
+    return grps
+
 
 def dedent_docstring(text):
     import textwrap
