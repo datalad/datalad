@@ -21,6 +21,7 @@ from .add_handle import AddHandle
 from .install_handle import InstallHandle
 from .unregister_collection import UnregisterCollection
 from .list_collections import ListCollection
+from .list_handles import ListHandles
 from .test import Test
 from .get import Get
 from .install import Install
