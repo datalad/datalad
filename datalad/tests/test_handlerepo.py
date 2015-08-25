@@ -20,7 +20,7 @@ from git.exc import GitCommandError
 from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, FOAF
 
-from ..support.handlerepo import HandleRepo
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.exceptions import FileInGitError
 from ..support.metadatahandler import DLNS, RDFS
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
@@ -65,6 +65,8 @@ def test_Handle_instance_from_existing(path):
 
     raise SkipTest
     # TODO: provide a testrepo, which is a Handle already!
+    # check for commit SHA, file content etc. Everything should
+    # be identical
 
     gr = HandleRepo(path)
     assert_is_instance(gr, HandleRepo, "HandleRepo was not created.")
@@ -210,20 +212,59 @@ def test_HandleRepo_name(path):
                  Literal("new_name"))
     assert_equal(h.name, "new_name")
 
+
+@with_tempfile
+def test_HandleRepo_get_metadata(path):
+    repo = HandleRepo(path)
+
+    # default
+    graph = repo.get_metadata()
+    assert_in((DLNS.this, RDF.type, DLNS.Handle),
+              graph)
+    assert_in((DLNS.this, RDFS.label, Literal(repo.name)),
+              graph)
+    assert_equal(len(graph), 2)
+    assert_equal(graph.identifier, URIRef(repo.name))
+
+    # single file:
+    graph2 = repo.get_metadata(["datalad.ttl"])
+    assert_in((DLNS.this, RDF.type, DLNS.Handle),
+              graph2)
+    assert_equal(len(graph2), 1)
+
+
+
+
 # testing HandleRepoBackend:
 
-
-def test_HandleRepoBackend_constructor():
-    raise SkipTest
-
-
-def test_HandleRepoBackend_url():
-    raise SkipTest
-
-
-def test_HandleRepoBackend_name():
-    raise SkipTest
+@with_tempfile
+def test_HandleRepoBackend_constructor(path):
+    repo = HandleRepo(path)
+    backend = HandleRepoBackend(repo)
+    assert_equal(backend._branch, repo.git_get_active_branch())
+    assert_equal(backend._repo, repo)
+    assert_equal(backend.url, repo.path)
 
 
-def test_HandleRepoBackend_metadata():
-    raise SkipTest
+@with_tempfile
+def test_HandleRepoBackend_name(path):
+    repo = HandleRepo(path)
+    backend = HandleRepoBackend(repo)
+
+    # get name:
+    assert_equal(backend.name, repo.name)
+
+    # set name:
+    backend.name = "new_name"
+    assert_equal(backend.name, "new_name")
+    assert_equal(repo.name, "new_name")
+
+
+@with_tempfile
+def test_HandleRepoBackend_metadata(path):
+    repo = HandleRepo(path)
+    backend = HandleRepoBackend(repo)
+    assert_equal(backend.metadata,
+                 repo.get_metadata())
+    assert_equal(backend.metadata.identifier,
+                 URIRef(repo.name))
