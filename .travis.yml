@@ -11,6 +11,11 @@ matrix:
   - python: 2.7
     env:
     - NOSE_WRAPPER="tools/eval_under_testloopfs"
+  - python: 2.7
+    env:
+    # to test operation under root since also would consider FS "crippled" due to
+    # ability to rewrite R/O files
+    - NOSE_WRAPPER="sudo"
   - python: 3.3
   - python: 3.4
 # not there -- don't try!
