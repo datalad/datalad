@@ -24,7 +24,12 @@ sudo mount -o uid=$uid $loop $mntpoint
 
 # Run the actual command
 echo "I: running $@"
+set +e
 DATALAD_TESTS_TEMPDIR=$mntpoint eval "$@"
+ret=$?
 
 echo "I: done, unmounting"
-sudo umount $mntpoint && sudo losetup -d $loop && rm -rf $mntpoint
+sudo umount $mntpoint
+sudo losetup -d $loop
+rm -rf $mntpoint $mntimage
+exit $ret
