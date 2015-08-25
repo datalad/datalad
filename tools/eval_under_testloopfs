@@ -8,7 +8,7 @@ fs=${DATALAD_TEMP_FS:-vfat}
 size=${DATALAD_TEMP_FS_SIZE:-10}
 
 set -u
-tmp=$(mktemp -u $TMPDIR/datalad-fs-XXXXX)
+tmp=$(mktemp -u ${TMPDIR:-/tmp}/datalad-fs-XXXXX)
 
 echo "I: $fs of $size:  $tmp"
 
