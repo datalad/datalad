@@ -16,22 +16,34 @@ from nose.tools import assert_raises, assert_is_instance, assert_true, \
 
 from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.handle import Handle
-from ..support.metadatahandler import URIRef
+from ..support.metadatahandler import URIRef, Literal, RDF, DLNS
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
     get_most_obscure_supported_name, swallow_outputs, ok_
+from ..utils import get_local_file_url
 
 
 @with_tempfile
 def test_Handle_constructor(path):
     repo = HandleRepo(path)
+    # backend constructor
     handle = Handle(HandleRepoBackend(repo))
     assert_equal(handle.url, repo.path)
+    assert_in((DLNS.this, RDF.type, DLNS.Handle),
+              handle.meta)
 
     # copy constructor:
     handle2 = Handle(handle)
     assert_equal(handle2.url, repo.path)
+    assert_in((DLNS.this, RDF.type, DLNS.Handle),
+              handle2.meta)
+
+    # empty:
+    handle3 = Handle(name="empty_handle")
+    assert_equal(handle3.meta.identifier, Literal("empty_handle"))
+    assert_in((DLNS.this, RDF.type, DLNS.Handle),
+              handle.meta)
 
 
 @with_tempfile
