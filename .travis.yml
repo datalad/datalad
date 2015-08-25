@@ -16,7 +16,7 @@ matrix:
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
-    - NOSE_WRAPPER="sudo -E"
+    - NOSE_WRAPPER="sudo"
   - python: 3.3
   - python: 3.4
 # not there -- don't try!
@@ -40,10 +40,10 @@ install:
   - pip install -e .
 
 script:
-  - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER nosetests -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
+  - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
 
 after_success:
   - coveralls
 
 after_failure:
-  - DATALAD_LOGLEVEL=DEBUG $NOSE_WRAPPER nosetests -s -v --with-doctest --with-cov --cover-package datalad --logging-level=DEBUG --failed
+  - DATALAD_LOGLEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --with-cov --cover-package datalad --logging-level=DEBUG --failed
