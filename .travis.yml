@@ -8,9 +8,10 @@ cache:
 matrix:
   include:
   - python: 2.7
-  - python: 2.7
-    env:
-    - NOSE_WRAPPER="tools/eval_under_testloopfs"
+  # no loop dev support on travis yet :-/ https://github.com/travis-ci/travis-ci/issues/2700
+  #- python: 2.7
+  #  env:
+  #  - NOSE_WRAPPER="tools/eval_under_testloopfs"
   - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
