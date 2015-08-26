@@ -45,7 +45,7 @@ class Crawl(Interface):
             doc="Flag whether to cache fetching of pages and parsing out urls")
     )
 
-    def __call__(configs, existing='check', dry_run=False, cache=False):
+    def __call__(self, configs, existing='check', dry_run=False, cache=False):
         from datalad.api import DoubleAnnexRepo, load_config
 
         cfg = load_config(configs)
