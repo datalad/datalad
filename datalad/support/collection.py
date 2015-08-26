@@ -344,10 +344,8 @@ class MetaCollection(dict):
 
     def __delitem__(self, key):
         # delete the graphs of the collection and its handles:
-        graphs_to_remove = [g.identifier for g in self[key].store.contexts()]
-        for graph in graphs_to_remove:
+        for graph in self[key].store.contexts():
             self.store.remove_graph(graph)
-
         # delete the entry itself:
         super(MetaCollection, self).__delitem__(key)
 
