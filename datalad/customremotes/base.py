@@ -437,7 +437,9 @@ class AnnexCustomRemote(object):
         displayed by git annex whereis.
 
         WHEREIS-SUCCESS String
-            Indicates a location of a key. Typically an url, the string can be anything that it makes sense to display to the user about content stored in the special remote.
+            Indicates a location of a key. Typically an url, the string can be anything
+            that it makes sense to display to the user about content stored in the special
+            remote.
         WHEREIS-FAILURE
             Indicates that no location is known for a key.
         """
