@@ -276,11 +276,11 @@ class PlainTextImporter(MetadataImporter):
             # create author's node:
             if parts[-1].startswith('<') and parts[-1].endswith('>'):
                 node = URIRef(parts[-1][1:-1])
+                name = Literal(author[0:-len(parts[-1])-1].strip())
             else:
                 node = EMP.__getattr__("author" + str(i))
                 i += 1
-
-            name = Literal(' '.join(parts[0:-1]))
+                name = Literal(author.strip())
 
             self._graphs['datalad'].add((node, RDF.type, PROV.Person))
             self._graphs['datalad'].add((node, RDF.type, FOAF.Person))
