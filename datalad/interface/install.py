@@ -38,9 +38,9 @@ class Install(Interface):
             doc="Flag whether to force git-annex to use direct mode",
             action="store_true"))
 
-    def __call__(source, destination, direct=False):
+    def __call__(self, source, destination, direct=False):
         import os
         from datalad.api import Handle
 
         path = os.path.expandvars(os.path.expanduser(destination))
-        return Handle, (path, source), dict(direct=direct)
+        return Handle(path, source, direct=direct)

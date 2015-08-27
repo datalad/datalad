@@ -182,8 +182,7 @@ def test_CollectionRepo_get_handle_list(clt_path, h1_path, h2_path):
 
     clt.add_handle(h1, "handle1")
     clt.add_handle(h2, "handle2")
-    assert_equal(list({"handle1", "handle2"}),
-                 clt.get_handle_list())
+    assert_equal({"handle1", "handle2"}, set(clt.get_handle_list()))
 
     # todo: query non-active (remote) branch
 

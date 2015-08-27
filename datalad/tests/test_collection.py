@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class Collection
+"""Test implementation of classes Collection and MetaCollection
 """
 
 import os
@@ -20,7 +20,7 @@ from six import iterkeys
 from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.handle import Handle
 from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend
-from ..support.collection import Collection, DLNS, RDF, DCTERMS
+from ..support.collection import Collection, MetaCollection, DLNS, RDF, DCTERMS
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
     with_tree, get_most_obscure_supported_name, ok_clean_git, ok_
@@ -81,6 +81,8 @@ def test_Collection_setitem(path):
 
 
     # TODO: Wrong! handle uri needs to be changed. Is still "this"!
+    # Note: Actually that's not wrong, since we don't "import" the handles, but
+    # set the entries manually. So, we need to adapt them manually, too.
 
 
 
@@ -118,3 +120,93 @@ def test_Collection_delitem(path):
 @with_tempfile
 def test_Collection_commit(path):
     raise SkipTest
+
+# testing MetaCollection:
+
+
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_MetaCollection_constructor(path1, path2, path3):
+
+    # setup two collections:
+    repo1 = CollectionRepo(path1)
+    repo2 = CollectionRepo(path2)
+    handle = HandleRepo(path3)
+    repo1.add_handle(handle, "somehandle")
+
+    clt1 = Collection(CollectionRepoBackend(repo1))
+    clt2 = Collection(CollectionRepoBackend(repo2))
+
+    # MetaCollection from list; items are either Collections
+    # or CollectionBackends:
+    m_clt = MetaCollection([Collection(CollectionRepoBackend(repo1)),
+                            CollectionRepoBackend(repo2)])
+
+    assert_equal(set(iterkeys(m_clt)), {repo1.name, repo2.name})
+    assert_equal(clt1.meta, m_clt[repo1.name].meta)
+    assert_equal(clt2.meta, m_clt[repo2.name].meta)
+    assert_equal(len(list(m_clt.store.contexts())), 3)
+    [assert_in(g.identifier, [Literal(repo1.name), Literal(repo2.name),
+                              Literal("somehandle")])
+     for g in m_clt.store.contexts()]
+
+    # put something else in that list:
+    assert_raises(TypeError, MetaCollection, [clt1, "invalid"])
+
+    # copy constructor:
+    m_clt_2 = MetaCollection(m_clt)
+    assert_equal(set(iterkeys(m_clt_2)), {repo1.name, repo2.name})
+    assert_equal(m_clt[repo1.name].meta, m_clt_2[repo1.name].meta)
+    assert_equal(m_clt[repo2.name].meta, m_clt_2[repo2.name].meta)
+    assert_equal(len(list(m_clt_2.store.contexts())), 3)
+    [assert_in(g.identifier, [Literal(repo1.name), Literal(repo2.name),
+                              Literal("somehandle")])
+     for g in m_clt_2.store.contexts()]
+
+    # MetaCollection from dict:
+    d = {repo1.name: clt1, repo2.name: clt2}
+    m_clt_3 = MetaCollection(d)
+    assert_equal(set(iterkeys(m_clt_3)), {repo1.name, repo2.name})
+    assert_equal(m_clt[repo1.name].meta, m_clt_3[repo1.name].meta)
+    assert_equal(m_clt[repo2.name].meta, m_clt_3[repo2.name].meta)
+    assert_equal(len(list(m_clt_3.store.contexts())), 3)
+    [assert_in(g.identifier, [Literal(repo1.name), Literal(repo2.name),
+                              Literal("somehandle")])
+     for g in m_clt_3.store.contexts()]
+
+    # MetaCollection (empty):
+    m_clt_4 = MetaCollection()
+    assert_equal(set(iterkeys(m_clt_4)), set([]))
+    assert_equal(len(list(m_clt_4.store.contexts())), 0)
+
+
+@with_tempfile
+@with_tempfile
+def test_MetaCollection_setitem(path1, path2):
+    cr = CollectionRepo(path1)
+    hr = HandleRepo(path2)
+    cr.add_handle(hr, "somehandle")
+    clt = Collection(CollectionRepoBackend(cr))
+    m_clt = MetaCollection()
+    m_clt[clt.name] = clt
+
+    assert_equal(set(iterkeys(m_clt)), {clt.name})
+    assert_equal(m_clt[clt.name].meta, clt.meta)
+    assert_equal(len(list(m_clt.store.contexts())), 2)
+    assert_equal(m_clt[clt.name].meta.identifier, Literal(clt.name))
+
+
+@with_tempfile
+@with_tempfile
+def test_MetaCollection_delitem(path1, path2):
+    cr = CollectionRepo(path1)
+    hr = HandleRepo(path2)
+    cr.add_handle(hr, "somehandle")
+    clt = Collection(CollectionRepoBackend(cr))
+    m_clt = MetaCollection()
+    m_clt[clt.name] = clt
+
+    del m_clt[clt.name]
+    assert_equal(set(iterkeys(m_clt)), set([]))
+    assert_equal(len(list(m_clt.store.contexts())), 0)
