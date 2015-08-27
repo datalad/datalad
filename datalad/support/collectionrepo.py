@@ -49,10 +49,17 @@ class CollectionRepoHandleBackend(HandleBackend):
         self._std_file = opj(self._path, "datalad.ttl")
 
         # remote branch? => read-only
-        if self.branch.split('/')[0] in self.repo.git_get_remotes():
+        branch_parts = self.branch.split('/')
+        if branch_parts[0] in self.repo.git_get_remotes():
             self.is_read_only = True
+            if len(branch_parts) == 1:
+                # remote name without branch
+                self.branch += "/master"
         else:
             self.is_read_only = False
+
+        if self._std_file not in self.repo.git_get_files(self.branch):
+            raise RuntimeError("Handle '%s' not available." % self.key)
 
     def get_metadata(self, files=None):
         """
@@ -111,15 +118,10 @@ class CollectionRepoHandleBackend(HandleBackend):
 
     @property
     def url(self):
-        if self.is_read_only:
-            # remote repo:
-            cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                               self.branch))
-            cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-            return str(cfg_graph.value(predicate=RDF.type, object=DLNS.Handle))
-        else:
-            # available repo:
-            return self.repo.path
+        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
+                                                           self.branch))
+        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+        return str(cfg_graph.value(predicate=RDF.type, object=DLNS.Handle))
 
 
 class CollectionRepoBackend(CollectionBackend):
@@ -412,7 +414,8 @@ class CollectionRepo(GitRepo):
 
         parts = key.split('/')
         if parts[0] in self.git_get_remotes() \
-                or parts[0] == self.name:
+                or parts[0] == self.name \
+                or parts[0] == self.git_get_active_branch():
             return key[len(parts[0]) + 1:].replace('/', '--')
         else:
             return key.replace('/', '--')

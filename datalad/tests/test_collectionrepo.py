@@ -21,11 +21,13 @@ from rdflib.namespace import FOAF
 
 from ..support.gitrepo import GitRepo
 from ..support.handlerepo import HandleRepo
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend
+from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
+    CollectionRepoHandleBackend
 from ..support.metadatahandler import DLNS, RDF, RDFS, DCTERMS
-from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
-    on_windows, on_linux, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
-    with_tree, get_most_obscure_supported_name, ok_clean_git, ok_
+from ..tests.utils import with_tempfile, with_testrepos, \
+    assert_cwd_unchanged, on_windows, on_linux, ok_clean_git_annex_proxy, \
+    swallow_logs, swallow_outputs, in_, with_tree, \
+    get_most_obscure_supported_name, ok_clean_git, ok_
 from ..support.exceptions import CollectionBrokenError
 from ..utils import get_local_file_url
 
@@ -180,15 +182,22 @@ def test_CollectionRepo_get_handle_list(clt_path, h1_path, h2_path):
 
     clt.add_handle(h1, "handle1")
     clt.add_handle(h2, "handle2")
-    assert_equal(list({"handle1", "handle2"}),
-                 clt.get_handle_list())
+    assert_equal({"handle1", "handle2"}, set(clt.get_handle_list()))
 
     # todo: query non-active (remote) branch
 
 
-def test_CollectionRepo_get_backend():
-    """tests method get_backend_from_branch"""
-    raise SkipTest
+@with_tempfile
+def test_CollectionRepo_get_backend(path):
+    clt = CollectionRepo(path)
+    backend = clt.get_backend_from_branch()
+    backend2 = CollectionRepoBackend(clt)
+    assert_equal(backend.branch, backend2.branch)
+    assert_equal(backend.is_read_only, backend2.is_read_only)
+    assert_equal(backend.repo, backend2.repo)
+    assert_equal(backend.url, backend2.url)
+    assert_equal(backend.get_handles(), backend2.get_handles())
+    assert_equal(backend.get_collection(), backend2.get_collection())
 
 
 def test_CollectionRepo_metadata_handle():
@@ -244,12 +253,54 @@ def test_CollectionRepoBackend_url(path1, path2):
     assert_equal(backend2.url, path2)
 
 
-def test_CollectionRepoBackend_get_handles():
-    raise SkipTest
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_CollectionRepoBackend_get_handles(clt_path, h1_path, h2_path):
+
+    clt = CollectionRepo(clt_path)
+    h1 = HandleRepo(h1_path)
+    h2 = HandleRepo(h2_path)
+    clt.add_handle(h1, "handle1")
+    clt.add_handle(h2, "handle2")
+
+    backend = CollectionRepoBackend(clt)
+    handles = backend.get_handles()
+
+    assert_equal(set(handles.keys()), {"handle1", "handle2"})
+    assert_in((URIRef(get_local_file_url(h1_path)), RDF.type, DLNS.Handle),
+              handles["handle1"].meta)
+    assert_equal(len(handles["handle1"].meta), 1)
+    assert_in((URIRef(get_local_file_url(h2_path)), RDF.type, DLNS.Handle),
+              handles["handle2"].meta)
+    assert_equal(len(handles["handle2"].meta), 1)
+    assert_equal(handles["handle1"].meta.identifier, Literal("handle1"))
+    assert_equal(handles["handle2"].meta.identifier, Literal("handle2"))
+
+    # TODO: Currently, CollectionRepoHandleBackend doesn't read config.ttl
+    # Not sure yet whether this is desirable behaviour, but should be
+    # consistent across classes.
 
 
-def test_CollectionRepoBackend_get_collection():
-    raise SkipTest
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_CollectionRepoBackend_get_collection(path, h1_path, h2_path):
+    clt = CollectionRepo(path)
+    h1 = HandleRepo(h1_path)
+    h2 = HandleRepo(h2_path)
+    clt.add_handle(h1, "handle1")
+    clt.add_handle(h2, "handle2")
+    backend = CollectionRepoBackend(clt)
+    collection = backend.get_collection()
+
+    assert_equal(collection.identifier, Literal(clt.name))
+    assert_in((DLNS.this, RDF.type, DLNS.Collection), collection)
+    assert_in((DLNS.this, DCTERMS.hasPart, URIRef(get_local_file_url(h1_path))),
+              collection)
+    assert_in((DLNS.this, DCTERMS.hasPart, URIRef(get_local_file_url(h2_path))),
+              collection)
+    assert_equal(len(collection), 3)
 
 
 def test_CollectionRepoBackend_commit_collection():
@@ -258,16 +309,86 @@ def test_CollectionRepoBackend_commit_collection():
 # testing CollectionRepoHandleBackend:
 
 
-def test_CollectionRepoHandleBackend_constructor():
-    raise SkipTest
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_CollectionRepoHandleBackend_constructor(path1, path2, h1_path, h2_path):
+
+    # setup
+    clt = CollectionRepo(path1, name='testcollection')
+    clt2 = CollectionRepo(path2, name='testcollection2')
+    h1 = HandleRepo(h1_path)
+    h2 = HandleRepo(h2_path)
+    clt.add_handle(h1, "handle1")
+    clt2.add_handle(h2, "handle2")
+    clt.git_remote_add("remoterepo", path2)
+    clt.git_fetch("remoterepo")
+
+    # constructors to test:
+    be1 = CollectionRepoHandleBackend(clt, "handle1")
+    be2 = CollectionRepoHandleBackend(clt, "master/handle1")
+    be3 = CollectionRepoHandleBackend(clt, "handle1", "master")
+    be4 = CollectionRepoHandleBackend(clt, "handle2", "remoterepo/master")
+    be5 = CollectionRepoHandleBackend(clt, "handle2", "remoterepo")
+    # TODO: Should also be possible: key="remoterepo/handle2" with no branch passed.
+
+    assert_raises(RuntimeError, CollectionRepoHandleBackend,
+                  clt, "notexisting")
+
+    # tests:
+    assert_equal(be1._path, "handle1")
+    assert_equal(be2._path, "handle1")
+    assert_equal(be3._path, "handle1")
+    assert_equal(be4._path, "handle2")
+    assert_equal(be5._path, "handle2")
+
+    assert_false(be1.is_read_only)
+    assert_false(be2.is_read_only)
+    assert_false(be3.is_read_only)
+    ok_(be4.is_read_only)
+    ok_(be5.is_read_only)
+
+    assert_equal(be1.url, get_local_file_url(h1_path))
+    assert_equal(be2.url, get_local_file_url(h1_path))
+    assert_equal(be3.url, get_local_file_url(h1_path))
+    assert_equal(be4.url, get_local_file_url(h2_path))
+    assert_equal(be5.url, get_local_file_url(h2_path))
 
 
-def test_CollectionRepoHandleBackend_url():
-    raise SkipTest
+@with_tempfile
+@with_tempfile
+@with_tempfile
+@with_tempfile
+def test_CollectionRepoHandleBackend_get_metadata(path1, path2, h1_path,
+                                                  h2_path):
+    # setup
+    clt = CollectionRepo(path1, name='testcollection')
+    clt2 = CollectionRepo(path2, name='testcollection2')
+    h1 = HandleRepo(h1_path)
+    h2 = HandleRepo(h2_path)
+    clt.add_handle(h1, "handle1")
+    clt2.add_handle(h2, "handle2")
+    clt.git_remote_add("remoterepo", path2)
+    clt.git_fetch("remoterepo")
 
+    # backends:
+    be1 = CollectionRepoHandleBackend(clt, "handle1")
+    be2 = CollectionRepoHandleBackend(clt, "handle2", "remoterepo")
 
-def test_CollectionRepoHandleBackend_get_metadata():
-    raise SkipTest
+    # metadata:
+    meta1 = be1.get_metadata()
+    meta2 = be2.get_metadata()
+
+    # tests:
+    assert_equal(meta1.identifier, Literal("handle1"))
+    assert_equal(meta2.identifier, Literal("handle2"))
+    assert_equal(len(meta1), 1)
+    assert_equal(len(meta2), 1)
+    assert_in((URIRef(get_local_file_url(h1_path)), RDF.type, DLNS.Handle),
+              meta1)
+    assert_in((URIRef(get_local_file_url(h2_path)), RDF.type, DLNS.Handle),
+              meta2)
 
 
 def test_CollectionRepoHandleBackend_set_metadata():

@@ -67,15 +67,14 @@ class HandleRepoBackend(HandleBackend):
 
     def set_name(self, name):
         self._repo.name = name
-        # TODO: By now, this is not written to file.
 
     name = property(get_name, set_name)
 
-    def get_metadata(self):
-        return self._repo.get_metadata()
+    def get_metadata(self, files=None):
+        return self._repo.get_metadata(files)
 
-    def set_metadata(self, meta):
-        self._repo.set_metadata(meta)
+    def set_metadata(self, meta, msg=None):
+        self._repo.set_metadata(meta, msg)
 
     metadata = property(get_metadata, set_metadata)
 
@@ -259,3 +258,37 @@ class HandleRepo(AnnexRepo):
         """Convenience method to create a `Handle` instance.
         """
         return Handle(HandleRepoBackend(self, branch))
+
+    def get_metadata(self, files=None):
+        """Get a Graph containing the handle's metadata
+
+        Parameters:
+        -----------
+        files: list of str
+            metadata files within the datalad directory of the handle to
+            be read. Default: All files are read.
+        """
+        # Parameter? May be by default get graph of all files, just some of
+        # them otherwise. But how to save then?
+        # Just don't save at all (Exception)?
+        # Or datalad.ttl + additional.ttl, regardless of where metadata
+        # came from?
+        # Is there some "in namespace" check in rdflib? => what to save to
+        # datalad.ttl ==> str.startswith(ns) or URIRef.startswith(ns)
+
+        if files is None:
+            files = opj(self.path, self.datalad_path)
+        else:
+            files = [opj(self.path, self.datalad_path, f) for f in files]
+
+        handler = CustomImporter('Handle', 'Handle', DLNS.this)
+
+        handler.import_data(files)
+        graphs = handler.get_graphs()
+        joined_graph = Graph(identifier=self.name)
+        for key in graphs:
+            joined_graph += graphs[key]
+        return joined_graph
+
+    def set_metadata(self, graph, msg="Metadata saved."):
+        raise NotImplementedError

@@ -12,7 +12,9 @@
 import logging
 from abc import ABCMeta, abstractmethod, abstractproperty
 
-from rdflib import URIRef, Graph
+from rdflib import URIRef, Graph, Literal
+
+from ..support.metadatahandler import DLNS, RDF
 
 from .annexrepo import AnnexRepo
 
@@ -97,7 +99,9 @@ class Handle(object):
 
         elif src is None:
             self._backend = None
-            self.meta = Graph(identifier=name)
+            self.meta = Graph(identifier=Literal(name))
+            self.meta.add((DLNS.this, RDF.type, DLNS.Handle))
+            self.url = None
 
         else:
             e_msg = "Invalid source for Handle: %s." % type(src)

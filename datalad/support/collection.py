@@ -14,7 +14,7 @@ from copy import deepcopy
 import logging
 import gc
 
-from rdflib import Graph, URIRef, ConjunctiveGraph
+from rdflib import Graph, URIRef, ConjunctiveGraph, Literal
 from rdflib.plugins.memory import IOMemory
 
 from .handle import Handle
@@ -153,10 +153,10 @@ class Collection(dict):
             self.store = IOMemory()
             for graph in src.store.contexts():
                 self.store.add_graph(graph)
-                if graph.identifier == self.name:
+                if graph.identifier == Literal(src.name):
                     self.meta = graph
                 else:
-                    self[graph.identifier].meta = graph
+                    self[str(graph.identifier)].meta = graph
 
             self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
@@ -171,7 +171,8 @@ class Collection(dict):
         elif src is None:
             self._backend = None
             self.store = IOMemory()
-            self.meta = Graph(store=self.store, identifier=name)
+            self.meta = Graph(store=self.store, identifier=Literal(name))
+            self.meta.add((DLNS.this, RDF.type, DLNS.Collection))
             self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
         else:
@@ -184,6 +185,7 @@ class Collection(dict):
 
     def __delitem__(self, key):
 
+        lgr.error("__delitem__ called.")
         self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
         key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
         self.meta.remove((self_uri, DCTERMS.hasPart, key_uri))
@@ -342,10 +344,8 @@ class MetaCollection(dict):
 
     def __delitem__(self, key):
         # delete the graphs of the collection and its handles:
-        graphs_to_remove = [g.identifier for g in self[key].store.contexts()]
-        for graph in graphs_to_remove:
+        for graph in self[key].store.contexts():
             self.store.remove_graph(graph)
-
         # delete the entry itself:
         super(MetaCollection, self).__delitem__(key)
 

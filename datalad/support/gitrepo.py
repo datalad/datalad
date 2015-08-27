@@ -423,8 +423,8 @@ class GitRepo(object):
         requested
         """
 
-        out, err =self._git_custom_command(
-            '', 'git config --get remote.%s.url' %name)
+        out, err = self._git_custom_command(
+            '', 'git config --get remote.%s.url' % name)
         return out.rstrip(linesep)
 
     def git_pull(self, name='', options=''):

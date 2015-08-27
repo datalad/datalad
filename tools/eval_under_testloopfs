@@ -1,0 +1,35 @@
+#!/bin/bash
+# Evaluate given command while running with DATALAD_TESTS_TEMPDIR pointing to
+# that temporary filesystem mounted using loop device
+
+set -e
+
+fs=${DATALAD_TEMP_FS:-vfat}
+size=${DATALAD_TEMP_FS_SIZE:-10}
+
+set -u
+tmp=$(mktemp -u ${TMPDIR:-/tmp}/datalad-fs-XXXXX)
+
+echo "I: $fs of $size:  $tmp"
+
+uid=$(id -u)
+mntimage=$tmp.img
+mntpoint=$tmp
+
+dd if=/dev/zero of=$mntimage bs=1032192c count=$size
+loop=$(sudo losetup --find --show $mntimage)
+sudo mkfs.$fs $loop
+mkdir -p $mntpoint
+sudo mount -o uid=$uid $loop $mntpoint
+
+# Run the actual command
+echo "I: running $@"
+set +e
+DATALAD_TESTS_TEMPDIR=$mntpoint eval "$@"
+ret=$?
+
+echo "I: done, unmounting"
+sudo umount $mntpoint
+sudo losetup -d $loop
+rm -rf $mntpoint $mntimage
+exit $ret
