@@ -22,6 +22,7 @@ from .install_handle import InstallHandle
 from .unregister_collection import UnregisterCollection
 from .list_collections import ListCollection
 from .list_handles import ListHandles
+from .sparql_query import SPARQLQuery
 from .test import Test
 from .get import Get
 from .install import Install
@@ -53,4 +54,5 @@ _group_misc = (
         Get,
         Install,
         Crawl,
+        SPARQLQuery,
     ])
