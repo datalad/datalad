@@ -38,6 +38,8 @@ install:
   - cd ..; pip install -q coveralls; cd -
   - pip install -r requirements.txt
   - pip install -e .
+  # So we could test under sudo -E with PATH pointing to installed location
+  - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
 
 script:
   - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
