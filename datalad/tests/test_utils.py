@@ -23,7 +23,7 @@ from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
-
+from .utils import on_windows
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -37,7 +37,7 @@ def test_rotree(d):
     # but if user is reported to be root, weird things could happen as e.g.
     # if actually a fakeroot -- then it would succeed to remove.  Thus
     # skipping those tests
-    if os.getuid() != 0:
+    if on_windows or os.getuid() != 0:
         assert_raises(OSError, os.unlink, f)
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible
