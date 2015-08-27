@@ -268,7 +268,7 @@ def test_query_collection(c_path, h_path, md_hdl):
         """SELECT ?g ?r {GRAPH ?g {?r pav:createdBy ?p .
                                    ?p foaf:name "Benjamin Poldrack" .}}"""
 
-    # TODO: handle or content, but not deeper down
+    # now just look for handles or direct child entities (handle content):
     alt_query_2 = \
         """SELECT ?g ?r {{GRAPH ?g {?r rdf:type dlns:Handle .
                                    ?r pav:createdBy ?p .
