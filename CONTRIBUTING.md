@@ -1,9 +1,6 @@
 Contributing to DataLad
 =======================
 
-**Note: This document is just to get started, more thorough
-contributing guidelines are coming.**
-
 [gh-datalad]: http://github.com/datalad/datalad
 
 Files organization
@@ -24,7 +21,7 @@ Files organization
 How to contribute
 -----------------
 
-The preferred way to contribute to the DataLad code base is 
+The preferred way to contribute to the DataLad code base is
 to fork the [main repository][gh-datalad] on GitHub.  Here
 we outline the workflow used by the developers:
 
@@ -38,7 +35,7 @@ we outline the workflow used by the developers:
    button near the top of the page.  This creates a copy of the code
    base under your account on the GitHub server.
 
-2. Add your forked clone as a remote to the local clone you already have on your 
+2. Add your forked clone as a remote to the local clone you already have on your
    local disk:
 
           git remote add gh-YourLogin git@github.com:YourLogin/datalad.git
@@ -81,11 +78,11 @@ we outline the workflow used by the developers:
           git commit
 
    to record your changes in Git.  Ideally, prefix your commit messages with the
-   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but you could 
+   `NF`, `BF`, `RF`, `DOC` similar to the branch name prefixes, but you could
    also use `TST` for commits concerned solely with tests, and `BK` to signal
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
-   entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for 
-   examples.  If a commit closes an existing DataLad issue, then add to the end 
+   entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
+   examples.  If a commit closes an existing DataLad issue, then add to the end
    of the mesage `(Closes #ISSUE_NUMER)`
 
 5. Push to GitHub with:
@@ -119,7 +116,7 @@ rules before submitting a pull request:
 ### Tests
 
 All tests are available under `datalad/tests`.  To execute tests, the codebase
-needs to be "installed" in order to generate scripts for the entry points.  For 
+needs to be "installed" in order to generate scripts for the entry points.  For
 that, the recommended course of action is to use `virtualenv`, e.g.
 
 ```sh
@@ -141,14 +138,14 @@ or similiarly,
 nosetests -s -v datalad
 ```
 
-then to later deactivate the virtualenv just simply enter 
+then to later deactivate the virtualenv just simply enter
 
 ```sh
 deactivate
 ```
 
 Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
-file which sets up a few virtual environments for testing locally, which you can 
+file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
 
 
