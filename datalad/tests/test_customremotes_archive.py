@@ -13,7 +13,7 @@ from os.path import realpath, pardir, join as opj, dirname, pathsep
 from ..customremotes.base import AnnexExchangeProtocol
 from ..customremotes.archive import AnnexArchiveCustomRemote
 from ..cmd import Runner
-from ..support.handle import Handle
+from ..support.handlerepo import HandleRepo
 
 from .utils import *
 
@@ -59,7 +59,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
 
     r = Runner(cwd=d, env=env, protocol=protocol)
 
-    handle = Handle(d, runner=r, direct=direct)
+    handle = HandleRepo(d, runner=r, direct=direct)
     handle.annex_initremote(
         'annexed-archives',
         ['encryption=none', 'type=external', 'externaltype=dl+archive'])
@@ -94,7 +94,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle.annex_drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_handle = Handle(d2, d,
+    cloned_handle = HandleRepo(d2, d,
                            runner=Runner(cwd=d2, env=env, protocol=protocol),
                            direct=direct)
     # we still need to enable manually atm that special remote for archives

@@ -86,6 +86,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
     # TODO: This test is rudimentary, since platform does not really determine
     # the filesystem. For now this should work for the buildbots.
     # Nevertheless: Find a better way to test it.
+    # TODO: just create a fitting git/config without using annex to test it.
 
     ar = AnnexRepo(dst, src)
     if on_windows:

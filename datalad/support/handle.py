@@ -6,107 +6,117 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""
-This layer makes the difference between an arbitrary annex and a datalad-managed dataset.
-
+"""Implements datalad handle metadata representation.
 """
 
-import os
-from os.path import join, exists
 import logging
+from abc import ABCMeta, abstractmethod, abstractproperty
+
+from rdflib import URIRef, Graph, Literal
+
+from ..support.metadatahandler import DLNS, RDF
 
 from .annexrepo import AnnexRepo
 
-lgr = logging.getLogger('datalad.dataset')
+
+lgr = logging.getLogger('datalad.handle')
 
 
-class Handle(AnnexRepo):
-    """Representation of a dataset handled by datalad.
+class HandleBackend(object):
+    """Interface to be implemented by backends for handles.
 
-    Implementations of datalad commands are supposed to use this rather than AnnexRepo or GitRepo directly,
-    since any restrictions on annexes required by datalad due to its cross-platform distribution approach are handled
-    within this class. Also an AnnexRepo has no idea of any datalad configuration needs, of course.
-
+    Abstract class defining an interface, that needs to be implemented
+    by any class that aims to provide a backend for handles.
     """
 
-    def __init__(self, path, url=None, direct=False, runner=None, backend=None):
-        """Creates a dataset representation from path.
+    __metaclass__ = ABCMeta
 
-        If `path` is empty, it creates an new repository.
-        If `url` is given, it is expected to point to a git repository to create a clone from.
+    @abstractproperty
+    def url(self):
+        """url of the physical representation of a handle.
 
-        Parameters
-        ----------
-        path : str
-          path to repository
-        url: str
-          url to the to-be-cloned repository.
-          valid git url according to http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS required.
-        direct: bool
-          if True, force git-annex to operate in direct mode
+        This is a read-only property, since an url can only be provided by a
+        physically existing handle. It doesn't make sense to tell a backend to
+        change it.
 
+        Returns:
+        --------
+        str
         """
+        pass
 
-        super(Handle, self).__init__(path, url, direct=direct, runner=runner,
-                                     backend=backend)
-        # TODO: what about runner? (dry runs ...)
+    @abstractmethod
+    def get_metadata(self, files=None):
+        """Get a graph containing the handle's metadata.
 
-        # TODO: should work with path (deeper) inside repo! => gitrepo/annexrepo
-
-        dataladPath = join(self.path, '.datalad')
-        if not exists(dataladPath):
-            os.mkdir(dataladPath)
-
-    def get(self, files):
-        """get the actual content of files
-
-        This command gets the actual content of the files in `list`.
+        Returns:
+        --------
+        rdflib.Graph
         """
-        self.annex_get(files)
-        # For now just pass
-        # TODO:
+        # TODO: doc `files` and may be find a more general name
+        pass
 
-    def _commit(self, msg):
-        """Commit changes to repository
+    @abstractmethod
+    def set_metadata(self, meta, msg=None):
+        """Set the metadata of a handle.
+
+        A backend can deny to write handle data. In that case is should raise
+        an exception.
+
+        TODO: Define a ReadOnlyException or sth.
 
         Parameters:
         -----------
-        msg: str
-            commit-message
+        meta: rdflib.Graph
+        msg: optionally a "commit-message"
         """
+        pass
 
-        if self.is_direct_mode():
-            self.annex_proxy('git commit -m "%s"' % msg)
+
+class Handle(object):
+    """Representation of a Handle's metadata.
+
+    Independent on its physical representation.
+    """
+
+    # TODO: May be all the data like url, id should directly go into the
+    # metadata graph. If we need them without a desire to query/build the
+    # metadata graph we would likely use HandleRepo instead of Handle anyway.
+
+    def __init__(self, src=None, name=None):
+        # TODO: Handling of 'name' option. See Collections.
+
+        if isinstance(src, HandleBackend):
+            self._backend = src
+            self.url = self._backend.url
+            self.meta = self._backend.get_metadata()
+
+        elif isinstance(src, Handle):
+            # TODO: Correct behaviour of copy constructor?
+            self._backend = src._backend
+            self.meta = src.meta
+            self.url = src.url
+
+        elif src is None:
+            self._backend = None
+            self.meta = Graph(identifier=Literal(name))
+            self.meta.add((DLNS.this, RDF.type, DLNS.Handle))
+            self.url = None
+
         else:
-            self.git_commit(msg)
+            e_msg = "Invalid source for Handle: %s." % type(src)
+            lgr.error(e_msg)
+            raise TypeError(e_msg)
 
-    def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
-        """Add file(s) to the annex.
+    def commit(self, msg="Handle updated."):
 
-        Adds files to the annex and commits.
+        if not self._backend:
+            lgr.error("Missing handle backend.")
+            raise RuntimeError("Missing handle backend.")
 
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to the annex; Can also be a str, in case of a single path.
-        """
+        self._backend.set_metadata(self.meta, msg)
 
-        self.annex_add(files)
-        self._commit(commit_msg)
+    @property
+    def name(self):
+        return self.meta.identifier
 
-    def add_to_git(self, files, commit_msg="Added file(s) to git."):
-        """Add file(s) directly to git
-
-        Adds files directly to git and commits.
-
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to git; Can also be a str, in case of a single path.
-        """
-        self.annex_add_to_git(files)
-        self._commit(commit_msg)
