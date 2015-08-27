@@ -44,6 +44,10 @@ class InstallHandle(Interface):
     def __call__(self, orig_name, path=curdir, inst_name=None):
 
         # TODO: Address handle via ID or url
+        # check urllib2 for url "validator"
+
+
+        # TODO: metadata: priority: handle->collection->nothing
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))

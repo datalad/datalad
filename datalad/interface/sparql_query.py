@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 
 from appdirs import AppDirs
+from six import string_types
 
 from .base import Interface
 from datalad.support.param import Parameter
@@ -36,9 +37,9 @@ class SPARQLQuery(Interface):
             nargs='*',
             doc="collections to query; if no collection is given the query is"
                 "performed on all known collections",
-            constraints=EnsureListOf(basestring)))
+            constraints=EnsureListOf(string_types) | EnsureNone()))
 
-    def __call__(self, query, collections=[]):
+    def __call__(self, query, collections=None):
 
         # TODO: sanity checks for the query;
 
@@ -47,7 +48,7 @@ class SPARQLQuery(Interface):
                                       name="local")
 
         be_list = list()
-        if collections == []:
+        if collections == [] or collections is None:
             be_list.extend([local_master.get_backend_from_branch(remote +
                                                                  "/master")
                             for remote in local_master.git_get_remotes()])
@@ -80,4 +81,4 @@ class SPARQLQuery(Interface):
             for col in row:
                 out += "\t%s" % col
             out.lstrip('\t')
-            print out
+            print(out)
