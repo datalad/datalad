@@ -23,7 +23,7 @@ from ..support.collection import Collection, MetaCollection
 from ..support.metadatahandler import PlainTextImporter, PAV, PROV, DCTERMS, \
     DCTYPES, DLNS, DCAT, FOAF, EMP, Literal, URIRef
 from ..tests.utils import ok_clean_git, with_tempfile, ok_, with_tree
-from ..utils import get_local_file_url
+from ..utils import get_local_file_url, rmtree
 
 # Note: For the actual commands use the following to determine paths to
 # the local master collection, configs, etc.:
@@ -221,9 +221,11 @@ def test_uninstall_handle(m_path, c_path, h_path, install_path):
 
     # uninstall handle:
     local_master.remove_handle("MyCollection/MyHandle")
+    rmtree(h_path)
 
     ok_clean_git(local_master.path, annex=False)
     assert_equal(local_master.get_handle_list(), [])
+    assert_false(os.path.exists(h_path))
 
 
 @with_tempfile
