@@ -27,41 +27,61 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class InstallHandle(Interface):
-    """Installs a handle."""
+    """Installs a handle.
+        Examples:
+
+    $ datalad install-handle http://psydata.ovgu.de/forrest_gump/.git /foo/bar
+    $ datalad install-handle MyCoolCollection/EvenCoolerHandle /foo/bar
+    """
     _params_ = dict(
-        orig_name=Parameter(
-            doc="name of the handle to install",
+        handle=Parameter(
+            doc="name or url of the handle to install; in case of  a name this "
+                "is expected to state the name of the collection the handle is "
+                "in, followed by the handle's name, seperated by '/'.",
             constraints=EnsureStr()),
         path=Parameter(
             args=('path',),
             nargs='?',
             doc="path, where to install the handle",
             constraints=EnsureStr()),
-        inst_name=Parameter(
+        name=Parameter(
             doc="local name of the installed handle",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, orig_name, path=curdir, inst_name=None):
-
-        # TODO: Address handle via ID or url
-        # check urllib2 for url "validator"
-
-
-        # TODO: metadata: priority: handle->collection->nothing
+    def __call__(self, handle, path=curdir, name=None):
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
+                                      'localcollection'))
 
-        # retrieve handle's url from id (orig_name):
-        q_col = orig_name.split('/')[0]
-        q_hdl = orig_name.split('/')[1]
+        # check whether 'handle' is a key ("{collection}/{handle}"):
+        parts = handle.split('/')
+        if parts[0] == local_master.name:
+            # addressing a handle, that is part of local master collection
+            # Note: Theoretically, we could allow for this if a new name is
+            # given.
+            raise ValueError("Installing handles from collection '%s' doesn't "
+                             "make sense." % local_master.name)
+        if parts[0] in local_master.git_get_remotes() \
+                and len(parts) >= 2:
+            # 'handle' starts with a name of a known collection, followed by at
+            # least a second part, seperated by '/'.
+            # Therefore assuming it's a handle's key, not an url
+            url = CollectionRepoHandleBackend(repo=local_master,
+                                              key=handle[len(parts[0])+1:],
+                                              branch=parts[0] + '/master').url
 
-        handle_backend = CollectionRepoHandleBackend(repo=local_master,
-                                                     key=q_hdl,
-                                                     branch=q_col + '/master')
+            # TODO: Where to determine whether the handle even exists?
+            # May be use Collection instead and check for "hasPart"->url
+        else:
+            # assume it's an url (or even a local path atm.):
+            # TODO: Further checks needed? May be at least check for spaces and
+            # ';' to avoid injection?
+            url = handle
 
         # install the handle:
         installed_handle = HandleRepo(abspath(expandvars(expanduser(path))),
-                                      handle_backend.url)
+                                      url)
         local_master.add_handle(installed_handle,
-                                name=inst_name or installed_handle.name)
+                                name=name or installed_handle.name)
+
+        # TODO: metadata: priority: handle->collection->nothing
