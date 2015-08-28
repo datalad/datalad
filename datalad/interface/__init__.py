@@ -23,9 +23,9 @@ from .unregister_collection import UnregisterCollection
 from .list_collections import ListCollection
 from .list_handles import ListHandles
 from .sparql_query import SPARQLQuery
+from .uninstall_handle import UninstallHandle
 from .test import Test
 from .get import Get
-from .install import Install
 from .crawl import Crawl
 
 # all interfaces should be associated with (at least) one of the groups below
@@ -44,6 +44,7 @@ _group_handle = (
         CreateHandle,
         AddHandle,
         InstallHandle,
+        UninstallHandle,
         ListHandles,
     ])
 
@@ -52,7 +53,6 @@ _group_misc = (
     [
         Test,
         Get,
-        Install,
         Crawl,
         SPARQLQuery,
     ])
