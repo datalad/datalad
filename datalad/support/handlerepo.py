@@ -144,8 +144,8 @@ class HandleRepo(AnnexRepo):
         importer.store_data(opj(self.path, self.datalad_path))
         # TODO: How do we know something has changed?
         # => check git status?
-        self.git_add([self._cfg_file, self._md_file])
-        self.git_commit("Initialized config file.")
+        self.add_to_git([self._cfg_file, self._md_file],
+                        "Initialized config file.")
 
     def _get_cfg(self):
         config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
@@ -158,9 +158,7 @@ class HandleRepo(AnnexRepo):
         graph_dict['config'] = graph
         config_handler.set_graphs(graph_dict)
         config_handler.store_data(opj(self.path, self.datalad_path))
-        self.git_add(self._cfg_file)
-        self.git_commit(commit_msg)
-
+        self.add_to_git(self._cfg_file, commit_msg)
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
