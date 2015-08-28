@@ -12,9 +12,10 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
 
-from os import getcwd
+from os import getcwd, linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
 import logging
+import shlex
 from six import string_types
 
 from functools import wraps
@@ -34,6 +35,8 @@ lgr = logging.getLogger('datalad.gitrepo')
 
 # TODO: Check whether it makes sense to unify passing of options in a way
 # similar to paths. See options_decorator in annexrepo.py
+# Note: GitPython is doing something similar already with **kwargs.
+# TODO: Figure this out in detail.
 
 
 def _normalize_path(base_dir, path):
@@ -57,6 +60,9 @@ def _normalize_path(base_dir, path):
     str:
         path, that is a relative path with respect to `base_dir`
     """
+    if not path:
+        return path
+
     base_dir = realpath(base_dir)
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
@@ -133,7 +139,7 @@ def normalize_paths(func, match_return_type=True):
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
-        if isinstance(files, string_types):
+        if isinstance(files, string_types) or not files:
             files_new = [_normalize_path(self.path, files)]
             single_file = True
         elif isinstance(files, list):
@@ -266,6 +272,25 @@ class GitRepo(object):
         else:
             lgr.warning("git_add was called with empty file list.")
 
+    @normalize_paths
+    def git_remove(self, files, **kwargs):
+        """Remove files.
+
+        Parameters:
+        -----------
+        files: str
+          list of paths to remove
+        Returns:
+        --------
+        [str]
+          list of successfully removed files.
+        """
+
+        files = _remove_empty_items(files)
+
+        return self.repo.index.remove(files, working_tree=True, **kwargs)
+
+
     def git_commit(self, msg=None, options=None):
         """Commit changes to git.
 
@@ -280,7 +305,7 @@ class GitRepo(object):
         if not msg:
             msg = "What would be a good default message?"
 
-        self.cmd_call_wrapper(self.repo.index.commit ,msg)
+        self.cmd_call_wrapper(self.repo.index.commit, msg)
 
     def get_indexed_files(self):
         """Get a list of files in git's index
@@ -294,3 +319,169 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
+    def git_get_branches(self):
+        """Get all branches of the repo.
+
+        Returns:
+        -----------
+        [str]
+            Names of all branches of this repository.
+        """
+
+        return [branch.name for branch in self.repo.branches]
+
+    def git_get_remote_branches(self):
+        """Get all branches of all remotes of the repo.
+
+        Returns:
+        -----------
+        [str]
+            Names of all remote branches.
+        """
+        # TODO: treat entries like this: origin/HEAD -> origin/master'
+        # currently this is done in collection
+        return [branch.strip() for branch in
+                self.repo.git.branch(r=True).split(linesep)]
+
+    def git_get_remotes(self):
+        return [remote.name for remote in self.repo.remotes]
+
+
+    def git_get_active_branch(self):
+
+        return self.repo.active_branch.name
+
+    @normalize_paths(match_return_type=False)
+    def _git_custom_command(self, files, cmd_str,
+                           log_stdout=True, log_stderr=True, log_online=False,
+                           expect_stderr=False, cwd=None, env=None,
+                           shell=None):
+        """Allows for calling arbitrary commands.
+
+        Helper for developing purposes, i.e. to quickly implement git commands
+        for proof of concept without the need to figure out, how this is done
+        via GitPython.
+
+        Parameters:
+        -----------
+        files: list of files
+        cmd_str: str
+            arbitrary command str. `files` is appended to that string.
+
+        Returns:
+        --------
+        stdout, stderr
+        """
+        
+        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
+                                  log_stdout=log_stdout, log_online=log_online,
+                                  expect_stderr=expect_stderr, cwd=cwd,
+                                  env=env, shell=shell)
+
+# TODO: --------------------------------------------------------------------
+
+    def git_remote_add(self, name, url, options=''):
+        """
+        """
+
+        return self._git_custom_command('', 'git remote add %s %s %s' %
+                                 (options, name, url))
+
+    def git_remote_remove(self, name):
+        """
+        """
+
+        return self._git_custom_command('', 'git remote remove %s' % name)
+
+    def git_remote_show(self, name='', verbose=False):
+        """
+        """
+
+        v = "-v" if verbose else ""
+        out, err = self._git_custom_command('', 'git remote %s show %s' %
+                                            (v, name))
+        return out.rstrip(linesep).split(linesep)
+
+    def git_remote_update(self, name='', verbose=False):
+        """
+        """
+
+        v = "-v" if verbose else ''
+        self._git_custom_command('', 'git remote %s update %s' %
+                                        (name, v))
+
+    def git_fetch(self, name, options=''):
+        """
+        """
+
+        self._git_custom_command('', 'git fetch %s %s' %
+                                        (options, name))
+
+    def git_get_remote_url(self, name):
+        """We need to know, where to clone from, if a remote is
+        requested
+        """
+
+        out, err = self._git_custom_command(
+            '', 'git config --get remote.%s.url' % name)
+        return out.rstrip(linesep)
+
+    def git_pull(self, name='', options=''):
+        """
+        """
+
+        return self._git_custom_command('', 'git pull %s %s' % (options, name))
+
+    def git_push(self, name='', options=''):
+        """
+        """
+
+        self._git_custom_command('', 'git push %s %s' % (options, name))
+
+    def git_checkout(self, name, options=''):
+        """
+        """
+        # TODO: May be check for the need of -b options herein?
+
+        self._git_custom_command('', 'git checkout %s %s' % (options, name))
+
+    def git_get_files(self, branch="HEAD"):
+        """Get a list of files in git.
+
+        Lists the files in the (remote) branch.
+
+        Parameters:
+        -----------
+        branch: str
+          Name of the branch to query.
+        Returns:
+        --------
+        [str]
+          list of files.
+        """
+        cmd_str = 'git ls-tree -r ' + branch
+        out, err = self._git_custom_command('', cmd_str)
+        return [line.split('\t')[1] for line in out.rstrip(linesep).split(linesep)]
+
+
+        # Only local branches: How to get from remote branches in a similar way?
+        #head = self.repo.head if branch == "HEAD" else self.repo.heads[branch]
+        # return [item.path for item in list(head.commit.tree.traverse())]
+        # #if isinstance(item, git.objects.blob.Blob)
+
+    def git_get_file_content(self, file_, branch='HEAD'):
+        """
+
+        Returns:
+        --------
+        [str]
+          content of file_ as a list of lines.
+        """
+
+        out, err = self._git_custom_command(
+            '', 'git cat-file blob %s:%s' % (branch, file_))
+        return out.rstrip(linesep).split(linesep)
+
+    def git_merge(self, name):
+        self._git_custom_command('', 'git merge %s' % name)

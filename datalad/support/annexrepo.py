@@ -14,7 +14,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 import os
 
 from os import linesep
-from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath
+from os.path import join as opj, exists
 import logging
 import json
 import shlex
@@ -71,6 +71,7 @@ class AnnexRepo(GitRepo):
 
     __slots__ = GitRepo.__slots__ + ['always_commit']
 
+    # TODO: pass description
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None, always_commit=True):
         """Creates representation of git-annex repository at `path`.
@@ -376,8 +377,8 @@ class AnnexRepo(GitRepo):
     def file_has_content(self, files):
         """ Check whether files have their content present under annex.
 
-        Parameters:tes
-        -----------
+        Parameters
+        ----------
         files: list of str
             file(s) to check for being actually present.
 
@@ -564,6 +565,35 @@ class AnnexRepo(GitRepo):
             [remote.get('description') for remote in item.get('whereis')]
             if item.get('success') else []
             for item in json_objects]
+
+
+# TODO: ---------------------------------------------------------------------
+    @normalize_paths(match_return_type=False)
+    def _annex_custom_command(self, files, cmd_str,
+                           log_stdout=True, log_stderr=True, log_online=False,
+                           expect_stderr=False, cwd=None, env=None,
+                           shell=None):
+        """Allows for calling arbitrary commands.
+
+        Helper for developing purposes, i.e. to quickly implement git-annex
+        commands for proof of concept.
+
+        Parameters:
+        -----------
+        files: list of files
+        cmd_str: str
+            arbitrary command str. `files` is appended to that string.
+
+        Returns:
+        --------
+        stdout, stderr
+        """
+        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
+                                  log_stdout=log_stdout, log_online=log_online,
+                                  expect_stderr=expect_stderr, cwd=cwd,
+                                  env=env, shell=shell)
+
 
     @normalize_paths
     def migrate_backend(self, files, backend=None):

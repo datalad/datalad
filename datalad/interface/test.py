@@ -6,7 +6,20 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Defines version to be imported in the module and obtained from setup.py
-"""
+"""Run internal DataLad (unit)tests to verify correct operation on the system"""
 
-__version__ = '0.0.3.dev0'
+
+__docformat__ = 'restructuredtext'
+
+
+import datalad
+from .base import Interface
+
+
+class Test(Interface):
+    """Run internal DataLad (unit)tests
+
+    This can be used to verify correct operation on the system
+    """
+    def __call__(self):
+        datalad.test()

@@ -26,6 +26,7 @@ setup(
     packages=datalad_pkgs,
     install_requires=[
         "GitPython",  # 'git://github.com/gitpython-developers/GitPython'
+        "rdflib",
         ],
     entry_points={
         'console_scripts': [

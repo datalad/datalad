@@ -426,6 +426,25 @@ class AnnexCustomRemote(object):
         """
         raise NotImplementedError()
 
+    def req_WHEREIS(self, key):
+        """Added in 5.20150812-17-g6bc46e3
+
+        provide any information about ways to access the content of a key stored in it,
+        such as eg, public urls. This will be displayed to the user by eg,
+        git annex whereis. The remote replies with WHEREIS-SUCCESS or WHEREIS-FAILURE.
+        Note that users expect git annex whereis to run fast, without eg, network access.
+        This is not needed when SETURIPRESENT is used, since such uris are automatically
+        displayed by git annex whereis.
+
+        WHEREIS-SUCCESS String
+            Indicates a location of a key. Typically an url, the string can be anything
+            that it makes sense to display to the user about content stored in the special
+            remote.
+        WHEREIS-FAILURE
+            Indicates that no location is known for a key.
+        """
+        raise NotImplementedError()
+
     def _transfer(self, cmd, key, file):
         raise NotImplementedError()
 

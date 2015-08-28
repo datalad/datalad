@@ -25,6 +25,7 @@ from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import ok_startswith
+from .utils import on_windows
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -35,11 +36,15 @@ def test_rotree(d):
         f_.write("LOAD")
     rotree(d)
     # we shouldn't be able to delete anything
-    assert_raises(OSError, os.unlink, f)
-    assert_raises(OSError, shutil.rmtree, d)
-    # but file should still be accessible
-    with open(f) as f_:
-        eq_(f_.read(), "LOAD")
+    # but if user is reported to be root, weird things could happen as e.g.
+    # if actually a fakeroot -- then it would succeed to remove.  Thus
+    # skipping those tests
+    if on_windows or os.getuid() != 0:
+        assert_raises(OSError, os.unlink, f)
+        assert_raises(OSError, shutil.rmtree, d)
+        # but file should still be accessible
+        with open(f) as f_:
+            eq_(f_.read(), "LOAD")
     # make it RW
     rotree(d, False)
     os.unlink(f)

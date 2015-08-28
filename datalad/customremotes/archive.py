@@ -301,6 +301,28 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             self.send("REMOVE-FAILURE", key,
                       "Cannot remove from the present tarball")
 
+    def req_WHEREIS(self, key):
+        """
+        WHEREIS-SUCCESS String
+            Indicates a location of a key. Typically an url, the string can be anything
+            that it makes sense to display to the user about content stored in the special
+            remote.
+        WHEREIS-FAILURE
+            Indicates that no location is known for a key.
+        """
+        self.send("WHEREIS-FAILURE")
+        """
+        although more logical is to report back success, it leads to imho more confusing
+        duplication. See
+        http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
+
+        try:
+            key, file = self._get_akey_afile(key)
+            self.send("WHEREIS-SUCCESS", "file %s within archive %s" % (file, key))
+        except ValueError:
+            self.send("WHEREIS-FAILURE")
+        """
+
     def _transfer(self, cmd, key, path):
 
         akey, afile = self._get_akey_afile(key)

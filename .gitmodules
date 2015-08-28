@@ -1,3 +1,0 @@
-[submodule "datalad/tests/testrepos"]
-	path = datalad/tests/testrepos
-	url = git://github.com/datalad/testrepos
