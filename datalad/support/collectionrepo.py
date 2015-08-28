@@ -529,7 +529,9 @@ class CollectionRepo(GitRepo):
         self.git_commit("New import branch created.")
 
         # switching back and merge:
-        self.git_checkout(active_branch)
+        # Note: -f used for the same reason as in remove_handle
+        # TODO: Check this out
+        self.git_checkout(active_branch, options="-f")
         self.git_merge(src_name)  # TODO!
 
     # TODO: following methods similar to 'add_metadata_src_to_handle'
