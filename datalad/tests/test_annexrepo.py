@@ -83,18 +83,18 @@ def test_AnnexRepo_get(src, dst):
 @with_testrepos
 @with_tempfile
 def test_AnnexRepo_crippled_filesystem(src, dst):
-    # TODO: This test is rudimentary, since platform does not really determine
-    # the filesystem. For now this should work for the buildbots.
-    # Nevertheless: Find a better way to test it.
-    # TODO: just create a fitting git/config without using annex to test it.
 
     ar = AnnexRepo(dst, src)
-    if on_windows:
-        assert_true(ar.is_crippled_fs(),
-                    "Detected non-crippled filesystem on windows.")
-    else:
-        assert_false(ar.is_crippled_fs(),
-                     "Detected crippled filesystem on non-windows.")
+
+    # fake git-annex entries in .git/config:
+    ar.repo.config_writer().set_value("annex", "crippledfilesystem", True)
+    assert_true(ar.is_crippled_fs())
+    ar.repo.config_writer().set_value("annex", "crippledfilesystem", False)
+    assert_false(ar.is_crippled_fs())
+    # since we can't remove the entry, just rename it to fake its absence:
+    ar.repo.config_writer().rename_section("annex", "removed")
+    ar.repo.config_writer().set_value("annex", "something", "value")
+    assert_false(ar.is_crippled_fs())
 
 
 @assert_cwd_unchanged
