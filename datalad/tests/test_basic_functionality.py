@@ -22,7 +22,8 @@ from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
 from ..support.collection import Collection, MetaCollection
 from ..support.metadatahandler import PlainTextImporter, PAV, PROV, DCTERMS, \
     DCTYPES, DLNS, DCAT, FOAF, EMP, Literal, URIRef
-from ..tests.utils import ok_clean_git, with_tempfile, ok_, with_tree
+from ..tests.utils import ok_clean_git, ok_clean_git_annex_proxy, \
+    with_tempfile, ok_, with_tree
 from ..utils import get_local_file_url, rmtree
 
 # Note: For the actual commands use the following to determine paths to
@@ -93,7 +94,10 @@ def test_create_handle(m_path, h_path):
     # create the handle repository:
     handle = HandleRepo(h_path, name="MyHandleDefaultName")
 
-    ok_clean_git(h_path, annex=True)
+    if handle.is_direct_mode():
+        ok_clean_git_annex_proxy(h_path)
+    else:
+        ok_clean_git(h_path, annex=True)
     ok_(os.path.exists(opj(h_path, '.datalad')))
     ok_(os.path.isdir(opj(h_path, '.datalad')))
     ok_(os.path.exists(opj(h_path, '.datalad', 'datalad.ttl')))
@@ -129,7 +133,10 @@ def test_add_handle_to_collection(m_path, c_path, h_path):
 
     ok_clean_git(local_master.path, annex=False)
     ok_clean_git(collection.path, annex=False)
-    ok_clean_git(handle.path, annex=True)
+    if handle.is_direct_mode():
+        ok_clean_git_annex_proxy(handle.path)
+    else:
+        ok_clean_git(handle.path, annex=True)
     assert_equal(collection.get_handle_list(), ["MyHandle"])
     assert_equal(local_master.get_handle_list(), ["MyHandle"])
     assert_equal(set(local_master.git_get_files(collection.name + '/master')),
@@ -168,7 +175,10 @@ def test_install_handle(m_path, c_path, h_path, install_path):
     installed_handle = HandleRepo(install_path, handle_backend.url)
     local_master.add_handle(installed_handle, name=handle_by_name)
 
-    ok_clean_git(install_path, annex=True)
+    if installed_handle.is_direct_mode():
+        ok_clean_git_annex_proxy(install_path)
+    else:
+        ok_clean_git(install_path, annex=True)
     ok_clean_git(local_master.path, annex=False)
     assert_equal(set(installed_handle.git_get_files()),
                  {opj('.datalad', 'datalad.ttl'),
@@ -215,7 +225,10 @@ def test_uninstall_handle(m_path, c_path, h_path, install_path):
     # test setup:
     ok_clean_git(local_master.path, annex=False)
     ok_clean_git(collection.path, annex=False)
-    ok_clean_git(handle.path, annex=True)
+    if handle.is_direct_mode():
+        ok_clean_git_annex_proxy(handle.path)
+    else:
+        ok_clean_git(handle.path, annex=True)
     assert_equal(collection.get_handle_list(), ["MyHandle"])
     assert_equal(local_master.get_handle_list(), ["MyCollection/MyHandle"])
 
