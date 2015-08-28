@@ -87,13 +87,17 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
     ar = AnnexRepo(dst, src)
 
     # fake git-annex entries in .git/config:
-    ar.repo.config_writer().set_value("annex", "crippledfilesystem", True)
+    writer = ar.repo.config_writer()
+    writer.set_value("annex", "crippledfilesystem", True)
+    writer.release()
     assert_true(ar.is_crippled_fs())
-    ar.repo.config_writer().set_value("annex", "crippledfilesystem", False)
+    writer.set_value("annex", "crippledfilesystem", False)
+    writer.release()
     assert_false(ar.is_crippled_fs())
     # since we can't remove the entry, just rename it to fake its absence:
-    ar.repo.config_writer().rename_section("annex", "removed")
-    ar.repo.config_writer().set_value("annex", "something", "value")
+    writer.rename_section("annex", "removed")
+    writer.set_value("annex", "something", "value")
+    writer.release()
     assert_false(ar.is_crippled_fs())
 
 

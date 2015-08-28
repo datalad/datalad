@@ -16,8 +16,7 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 
 from appdirs import AppDirs
-from urlparse import urlparse
-
+from six.moves.urllib.parse import urlparse
 
 from .base import Interface
 from datalad.support.param import Parameter
