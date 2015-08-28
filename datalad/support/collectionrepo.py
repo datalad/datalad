@@ -630,7 +630,10 @@ class CollectionRepo(GitRepo):
         # normalize_path decorator in gitrepo.py. It expects one output per
         # one input file. So, recursively removing the 'dir_' violates that
         # assertion.
-        [self.git_remove(file_) for file_ in self.get_indexed_files()
+        # Note2: Currently using "-f" option, since on ntfs/vfat, git somehow
+        # reports the files (at least config.ttl) have staged changes.
+        # TODO: Figure out, what the hell this is about.
+        [self.git_remove(file_, f=True) for file_ in self.get_indexed_files()
          if file_.startswith(dir_)]
 
         self.git_add('datalad.ttl')
