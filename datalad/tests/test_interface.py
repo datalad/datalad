@@ -9,12 +9,15 @@
 """Test command call wrapper
 """
 
+import re
 from nose.tools import assert_is, assert_equal, assert_raises, assert_true
 
-from datalad.support.param import Parameter
-import datalad.support.constraints as cnstr
-from datalad.interface.base import Interface
+from ..support.param import Parameter
+from ..support import constraints as cnstr
+from ..interface.base import Interface
 
+from ..utils import swallow_outputs
+from .utils import assert_re_in
 
 class Demo(Interface):
     """I am a demo"""
@@ -71,7 +74,10 @@ def test_interface():
     parser = argparse.ArgumentParser()
 
     di.setup_parser(parser)
-    print(parser.print_help())
+    with swallow_outputs() as cmo:
+        assert_equal(parser.print_help(), None)
+        assert(cmo.out)
+        assert_equal(cmo.err, '')
     args = parser.parse_args(['42', '11', '1', '2', '--demoarg', '23'])
     assert_is(args.demoarg, 23)
     assert_equal(args.demoposarg, [42, 11])
@@ -79,8 +85,18 @@ def test_interface():
     assert_equal(args.demooptposarg2, 2)
 
     # wrong type
-    assert_raises(SystemExit, parser.parse_args, ['--demoarg', 'abc'])
+    with swallow_outputs() as cmo:
+        assert_raises(SystemExit, parser.parse_args, ['--demoarg', 'abc'])
+        # that is what we dump upon folks atm. TODO: improve reporting of illspecified options
+        assert_re_in(".*invalid <datalad.support.constraints.EnsureInt object at .*> value:.*",
+                     cmo.err, re.DOTALL)
+
     # missing argument to option
-    assert_raises(SystemExit, parser.parse_args, ['--demoarg'])
+    with swallow_outputs() as cmo:
+        assert_raises(SystemExit, parser.parse_args, ['--demoarg'])
+        assert_re_in(".*--demoarg: expected one argument", cmo.err, re.DOTALL)
+
     # missing positional argument
-    assert_raises(SystemExit, parser.parse_args, [''])
+    with swallow_outputs() as cmo:
+        assert_raises(SystemExit, parser.parse_args, [''])
+        assert_re_in(".*error: too few arguments", cmo.err, re.DOTALL)
