@@ -99,4 +99,6 @@ def test_interface():
     # missing positional argument
     with swallow_outputs() as cmo:
         assert_raises(SystemExit, parser.parse_args, [''])
-        assert_re_in(".*error: too few arguments", cmo.err, re.DOTALL)
+        # PY2|PY3
+        assert_re_in(".*error: (too few arguments|the following arguments are required: demoposarg)",
+                     cmo.err, re.DOTALL)
