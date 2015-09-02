@@ -38,7 +38,10 @@ def test_rotree(d):
     rotree(d)
     # we shouldn't be able to delete anything UNLESS in "crippled" situation:
     # root, or filesystem is FAT etc
-    if not ar.is_crippled_fs():
+    # Theoretically annex should declare FS as crippled when ran as root, but
+    # see http://git-annex.branchable.com/bugs/decides_that_FS_is_crippled_under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
+    # so explicit 'or'
+    if not (ar.is_crippled_fs() or (os.getuid() == 0)):
         assert_raises(OSError, os.unlink, f)
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible
