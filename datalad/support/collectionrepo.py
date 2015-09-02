@@ -281,7 +281,7 @@ class CollectionRepo(GitRepo):
            uses to operate on that collection
         b) Optionally additional ttl-files for additional collection level
            metadata
-        b) one directory per handle, storing the metadata of each handle in the
+        c) one directory per handle, storing the metadata of each handle in the
            same way as the collection level metadata.
 
     Attention: files are valid only if in git.
