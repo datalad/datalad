@@ -16,6 +16,7 @@ from ..support.annexrepo import AnnexRepo
 from ..cmd import Runner
 from ..utils import get_local_file_url
 from ..utils import swallow_outputs
+from ..utils import swallow_logs
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
@@ -35,7 +36,9 @@ class TestRepo(object):
             _TEMP_PATHS_GENERATED.append(path)
         if puke_if_exists and exists(path):
             raise RuntimeError("Directory %s for test repo already exist" % path)
-        self.repo = self.REPO_CLASS(path)
+        # swallow logs so we don't print all those about crippled FS etc
+        with swallow_logs():
+            self.repo = self.REPO_CLASS(path)
         self.runner = Runner(cwd=self.repo.path)
         self._created = False
 
