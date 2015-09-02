@@ -24,6 +24,7 @@ from .collection import Collection, CollectionBackend
 from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
     MetadataImporter, DCTERMS, RDF
 from ..utils import assure_dir
+from ..consts import REPO_STD_META_FILE, REPO_CONFIG_FILE
 
 lgr = logging.getLogger('datalad.collectionrepo')
 
@@ -45,8 +46,8 @@ class CollectionRepoHandleBackend(HandleBackend):
             else self.repo.git_get_active_branch()
         self.key = key
         self._path = self.repo._key2filename(self.key)
-        self._cfg_file = opj(self._path, "config.ttl")
-        self._std_file = opj(self._path, "datalad.ttl")
+        self._cfg_file = opj(self._path, REPO_CONFIG_FILE)
+        self._std_file = opj(self._path, REPO_STD_META_FILE)
 
         # remote branch? => read-only
         branch_parts = self.branch.split('/')
@@ -85,7 +86,7 @@ class CollectionRepoHandleBackend(HandleBackend):
             files = [file_
                      for file_ in self.repo.git_get_files(branch=self.branch)
                      if file_.startswith(self.repo._key2filename(self.key))
-                     and basename(file_) != "config.ttl"]
+                     and basename(file_) != REPO_CONFIG_FILE]
 
         out = Graph(identifier=h_name)
         for file_ in files:
@@ -189,7 +190,7 @@ class CollectionRepoBackend(CollectionBackend):
         """Get collection level metadata of a branch
         """
         # read standard files:
-        cfg_str = '\n'.join(self.repo.git_get_file_content("config.ttl",
+        cfg_str = '\n'.join(self.repo.git_get_file_content(REPO_CONFIG_FILE,
                                                            self.branch))
         std = Graph().parse(data=cfg_str, format="turtle")
 
@@ -198,7 +199,7 @@ class CollectionRepoBackend(CollectionBackend):
 
         # additional files in collection's basedir:
         files = [file_ for file_ in self.repo.git_get_files(branch=self.branch)
-                 if file_ == basename(file_) and file_ != "config.ttl"]
+                 if file_ == basename(file_) and file_ != REPO_CONFIG_FILE]
 
         out = Graph(identifier=col_name)  # avoid type 'URIRef' or sth.
 
@@ -241,9 +242,9 @@ class CollectionRepoBackend(CollectionBackend):
         files_to_add = []
 
         # collection level:
-        collection.meta.serialize(opj(self.repo.path, self.repo._md_file),
+        collection.meta.serialize(opj(self.repo.path, REPO_STD_META_FILE),
                                   format="turtle")
-        files_to_add.append(self.repo._md_file)
+        files_to_add.append(REPO_STD_META_FILE)
 
         # handles:
         for k, v in collection.iteritems():
@@ -322,37 +323,34 @@ class CollectionRepo(GitRepo):
         super(CollectionRepo, self).__init__(path, url, runner=runner,
                                              create=create)
 
-        self._cfg_file = 'config.ttl'
-        self._md_file = 'datalad.ttl'
-
         importer = CustomImporter('Collection', 'Collection', DLNS.this)
         # load existing files:
-        if self._cfg_file in self.get_indexed_files():
-            importer.import_data(opj(self.path, self._cfg_file))
+        if REPO_CONFIG_FILE in self.get_indexed_files():
+            importer.import_data(opj(self.path, REPO_CONFIG_FILE))
         elif not create:
             raise CollectionBrokenError("Missing %s in git: %s." %
-                                        (self._cfg_file, path))
-        if self._md_file in self.get_indexed_files():
-            importer.import_data(opj(self.path, self._md_file))
+                                        (REPO_CONFIG_FILE, path))
+        if REPO_STD_META_FILE in self.get_indexed_files():
+            importer.import_data(opj(self.path, REPO_STD_META_FILE))
         elif not create:
             raise CollectionBrokenError("Missing %s in git: %s." %
-                                        (self._md_file, path))
+                                        (REPO_STD_META_FILE, path))
         graphs = importer.get_graphs()
 
         # collection settings:
         # if there is no name statement, add it:
-        if len([subj for subj in graphs['config'].objects(DLNS.this,
+        if len([subj for subj in graphs[REPO_CONFIG_FILE[0:-4]].objects(DLNS.this,
                                                           RDFS.label)]) == 0:
             if create:
-                graphs['config'].add((DLNS.this, RDFS.label,
+                graphs[REPO_CONFIG_FILE[0:-4]].add((DLNS.this, RDFS.label,
                                       Literal(name or basename(self.path))))
             else:
                 raise CollectionBrokenError("Missing label in %s." %
-                                            self._cfg_file)
+                                            REPO_CONFIG_FILE)
 
         importer.set_graphs(graphs)  # necessary?
         importer.store_data(self.path)
-        self.git_add([self._cfg_file, self._md_file])
+        self.git_add([REPO_CONFIG_FILE, REPO_STD_META_FILE])
 
         if not self.repo.head.is_valid() or \
                 self.repo.index.diff(self.repo.head.commit):
@@ -360,16 +358,16 @@ class CollectionRepo(GitRepo):
 
     def _get_cfg(self):
         config_handler = CustomImporter('Collection', 'Collection', DLNS.this)
-        config_handler.import_data(opj(self.path, self._cfg_file))
-        return config_handler.get_graphs()['config']
+        config_handler.import_data(opj(self.path, REPO_CONFIG_FILE))
+        return config_handler.get_graphs()[REPO_CONFIG_FILE[0:-4]]
 
     def _set_cfg(self, graph, commit_msg="Updated config file."):
         config_handler = CustomImporter('Collection', 'Collection', DLNS.this)
         graph_dict = dict()
-        graph_dict['config'] = graph
+        graph_dict[REPO_CONFIG_FILE[0:-4]] = graph
         config_handler.set_graphs(graph_dict)
         config_handler.store_data(self.path)
-        self.git_add(self._cfg_file)
+        self.git_add(REPO_CONFIG_FILE)
         self.git_commit(commit_msg)
 
     # TODO: Consider using preferred label for the name
@@ -509,7 +507,7 @@ class CollectionRepo(GitRepo):
             raise TypeError("Not a MetadataImporter: " + str(importer))
 
         cfg_graph = Graph().parse(opj(self.path, self._key2filename(key),
-                                      "config.ttl"), format="turtle")
+                                      REPO_CONFIG_FILE), format="turtle")
         url = cfg_graph.value(predicate=RDFS.label, object=Literal(key))
 
         # check for existing metadata sources to determine the name for the
@@ -534,7 +532,7 @@ class CollectionRepo(GitRepo):
 
         im.store_data(opj(self.path, self._key2filename(key)))
         cfg_graph.serialize(opj(self.path, self._key2filename(key),
-                                "config.ttl"), format="turtle")
+                                REPO_CONFIG_FILE), format="turtle")
         self.git_add(self._key2filename(key))
         self.git_commit("New import branch created.")
 
@@ -599,9 +597,9 @@ class CollectionRepo(GitRepo):
 
         # handle config:
         # default name:
-        graphs['config'].add((uri, RDFS.label, Literal(name)))
+        graphs[REPO_CONFIG_FILE[0:-4]].add((uri, RDFS.label, Literal(name)))
         # default dir name:
-        graphs['config'].add((uri, DLNS.defaultTarget, Literal(name)))
+        graphs[REPO_CONFIG_FILE[0:-4]].add((uri, DLNS.defaultTarget, Literal(name)))
         # TODO: Is this target actually correct?
         # TODO: anything else?
         md_handle.set_graphs(graphs)
@@ -614,12 +612,13 @@ class CollectionRepo(GitRepo):
                                        about_uri=DLNS.this)
         md_collection.import_data(self.path)
         graphs = md_collection.get_graphs()
-        graphs['datalad'].add((DLNS.this, DCTERMS.hasPart, uri))
+        graphs[REPO_STD_META_FILE[0:-4]].add((DLNS.this, DCTERMS.hasPart, uri))
         # TODO: anything else? any config needed?
         md_collection.set_graphs(graphs)
         md_collection.store_data(self.path)
 
-        self.git_add(['datalad.ttl', 'config.ttl', self._key2filename(key)])
+        self.git_add([REPO_STD_META_FILE, REPO_CONFIG_FILE,
+                      self._key2filename(key)])
         self.git_commit("Added handle '%s'" % name)
 
     def remove_handle(self, key):
@@ -627,13 +626,13 @@ class CollectionRepo(GitRepo):
         dir_ = self._key2filename(key)
 
         # remove handle from collection descriptor:
-        uri = Graph().parse(opj(self.path, dir_, 'datalad.ttl'),
+        uri = Graph().parse(opj(self.path, dir_, REPO_STD_META_FILE),
                             format="turtle").value(predicate=RDF.type,
                                                    object=DLNS.Handle)
-        col_graph = Graph().parse(opj(self.path, 'datalad.ttl'),
+        col_graph = Graph().parse(opj(self.path, REPO_STD_META_FILE),
                                   format="turtle")
         col_graph.remove((DLNS.this, DCTERMS.hasPart, uri))
-        col_graph.serialize(opj(self.path, 'datalad.ttl'), format="turtle")
+        col_graph.serialize(opj(self.path, REPO_STD_META_FILE), format="turtle")
 
         # remove handle's directory:
         # Note: Currently all files separatly due to issues with the
@@ -643,5 +642,5 @@ class CollectionRepo(GitRepo):
         [self.git_remove(file_) for file_ in self.get_indexed_files()
          if file_.startswith(dir_)]
 
-        self.git_add('datalad.ttl')
+        self.git_add(REPO_STD_META_FILE)
         self.git_commit("Removed handle %s." % key)

@@ -18,6 +18,8 @@ from rdflib import Graph, Literal, Namespace, BNode, URIRef
 from rdflib.namespace import RDF, RDFS, FOAF, XSD, DCTERMS
 from rdflib.exceptions import ParserError
 
+from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
+
 # define needed namespaces:
 DLNS = Namespace('http://www.datalad.org/terms/')
 """Namespace for datalad terms.
@@ -90,33 +92,37 @@ class MetadataImporter(object):
     def _init_datalad_graphs(self):
         """Convenience method to init the datalad descriptor graph"""
 
-        self._graphs['datalad'] = Graph()
-        self._graphs['config'] = Graph()
-        self._graphs['datalad'].bind('prov', PROV)
-        self._graphs['datalad'].bind('dcat', DCAT)
-        self._graphs['datalad'].bind('dctypes', DCTYPES)
-        self._graphs['datalad'].bind('dct', DCTERMS)
-        self._graphs['datalad'].bind('pav', PAV)
-        self._graphs['datalad'].bind('foaf', FOAF)
-        self._graphs['datalad'].bind('dlns', DLNS)
-        self._graphs['config'].bind('dlns', DLNS)
-        self._graphs['datalad'].bind('', EMP)
-        self._graphs['config'].bind('', EMP)
+        self._graphs[REPO_STD_META_FILE[0:-4]] = Graph()
+        self._graphs[REPO_CONFIG_FILE[0:-4]] = Graph()
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('prov', PROV)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dcat', DCAT)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dctypes', DCTYPES)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dct', DCTERMS)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('pav', PAV)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('foaf', FOAF)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dlns', DLNS)
+        self._graphs[REPO_CONFIG_FILE[0:-4]].bind('dlns', DLNS)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('', EMP)
+        self._graphs[REPO_CONFIG_FILE[0:-4]].bind('', EMP)
 
         # TODO: Find a better prefix than ''. When stored, then parsed with
         # rdflib and stored again, it turns to the path of the file,
         # it was stored in!
 
         if self._about_class == 'Handle':
-            self._graphs['datalad'].add((self._about_uri, RDF.type,
-                                         DLNS.Handle))
-            self._graphs['config'].add((self._about_uri, RDF.type,
-                                        DLNS.Handle))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        RDF.type,
+                                                        DLNS.Handle))
+            self._graphs[REPO_CONFIG_FILE[0:-4]].add((self._about_uri,
+                                                      RDF.type,
+                                                      DLNS.Handle))
         elif self._about_class == 'Collection':
-            self._graphs['datalad'].add((self._about_uri, RDF.type,
-                                         DLNS.Collection))
-            self._graphs['config'].add((self._about_uri, RDF.type,
-                                        DLNS.Collection))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        RDF.type,
+                                                        DLNS.Collection))
+            self._graphs[REPO_CONFIG_FILE[0:-4]].add((self._about_uri,
+                                                      RDF.type,
+                                                      DLNS.Collection))
 
     @abstractmethod
     def import_data(self, files=None, data=None):
@@ -247,12 +253,14 @@ class PlainTextImporter(MetadataImporter):
         # TODO: This behaviour is open to discussion, of course.
         # Not entirely sure yet, whether or not this is reasonable.
         if self._about_class == self._target_class:
-            self._graphs['datalad'].add((EMP.datalad, RDF.type,
-                                         PROV.SoftwareAgent))
-            self._graphs['datalad'].add((EMP.datalad, RDFS.label,
-                                         Literal("datalad")))
-            self._graphs['datalad'].add((self._about_uri, PAV.createdWith,
-                                         EMP.datalad))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((EMP.datalad, RDF.type,
+                                                        PROV.SoftwareAgent))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((EMP.datalad,
+                                                        RDFS.label,
+                                                        Literal("datalad")))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        PAV.createdWith,
+                                                        EMP.datalad))
             # TODO: datalad version and may be creation time
 
         # If the metadata is about a handle, we need to add a 'data entity',
@@ -261,10 +269,11 @@ class PlainTextImporter(MetadataImporter):
         # So, we are just stating: "There is something in it,
         # and it's some kind of dataset."
         if self._about_class == 'Handle':
-            self._graphs['datalad'].add((EMP.content, RDF.type,
-                                         DCTYPES.Dataset))
-            self._graphs['datalad'].add((self._about_uri, DCTERMS.hasPart,
-                                         EMP.content))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((EMP.content, RDF.type,
+                                                        DCTYPES.Dataset))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        DCTERMS.hasPart,
+                                                        EMP.content))
 
         # authors:
         i = 1
@@ -282,35 +291,41 @@ class PlainTextImporter(MetadataImporter):
                 i += 1
                 name = Literal(author.strip())
 
-            self._graphs['datalad'].add((node, RDF.type, PROV.Person))
-            self._graphs['datalad'].add((node, RDF.type, FOAF.Person))
-            self._graphs['datalad'].add((node, FOAF.name, name))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
+                                                        PROV.Person))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
+                                                        FOAF.Person))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, FOAF.name, name))
 
             # the actual 'authoring' relation:
-            self._graphs['datalad'].add((self._about_uri, PAV.createdBy, node))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        PAV.createdBy, node))
 
             # same condition as above: If this is about a handle and therefore
             # a node 'EMP.content' was created, consider any author of the
             # handle also an author of its content:
             if self._about_class == 'Handle':
-                self._graphs['datalad'].add((EMP.content, PAV.createdBy, node))
+                self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                    (EMP.content, PAV.createdBy, node))
 
         # description:
         if readme is not None:
-            self._graphs['datalad'].add((self._about_uri, DCTERMS.description,
-                                         Literal(''.join(readme))))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                (self._about_uri, DCTERMS.description,
+                 Literal(''.join(readme))))
 
         # license:
         if license_ is not None:
             if license_.__len__() == 1:
                 # file contains a single line. Treat it as URI of the license:
                 # TODO: How restrictive we want to be? Check for valid url?
-                self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
-                                             URIRef(license_[0])))
+                self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                    (self._about_uri, DCTERMS.license, URIRef(license_[0])))
             else:
                 # file is assumed to contain the actual license
-                self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
-                                             Literal(''.join(license_))))
+                self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                    (self._about_uri, DCTERMS.license,
+                     Literal(''.join(license_))))
 
 
 class CustomImporter(MetadataImporter):
