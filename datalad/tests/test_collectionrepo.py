@@ -17,7 +17,8 @@ from nose import SkipTest
 from nose.tools import assert_raises, assert_equal, assert_false, assert_in, \
     assert_not_in
 from rdflib import Graph, Literal, URIRef
-from rdflib.namespace import FOAF
+from rdflib.plugins.parsers.notation3 import BadSyntax
+from git.exc import NoSuchPathError, InvalidGitRepositoryError
 
 from ..support.gitrepo import GitRepo
 from ..support.handlerepo import HandleRepo
@@ -40,15 +41,14 @@ local_flavors = ['network-clone' if on_windows else 'local']
 
 @with_tempfile
 @with_tempfile
-def test_CollectionRepo_constructor(clean_path, clean_path2):
+@with_tempfile
+def test_CollectionRepo_constructor(clean_path, clean_path2, clean_path3):
     # Just a brand new CollectionRepo:
     clt = CollectionRepo(clean_path)
     clt2 = CollectionRepo(clean_path2, name='different')
 
     ok_clean_git(clean_path, annex=False)
     ok_clean_git(clean_path2, annex=False)
-    # TODO: ok_clean_git doesn't work on empty repo, due to
-    # repo.head.is_valid() returns False
 
     # test collection's name:
     assert_equal(os.path.basename(os.path.normpath(clean_path)),
@@ -75,6 +75,24 @@ def test_CollectionRepo_constructor(clean_path, clean_path2):
               "Missing DLNS.Collection statement.")
     assert_in((DLNS.this, RDFS.label, Literal(clt.name)), g_config,
               "Missing RDFS.label.")
+
+    # now, test Exceptions:
+    assert_raises(NoSuchPathError, CollectionRepo, clean_path3, create=False)
+    os.mkdir(clean_path3)
+    assert_raises(InvalidGitRepositoryError, CollectionRepo, clean_path3,
+                  create=False)
+    gr = GitRepo(clean_path3)
+    ok_(os.path.exists(opj(clean_path3, '.git')))
+    assert_raises(CollectionBrokenError, CollectionRepo, clean_path3,
+                  create=False)
+    with open(opj(clean_path3, 'config.ttl'), 'w') as f:
+        f.write("invalid config.ttl")
+    gr.git_add('config.ttl')
+    gr.git_commit("setup invalid config.ttl")
+    assert_raises(BadSyntax, CollectionRepo, clean_path3,
+                  create=False)
+    # TODO: Provide broken testrepos for better testing;
+    # not just collection repos
 
 
 @with_tempfile

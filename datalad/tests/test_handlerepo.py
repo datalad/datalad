@@ -20,7 +20,7 @@ from git.exc import GitCommandError
 from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, FOAF
 
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handlerepo import HandleRepo, HandleRepoBackend, AnnexRepo
 from ..support.exceptions import FileInGitError
 from ..support.metadatahandler import DLNS, RDFS
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
@@ -78,9 +78,18 @@ def test_Handle_instance_from_existing(path):
 @with_tempfile
 def test_HandleRepo_instance_brand_new(path):
 
-    gr = HandleRepo(path)
-    assert_is_instance(gr, HandleRepo, "HandleRepo was not created.")
+    annex = AnnexRepo(path)
+    h1 = HandleRepo(path, create=False)
+    assert_is_instance(h1, HandleRepo, "HandleRepo was not created.")
+    assert_false(exists(opj(path, '.datalad')))
+    assert_false(exists(opj(path, '.datalad', 'datalad.ttl')))
+    assert_false(exists(opj(path, '.datalad', 'config.ttl')))
+
+    h2 = HandleRepo(path)
+    assert_is_instance(h2, HandleRepo, "HandleRepo was not created.")
     assert_true(exists(opj(path, '.datalad')))
+    assert_true(exists(opj(path, '.datalad', 'datalad.ttl')))
+    assert_true(exists(opj(path, '.datalad', 'config.ttl')))
 
 
 @ignore_nose_capturing_stdout

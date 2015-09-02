@@ -276,28 +276,22 @@ class CollectionRepo(GitRepo):
     """Representation of a datalad collection repository.
 
     A Collection is represented as a git-repository containing:
-        a) a file named 'collection', which stores metadata of the collection
-           itself, and
-        b) one file per handle, storing the metadata of each handle
+        a) a file named 'datalad.ttl', which stores datalad standard metadata
+           of the collection itself, and a file named 'config.ttl', datalad
+           uses to operate on that collection
+        b) Optionally additional ttl-files for additional collection level
+           metadata
+        b) one directory per handle, storing the metadata of each handle in the
+           same way as the collection level metadata.
 
     Attention: files are valid only if in git.
     Being present is not sufficient!
-
-    Note: new file layout for collection repositories:
-    ./                one cfg-file per handle, plus collection.cfg
-    ./metadatacache/  one rdf-file per handle
-    ./collection/     collection-level metadata
     """
-
-    # TODO: Collection level metadata:
-    #       - get/set like for handles
-    #       - include statement (self.get_uri_ref(), RDF.type, DLNS.Collection)
-    #         But: get_uri_ref: How to distinct branches? Just '/branch'?
 
     # TODO: not up-to-date:
     # __slots__ = GitRepo.__slots__ + ['name']
 
-    def __init__(self, path, url=None, name=None, runner=None):
+    def __init__(self, path, url=None, name=None, runner=None, create=True):
         """
 
         Parameters:
@@ -316,12 +310,17 @@ class CollectionRepo(GitRepo):
           collections. If there is a collection repo at path already, `name`
           is ignored.
 
+        create: bool
+          if true, creates a collection repository at path, in case there is
+          none. Otherwise an exception is raised.
+
         Raises:
         -------
         CollectionBrokenError
         """
 
-        super(CollectionRepo, self).__init__(path, url, runner=runner)
+        super(CollectionRepo, self).__init__(path, url, runner=runner,
+                                             create=create)
 
         self._cfg_file = 'config.ttl'
         self._md_file = 'datalad.ttl'
@@ -330,23 +329,34 @@ class CollectionRepo(GitRepo):
         # load existing files:
         if self._cfg_file in self.get_indexed_files():
             importer.import_data(opj(self.path, self._cfg_file))
+        elif not create:
+            raise CollectionBrokenError("Missing %s in git: %s." %
+                                        (self._cfg_file, path))
         if self._md_file in self.get_indexed_files():
             importer.import_data(opj(self.path, self._md_file))
+        elif not create:
+            raise CollectionBrokenError("Missing %s in git: %s." %
+                                        (self._md_file, path))
         graphs = importer.get_graphs()
 
         # collection settings:
         # if there is no name statement, add it:
         if len([subj for subj in graphs['config'].objects(DLNS.this,
                                                           RDFS.label)]) == 0:
-            graphs['config'].add((DLNS.this, RDFS.label,
-                                  Literal(name or basename(self.path))))
+            if create:
+                graphs['config'].add((DLNS.this, RDFS.label,
+                                      Literal(name or basename(self.path))))
+            else:
+                raise CollectionBrokenError("Missing label in %s." %
+                                            self._cfg_file)
 
         importer.set_graphs(graphs)  # necessary?
         importer.store_data(self.path)
-        # TODO: How do we know something has changed?
-        # => check git status?
         self.git_add([self._cfg_file, self._md_file])
-        self.git_commit("Initialized config file.")
+
+        if not self.repo.head.is_valid() or \
+                self.repo.index.diff(self.repo.head.commit):
+            self.git_commit("Initialized collection metadata.")
 
     def _get_cfg(self):
         config_handler = CustomImporter('Collection', 'Collection', DLNS.this)

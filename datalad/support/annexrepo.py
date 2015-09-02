@@ -70,7 +70,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: pass description
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True):
+                 direct=False, backend=None, always_commit=True, create=True):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -99,16 +99,24 @@ class AnnexRepo(GitRepo):
             set default backend used by this annex. This does NOT affect files,
             that are already annexed nor will it automatically migrate files,
             that are 'getted' afterwards.
+
+        create: bool
+          if true, creates an annex repository at path, in case there is
+          none. Otherwise an exception is raised.
         """
-        super(AnnexRepo, self).__init__(path, url, runner=runner)
+        super(AnnexRepo, self).__init__(path, url, runner=runner,
+                                        create=create)
 
         self.always_commit = always_commit
 
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
-            lgr.debug('No annex found in %s.'
-                      ' Creating a new one ...' % self.path)
-            self._annex_init()
+            if create:
+                lgr.debug('No annex found at %s.'
+                          ' Creating a new one ...' % self.path)
+                self._annex_init()
+            else:
+                raise RuntimeError("No annex found at %s." % self.path)
 
         # only force direct mode; don't force indirect mode
         if direct and not self.is_direct_mode():
