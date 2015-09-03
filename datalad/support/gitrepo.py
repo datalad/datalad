@@ -25,7 +25,7 @@ from git.exc import GitCommandError
 
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
-from ..utils import optional_args
+from ..utils import optional_args, on_windows
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -373,7 +373,8 @@ class GitRepo(object):
         stdout, stderr
         """
         
-        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        cmd = shlex.split(cmd_str + " " + " ".join(files),
+                          posix=not on_windows)
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
