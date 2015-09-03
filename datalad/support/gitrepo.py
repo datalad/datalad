@@ -341,7 +341,7 @@ class GitRepo(object):
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
         return [branch.strip() for branch in
-                self.repo.git.branch(r=True).split(linesep)]
+                self.repo.git.branch(r=True).splitlines()]
 
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
@@ -402,7 +402,7 @@ class GitRepo(object):
         v = "-v" if verbose else ""
         out, err = self._git_custom_command('', 'git remote %s show %s' %
                                             (v, name))
-        return out.rstrip(linesep).split(linesep)
+        return out.rstrip(linesep).splitlines()
 
     def git_remote_update(self, name='', verbose=False):
         """
@@ -463,7 +463,7 @@ class GitRepo(object):
         """
         cmd_str = 'git ls-tree -r ' + branch
         out, err = self._git_custom_command('', cmd_str)
-        return [line.split('\t')[1] for line in out.rstrip(linesep).split(linesep)]
+        return [line.split('\t')[1] for line in out.rstrip(linesep).splitlines()]
 
 
         # Only local branches: How to get from remote branches in a similar way?
@@ -482,7 +482,7 @@ class GitRepo(object):
 
         out, err = self._git_custom_command(
             '', 'git cat-file blob %s:%s' % (branch, file_))
-        return out.rstrip(linesep).split(linesep)
+        return out.rstrip(linesep).splitlines()
 
     def git_merge(self, name):
         self._git_custom_command('', 'git merge %s' % name)

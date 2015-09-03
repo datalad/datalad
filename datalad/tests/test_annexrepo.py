@@ -389,7 +389,7 @@ def test_AnnexRepo_always_commit(path):
 
     # Now git-annex log should show the addition:
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 1)
     assert_in(file1, out_list[0])
     # check git log of git-annex branch:
@@ -418,13 +418,13 @@ def test_AnnexRepo_always_commit(path):
     # so it should commit the addition at the end. Calling it again should then
     # show two commits.
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in("recording state in git", out_list[1])
 
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in(file2, out_list[1])

@@ -372,7 +372,7 @@ class AnnexRepo(GitRepo):
                 # Not sure, whether or not this can actually happen
                 raise e
 
-        return out.rstrip(linesep).split(linesep)[0]
+        return out.rstrip(linesep).splitlines()[0]
 
     @normalize_paths
     def file_has_content(self, files):
@@ -405,7 +405,7 @@ class AnnexRepo(GitRepo):
             else:
                 raise
 
-        found_files = {f for f in out.split(linesep) if f}
+        found_files = {f for f in out.splitlines() if f}
         found_files_new = set(found_files) - set(files)
         if found_files_new:
             raise RuntimeError("'annex find' returned entries for files which "
@@ -560,7 +560,7 @@ class AnnexRepo(GitRepo):
                 raise e
 
         json_objects = [json.loads(line)
-                        for line in out.split(linesep) if line.startswith('{')]
+                        for line in out.splitlines() if line.startswith('{')]
 
         return [
             [remote.get('description') for remote in item.get('whereis')]
