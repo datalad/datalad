@@ -23,7 +23,7 @@ from .exceptions import CollectionBrokenError
 from .collection import Collection, CollectionBackend
 from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
     MetadataImporter, DCTERMS, RDF
-from ..utils import assure_dir
+from ..utils import assure_dir, get_local_file_url
 
 lgr = logging.getLogger('datalad.collectionrepo')
 
@@ -562,7 +562,7 @@ class CollectionRepo(GitRepo):
             name = name or handle.get_metadata().identifier
 
         if isinstance(handle, HandleRepo):
-            uri = URIRef(handle.path)
+            uri = URIRef(get_local_file_url(handle.path))
             name = name or handle.name
 
         if isinstance(handle, string_types):
