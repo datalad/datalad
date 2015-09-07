@@ -28,6 +28,7 @@ from .test import Test
 from .get import Get
 from .crawl import Crawl
 from .update import Update
+from .whereis import Whereis
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -57,4 +58,5 @@ _group_misc = (
         Crawl,
         SPARQLQuery,
         Update,
+        Whereis
     ])
