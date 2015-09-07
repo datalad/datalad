@@ -16,7 +16,7 @@ from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr
 from ..support.annexrepo import AnnexRepo
-from ..cmdline.helpers import get_repo_instance_from_cwd
+from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 
 
@@ -38,7 +38,7 @@ class Get(Interface):
     def __call__(self, paths):
 
         try:
-            handle = get_repo_instance_from_cwd(AnnexRepo)
+            handle = get_repo_instance(AnnexRepo)
         except RuntimeError as e:
             lgr.error(str(e))
             return -1  # TODO: How is this properly done?
