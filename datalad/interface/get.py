@@ -11,9 +11,13 @@
 
 __docformat__ = 'restructuredtext'
 
+from glob import glob
 from .base import Interface
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr
+from ..support.param import Parameter
+from ..support.constraints import EnsureStr
+from ..support.annexrepo import AnnexRepo
+from ..cmdline.helpers import get_repo_instance_from_cwd
+from ..log import lgr
 
 
 class Get(Interface):
@@ -25,48 +29,26 @@ class Get(Interface):
     """
 
     _params_ = dict(
-        path=Parameter(
+        paths=Parameter(
             doc="path(s) to data content that is to be obtained",
             constraints=EnsureStr(),
             metavar='file',
             nargs='+'))
 
-    def __call__(self, path):
-        import glob
-        import os
-        import os.path
+    def __call__(self, paths):
 
-        from datalad.api import HandleRepo
-        from datalad.log import lgr
+        try:
+            handle = get_repo_instance_from_cwd(AnnexRepo)
+        except RuntimeError as e:
+            lgr.error(str(e))
+            return -1  # TODO: How is this properly done?
 
-        # Since GitPython doesn't recognize we ar with in a repo, if we are
-        # deeper down the tree, walk upwards and look for '.git':
-        # TODO: May be provide a patch for GitPython to have it cleaner.
-        cwd_before = cwd = os.getcwd()
-        while True:
-            if os.path.exists(os.path.join(cwd, '.git')):
-                break
-            else:
-                if cwd == '/':  # TODO: Is this platform-dependend?
-                    lgr.error("No repository found.")
-                    raise ValueError  # TODO: Proper Exception or clean exit?
-                else:
-                    os.chdir(os.pardir)
-                    cwd = os.getcwd()
-
-        ds = HandleRepo(cwd)
-        os.chdir(cwd_before)
-
-        # args.path comes as a list
-        # Expansions (like globs) provided by the shell itself are already done.
-        # But: We don't know exactly what shells we are running on and what it may provide or not.
-        # Therefore, make any expansion we want to guarantee, per item of the list:
+        # 'paths' comes as a list
+        # Expansions (like globs) provided by the shell itself are already
+        # done. But: We don't know exactly what shells we are running on and
+        # what it may provide or not. Therefore, make any expansion we want to
+        # guarantee, per item of the list:
 
         expanded_list = []
-        for item in path:
-            expanded_list.extend(glob.glob(item))
-            # TODO: regexp + may be ext. glob zsh-style
-            # TODO: what about spaces in filenames and similar things?
-            # TODO: os.path.expandvars, os.path.expanduser? Is not needed here, isn't it? Always?
-
-        ds.get(expanded_list)
+        [expanded_list.extend(glob(item)) for item in paths]
+        handle.annex_get(expanded_list)
