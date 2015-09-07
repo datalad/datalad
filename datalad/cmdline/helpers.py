@@ -104,3 +104,66 @@ class RegexpType(object):
             return re.compile(string)
         else:
             return None
+
+
+def get_repo_instance_from_cwd(class_=None):
+    """Returns an instance of appropriate datalad repository for cwd.
+
+    Raises
+    ------
+    RuntimeError, in case cwd is not inside a known repository.
+    """
+    # TODO: After PR #195 is merged, use/create proper Exceptions
+
+    from os import getcwd
+    from os.path import join as opj, ismount, exists
+    from git.exc import InvalidGitRepositoryError
+    from ..support.gitrepo import GitRepo
+    from ..support.annexrepo import AnnexRepo
+    from ..support.handlerepo import HandleRepo
+    from ..support.collectionrepo import CollectionRepo
+    from ..support.exceptions import CollectionBrokenError
+
+    dir_ = getcwd()
+    if class_ is not None:
+        if class_ == CollectionRepo:
+            type_ = "collection"
+        elif class_ == HandleRepo:
+            type_ = "handle"
+        elif class_ == AnnexRepo:
+            type_ = "annex"
+        elif class_ == GitRepo:
+            type_ = "git"
+        else:
+            raise RuntimeError("Unknown class %s." % str(class_))
+
+    while not ismount(dir_):  # TODO: always correct termination?
+        if exists(opj(dir_, '.git')):
+            # found git dir
+            if class_ is None:
+                # detect repo type:
+                try:
+                    return HandleRepo(dir_)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return AnnexRepo(dir_)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return CollectionRepo(dir_)
+                except CollectionBrokenError as e:
+                    pass
+                try:
+                    return GitRepo(dir_)
+                except InvalidGitRepositoryError as e:
+                    raise RuntimeError("No datalad repository found in %s" %
+                                       getcwd())
+            else:
+                try:
+                    return class_(dir_)
+                except (RuntimeError, InvalidGitRepositoryError) as e:
+                    raise RuntimeError("No %s repository found in %s" %
+                                       (type_, getcwd()))
+        else:
+            dir_ = opj(dir_, "..")
