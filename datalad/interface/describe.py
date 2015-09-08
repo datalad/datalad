@@ -51,7 +51,7 @@ class Describe(Interface):
             doc="description of the subject",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, subject=None, author=None, license_=None,
+    def __call__(self, subject=None, author=None, license=None,
                  description=None):
         repo = get_repo_instance()
 
@@ -116,9 +116,9 @@ class Describe(Interface):
 
         # TODO: check what is given by license_ and
         # description: File, Text, URL, ...?
-        if license_ is not None:
+        if license is not None:
             graphs['datalad'].add((about_uri, DCTERMS.license,
-                                   URIRef(license_)))
+                                   URIRef(license)))
 
         if description is not None:
             graphs['datalad'].add((about_uri, DCTERMS.description,
