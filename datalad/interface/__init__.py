@@ -32,6 +32,7 @@ from .whereis import Whereis
 from .describe import Describe
 from .pull import Pull
 from .push import Push
+from .upgrade_handle import UpgradeHandle
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -52,6 +53,7 @@ _group_handle = (
         UninstallHandle,
         ListHandles,
         Get,
+        UpgradeHandle,
     ])
 
 _group_misc = (
