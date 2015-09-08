@@ -30,6 +30,7 @@ from .crawl import Crawl
 from .update import Update
 from .whereis import Whereis
 from .describe import Describe
+from .pull import Pull
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -61,4 +62,5 @@ _group_misc = (
         Update,
         Whereis,
         Describe,
+        Pull,
     ])
