@@ -31,6 +31,7 @@ from .update import Update
 from .whereis import Whereis
 from .describe import Describe
 from .pull import Pull
+from .push import Push
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -63,4 +64,5 @@ _group_misc = (
         Whereis,
         Describe,
         Pull,
+        Push
     ])
