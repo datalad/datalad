@@ -19,11 +19,12 @@ from six import PY3
 
 from os.path import join as opj
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
-from .utils import on_windows
+
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -32,12 +33,15 @@ def test_rotree(d):
     os.makedirs(d2)
     with open(f, 'w') as f_:
         f_.write("LOAD")
+    with swallow_logs():
+        ar = AnnexRepo(d2)
     rotree(d)
-    # we shouldn't be able to delete anything
-    # but if user is reported to be root, weird things could happen as e.g.
-    # if actually a fakeroot -- then it would succeed to remove.  Thus
-    # skipping those tests
-    if on_windows or os.getuid() != 0:
+    # we shouldn't be able to delete anything UNLESS in "crippled" situation:
+    # root, or filesystem is FAT etc
+    # Theoretically annex should declare FS as crippled when ran as root, but
+    # see http://git-annex.branchable.com/bugs/decides_that_FS_is_crippled_under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
+    # so explicit 'or'
+    if not (ar.is_crippled_fs() or (os.getuid() == 0)):
         assert_raises(OSError, os.unlink, f)
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible

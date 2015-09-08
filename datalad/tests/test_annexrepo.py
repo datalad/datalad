@@ -17,7 +17,7 @@ from six import PY3
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
 
-from ..support.annexrepo import AnnexRepo, kwargs_to_options
+from ..support.annexrepo import AnnexRepo, kwargs_to_options, GitRepo
 from ..support.exceptions import CommandNotAvailableError, \
     FileInGitError, FileNotInAnnexError, CommandError
 from ..cmd import Runner
@@ -55,6 +55,9 @@ def test_AnnexRepo_instance_from_existing(path):
 @assert_cwd_unchanged
 @with_tempfile
 def test_AnnexRepo_instance_brand_new(path):
+
+    GitRepo(path)
+    assert_raises(RuntimeError, AnnexRepo, path, create=False)
 
     ar = AnnexRepo(path)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
