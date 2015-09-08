@@ -60,6 +60,6 @@ class FileNotInRepositoryError(FileNotInAnnexError):
 
 
 class CollectionBrokenError(Exception):
-    """Thrown if a collection is somehow invalid
+    """Thrown if a collection repository is somehow invalid
     """
     pass

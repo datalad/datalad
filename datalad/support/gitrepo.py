@@ -21,7 +21,7 @@ from six import string_types
 from functools import wraps
 
 from git import Repo
-from git.exc import GitCommandError
+from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
@@ -194,12 +194,11 @@ class GitRepo(object):
     """
     __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
-    def __init__(self, path, url=None, runner=None):
+    def __init__(self, path, url=None, runner=None, create=True):
         """Creates representation of git repository at `path`.
 
-        If there is no git repository at this location, it will create an empty one.
-        Additionally the directory is created if it doesn't exist.
-        If url is given, a clone is created at `path`.
+        If `url` is given, a clone is created at `path`.
+        Can also be used to create a git repository at `path`.
 
         Parameters
         ----------
@@ -207,9 +206,14 @@ class GitRepo(object):
           path to the git repository; In case it's not an absolute path,
           it's relative to os.getcwd()
         url: str
-          url to the to-be-cloned repository. Requires a valid git url according to
+          url to the to-be-cloned repository. Requires a valid git url
+          according to:
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
-
+        create: bool
+          if true, creates a git repository at `path` if there is none. Also
+          creates `path`, if it doesn't exist.
+          If set to false, an exception is raised in case `path` doesn't exist
+          or doesn't contain a git repository.
         """
 
         self.path = normpath(path)
@@ -223,6 +227,9 @@ class GitRepo(object):
         #       fine grained.
 
         if url is not None:
+            # TODO: What to do, in case url is given, but path exists already?
+            # Just rely on whatever clone_from() does, independently on value
+            # of create argument?
             try:
                 self.cmd_call_wrapper(Repo.clone_from, url, path)
                 # TODO: more arguments possible: ObjectDB etc.
@@ -231,7 +238,7 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-        if not exists(opj(path, '.git')):
+        if create and not exists(opj(path, '.git')):
             try:
                 self.repo = self.cmd_call_wrapper(Repo.init, path, True)
             except GitCommandError as e:
@@ -240,10 +247,14 @@ class GitRepo(object):
         else:
             try:
                 self.repo = self.cmd_call_wrapper(Repo, path)
-            except GitCommandError as e:
-                # TODO: Creating Repo-object from existing git repository might raise other Exceptions
+            except (GitCommandError,
+                    NoSuchPathError,
+                    InvalidGitRepositoryError) as e:
                 lgr.error(str(e))
                 raise
+
+        r = Repo()
+        r.index.diff()
 
     @normalize_paths
     def git_add(self, files):
