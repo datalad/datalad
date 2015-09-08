@@ -54,6 +54,8 @@ class Update(Interface):
 
     def __call__(self, key=curdir):
 
+        # TODO: use name of local master, instead of --all option!
+
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
 
