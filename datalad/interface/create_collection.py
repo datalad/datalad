@@ -45,7 +45,7 @@ class CreateCollection(Interface):
                                           'localcollection'))
         # create the collection:
         new_collection = CollectionRepo(abspath(expandvars(expanduser(path))),
-                                        name=name)
+                                        name=name, create=True)
         # TODO: Move the abspath conversion to a constraint!
         # Additionally (or instead?) check for validity: existing directory or
         # just non-existing.

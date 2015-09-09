@@ -20,6 +20,7 @@ from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
 from ..log import lgr
 from appdirs import AppDirs
+from six.moves.urllib.parse import urlparse
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -39,8 +40,10 @@ class Whereis(Interface):
                                       'localcollection'))
 
         if key in local_master.git_get_remotes():
-            print(CollectionRepoBackend(local_master, key).url)
+            location = CollectionRepoBackend(local_master, key).url
         elif key in local_master.get_handle_list():
-            print(CollectionRepoHandleBackend(local_master, key).url)
+            location = CollectionRepoHandleBackend(local_master, key).url
         else:
-            lgr.error("Unknown name '%s" % key)
+            lgr.error("Unknown name '%s'" % key)
+
+        print(urlparse(location).path)

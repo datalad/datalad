@@ -43,8 +43,8 @@ class CreateHandle(Interface):
     def __call__(self, path=curdir, name=None):
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
+                                          'localcollection'), create=True)
 
         new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
-                                name=name)
+                                name=name, create=True)
         local_master.add_handle(new_handle, name=name)

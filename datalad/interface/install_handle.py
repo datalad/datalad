@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars
+from os.path import join as opj, abspath, expanduser, expandvars, isdir
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
@@ -53,7 +53,8 @@ class InstallHandle(Interface):
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
 
-        # check whether 'handle' is a key ("{collection}/{handle}"):
+        # check whether 'handle' is a key ("{collection}/{handle}")
+        # or a local path or an url:
         parts = handle.split('/')
         if parts[0] == local_master.name:
             # addressing a handle, that is part of local master collection
@@ -61,27 +62,39 @@ class InstallHandle(Interface):
             # given.
             raise ValueError("Installing handles from collection '%s' doesn't "
                              "make sense." % local_master.name)
+
+        name_prefix = None
         if parts[0] in local_master.git_get_remotes() \
                 and len(parts) >= 2:
             # 'handle' starts with a name of a known collection, followed by at
             # least a second part, seperated by '/'.
             # Therefore assuming it's a handle's key, not an url
+
             url = CollectionRepoHandleBackend(repo=local_master,
                                               key=handle[len(parts[0])+1:],
                                               branch=parts[0] + '/master').url
+            name_prefix = parts[0] + '/'
 
             # TODO: Where to determine whether the handle even exists?
             # May be use Collection instead and check for "hasPart"->url
+            # Note: Actually CollectionRepoHandleBackend should raise an
+            # exception!
+        elif isdir(abspath(expandvars(expanduser(handle)))):
+            # appears to be a local path
+            url = abspath(expandvars(expanduser(handle)))
         else:
-            # assume it's an url (or even a local path atm.):
+            # assume it's an url:
             # TODO: Further checks needed? May be at least check for spaces and
             # ';' to avoid injection?
             url = handle
 
         # install the handle:
         installed_handle = HandleRepo(abspath(expandvars(expanduser(path))),
-                                      url)
-        local_master.add_handle(installed_handle,
-                                name=name or installed_handle.name)
+                                      url, create=True)
+        local_name = name or installed_handle.name
+        if name_prefix is not None:
+            local_name = name_prefix + local_name
+
+        local_master.add_handle(installed_handle, name=local_name)
 
         # TODO: metadata: priority: handle->collection->nothing

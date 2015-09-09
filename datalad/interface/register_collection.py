@@ -14,12 +14,13 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath
+from os.path import join as opj, abspath, expanduser, expandvars, isdir
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
 from appdirs import AppDirs
+from ..log import lgr
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -39,25 +40,35 @@ class RegisterCollection(Interface):
 
     def __call__(self, url, name=None):
 
-        # TODO: Sanity/validity checks for url. Also constraint?
-        #       What's may be different in case it's a local path?
+        # check whether url is a local path:
+        if isdir(abspath(expandvars(expanduser(url)))):
+            url = abspath(expandvars(expanduser(url)))
+            # raise exception, if it's not a valid collection:
+            repo = CollectionRepo(url, create=False)
+            if name is None:
+                name = repo.name
 
-        # derive name from url:
-        if name is None:
-            parts = url.split('/')
-            parts.reverse()
-            catch_next = False
-            for part in parts:
-                if catch_next:
-                    name = part
-                    break
-                elif part == '.git':
-                    catch_next = True
-                elif part.endswith('.git'):
-                    name = part[0:-4]
-                    break
-                else:
-                    pass
+        else:
+            # assume it's a git url:
+            if name is None:
+                # derive name from url:
+                parts = url.split('/')
+                parts.reverse()
+                catch_next = False
+                for part in parts:
+                    if catch_next:
+                        name = part
+                        break
+                    elif part == '.git':
+                        catch_next = True
+                    elif part.endswith('.git'):
+                        name = part[0:-4]
+                        break
+                    else:
+                        pass
+
+        if name is None:  # still no name?
+            raise RuntimeError("Couldn't derive a name from %s" % url)
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))

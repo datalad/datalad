@@ -105,7 +105,7 @@ class MetadataImporter(object):
         self._graphs[REPO_STD_META_FILE[0:-4]].bind('', EMP)
         self._graphs[REPO_CONFIG_FILE[0:-4]].bind('', EMP)
 
-        # TODO: Find a better prefix than ''. When stored, then parsed with
+        # TODO: Find a better prefix than '#'. When stored, then parsed with
         # rdflib and stored again, it turns to the path of the file,
         # it was stored in!
 
