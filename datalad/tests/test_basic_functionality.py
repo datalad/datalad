@@ -412,8 +412,30 @@ def test_query_metacollection(m_path, c_path1, c_path2, h_path1, h_path2,
                                    ?p foaf:name "another one" .}}"""
     results2 = \
         metacollection.conjunctive_graph.query(query_handle_certain_author2)
-    # returns both handles and their locations:
+    # returns handle2 and its location:
     assert_equal(len(results2), 1)
     assert_in((Literal("handle2"), URIRef(get_local_file_url(h_path2))),
-              results)
+              results2)
 
+    # query for handle with any appearance of a string "Benjamin Poldrack":
+    uni_query_1 = """SELECT ?g ?r {GRAPH ?g {?r rdf:type dlns:Handle .
+                                             ?s ?p ?o .
+                                             FILTER regex(?o, "Benjamin Poldrack", "i")}}"""
+
+    results3 = metacollection.conjunctive_graph.query(uni_query_1)
+    # returns both handles and their locations:
+    assert_equal(len(results3), 2)
+    assert_in((Literal("handle1"), URIRef(get_local_file_url(h_path1))),
+              results3)
+    assert_in((Literal("handle2"), URIRef(get_local_file_url(h_path2))),
+              results3)
+
+    # query for handle with any appearance of a string "This is a license file"
+    uni_query_2 = """SELECT ?g ?r {GRAPH ?g {?r rdf:type dlns:Handle .
+                                             ?s ?p ?o .
+                                             FILTER regex(?o, "This is a license file", "i")}}"""
+    results4 = metacollection.conjunctive_graph.query(uni_query_2)
+    # returns handle1 and its location:
+    assert_equal(len(results4), 1)
+    assert_in((Literal("handle1"), URIRef(get_local_file_url(h_path1))),
+              results4)

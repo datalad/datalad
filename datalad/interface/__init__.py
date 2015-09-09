@@ -33,6 +33,7 @@ from .describe import Describe
 from .pull import Pull
 from .push import Push
 from .upgrade_handle import UpgradeHandle
+from .search_handle import SearchHandle
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -62,9 +63,10 @@ _group_misc = (
         Test,
         Crawl,
         SPARQLQuery,
+        SearchHandle,
         Update,
         Whereis,
         Describe,
         Pull,
-        Push
+        Push,
     ])
