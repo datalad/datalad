@@ -253,9 +253,6 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-        r = Repo()
-        r.index.diff()
-
     @normalize_paths
     def git_add(self, files):
         """Adds file(s) to the repository.
