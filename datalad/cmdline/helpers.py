@@ -127,11 +127,9 @@ def get_repo_instance(path=curdir, class_=None):
     ------
     RuntimeError, in case cwd is not inside a known repository.
     """
-    # TODO: After PR #195 is merged, use/create proper Exceptions and use
-    # "create" option with constructors!
-    # Note: Will only properly work with PR #195!
 
-    from os.path import join as opj, ismount, exists
+    from os.path import join as opj, ismount, exists, abspath, expanduser, \
+        expandvars
     from git.exc import InvalidGitRepositoryError
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo
@@ -139,7 +137,7 @@ def get_repo_instance(path=curdir, class_=None):
     from ..support.collectionrepo import CollectionRepo
     from ..support.exceptions import CollectionBrokenError
 
-    dir_ = path  # copy?
+    dir_ = abspath(expandvars(expanduser(path)))
     if class_ is not None:
         if class_ == CollectionRepo:
             type_ = "collection"
@@ -158,19 +156,19 @@ def get_repo_instance(path=curdir, class_=None):
             if class_ is None:
                 # detect repo type:
                 try:
-                    return HandleRepo(dir_)
+                    return HandleRepo(dir_, create=False)
                 except RuntimeError as e:
                     pass
                 try:
-                    return AnnexRepo(dir_)
+                    return AnnexRepo(dir_, create=False)
                 except RuntimeError as e:
                     pass
                 try:
-                    return CollectionRepo(dir_)
+                    return CollectionRepo(dir_, create=False)
                 except CollectionBrokenError as e:
                     pass
                 try:
-                    return GitRepo(dir_)
+                    return GitRepo(dir_, create=False)
                 except InvalidGitRepositoryError as e:
                     raise RuntimeError("No datalad repository found in %s" %
                                        path)
