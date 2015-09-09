@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import exists, join as opj
+from os.path import exists, join as opj, isfile
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
@@ -24,6 +24,7 @@ from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
+from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -44,6 +45,19 @@ class Describe(Interface):
         author=Parameter(
             doc="name of the author of the subject",
             constraints=EnsureStr() | EnsureNone()),
+        author_orcid=Parameter(
+            args=('--author-orcid',),
+            doc="ORCID URL of the author",
+            constraints=EnsureStr() | EnsureNone()),
+        author_email=Parameter(
+            args=('--author-email',),
+            doc="email address of the author",
+            constraints=EnsureStr() | EnsureNone()),
+        author_page=Parameter(
+            args=('--author-page',),
+            doc="homepage of the author",
+            constraints=EnsureStr() | EnsureNone()),
+
         license=Parameter(
             doc="license the subject is published under.",
             constraints=EnsureStr() | EnsureNone()),
@@ -51,8 +65,10 @@ class Describe(Interface):
             doc="description of the subject",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, subject=None, author=None, license=None,
+    def __call__(self, subject=None, author=None, author_orcid=None,
+                 author_email=None, author_page=None, license=None,
                  description=None):
+
         repo = get_repo_instance()
 
         # TODO: use path constants!
@@ -76,7 +92,7 @@ class Describe(Interface):
             if subject in [repo.name, None]:
                 about_class = 'Handle'
                 about_uri = DLNS.this
-                files = opj(repo.path, '.datalad')
+                files = opj(repo.path, HANDLE_META_DIR)
             else:
                 # TODO: look for internal entities as subject
                 lgr.error("Subject '%s' unknwon." % subject)
@@ -92,38 +108,60 @@ class Describe(Interface):
                                   about_uri=about_uri)
         # read existing metadata:
         importer.import_data(files)
-        graphs = importer.get_graphs()
+        graph = importer.get_graphs()[REPO_STD_META_FILE[0:-4]]
 
-        if about_uri not in graphs['datalad'].all_nodes():
+        if about_uri not in graph.all_nodes():
             # TODO: When arbitrary entities are allowed, this has to change.
-            raise RuntimeError("Didn't find URI '%s' in datalad graph.")
-
-        # TODO: Remove the following DEBUG Output:
-        lgr.error("Files: %s" % files)
-        lgr.error("Graph:\n%s\n\nAbout URI: %s" %
-                  (graphs['datalad'].serialize(format="turtle"), about_uri))
+            raise RuntimeError("Didn't find URI '%s' in datalad graph." %
+                               about_uri)
 
         # add the metadata:
-        # TODO: this is just basic. Will get more complex by adding way more
-        # options to this command
 
-        if author is not None:
+        # create author node in graph;
+        # choose most unique identifier available:
+        a_node = None
+        if author_orcid is not None:
+            a_node = URIRef(author_orcid)
+        elif author_email is not None:
+            a_node = URIRef("mailto:" + author_email)
+        elif author_page is not None:
+            a_node = URIRef(author_page)
+        elif author is not None:
             a_node = EMP.__getattr__("author")
-            graphs['datalad'].add((about_uri, PAV.createdBy, a_node))
-            graphs['datalad'].add((a_node, RDF.type, PROV.Person))
-            graphs['datalad'].add((a_node, RDF.type, FOAF.Person))
-            graphs['datalad'].add((a_node, FOAF.name, Literal(author)))
 
-        # TODO: check what is given by license_ and
-        # description: File, Text, URL, ...?
+        # assign author's properties:
+        if a_node is not None:
+            graph.add((about_uri, PAV.createdBy, a_node))
+            graph.add((a_node, RDF.type, PROV.Person))
+            graph.add((a_node, RDF.type, FOAF.Person))
+
+            if author_email is not None:
+                graph.add((a_node, FOAF.mbox,
+                           URIRef("mailto:" + author_email)))
+            if author_page is not None:
+                graph.add((a_node, FOAF.homepage, URIRef(author_page)))
+            if author is not None:
+                graph.add((a_node, FOAF.name, Literal(author)))
+
         if license is not None:
-            graphs['datalad'].add((about_uri, DCTERMS.license,
-                                   URIRef(license)))
+            if isfile(license):
+                with open(license, 'r') as f:
+                    l_content = f.readlines()
+                graph.add((about_uri, DCTERMS.license,
+                           Literal(''.join(l_content))))
+            # TODO: possible URL, dictionary of known URLs
+            else:
+                graph.add((about_uri, DCTERMS.license, Literal(license)))
 
         if description is not None:
-            graphs['datalad'].add((about_uri, DCTERMS.description,
-                                   Literal(description)))
+            if isfile(description):
+                with open(description, 'r') as f:
+                    d_content = f.readlines()
+                graph.add((about_uri, DCTERMS.description,
+                           Literal(''.join(d_content))))
+            else:
+                graph.add((about_uri, DCTERMS.description,
+                           Literal(description)))
 
         # save:
-        importer.set_graphs(graphs)
         importer.store_data(files)
