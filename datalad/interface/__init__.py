@@ -35,6 +35,7 @@ from .push import Push
 from .upgrade_handle import UpgradeHandle
 from .search_handle import SearchHandle
 from .publish_handle import PublishHandle
+from .search_collection import SearchCollection
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -66,6 +67,7 @@ _group_misc = (
         Crawl,
         SPARQLQuery,
         SearchHandle,
+        SearchCollection,
         Update,
         Whereis,
         Describe,
