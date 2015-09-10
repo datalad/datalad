@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interface for adding metadata
+"""Interface for searching a handle by its metadata
 """
 
 __docformat__ = 'restructuredtext'
