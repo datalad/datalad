@@ -145,5 +145,5 @@ class Interface(object):
         # XXX needs safety check for name collisions
         from inspect import getargspec
         argnames = getargspec(self.__call__)[0]
-        kwargs = {k: getattr(args, k.replace('_', '-')) for k in argnames if k != 'self'}
+        kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
         return self(**kwargs)
