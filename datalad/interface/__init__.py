@@ -34,6 +34,7 @@ from .pull import Pull
 from .push import Push
 from .upgrade_handle import UpgradeHandle
 from .search_handle import SearchHandle
+from .publish_handle import PublishHandle
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -55,6 +56,7 @@ _group_handle = (
         ListHandles,
         Get,
         UpgradeHandle,
+        PublishHandle,
     ])
 
 _group_misc = (

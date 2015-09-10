@@ -575,6 +575,13 @@ class AnnexRepo(GitRepo):
             if item.get('success') else []
             for item in json_objects]
 
+    def get_annexed_files(self):
+        """Get a list of files in annex
+        """
+
+        out, err = self._run_annex_command('find')
+        return out.splitlines()
+
 
 # TODO: ---------------------------------------------------------------------
     @normalize_paths(match_return_type=False)
