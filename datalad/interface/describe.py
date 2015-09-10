@@ -165,3 +165,8 @@ class Describe(Interface):
 
         # save:
         importer.store_data(files)
+        if isinstance(repo, HandleRepo):
+            repo.add_to_git(files, "Metadata changed.")
+        elif isinstance(repo, CollectionRepo):
+            repo.git_add(files)
+            repo.git_commit("Metadata changed.")
