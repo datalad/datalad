@@ -17,7 +17,7 @@ from six import PY3
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
 
-from ..support.annexrepo import AnnexRepo, kwargs_to_options
+from ..support.annexrepo import AnnexRepo, kwargs_to_options, GitRepo
 from ..support.exceptions import CommandNotAvailableError, \
     FileInGitError, FileNotInAnnexError, CommandError
 from ..cmd import Runner
@@ -56,6 +56,9 @@ def test_AnnexRepo_instance_from_existing(path):
 @with_tempfile
 def test_AnnexRepo_instance_brand_new(path):
 
+    GitRepo(path)
+    assert_raises(RuntimeError, AnnexRepo, path, create=False)
+
     ar = AnnexRepo(path)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     assert_true(os.path.exists(os.path.join(path, '.git')))
@@ -83,17 +86,22 @@ def test_AnnexRepo_get(src, dst):
 @with_testrepos
 @with_tempfile
 def test_AnnexRepo_crippled_filesystem(src, dst):
-    # TODO: This test is rudimentary, since platform does not really determine
-    # the filesystem. For now this should work for the buildbots.
-    # Nevertheless: Find a better way to test it.
 
     ar = AnnexRepo(dst, src)
-    if on_windows:
-        assert_true(ar.is_crippled_fs(),
-                    "Detected non-crippled filesystem on windows.")
-    else:
-        assert_false(ar.is_crippled_fs(),
-                     "Detected crippled filesystem on non-windows.")
+
+    # fake git-annex entries in .git/config:
+    writer = ar.repo.config_writer()
+    writer.set_value("annex", "crippledfilesystem", True)
+    writer.release()
+    assert_true(ar.is_crippled_fs())
+    writer.set_value("annex", "crippledfilesystem", False)
+    writer.release()
+    assert_false(ar.is_crippled_fs())
+    # since we can't remove the entry, just rename it to fake its absence:
+    writer.rename_section("annex", "removed")
+    writer.set_value("annex", "something", "value")
+    writer.release()
+    assert_false(ar.is_crippled_fs())
 
 
 @assert_cwd_unchanged
@@ -102,17 +110,13 @@ def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
     dm = ar.is_direct_mode()
-    if on_windows:
-        assert_true(dm,
-                    "AnnexRepo.is_direct_mode() returned false on windows.")
+
+    # by default annex should be in direct mode on crippled filesystem and
+    # on windows:
+    if ar.is_crippled_fs() or on_windows:
+        assert_true(dm)
     else:
-        assert_false(dm,
-                     "AnnexRepo.is_direct_mode() returned true on non-windows")
-    # Note: In fact this test isn't totally correct, since you always can
-    # switch to direct mode. So not being on windows doesn't necessarily mean
-    # we are in indirect mode. But how to obtain a "ground truth" to test
-    # against, without making test of is_direct_mode() dependent on
-    # set_direct_mode() and vice versa?
+        assert_false(dm)
 
 
 @assert_cwd_unchanged
@@ -388,7 +392,7 @@ def test_AnnexRepo_always_commit(path):
 
     # Now git-annex log should show the addition:
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 1)
     assert_in(file1, out_list[0])
     # check git log of git-annex branch:
@@ -417,13 +421,13 @@ def test_AnnexRepo_always_commit(path):
     # so it should commit the addition at the end. Calling it again should then
     # show two commits.
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in("recording state in git", out_list[1])
 
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in(file2, out_list[1])

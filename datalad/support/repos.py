@@ -61,7 +61,7 @@ class AnnexRepoOld(object):
         Parameters
         ----------
 
-        cmd : list of basestring
+        cmd : list of string
         """
         return self.runner.run(["git", git_cmd] + cmd, cwd=self.path,
                                expect_stderr=expect_stderr)

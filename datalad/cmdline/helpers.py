@@ -17,6 +17,7 @@ import sys
 
 from ..log import is_interactive
 
+
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
 #        import pydb; pydb.debugger()
@@ -26,16 +27,16 @@ class HelpAction(argparse.Action):
             try:
                 import subprocess
                 subprocess.check_call(
-                        'man %s 2> /dev/null' % parser.prog.replace(' ', '-'),
-                        shell=True)
+                    'man %s 2> /dev/null' % parser.prog.replace(' ', '-'),
+                    shell=True)
                 sys.exit(0)
             except (subprocess.CalledProcessError, OSError):
                 # ...but silently fall back if it doesn't work
                 pass
         if option_string == '-h':
-            helpstr = "%s\n%s" \
-                    % (parser.format_usage(),
-                       "Use '--help' to get more comprehensive information.")
+            helpstr = "%s\n%s" % (
+                parser.format_usage(),
+                "Use '--help' to get more comprehensive information.")
         else:
             helpstr = parser.format_help()
         # better for help2man
@@ -44,10 +45,11 @@ class HelpAction(argparse.Action):
         #helpstr = re.sub(r'positional arguments:\n.*\n', '', helpstr)
         # convert all heading to have the first character uppercase
         headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
-        helpstr = re.subn(headpat,
-               lambda match: r'{0}{1}:'.format(match.group(1).upper(),
-                                             match.group(2)),
-               helpstr)[0]
+        helpstr = re.subn(
+            headpat,
+            lambda match: r'{0}{1}:'.format(match.group(1).upper(),
+                                            match.group(2)),
+            helpstr)[0]
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
         if option_string == '--help-np':
@@ -57,6 +59,7 @@ class HelpAction(argparse.Action):
             helpstr = '%s\n%s' % (usagestr, helpstr[usage_length:])
         print(helpstr)
         sys.exit(0)
+
 
 class LogLevelAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -78,6 +81,7 @@ def parser_add_common_args(parser, pos=None, opt=None, **kwargs):
             else:
                 parser.add_argument(arg_tmpl[i], **arg_kwargs)
 
+
 def parser_add_common_opt(parser, opt, names=None, **kwargs):
     from . import common_args
     opt_tmpl = getattr(common_args, opt)
@@ -87,6 +91,7 @@ def parser_add_common_opt(parser, opt, names=None, **kwargs):
         parser.add_argument(*opt_tmpl[1], **opt_kwargs)
     else:
         parser.add_argument(*names, **opt_kwargs)
+
 
 class RegexpType(object):
     """Factory for creating regular expression types for argparse
@@ -100,3 +105,83 @@ class RegexpType(object):
         else:
             return None
 
+
+from os import curdir
+def get_repo_instance(path=curdir, class_=None):
+    """Returns an instance of appropriate datalad repository for path.
+
+    Check whether a certain path is inside a known type of repository and
+    returns an instance representing it. May also check for a certain type
+    instead of detecting the type of repository.
+
+    Parameters:
+    -----------
+    path: str
+      path to check; default: current working directory
+
+    class_: class
+      if given, check whether path is inside a repository, that can be
+      represented as an instance of the passed class.
+
+    Raises
+    ------
+    RuntimeError, in case cwd is not inside a known repository.
+    """
+
+    from os.path import join as opj, ismount, exists, abspath, expanduser, \
+        expandvars
+    from git.exc import InvalidGitRepositoryError
+    from ..support.gitrepo import GitRepo
+    from ..support.annexrepo import AnnexRepo
+    from ..support.handlerepo import HandleRepo
+    from ..support.collectionrepo import CollectionRepo
+    from ..support.exceptions import CollectionBrokenError
+
+    dir_ = abspath(expandvars(expanduser(path)))
+    if class_ is not None:
+        if class_ == CollectionRepo:
+            type_ = "collection"
+        elif class_ == HandleRepo:
+            type_ = "handle"
+        elif class_ == AnnexRepo:
+            type_ = "annex"
+        elif class_ == GitRepo:
+            type_ = "git"
+        else:
+            raise RuntimeError("Unknown class %s." % str(class_))
+
+    while not ismount(dir_):  # TODO: always correct termination?
+        if exists(opj(dir_, '.git')):
+            # found git dir
+            if class_ is None:
+                # detect repo type:
+                try:
+                    return HandleRepo(dir_, create=False)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return AnnexRepo(dir_, create=False)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return CollectionRepo(dir_, create=False)
+                except CollectionBrokenError as e:
+                    pass
+                try:
+                    return GitRepo(dir_, create=False)
+                except InvalidGitRepositoryError as e:
+                    raise RuntimeError("No datalad repository found in %s" %
+                                       path)
+            else:
+                try:
+                    return class_(dir_)
+                except (RuntimeError, InvalidGitRepositoryError) as e:
+                    raise RuntimeError("No %s repository found in %s" %
+                                       (type_, path))
+        else:
+            dir_ = opj(dir_, "..")
+
+    if class_ is not None:
+        raise RuntimeError("No %s repository found in %s." % (type_, path))
+    else:
+        raise RuntimeError("No datalad repository found in %s" % path)

@@ -384,3 +384,15 @@ def setup_exceptionhook():
 
     sys.excepthook = _datalad_pdb_excepthook
 
+
+def assure_dir(*args):
+    """Make sure directory exists.
+
+    Joins the list of arguments to an os-specific path to the desired
+    directory and creates it, if it not exists yet.
+    """
+    dirname = opj(*args)
+    if not exists(dirname):
+        os.makedirs(dirname)
+    return dirname
+
