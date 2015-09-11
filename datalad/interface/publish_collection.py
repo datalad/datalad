@@ -31,6 +31,34 @@ from six.moves.urllib.parse import urlparse
 dirs = AppDirs("datalad", "datalad.org")
 
 
+def parse_script_output(out, err):
+    """parse out put of server setup script"""
+    results = dict()
+    import re
+    col_p = re.compile("DATALAD_COLLECTION_REPO_.+?: init")
+    for entry in re.findall(col_p, out):
+        results[entry[24:-6]] = dict()
+        results[entry[24:-6]]['init'] = True
+
+    # handle occurences:
+    hdl_p = re.compile("DATALAD_HANDLE_REPO_.+?:")
+    for entry in re.findall(hdl_p, out):
+        if entry.startswith("_INFO"):
+            continue
+        else:
+            results[entry[20:-24]] = dict()
+
+    hdl_p = re.compile("DATALAD_HANDLE_REPO_.+?: init DATALAD_END")
+    for entry in re.findall(hdl_p, out):
+        results[entry[20:-24]]['init'] = True
+
+    hdl_p = re.compile("DATALAD_HANDLE_REPO_.+?: annex_init DATALAD_END")
+    for entry in re.findall(hdl_p, out):
+        results[entry[20:-24]]['annex init'] = True
+
+    return results
+
+
 class PublishCollection(Interface):
     """publish a collection.
 
@@ -71,6 +99,10 @@ class PublishCollection(Interface):
 
         parsed_target = urlparse(target)  # => scheme, path
 
+        if baseurl is None:
+            baseurl = parsed_target.path  # correct?
+        collection_url = baseurl + '/' + local_collection_repo.name
+
         from ..cmd import Runner
         runner = Runner()
         if parsed_target.scheme == 'ssh':
@@ -103,6 +135,9 @@ class PublishCollection(Interface):
             os.environ['GIT_SSH'] = "ssh %s" % ' '.join(ssh_cmd_opt)
 
         elif parsed_target.scheme == 'file' or parsed_target.scheme == '':
+            # we should have a local target path
+            if not isdir(abspath(expandvars(expanduser(parsed_target.path)))):
+                raise RuntimeError("%s doesn't exist." % parsed_target.path)
 
             # TODO: run the script:
             # arguments:
@@ -122,7 +157,7 @@ class PublishCollection(Interface):
         script_failed = False
         for name in local_collection_repo.get_handle_list() + \
                 ["DATALAD_COL_" + local_collection_repo.name]:
-            if not results[name].ok:
+            if not results[name]['init']:
                 lgr.error("Server setup for %s failed." % name)
                 script_failed = True
         # exit here, if something went wrong:
@@ -144,28 +179,13 @@ class PublishCollection(Interface):
                 lgr.error("No handle available at %s. Skip." % handle_loc)
                 raise e
 
-            handle_target = opj(target, handle_name)
-
-
-            handle_publisher(handle_target, handle=handle_loc,
+            # TODO: pass no target to handle_publisher, just url => remote
+            # publisher therefore can't annex-get something
+            # => another server script
+            handle_publisher(None, handle=handle_loc,
                              url=baseurl + '/' + handle_name)
 
-
-        # check succes => go on with collection
-
-
-
-
-        # first try: local path
-        if not isdir(abspath(expandvars(expanduser(target)))):
-            raise RuntimeError("Can't handle target %s" % target)
-        target = abspath(expandvars(expanduser(target)))
-
-        if baseurl is None:
-            baseurl = target
-
-        collection_url = baseurl + '/' + local_collection_repo.name
-        collection_target = opj(target, local_collection_repo.name)
+        # TODO: check success => go on with collection
 
         # prepare publish branch in local collection:
         # check for existing publish branches:
@@ -206,12 +226,10 @@ class PublishCollection(Interface):
 
         # TODO: add commit reference
 
-
         importer.store_data(local_collection_repo.path)
         [local_collection_repo.git_add(graph_name + '.ttl')
          for graph_name in graphs]
         local_collection_repo.git_commit("metadata prepared for publishing")
-
 
         # add as remote to local:
         if remote_name is None:
