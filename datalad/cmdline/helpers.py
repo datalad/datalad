@@ -104,3 +104,84 @@ class RegexpType(object):
             return re.compile(string)
         else:
             return None
+
+
+from os import curdir
+def get_repo_instance(path=curdir, class_=None):
+    """Returns an instance of appropriate datalad repository for path.
+
+    Check whether a certain path is inside a known type of repository and
+    returns an instance representing it. May also check for a certain type
+    instead of detecting the type of repository.
+
+    Parameters:
+    -----------
+    path: str
+      path to check; default: current working directory
+
+    class_: class
+      if given, check whether path is inside a repository, that can be
+      represented as an instance of the passed class.
+
+    Raises
+    ------
+    RuntimeError, in case cwd is not inside a known repository.
+    """
+
+    from os.path import join as opj, ismount, exists, abspath, expanduser, \
+        expandvars
+    from git.exc import InvalidGitRepositoryError
+    from ..support.gitrepo import GitRepo
+    from ..support.annexrepo import AnnexRepo
+    from ..support.handlerepo import HandleRepo
+    from ..support.collectionrepo import CollectionRepo
+    from ..support.exceptions import CollectionBrokenError
+
+    dir_ = abspath(expandvars(expanduser(path)))
+    if class_ is not None:
+        if class_ == CollectionRepo:
+            type_ = "collection"
+        elif class_ == HandleRepo:
+            type_ = "handle"
+        elif class_ == AnnexRepo:
+            type_ = "annex"
+        elif class_ == GitRepo:
+            type_ = "git"
+        else:
+            raise RuntimeError("Unknown class %s." % str(class_))
+
+    while not ismount(dir_):  # TODO: always correct termination?
+        if exists(opj(dir_, '.git')):
+            # found git dir
+            if class_ is None:
+                # detect repo type:
+                try:
+                    return HandleRepo(dir_, create=False)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return AnnexRepo(dir_, create=False)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return CollectionRepo(dir_, create=False)
+                except CollectionBrokenError as e:
+                    pass
+                try:
+                    return GitRepo(dir_, create=False)
+                except InvalidGitRepositoryError as e:
+                    raise RuntimeError("No datalad repository found in %s" %
+                                       path)
+            else:
+                try:
+                    return class_(dir_)
+                except (RuntimeError, InvalidGitRepositoryError) as e:
+                    raise RuntimeError("No %s repository found in %s" %
+                                       (type_, path))
+        else:
+            dir_ = opj(dir_, "..")
+
+    if class_ is not None:
+        raise RuntimeError("No %s repository found in %s." % (type_, path))
+    else:
+        raise RuntimeError("No datalad repository found in %s" % path)

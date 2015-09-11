@@ -23,7 +23,7 @@ from .exceptions import CollectionBrokenError
 from .collection import Collection, CollectionBackend
 from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
     MetadataImporter, DCTERMS, RDF
-from ..utils import assure_dir
+from ..utils import assure_dir, get_local_file_url
 from ..consts import REPO_STD_META_FILE, REPO_CONFIG_FILE
 
 lgr = logging.getLogger('datalad.collectionrepo')
@@ -537,7 +537,9 @@ class CollectionRepo(GitRepo):
         self.git_commit("New import branch created.")
 
         # switching back and merge:
-        self.git_checkout(active_branch)
+        # Note: -f used for the same reason as in remove_handle
+        # TODO: Check this out
+        self.git_checkout(active_branch, options="-f")
         self.git_merge(src_name)  # TODO!
 
     # TODO: following methods similar to 'add_metadata_src_to_handle'
@@ -568,7 +570,7 @@ class CollectionRepo(GitRepo):
             name = name or handle.get_metadata().identifier
 
         if isinstance(handle, HandleRepo):
-            uri = URIRef(handle.path)
+            uri = URIRef(get_local_file_url(handle.path))
             name = name or handle.name
 
         if isinstance(handle, string_types):
@@ -639,7 +641,10 @@ class CollectionRepo(GitRepo):
         # normalize_path decorator in gitrepo.py. It expects one output per
         # one input file. So, recursively removing the 'dir_' violates that
         # assertion.
-        [self.git_remove(file_) for file_ in self.get_indexed_files()
+        # Note2: Currently using "-f" option, since on ntfs/vfat, git somehow
+        # reports the files (at least config.ttl) have staged changes.
+        # TODO: Figure out, what the hell this is about.
+        [self.git_remove(file_, f=True) for file_ in self.get_indexed_files()
          if file_.startswith(dir_)]
 
         self.git_add(REPO_STD_META_FILE)

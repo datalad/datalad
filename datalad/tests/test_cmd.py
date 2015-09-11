@@ -41,7 +41,7 @@ def test_runner_dry(tempfile):
     ret = runner.run(cmd)
     assert_equal(("DRY", "DRY"), ret,
                  "Output of dry run (%s): %s" % (cmd, ret))
-    assert_equal(shlex.split(cmd), dry[0]['command'])
+    assert_equal(shlex.split(cmd, posix=not on_windows), dry[0]['command'])
     assert_false(os.path.exists(tempfile))
 
     # test dry python function call

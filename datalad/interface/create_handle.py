@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for collection creation
+"""High-level interface for handle creation
 
 """
 
@@ -19,37 +19,32 @@ from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.handlerepo import HandleRepo
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
 
 
-class CreateCollection(Interface):
-    """Creates a new collection."""
+class CreateHandle(Interface):
+    """Creates a new handle."""
     _params_ = dict(
         path=Parameter(
             args=('path',),
             nargs='?',
-            doc="path where to create the collection",
+            doc="path where to create the handle",
             constraints=EnsureStr()),
         name=Parameter(
             args=('name',),
             nargs='?',
-            doc="name of the collection; if no name is given the name of the "
+            doc="name of the handle; if no name is given the name of the "
                 "destination directory is used.",
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, path=curdir, name=None):
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
-        # create the collection:
-        new_collection = CollectionRepo(abspath(expandvars(expanduser(path))),
-                                        name=name, create=True)
-        # TODO: Move the abspath conversion to a constraint!
-        # Additionally (or instead?) check for validity: existing directory or
-        # just non-existing.
+                                          'localcollection'), create=True)
 
-        # register with local master:
-        local_master.git_remote_add(new_collection.name, new_collection.path)
-        local_master.git_fetch(new_collection.name)
+        new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
+                                name=name, create=True)
+        local_master.add_handle(new_handle, name=name)

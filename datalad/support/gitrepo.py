@@ -25,7 +25,7 @@ from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
-from ..utils import optional_args
+from ..utils import optional_args, on_windows
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -253,9 +253,6 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-        r = Repo()
-        r.index.diff()
-
     @normalize_paths
     def git_add(self, files):
         """Adds file(s) to the repository.
@@ -352,7 +349,7 @@ class GitRepo(object):
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
         return [branch.strip() for branch in
-                self.repo.git.branch(r=True).split(linesep)]
+                self.repo.git.branch(r=True).splitlines()]
 
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
@@ -384,7 +381,8 @@ class GitRepo(object):
         stdout, stderr
         """
         
-        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        cmd = shlex.split(cmd_str + " " + " ".join(files),
+                          posix=not on_windows)
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
@@ -412,7 +410,7 @@ class GitRepo(object):
         v = "-v" if verbose else ""
         out, err = self._git_custom_command('', 'git remote %s show %s' %
                                             (v, name))
-        return out.rstrip(linesep).split(linesep)
+        return out.rstrip(linesep).splitlines()
 
     def git_remote_update(self, name='', verbose=False):
         """
@@ -473,7 +471,7 @@ class GitRepo(object):
         """
         cmd_str = 'git ls-tree -r ' + branch
         out, err = self._git_custom_command('', cmd_str)
-        return [line.split('\t')[1] for line in out.rstrip(linesep).split(linesep)]
+        return [line.split('\t')[1] for line in out.rstrip(linesep).splitlines()]
 
 
         # Only local branches: How to get from remote branches in a similar way?
@@ -492,7 +490,7 @@ class GitRepo(object):
 
         out, err = self._git_custom_command(
             '', 'git cat-file blob %s:%s' % (branch, file_))
-        return out.rstrip(linesep).split(linesep)
+        return out.rstrip(linesep).splitlines()
 
     def git_merge(self, name):
         self._git_custom_command('', 'git merge %s' % name)

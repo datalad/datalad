@@ -120,7 +120,6 @@ class HandleRepo(AnnexRepo):
 
         self.datalad_path = HANDLE_META_DIR
         self._cfg_file = opj(HANDLE_META_DIR, REPO_CONFIG_FILE)
-        config_key = REPO_CONFIG_FILE
         self._md_file = opj(HANDLE_META_DIR, REPO_STD_META_FILE)
 
         if create:
@@ -135,10 +134,11 @@ class HandleRepo(AnnexRepo):
             graphs = importer.get_graphs()
 
             # if there is no name statement, add it:
-            if len([subj for subj in graphs[REPO_CONFIG_FILE[0:-4]].objects(DLNS.this,
-                                                              RDFS.label)]) == 0:
-                graphs[REPO_CONFIG_FILE[0:-4]].add((DLNS.this, RDFS.label,
-                                      Literal(name or basename(self.path))))
+            if len([subj for subj in graphs[REPO_CONFIG_FILE[0:-4]].objects(
+                    DLNS.this, RDFS.label)]) == 0:
+                graphs[REPO_CONFIG_FILE[0:-4]].add(
+                    (DLNS.this, RDFS.label,
+                     Literal(name or basename(self.path))))
 
             importer.set_graphs(graphs)  # necessary?
             importer.store_data(opj(self.path, HANDLE_META_DIR))

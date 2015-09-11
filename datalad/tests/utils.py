@@ -88,7 +88,7 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 
 
 def ok_clean_git_annex_proxy(path):
@@ -135,9 +135,14 @@ def ok_clean_git(path, annex=True, untracked=[]):
 
 
 def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepoOld(path)
+    repo = AnnexRepo(path)
     assert(filename in repo.get_indexed_files())  # file is known to Git
-    assert(annexed == os.path.islink(opj(path, filename)))
+    try:
+        repo.get_file_key(filename)
+        in_annex = True
+    except FileNotInAnnexError as e:
+        in_annex = False
+    assert(annexed == in_annex)
 
 #
 # Helpers to test symlinks
