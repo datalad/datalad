@@ -64,8 +64,97 @@ class PublishCollection(Interface):
     def __call__(self, target, collection=curdir, baseurl=None,
                  remote_name=None):
 
+        # ssh-target: ssh://someone@somewhere/deeper/in/there
+
         local_collection_repo = get_repo_instance(
             abspath(expandvars(expanduser(collection))), CollectionRepo)
+
+        parsed_target = urlparse(target)  # => scheme, path
+
+        from ..cmd import Runner
+        runner = Runner()
+        if parsed_target.scheme == 'ssh':
+            if parsed_target.netloc == '':
+                raise RuntimeError("Invalid ssh address: %s" % target)
+            # build control master:
+            import os.path
+            import os
+
+            # For now, not really cross-platform:
+            user_home = os.path.expanduser('~')  #  This has to be available somewhere!
+            cm_path = opj(user_home, '.ssh', 'controlmasters')
+            ssh_cmd_opt = "-S %s/%s:%d %s" % (cm_path,
+                                              parsed_target.netloc,
+                                              22 if parsed_target.port is None
+                                              else parsed_target.port,
+                                              parsed_target.hostname)
+            runner.run("ssh -M %s" % ssh_cmd_opt)
+
+            # TODO: copy script to server:
+            # TODO: run it:
+            # arguments:
+            # parsed_target.path
+            # "DATALAD_COL_" + local_collection_repo.name
+            # local_collection_repo.get_handle_list()
+
+            out, err = runner.run("ssh %s ....." % ssh_cmd_opt)
+
+            # set GIT-SSH:
+            os.environ['GIT_SSH'] = "ssh %s" % ' '.join(ssh_cmd_opt)
+
+        elif parsed_target.scheme == 'file' or parsed_target.scheme == '':
+
+            # TODO: run the script:
+            # arguments:
+            # parsed_target.path
+            # "DATALAD_COL_" + local_collection_repo.name
+            # local_collection_repo.get_handle_list()
+
+            out, err = runner.run("....")
+
+        else:
+            raise RuntimeError("Don't know scheme '%s'." %
+                               parsed_target.scheme)
+
+        # check output:
+        results = parse_script_output(out, err)
+
+        script_failed = False
+        for name in local_collection_repo.get_handle_list() + \
+                ["DATALAD_COL_" + local_collection_repo.name]:
+            if not results[name].ok:
+                lgr.error("Server setup for %s failed." % name)
+                script_failed = True
+        # exit here, if something went wrong:
+        if script_failed:
+            raise RuntimeError("Server setup failed.")
+
+        # Now, all the handles:
+        from .publish_handle import PublishHandle
+        handle_publisher = PublishHandle()
+        for handle_name in local_collection_repo.get_handle_list():
+
+            # get location:
+            handle_loc = urlparse(CollectionRepoHandleBackend(
+                local_collection_repo, handle_name).url).path
+            # raise exception if there's no handle at that location:
+            try:
+                handle_repo = get_repo_instance(handle_loc, HandleRepo)
+            except RuntimeError as e:
+                lgr.error("No handle available at %s. Skip." % handle_loc)
+                raise e
+
+            handle_target = opj(target, handle_name)
+
+
+            handle_publisher(handle_target, handle=handle_loc,
+                             url=baseurl + '/' + handle_name)
+
+
+        # check succes => go on with collection
+
+
+
 
         # first try: local path
         if not isdir(abspath(expandvars(expanduser(target)))):
@@ -80,6 +169,7 @@ class PublishCollection(Interface):
 
         # prepare publish branch in local collection:
         # check for existing publish branches:
+        # TODO: hash + delete on success
         num_pub = len([b for b in local_collection_repo.git_get_branches()
                       if b.startswith("publish")])
         p_branch = "publish%d" % (num_pub + 1)
@@ -114,13 +204,14 @@ class PublishCollection(Interface):
             graphs[REPO_STD_META_FILE[0:-4]].remove((new_uri, DCTERMS.hasPart, o))
             graphs[REPO_STD_META_FILE[0:-4]].add((new_uri, DCTERMS.hasPart, o_new))
 
+        # TODO: add commit reference
+
+
         importer.store_data(local_collection_repo.path)
         [local_collection_repo.git_add(graph_name + '.ttl')
          for graph_name in graphs]
         local_collection_repo.git_commit("metadata prepared for publishing")
 
-        # create target repository:
-        published_collection = GitRepo(collection_target, create=True)
 
         # add as remote to local:
         if remote_name is None:
@@ -134,31 +225,8 @@ class PublishCollection(Interface):
         # we want to push to master, so a different branch has to be checked
         # out in target; in general we can't explicitly allow for the local
         # repo to push
-        published_collection.git_checkout("TEMP", '-b')
         local_collection_repo.git_push("%s +%s:master" % (remote_name, p_branch))
 
         # finally:
-        published_collection.git_checkout("master")
         local_collection_repo.git_checkout("master")
-
-        # TODO: Now, all the handles:
-        from os import mkdir
-        from .publish_handle import PublishHandle
-        handle_publisher = PublishHandle()
-        for handle_name in local_collection_repo.get_handle_list():
-
-            # get location:
-            handle_loc = urlparse(CollectionRepoHandleBackend(
-                local_collection_repo, handle_name).url).path
-            # raise exception if there's no handle at that location:
-            try:
-                handle_repo = get_repo_instance(handle_loc, HandleRepo)
-            except RuntimeError as e:
-                lgr.erroe("No handle available at %s. Skip." % handle_loc)
-                raise e
-
-            handle_target = opj(target, handle_name)
-            mkdir(handle_target)
-            handle_publisher(handle_target, handle=handle_loc,
-                             url=baseurl + '/' + handle_name)
-
+        # TODO: Delete publish branch? see above
