@@ -36,6 +36,7 @@ from .upgrade_handle import UpgradeHandle
 from .search_handle import SearchHandle
 from .publish_handle import PublishHandle
 from .search_collection import SearchCollection
+from .publish_collection import PublishCollection
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -45,6 +46,7 @@ _group_collection = (
         RegisterCollection,
         UnregisterCollection,
         ListCollection,
+        PublishCollection,
     ])
 
 _group_handle = (

@@ -91,7 +91,9 @@ class PublishHandle(Interface):
 
         importer.store_data(opj(local_handle_repo.path, HANDLE_META_DIR))
         local_handle_repo.add_to_git(opj(local_handle_repo.path,
-                                         HANDLE_META_DIR))
+                                         HANDLE_META_DIR),
+                                     commit_msg="metadata prepared for "
+                                                "publishing")
 
         # create target annex:
         published_handle = AnnexRepo(target, create=True)

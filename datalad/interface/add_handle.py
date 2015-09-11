@@ -36,14 +36,14 @@ class AddHandle(Interface):
         collection=Parameter(
             doc="path to or name of the collection",
             constraints=EnsureStr()),
-        h_name=Parameter(
-            args=('h_name',),
+        name=Parameter(
+            args=('name',),
             nargs='?',
             doc="name of the handle in the collection. If no name is given, "
                 "the handle's default name is used.",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, handle, collection, h_name=None):
+    def __call__(self, handle, collection, name=None):
 
         # TODO: - add a remote handle by its url
         #       - handle and collection can be adressed via name or path/url
@@ -76,7 +76,7 @@ class AddHandle(Interface):
 
         handle_repo = HandleRepo(h_path, create=False)
         collection_repo = CollectionRepo(c_path, create=False)
-        collection_repo.add_handle(handle_repo, name=h_name)
+        collection_repo.add_handle(handle_repo, name=name)
 
         # TODO: More sophisticated: Check whether the collection is registered.
         # Might be a different name than collection_repo.name or not at all.
