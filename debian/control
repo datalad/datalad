@@ -22,7 +22,7 @@ Vcs-Browser: https://github.com/datalad/datalad/
 Package: datalad
 Architecture: all
 Depends:
- ${python:Depends}, ${misc:Depends}
+ ${python:Depends}, ${misc:Depends},
  python,
  git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
  python-git,
