@@ -46,7 +46,7 @@ class AddHandle(Interface):
     def __call__(self, handle, collection, h_name=None):
 
         # TODO: - add a remote handle by its url
-        #       - handle and collection can be adressed via name or path/url
+        #       - handle and collection can be addressed via name or path/url
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))

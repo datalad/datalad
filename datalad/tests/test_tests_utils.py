@@ -143,7 +143,7 @@ def test_get_most_obscure_supported_name():
     if platform.system() in ('Linux', 'Darwin'):
         eq_(n, OBSCURE_FILENAMES[1])
     else:
-        # ATM noone else is as good
+        # ATM no one else is as good
         ok_(n in OBSCURE_FILENAMES[2:])
 
 

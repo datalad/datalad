@@ -37,7 +37,7 @@ class InstallHandle(Interface):
         handle=Parameter(
             doc="name or url of the handle to install; in case of  a name this "
                 "is expected to state the name of the collection the handle is "
-                "in, followed by the handle's name, seperated by '/'.",
+                "in, followed by the handle's name, separated by '/'.",
             constraints=EnsureStr()),
         path=Parameter(
             args=('path',),
@@ -67,7 +67,7 @@ class InstallHandle(Interface):
         if parts[0] in local_master.git_get_remotes() \
                 and len(parts) >= 2:
             # 'handle' starts with a name of a known collection, followed by at
-            # least a second part, seperated by '/'.
+            # least a second part, separated by '/'.
             # Therefore assuming it's a handle's key, not an url
 
             url = CollectionRepoHandleBackend(repo=local_master,

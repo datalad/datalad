@@ -132,7 +132,7 @@ and then use that virtual environment to run the tests, via
 python -m nose -s -v datalad
 ```
 
-or similiarly,
+or similarly,
 
 ```sh
 nosetests -s -v datalad
