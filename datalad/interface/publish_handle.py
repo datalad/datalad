@@ -116,11 +116,8 @@ class PublishHandle(Interface):
         # published_handle._git_custom_command('', "git branch -D TEMP")
         # "TEMP" not found? => because it's empty?
 
-        # 2. sync, to get locations for files, that are not present in
-        # local handle
-        local_handle_repo._annex_custom_command('', "git annex sync %s"
-                                                % remote)
-        published_handle._annex_custom_command('', "git annex sync")
+        # 2. push git-annex branch
+        local_handle_repo.git_push("%s +git-annex:git-annex" % remote)
 
         # 3. copy locally available files:
         for file in local_handle_repo.get_annexed_files():
