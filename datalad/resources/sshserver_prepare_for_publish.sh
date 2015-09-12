@@ -20,8 +20,8 @@ git_init_options=''
 git_annex_init_options=''
 
 printf "## start server capabilities ####\n"
-printf "DATALAD_GIT_VERSION: %s DATALAD_END\n" `git --version`
-printf "DATALAD_GIT_ANNEX_VERSION: %s DATALAD_END\n" `git annex version`
+printf "DATALAD_GIT_VERSION: %s DATALAD_END\n" "`git --version`"
+printf "DATALAD_GIT_ANNEX_VERSION: %s DATALAD_END\n" "`git annex version`"
 printf "## end server capabilities ####\n"
 
 mkdir -p "$ROOT_PATH"
@@ -29,7 +29,11 @@ cd "$ROOT_PATH"
 [ -d "$COL_REPO_NAME" ] && printf "error: target '%s' exists\n" "$COL_REPO_NAME" && exit 1
 mkdir -p "$COL_REPO_NAME"
 git -C "$COL_REPO_NAME" init $git_init_options
-printf "DATALAD_COLLECTION_REPO_%s: init\n" "$COL_REPO_NAME"
+printf "DATALAD_COLLECTION_REPO_%s: init DATALAD_END\n" "$COL_REPO_NAME"
+# may be there is a better solution, but for now, checkout a temporary branch
+# to allow pushing to master
+git -C "$COL_REPO_NAME" checkout -b TEMP
+printf "DATALAD_COLLECTION_REPO_%s: checkout_tmp DATALAD_END\n" "$COL_REPO_NAME"
 
 for name in "$@"; do
     [ -d "$name" ] && printf "error: target '%s' exists\n" "$name" && exit 1
@@ -39,7 +43,9 @@ for name in "$@"; do
     curdir=$PWD
     cd "$name"
     git annex init $git_annex_init_options \
-        && printf "DATALAD_HANDLE_REPO_%s: annex_init DATALAD_END\nDATALAD_HANDLE_REPO_INFO_%s: %s DATALAD_END\n" \ "$name" "$name" `git annex info`
+        && printf "DATALAD_HANDLE_REPO_%s: annex_init DATALAD_END\nDATALAD_HANDLE_REPO_INFO_%s: %s DATALAD_END\n" \ "$name" "$name" "`git annex info`" \
         || printf "DATALAD_HANDLE_REPO_%s: annex_init_error DATALAD_END\n" "$name"
+    git checkout -b TEMP
+    printf "DATALAD_HANDLE_REPO_%s: checkout_tmp DATALAD_END\n" "$name"
     cd "$curdir"
 done

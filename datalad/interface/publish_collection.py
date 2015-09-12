@@ -46,11 +46,11 @@ def parse_script_output(out, err):
         if entry.startswith("_INFO"):
             continue
         else:
-            results[entry[20:-24]] = dict()
+            results[entry[20:-1]] = dict()
 
     hdl_p = re.compile("DATALAD_HANDLE_REPO_.+?: init DATALAD_END")
     for entry in re.findall(hdl_p, out):
-        results[entry[20:-24]]['init'] = True
+        results[entry[20:-18]]['init'] = True
 
     hdl_p = re.compile("DATALAD_HANDLE_REPO_.+?: annex_init DATALAD_END")
     for entry in re.findall(hdl_p, out):
@@ -101,7 +101,11 @@ class PublishCollection(Interface):
 
         if baseurl is None:
             baseurl = parsed_target.path  # correct?
-        collection_url = baseurl + '/' + local_collection_repo.name
+        collection_url = baseurl + '/' + "DATALAD_COL_" + local_collection_repo.name
+
+        from pkg_resources import resource_filename
+        prepare_script_path = resource_filename('datalad', 'resources/sshserver_prepare_for_publish.sh')
+        cleanup_script_path = resource_filename('datalad', 'resources/sshserver_cleanup_after_publish.sh')
 
         from ..cmd import Runner
         runner = Runner()
@@ -113,7 +117,7 @@ class PublishCollection(Interface):
             import os
 
             # For now, not really cross-platform:
-            user_home = os.path.expanduser('~')  #  This has to be available somewhere!
+            user_home = os.path.expanduser('~')  # This has to be available somewhere!
             cm_path = opj(user_home, '.ssh', 'controlmasters')
             ssh_cmd_opt = "-S %s/%s:%d %s" % (cm_path,
                                               parsed_target.netloc,
@@ -122,14 +126,16 @@ class PublishCollection(Interface):
                                               parsed_target.hostname)
             runner.run("ssh -M %s" % ssh_cmd_opt)
 
-            # TODO: copy script to server:
-            # TODO: run it:
-            # arguments:
-            # parsed_target.path
-            # "DATALAD_COL_" + local_collection_repo.name
-            # local_collection_repo.get_handle_list()
+            # TODO: copy scripts to server:
+            prepare_script_path_remote = '?'
+            cleanup_script_path_remote = '?'
 
-            out, err = runner.run("ssh %s ....." % ssh_cmd_opt)
+            # run it:
+            out, err = runner.run(["ssh", ssh_cmd_opt, "sh",
+                                  prepare_script_path_remote,
+                                  parsed_target.path,
+                                  "DATALAD_COL_" + local_collection_repo.name]
+                                  + local_collection_repo.get_handle_list())
 
             # set GIT-SSH:
             os.environ['GIT_SSH'] = "ssh %s" % ' '.join(ssh_cmd_opt)
@@ -145,7 +151,10 @@ class PublishCollection(Interface):
             # "DATALAD_COL_" + local_collection_repo.name
             # local_collection_repo.get_handle_list()
 
-            out, err = runner.run("....")
+            out, err = runner.run(["sh", prepare_script_path,
+                                   parsed_target.path,
+                                   "DATALAD_COL_" + local_collection_repo.name]
+                                  + local_collection_repo.get_handle_list())
 
         else:
             raise RuntimeError("Don't know scheme '%s'." %
@@ -245,6 +254,19 @@ class PublishCollection(Interface):
         # repo to push
         local_collection_repo.git_push("%s +%s:master" % (remote_name, p_branch))
 
-        # finally:
+        # checkout master in local collection:
         local_collection_repo.git_checkout("master")
         # TODO: Delete publish branch? see above
+
+        # checkout master in published collection:
+        if parsed_target.scheme == 'ssh':
+            out, err = runner.run(["ssh", ssh_cmd_opt, "sh",
+                                  cleanup_script_path_remote,
+                                  parsed_target.path,
+                                  "DATALAD_COL_" + local_collection_repo.name]
+                                  + local_collection_repo.get_handle_list())
+        else:
+            out, err = runner.run(["sh", cleanup_script_path,
+                                   parsed_target.path,
+                                   "DATALAD_COL_" + local_collection_repo.name]
+                                  + local_collection_repo.get_handle_list())
