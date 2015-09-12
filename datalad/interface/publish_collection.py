@@ -92,10 +92,24 @@ class PublishCollection(Interface):
     def __call__(self, target, collection=curdir, baseurl=None,
                  remote_name=None):
 
+        # Note:
         # ssh-target: ssh://someone@somewhere/deeper/in/there
 
+        local_master = CollectionRepo(opj(dirs.user_data_dir,
+                                          'localcollection'))
+
+        if isdir(abspath(expandvars(expanduser(collection)))):
+            c_path = abspath(expandvars(expanduser(collection)))
+        elif collection in local_master.git_get_remotes():
+            c_path = urlparse(local_master.git_get_remote_url(collection)).path
+            if not isdir(c_path):
+                raise RuntimeError("Invalid path to collection '%s':\n%s" %
+                                   (collection, c_path))
+        else:
+            raise RuntimeError("Unknown collection '%s'." % collection)
+
         local_collection_repo = get_repo_instance(
-            abspath(expandvars(expanduser(collection))), CollectionRepo)
+            abspath(expandvars(expanduser(c_path))), CollectionRepo)
 
         parsed_target = urlparse(target)  # => scheme, path
 
