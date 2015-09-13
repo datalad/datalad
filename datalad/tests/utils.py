@@ -469,7 +469,12 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
         flavors_ = _get_resolved_flavors(flavors)
 
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
-        assert(testrepos_uris)
+        # MIH: I don't think we can assert that there always is a testrepo
+        # for network test when NONETWORK is given, this list will be empty
+        # will change it to skipping the test. Remove on ACK.
+        #assert(testrepos_uris)
+        if not len(testrepos_uris):
+            raise SkipTest
 
         for uri in testrepos_uris:
             if __debug__:

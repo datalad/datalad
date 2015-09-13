@@ -48,7 +48,8 @@ def test_local_master(m_path):
 
 @with_tempfile
 def test_register_collection(m_path):
-
+    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        raise SkipTest
     test_url = "https://github.com/bpoldrack/ExampleCollection.git"
     test_name = test_url.split('/')[-1].rstrip('.git')
     assert_equal(test_name, 'ExampleCollection')
@@ -190,6 +191,8 @@ def test_install_handle(m_path, c_path, h_path, install_path):
 
 @with_tempfile
 def test_unregister_collection(m_path):
+    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        raise SkipTest
 
     # setup:
     m_path = opj(m_path, 'localcollection')

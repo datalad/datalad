@@ -15,6 +15,7 @@ from os.path import join as opj, exists
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_in, assert_false
+from nose import SkipTest
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
 from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
@@ -245,6 +246,9 @@ def test_GitRepo_remote_add(orig_path, path):
     assert_in('origin', out)
     assert_in('github', out)
     assert_equal(len(out), 2)
+    # until here is actually doesn't need network access
+    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        raise SkipTest
     out = gr.git_remote_show('github')
     assert_in('  Fetch URL: git://github.com/datalad/testrepo--basic--r1', out)
 

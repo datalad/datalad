@@ -16,6 +16,7 @@ from six import PY3
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
+from nose import SkipTest
 
 from ..support.annexrepo import AnnexRepo, kwargs_to_options, GitRepo
 from ..support.exceptions import CommandNotAvailableError, \
@@ -242,6 +243,8 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_web_remote(src, dst):
+    if os.environ.get('DATALAD_TESTS_NONETWORK'):
+        raise SkipTest
 
     ar = AnnexRepo(dst, src)
 
