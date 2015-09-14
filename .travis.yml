@@ -17,6 +17,9 @@ matrix:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
+  - python: 2.7
+    env:
+    - DATALAD_TESTS_NONETWORK=1
   - python: 3.3
   - python: 3.4
 # not there -- don't try!
@@ -42,6 +45,7 @@ install:
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
 
 script:
+  - ifconfig
   - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
 
 after_success:
