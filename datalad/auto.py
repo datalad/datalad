@@ -63,8 +63,8 @@ class AutomagicIO(object):
     def active(self):
         return self._active
 
-    def _open(self, *args, **kwargs):
-        """Proxy for open
+    def _open_name_mode(self, *args, **kwargs):
+        """Proxy for various "open" which have first argument name and 2nd - mode
 
         """
         # wrap it all for resilience to errors -- proxying must do no harm!
@@ -90,9 +90,6 @@ class AutomagicIO(object):
                         raise _EarlyExit
                     file = kwargs.get(filearg)
 
-                if not _is_file_under_git(file):
-                    raise _EarlyExit  # just to proceed to stock open
-
                 mode = 'r'
                 if len(args) > 1:
                     mode = args[1]
@@ -100,16 +97,7 @@ class AutomagicIO(object):
                     mode = kwargs['mode']
 
                 if 'r' in mode:
-                    # deduce directory for file
-                    filedir = dirname(file)
-                    repotop = GitRepo.get_toppath(filedir)
-                    # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
-                    # see https://github.com/datalad/datalad/issues/204
-                    annex = AnnexRepo(repotop, create=True) # if got there -- must be a git repo
-                    # either it has content
-                    if not annex.file_has_content(file):
-                        lgr.info("File %s has no content -- retrieving", file)
-                        annex.annex_get(file)
+                    self._handle_auto_get(file)
                 else:
                     lgr.debug("Skipping operation on %s since mode=%r", file, mode)
         except _EarlyExit:
@@ -123,12 +111,28 @@ class AutomagicIO(object):
         # finally give it back to stock open
         return self._builtin_open(*args, **kwargs)
 
+    def _handle_auto_get(self, filepath):
+        """Verify that filepath is under annex, and if so and not present - get it"""
+
+        if not self._autoget or not _is_file_under_git(filepath):
+            return
+        # deduce directory for filepath
+        filedir = dirname(filepath)
+        repotop = GitRepo.get_toppath(filedir)
+        # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
+        # see https://github.com/datalad/datalad/issues/204
+        annex = AnnexRepo(repotop, create=True)  # if got there -- must be a git repo
+        # either it has content
+        if not annex.file_has_content(filepath):
+            lgr.info("File %s has no content -- retrieving", filepath)
+            annex.annex_get(filepath)
+
     def activate(self):
         if self.active:
             lgr.warning("%s already active. No action taken" % self)
             return
         # overloads
-        __builtin__.open = self._open
+        __builtin__.open = self._open_name_mode
         self._active = True
 
     def deactivate(self):
