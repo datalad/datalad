@@ -45,10 +45,11 @@ install:
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
 
 script:
-  - ifconfig
+  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then `tools/testing/travis_ifdown_nonlo.sh down`; fi
   - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
 
 after_success:
+  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then tools/testing/travis_ifdown_nonlo.sh up; fi
   - coveralls
 
 after_failure:
