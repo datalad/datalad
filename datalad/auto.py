@@ -12,6 +12,7 @@
 from mock import patch
 from six import PY2
 import six.moves.builtins as __builtin__
+builtins_name = '__builtin__' if PY2 else 'builtins'
 
 import logging
 
@@ -74,7 +75,7 @@ class AutomagicIO(object):
             self._in_open = True  # just in case someone kept alias/assignment
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
-            with patch('__builtin__.open', self._builtin_open):
+            with patch('%s.open' % builtins_name, self._builtin_open):
                 lgr.log(1, "Proxying open with %r %r", args, kwargs)
 
                 # had to go with *args since in PY2 it is name, in PY3 file
