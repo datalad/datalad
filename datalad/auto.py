@@ -14,6 +14,11 @@ from six import PY2
 import six.moves.builtins as __builtin__
 builtins_name = '__builtin__' if PY2 else 'builtins'
 
+try:
+    import h5py
+except ImportError:
+    h5py = None
+
 import logging
 
 from os.path import dirname, abspath, pardir, join as opj, exists, basename
@@ -47,14 +52,29 @@ class _EarlyExit(Exception):
     pass
 
 class AutomagicIO(object):
+    """Class to proxy commonly used API for accessing files so they get automatically fetched
+
+    Currently supports builtin open() and h5py.File when those are read
+    """
 
     def __init__(self, autoget=True, activate=False):
         self._active = False
         self._builtin_open = __builtin__.open
+        if h5py:
+            self._h5py_File = h5py.File
+        else:
+            self._h5py_File = None
         self._autoget = autoget
         self._in_open = False
         if activate:
             self.activate()
+
+    def __enter__(self):
+        self.activate()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.deactivate()
 
     @property
     def autoget(self):
@@ -64,7 +84,7 @@ class AutomagicIO(object):
     def active(self):
         return self._active
 
-    def _open_name_mode(self, *args, **kwargs):
+    def _proxy_open_name_mode(self, origname, origfunc, *args, **kwargs):
         """Proxy for various "open" which have first argument name and 2nd - mode
 
         """
@@ -75,7 +95,7 @@ class AutomagicIO(object):
             self._in_open = True  # just in case someone kept alias/assignment
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
-            with patch('%s.open' % builtins_name, self._builtin_open):
+            with patch(origname, origfunc):
                 lgr.log(1, "Proxying open with %r %r", args, kwargs)
 
                 # had to go with *args since in PY2 it is name, in PY3 file
@@ -105,12 +125,20 @@ class AutomagicIO(object):
             pass
         except Exception as e:
             # If anything goes wrong -- we should complain and proceed
-            with patch('__builtin__.open', self._builtin_open):
+            with patch(origname, origfunc):
                 lgr.warning("Failed proxying open with %r, %r: %s", args, kwargs, e)
         finally:
             self._in_open = False
         # finally give it back to stock open
-        return self._builtin_open(*args, **kwargs)
+        return origfunc(*args, **kwargs)
+
+    def _proxy_open(self, *args, **kwargs):
+        return self._proxy_open_name_mode(builtins_name + '.open', self._builtin_open,
+                                          *args, **kwargs)
+
+    def _proxy_h5py_File(self, *args, **kwargs):
+        return self._proxy_open_name_mode('h5py.File', self._h5py_File,
+                                          *args, **kwargs)
 
     def _handle_auto_get(self, filepath):
         """Verify that filepath is under annex, and if so and not present - get it"""
@@ -133,7 +161,9 @@ class AutomagicIO(object):
             lgr.warning("%s already active. No action taken" % self)
             return
         # overloads
-        __builtin__.open = self._open_name_mode
+        __builtin__.open = self._proxy_open
+        if h5py:
+            h5py.File = self._proxy_h5py_File
         self._active = True
 
     def deactivate(self):
@@ -141,6 +171,8 @@ class AutomagicIO(object):
             lgr.warning("%s is not active, can't deactivate" % self)
             return
         __builtin__.open = self._builtin_open
+        if h5py:
+            h5py.File = self._h5py_File
         self._active = False
 
     def __del__(self):
