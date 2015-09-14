@@ -24,9 +24,11 @@ from functools import wraps
 from git import Repo
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
+from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
 from ..utils import optional_args, on_windows
+from ..utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -256,6 +258,24 @@ class GitRepo(object):
                     InvalidGitRepositoryError) as e:
                 lgr.error(str(e))
                 raise
+
+    @classmethod
+    def get_toppath(cls, path):
+        """Return top-level of a repository given the path.
+
+        If path has symlinks -- they get resolved.
+
+        Returns None if not under git
+        """
+        try:
+            toppath, err = Runner().run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=path,
+                log_stdout=True, log_stderr=True,
+                expect_fail=True, expect_stderr=True)
+            return toppath.rstrip('\n\r')
+        except CommandError:
+            return None
 
     @normalize_paths
     def git_add(self, files):

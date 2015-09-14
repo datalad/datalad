@@ -11,7 +11,7 @@
 """
 
 import os
-from os.path import join as opj, exists
+from os.path import join as opj, exists, realpath
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_in, assert_false
@@ -397,8 +397,17 @@ def test_GitRepo_get_files(src, path, path2clone):
     #gr2.git_fetch('remoterepo')
 
 
-
-
+@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile(mkdir=True)
+def test_GitRepo_get_toppath(repo, tempdir):
+    reporeal = realpath(repo)
+    assert_equal(GitRepo.get_toppath(repo), reporeal)
+    # Generate some nested directory
+    nested = opj(repo, "d1", "d2")
+    os.makedirs(nested)
+    assert_equal(GitRepo.get_toppath(nested), reporeal)
+    # and if not under git, should return None
+    assert_equal(GitRepo.get_toppath(tempdir), None)
 
 
 # TODO:
