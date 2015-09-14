@@ -491,6 +491,15 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
     return newfunc
 with_testrepos.__test__ = False
 
+def skip_if_no_network(func):
+    """Skip test completely in NONETWORK settings
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+            raise SkipTest("Skipping since no network settings")
+        return func(*args, **kwargs)
+    return newfunc
 
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):

@@ -32,6 +32,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
 
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
+from .utils import skip_if_no_network
 
 #
 # Test with_tempfile, especially nested invocations
@@ -91,7 +92,9 @@ def test_with_testrepos():
 
     check_with_testrepos()
 
-    eq_(len(repos), 2 if on_windows else 4)  # local, local-url, clone, network
+    eq_(len(repos),
+        2 if on_windows # TODO -- would fail now in DTGALAD_TESTS_NONETWORK mode
+          else (3 if os.environ.get('DATALAD_TESTS_NONETWORK') else 4))  # local, local-url, clone, network
 
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):
@@ -353,3 +356,17 @@ def test_assert_re_in():
 
     # shouldn't "match" the emty list
     assert_raises(AssertionError, assert_re_in, "", [])
+
+
+def test_skip_if_no_network():
+    cleaned_env = os.environ.copy()
+    cleaned_env.pop('DATALAD_TESTS_NONETWORK', None)
+    # we need to run under cleaned env to make sure we actually test in both conditions
+    with patch('os.environ', cleaned_env):
+        @skip_if_no_network
+        def somefunc(a1):
+            return a1
+        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+            assert_raises(SkipTest, somefunc, 1)
+        with patch.dict('os.environ', {}):
+            eq_(somefunc(1), 1)
