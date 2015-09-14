@@ -360,7 +360,8 @@ def with_tempfile(t, *targs, **tkwargs):
 def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
     #           if flavors == 'auto' else flavors
-    flavors_ = (['local', 'clone', 'local-url'] if not on_windows else ['network', 'network-clone']) \
+    flavors_ = (['local', 'clone', 'local-url', 'network'] if not on_windows
+                else ['network', 'network-clone']) \
                if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
