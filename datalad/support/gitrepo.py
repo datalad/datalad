@@ -14,6 +14,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 from os import getcwd, linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
+from os.path import dirname, basename
 import logging
 import shlex
 from six import string_types
@@ -69,7 +70,10 @@ def _normalize_path(base_dir, path):
     # But we don't want to realpath relative paths, in case cwd isn't the correct base.
 
     if isabs(path):
-        path = realpath(path)
+        # path might already be a symlink pointing to annex etc,
+        # so realpath only its directory, to get "inline" with realpath(base_dir)
+        # above
+        path = opj(realpath(dirname(path)), basename(path))
         if commonprefix([path, base_dir]) != base_dir:
             raise FileNotInRepositoryError(msg="Path outside repository: %s"
                                                % path, filename=path)
