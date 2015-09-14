@@ -470,7 +470,13 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
         flavors_ = _get_resolved_flavors(flavors)
 
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
-        assert(testrepos_uris)
+        # we should always have at least one repo to test on, unless explicitly only
+        # network was requested by we are running without networked tests
+        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
+            assert(testrepos_uris)
+        else:
+            if not testrepos_uris:
+                raise SkipTest("No non-networked repos to test on")
 
         for uri in testrepos_uris:
             if __debug__:
