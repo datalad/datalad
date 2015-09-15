@@ -53,14 +53,12 @@ def setup_parser():
     # main parser
     parser = argparse.ArgumentParser(
         fromfile_prefix_chars='@',
-        # Default usage is too heavy
-        usage="datalad [global-opts] command [command-opts]",
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
             DataLad provides a unified data distribution with the convenience of git-annex
             repositories as a backend.  datalad command line tool allows to manipulate
             (obtain, create, update, publish, etc.) datasets and their collections."""),
-        epilog='DataLad v%s "Control Your Data"' % datalad.__version__,
+        epilog='"Control Your Data"',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False)
     # common options

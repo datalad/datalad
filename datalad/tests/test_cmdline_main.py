@@ -65,10 +65,17 @@ def test_version():
     in_("Permission is hereby granted", out)
 
 
-def test_help():
-    stdout, stderr = run_main(['--help'])
+def test_help_np():
+    stdout, stderr = run_main(['--help-np'])
 
     # Let's extract section titles:
-    sections = list(filter(re.compile('[a-zA-Z ]{4,50}:').match, stdout.split('\n')))
-    ok_(sections[0].startswith('Usage:'))  # == Usage: nosetests [-h] if running using nose
-    assert_equal(sections[1:], ['Positional arguments:', 'Options:'])
+    # enough of bin/datalad and .tox/py27/bin/datalad -- guarantee consistency! ;)
+    ok_(stdout.startswith('Usage: datalad'))
+    # Sections start/end with * in --help-np mode
+    sections = [l[1:-1] for l in filter(re.compile('^\*.*\*$').match, stdout.split('\n'))]
+    assert_equal(sections,
+                 ['Commands for collection handling',
+                  'Commands for handle operations',
+                  'Miscellaneous commands',
+                  'General information',
+                  'Global options'])
