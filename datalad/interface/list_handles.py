@@ -25,7 +25,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class ListHandles(Interface):
-    """list all locally installed handles."""
+    """List all locally installed handles."""
 
     def __call__(self):
 

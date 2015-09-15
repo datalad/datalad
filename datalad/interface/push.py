@@ -21,7 +21,7 @@ from ..log import lgr
 
 
 class Push(Interface):
-    """Get changes froma remote repository.
+    """Push changes to a remote repository.
 
     Examples:
 

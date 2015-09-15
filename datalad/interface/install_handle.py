@@ -27,8 +27,9 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class InstallHandle(Interface):
-    """Installs a handle.
-        Examples:
+    """Install a handle.
+
+    Examples:
 
     $ datalad install-handle http://psydata.ovgu.de/forrest_gump/.git /foo/bar
     $ datalad install-handle MyCoolCollection/EvenCoolerHandle /foo/bar

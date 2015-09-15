@@ -21,7 +21,7 @@ from ..log import lgr
 
 
 class Pull(Interface):
-    """Get changes froma remote repository.
+    """Get changes from a remote repository.
 
     Examples:
 
