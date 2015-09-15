@@ -53,15 +53,14 @@ def setup_parser():
     # main parser
     parser = argparse.ArgumentParser(
         fromfile_prefix_chars='@',
+        # Default usage is too heavy
+        usage="datalad [global-opts] command [command-opts]",
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
-    DataLad aims to expose (scientific) data available online as a unified data
-    distribution with the convenience of git-annex repositories as a backend.
-
-    datalad command line tool facilitates initial construction and update of
-    harvested online datasets.  It supports following commands
-    """),
-        epilog='"Control Your Data"',
+            DataLad provides a unified data distribution with the convenience of git-annex
+            repositories as a backend.  datalad command line tool allows to manipulate
+            (obtain, create, update, publish, etc.) datasets and their collections."""),
+        epilog='DataLad v%s "Control Your Data"' % datalad.__version__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False)
     # common options
@@ -91,7 +90,7 @@ def setup_parser():
     #                         only warnings and errors are printed.""")
 
     # subparsers
-    subparsers = parser.add_subparsers()
+    subparsers = parser.add_subparsers(title="Commands summary")
 
     # auto detect all available interfaces and generate a function-based
     # API from them
@@ -143,20 +142,20 @@ def setup_parser():
 
         cmd_summary.append('\n%s\n' % (grp_descr,))
         for cd in grp_cmds:
-            cmd_summary.append('  %s\n%s\n\n'
+            cmd_summary.append('  - %s:  %s'
                                % (cd[0],
                                   textwrap.fill(
-                                      cd[1],
+                                      cd[1].rstrip(' .'),
                                       75,
-                                      initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 4)))
+                                      #initial_indent=' ' * 4,
+                                      subsequent_indent=' ' * 8)))
     parser.description = '%s\n%s\n\n%s' \
         % (parser.description,
            '\n'.join(cmd_summary),
            textwrap.fill(dedent_docstring("""\
     Detailed usage information for individual commands is
-    available via command-specific help options, i.e.:
-    %s <command> --help""") % sys.argv[0],
+    available via command-specific --help, i.e.:
+    datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
     return parser
 
