@@ -25,8 +25,8 @@ class Push(Interface):
 
     Examples:
 
-    ~/MyRepository $ datalad push
-    ~/MyRepository $ datalad push MyRemote
+      ~/MyRepository $ datalad push
+      ~/MyRepository $ datalad push MyRemote
     """
 
     _params_ = dict(

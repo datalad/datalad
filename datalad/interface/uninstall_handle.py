@@ -30,9 +30,10 @@ dirs = AppDirs("datalad", "datalad.org")
 
 class UninstallHandle(Interface):
     """Uninstalls a handle.
-        Examples:
 
-    $ datalad uninstall-handle MyCoolHandle
+    Examples:
+
+      $ datalad uninstall-handle MyCoolHandle
     """
     _params_ = dict(
         handle=Parameter(

@@ -19,7 +19,7 @@ class Crawl(Interface):
 
     Examples:
 
-    $ datalad crawl cfgs/openfmri.cfg
+      $ datalad crawl cfgs/openfmri.cfg
     """
     _params_ = dict(
         configs=Parameter(
