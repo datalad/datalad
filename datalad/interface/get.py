@@ -25,7 +25,7 @@ class Get(Interface):
 
     Examples:
 
-    $ datalad get foo/*
+      $ datalad get foo/*
     """
 
     _params_ = dict(

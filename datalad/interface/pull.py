@@ -25,8 +25,8 @@ class Pull(Interface):
 
     Examples:
 
-    ~/MyRepository $ datalad pull
-    ~/MyRepository $ datalad pull MyRemote
+      ~/MyRepository $ datalad pull
+      ~/MyRepository $ datalad pull MyRemote
     """
 
     _params_ = dict(

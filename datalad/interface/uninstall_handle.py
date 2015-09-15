@@ -33,7 +33,7 @@ class UninstallHandle(Interface):
 
     Examples:
 
-    $ datalad uninstall-handle MyCoolHandle
+      $ datalad uninstall-handle MyCoolHandle
     """
     _params_ = dict(
         handle=Parameter(

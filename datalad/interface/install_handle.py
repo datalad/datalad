@@ -31,8 +31,8 @@ class InstallHandle(Interface):
 
     Examples:
 
-    $ datalad install-handle http://psydata.ovgu.de/forrest_gump/.git /foo/bar
-    $ datalad install-handle MyCoolCollection/EvenCoolerHandle /foo/bar
+      $ datalad install-handle http://psydata.ovgu.de/forrest_gump/.git /foo/bar
+      $ datalad install-handle MyCoolCollection/EvenCoolerHandle /foo/bar
     """
     _params_ = dict(
         handle=Parameter(
