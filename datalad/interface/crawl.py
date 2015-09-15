@@ -15,7 +15,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureChoice
 
 class Crawl(Interface):
-    """Crawl a webpage and push extracted data into a handle
+    """Crawl online resource to create or update a handle.
 
     Examples:
 

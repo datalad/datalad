@@ -17,7 +17,8 @@ from nose import SkipTest
 from nose.tools import assert_raises, assert_equal, assert_false, assert_in, \
     assert_not_in
 from rdflib import Graph, Literal, URIRef
-from rdflib.namespace import FOAF
+from rdflib.plugins.parsers.notation3 import BadSyntax
+from git.exc import NoSuchPathError, InvalidGitRepositoryError
 
 from ..support.gitrepo import GitRepo
 from ..support.handlerepo import HandleRepo
@@ -30,6 +31,7 @@ from ..tests.utils import with_tempfile, with_testrepos, \
     get_most_obscure_supported_name, ok_clean_git, ok_
 from ..support.exceptions import CollectionBrokenError
 from ..utils import get_local_file_url
+from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
 
 # For now (at least) we would need to clone from the network
 # since there are troubles with submodules on Windows.
@@ -40,15 +42,14 @@ local_flavors = ['network-clone' if on_windows else 'local']
 
 @with_tempfile
 @with_tempfile
-def test_CollectionRepo_constructor(clean_path, clean_path2):
+@with_tempfile
+def test_CollectionRepo_constructor(clean_path, clean_path2, clean_path3):
     # Just a brand new CollectionRepo:
     clt = CollectionRepo(clean_path)
     clt2 = CollectionRepo(clean_path2, name='different')
 
     ok_clean_git(clean_path, annex=False)
     ok_clean_git(clean_path2, annex=False)
-    # TODO: ok_clean_git doesn't work on empty repo, due to
-    # repo.head.is_valid() returns False
 
     # test collection's name:
     assert_equal(os.path.basename(os.path.normpath(clean_path)),
@@ -56,25 +57,47 @@ def test_CollectionRepo_constructor(clean_path, clean_path2):
     assert_equal('different', clt2.name)
 
     # basic files created?
-    ok_(os.path.exists(opj(clt.path, 'datalad.ttl')), "Missing 'datalad.ttl'.")
-    ok_(os.path.exists(opj(clt.path, 'config.ttl')), "Missing 'config.ttl'.")
+    ok_(os.path.exists(opj(clt.path, REPO_STD_META_FILE)), "Missing '%s'." %
+        REPO_STD_META_FILE)
+    ok_(os.path.exists(opj(clt.path, REPO_CONFIG_FILE)), "Missing '%s'." %
+        REPO_CONFIG_FILE)
 
     # testing the actual statements stored in these files:
     # TODO: Keep this test up to date!
     # datalad.ttl
-    g_datalad = Graph().parse(opj(clean_path, 'datalad.ttl'), format="turtle")
+    g_datalad = Graph().parse(opj(clean_path, REPO_STD_META_FILE),
+                              format="turtle")
     assert_equal(len(g_datalad), 1)
     assert_in((DLNS.this, RDF.type, DLNS.Collection), g_datalad,
               "Missing DLNS.Collection statement.")
 
     # config.ttl
-    g_config = Graph().parse(opj(clean_path, 'config.ttl'), format="turtle")
+    g_config = Graph().parse(opj(clean_path, REPO_CONFIG_FILE),
+                             format="turtle")
     assert_equal(len(g_config), 2,
-                 "Unexpected number of statements in config.ttl.")
+                 "Unexpected number of statements in %s." % REPO_CONFIG_FILE)
     assert_in((DLNS.this, RDF.type, DLNS.Collection), g_config,
               "Missing DLNS.Collection statement.")
     assert_in((DLNS.this, RDFS.label, Literal(clt.name)), g_config,
               "Missing RDFS.label.")
+
+    # now, test Exceptions:
+    assert_raises(NoSuchPathError, CollectionRepo, clean_path3, create=False)
+    os.mkdir(clean_path3)
+    assert_raises(InvalidGitRepositoryError, CollectionRepo, clean_path3,
+                  create=False)
+    gr = GitRepo(clean_path3)
+    ok_(os.path.exists(opj(clean_path3, '.git')))
+    assert_raises(CollectionBrokenError, CollectionRepo, clean_path3,
+                  create=False)
+    with open(opj(clean_path3, REPO_CONFIG_FILE), 'w') as f:
+        f.write("invalid %s" % REPO_CONFIG_FILE)
+    gr.git_add(REPO_CONFIG_FILE)
+    gr.git_commit("setup invalid %s" % REPO_CONFIG_FILE)
+    assert_raises(BadSyntax, CollectionRepo, clean_path3,
+                  create=False)
+    # TODO: Provide broken testrepos for better testing;
+    # not just collection repos
 
 
 @with_tempfile
@@ -84,7 +107,7 @@ def test_CollectionRepo_name(path):
     assert_equal(clt.name,
                  os.path.basename(path))
     clt.name = "new_name"
-    assert_equal(Graph().parse(opj(path, 'config.ttl'),
+    assert_equal(Graph().parse(opj(path, REPO_CONFIG_FILE),
                                format="turtle").value(subject=DLNS.this,
                                                       predicate=RDFS.label),
                  Literal("new_name"))
@@ -126,12 +149,13 @@ def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
     # test file layout:
     ok_(os.path.exists(opj(clt.path, "first_handle")))
     ok_(os.path.isdir(opj(clt.path, "first_handle")))
-    ok_(os.path.exists(opj(clt.path, "first_handle", "datalad.ttl")))
-    ok_(os.path.exists(opj(clt.path, "first_handle", "config.ttl")))
+    ok_(os.path.exists(opj(clt.path, "first_handle", REPO_STD_META_FILE)))
+    ok_(os.path.exists(opj(clt.path, "first_handle", REPO_CONFIG_FILE)))
 
     # test statements:
     # 1. within collection level metadata:
-    g_datalad = Graph().parse(opj(clt.path, 'datalad.ttl'), format="turtle")
+    g_datalad = Graph().parse(opj(clt.path, REPO_STD_META_FILE),
+                              format="turtle")
 
     handle_uri = g_datalad.value(subject=DLNS.this, predicate=DCTERMS.hasPart)
     assert_equal(handle_uri, URIRef(get_local_file_url(handle.path)))
@@ -139,7 +163,7 @@ def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
     # Note: Use datalad/utils.py:60:def get_local_file_url(fname)
 
     # 2. handle's metadata:
-    g_config = Graph().parse(opj(clt.path, 'first_handle', 'config.ttl'),
+    g_config = Graph().parse(opj(clt.path, 'first_handle', REPO_CONFIG_FILE),
                              format="turtle")
     assert_equal(g_config.value(subject=handle_uri, predicate=RDFS.label),
                  Literal('first_handle'))
@@ -165,7 +189,8 @@ def test_CollectionRepo_remove_handle(annex_path, handle_path, clt_path):
     assert_false(os.path.exists(opj(clt_path, "MyHandle")))
 
     # test statements in collection's graph
-    g_datalad = Graph().parse(opj(clt.path, 'datalad.ttl'), format="turtle")
+    g_datalad = Graph().parse(opj(clt.path, REPO_STD_META_FILE),
+                              format="turtle")
 
     assert_equal(len(list(g_datalad.objects(subject=DLNS.this,
                                             predicate=DCTERMS.hasPart))),
@@ -296,10 +321,10 @@ def test_CollectionRepoBackend_get_collection(path, h1_path, h2_path):
 
     assert_equal(collection.identifier, Literal(clt.name))
     assert_in((DLNS.this, RDF.type, DLNS.Collection), collection)
-    assert_in((DLNS.this, DCTERMS.hasPart, URIRef(get_local_file_url(h1_path))),
-              collection)
-    assert_in((DLNS.this, DCTERMS.hasPart, URIRef(get_local_file_url(h2_path))),
-              collection)
+    assert_in((DLNS.this, DCTERMS.hasPart,
+               URIRef(get_local_file_url(h1_path))), collection)
+    assert_in((DLNS.this, DCTERMS.hasPart,
+               URIRef(get_local_file_url(h2_path))), collection)
     assert_equal(len(collection), 3)
 
 

@@ -88,7 +88,7 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 
 
 def ok_clean_git_annex_proxy(path):
@@ -135,9 +135,14 @@ def ok_clean_git(path, annex=True, untracked=[]):
 
 
 def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepoOld(path)
+    repo = AnnexRepo(path)
     assert(filename in repo.get_indexed_files())  # file is known to Git
-    assert(annexed == os.path.islink(opj(path, filename)))
+    try:
+        repo.get_file_key(filename)
+        in_annex = True
+    except FileNotInAnnexError as e:
+        in_annex = False
+    assert(annexed == in_annex)
 
 #
 # Helpers to test symlinks
@@ -355,7 +360,8 @@ def with_tempfile(t, *targs, **tkwargs):
 def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
     #           if flavors == 'auto' else flavors
-    flavors_ = (['local', 'clone', 'local-url'] if not on_windows else ['network', 'network-clone']) \
+    flavors_ = (['local', 'clone', 'local-url', 'network'] if not on_windows
+                else ['network', 'network-clone']) \
                if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
@@ -464,7 +470,13 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
         flavors_ = _get_resolved_flavors(flavors)
 
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
-        assert(testrepos_uris)
+        # we should always have at least one repo to test on, unless explicitly only
+        # network was requested by we are running without networked tests
+        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
+            assert(testrepos_uris)
+        else:
+            if not testrepos_uris:
+                raise SkipTest("No non-networked repos to test on")
 
         for uri in testrepos_uris:
             if __debug__:
@@ -479,6 +491,15 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
     return newfunc
 with_testrepos.__test__ = False
 
+def skip_if_no_network(func):
+    """Skip test completely in NONETWORK settings
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+            raise SkipTest("Skipping since no network settings")
+        return func(*args, **kwargs)
+    return newfunc
 
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):

@@ -12,7 +12,8 @@
 from os.path import join as pathjoin
 
 from .utils_testrepos import BasicTestRepo
-from .utils import with_tempfile, assert_true, ok_clean_git
+from .utils import with_tempfile, assert_true, ok_clean_git, \
+    ok_clean_git_annex_proxy
 from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
 from .utils import swallow_outputs
 from .utils import on_windows
@@ -21,10 +22,14 @@ from .utils import SkipTest
 if on_windows:
     raise SkipTest("experiencing issues on windows -- disabled for now")
 
+
 def _test_BasicTestRepo(repodir):
     trepo = BasicTestRepo(repodir)
     trepo.create()
-    ok_clean_git(trepo.path)
+    if trepo.repo.is_direct_mode():
+        ok_clean_git_annex_proxy(trepo.path)
+    else:
+        ok_clean_git(trepo.path)
     ok_file_under_git(trepo.path, 'test.dat')
     ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
     if not trepo.repo.is_crippled_fs():
@@ -34,10 +39,12 @@ def _test_BasicTestRepo(repodir):
     if not trepo.repo.is_crippled_fs():
         ok_good_symlink(pathjoin(trepo.path, 'test-annex.dat'))
 
+
 # Use of @with_tempfile() apparently is not friendly to test generators yet
 # so generating two tests manually
 def test_BasicTestRepo_random_location_generated():
     _test_BasicTestRepo(None)  # without explicit path -- must be generated
+
 
 @with_tempfile()
 def test_BasicTestRepo(path):

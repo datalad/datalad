@@ -20,7 +20,7 @@ from git.exc import GitCommandError
 from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, FOAF
 
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handlerepo import HandleRepo, HandleRepoBackend, AnnexRepo
 from ..support.exceptions import FileInGitError
 from ..support.metadatahandler import DLNS, RDFS
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
@@ -29,6 +29,7 @@ from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     get_most_obscure_supported_name, swallow_outputs, ok_
 
 from .utils import local_testrepo_flavors
+from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -78,13 +79,22 @@ def test_Handle_instance_from_existing(path):
 @with_tempfile
 def test_HandleRepo_instance_brand_new(path):
 
-    gr = HandleRepo(path)
-    assert_is_instance(gr, HandleRepo, "HandleRepo was not created.")
+    annex = AnnexRepo(path)
+    h1 = HandleRepo(path, create=False)
+    assert_is_instance(h1, HandleRepo, "HandleRepo was not created.")
+    assert_false(exists(opj(path, '.datalad')))
+    assert_false(exists(opj(path, '.datalad', REPO_STD_META_FILE)))
+    assert_false(exists(opj(path, '.datalad', REPO_CONFIG_FILE)))
+
+    h2 = HandleRepo(path)
+    assert_is_instance(h2, HandleRepo, "HandleRepo was not created.")
     assert_true(exists(opj(path, '.datalad')))
+    assert_true(exists(opj(path, '.datalad', REPO_STD_META_FILE)))
+    assert_true(exists(opj(path, '.datalad', REPO_CONFIG_FILE)))
 
 
 @ignore_nose_capturing_stdout
-@with_testrepos(flavors=['network'])
+@with_testrepos(flavors=['local', 'network'])
 @with_tempfile
 def test_HandleRepo_get(src, dst):
 
@@ -206,7 +216,7 @@ def test_HandleRepo_name(path):
     h = HandleRepo(path)
     assert_equal(h.name, basename(path))
     h.name = "new_name"
-    assert_equal(Graph().parse(opj(path, '.datalad', 'config.ttl'),
+    assert_equal(Graph().parse(opj(path, '.datalad', REPO_CONFIG_FILE),
                                format="turtle").value(subject=DLNS.this,
                                                       predicate=RDFS.label),
                  Literal("new_name"))
@@ -227,7 +237,7 @@ def test_HandleRepo_get_metadata(path):
     assert_equal(graph.identifier, URIRef(repo.name))
 
     # single file:
-    graph2 = repo.get_metadata(["datalad.ttl"])
+    graph2 = repo.get_metadata([REPO_STD_META_FILE])
     assert_in((DLNS.this, RDF.type, DLNS.Handle),
               graph2)
     assert_equal(len(graph2), 1)

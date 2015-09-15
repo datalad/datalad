@@ -25,6 +25,8 @@ from six.moves.configparser import NoOptionError
 from .gitrepo import GitRepo, normalize_path, normalize_paths
 from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
+from ..utils import on_windows
+
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -70,7 +72,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: pass description
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True):
+                 direct=False, backend=None, always_commit=True, create=True):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -99,16 +101,24 @@ class AnnexRepo(GitRepo):
             set default backend used by this annex. This does NOT affect files,
             that are already annexed nor will it automatically migrate files,
             that are 'getted' afterwards.
+
+        create: bool
+          if true, creates an annex repository at path, in case there is
+          none. Otherwise an exception is raised.
         """
-        super(AnnexRepo, self).__init__(path, url, runner=runner)
+        super(AnnexRepo, self).__init__(path, url, runner=runner,
+                                        create=create)
 
         self.always_commit = always_commit
 
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
-            lgr.debug('No annex found in %s.'
-                      ' Creating a new one ...' % self.path)
-            self._annex_init()
+            if create:
+                lgr.debug('No annex found at %s.'
+                          ' Creating a new one ...' % self.path)
+                self._annex_init()
+            else:
+                raise RuntimeError("No annex found at %s." % self.path)
 
         # only force direct mode; don't force indirect mode
         if direct and not self.is_direct_mode():
@@ -325,7 +335,9 @@ class AnnexRepo(GitRepo):
         # Temporarily use shlex, until calls use lists for git_cmd
         return self._run_annex_command('proxy',
                                        annex_options=['--'] +
-                                                     shlex.split(git_cmd))
+                                                     shlex.split(
+                                                         git_cmd,
+                                                         posix=not on_windows))
 
     @normalize_path
     def get_file_key(self, file_):
@@ -368,7 +380,7 @@ class AnnexRepo(GitRepo):
                 # Not sure, whether or not this can actually happen
                 raise e
 
-        return out.rstrip(linesep).split(linesep)[0]
+        return out.rstrip(linesep).splitlines()[0]
 
     @normalize_paths
     def file_has_content(self, files):
@@ -401,7 +413,7 @@ class AnnexRepo(GitRepo):
             else:
                 raise
 
-        found_files = {f for f in out.split(linesep) if f}
+        found_files = {f for f in out.splitlines() if f}
         found_files_new = set(found_files) - set(files)
         if found_files_new:
             raise RuntimeError("'annex find' returned entries for files which "
@@ -556,12 +568,19 @@ class AnnexRepo(GitRepo):
                 raise e
 
         json_objects = [json.loads(line)
-                        for line in out.split(linesep) if line.startswith('{')]
+                        for line in out.splitlines() if line.startswith('{')]
 
         return [
             [remote.get('description') for remote in item.get('whereis')]
             if item.get('success') else []
             for item in json_objects]
+
+    def get_annexed_files(self):
+        """Get a list of files in annex
+        """
+
+        out, err = self._run_annex_command('find')
+        return out.splitlines()
 
 
 # TODO: ---------------------------------------------------------------------
@@ -585,7 +604,7 @@ class AnnexRepo(GitRepo):
         --------
         stdout, stderr
         """
-        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows)
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,

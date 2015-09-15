@@ -12,11 +12,7 @@ Implements a datalad handle repository.
 This layer makes the difference between an arbitrary annex and a
 datalad-managed dataset.
 """
-# TODO: where to document definition of a valid handle?
-# - Annex
-# - .datalad directory:
-#   - handle.cfg
-#   - metadata file(s)
+
 
 import os
 from os.path import join as opj, exists, basename
@@ -28,6 +24,7 @@ from .annexrepo import AnnexRepo
 from .metadatahandler import CustomImporter, Graph, Literal, DLNS, RDFS
 from .handle import HandleBackend, Handle
 from ..utils import assure_dir
+from ..consts import HANDLE_META_DIR, REPO_CONFIG_FILE, REPO_STD_META_FILE
 
 lgr = logging.getLogger('datalad.handlerepo')
 
@@ -94,7 +91,7 @@ class HandleRepo(AnnexRepo):
     """
 
     def __init__(self, path, url=None, direct=False, runner=None, backend=None,
-                 name=None):
+                 name=None, create=True):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -118,49 +115,49 @@ class HandleRepo(AnnexRepo):
         # TODO: More doc.
 
         super(HandleRepo, self).__init__(path, url, direct=direct,
-                                         runner=runner, backend=backend)
+                                         runner=runner, backend=backend,
+                                         create=create)
 
-        self.datalad_path = '.datalad'
-        assure_dir(self.path, self.datalad_path)
-        self._cfg_file = opj(self.datalad_path, 'config.ttl')
-        self._md_file = opj(self.datalad_path, 'datalad.ttl')
+        self.datalad_path = HANDLE_META_DIR
+        self._cfg_file = opj(HANDLE_META_DIR, REPO_CONFIG_FILE)
+        self._md_file = opj(HANDLE_META_DIR, REPO_STD_META_FILE)
 
-        importer = CustomImporter('Handle', 'Handle', DLNS.this)
-        # load existing files:
-        if self._cfg_file in self.get_indexed_files():
-            importer.import_data(opj(self.path, self._cfg_file))
-        if self._md_file in self.get_indexed_files():
-            importer.import_data(opj(self.path, self._md_file))
-        graphs = importer.get_graphs()
+        if create:
+            assure_dir(self.path, HANDLE_META_DIR)
 
-        # collection settings:
-        # if there is no name statement, add it:
-        if len([subj for subj in graphs['config'].objects(DLNS.this,
-                                                          RDFS.label)]) == 0:
-            graphs['config'].add((DLNS.this, RDFS.label,
-                                  Literal(name or basename(self.path))))
+            importer = CustomImporter('Handle', 'Handle', DLNS.this)
+            # load existing files:
+            if self._cfg_file in self.get_indexed_files():
+                importer.import_data(opj(self.path, self._cfg_file))
+            if self._md_file in self.get_indexed_files():
+                importer.import_data(opj(self.path, self._md_file))
+            graphs = importer.get_graphs()
 
-        importer.set_graphs(graphs)  # necessary?
-        importer.store_data(opj(self.path, self.datalad_path))
-        # TODO: How do we know something has changed?
-        # => check git status?
-        self.git_add([self._cfg_file, self._md_file])
-        self.git_commit("Initialized config file.")
+            # if there is no name statement, add it:
+            if len([subj for subj in graphs[REPO_CONFIG_FILE[0:-4]].objects(
+                    DLNS.this, RDFS.label)]) == 0:
+                graphs[REPO_CONFIG_FILE[0:-4]].add(
+                    (DLNS.this, RDFS.label,
+                     Literal(name or basename(self.path))))
+
+            importer.set_graphs(graphs)  # necessary?
+            importer.store_data(opj(self.path, HANDLE_META_DIR))
+
+            self.add_to_git([self._cfg_file, self._md_file],
+                            "Initialized handle metadata.")
 
     def _get_cfg(self):
         config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
         config_handler.import_data(opj(self.path, self._cfg_file))
-        return config_handler.get_graphs()['config']
+        return config_handler.get_graphs()[REPO_CONFIG_FILE[0:-4]]
 
     def _set_cfg(self, graph, commit_msg="Updated config file."):
         config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
         graph_dict = dict()
-        graph_dict['config'] = graph
+        graph_dict[REPO_CONFIG_FILE[0:-4]] = graph
         config_handler.set_graphs(graph_dict)
-        config_handler.store_data(opj(self.path, self.datalad_path))
-        self.git_add(self._cfg_file)
-        self.git_commit(commit_msg)
-
+        config_handler.store_data(opj(self.path, HANDLE_META_DIR))
+        self.add_to_git(self._cfg_file, commit_msg)
 
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
@@ -277,9 +274,9 @@ class HandleRepo(AnnexRepo):
         # datalad.ttl ==> str.startswith(ns) or URIRef.startswith(ns)
 
         if files is None:
-            files = opj(self.path, self.datalad_path)
+            files = opj(self.path, HANDLE_META_DIR)
         else:
-            files = [opj(self.path, self.datalad_path, f) for f in files]
+            files = [opj(self.path, HANDLE_META_DIR, f) for f in files]
 
         handler = CustomImporter('Handle', 'Handle', DLNS.this)
 

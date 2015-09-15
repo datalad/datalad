@@ -13,18 +13,21 @@
 import os
 from os.path import join as opj, exists
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_in
-from git.exc import GitCommandError
+from nose.tools import assert_raises, assert_is_instance, assert_true, \
+    assert_equal, assert_in, assert_false
+from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
 from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, on_windows,\
-    with_tree, get_most_obscure_supported_name, ok_clean_git
+from datalad.tests.utils import with_tempfile, with_testrepos, \
+    assert_cwd_unchanged, on_windows, with_tree, \
+    get_most_obscure_supported_name, ok_clean_git
 from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.cmd import Runner
 
 from .utils import swallow_logs
 
 from .utils import local_testrepo_flavors
+from .utils import skip_if_no_network
 from .utils import assert_re_in
 
 
@@ -54,9 +57,26 @@ def test_GitRepo_instance_from_existing(path):
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_GitRepo_instance_brand_new(path):
+@with_tempfile
+def test_GitRepo_instance_from_not_existing(path, path2):
+    # 1. create=False and path doesn't exist:
+    assert_raises(NoSuchPathError, GitRepo, path, create=False)
+    assert_false(exists(path))
 
-    gr = GitRepo(path)
+    # 2. create=False, path exists, but no git repo:
+    os.mkdir(path)
+    assert_true(exists(path))
+    assert_raises(InvalidGitRepositoryError, GitRepo, path, create=False)
+    assert_false(exists(opj(path, '.git')))
+
+    # 3. create=True, path doesn't exist:
+    gr = GitRepo(path2, create=True)
+    assert_is_instance(gr, GitRepo, "GitRepo was not created.")
+    assert_true(exists(opj(path2, '.git')))
+    ok_clean_git(path2, annex=False)
+
+    # 4. create=True, path exists, but no git repo:
+    gr = GitRepo(path, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     assert_true(exists(opj(path, '.git')))
     ok_clean_git(path, annex=False)
@@ -213,6 +233,7 @@ def test_GitRepo_files_decorator():
     assert_raises(ValueError, test_instance.decorated_one, 1)
 
 
+@skip_if_no_network
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_remote_add(orig_path, path):

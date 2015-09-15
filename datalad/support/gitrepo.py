@@ -21,11 +21,11 @@ from six import string_types
 from functools import wraps
 
 from git import Repo
-from git.exc import GitCommandError
+from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
-from ..utils import optional_args
+from ..utils import optional_args, on_windows
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -194,12 +194,11 @@ class GitRepo(object):
     """
     __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
-    def __init__(self, path, url=None, runner=None):
+    def __init__(self, path, url=None, runner=None, create=True):
         """Creates representation of git repository at `path`.
 
-        If there is no git repository at this location, it will create an empty one.
-        Additionally the directory is created if it doesn't exist.
-        If url is given, a clone is created at `path`.
+        If `url` is given, a clone is created at `path`.
+        Can also be used to create a git repository at `path`.
 
         Parameters
         ----------
@@ -207,9 +206,14 @@ class GitRepo(object):
           path to the git repository; In case it's not an absolute path,
           it's relative to os.getcwd()
         url: str
-          url to the to-be-cloned repository. Requires a valid git url according to
+          url to the to-be-cloned repository. Requires a valid git url
+          according to:
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
-
+        create: bool
+          if true, creates a git repository at `path` if there is none. Also
+          creates `path`, if it doesn't exist.
+          If set to false, an exception is raised in case `path` doesn't exist
+          or doesn't contain a git repository.
         """
 
         self.path = normpath(path)
@@ -223,6 +227,9 @@ class GitRepo(object):
         #       fine grained.
 
         if url is not None:
+            # TODO: What to do, in case url is given, but path exists already?
+            # Just rely on whatever clone_from() does, independently on value
+            # of create argument?
             try:
                 self.cmd_call_wrapper(Repo.clone_from, url, path)
                 # TODO: more arguments possible: ObjectDB etc.
@@ -231,7 +238,7 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
-        if not exists(opj(path, '.git')):
+        if create and not exists(opj(path, '.git')):
             try:
                 self.repo = self.cmd_call_wrapper(Repo.init, path, True)
             except GitCommandError as e:
@@ -240,8 +247,9 @@ class GitRepo(object):
         else:
             try:
                 self.repo = self.cmd_call_wrapper(Repo, path)
-            except GitCommandError as e:
-                # TODO: Creating Repo-object from existing git repository might raise other Exceptions
+            except (GitCommandError,
+                    NoSuchPathError,
+                    InvalidGitRepositoryError) as e:
                 lgr.error(str(e))
                 raise
 
@@ -341,7 +349,7 @@ class GitRepo(object):
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
         return [branch.strip() for branch in
-                self.repo.git.branch(r=True).split(linesep)]
+                self.repo.git.branch(r=True).splitlines()]
 
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
@@ -373,7 +381,8 @@ class GitRepo(object):
         stdout, stderr
         """
         
-        cmd = shlex.split(cmd_str + " " + " ".join(files))
+        cmd = shlex.split(cmd_str + " " + " ".join(files),
+                          posix=not on_windows)
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
@@ -401,7 +410,7 @@ class GitRepo(object):
         v = "-v" if verbose else ""
         out, err = self._git_custom_command('', 'git remote %s show %s' %
                                             (v, name))
-        return out.rstrip(linesep).split(linesep)
+        return out.rstrip(linesep).splitlines()
 
     def git_remote_update(self, name='', verbose=False):
         """
@@ -462,7 +471,7 @@ class GitRepo(object):
         """
         cmd_str = 'git ls-tree -r ' + branch
         out, err = self._git_custom_command('', cmd_str)
-        return [line.split('\t')[1] for line in out.rstrip(linesep).split(linesep)]
+        return [line.split('\t')[1] for line in out.rstrip(linesep).splitlines()]
 
 
         # Only local branches: How to get from remote branches in a similar way?
@@ -481,7 +490,7 @@ class GitRepo(object):
 
         out, err = self._git_custom_command(
             '', 'git cat-file blob %s:%s' % (branch, file_))
-        return out.rstrip(linesep).split(linesep)
+        return out.rstrip(linesep).splitlines()
 
     def git_merge(self, name):
         self._git_custom_command('', 'git merge %s' % name)

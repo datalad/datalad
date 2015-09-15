@@ -6,20 +6,12 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Run internal DataLad (unit)tests to verify correct operation on the system"""
+"""constants for datalad
+"""
 
+# file names for metadata of collections and handles:
+REPO_STD_META_FILE = 'datalad.ttl'
+REPO_CONFIG_FILE = 'config.ttl'
 
-__docformat__ = 'restructuredtext'
-
-
-import datalad
-from .base import Interface
-
-
-class Test(Interface):
-    """Run internal DataLad (unit)tests.
-
-    This can be used to verify correct operation on the system
-    """
-    def __call__(self):
-        datalad.test()
+# directory containing prepared metadata of a handle repository:
+HANDLE_META_DIR = ".datalad"
