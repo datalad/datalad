@@ -40,9 +40,8 @@ class HelpAction(argparse.Action):
         else:
             helpstr = parser.format_help()
         # better for help2man
-        helpstr = re.sub(r'optional arguments:', 'options:', helpstr)
-        # yoh: TODO for datalad + help2man
-        #helpstr = re.sub(r'positional arguments:\n.*\n', '', helpstr)
+        helpstr = re.sub(r'optional arguments:', '*Options*', helpstr)
+        helpstr = re.sub(r'positional arguments:', '*Arguments*', helpstr)
         # convert all heading to have the first character uppercase
         headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
         helpstr = re.subn(
