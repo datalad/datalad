@@ -2,21 +2,27 @@
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
-#   See COPYING file distributed along with the duecredit package for the
+#   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Helper to use duecredit as a "runnable" module with  -m duecredit"""
+"""Helper to use datalad as a "runnable" module with  -m datalad"""
 
 import sys
-from . import due, __version__
+from . import __version__
+from .auto import AutomagicIO
 from .log import lgr
 
 def usage(outfile, executable=sys.argv[0]):
     if '__main__.py' in executable:
-        # That was -m duecredit way to launch
-        executable = "%s -m duecredit" % sys.executable
+        # That was -m datalad way to launch
+        executable = "%s -m datalad" % sys.executable
     outfile.write("""Usage: %s [OPTIONS] <file> [ARGS]
+
+Purpose:
+ To provide FUSE-like operation whenever necessary files
+ (as accessed by open, h5py.File) are requested, they get
+ fetched.
 
 Meta-options:
 --help                Display this help then exit.
@@ -63,7 +69,7 @@ def main(argv=None):
             sys.exit(0)
 
         if opt == "--version":
-            sys.stdout.write("duecredit %s\n" % __version__)
+            sys.stdout.write("datalad %s\n" % __version__)
             sys.exit(0)
 
     sys.argv = prog_argv
@@ -81,7 +87,7 @@ def main(argv=None):
             '__cached__': None,
         }
         # Since used explicitly -- activate the beast
-        due.activate(True)
+        aio = AutomagicIO(activate=True)
         runctx(code, globs, globs)
         # TODO: see if we could hide our presence from the final tracebacks if execution fails
     except IOError as err:
