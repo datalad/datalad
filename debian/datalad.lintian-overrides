@@ -1,0 +1,4 @@
+# this package depends on the corresponding python-datalad package built form
+# the same source package. This pulls in the necessary python version with all
+# its dependencies
+datalad: python-script-but-no-python-dep usr/bin/datalad
