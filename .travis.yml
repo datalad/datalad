@@ -34,7 +34,7 @@ before_install:
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - sudo apt-get install git-annex-standalone zip
+  - sudo apt-get install git-annex-standalone zip help2man
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - git submodule update --init --recursive
@@ -48,6 +48,8 @@ script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
+  # Verify that we can render manpages
+  - make manpages
 
 after_success:
   - coveralls
