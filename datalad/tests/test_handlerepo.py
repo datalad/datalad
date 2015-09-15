@@ -94,7 +94,7 @@ def test_HandleRepo_instance_brand_new(path):
 
 
 @ignore_nose_capturing_stdout
-@with_testrepos(flavors=['network'])
+@with_testrepos(flavors=['local', 'network'])
 @with_tempfile
 def test_HandleRepo_get(src, dst):
 

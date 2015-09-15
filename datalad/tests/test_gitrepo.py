@@ -27,6 +27,7 @@ from datalad.cmd import Runner
 from .utils import swallow_logs
 
 from .utils import local_testrepo_flavors
+from .utils import skip_if_no_network
 from .utils import assert_re_in
 
 
@@ -232,6 +233,7 @@ def test_GitRepo_files_decorator():
     assert_raises(ValueError, test_instance.decorated_one, 1)
 
 
+@skip_if_no_network
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_remote_add(orig_path, path):
