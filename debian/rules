@@ -33,6 +33,7 @@ override_dh_auto_install:
 	mkdir -p build/man
 	mv debian/python-datalad/usr/bin/datalad debian/datalad/usr/bin
 	$(MAKE) manpages
+	register-python-argcomplete datalad > debian/datalad/etc/bash_completion.d/datalad
 
 # make orig tarball from repository content
 get-orig-source:

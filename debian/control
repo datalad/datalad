@@ -11,13 +11,14 @@ Build-Depends:
  python-setuptools,
  git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
  patool,
+ python-argcomplete,
  python-bs4,
  python-git,
  python-joblib,
  python-testtools,
  python-mock,
  python-nose,
- help2man
+ help2man,
 Standards-Version: 3.9.6
 Homepage: http://datalad.org
 Vcs-Git: git://github.com/datalad/datalad -b debian
@@ -28,7 +29,8 @@ Architecture: all
 Section: science
 Depends:
  ${misc:Depends},
- python-datalad (= ${binary:Version})
+ python-datalad (= ${binary:Version}),
+ python-argcomplete,
 Description: data distribution
  DataLad is a data distribution providing access to a wide range of
  data resources already available online (initially aiming for
