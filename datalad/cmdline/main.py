@@ -171,7 +171,13 @@ def generate_api_call(cmdlineargs=None):
 
 
 def main(cmdlineargs=None):
+    # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser()
+    try:
+        import argcomplete
+        argcomplete.autocomplete(parser)
+    except ImportError:
+        pass
     # parse cmd args
     cmdlineargs = parser.parse_args(cmdlineargs)
     # run the function associated with the selected command
