@@ -8,6 +8,7 @@
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 '''Unit tests for Python API functionality.'''
 
+import re
 from nose.tools import assert_true, assert_false
 
 
@@ -17,7 +18,8 @@ def test_basic_setup():
     from datalad import api
     # random pick of something that should be there
     assert_true(hasattr(api, 'create_collection'))
+    assert_true(hasattr(api, 'test'))
+    assert_true(hasattr(api, 'crawl'))
     # make sure all helper utilities do not pollute the namespace
-    assert_false(hasattr(api, '_update_docstring'))
-    assert_false(hasattr(api, '_interfaces'))
-    assert_false(hasattr(api, '_get_interface_groups'))
+    # and we end up only with __...__ attributes
+    assert_false(list(filter(lambda s: s.startswith('_') and not re.match('__.*__', s), dir(api))))

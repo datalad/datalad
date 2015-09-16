@@ -7,10 +7,6 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from .config import load_config, EnhancedConfigParser
-from .db import load_db, save_db
-from .support.archives import decompress_file
-from .crawler.main import DoubleAnnexRepo
 from .support.handlerepo import HandleRepo
 
 from .interface.base import update_docstring_with_parameters as _update_docstring
@@ -34,8 +30,9 @@ for _grp_name, _grp_descr, _interfaces in _get_interface_groups():
         del _intfcls
 
 # be nice and clean up the namespace properly
-del _grp_name
-del _grp_descr
-del _update_docstring
 del _interfaces
 del _get_interface_groups
+del _grp_name
+del _grp_descr
+del _spec
+del _update_docstring
