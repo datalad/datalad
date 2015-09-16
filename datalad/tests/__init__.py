@@ -14,6 +14,16 @@ from logging import getLogger
 
 lgr = getLogger("datalad.tests")
 
+def setup_module():
+    # To overcome pybuild by default defining http{,s}_proxy we would need
+    # to define them to e.g. empty value so it wouldn't bother touching them.
+    # But then haskell libraries do not digest empty value nicely, so we just
+    # pop them out from the environment
+    for ev in ('http_proxy', 'https_proxy'):
+        if ev in os.environ and not (os.environ[ev]):
+            lgr.debug("Removing %s from the environment since it is empty", ev)
+            os.environ.pop(ev)
+
 # We will delay generation of some test files/directories until they are
 # actually used but then would remove them here
 _TEMP_PATHS_GENERATED = []
