@@ -66,16 +66,20 @@ def test_version():
 
 
 def test_help_np():
-    stdout, stderr = run_main(['--help-np'])
+    with patch.dict('os.environ', {'DATALAD_HELP2MAN': '1'}):
+        stdout, stderr = run_main(['--help-np'])
 
     # Let's extract section titles:
     # enough of bin/datalad and .tox/py27/bin/datalad -- guarantee consistency! ;)
     ok_(stdout.startswith('Usage: datalad'))
-    # Sections start/end with * in --help-np mode
+    # Sections start/end with * if ran under DATALAD_HELP2MAN mode
     sections = [l[1:-1] for l in filter(re.compile('^\*.*\*$').match, stdout.split('\n'))]
-    assert_equal(sections,
-                 ['Commands for collection handling',
+    # but order is still not guaranteed (dict somewhere)! TODO
+    # see https://travis-ci.org/datalad/datalad/jobs/80519004
+    # thus testing sets
+    assert_equal(set(sections),
+                 {'Commands for collection handling',
                   'Commands for handle operations',
                   'Miscellaneous commands',
                   'General information',
-                  'Global options'])
+                  'Global options'})
