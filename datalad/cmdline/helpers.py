@@ -12,6 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 import argparse
+import os
 import re
 import sys
 
@@ -20,8 +21,6 @@ from ..log import is_interactive
 
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-#        import pydb; pydb.debugger()
-
         if is_interactive() and option_string == '--help':
             # lets use the manpage on mature systems ...
             try:
@@ -40,9 +39,23 @@ class HelpAction(argparse.Action):
         else:
             helpstr = parser.format_help()
         # better for help2man
-        helpstr = re.sub(r'optional arguments:', 'options:', helpstr)
-        # yoh: TODO for datalad + help2man
-        #helpstr = re.sub(r'positional arguments:\n.*\n', '', helpstr)
+        # For main command -- should be different sections. And since we are in
+        # heavy output massaging mode...
+        if "commands for collection" in helpstr.lower():
+            opt_args_str = '*Global options*'
+            pos_args_str = '*Commands*'
+            # tune up usage -- default one is way too heavy
+            helpstr = re.sub('^[uU]sage: .*?\n\s*\n',
+                             'Usage: datalad [global-opts] command [command-opts]\n\n',
+                             helpstr,
+                             flags=re.MULTILINE | re.DOTALL)
+            # And altogether remove section with long list of commands
+            helpstr = re.sub(r'positional arguments:\s*\n\s*{.*}\n', '', helpstr)
+        else:
+            opt_args_str = "*Options*"
+            pos_args_str = "*Arguments*"
+        helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
+        helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
         # convert all heading to have the first character uppercase
         headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
         helpstr = re.subn(
@@ -57,6 +70,14 @@ class HelpAction(argparse.Action):
             usage_length = len(usagestr)
             usagestr = re.subn(r'\s+', ' ', usagestr.replace('\n', ' '))[0]
             helpstr = '%s\n%s' % (usagestr, helpstr[usage_length:])
+
+        if os.environ.get('DATALAD_HELP2MAN'):
+            # Convert 1-line command descriptions to remove leading -
+            helpstr = re.sub('\n\s*-\s*([-a-z0-9]*):\s*?([^\n]*)', r"\n'\1':\n  \2\n", helpstr)
+        else:
+            # Those *s intended for man formatting do not contribute to readability in regular text mode
+            helpstr = helpstr.replace('*', '')
+
         print(helpstr)
         sys.exit(0)
 

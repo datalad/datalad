@@ -81,7 +81,7 @@ def update_docstring_with_parameters(func, params):
                 default=defaults[defaults_idx] if defaults_idx >= 0 else None,
                 has_default=defaults_idx >= 0)
             doc += '\n'
-    # assign the ammended docs
+    # assign the amended docs
     func.__doc__ = doc
     return func
 

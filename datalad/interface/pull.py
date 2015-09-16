@@ -21,12 +21,12 @@ from ..log import lgr
 
 
 class Pull(Interface):
-    """Get changes froma remote repository.
+    """Get changes from a remote repository.
 
     Examples:
 
-    ~/MyRepository $ datalad pull
-    ~/MyRepository $ datalad pull MyRemote
+      ~/MyRepository $ datalad pull
+      ~/MyRepository $ datalad pull MyRemote
     """
 
     _params_ = dict(

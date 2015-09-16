@@ -21,12 +21,12 @@ from ..log import lgr
 
 
 class Push(Interface):
-    """Get changes froma remote repository.
+    """Push changes to a remote repository.
 
     Examples:
 
-    ~/MyRepository $ datalad push
-    ~/MyRepository $ datalad push MyRemote
+      ~/MyRepository $ datalad push
+      ~/MyRepository $ datalad push MyRemote
     """
 
     _params_ = dict(
