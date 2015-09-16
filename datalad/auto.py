@@ -168,9 +168,12 @@ class AutomagicIO(object):
         self._active = False
 
     def __del__(self):
-        if self._active:
-            self.deactivate()
+        try:
+            if self._active:
+                self.deactivate()
+        except:
+            pass
         try:
             super(self.__class__, self).__del__()
-        except Exception:
+        except:
             pass
