@@ -27,25 +27,11 @@ from .support.annexrepo import AnnexRepo
 from .support.gitrepo import GitRepo
 from .support.exceptions import CommandError
 from .cmd import Runner
+from .cmdline.helpers import get_repo_instance
 
 from .utils import swallow_outputs
 lgr = logging.getLogger("datalad.auto")
 
-
-# TODO: shouldn't be some classmethod of GitRepo?
-_git_runner = Runner()
-def _is_file_under_git(f):
-    fpath = abspath(f)
-    fdir = dirname(fpath)
-    fname = basename(fpath)
-    try:
-        with swallow_outputs():
-            _git_runner.run(["git", "ls-files", fname, "--error-unmatch"], cwd=fdir,
-                            log_stdout=False, log_stderr=False, expect_fail=True,
-                            expect_stderr=True)
-        return True
-    except CommandError:
-        return False
 
 class _EarlyExit(Exception):
     """Helper to early escape try/except logic in wrappde open"""
@@ -143,14 +129,20 @@ class AutomagicIO(object):
     def _handle_auto_get(self, filepath):
         """Verify that filepath is under annex, and if so and not present - get it"""
 
-        if not self._autoget or not _is_file_under_git(filepath):
+        if not self._autoget:
             return
         # deduce directory for filepath
         filedir = dirname(filepath)
-        repotop = GitRepo.get_toppath(filedir)
-        # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
-        # see https://github.com/datalad/datalad/issues/204
-        annex = AnnexRepo(repotop, create=True)  # if got there -- must be a git repo
+        try:
+            # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
+            # see https://github.com/datalad/datalad/issues/204
+            annex = get_repo_instance(filedir)
+        except RuntimeError as e:
+            # must be not under annex etc
+            return
+        if not isinstance(annex, AnnexRepo):
+            # not an annex -- can do nothing
+            return
         # either it has content
         if not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
