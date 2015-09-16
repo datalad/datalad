@@ -20,6 +20,9 @@ matrix:
   - python: 2.7
     env:
     - DATALAD_TESTS_NONETWORK=1
+    # must operate nicely with those env variables set
+    - http_proxy=
+    - https_proxy=
   - python: 3.3
   - python: 3.4
 # not there -- don't try!
