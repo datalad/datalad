@@ -28,7 +28,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class AddHandle(Interface):
-    """Adds a handle to a collection."""
+    """Add a handle to a collection."""
     _params_ = dict(
         handle=Parameter(
             doc="path to or name of the handle",

@@ -32,18 +32,18 @@ class Update(Interface):
 
     Examples:
 
-    Updating registered collections:
-    $ datalad update
+    Updating registered collections
+      $ datalad update
 
-    Updating a local handle:
-    ~/MyHandle/$ datalad update
+    Updating a local handle
+      ~/MyHandle/$ datalad update
     or
-    $ datalad update MyHandle
+      $ datalad update MyHandle
 
-    Updating a local collection:
-    ~/MyCollection/$ datalad update
+    Updating a local collection
+      ~/MyCollection/$ datalad update
     or
-    $ datalad update MyCollection
+      $ datalad update MyCollection
     """
     _params_ = dict(
         key=Parameter(
