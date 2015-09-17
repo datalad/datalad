@@ -105,7 +105,6 @@ class a_href_match(ExtractorMatch):
             url = url_href = url_e.xpath('@href').extract_first()
             # make it a full url, if there was an original url
             if 'url' in data:
-                import pdb; pdb.set_trace()
                 url = dlurljoin(data['url'], url_href)
 
             url_regex = url_query.match(url)
@@ -114,7 +113,7 @@ class a_href_match(ExtractorMatch):
 
             # enrich data with extracted keywords
             data_ = data.copy()
-            for k, v in url_regex.groupdict():
+            for k, v in url_regex.groupdict().items():
                 data_[k] = v
             data_['url'] = url
             data_['url_href'] = url_href

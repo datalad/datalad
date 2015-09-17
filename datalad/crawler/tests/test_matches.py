@@ -72,18 +72,37 @@ def test_a_href_match_basic():
     eq_([u['url'] for u in hits], sample1.a_url_hrefs)
 
     # if we do provide original url where it comes from -- result urls should be full
-    mg = m(input=sample1.input, url="http://example.com/d/")
+    mg = m(input=sample1.input, url="http://w.example.com:888/d/")
     ok_(inspect.isgenerator(mg))
     hits = list(mg)
     eq_(len(hits), 3)
     eq_([u['url_text'] for u in hits], sample1.a_texts)
     eq_([u['url_href'] for u in hits], sample1.a_url_hrefs)
-    eq_([u['url'] for u in hits], sample1.a_url_hrefs)
+    eq_([u['url'] for u in hits],
+        ['http://w.example.com:888/', 'http://w.example.com:888/d/buga/duga/du', 'http://example.com'])
 
-def test_a_href_match_pattern():
-    m = a_href_match('.*')
+def test_a_href_match_pattern1():
+    m = a_href_match('.*buga/(?P<custom>.*)/.*')
 
-    mg = m(input=sample1.input)
-    ok_(inspect.isgenerator(mg))
-    hits = list(mg)
-    eq_(len(hits), 3)
+    hits = list(m(input=sample1.input))
+    eq_(len(hits), 1)
+    hit = hits[0]
+    eq_(hit['url'], 'buga/duga/du')
+    eq_(hit['custom'], 'duga')
+
+def test_a_href_match_pattern2():
+    m = a_href_match('.*(?P<custom>.a).*')
+
+    hits = list(m(input=sample1.input))
+    eq_(len(hits), 2)
+    eq_([u['url'] for u in hits], ['buga/duga/du', 'http://example.com'])
+    eq_([u['custom'] for u in hits], ['ga', 'xa'])
+
+def test_a_href_match_pattern3():
+    # that we would match if top url was provided as well
+    m = a_href_match('.*(?P<custom>bu..).*')
+
+    hits = list(m(input=sample1.input, url="http://w.buxxxx.com/"))
+    eq_(len(hits), 2)
+    eq_([u['url'] for u in hits], ['http://w.buxxxx.com/', 'http://w.buxxxx.com/buga/duga/du'])
+    eq_([u['custom'] for u in hits], ['buxx', 'buga'])

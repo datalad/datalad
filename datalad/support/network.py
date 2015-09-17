@@ -179,7 +179,6 @@ def dlurljoin(u_path, url):
         if url.startswith('/'): # jump to the root
             u_path_rec = urlparse(u_path)
             return urljoin(urlunparse((u_path_rec.scheme, u_path_rec.netloc, '','','','')), url)
-            import pdb; pdb.set_trace()
         else:
             return os.path.join(u_path, url)
     # TODO: recall where all this dirname came from and bring into the test
