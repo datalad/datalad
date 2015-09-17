@@ -1,11 +1,26 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+
 # In new design there is no public/incoming -- but there will be multiple branches
 # No actions performed in "incoming" branches
 
+__docformat__ = 'restructuredtext'
+
 from os.path import exists
 
-from ..support.annexrepo import AnnexRepo
 from logging import getLogger
+from six.moves.urllib.parse import urljoin
+
+from ..support.annexrepo import AnnexRepo
+
 lgr = getLogger('datalad.crawler')
+
 
 def _assure_listuple(obj):
     """Given an object, wrap into a tuple if not list or tuple
@@ -110,17 +125,20 @@ def crawl_openfmri():
     # TODO: get to 'incoming branch'
     crawl_url("https://openfmri.org/datasets",
                  [# for crawling for datasets
-                  (a_href_match("(?P<url>.*/dataset/(?P<dataset>ds[0-9]*))$")),
+                  (a_href_match("(?P<url>.*/dataset/ds0*(?P<dataset>[1-9][0-9]*))$")),
                    initiate_handle(directory="openfmri/%{dataset}s",
                                    uri="%{url}s",
                                    flavor="openfmri"))])
 
 
-def crawl_openfmri_dataset(path):
+from os.path import curdir
+def crawl_openfmri_dataset(dataset, path=curdir):
     annexer = Annexificator(path,
                             options=["-c", "annex.largefiles='exclude=*.txt'"])
     # TODO: url = get_crawl_config(directory)
-    # TODO: cd directory
+    # I think it will be the internal knowledge of the "template"
+    url = urljoin("https://openfmri.org/dataset", "ds%06d" % int(dataset))
+    # TODO: cd directory.
     # TODO: get to 'incoming branch'
     crawl_url(
         url,
