@@ -112,7 +112,9 @@ class AnnexRepo(GitRepo):
         self.always_commit = always_commit
 
         # Check whether an annex already exists at destination
-        if not exists(opj(self.path, '.git', 'annex')):
+        if not (
+            exists(opj(self.path, '.git', 'annex')) or
+            any((b.endswith('/git-annex') for b in self.git_get_remote_branches()))):
             if create:
                 lgr.debug('No annex found at %s.'
                           ' Creating a new one ...' % self.path)
