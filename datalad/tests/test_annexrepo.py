@@ -445,7 +445,7 @@ def test_AnnexRepo_always_commit(path):
 @with_testrepos('basic', flavors=['clone'])
 def test_AnnexRepo_on_uninited_annex(path):
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
-    annex = AnnexRepo(path, create=False)  # so we can initialize without
+    annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
     # and still can get our things
     assert_false(annex.file_has_content('test-annex.dat'))
     with swallow_outputs():
