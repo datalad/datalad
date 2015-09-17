@@ -18,7 +18,7 @@ import time
 from six import string_types
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
+from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse
 from six.moves.urllib.error import URLError
 from six.moves import StringIO
 
@@ -170,13 +170,18 @@ def same_website(url_rec, u_rec):
     # desired not to go to the parent -- we might need explicit option
     # and u_rec.path.startswith(url_rec.path)):
 
-def dgurljoin(u_path, url):
+def dlurljoin(u_path, url):
     url_rec = urlparse(url)  # probably duplicating parsing :-/ TODO
     if url_rec.scheme:
         # independent full url, so just return it
         return url
     if u_path.endswith('/'):  # should here be also a scheme use?
-        return os.path.join(u_path, url)
+        if url.startswith('/'): # jump to the root
+            u_path_rec = urlparse(u_path)
+            return urljoin(urlunparse((u_path_rec.scheme, u_path_rec.netloc, '','','','')), url)
+            import pdb; pdb.set_trace()
+        else:
+            return os.path.join(u_path, url)
     # TODO: recall where all this dirname came from and bring into the test
     return urljoin(os.path.dirname(u_path) + '/', url)
 
@@ -255,7 +260,7 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
                 new_urls = collect_urls(
                     u_full, recurse=recurse, hot_cache=hot_cache, cache=cache,
                     memo=memo)
-                new_fullurls = [(dgurljoin(u_path, url__[0]),) + url__[1:]
+                new_fullurls = [(dlurljoin(u_path, url__[0]),) + url__[1:]
                                  for url__ in new_urls]
                 # and add to their "hrefs" appropriate prefix
                 lgr.log(4, "Adding %d urls collected from %s" % (len(new_fullurls), u_full))

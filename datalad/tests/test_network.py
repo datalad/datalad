@@ -9,7 +9,7 @@
 
 from .utils import eq_, ok_
 
-from ..support.network import same_website, dgurljoin
+from ..support.network import same_website, dlurljoin
 
 
 def test_same_website():
@@ -19,7 +19,9 @@ def test_same_website():
     ok_(same_website("http://a.b/page/2/", "https://a.b/2014/01/xxx/"))
 
 def test_dgurljoin():
-    eq_(dgurljoin('http://a.b/', 'f'), 'http://a.b/f')
-    eq_(dgurljoin('http://a.b/page', 'f'), 'http://a.b/f')
-    eq_(dgurljoin('http://a.b/dir/', 'f'), 'http://a.b/dir/f')
-    eq_(dgurljoin('http://a.b/dir/', 'http://url'), 'http://url')
+    eq_(dlurljoin('http://a.b/', 'f'), 'http://a.b/f')
+    eq_(dlurljoin('http://a.b/page', 'f'), 'http://a.b/f')
+    eq_(dlurljoin('http://a.b/dir/', 'f'), 'http://a.b/dir/f')
+    eq_(dlurljoin('http://a.b/dir/', 'http://url'), 'http://url')
+    eq_(dlurljoin('http://a.b/dir/', '/'), 'http://a.b/')
+    eq_(dlurljoin('http://a.b/dir/', '/x/y'), 'http://a.b/x/y')
