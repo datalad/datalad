@@ -35,6 +35,7 @@ setup(
     },
     package_data={
         'datalad': ['resources/sshserver_prepare_for_publish.sh',
-                    'resources/sshserver_cleanup_after_publish.sh']
+                    'resources/sshserver_cleanup_after_publish.sh',
+                    'resources/git_ssh.sh']
     }
 )

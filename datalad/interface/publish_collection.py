@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from os import curdir
+from os import curdir, environ
 from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
 from .base import Interface
 from ..support.param import Parameter
@@ -113,63 +113,74 @@ class PublishCollection(Interface):
 
         parsed_target = urlparse(target)  # => scheme, path
 
-        if baseurl is None:
-            baseurl = parsed_target.path  # correct?
-        collection_url = baseurl + '/' + "DATALAD_COL_" + local_collection_repo.name
-
         from pkg_resources import resource_filename
-        prepare_script_path = resource_filename('datalad', 'resources/sshserver_prepare_for_publish.sh')
-        cleanup_script_path = resource_filename('datalad', 'resources/sshserver_cleanup_after_publish.sh')
+        prepare_script_path = \
+            resource_filename('datalad',
+                              'resources/sshserver_prepare_for_publish.sh')
+        cleanup_script_path = \
+            resource_filename('datalad',
+                              'resources/sshserver_cleanup_after_publish.sh')
 
         from ..cmd import Runner
         runner = Runner()
         if parsed_target.scheme == 'ssh':
             if parsed_target.netloc == '':
                 raise RuntimeError("Invalid ssh address: %s" % target)
+
+            if baseurl is None:
+                baseurl = target
+            collection_url = baseurl + '/' + "DATALAD_COL_" + \
+                             local_collection_repo.name
+
             # build control master:
-            import os.path
-            import os
+            cm_path = opj(expanduser('~'), '.ssh', 'controlmasters')
+            # Note: '.ssh/controlmasters' has to exist!
+            from datalad.utils import assure_dir
+            assure_dir(cm_path)
+            control_path = "%s/%s" % (cm_path, parsed_target.netloc)
+            control_path += ":22" if parsed_target.port is None else None
 
-            # For now, not really cross-platform:
-            user_home = os.path.expanduser('~')  # This has to be available somewhere!
-            cm_path = opj(user_home, '.ssh', 'controlmasters')
-            ssh_cmd_opt = "-S %s/%s:%d %s" % (cm_path,
-                                              parsed_target.netloc,
-                                              22 if parsed_target.port is None
-                                              else parsed_target.port,
-                                              parsed_target.hostname)
-            runner.run("ssh -M %s" % ssh_cmd_opt)
+            # start controlmaster:
 
-            # TODO: copy scripts to server:
-            prepare_script_path_remote = '?'
-            cleanup_script_path_remote = '?'
+            cmd_str = "ssh -o \"ControlMaster=yes\" -o \"ControlPath=%s\" " \
+                      "-o \"ControlPersist=yes\" %s exit" % \
+                      (control_path,  parsed_target.hostname)
 
-            # run it:
-            out, err = runner.run(["ssh", ssh_cmd_opt, "sh",
-                                  prepare_script_path_remote,
-                                  parsed_target.path,
-                                  "DATALAD_COL_" + local_collection_repo.name]
-                                  + local_collection_repo.get_handle_list())
+            import subprocess
+            proc = subprocess.Popen(cmd_str, shell=True)
+            proc.communicate(input="\n")  # why the f.. this is necessary?
+
+            # prepare target repositories:
+
+            script_options = "%s DATALAD_COL_%s" % (parsed_target.path,
+                                                    local_collection_repo.name)
+            for key in local_collection_repo.get_handle_list():
+                script_options += " %s" % key
+
+            cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
+                      (control_path, parsed_target.hostname, script_options)
+            cmd_str += " < %s" % prepare_script_path
+            out, err = runner.run(cmd_str)
 
             # set GIT-SSH:
-            os.environ['GIT_SSH'] = "ssh %s" % ' '.join(ssh_cmd_opt)
+            environ['GIT_SSH'] = resource_filename('datalad',
+                                                   'resources/git_ssh.sh')
 
         elif parsed_target.scheme == 'file' or parsed_target.scheme == '':
             # we should have a local target path
             if not isdir(abspath(expandvars(expanduser(parsed_target.path)))):
                 raise RuntimeError("%s doesn't exist." % parsed_target.path)
 
-            # TODO: run the script:
-            # arguments:
-            # parsed_target.path
-            # "DATALAD_COL_" + local_collection_repo.name
-            # local_collection_repo.get_handle_list()
+            target_path = abspath(expandvars(expanduser(parsed_target.path)))
+            if baseurl is None:
+                baseurl = target_path
+            collection_url = baseurl + '/' + "DATALAD_COL_" + \
+                             local_collection_repo.name
 
             out, err = runner.run(["sh", prepare_script_path,
-                                   parsed_target.path,
+                                   target_path,
                                    "DATALAD_COL_" + local_collection_repo.name]
                                   + local_collection_repo.get_handle_list())
-
         else:
             raise RuntimeError("Don't know scheme '%s'." %
                                parsed_target.scheme)
@@ -231,6 +242,7 @@ class PublishCollection(Interface):
                 graphs[graph_name].add((new_uri, p, o))
 
         # correct handle uris in hasPart statements:
+        # TODO: this is incorrect in case basename(handle's path) != handle's name
         replacements = []
         for o in graphs[REPO_STD_META_FILE[0:-4]].objects(subject=new_uri,
                                                           predicate=DCTERMS.hasPart):
@@ -274,13 +286,17 @@ class PublishCollection(Interface):
 
         # checkout master in published collection:
         if parsed_target.scheme == 'ssh':
-            out, err = runner.run(["ssh", ssh_cmd_opt, "sh",
-                                  cleanup_script_path_remote,
-                                  parsed_target.path,
-                                  "DATALAD_COL_" + local_collection_repo.name]
-                                  + local_collection_repo.get_handle_list())
+            cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
+                      (control_path, parsed_target.hostname, script_options)
+            cmd_str += " < %s" % cleanup_script_path
+            out, err = runner.run(cmd_str)
+
+            # stop controlmaster:
+            cmd_str = "ssh -O stop -S %s %s" % (control_path,
+                                                parsed_target.hostname)
+            out, err = runner.run(cmd_str)
         else:
             out, err = runner.run(["sh", cleanup_script_path,
-                                   parsed_target.path,
+                                   target_path,
                                    "DATALAD_COL_" + local_collection_repo.name]
                                   + local_collection_repo.get_handle_list())
