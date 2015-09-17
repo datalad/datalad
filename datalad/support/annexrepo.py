@@ -72,7 +72,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: pass description
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True, create=True):
+                 direct=False, backend=None, always_commit=True, create=True, init=False):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -85,26 +85,33 @@ class AnnexRepo(GitRepo):
           path to git-annex repository. In case it's not an absolute path, it's
           relative to os.getcwd()
 
-        url: str
+        url: str, optional
           url to the to-be-cloned repository. Requires valid git url
           according to
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
 
-        runner: Runner
-           Provide a Runner in case AnnexRepo shall not create it's own.
-           This is especially needed in case of desired dry runs.
+        runner: Runner, optional
+          Provide a Runner in case AnnexRepo shall not create it's own.
+          This is especially needed in case of desired dry runs.
 
-        direct: bool
-           If True, force git-annex to use direct mode
+        direct: bool, optional
+          If True, force git-annex to use direct mode
 
-        backend: str
-            set default backend used by this annex. This does NOT affect files,
-            that are already annexed nor will it automatically migrate files,
-            that are 'getted' afterwards.
+        backend: str, optional
+          Set default backend used by this annex. This does NOT affect files,
+          that are already annexed nor will it automatically migrate files,
+          hat are 'getted' afterwards.
 
-        create: bool
-          if true, creates an annex repository at path, in case there is
-          none. Otherwise an exception is raised.
+        create: bool, optional
+          Create and initializes an annex repository at path, in case
+          there is none. If set to False, and this repository is not an annex
+          repository (initialized or not), an exception is raised.
+
+        init: bool, optional
+          Initialize git-annex repository (run "git annex init") if path is an
+          annex repository which just was not yet initialized by annex (e.g. a
+          fresh git clone). Note that if `create=True`, then initialization
+          would happen
         """
         super(AnnexRepo, self).__init__(path, url, runner=runner,
                                         create=create)
@@ -112,12 +119,16 @@ class AnnexRepo(GitRepo):
         self.always_commit = always_commit
 
         # Check whether an annex already exists at destination
-        if not (
-            exists(opj(self.path, '.git', 'annex')) or
-            any((b.endswith('/git-annex') for b in self.git_get_remote_branches()))):
-            if create:
-                lgr.debug('No annex found at %s.'
-                          ' Creating a new one ...' % self.path)
+        if not exists(opj(self.path, '.git', 'annex')):
+            # so either it is not annex at all or just was not yet initialized
+            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())):
+                # it is an annex repository which was not initialized yet
+                if create or init:
+                    lgr.debug('Annex repository was not yet initialized at %s.'
+                              ' Initializing ...' % self.path)
+                    self._annex_init()
+            elif create:
+                lgr.debug('Initializing annex repository at %s...' % self.path)
                 self._annex_init()
             else:
                 raise RuntimeError("No annex found at %s." % self.path)
