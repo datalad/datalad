@@ -29,7 +29,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class SearchCollection(Interface):
-    """search for a collection.
+    """Search for a collection.
     """
     # TODO: A lot of doc ;)
 

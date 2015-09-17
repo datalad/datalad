@@ -30,7 +30,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class PublishHandle(Interface):
-    """publish a handle.
+    """Publish a handle.
 
     This is basic implementation for testing purposes
     """

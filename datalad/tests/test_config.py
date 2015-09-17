@@ -11,7 +11,7 @@ from os.path import join
 
 from .utils import *
 
-from ..api import *
+from ..config import load_config
 
 @with_tempfile(suffix='.cfg')
 def test_eval_value(filename):

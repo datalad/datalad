@@ -27,7 +27,8 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class SPARQLQuery(Interface):
-    """Querying metadata by a SPARQL query string."""
+    """Query metadata by a SPARQL query string."""
+
     _params_ = dict(
         query=Parameter(
             doc="string containing the SPARQL query",

@@ -55,12 +55,9 @@ def setup_parser():
         fromfile_prefix_chars='@',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
-    DataLad aims to expose (scientific) data available online as a unified data
-    distribution with the convenience of git-annex repositories as a backend.
-
-    datalad command line tool facilitates initial construction and update of
-    harvested online datasets.  It supports following commands
-    """),
+            DataLad provides a unified data distribution with the convenience of git-annex
+            repositories as a backend.  datalad command line tool allows to manipulate
+            (obtain, create, update, publish, etc.) datasets and their collections."""),
         epilog='"Control Your Data"',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False)
@@ -141,22 +138,25 @@ def setup_parser():
         grp_descr = grp[1]
         grp_cmds = grp_short_descriptions[i]
 
-        cmd_summary.append('\n%s\n' % (grp_descr,))
+        cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
-            cmd_summary.append('  %s\n%s\n\n'
+            cmd_summary.append('  - %s:  %s'
                                % (cd[0],
                                   textwrap.fill(
-                                      cd[1],
+                                      cd[1].rstrip(' .'),
                                       75,
-                                      initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 4)))
+                                      #initial_indent=' ' * 4,
+                                      subsequent_indent=' ' * 8)))
+    # we need one last formal section to not have the trailed be
+    # confused with the last command group
+    cmd_summary.append('\n*General information*\n')
     parser.description = '%s\n%s\n\n%s' \
         % (parser.description,
            '\n'.join(cmd_summary),
            textwrap.fill(dedent_docstring("""\
     Detailed usage information for individual commands is
-    available via command-specific help options, i.e.:
-    %s <command> --help""") % sys.argv[0],
+    available via command-specific --help, i.e.:
+    datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
     return parser
 

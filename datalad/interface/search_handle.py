@@ -29,7 +29,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class SearchHandle(Interface):
-    """search for a handle.
+    """Search for a handle.
     """
     # TODO: A lot of doc ;)
 

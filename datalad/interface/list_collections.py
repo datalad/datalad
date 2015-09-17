@@ -25,7 +25,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class ListCollection(Interface):
-    """list all colections known to datalad."""
+    """List all collections known to datalad."""
 
     def __call__(self):
 

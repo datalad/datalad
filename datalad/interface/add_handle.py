@@ -28,7 +28,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class AddHandle(Interface):
-    """Adds a handle to a collection."""
+    """Add a handle to a collection."""
     _params_ = dict(
         handle=Parameter(
             doc="path to or name of the handle",
@@ -46,7 +46,7 @@ class AddHandle(Interface):
     def __call__(self, handle, collection, h_name=None):
 
         # TODO: - add a remote handle by its url
-        #       - handle and collection can be adressed via name or path/url
+        #       - handle and collection can be addressed via name or path/url
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))

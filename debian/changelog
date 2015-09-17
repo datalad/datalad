@@ -1,5 +1,11 @@
-datalad (0.0.3-1) UNRELEASED; urgency=low
+datalad (0.0.3+git321-gee70b90.1-1) UNRELEASED; urgency=low
 
+  [ Yaroslav Halchenko ]
   * Initial Debian packaging
+
+  [ Michael Hanke ]
+  * Add lintian override for insufficient dependencies of the 'datalad'
+    package. All relevant dependencies are satisfied by the tightly coupled
+    'python-datalad' package.
 
  -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 16 Aug 2015 09:26:52 -0400

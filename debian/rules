@@ -1,14 +1,42 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE = 1
 
+srcpkg = $(shell LC_ALL=C dpkg-parsechangelog | grep '^Source:' | cut -d ' ' -f 2,2)
+# this figures out the last merge point from 'master' into the Debian branch and
+# then described this commit relative to the last release tag (V...)
+# If this should make any sense the local master branch must track upstream's
+# master or whatever other source branch.
+gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match '[0-9].*' $$(git merge-base -a HEAD master) | sed -e 's/-/+git/').1
+
+export DH_VERBOSE = 1
+export PYBUILD_NAME = datalad
+export DATALAD_TESTS_NONETWORK = 1
+export http_proxy=
+export https_proxy=
+
 %:
-	dh $@ --with python2 --buildsystem=python_distutils
+#	dh $@ --with python2,python3,sphinxdoc --buildsystem=pybuild
+	dh $@ --with python2 --buildsystem=pybuild
+
+clean::
+	dh_clean
+	-rm -rf bin build .pybuild datalad.egg-info
+	-find . -name '*.pyc' -delete
 
 override_dh_auto_test:
-	: # will be performed after installation so we have access to generated entry points etc
+	# cheap fake of an installed datalad
+	$(MAKE) bin
+	PATH=$(CURDIR)/bin:$$PATH dh_auto_test
 
-# for now just relying on providing python interface for a single version
 override_dh_auto_install:
 	dh_auto_install
-	PYPATH=$$(find $(CURDIR)/debian/datalad/usr -iname datalad -type d | xargs dirname); \
-		cd debian/datalad; PYTHONPATH=$$PYPATH PATH=$$PATH:$(CURDIR)/debian/datalad/usr/bin/ nosetests -s -v $$PYPATH/datalad
+	mkdir -p build/man
+	mv debian/python-datalad/usr/bin/datalad debian/datalad/usr/bin
+	$(MAKE) manpages
+	register-python-argcomplete datalad > debian/datalad/etc/bash_completion.d/datalad
+
+# make orig tarball from repository content
+get-orig-source:
+	# orig tarball, turn directory into something nicer
+	git archive --format=tar --prefix=$(srcpkg)-$(gitver)/ HEAD | \
+		gzip -9 > $(srcpkg)_$(gitver).orig.tar.gz

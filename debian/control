@@ -1,19 +1,24 @@
 Source: datalad
 Section: science
 Priority: optional
-Maintainer: Yaroslav Halchenko <debian@onerussian.com>
+Maintainer: NeuroDebian Team <team@neuro.debian.net>
+Uploaders: Yaroslav Halchenko <debian@onerussian.com>,
+           Michael Hanke <mih@debian.org>
 Build-Depends:
  debhelper (>= 9),
- python,
+ dh-python,
+ python-all,
  python-setuptools,
  git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
  patool,
+ python-argcomplete,
  python-bs4,
  python-git,
  python-joblib,
  python-testtools,
  python-mock,
  python-nose,
+ help2man,
 Standards-Version: 3.9.6
 Homepage: http://datalad.org
 Vcs-Git: git://github.com/datalad/datalad -b debian
@@ -21,19 +26,11 @@ Vcs-Browser: https://github.com/datalad/datalad/
 
 Package: datalad
 Architecture: all
+Section: science
 Depends:
- ${python:Depends}, ${misc:Depends},
- python,
- git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
- python-git,
-Recommends:
- patool,
- python-bs4,
- python-joblib,
- python-testtools,
- python-mock,
- python-nose,
- python-numpy,
+ ${misc:Depends},
+ python-datalad (= ${binary:Version}),
+ python-argcomplete,
 Description: data distribution
  DataLad is a data distribution providing access to a wide range of
  data resources already available online (initially aiming for
@@ -44,6 +41,41 @@ Description: data distribution
     repositories with content from online websites
   - command line interface for manipulation of datasets
     (search, install, uninstall, upgrade etc)
+ .
+ This package provides the command line tool.
+ .
+ DISCLAIMER:  DataLad is Work-In-Progress and this package is not yet
+ for regular user consumption.  Primarily intended for demonstrations
+ and development.
+
+Package: python-datalad
+Architecture: all
+Section: python
+Provides: ${python:Provides}
+Depends:
+ ${python:Depends}, ${misc:Depends},
+ git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
+ python-git,
+Recommends:
+ patool,
+ python-bs4,
+ python-joblib,
+ python-testtools,
+ python-mock,
+ python-nose,
+ python-numpy,
+Description: data distribution (Python 2)
+ DataLad is a data distribution providing access to a wide range of
+ data resources already available online (initially aiming for
+ neuroscience domain). Using git-annex as its backend for data
+ logistics it provides following facilities
+ .
+  - crawling of web sites to automatically prepare or update git-annex
+    repositories with content from online websites
+  - command line interface for manipulation of datasets
+    (search, install, uninstall, upgrade etc)
+ .
+ This package installs the module for Python 2.
  .
  DISCLAIMER:  DataLad is Work-In-Progress and this package is not yet
  for regular user consumption.  Primarily intended for demonstrations
