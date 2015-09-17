@@ -320,7 +320,7 @@ def test_query_collection(c_path, h_path, md_hdl):
     # no use here.
     # Note: This uri construction has to change.
     import os
-    content_uri = URIRef(get_local_file_url(os.getcwd() + '/#content'))
+    content_uri = URIRef(get_local_file_url(os.getcwd()) + '/#content')
 
     assert_equal(len(results2), 2)
     assert_in((Literal("MyHandle"), URIRef(get_local_file_url(h_path))),
