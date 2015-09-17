@@ -18,6 +18,7 @@ from logging import getLogger
 from six.moves.urllib.parse import urljoin
 
 from ..support.annexrepo import AnnexRepo
+from .matches import *
 
 lgr = getLogger('datalad.crawler')
 
@@ -52,26 +53,6 @@ def crawl_url(parent_url, conditionals, meta={}):
                     url, file, meta_ = \
                         action(parent_url=parent_url, url=url, file=file, meta=meta_)
                 seen_urls.add(url)
-
-
-def initiate_handle(directory, uri, flavor):
-    if exists(directory):
-        lgr.info("Skipping %s since already exists" % directory)
-        return
-        # TODO verify flavor etc
-    # well -- we will have a registry, so no explicit if code will be here
-    if flavor == 'openfmri':
-        init = initiate_openfmri_handle
-    else:
-        raise ValueError("Unknown flavor 'openfmri'")
-    lgr.info("Initializing handle from %{uri}s under %{directory}s of flavor %{flavor}s using %{init}s" % locals())
-    init = (directory, uri)
-
-
-def initiate_openfmri_handle(directory, uri):
-    if exists(directory):
-        lgr.info("Skipping %s since already exists" % directory)
-    # TODO:
 
 class URLDB(object):
     """Database collating urls for the content across all handles
@@ -121,14 +102,40 @@ class Annexificator(object):
         """
 
 
+
+def initiate_handle(directory, template, **params):
+    if exists(directory):
+        lgr.info("Skipping %s since already exists" % directory)
+        return
+        # TODO verify flavor etc
+    # well -- we will have a registry, so no explicit if code will be here
+    if template == 'openfmri':
+        init = initiate_openfmri_handle
+    else:
+        raise ValueError("Unknown flavor 'openfmri'")
+    lgr.info("Initializing handle from %{uri}s under %{directory}s of flavor %{flavor}s using %{init}s "
+             "with params %{params}s" % locals())
+    init(directory, uri, **params)
+
+
+def initiate_openfmri_handle(directory, uri):
+    if exists(directory):
+        lgr.info("Skipping %s since already exists" % directory)
+    # TODO:
+
+
 def crawl_openfmri():
     # TODO: get to 'incoming branch'
-    crawl_url("https://openfmri.org/datasets",
-                 [# for crawling for datasets
-                  (a_href_match("(?P<url>.*/dataset/ds0*(?P<dataset>[1-9][0-9]*))$")),
-                   initiate_handle(directory="openfmri/%{dataset}s",
-                                   uri="%{url}s",
-                                   flavor="openfmri"))])
+    return [
+        crawl_url("https://openfmri.org/datasets"),
+        a_href_match("(?P<url>.*/dataset/(?P<dataset_dir>ds0*(?P<dataset>[1-9][0-9]*)))$"),
+        initiate_handle(
+                        uri="%{url}s",
+                        directory="openfmri/%{dataset_dir}s",
+                        template="openfmri",
+                        # further any additional options
+                        dataset="%{dataset}s")
+    ]
 
 
 from os.path import curdir
@@ -140,45 +147,54 @@ def crawl_openfmri_dataset(dataset, path=curdir):
     url = urljoin("https://openfmri.org/dataset", "ds%06d" % int(dataset))
     # TODO: cd directory.
     # TODO: get to 'incoming branch'
-    crawl_url(
-        url,
-        # mixing hits by url's and then xpath -- might be real tricky
-        #Action() API should be
-        # parent_url=None, url=None, file=None, meta={})
-        [ (a_href_match(".*release_history.txt", limit=1), annexer(filename="changelog.txt")),
-          # (a_href_match(...) && not a_href_match(...)
-          (a_href_match("ds.*_raw.tgz"
-                        # TODO: might think about providing some checks, e.g. that we MUST
-                        # have at least 1 hit of those, or may be in combination with some other
-                        ), annexer(content_filename_request=False)),
-          (a_href_match(".*dataset/ds[0-9]*$",
-                        # extracted xpaths relevant to the url should be passed into the action
-                        xpaths={"url_text": 'text()',
-                                "parent_div": '../..'}),
-                        ExtractOpenfMRIDatasetMeta("README.txt")),
-          (xpath_match("TODO"), annexer(filename="license.txt")),
-          # ad-hoc way to state some action to be performed for anything which matched any of prev rules
-          (any_matched(), DontHaveAGoodExampleYet())
-          # How to implement above without causing duplication... probably need to memo/cache all prev
-          # hits
-          ]
-    )
+    return [
+        annexer.switch_branch('incoming'),
+        [
+            crawl_url(url),
+            # mixing hits by url's and then xpath -- might be real tricky
+            #Action() API should be
+            # parent_url=None, url=None, file=None, meta={})
+            ( a_href_match(".*release_history.txt", limit=1),
+              annexer(filename="changelog.txt")),
+            # (a_href_match(...) && not a_href_match(...)
+            ( a_href_match("ds.*_raw.tgz"
+                           # TODO: might think about providing some checks, e.g. that we MUST
+                           # have at least 1 hit of those, or may be in combination with some other
+                          ),
+              annexer(content_filename_request=False)),
+            ( a_href_match(".*dataset/ds[0-9]*$",
+                           # extracted xpaths relevant to the url should be passed into the action
+                           xpaths={"url_text": 'text()',
+                                   "parent_div": '../..'}),
+              ExtractOpenfMRIDatasetMeta(opj(path, "README.txt")),
+              annexer()),
+            ( xpath_match("TODO"),
+              annexer(filename="license.txt") ),
+            # ad-hoc way to state some action to be performed for anything which matched any of prev rules
+            # (any_matched(), DontHaveAGoodExampleYet())
+            # How to implement above without causing duplication... probably need to memo/cache all prev
+            # hits
+        ],
+        annexer.commit(),  # assure that we commit what we got so far. TODO: automagic by switch_branch?
+        annexer.switch_branch('master'),
+        ExtractArchives(
+            # will do the merge of 'replace' strategy
+            source_branch="incoming",
+            regex="\.(tgz|tar\..*)$",
+            renames=[
+                ("^[^/]*/(.*)", "\1") # e.g. to strip leading dir, or could prepend etc
+            ],
+            exclude="license.*", # regexp
+            ),
+        annexer(),
+        annexer.commit(),
+    ]
     # master branch should then be based on 'incoming' but with some actions performed
     # TODO: switch to 'master'
-    perform_actions(
-        source_branch="incoming",
-        merge_strategy="replace", # so we will remove original content of the branch, overlay content from source_branch, perform actions
-        actions=[
-            # so will take each
-            ExtractArchives(
-                #source_branch="incoming",
-                regex="\.(tgz|tar\..*)$",
-                renames=[
-                    ("^[^/]*/(.*)", "\1") # e.g. to strip leading dir, or could prepend etc
-                ],
-                exclude="license.*", # regexp
-                annexer
-                )])
+    #perform_actions(
+    #    merge_strategy="replace", # so we will remove original content of the branch, overlay content from source_branch, perform actions
+    #    actions=[
+    #        # so will take each
     # in principle could may be implemented in the same fashion as crawl_url where for each
     # file it would spit out
 
@@ -215,20 +231,21 @@ def crawl_ratholeradio():
                                   mode='relaxed')
     # TODO: url = get_crawl_config(directory)
     # TODO: cd directory
-    crawl_url('http://ratholeradio.org',
-              [
-                  (a_href_match('http://ratholeradio\.org/.*/ep(?P<episode>[0-9]*)/'),
-                   recurse_crawl(url="%{url}s")),
-                  (page_match('http://ratholeradio\.org/(?P<year>[0-9]*)/(?P<month>[0-9]*)/ep(?P<episode>[0-9]*)/')
-                   && a_href_match('', xpaths='TODO'),
-                   [annexer(filename="%{episode}003d-TODO.ogg"),
-                    GenerateRatholeRadioCue(filename="%{episode}003d-TODO.cue"),
-                    # Ha -- here to assign the tags we need to bother above files not urls!
-                    # and we seems to not allow that easily
-                    AssignAnnexTags(files="%{episode}003d-TODO.*",
-                                    year="%(year)s",
-                                    month="%(month)s")])
-              ])
+    return [
+        crawl_url('http://ratholeradio.org'),
+        a_href_match('http://ratholeradio\.org/.*/ep(?P<episode>[0-9]*)/'),
+        recurse_crawl(url="%{url}s"),
+        # stop -- how to recurse entirely?...
+        page_match('http://ratholeradio\.org/(?P<year>[0-9]*)/(?P<month>[0-9]*)/ep(?P<episode>[0-9]*)/'),
+        a_href_match('.*\.ogg', xpaths='TODO'),
+        annexer(filename="%{episode}003d-TODO.ogg"),
+        GenerateRatholeRadioCue(filename="%{episode}003d-TODO.cue"),
+        # Ha -- here to assign the tags we need to bother above files not urls!
+        # and we seems to not allow that easily
+        AssignAnnexTags(files="%{episode}003d-TODO.*",
+                        year="%(year)s",
+                        month="%(month)s")
+    ]
 
 """
     nih videos

@@ -100,12 +100,13 @@ class a_href_match(ExtractorMatch):
     """
 
     def _select_and_extract(self, selector, query, data):
+        prev_url = data.get('url', None)
         url_query = re.compile(query)
         for url_e in selector.xpath('//a'):
             url = url_href = url_e.xpath('@href').extract_first()
             # make it a full url, if there was an original url
-            if 'url' in data:
-                url = dlurljoin(data['url'], url_href)
+            if prev_url:
+                url = dlurljoin(prev_url, url_href)
 
             url_regex = url_query.match(url)
             if not url_regex:
@@ -115,6 +116,9 @@ class a_href_match(ExtractorMatch):
             data_ = data.copy()
             for k, v in url_regex.groupdict().items():
                 data_[k] = v
+
+            # TODO: such actions we might want to perform also in other cases,
+            # e.g. operating on some extracted with XPATH content
             data_['url'] = url
             data_['url_href'] = url_href
             data_['url_text'] = url_e.xpath('text()').extract_first()
