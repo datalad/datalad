@@ -7,18 +7,21 @@ Uploaders: Yaroslav Halchenko <debian@onerussian.com>,
 Build-Depends:
  debhelper (>= 9),
  dh-python,
- python-all,
- python-setuptools,
  git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
+ help2man,
  patool,
+ python-all,
+ python-appdirs,
  python-argcomplete,
  python-bs4,
- python-git,
+ python-git (>= 1.0.1+git137~),
  python-joblib,
- python-testtools,
  python-mock,
  python-nose,
- help2man,
+ python-rdflib (>= 4.1.2~),
+ python-setuptools,
+ python-six (>= 1.8.0~),
+ python-testtools,
 Standards-Version: 3.9.6
 Homepage: http://datalad.org
 Vcs-Git: git://github.com/datalad/datalad -b debian
@@ -29,8 +32,8 @@ Architecture: all
 Section: science
 Depends:
  ${misc:Depends},
- python-datalad (= ${binary:Version}),
  python-argcomplete,
+ python-datalad (= ${binary:Version}),
 Description: data distribution
  DataLad is a data distribution providing access to a wide range of
  data resources already available online (initially aiming for
@@ -55,7 +58,10 @@ Provides: ${python:Provides}
 Depends:
  ${python:Depends}, ${misc:Depends},
  git-annex (>= 5.20150706) | git-annex-standalone (>= 5.20150706),
- python-git,
+ python-appdirs,
+ python-git (>= 1.0.1+git137~),
+ python-rdflib (>= 4.1.2~),
+ python-six (>= 1.8.0~),
 Recommends:
  patool,
  python-bs4,
