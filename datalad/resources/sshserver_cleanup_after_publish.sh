@@ -22,6 +22,11 @@ git -C "$COL_REPO_NAME" checkout master
 printf "DATALAD_COLLECTION_REPO_%s: checkout_master DATALAD_END\n" "$COL_REPO_NAME"
 
 for name in "$@"; do
-    git -C "$name" checkout master
+    curdir=$PWD
+    cd "$name"
+    git checkout master
     printf "DATALAD_HANDLE_REPO_%s: checkout_master DATALAD_END\n" "$name"
+    git annex get .
+    printf "DATALAD_HANDLE_REPO_%s: annex_get_all DATALAD_END\n" "$name"
+    cd "$curdir"
 done

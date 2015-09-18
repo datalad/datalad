@@ -251,7 +251,9 @@ class PublishCollection(Interface):
                 o_new = URIRef(baseurl + '/' + path[-len(basename(path)):])
                 replacements.append((o, o_new))
             else:
-                # TODO: what to do? just skip for now
+                # TODO: what to do? We have a locally not available handle
+                # in that collection, that therefore can't be published.
+                # Just skip for now and assume uri simply doesn't change.
                 continue
         for o, o_new in replacements:
             graphs[REPO_STD_META_FILE[0:-4]].remove((new_uri, DCTERMS.hasPart, o))
