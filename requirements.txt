@@ -9,3 +9,4 @@ rdflib>=4.2.0
 six>=1.8.0
 appdirs
 scrapy>=1.0.3
+vcrpy

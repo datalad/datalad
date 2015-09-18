@@ -19,6 +19,7 @@ from six.moves.urllib.parse import urljoin
 
 from ..support.annexrepo import AnnexRepo
 from .matches import *
+from ..support.network import fetch_page
 
 lgr = getLogger('datalad.crawler')
 
@@ -30,13 +31,28 @@ def _assure_listuple(obj):
         return obj
     return (obj,)
 
-def crawl_url(parent_url, conditionals, meta={}):
-    """Given a source url, perform crawling of the page
-
-       with subsequent set of actions associated with each "conditional"
+class crawl_url(object):
+    """Given a source url, perform the initial crawling of the page, i.e. simply
+    bloody fetch it and pass along
 
     """
+    def __init__(self, url=None, input='url'):
+        """If url is None, would try to pick it up from data[input]"""
+        self._url = url
+        self._input = input
 
+    def __call__(self, **data):
+        #assert(data == {}) # atm assume we are the first of mogican
+        url = data[self._input] if self._url is None else self._url
+
+        # this is just a cruel first attempt
+        data_ = data.copy()
+        data_.update(
+            {'response': fetch_page(url),
+             'url': self._url})
+        yield data_
+
+"""
     for extractors, actions in conditionals:
         extractors = _assure_listuple(extractors)
         actions = _assure_listuple(actions)
@@ -53,6 +69,7 @@ def crawl_url(parent_url, conditionals, meta={}):
                     url, file, meta_ = \
                         action(parent_url=parent_url, url=url, file=file, meta=meta_)
                 seen_urls.add(url)
+"""
 
 class URLDB(object):
     """Database collating urls for the content across all handles
@@ -88,6 +105,7 @@ class Annexificator(object):
 
     def register_url_in_db(self, url, filename):
         # might need to go outside -- since has nothing to do with self
+        raise NotImplementedError()
 
     def __call__(self, filename=None, content_filename_request=False):
         """Return the "Action" callable which would do all the annexification
@@ -225,6 +243,7 @@ class GenerateRatholeRadioCue(object):
     def __init__(self, filename):
         self.filename = filename
     def __call__(self, el, tags):
+        raise NotImplementedError()
 
 def crawl_ratholeradio():
     annexer = Annexificator(options=["-c", "annex.largefiles='exclude=*.cue and exclude=*.txt'"],

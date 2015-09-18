@@ -27,7 +27,7 @@ class ExtractorMatch(object):
     """
     # abstract property
     EXTRACTOR = None
-    def __init__(self, query, input='input', output='output', pop_input=False,
+    def __init__(self, query, input='response', output='match', pop_input=False,
                  allow_multiple=False, xpaths=None, csss=None):
         self._query = query
         # allow_multiple concerns only extraction of additional xpaths and csss
@@ -53,9 +53,9 @@ class ExtractorMatch(object):
         else:
             selector = Selector(text=input)
 
-        for entry, selected_data in self._select_and_extract(selector, self._query, data):
-            output = selected_data.copy()
-            output[self._output] = entry.extract()
+        for entry, data_ in self._select_and_extract(selector, self._query, data):
+            data_ = data_.copy()  # operate on copy since we are modifying
+            data_[self._output] = entry.extract()
             # now get associated xpaths, csss etc
             for selectors_dict, entry_method in ((self._xpaths, entry.xpath),
                                                  (self._csss, entry.css)):
@@ -73,8 +73,8 @@ class ExtractorMatch(object):
                             lgr.warn(
                                 "Got multiple selections for xpath query %s. "
                                 "Keeping only the first one: %s" % (repr(query), key_extracted[0]))
-                    output[key] = key_extracted[0]
-            yield output
+                    data_[key] = key_extracted[0]
+            yield data_
 
 class ScrapyExtractorMatch(ExtractorMatch):
     EXTRACTOR = None  # Defined in subclasses
@@ -104,6 +104,10 @@ class a_href_match(ExtractorMatch):
         url_query = re.compile(query)
         for url_e in selector.xpath('//a'):
             url = url_href = url_e.xpath('@href').extract_first()
+            if not url:
+                # it was an <a> without href
+                continue
+
             # make it a full url, if there was an original url
             if prev_url:
                 url = dlurljoin(prev_url, url_href)
