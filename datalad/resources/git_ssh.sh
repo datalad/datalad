@@ -6,7 +6,8 @@ then
 else
 	PORT=22
 fi
-CONTROL_MASTER="$HOME/.ssh/controlmasters/$1:$PORT $1"
+CONTROL_MASTER="/var/run/user/$(id -u)/datalad/$1:$PORT $1"
+echo "DEBUG: socket: $CONTROL_MASTER" >&2
 shift 1
 ssh -S $CONTROL_MASTER "$@"
 
