@@ -9,8 +9,8 @@
 
 import vcr
 
-from ..newmain import crawl_url
-from ..matches import *
+from ..nodes.crawl_url import crawl_url
+from ..nodes.matches import *
 from ..pipeline import run_pipeline
 
 from ...tests.utils import eq_, ok_

@@ -15,8 +15,8 @@ import re
 from scrapy.selector import Selector
 from scrapy.http import Response
 
-from ..utils import updated
-from ..support.network import dlurljoin
+from ...utils import updated
+from ...support.network import dlurljoin
 
 from logging import getLogger
 lgr = getLogger('datalad.crawler')
@@ -26,8 +26,7 @@ lgr = getLogger('datalad.crawler')
 class ExtractorMatch(object):
     """Generic matching extractor
     """
-    # abstract property
-    EXTRACTOR = None
+
     def __init__(self, query, input='response', output='match', pop_input=False,
                  allow_multiple=False, xpaths=None, csss=None):
         self._query = query
@@ -75,7 +74,9 @@ class ExtractorMatch(object):
                     data_[key] = key_extracted[0]
             yield data_
 
+
 class ScrapyExtractorMatch(ExtractorMatch):
+
     EXTRACTOR = None  # Defined in subclasses
 
     def _select_and_extract(self, selector, query, data):
@@ -86,8 +87,10 @@ class ScrapyExtractorMatch(ExtractorMatch):
 class xpath_match(ScrapyExtractorMatch):
     EXTRACTOR = Selector.xpath
 
+
 class css_match(ScrapyExtractorMatch):
     EXTRACTOR = Selector.css
+
 
 class a_href_match(ExtractorMatch):
     """Helper to simplify matching based on URL while also extracting various tags from URL while at it

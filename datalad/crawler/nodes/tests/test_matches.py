@@ -10,7 +10,7 @@
 import inspect
 from nose import SkipTest
 from ..matches import *
-from ...tests.utils import ok_, eq_
+from datalad.tests.utils import ok_, eq_
 
 try:
     import scrapy

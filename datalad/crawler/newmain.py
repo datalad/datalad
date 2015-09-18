@@ -18,9 +18,7 @@ from logging import getLogger
 from six.moves.urllib.parse import urljoin
 
 from ..support.annexrepo import AnnexRepo
-from .matches import *
-from ..support.network import fetch_page
-from ..utils import updated
+from .nodes.matches import *
 
 lgr = getLogger('datalad.crawler')
 
@@ -31,59 +29,6 @@ def _assure_listuple(obj):
     if isinstance(obj, list) or isinstance(obj, tuple):
         return obj
     return (obj,)
-
-class crawl_url(object):
-    """Given a source url, perform the initial crawling of the page, i.e. simply
-    bloody fetch it and pass along
-
-    """
-    def __init__(self, url=None,
-                 input='url',
-                 output=('response', 'url')):
-        """If url is None, would try to pick it up from data[input]"""
-        self._url = url
-        self._input = input
-        self._output = output
-
-    def __call__(self, **data):
-        #assert(data == {}) # atm assume we are the first of mogican
-        url = data[self._input] if self._url is None else self._url
-
-        # this is just a cruel first attempt
-        yield updated(data, zip(self._output, (fetch_page(url), url)))
-
-"""
-    for extractors, actions in conditionals:
-        extractors = _assure_listuple(extractors)
-        actions = _assure_listuple(actions)
-        seen_urls = set()
-        for extractor in extractors:
-            for url, meta_ in extractor(parent_url, meta=meta):
-                if url in seen_urls:
-                    continue
-                file = None
-                # progress through actions while possibly augmenting the url, file, and/or meta_
-                for action in actions:
-                    # TODO: may be we should return a dict with whatever that action
-                    # found necessary to change, update local state and pass into
-                    url, file, meta_ = \
-                        action(parent_url=parent_url, url=url, file=file, meta=meta_)
-                seen_urls.add(url)
-"""
-
-class URLDB(object):
-    """Database collating urls for the content across all handles
-
-    Schema: TODO, but needs for sure
-
-    - URL (only "public" or internal as for content from archives, or that separate table?)
-    - common checksums which we might use/rely upon (MD5, SHA1, SHA256, SHA512)
-    - last_checked (if online)
-    - last_verified (when verified to contain the content according to the checksums
-
-    allow to query by any known checksum
-    """
-    pass
 
 
 class Annexificator(object):
