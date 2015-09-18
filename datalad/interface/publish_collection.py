@@ -144,7 +144,7 @@ class PublishCollection(Interface):
             cmd_str = "ssh -o \"ControlMaster=yes\" -o \"ControlPath=%s\" " \
                       "-o \"ControlPersist=yes\" %s exit" % \
                       (control_path,  parsed_target.hostname)
-
+            lgr.error("DEBUG: %s" % cmd_str)
             import subprocess
             proc = subprocess.Popen(cmd_str, shell=True)
             proc.communicate(input="\n")  # why the f.. this is necessary?
@@ -212,9 +212,6 @@ class PublishCollection(Interface):
                 lgr.error("No handle available at %s. Skip." % handle_loc)
                 raise e
 
-            # TODO: pass no target to handle_publisher, just url => remote
-            # publisher therefore can't annex-get something
-            # => another server script
             handle_publisher(None, handle=handle_loc,
                              url=baseurl + '/' + handle_name)
 
@@ -240,15 +237,26 @@ class PublishCollection(Interface):
                 graphs[graph_name].add((new_uri, p, o))
 
         # correct handle uris in hasPart statements:
-        # TODO: this is incorrect in case basename(handle's path) != handle's name
         replacements = []
+        from datalad.support.collection import Collection
+        from datalad.support.collectionrepo import CollectionRepoBackend
+        col_meta = Collection(CollectionRepoBackend(local_collection_repo))
         for o in graphs[REPO_STD_META_FILE[0:-4]].objects(subject=new_uri,
                                                           predicate=DCTERMS.hasPart):
             from os.path import basename
             path = urlparse(o).path
             if exists(path):
                 # local handle
-                o_new = URIRef(baseurl + '/' + path[-len(basename(path)):])
+                # retrieve name for that uri:
+                # Note: That's an experimental implementation
+                hdl_name = None
+                for key in col_meta:
+                    if urlparse(col_meta[key].url).path == path:
+                        hdl_name = col_meta[key].name
+                if hdl_name is None:
+                    raise RuntimeError("No handle found for path '%s'." % path)
+
+                o_new = URIRef(baseurl + '/' + hdl_name)
                 replacements.append((o, o_new))
             else:
                 # TODO: what to do? We have a locally not available handle
