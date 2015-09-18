@@ -13,6 +13,7 @@
 import gc
 from git.exc import GitCommandError
 from six import PY3
+from six.moves.urllib.parse import urljoin, urlsplit
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
@@ -66,7 +67,7 @@ def test_AnnexRepo_instance_brand_new(path):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network'])
+@with_testrepos(flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
@@ -192,7 +193,7 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
-@with_testrepos(flavors=['network'])
+@with_testrepos(flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_file_has_content(src, annex_path):
 
@@ -240,13 +241,14 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
+@with_tree(tree=(('about.txt', 'Lots of abouts'),))
+@serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_web_remote(src, dst):
+def test_AnnexRepo_web_remote(src, sitepath, siteurl, dst):
 
     ar = AnnexRepo(dst, src)
-
-    testurl = 'http://datalad.org/pages/about.html'
-    testfile = 'datalad.org_pages_about.html'
+    testurl = urljoin(siteurl, 'about.txt')
+    testfile = '%s_about.txt' % urlsplit(testurl).netloc.split(':')[0]
 
     # get the file from remote
     with swallow_outputs() as cmo:
@@ -290,7 +292,7 @@ def test_AnnexRepo_web_remote(src, dst):
     assert_equal(len(l), 1)
     assert_false(ar.file_has_content(testfile))
 
-@with_testrepos(flavors='network')
+@with_testrepos(flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo(dst, src, backend='MD5')

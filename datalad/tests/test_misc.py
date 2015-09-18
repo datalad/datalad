@@ -11,7 +11,6 @@ from os.path import join
 
 from .utils import *
 
-from ..api import *
 from ..support.network import filter_urls, get_url_response_stamp, download_url_to_incoming, is_url_quoted
 
 def test_is_url_quoted():

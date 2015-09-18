@@ -25,7 +25,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class CreateCollection(Interface):
-    """Creates a new collection."""
+    """Create a new collection."""
     _params_ = dict(
         path=Parameter(
             args=('path',),
