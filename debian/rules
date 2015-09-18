@@ -6,7 +6,7 @@ srcpkg = $(shell LC_ALL=C dpkg-parsechangelog | grep '^Source:' | cut -d ' ' -f 
 # then described this commit relative to the last release tag (V...)
 # If this should make any sense the local master branch must track upstream's
 # master or whatever other source branch.
-gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match '[0-9].*' $$(git merge-base -a HEAD master) | sed -e 's/-/+git/').1
+gitver = $(shell [ -x /usr/bin/git ] && git describe --tags --match '[0-9].*' $$(git merge-base -a HEAD master) | sed -e 's/-/+git/')
 
 export DH_VERBOSE = 1
 export PYBUILD_NAME = datalad
