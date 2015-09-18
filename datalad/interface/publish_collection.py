@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from os import curdir, environ
+from os import curdir, environ, geteuid
 from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
 from .base import Interface
 from ..support.param import Parameter
@@ -133,11 +133,10 @@ class PublishCollection(Interface):
                              local_collection_repo.name
 
             # build control master:
-            cm_path = opj(expanduser('~'), '.ssh', 'controlmasters')
-            # Note: '.ssh/controlmasters' has to exist!
             from datalad.utils import assure_dir
-            assure_dir(cm_path)
-            control_path = "%s/%s" % (cm_path, parsed_target.netloc)
+            var_run_user_datalad = "/var/run/user/%s/datalad" % geteuid()
+            assure_dir(var_run_user_datalad)
+            control_path = "%s/%s" % (var_run_user_datalad, parsed_target.netloc)
             control_path += ":22" if parsed_target.port is None else None
 
             # start controlmaster:

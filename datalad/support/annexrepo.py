@@ -578,6 +578,7 @@ class AnnexRepo(GitRepo):
     def get_annexed_files(self):
         """Get a list of files in annex
         """
+        # TODO: Review!
 
         out, err = self._run_annex_command('find')
         return out.splitlines()
