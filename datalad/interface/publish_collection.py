@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from os import curdir, environ, geteuid
+from os import curdir, environ, geteuid, urandom
 from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
 from .base import Interface
 from ..support.param import Parameter
@@ -222,10 +222,9 @@ class PublishCollection(Interface):
 
         # prepare publish branch in local collection:
         # check for existing publish branches:
-        # TODO: hash + delete on success
-        num_pub = len([b for b in local_collection_repo.git_get_branches()
-                      if b.startswith("publish")])
-        p_branch = "publish%d" % (num_pub + 1)
+        from random import choice
+        from string import letters
+        p_branch = "publish_" + ''.join(choice(letters) for i in xrange(6))
         local_collection_repo.git_checkout(p_branch, '-b')
 
         importer = CustomImporter('Collection', 'Collection', DLNS.this)
@@ -266,11 +265,9 @@ class PublishCollection(Interface):
         local_collection_repo.git_commit("metadata prepared for publishing")
 
         # add as remote to local:
+        # TODO: Better remote name?
         if remote_name is None:
-            num_pub_remotes = len([r for r in
-                                   local_collection_repo.git_get_remotes()
-                                   if r.startswith("publish")])
-            remote_name = "published%d" % (num_pub_remotes + 1)
+            remote_name = p_branch
         local_collection_repo.git_remote_add(remote_name, collection_url)
 
         # push local branch "publish" to remote branch "master"
@@ -281,7 +278,6 @@ class PublishCollection(Interface):
 
         # checkout master in local collection:
         local_collection_repo.git_checkout("master")
-        # TODO: Delete publish branch? see above
 
         # checkout master in published collection:
         if parsed_target.scheme == 'ssh':
@@ -299,3 +295,8 @@ class PublishCollection(Interface):
                                    target_path,
                                    "DATALAD_COL_" + local_collection_repo.name]
                                   + local_collection_repo.get_handle_list())
+
+        # TODO: final check, whether everything is fine
+        # Delete publish branch:
+        local_collection_repo._git_custom_command('', 'git branch -D %s'
+                                                  % p_branch)
