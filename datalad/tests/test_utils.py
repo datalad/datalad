@@ -18,7 +18,10 @@ from mock import patch
 from six import PY3
 
 from os.path import join as opj
+from collections import OrderedDict
+
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from ..utils import updated
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
@@ -128,3 +131,18 @@ def test_md5sum():
 def test_md5sum_archive(d):
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(opj(d, '1.tar.gz'))
+
+def test_updated():
+    d = {}
+    eq_(updated(d, {1: 2}), {1: 2})
+    eq_(d, {})
+
+    d = {'a': 'b'}
+    eq_(updated(d, ((0, 1), (2, 3))), {0: 1, 'a': 'b', 2: 3})
+    eq_(d, {'a': 'b'})
+
+    # and that it would maintain the type
+    d = OrderedDict(((99, 0), ('z', 0), ('a', 0)))
+    d_ = updated(d, {0: 1})
+    ok_(isinstance(d_, OrderedDict))
+    eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))

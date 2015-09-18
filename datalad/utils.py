@@ -396,3 +396,11 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
+def updated(d, update):
+    """Return a copy of the input with the 'update'
+
+    Primarily for updating dictionaries
+    """
+    d = d.copy()
+    d.update(update)
+    return d
