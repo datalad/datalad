@@ -20,6 +20,7 @@ from six.moves.urllib.parse import urljoin
 from ..support.annexrepo import AnnexRepo
 from .matches import *
 from ..support.network import fetch_page
+from ..utils import updated
 
 lgr = getLogger('datalad.crawler')
 
@@ -36,21 +37,20 @@ class crawl_url(object):
     bloody fetch it and pass along
 
     """
-    def __init__(self, url=None, input='url'):
+    def __init__(self, url=None,
+                 input='url',
+                 output=('response', 'url')):
         """If url is None, would try to pick it up from data[input]"""
         self._url = url
         self._input = input
+        self._output = output
 
     def __call__(self, **data):
         #assert(data == {}) # atm assume we are the first of mogican
         url = data[self._input] if self._url is None else self._url
 
         # this is just a cruel first attempt
-        data_ = data.copy()
-        data_.update(
-            {'response': fetch_page(url),
-             'url': self._url})
-        yield data_
+        yield updated(data, zip(self._output, (fetch_page(url), url)))
 
 """
     for extractors, actions in conditionals:

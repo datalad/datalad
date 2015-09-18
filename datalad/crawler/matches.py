@@ -15,6 +15,7 @@ import re
 from scrapy.selector import Selector
 from scrapy.http import Response
 
+from ..utils import updated
 from ..support.network import dlurljoin
 
 from logging import getLogger
@@ -48,14 +49,12 @@ class ExtractorMatch(object):
             selector = Selector(response=input)
             if hasattr(input, 'url') and input.url and (not 'url' in data):
                 # take the url of the response object
-                data = data.copy()
-                data['url'] = input.url
+                data = updated(data, {'url': input.url})
         else:
             selector = Selector(text=input)
 
         for entry, data_ in self._select_and_extract(selector, self._query, data):
-            data_ = data_.copy()  # operate on copy since we are modifying
-            data_[self._output] = entry.extract()
+            data_ = updated(data_, {self._output: entry.extract()})
             # now get associated xpaths, csss etc
             for selectors_dict, entry_method in ((self._xpaths, entry.xpath),
                                                  (self._csss, entry.css)):
