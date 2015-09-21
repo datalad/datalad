@@ -21,6 +21,7 @@ Build-Depends:
  python-rdflib (>= 4.1.2~),
  python-setuptools,
  python-six (>= 1.8.0~),
+ python-sparqlwrapper,
  python-testtools,
 Standards-Version: 3.9.6
 Homepage: http://datalad.org
@@ -62,6 +63,7 @@ Depends:
  python-git (>= 1.0.1+git137~),
  python-rdflib (>= 4.1.2~),
  python-six (>= 1.8.0~),
+ python-sparqlwrapper,
 Recommends:
  patool,
  python-bs4,
