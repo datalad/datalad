@@ -12,6 +12,9 @@
 from ...support.network import fetch_page
 from ...utils import updated
 
+from logging import getLogger
+lgr = getLogger('datalad.crawl.crawl_url')
+
 class crawl_url(object):
     """Given a source url, perform the initial crawling of the page, i.e. simply
     bloody fetch it and pass along
@@ -25,12 +28,20 @@ class crawl_url(object):
         self._input = input
         self._output = output
 
+    def _visit_url(self, url, data):
+        # this is just a cruel first attempt
+        lgr.debug("Visiting %s" % url)
+        yield updated(data, zip(self._output, (fetch_page(url), url)))
+
     def __call__(self, **data):
         #assert(data == {}) # atm assume we are the first of mogican
-        url = data[self._input] if self._url is None else self._url
+        url = data[self._input] if not self._url else self._url
+        return self._visit_url(url, data)
 
-        # this is just a cruel first attempt
-        yield updated(data, zip(self._output, (fetch_page(url), url)))
+    def recurse(self, **data):
+        """Recurse into the page - self._url gets ignored"""
+        return self._visit_url(data[self._input], data)
+
 
 """
     for extractors, actions in conditionals:

@@ -6,12 +6,3 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Nodes for the pipelines.
-
-Each node must be a callable accepting **data, and must yield (thus be a generator)
-"derived" data
-"""
-
-"""
-Many nodes feel like class is a bit too heavy for them since by relying on
-"""

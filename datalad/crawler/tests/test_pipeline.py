@@ -13,25 +13,16 @@ from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import *
 from ..pipeline import run_pipeline
 
-from ...tests.utils import eq_, ok_
+from ..nodes.misc import Sink
 
-class DataSink(object):
-    def __init__(self):
-        self.data = []
-
-    def get_fields(self, *keys):
-        return [(d[k] for k in keys) for d in self.data]
-
-    def __call__(self, **data):
-        # ??? for some reason didn't work when I made entire thing a list
-        self.data.append(data)
-        yield data
+from datalad.tests.utils import eq_, ok_
+from datalad.tests.utils import serve_path_via_http, with_tree
 
 @vcr.use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
 def test_basic_openfmri_top_pipeline():
-    sink1 = DataSink()
-    sink2 = DataSink()
-    sink_licenses = DataSink()
+    sink1 = Sink()
+    sink2 = Sink()
+    sink_licenses = Sink()
     pipeline = [
         crawl_url("https://openfmri.org/data-sets"),
         a_href_match(".*/dataset/(?P<dataset_dir>ds0*(?P<dataset>[1-9][0-9]*))$"),
@@ -70,3 +61,27 @@ def test_basic_openfmri_top_pipeline():
     all_licenses = sink_licenses.get_fields('dataset', 'url_text', 'url')
     eq_(len(all_licenses), len(urls))
     #print('\n'.join(map(str, all_licenses)))
+
+
+# now with some recursive structure of directories
+pages_loop = dict(
+    tree=(
+        ('index.html', '<html><body><a href="page2.html">page2</a></body></html>'),
+        ('page2.html', '<html><body><a href="/">root</a></body></html>')))
+
+@with_tree(**pages_loop)
+@serve_path_via_http()
+def test_recurse_loop_http(path, url):
+    crawler = crawl_url(url)
+    visited = []
+    def visiting(url, **data):
+        visited.append(url)
+        yield data
+
+    run_pipeline([
+        crawler,
+        a_href_match('.*'),
+        crawler.recurse,
+        visiting
+    ])
+    print visited

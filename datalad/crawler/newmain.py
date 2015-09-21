@@ -31,40 +31,6 @@ def _assure_listuple(obj):
     return (obj,)
 
 
-class Annexificator(object):
-    """A helper which would encapsulate operation of adding new content to git/annex repo
-
-    """
-    def __init__(self, path, mode=None, options=None):
-        self.repo = AnnexRepo(path, create=False)
-        self.mode = mode
-        self.options = options or []
-
-    def add(self, filenames):
-        raise NotImplementedError()
-
-    def addurl(self, url, filename=None):
-        raise NotImplementedError()
-        # TODO: register url within "The DB" after it was added
-        self.register_url_in_db(url, filename)
-
-    def register_url_in_db(self, url, filename):
-        # might need to go outside -- since has nothing to do with self
-        raise NotImplementedError()
-
-    def __call__(self, filename=None, content_filename_request=False):
-        """Return the "Action" callable which would do all the annexification
-
-        Parameters
-        ----------
-        filename : str or None, optional
-          Filename to be used
-        content_filename_request : bool, optional
-          Either to request the filename from the website to serve as a value
-          for the filename
-        """
-
-
 
 def initiate_handle(directory, template, **params):
     if exists(directory):
@@ -80,6 +46,9 @@ def initiate_handle(directory, template, **params):
              "with params %{params}s" % locals())
     init(directory, uri, **params)
 
+
+
+# All below should get under 'pipelines' and properly "instrumented"
 
 def initiate_openfmri_handle(directory, uri):
     if exists(directory):
@@ -218,4 +187,55 @@ def crawl_ratholeradio():
         xpath_match('//a[contains(@href, ".f4v")][last()]',
             {"title": '//div[@class="blox-title"]//h3/text()',
              "date_field": '//b[text()="Air date:"]/../..//td[2]/text()[1]' }
+"""
+
+"""
+SfN program
+
+interesting case it to allow to extract things from some structure and then group
+them within a single data item e.g. dict
+
+e.g.
+http://www.abstractsonline.com/plan/ViewAbstract.aspx\?mID\=3744\&sKey\=64008424-c04d-40ad-9f9e-547223d7fab4\&cKey\=9ae8e7d9-7bf7-4013-a845-034079db07c3\&mKey\=d0ff4555-8574-4fbb-b9d4-04eec8ba0c84
+[(h.xpath('text()').extract(), h.xpath('following-sibling::td').extract()) for h in response.xpath('//td[@class="ViewAbstractDataLabel"]')]
+
+should look like a separate pipeline from which we would want to actually return some field
+
+  crawler = crawl_url('http://www.abstractsonline.com/plan/Browse.aspx')
+
+  fields_sink = sink_dict(key='field', values='raw_value',
+                          output='abstract_fields',
+                          exclude_keys=('', 'Disclosures:')),
+  [
+    crawler,
+    a_href_match('.*/BrowseResults.aspx?date=(?P<date>[/0-9]*)'),
+    crawler.recurse,
+    a_href_match('.*/ViewSession.aspx?.*'),
+    crawler.recurse,
+    a_href_match('.*/ViewAbstract.aspx?mID=.*'),
+    [
+      crawler.recurse,
+      fields_sink.reset,
+      xpath_match('//td[@class="ViewAbstractDataLabel"]',
+         xpaths={'field': 'normalize-space(text())',
+                 'raw_value': 'following-sibling::td'}),
+      fields_sink,
+      return_from_pipeline(['abstract_fields'])
+    ],
+    process_fields(key='abstract_fields',
+                   funcs={'Program#/Poster#:': extract_td_text,
+                          'Authors:': fancy_authors_extractor,
+                          {'Presentation time:', 'Presenter at Poster:'}: extract_date,
+                          ...},
+                   default_func=extract_td_text),
+
+
+which then pipeline runner would comprehend to maintain and return (or yield??) the last value
+although it starts to feel that may be regular scrapy/slybot could be more appropriate
+since we do not even want much...  BUT on other hand we could even simply add
+
+    dump_dict(keys=('...'), filename='output.csv')
+
+]
+and be done!
 """
