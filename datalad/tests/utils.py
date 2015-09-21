@@ -42,6 +42,12 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 
+def skip_if_no_module(module):
+    try:
+        imp = __import__(module)
+    except ImportError:
+        raise SkipTest("No %s module" % module)
+
 
 def create_tree_archive(path, name, load, overwrite=False):
     """Given an archive `name`, create under `path` with specified `load` tree
