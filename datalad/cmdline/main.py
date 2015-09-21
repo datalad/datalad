@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import argparse
 import logging
 import sys
+import os
 import textwrap
 
 import datalad
@@ -72,6 +73,14 @@ def setup_parser():
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
             help="do not catch exceptions and show exception traceback")
+    parser.add_argument(
+        '-C', action='append', dest='change_path', metavar='PATH',
+        help="""Run as if datalad was started in <path> instead
+        of the current working directory. When multiple -C options are given,
+        each subsequent non-absolute -C <path> is interpreted relative to the
+        preceding -C <path>. This option affects the interpretations of the
+        path names in that they are made relative to the working directory
+        caused by the -C option.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -180,6 +189,9 @@ def main(cmdlineargs=None):
         pass
     # parse cmd args
     cmdlineargs = parser.parse_args(cmdlineargs)
+    if not cmdlineargs.change_path is None:
+        for path in cmdlineargs.change_path:
+            os.chdir(path)
     # run the function associated with the selected command
     if cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure
