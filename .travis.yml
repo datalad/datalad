@@ -43,6 +43,8 @@ install:
   - git submodule update --init --recursive
   - cd ..; pip install -q coveralls; cd -
   - pip install -r requirements.txt
+  # Verify that setup.py build doesn't puke
+  - python setup.py build
   - pip install -e .
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
