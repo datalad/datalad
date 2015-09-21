@@ -1,4 +1,4 @@
-# !/bin/sh
+#!/bin/sh
 if test "$1" = "-p"
 then
 	PORT=$2
