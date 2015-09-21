@@ -158,6 +158,12 @@ def test_getpwd_symlink(tdir):
         chpwd(sdir)
         pwd = getpwd()
         eq_(pwd, sdir)
+        chpwd('s1')
+        eq_(getpwd(), opj(sdir, 's1'))
+        chpwd('.')
+        eq_(getpwd(), opj(sdir, 's1'))
+        chpwd('..')
+        eq_(getpwd(), sdir)
     finally:
         chpwd(pwd_orig)
 

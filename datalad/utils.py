@@ -18,7 +18,7 @@ import platform
 import gc
 
 from functools import wraps
-from os.path import exists, join as opj
+from os.path import exists, join as opj, isabs, normpath
 from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
@@ -404,6 +404,8 @@ def chpwd(path):
     and we have no ability to assess directory path without dereferencing
     symlinks
     """
+    if not isabs(path):
+        path = normpath(opj(getpwd(), path))
     os.chdir(path)  # for grep people -- ok, to chdir here!
     os.environ['PWD'] = path
 
