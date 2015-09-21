@@ -17,10 +17,22 @@ from ...api import get
 
 from ...tests.utils import with_testrepos
 from ...tests.utils import assert_cwd_unchanged
+from ...utils import chpwd
 
-@assert_cwd_unchanged(ok_to_chdir=True)
 @with_testrepos('basic', flavors=['clone'])
+@assert_cwd_unchanged(ok_to_chdir=True)
 @patch('datalad.support.annexrepo.AnnexRepo.annex_get')
-def test_get_basic(path_to_ignore, annex_get_mocked):
-    get('test-annex.dat')
-    annex_get_mocked.assert_called_with('test-annex.dat')
+def test_get_basic(repo_path, annex_get_mocked):
+    chpwd(repo_path)
+    get(['test-annex.dat'])
+    annex_get_mocked.assert_called_with(['test-annex.dat'])
+
+    # ATM get does glob extension
+    get(['test-annex.*'])
+    annex_get_mocked.assert_called_with(['test-annex.dat'])
+
+    # thus would provide an empty list (which would cause annex call to puke!)
+    # if there is no matching file, but since we mock -- we just test that
+    # it functions as we thought it should
+    get(['abracadabrasesame'])
+    annex_get_mocked.assert_called_with([])
