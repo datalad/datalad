@@ -9,10 +9,12 @@
 '''Unit tests for basic constraints functionality.'''
 
 
-from nose.tools import assert_equal, assert_raises
-
-import datalad.support.constraints as ct
 import sys
+from six import string_types, PY2
+
+from ..support import constraints as ct
+
+from nose.tools import assert_equal, assert_raises
 
 
 def test_int():
@@ -27,6 +29,7 @@ def test_int():
     assert_raises(ValueError, lambda: c([3, 'fail']))
     # this will also fail
     assert_raises(ValueError, lambda: c('17.0'))
+    assert_equal(c.short_description(), 'int')
 
 
 def test_float():
@@ -76,6 +79,7 @@ def test_str():
     assert_raises(ValueError, lambda: c(('a', 'b')))
     # no automatic conversion attempted
     assert_raises(ValueError, lambda: c(7.0))
+    assert_equal(c.short_description(), 'str')
 
 
 def test_none():
@@ -165,6 +169,7 @@ def test_altconstraints():
     c = ct.AltConstraints(ct.EnsureFloat())
     assert_equal(c(7.0), 7.0)
     c = ct.AltConstraints(ct.EnsureFloat(), ct.EnsureNone())
+    assert_equal(c.short_description(), '(float or None)')
     assert_equal(c(7.0), 7.0)
     assert_equal(c(None), None)
     # __or__ form
@@ -193,3 +198,7 @@ def test_both():
     assert_equal(c(None), None)
     # this should always fail
     assert_raises(ValueError, lambda: c(77.0))
+
+def test_type_str():
+    assert_equal(ct._type_str((str,)), 'str')
+    assert_equal(ct._type_str(string_types), 'basestring' if PY2 else 'str')

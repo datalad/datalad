@@ -9,6 +9,7 @@
 
 import collections
 import six.moves.builtins as __builtin__
+from six.moves.urllib.parse import quote as urlquote
 
 import logging
 import shutil, stat, os, sys
@@ -69,10 +70,10 @@ def get_local_file_url(fname):
     """
     if on_windows:
         fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % fname_rep
+        furl = "file:///%s" % urlquote(fname_rep)
         lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
     else:
-        furl = "file://%s" % fname
+        furl = "file://%s" % urlquote(fname)
     return furl
 
 
