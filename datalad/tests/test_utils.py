@@ -19,6 +19,7 @@ from six import PY3
 
 from os.path import join as opj
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from ..utils import get_local_file_url
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
@@ -128,3 +129,12 @@ def test_md5sum():
 def test_md5sum_archive(d):
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(opj(d, '1.tar.gz'))
+
+def test_get_local_file_url_linux():
+    assert_equal(get_local_file_url('/a'), 'file:///a')
+    assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
+    assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
+    assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
+
+def test_get_local_file_url_windows():
+    raise SkipTest("TODO")
