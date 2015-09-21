@@ -11,6 +11,9 @@
 __docformat__ = 'restructuredtext'
 
 import re
+import types
+
+from six import PY3
 
 from scrapy.selector import Selector
 from scrapy.http import Response
@@ -80,6 +83,11 @@ class ScrapyExtractorMatch(ExtractorMatch):
     EXTRACTOR = None  # Defined in subclasses
 
     def _select_and_extract(self, selector, query, data):
+        # there must be some magic happening since originally
+        # (when just parsing the code) those are unbound (func)
+        # and then somehow become bound
+        if PY3 and isinstance(self.EXTRACTOR, types.MethodType):
+            self.EXTRACTOR = self.EXTRACTOR.__func__
         for extracted in self.EXTRACTOR(selector, query):
             yield extracted, data
 
@@ -92,14 +100,12 @@ class css_match(ScrapyExtractorMatch):
     EXTRACTOR = Selector.css
 
 
-class a_href_match(ExtractorMatch):
-    """Helper to simplify matching based on URL while also extracting various tags from URL while at it
-
-    Given a url regular expression pattern, perform matching among available URLs
-    and yield those of interest, while also yielding additional groups which matched.
-    It will return keys 'url', 'url_href', 'url_text' and the original .extracted()
-    entry for the url extractor in the field specified by output argument
+class AExtractorMatch(ExtractorMatch):
+    """Helper to simplify matching of URLs based on their HREF or text
     """
+
+    # abstract -- must be defined in subclass
+    #_TARGET = None
 
     def _select_and_extract(self, selector, query, data):
         prev_url = data.get('url', None)
@@ -114,13 +120,20 @@ class a_href_match(ExtractorMatch):
             if prev_url:
                 url = dlurljoin(prev_url, url_href)
 
-            url_regex = url_query.match(url)
-            if not url_regex:
+            if self._TARGET == 'href':
+                regex_target = url
+            elif self._TARGET == 'text':
+                regex_target = url_e.xpath('text()').extract_first()
+            else:
+                raise ValueError("Unknown _TARGET=%r" % (self._TARGET,))
+
+            regex = url_query.match(regex_target)
+            if not regex:
                 continue
 
             # enrich data with extracted keywords
             data_ = data.copy()
-            for k, v in url_regex.groupdict().items():
+            for k, v in regex.groupdict().items():
                 data_[k] = v
 
             # TODO: such actions we might want to perform also in other cases,
@@ -130,3 +143,18 @@ class a_href_match(ExtractorMatch):
             data_['url_text'] = url_e.xpath('text()').extract_first()
             yield url_e, data_
 
+class a_href_match(AExtractorMatch):
+    """Helper to simplify matching based on URL while also extracting various tags from URL while at it
+
+    Given a url regular expression pattern, perform matching among available URLs
+    and yield those of interest, while also yielding additional groups which matched.
+    It will return keys 'url', 'url_href', 'url_text' and the original .extracted()
+    entry for the url extractor in the field specified by output argument
+    """
+    _TARGET = 'href'
+
+class a_text_match(AExtractorMatch):
+    """Helper to simplify matching based on A target's text while also extracting various tags from it while at it
+
+    """
+    _TARGET = 'text'

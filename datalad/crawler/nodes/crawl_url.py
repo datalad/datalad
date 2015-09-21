@@ -20,18 +20,50 @@ class crawl_url(object):
     bloody fetch it and pass along
 
     """
-    def __init__(self, url=None,
+    def __init__(self,
+                 url=None, matchers=None,
                  input='url',
                  output=('response', 'url')):
-        """If url is None, would try to pick it up from data[input]"""
+        """If url is None, would try to pick it up from data[input]
+
+        Parameters
+        ----------
+
+        matchers: list of matchers
+          Expect page content in and should produce url field
+        """
         self._url = url
+        self._matchers = matchers
         self._input = input
         self._output = output
+        self._seen = set()
+
+    def reset(self):
+        """Reset cache of seen urls"""
+        self._seen = set()
 
     def _visit_url(self, url, data):
+        if url in self._seen:
+            return
+        self._seen.add(url)
         # this is just a cruel first attempt
         lgr.debug("Visiting %s" % url)
-        yield updated(data, zip(self._output, (fetch_page(url), url)))
+        page = fetch_page(url)
+        data_ = updated(data, zip(self._output, (page, url)))
+        yield data_
+        # now recurse if matchers were provided
+        matchers = self._matchers
+        if matchers:
+            lgr.debug("Looking for more URLs at %s using %s", url, matchers)
+            for matcher in (matchers if isinstance(matchers, (list, tuple)) else [matchers]):
+                for data_matched in matcher(**data_):
+                    if 'url' not in data_matched:
+                        lgr.warning("Got data without a url from %s" % matcher)
+                        continue
+                    # proxy findings
+                    for data_matched_ in self._visit_url(data_matched['url'], data_matched):
+                        yield data_matched_
+
 
     def __call__(self, **data):
         #assert(data == {}) # atm assume we are the first of mogican
