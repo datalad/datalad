@@ -397,3 +397,22 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
+def chpwd(path):
+    """Wrapper around os.chdir which also adjusts environ['PWD']
+
+    The reason is that otherwise PWD is simply inherited from the shell
+    and we have no ability to assess directory path without dereferencing
+    symlinks
+    """
+    os.chdir(path)  # for grep people -- ok, to chdir here!
+    os.environ['PWD'] = path
+
+def getpwd():
+    """Try to return a CWD without dereferencing possible symlinks
+
+    If no PWD found in the env, output of getcwd() is returned
+    """
+    try:
+        return os.environ['PWD']
+    except KeyError:
+        return os.getcwd()
