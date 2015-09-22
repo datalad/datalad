@@ -13,6 +13,9 @@ from .version import __version__
 
 from datalad.log import lgr
 
+from .config import ConfigManager
+cfg = ConfigManager()
+
 # be friendly on systems with ancient numpy -- no tests, but at least
 # importable
 try:

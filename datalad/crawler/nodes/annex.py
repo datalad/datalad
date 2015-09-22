@@ -18,7 +18,8 @@ lgr = getLogger('datalad.crawl.annex')
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
-    def __init__(self, template, handle_name, collection_name=None, add_opts=None):
+    def __init__(self, template, handle_name, collection_name=None,
+                 data_fields=None, add_fields=None):
         """
         Parameters
         ----------
@@ -28,23 +29,32 @@ class initiate_handle(object):
           Name of the handle
         collection_name : str, optional
           If None and not present in data, template is taken
-        data_fields : list or tuple, optional
-          Additional
-        :param template:
-        :param handle_name:
-        :param collection_name:
-        :param add_opts:
-        :return:
+        data_fields : list or tuple of str, optional
+          Additional fields from data to store into configuration for
+          the handle crawling options -- would be passed into the corresponding
+          crawler template
+        add_fields : dict, optional
+          Dictionary of additional fields to store in the crawler configuration
+          to be passed into the template
         """
+        # TODO: add_fields might not be flexible enough for storing more elaborate
+        # configurations for e.g. "basic" template
         self.template = template
-        self.handle_name =
+        self.handle_name = handle_name
+        self.collection_name = collection_name
+        self.data_fields = data_fields
+        self.add_fields = add_fields
+
     def __call__(self, **data):
+        yield data
+"""
 
                         uri="%{url}s",
                         directory="openfmri/%{dataset_dir}s",
                         template="openfmri",
                         # further any additional options
                         dataset="%{dataset}s")
+"""
 
 class Annexificator(object):
     """A helper which would encapsulate operation of adding new content to git/annex repo
@@ -89,7 +99,7 @@ class Annexificator(object):
                              "Please adjust pipeline to provide one" % url)
         return filename
 
-    def __call__(self, **data): # filename=None, get_deposition_filename=False):
+    def __call__(self, **data):  # filename=None, get_deposition_filename=False):
         url = data.get('url')
 
         # figure out the filename. If deposition one was needed, pipeline should

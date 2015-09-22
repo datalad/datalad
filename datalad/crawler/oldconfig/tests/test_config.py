@@ -7,11 +7,9 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from os.path import join
+from datalad.tests.utils import *
 
-from .utils import *
-
-from ..config import load_config
+from ..base import load_config
 
 @with_tempfile(suffix='.cfg')
 def test_eval_value(filename):
