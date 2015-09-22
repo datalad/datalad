@@ -9,6 +9,9 @@
 """Various small nodes
 """
 
+from datalad.support.network import get_url_deposition_filename, get_url_straight_filename
+from datalad.utils import updated
+
 class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
     """
@@ -34,14 +37,33 @@ class rename(object):
 
         Use OrderedDict when order of remapping matters
         """
-        self._mapping = mapping
+        self.mapping = mapping
 
     def __call__(self, **data):
         # TODO: unittest
         data = data.copy()
-        for from_, to_ in self._mapping:
+        for from_, to_ in self.mapping:
             if from_ in data:
                 data[to_] = data.pop(from_)
         yield data
 
+
+class assign(object):
+    def __init__(self, assignments, interpolate=False):
+        self.assignments = assignments
+        self.interpolate = interpolate
+
+    def __call__(self, **data):
+        for k, v in self.assignments.items():
+            data[k] = v % data if self.interpolate else v
+        yield data
+
 #class prune(object):
+
+def get_url_filename(**data):
+    yield updated(data, {'filename': get_url_straight_filename(data['url'])})
+
+def get_deposition_filename(**data):
+    """For the URL request content filename deposition
+    """
+    yield updated(data, {'filename': get_url_deposition_filename(data['url'])})

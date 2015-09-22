@@ -9,9 +9,9 @@
 
 from six import iteritems
 
-from ..support.configparserinc import SafeConfigParserWithIncludes
+from datalad.support.configparserinc import SafeConfigParserWithIncludes
 
-from ..support.archives import DECOMPRESSORS
+from datalad.support.archives import DECOMPRESSORS
 
 import logging
 lgr = logging.getLogger('datalad.config')
