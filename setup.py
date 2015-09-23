@@ -22,7 +22,6 @@ setup(
     author_email="team@datalad.org",
     version=datalad.version.__version__,
     description="data distribution geared toward scientific datasets",
-    py_modules=['datalad'],
     packages=datalad_pkgs,
     install_requires=[
         "GitPython",  # 'git://github.com/gitpython-developers/GitPython'

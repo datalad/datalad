@@ -17,14 +17,16 @@ import logging
 from mock import patch
 from six import PY3
 
-from os.path import join as opj
+from os.path import join as opj, isabs, abspath
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from ..utils import get_local_file_url
+from ..utils import getpwd, chpwd
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
-
+from .utils import assert_cwd_unchanged, skip_if_on_windows
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -128,3 +130,40 @@ def test_md5sum():
 def test_md5sum_archive(d):
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(opj(d, '1.tar.gz'))
+
+def test_get_local_file_url_linux():
+    assert_equal(get_local_file_url('/a'), 'file:///a')
+    assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
+    assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
+    assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
+
+def test_get_local_file_url_windows():
+    raise SkipTest("TODO")
+
+@assert_cwd_unchanged
+def test_getpwd_basic():
+    pwd = getpwd()
+    ok_(isabs(pwd))
+    eq_(os.getcwd(), abspath(pwd))
+
+
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@assert_cwd_unchanged
+def test_getpwd_symlink(tdir):
+    sdir = opj(tdir, 's1')
+    pwd_orig = getpwd()
+    os.symlink('.', sdir)
+    try:
+        chpwd(sdir)
+        pwd = getpwd()
+        eq_(pwd, sdir)
+        chpwd('s1')
+        eq_(getpwd(), opj(sdir, 's1'))
+        chpwd('.')
+        eq_(getpwd(), opj(sdir, 's1'))
+        chpwd('..')
+        eq_(getpwd(), sdir)
+    finally:
+        chpwd(pwd_orig)
+

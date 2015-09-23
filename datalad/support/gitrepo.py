@@ -14,6 +14,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 from os import getcwd, linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
+from os.path import dirname, basename
 import logging
 import shlex
 from six import string_types
@@ -23,9 +24,11 @@ from functools import wraps
 from git import Repo
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
+from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
 from ..utils import optional_args, on_windows
+from ..utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -69,7 +72,10 @@ def _normalize_path(base_dir, path):
     # But we don't want to realpath relative paths, in case cwd isn't the correct base.
 
     if isabs(path):
-        path = realpath(path)
+        # path might already be a symlink pointing to annex etc,
+        # so realpath only its directory, to get "inline" with realpath(base_dir)
+        # above
+        path = opj(realpath(dirname(path)), basename(path))
         if commonprefix([path, base_dir]) != base_dir:
             raise FileNotInRepositoryError(msg="Path outside repository: %s"
                                                % path, filename=path)
@@ -252,6 +258,24 @@ class GitRepo(object):
                     InvalidGitRepositoryError) as e:
                 lgr.error(str(e))
                 raise
+
+    @classmethod
+    def get_toppath(cls, path):
+        """Return top-level of a repository given the path.
+
+        If path has symlinks -- they get resolved.
+
+        Returns None if not under git
+        """
+        try:
+            toppath, err = Runner().run(
+                ["git", "rev-parse", "--show-toplevel"],
+                cwd=path,
+                log_stdout=True, log_stderr=True,
+                expect_fail=True, expect_stderr=True)
+            return toppath.rstrip('\n\r')
+        except CommandError:
+            return None
 
     @normalize_paths
     def git_add(self, files):
