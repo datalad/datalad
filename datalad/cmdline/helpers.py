@@ -150,7 +150,7 @@ def get_repo_instance(path=curdir, class_=None):
     """
 
     from os.path import join as opj, ismount, exists, abspath, expanduser, \
-        expandvars
+        expandvars, normpath
     from git.exc import InvalidGitRepositoryError
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo
@@ -192,17 +192,17 @@ def get_repo_instance(path=curdir, class_=None):
                     return GitRepo(dir_, create=False)
                 except InvalidGitRepositoryError as e:
                     raise RuntimeError("No datalad repository found in %s" %
-                                       path)
+                                       dir_)
             else:
                 try:
                     return class_(dir_)
                 except (RuntimeError, InvalidGitRepositoryError) as e:
                     raise RuntimeError("No %s repository found in %s" %
-                                       (type_, path))
+                                       (type_, dir_))
         else:
-            dir_ = opj(dir_, "..")
+            dir_ = normpath(opj(dir_, ".."))
 
     if class_ is not None:
-        raise RuntimeError("No %s repository found in %s." % (type_, path))
+        raise RuntimeError("No %s repository found in %s" % (type_, dir_))
     else:
-        raise RuntimeError("No datalad repository found in %s" % path)
+        raise RuntimeError("No datalad repository found in %s" % dir_)
