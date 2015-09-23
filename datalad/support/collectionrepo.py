@@ -393,12 +393,9 @@ class CollectionRepo(GitRepo):
         if branch is None:
             branch = self.git_get_active_branch()
 
-        # TODO: see _filename2key:
-        # return set([self._filename2key(f.split(os.sep)[0], branch)
-        #             for f in self.git_get_files(branch) if f != basename(f)])
         return list(set([self._filename2key(f.split(os.sep)[0])
                          for f in self.git_get_files(branch)
-                         if f != basename(f)]))
+                         if f != basename(f) and not f.startswith('.')]))
 
     def _filename2key(self, fname):
         """Placeholder

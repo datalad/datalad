@@ -31,5 +31,10 @@ setup(
         'console_scripts': [
             'datalad=datalad.cmdline.main:main',
             'git-annex-remote-dl+archive=datalad.customremotes.archive:main'],
+    },
+    package_data={
+        'datalad': ['resources/sshserver_prepare_for_publish.sh',
+                    'resources/sshserver_cleanup_after_publish.sh',
+                    'resources/git_ssh.sh']
     }
 )
