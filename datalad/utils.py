@@ -18,7 +18,7 @@ import platform
 import gc
 
 from functools import wraps
-from os.path import exists, join as opj
+from os.path import exists, join as opj, isabs, normpath
 from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
@@ -397,3 +397,24 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
+def chpwd(path):
+    """Wrapper around os.chdir which also adjusts environ['PWD']
+
+    The reason is that otherwise PWD is simply inherited from the shell
+    and we have no ability to assess directory path without dereferencing
+    symlinks
+    """
+    if not isabs(path):
+        path = normpath(opj(getpwd(), path))
+    os.chdir(path)  # for grep people -- ok, to chdir here!
+    os.environ['PWD'] = path
+
+def getpwd():
+    """Try to return a CWD without dereferencing possible symlinks
+
+    If no PWD found in the env, output of getcwd() is returned
+    """
+    try:
+        return os.environ['PWD']
+    except KeyError:
+        return os.getcwd()
