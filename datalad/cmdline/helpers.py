@@ -150,7 +150,7 @@ def get_repo_instance(path=curdir, class_=None):
     """
 
     from os.path import join as opj, ismount, exists, abspath, expanduser, \
-        expandvars, normpath
+        expandvars, normpath, isabs
     from git.exc import InvalidGitRepositoryError
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo
@@ -159,6 +159,7 @@ def get_repo_instance(path=curdir, class_=None):
     from ..support.exceptions import CollectionBrokenError
 
     dir_ = abspath(expandvars(expanduser(path)))
+    abspath_ = path if isabs(path) else dir_
     if class_ is not None:
         if class_ == CollectionRepo:
             type_ = "collection"
@@ -192,17 +193,17 @@ def get_repo_instance(path=curdir, class_=None):
                     return GitRepo(dir_, create=False)
                 except InvalidGitRepositoryError as e:
                     raise RuntimeError("No datalad repository found in %s" %
-                                       dir_)
+                                       abspath_)
             else:
                 try:
                     return class_(dir_)
                 except (RuntimeError, InvalidGitRepositoryError) as e:
                     raise RuntimeError("No %s repository found in %s" %
-                                       (type_, dir_))
+                                       (type_, abspath_))
         else:
             dir_ = normpath(opj(dir_, ".."))
 
     if class_ is not None:
-        raise RuntimeError("No %s repository found in %s" % (type_, dir_))
+        raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
     else:
-        raise RuntimeError("No datalad repository found in %s" % dir_)
+        raise RuntimeError("No datalad repository found in %s" % abspath_)
