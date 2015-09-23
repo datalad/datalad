@@ -25,7 +25,7 @@ class Get(Interface):
 
     Examples:
 
-    $ datalad get foo/*
+      $ datalad get foo/*
     """
 
     _params_ = dict(
@@ -38,7 +38,7 @@ class Get(Interface):
     def __call__(self, paths):
 
         try:
-            handle = get_repo_instance(AnnexRepo)
+            handle = get_repo_instance(class_=AnnexRepo)
         except RuntimeError as e:
             lgr.error(str(e))
             return -1  # TODO: How is this properly done?

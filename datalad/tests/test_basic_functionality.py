@@ -26,6 +26,8 @@ from ..tests.utils import ok_clean_git, ok_clean_git_annex_proxy, \
     with_tempfile, ok_, with_tree
 from ..utils import get_local_file_url, rmtree
 
+from .utils import skip_if_no_network
+
 # Note: For the actual commands use the following to determine paths to
 # the local master collection, configs, etc.:
 # from appdirs import AppDirs
@@ -46,9 +48,10 @@ def test_local_master(m_path):
     assert_equal(local_master.get_handle_list(), [])
 
 
+@skip_if_no_network
 @with_tempfile
 def test_register_collection(m_path):
-
+    # TODO: redo using locally established collection
     test_url = "https://github.com/bpoldrack/ExampleCollection.git"
     test_name = test_url.split('/')[-1].rstrip('.git')
     assert_equal(test_name, 'ExampleCollection')
@@ -188,9 +191,10 @@ def test_install_handle(m_path, c_path, h_path, install_path):
     assert_equal(installed_handle.name, "MyHandle")
 
 
+@skip_if_no_network
 @with_tempfile
 def test_unregister_collection(m_path):
-
+    # TODO: redo using locally established collection
     # setup:
     m_path = opj(m_path, 'localcollection')
     local_master = CollectionRepo(m_path, name='local')
@@ -316,7 +320,7 @@ def test_query_collection(c_path, h_path, md_hdl):
     # no use here.
     # Note: This uri construction has to change.
     import os
-    content_uri = URIRef(get_local_file_url(os.getcwd() + '/#content'))
+    content_uri = URIRef(get_local_file_url(os.getcwd()) + '/#content')
 
     assert_equal(len(results2), 2)
     assert_in((Literal("MyHandle"), URIRef(get_local_file_url(h_path))),

@@ -10,8 +10,25 @@
 
 __docformat__ = 'restructuredtext'
 
+import re
+from six import string_types
 from six.moves import map as map
 
+def _strip_typerepr(s):
+    """Strip away <class '...'> and <type '...'> decorations for docstrings
+    """
+    return re.sub("<(class|type) '(\S+)'>", r'\2', s)
+
+def _type_str(t):
+    """Get string human-readable representation of a data type
+
+    If type (t) is given as a tuple, assume ability to choose any of the
+    listed types, so those types listing get joined with |
+    """
+    if isinstance(t, tuple):
+        s = ' or '.join(map(_type_str, t))
+        return ("(%s)" % s) if len(t) > 1 else s
+    return _strip_typerepr(str(t))
 
 class Constraint(object):
     """Base class for input value conversion/validation.
@@ -58,19 +75,13 @@ class EnsureDType(Constraint):
     def __call__(self, value):
         from six import binary_type, text_type
         if hasattr(value, '__iter__') and \
-                not (isinstance(value, binary_type)
-                     or isinstance(value, text_type)):
+                not (isinstance(value, (binary_type, text_type))):
             return list(map(self._dtype, value))
         else:
             return self._dtype(value)
 
     def short_description(self):
-        dtype_descr = str(self._dtype)
-        if dtype_descr[:7] == "<type '" and dtype_descr[-2:] == "'>":
-            dtype_descr = dtype_descr[7:-2]
-        elif dtype_descr[:8] == "<class '" and dtype_descr[-2:] == "'>":
-            dtype_descr = dtype_descr[8:-2]
-        return dtype_descr
+        return _type_str(self._dtype)
 
     def long_description(self):
         return "value must be convertible to type '%s'" % self.short_description()
@@ -108,10 +119,7 @@ class EnsureListOf(Constraint):
         return list(map(self._dtype, value))
 
     def short_description(self):
-        dtype_descr = str(self._dtype)
-        if dtype_descr[:7] == "<type '" and dtype_descr[-2:] == "'>":
-            dtype_descr = dtype_descr[7:-2]
-        return 'list(%s)' % dtype_descr
+        return 'list(%s)' % _type_str(self._dtype)
 
     def long_description(self):
         return "value must be convertible to %s" % self.short_description()
@@ -133,10 +141,7 @@ class EnsureTupleOf(Constraint):
         return tuple(map(self._dtype, value))
 
     def short_description(self):
-        dtype_descr = str(self._dtype)
-        if dtype_descr[:7] == "<type '" and dtype_descr[-2:] == "'>":
-            dtype_descr = dtype_descr[7:-2]
-        return 'tuple(%s)' % dtype_descr
+        return 'tuple(%s)' % _type_str(self._dtype)
 
     def long_description(self):
         return "value must be convertible to %s" % self.short_description()
@@ -153,7 +158,7 @@ class EnsureBool(Constraint):
         from six import binary_type, text_type
         if isinstance(value, bool):
             return value
-        elif isinstance(value, binary_type) or isinstance(value, text_type):
+        elif isinstance(value, (binary_type, text_type)):
             value = value.lower()
             if value in ('0', 'no', 'off', 'disable', 'false'):
                 return False
@@ -175,7 +180,7 @@ class EnsureStr(Constraint):
     """
     def __call__(self, value):
         from six import binary_type, text_type
-        if not (isinstance(value, binary_type) or isinstance(value, text_type)):
+        if not isinstance(value, (binary_type, text_type)):
             # do not perform a blind conversion ala str(), as almost
             # anything can be converted and the result is most likely
             # unintended

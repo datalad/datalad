@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 import argparse
 import logging
 import sys
+import os
 import textwrap
 
 import datalad
@@ -21,7 +22,7 @@ from datalad.log import lgr
 
 from datalad.cmdline import helpers
 from ..interface.base import dedent_docstring, get_interface_groups
-from ..utils import setup_exceptionhook
+from ..utils import setup_exceptionhook, chpwd
 
 
 def _license_info():
@@ -55,12 +56,9 @@ def setup_parser():
         fromfile_prefix_chars='@',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
-    DataLad aims to expose (scientific) data available online as a unified data
-    distribution with the convenience of git-annex repositories as a backend.
-
-    datalad command line tool facilitates initial construction and update of
-    harvested online datasets.  It supports following commands
-    """),
+            DataLad provides a unified data distribution with the convenience of git-annex
+            repositories as a backend.  datalad command line tool allows to manipulate
+            (obtain, create, update, publish, etc.) datasets and their collections."""),
         epilog='"Control Your Data"',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False)
@@ -75,6 +73,14 @@ def setup_parser():
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
             help="do not catch exceptions and show exception traceback")
+    parser.add_argument(
+        '-C', action='append', dest='change_path', metavar='PATH',
+        help="""Run as if datalad was started in <path> instead
+        of the current working directory. When multiple -C options are given,
+        each subsequent non-absolute -C <path> is interpreted relative to the
+        preceding -C <path>. This option affects the interpretations of the
+        path names in that they are made relative to the working directory
+        caused by the -C option.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -141,22 +147,25 @@ def setup_parser():
         grp_descr = grp[1]
         grp_cmds = grp_short_descriptions[i]
 
-        cmd_summary.append('\n%s\n' % (grp_descr,))
+        cmd_summary.append('\n*%s*\n' % (grp_descr,))
         for cd in grp_cmds:
-            cmd_summary.append('  %s\n%s\n\n'
+            cmd_summary.append('  - %s:  %s'
                                % (cd[0],
                                   textwrap.fill(
-                                      cd[1],
+                                      cd[1].rstrip(' .'),
                                       75,
-                                      initial_indent=' ' * 4,
-                                      subsequent_indent=' ' * 4)))
+                                      #initial_indent=' ' * 4,
+                                      subsequent_indent=' ' * 8)))
+    # we need one last formal section to not have the trailed be
+    # confused with the last command group
+    cmd_summary.append('\n*General information*\n')
     parser.description = '%s\n%s\n\n%s' \
         % (parser.description,
            '\n'.join(cmd_summary),
            textwrap.fill(dedent_docstring("""\
     Detailed usage information for individual commands is
-    available via command-specific help options, i.e.:
-    %s <command> --help""") % sys.argv[0],
+    available via command-specific --help, i.e.:
+    datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
     return parser
 
@@ -171,9 +180,18 @@ def generate_api_call(cmdlineargs=None):
 
 
 def main(cmdlineargs=None):
+    # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser()
+    try:
+        import argcomplete
+        argcomplete.autocomplete(parser)
+    except ImportError:
+        pass
     # parse cmd args
     cmdlineargs = parser.parse_args(cmdlineargs)
+    if not cmdlineargs.change_path is None:
+        for path in cmdlineargs.change_path:
+            chpwd(path)
     # run the function associated with the selected command
     if cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure

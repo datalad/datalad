@@ -26,7 +26,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class CreateHandle(Interface):
-    """Creates a new handle."""
+    """Create a new handle."""
     _params_ = dict(
         path=Parameter(
             args=('path',),
