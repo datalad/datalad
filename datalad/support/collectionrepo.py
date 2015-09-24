@@ -482,7 +482,7 @@ class CollectionRepo(GitRepo):
     # remove metadata sources ?
 
     def add_metadata_src_to_handle(self, importer, key, files=None,
-                                   data=None):
+                                   about_uri=None):
         """Imports a new metadata source
 
         Parameters:
@@ -494,34 +494,39 @@ class CollectionRepo(GitRepo):
         files: str or list of str
           either a path to the file or directory to be imported or a list
           containing paths to the files.
-        data: dict of list of str
-          a dictionary containing the metadata to be imported. The key is
-          expected to be the file name and the value its content as a list of
-          the file's lines as returned by `readlines()`.
+        about_uri: URIRef
+          uri of the entity the metadata is about. By default it's the handle
+          itself.
         """
 
         if not issubclass(importer, MetadataImporter):
             raise TypeError("Not a MetadataImporter: " + str(importer))
 
         cfg_graph = Graph().parse(opj(self.path, self._key2filename(key),
-                                      REPO_CONFIG_FILE), format="turtle")
-        url = cfg_graph.value(predicate=RDFS.label, object=Literal(key))
+                                      REPO_CONFIG_FILE),
+                                  format="turtle")
+        if about_uri is None:
+            about_uri = cfg_graph.value(predicate=RDFS.label,
+                                        object=Literal(key))
 
         # check for existing metadata sources to determine the name for the
         # new one:
         src_name = "%s_import%d" % (key,
                                     len([src for src in
-                                         cfg_graph.objects(url, DLNS.usesSrc)])
+                                         cfg_graph.objects(about_uri,
+                                                           DLNS.usesSrc)])
                                     + 1)
         src_node = URIRef(src_name)
         im = importer(target_class='Collection', about_class='Handle',
-                      about_uri=url)
-        im.import_data(files=files, data=data)
+                      about_uri=about_uri)
+        im.import_data(files=files)
 
         # add config-entries for that source:
-        cfg_graph.add((url, DLNS.usesSrc, src_node))
-        # TODO: specify that source (used files, ..):
-        # cfg_graph.add((src_node, ))
+        cfg_graph.add((about_uri, DLNS.usesSrc, src_node))
+        if isinstance(files, string_types):
+            cfg_graph.add((src_node, DLNS.usesFile, URIRef(files)))
+        elif isinstance(files, list):
+            [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f))) for f in files]
 
         # create import branch:
         active_branch = self.git_get_active_branch()
@@ -547,6 +552,9 @@ class CollectionRepo(GitRepo):
         # But: also needs handle or collection
         # So may be add parameters to the other methods for importing data
         # about a sub-entity instead of an dedicated method for that.
+        raise NotImplementedError
+
+    def update_metadata_src(self):
         raise NotImplementedError
 
     def add_handle(self, handle, name=None):
