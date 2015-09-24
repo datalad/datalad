@@ -19,9 +19,11 @@ from os.path import join as opj, exists, basename
 import logging
 
 from rdflib import URIRef, RDF
+from six import string_types
 
 from .annexrepo import AnnexRepo
-from .metadatahandler import CustomImporter, Graph, Literal, DLNS, RDFS
+from .metadatahandler import MetadataImporter, CustomImporter, Graph, Literal, \
+    DLNS, RDFS
 from .handle import HandleBackend, Handle
 from ..utils import assure_dir
 from ..consts import HANDLE_META_DIR, REPO_CONFIG_FILE, REPO_STD_META_FILE
@@ -289,3 +291,82 @@ class HandleRepo(AnnexRepo):
 
     def set_metadata(self, graph, msg="Metadata saved."):
         raise NotImplementedError
+
+    def import_metadata(self, importer, files=None, data=None,
+                        about_uri=DLNS.this):
+        """Imports metadata to the datalad-conform metadata representation
+        of the handle.
+
+        Expects either `files` or `data` to be not `None`.
+
+        Parameters:
+        ___________
+        importer: class
+          the importer to be used; has to be a subclass of MetadataImporter
+        files: str or list of str
+          either a path to the file or directory to be imported or a list
+          containing paths to the files.
+        data: dict of list of str
+          a dictionary containing the metadata to be imported. The key is
+          expected to be the file name and the value its content as a list of
+          the file's lines as returned by `readlines()`.
+        about_uri: URIRef
+          uri of the entity the metadata is about. By default it's the handle
+          itself.
+        """
+
+        if not issubclass(importer, MetadataImporter):
+            raise TypeError("Not a MetadataImporter: " + str(importer))
+
+        # TODO: check whether cfg-file even exists, otherwise create a basic one.
+        old_cfg_graph = Graph().parse(opj(self.path, HANDLE_META_DIR,
+                                      REPO_CONFIG_FILE),
+                                  format="turtle")
+        # check for existing metadata sources to determine the name for the
+        # new one:
+        # TODO: the numbering is shit ;) Use a hash or sth.
+        src_name = "%s_import%d" % (self.name,
+                                    len([src for src in
+                                         old_cfg_graph.objects(about_uri,
+                                                               DLNS.usesSrc)])
+                                    + 1)
+
+        # graph containing just new config statements:
+        cfg_graph = Graph()
+
+        if files is not None and data is None:
+            # treat it as a metadata source, that can be used again later on.
+            src_node = URIRef(src_name)
+            # add config-entries for that source:
+            cfg_graph.add((about_uri, DLNS.usesSrc, src_node))
+            if isinstance(files, string_types):
+                cfg_graph.add((src_node, DLNS.usesFile, URIRef(files)))
+            elif isinstance(files, list):
+                [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f)))
+                 for f in files]
+
+        elif files is None and data is not None:
+            # just metadata to read, nothing we can refer to later on
+            pass
+        else:
+            raise ValueError("Either 'files' or 'data' have to be passed.")
+
+        im = importer(target_class='Handle', about_class='Handle',
+                      about_uri=about_uri)
+        im.import_data(files=files, data=data)
+
+        # add new config statements:
+        im.get_graphs()[REPO_CONFIG_FILE[:-4]] += cfg_graph
+
+        # create import branch:
+        active_branch = self.git_get_active_branch()
+        self.git_checkout(name=src_name, options='-b')
+
+        im.store_data(opj(self.path, HANDLE_META_DIR))
+        self.add_to_git(opj(self.path, HANDLE_META_DIR))
+
+        # switching back and merge:
+        # Note: -f used for the same reason as in remove_handle
+        # TODO: Check this out
+        self.git_checkout(active_branch, options="-f")
+        self.git_merge(src_name)

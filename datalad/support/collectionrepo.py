@@ -526,7 +526,8 @@ class CollectionRepo(GitRepo):
         if isinstance(files, string_types):
             cfg_graph.add((src_node, DLNS.usesFile, URIRef(files)))
         elif isinstance(files, list):
-            [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f))) for f in files]
+            [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f)))
+             for f in files]
 
         # create import branch:
         active_branch = self.git_get_active_branch()
@@ -542,7 +543,7 @@ class CollectionRepo(GitRepo):
         # Note: -f used for the same reason as in remove_handle
         # TODO: Check this out
         self.git_checkout(active_branch, options="-f")
-        self.git_merge(src_name)  # TODO!
+        self.git_merge(src_name)
 
     # TODO: following methods similar to 'add_metadata_src_to_handle'
     def add_metadata_src_to_collection(self):

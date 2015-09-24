@@ -81,3 +81,5 @@ class AddHandle(Interface):
         # TODO: More sophisticated: Check whether the collection is registered.
         # Might be a different name than collection_repo.name or not at all.
         local_master.git_fetch(collection_repo.name)
+
+        # TODO: metadata: prepared handle or init
