@@ -3,9 +3,6 @@
 
 set -eu
 
-mkdir -p pymvpa-collection
-cd pymvpa-collection
-
 echo "I: adding haxby2001"
 # Haxby 2001 -- the main demo dataset
 datalad install-handle http://data.pymvpa.org/datasets/haxby2001/.git
@@ -35,7 +32,7 @@ datalad install-handle http://psydata.ovgu.de/forrest_gump/.git
 
 # new plain collection
 echo "I: creating PyMVPA collection"
-datalad create-collection collection pymvpa # path name
+datalad create-collection pymvpa_collection pymvpa # path name
 
 # add all handles to the pymvpa_collection
 echo "I: adding all handles to the PyMVPA collection"
@@ -47,7 +44,7 @@ cd pymvpa_collection
 # XXX this should pull in the new handle meta-data, but doesn't ???
 echo "I: updating collection"
 datalad update
-# this leads to all of .git being commited with the meta data change
+
 echo "I: describing collection"
 datalad describe \
     --author "DataLad AKA PyMVPA Team" \
