@@ -319,15 +319,16 @@ class HandleRepo(AnnexRepo):
             raise TypeError("Not a MetadataImporter: " + str(importer))
 
         # TODO: check whether cfg-file even exists, otherwise create a basic one.
-        old_cfg_graph = Graph().parse(opj(self.path, HANDLE_META_DIR,
-                                      REPO_CONFIG_FILE),
-                                  format="turtle")
+        cfg_graph = Graph().parse(opj(self.path, HANDLE_META_DIR,
+                                          REPO_CONFIG_FILE),
+                                      format="turtle")
+
         # check for existing metadata sources to determine the name for the
         # new one:
         # TODO: the numbering is shit ;) Use a hash or sth.
         src_name = "%s_import%d" % (self.name,
                                     len([src for src in
-                                         old_cfg_graph.objects(about_uri,
+                                         cfg_graph.objects(about_uri,
                                                                DLNS.usesSrc)])
                                     + 1)
 

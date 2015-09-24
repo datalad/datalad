@@ -472,71 +472,83 @@ class CollectionRepo(GitRepo):
             branch = self.git_get_active_branch()
         return CollectionRepoBackend(self, branch)
 
-    # #######################################
-    # TODO (adapting to new design):
-    # add/remove handle
-    # add metadata sources
-    # adapting backends and may be Handle/Collection interfaces
-    # test cases
-    # update metadata sources
-    # remove metadata sources ?
+    def _import_metadata(self, target_path, importer, about_uri,
+                         about_class=None, files=None, data=None):
+        """Imports metadata to the collection.
 
-    def add_metadata_src_to_handle(self, importer, key, files=None,
-                                   about_uri=None):
-        """Imports a new metadata source
+        Private method to be used by import_metadata_to_handle and
+        import_metadata_to_collection.
+        Expects either `files` or `data` to be not `None`.
 
         Parameters:
         ___________
+        target_path: str
+          path to the metadata files. Depends on whether to add to collection
+          level metadata or a handle of the collection
         importer: class
           the importer to be used; has to be a subclass of MetadataImporter
-        key: str
-          the handle's key in the collection
+        about_uri: URIRef
+          uri of the entity the metadata is about
+        about_class: str
+          Either "Handle", "Collection" or None, in case of a sub-entity
         files: str or list of str
           either a path to the file or directory to be imported or a list
           containing paths to the files.
-        about_uri: URIRef
-          uri of the entity the metadata is about. By default it's the handle
-          itself.
+        data: dict of list of str
+          a dictionary containing the metadata to be imported. The key is
+          expected to be the file name and the value its content as a list of
+          the file's lines as returned by `readlines()`.
         """
-
         if not issubclass(importer, MetadataImporter):
             raise TypeError("Not a MetadataImporter: " + str(importer))
 
-        cfg_graph = Graph().parse(opj(self.path, self._key2filename(key),
-                                      REPO_CONFIG_FILE),
-                                  format="turtle")
-        if about_uri is None:
-            about_uri = cfg_graph.value(predicate=RDFS.label,
-                                        object=Literal(key))
+        # TODO: if about_uri doesn't exist and it's a subentity
+        # (about_class is None), create it. (+ doc)
+
+        # TODO: check whether cfg-file even exists, otherwise create
+        # a basic one.
+        cfg_graph = Graph().parse(opj(target_path, REPO_CONFIG_FILE),
+                                      format="turtle")
 
         # check for existing metadata sources to determine the name for the
         # new one:
-        src_name = "%s_import%d" % (key,
+        # TODO: the numbering is shit ;) Use a hash or sth.
+        src_name = "%s_import%d" % (self.name,
                                     len([src for src in
                                          cfg_graph.objects(about_uri,
                                                            DLNS.usesSrc)])
                                     + 1)
-        src_node = URIRef(src_name)
-        im = importer(target_class='Collection', about_class='Handle',
-                      about_uri=about_uri)
-        im.import_data(files=files)
 
-        # add config-entries for that source:
-        cfg_graph.add((about_uri, DLNS.usesSrc, src_node))
-        if isinstance(files, string_types):
-            cfg_graph.add((src_node, DLNS.usesFile, URIRef(files)))
-        elif isinstance(files, list):
-            [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f)))
-             for f in files]
+        if files is not None and data is None:
+            # treat it as a metadata source, that can be used again later on.
+            src_node = URIRef(src_name)
+            # add config-entries for that source:
+            cfg_graph.add((about_uri, DLNS.usesSrc, src_node))
+            if isinstance(files, string_types):
+                cfg_graph.add((src_node, DLNS.usesFile, URIRef(files)))
+            elif isinstance(files, list):
+                [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f)))
+                 for f in files]
+
+        elif files is None and data is not None:
+            # just metadata to read, nothing we can refer to later on
+            pass
+        else:
+            raise ValueError("Either 'files' or 'data' have to be passed.")
+
+        im = importer(target_class='Collection', about_class=about_class,
+                      about_uri=about_uri)
+        im.import_data(files=files, data=data)
+
+        # add new config statements:
+        im.get_graphs()[REPO_CONFIG_FILE[:-4]] += cfg_graph
 
         # create import branch:
         active_branch = self.git_get_active_branch()
         self.git_checkout(name=src_name, options='-b')
 
-        im.store_data(opj(self.path, self._key2filename(key)))
-        cfg_graph.serialize(opj(self.path, self._key2filename(key),
-                                REPO_CONFIG_FILE), format="turtle")
-        self.git_add(self._key2filename(key))
+        im.store_data(target_path)
+        self.git_add(target_path)
         self.git_commit("New import branch created.")
 
         # switching back and merge:
@@ -545,17 +557,52 @@ class CollectionRepo(GitRepo):
         self.git_checkout(active_branch, options="-f")
         self.git_merge(src_name)
 
-    # TODO: following methods similar to 'add_metadata_src_to_handle'
-    def add_metadata_src_to_collection(self):
-        raise NotImplementedError
+    def import_metadata_to_handle(self, importer, key, files=None, data=None,
+                                  about_uri=None):
+        # TODO: Doc
 
-    def add_metadata_src_to_entity(self):
-        # But: also needs handle or collection
-        # So may be add parameters to the other methods for importing data
-        # about a sub-entity instead of an dedicated method for that.
-        raise NotImplementedError
+        target_path = opj(self.path, self._key2filename(key))
+
+        if about_uri is None:
+            # by default the metadata is assumed to be about the handle itself:
+            about_uri = Graph().parse(opj(target_path, REPO_CONFIG_FILE),
+                                      format="turtle").value(
+                predicate=RDFS.label,
+                object=Literal(key))
+            about_class = "Handle"
+        else:
+            # Assume it's a sub-entity.
+            # Note: Theoretically, we could recognize, whether or not this uri
+            # is matching the uri of the handle
+            about_class = None
+
+        self._import_metadata(target_path=target_path, importer=importer,
+                              about_uri=about_uri, about_class=about_class,
+                              files=files, data=data)
+
+    def import_metadata_collection(self, importer, files=None, data=None,
+                                   about_uri=None):
+
+        # TODO: Doc
+        if about_uri is None:
+            about_uri = DLNS.this
+            about_class = "Collection"
+        else:
+            # Assume it's a sub-entity.
+            # Note: Theoretically, we could recognize, whether or not this uri
+            # is matching the uri of the collection
+            about_class = None
+
+        self._import_metadata(target_path=self.path, importer=importer,
+                              about_uri=about_uri, about_class=about_class,
+                              files=files, data=data)
 
     def update_metadata_src(self):
+        # TODO
+        raise NotImplementedError
+
+    def remove_metadata_src(self):
+        # Do we need that one?
         raise NotImplementedError
 
     def add_handle(self, handle, name=None):
