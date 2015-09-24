@@ -93,9 +93,9 @@ class ConfigManager(SafeConfigParserWithIncludes, object):
         self._super.__init__()
 
         # set critical defaults
-        for sec, params in ConfigManager._DEFAULTS.iteritems():
+        for sec, params in ConfigManager._DEFAULTS.items():
             self.add_section(sec)
-            for key, value in params.iteritems():
+            for key, value in params.items():
                 self.set(sec, key, value)
 
         self.__cfg_filenames = []
@@ -223,7 +223,7 @@ class ConfigManager(SafeConfigParserWithIncludes, object):
             return default
         try:
             return self._super._get(section, dtype, option)
-        except ValueError, e:
+        except ValueError as e:
             # provide somewhat descriptive error
             raise ValueError(
                 "Failed to obtain value from configuration for %s.%s. "

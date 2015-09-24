@@ -178,15 +178,16 @@ class Annexificator(object):
         lgr.debug("Request to annex %(url)s to %(filename)s", locals())
         # Filename still can be None
 
-        db_filename = self.db.get_filename(url)
-        if filename is not None and filename != db_filename:
-            # need to download new
-            self.repo.annex_addurls
-            # remove old
-            self.repo.git_remove([db_filename])
-            self.db.set_filename(url, filename)
-        # figure out if we need to download it
-        #if self.mode in ('relaxed', 'fast'):
+        # WiP: commented out to do testing before merge
+        # db_filename = self.db.get_filename(url)
+        # if filename is not None and filename != db_filename:
+        #     # need to download new
+        #     self.repo.annex_addurls
+        #     # remove old
+        #     self.repo.git_remove([db_filename])
+        #     self.db.set_filename(url, filename)
+        # # figure out if we need to download it
+        # #if self.mode in ('relaxed', 'fast'):
 
 
         yield data  # There might be more to it!
