@@ -31,7 +31,7 @@ def _test_get_url_straight_filename(suf):
     eq_(get_url_straight_filename('http://a.b/' + suf), '')
     eq_(get_url_straight_filename('http://a.b/p1' + suf), 'p1')
     eq_(get_url_straight_filename('http://a.b/p1/' + suf), '')
-    #eq_(get_url_straight_filename('http://a.b/p1/' + suf, allowdir=True), 'p1')
+    eq_(get_url_straight_filename('http://a.b/p1/' + suf, allowdir=True), 'p1')
     eq_(get_url_straight_filename('http://a.b/p1/p2' + suf), 'p2')
     eq_(get_url_straight_filename('http://a.b/p1/p2/' + suf), '')
     eq_(get_url_straight_filename('http://a.b/p1/p2/' + suf, allowdir=True), 'p2')
