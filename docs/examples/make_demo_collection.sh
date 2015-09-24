@@ -35,12 +35,12 @@ git commit -m "CZE and BUL switched to 'kein Ausbau' (no expansion)"
 # Disable for now to keep it fast
 #
 ## video from https://archive.org/details/BigBuckBunny_328
-#git annex addurl "https://archive.org/download/BigBuckBunny_328/BigBuckBunny.avi"
-#git mv archive.org_download_BigBuckBunny_328_BigBuckBunny.avi BigBuckBunny.avi
+# using http: works without redirect to https which allows for local caching
+#git annex addurl --pathdepth -1 "http://archive.org/download/BigBuckBunny_328/BigBuckBunny.avi"
 #git commit -m "Include big buck bunny from internet archive"
 #
 ## public domain book Alice in Wonderland from https://archive.org/details/alicesadventures19033gut
-#wget https://archive.org/download/alicesadventures19033gut/19033-h.zip 
+#wget http://archive.org/download/alicesadventures19033gut/19033-h.zip
 #unzip 19033-h.zip
 #mv 19033-h alice_in_wonderland
 #rm *.zip
