@@ -63,10 +63,16 @@ class PublishHandle(Interface):
         local_handle_repo = get_repo_instance(
             abspath(expandvars(expanduser(handle))), HandleRepo)
 
-        # first try: local path
-        if not isdir(abspath(expandvars(expanduser(target)))):
+        if target is None:
+            # assume url is a valid repo to push to;
+            assert url is not None
+        # TODO: direct ssh-publishing for single handle
+        elif not isdir(abspath(expandvars(expanduser(target)))):
+            # unexpected target type or invalid path
             raise RuntimeError("Can't handle target %s" % target)
-        target = abspath(expandvars(expanduser(target)))
+        else:
+            # target is local path
+            target = abspath(expandvars(expanduser(target)))
 
         if url is None:
             url = target
@@ -91,10 +97,13 @@ class PublishHandle(Interface):
 
         importer.store_data(opj(local_handle_repo.path, HANDLE_META_DIR))
         local_handle_repo.add_to_git(opj(local_handle_repo.path,
-                                         HANDLE_META_DIR))
+                                         HANDLE_META_DIR),
+                                     commit_msg="metadata prepared for "
+                                                "publishing")
 
-        # create target annex:
-        published_handle = AnnexRepo(target, create=True)
+        if target is not None:
+            # create target annex:
+            published_handle = AnnexRepo(target, create=True)
 
         # add as remote to local:
         if remote is None:
@@ -110,17 +119,16 @@ class PublishHandle(Interface):
         # we want to push to master, so a different branch has to be checked
         # out in target; in general we can't explicitly allow for the local
         # repo to push
-        published_handle.git_checkout("TEMP", '-b')
+        if target is not None:
+            published_handle.git_checkout("TEMP", '-b')
         local_handle_repo.git_push("%s +%s:master" % (remote, p_branch))
-        published_handle.git_checkout("master")
+        if target is not None:
+            published_handle.git_checkout("master")
         # published_handle._git_custom_command('', "git branch -D TEMP")
         # "TEMP" not found? => because it's empty?
 
-        # 2. sync, to get locations for files, that are not present in
-        # local handle
-        local_handle_repo._annex_custom_command('', "git annex sync %s"
-                                                % remote)
-        published_handle._annex_custom_command('', "git annex sync")
+        # 2. push git-annex branch
+        local_handle_repo.git_push("%s +git-annex:git-annex" % remote)
 
         # 3. copy locally available files:
         for file in local_handle_repo.get_annexed_files():
@@ -128,8 +136,11 @@ class PublishHandle(Interface):
                 local_handle_repo._annex_custom_command(
                     '', "git annex copy %s --to=%s" % (file, remote))
 
-        # 4. get everything else
-        published_handle.annex_get('.')
+        # Note: Currently, this is only relevant, when publish-handle is called
+        # directly (with local target). Obviously doesn't work remotely!
+        if target is not None:
+            # 4. get everything else
+            published_handle.annex_get('.')
 
         # finally:
         local_handle_repo.git_checkout("master")

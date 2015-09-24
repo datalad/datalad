@@ -59,13 +59,25 @@ class UpgradeHandle(Interface):
             lgr.error("Unknown handle '%s'." % handle)
             raise RuntimeError("Unknown handle '%s'." % handle)
 
+        remotes = repo.git_get_remotes()
+        if not remotes:
+            raise RuntimeError("No remotes were found for %s. Cannot upgrade"
+                               % repo.path)
+
+        # TODO: it might be arbitrary other remote, not necessarily origin
+        # That information is stored in git/.config -- use it
+        upgrade_remote = 'origin'
+        if upgrade_remote not in remotes:
+            raise RuntimeError("No remote %r found to upgrade from. Known remotes: %s"
+                               % (upgrade_remote, ', '.join(remotes)))
+
         if upgrade_data:
             # what files do we currently have?
             files_to_upgrade = [f for f in repo.get_indexed_files()
                                 if repo.file_has_content(f)]
 
         # upgrade it:
-        repo.git_pull('origin')
+        repo.git_pull(upgrade_remote)
 
         if upgrade_data:
             # upgrade content:

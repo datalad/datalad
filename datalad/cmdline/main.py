@@ -22,7 +22,7 @@ from datalad.log import lgr
 
 from datalad.cmdline import helpers
 from ..interface.base import dedent_docstring, get_interface_groups
-from ..utils import setup_exceptionhook
+from ..utils import setup_exceptionhook, chpwd
 
 
 def _license_info():
@@ -191,7 +191,7 @@ def main(cmdlineargs=None):
     cmdlineargs = parser.parse_args(cmdlineargs)
     if not cmdlineargs.change_path is None:
         for path in cmdlineargs.change_path:
-            os.chdir(path)
+            chpwd(path)
     # run the function associated with the selected command
     if cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure

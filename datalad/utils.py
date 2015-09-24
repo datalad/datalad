@@ -9,8 +9,9 @@
 
 import collections
 import six.moves.builtins as __builtin__
-from six.moves.urllib.parse import quote as urlquote
+from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
+import re
 import logging
 import shutil, stat, os, sys
 import tempfile
@@ -18,7 +19,7 @@ import platform
 import gc
 
 from functools import wraps
-from os.path import exists, join as opj
+from os.path import exists, join as opj, isabs, normpath
 from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
@@ -76,6 +77,10 @@ def get_local_file_url(fname):
         furl = "file://%s" % urlquote(fname)
     return furl
 
+def get_url_path(url):
+    """Given a file:// url, return the path itself"""
+
+    return urlunquote(urlsplit(url).path)
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -405,3 +410,25 @@ def updated(d, update):
     d = d.copy()
     d.update(update)
     return d
+
+def chpwd(path):
+    """Wrapper around os.chdir which also adjusts environ['PWD']
+
+    The reason is that otherwise PWD is simply inherited from the shell
+    and we have no ability to assess directory path without dereferencing
+    symlinks
+    """
+    if not isabs(path):
+        path = normpath(opj(getpwd(), path))
+    os.chdir(path)  # for grep people -- ok, to chdir here!
+    os.environ['PWD'] = path
+
+def getpwd():
+    """Try to return a CWD without dereferencing possible symlinks
+
+    If no PWD found in the env, output of getcwd() is returned
+    """
+    try:
+        return os.environ['PWD']
+    except KeyError:
+        return os.getcwd()
