@@ -198,7 +198,7 @@ def ok_annex_get(ar, files, network=True):
         ar.annex_get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
-            ok_('100%' in cmo.err or '100.0%' in cmo.err)
+            ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
     # verify that load was fetched
     ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
@@ -523,33 +523,38 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
     def newfunc(*args, **kwargs):
         cwd_before = os.getcwd()
         pwd_before = getpwd()
-        exc_info = None
-        try:
-            func(*args, **kwargs)
-        except:
-            exc_info = sys.exc_info()
-        finally:
+
+        def cleanup(was_exception):
+            """Helper to perform cleanup actions/checks.
+
+            Done so to overcome difficulty of re-raising the original exception
+            with original stack in python3
+            """
             try:
                 cwd_after = os.getcwd()
             except OSError as e:
                 lgr.warning("Failed to getcwd: %s" % e)
                 cwd_after = None
 
-        if cwd_after != cwd_before:
-            chpwd(pwd_before)
-            if not ok_to_chdir:
-                lgr.warning(
-                    "%s changed cwd to %s. Mitigating and changing back to %s"
-                    % (func, cwd_after, pwd_before))
-                # If there was already exception raised, we better re-raise
-                # that one since it must be more important, so not masking it
-                # here with our assertion
-                if exc_info is None:
-                    assert_equal(cwd_before, cwd_after,
-                                 "CWD changed from %s to %s" % (cwd_before, cwd_after))
+            if cwd_after != cwd_before:
+                chpwd(pwd_before)
+                if not ok_to_chdir:
+                    lgr.warning(
+                        "%s changed cwd to %s. Mitigating and changing back to %s"
+                        % (func, cwd_after, pwd_before))
+                    # If there was already exception raised, we better re-raise
+                    # that one since it must be more important, so not masking it
+                    # here with our assertion
+                    if not was_exception:
+                        assert_equal(cwd_before, cwd_after,
+                                     "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
-        if exc_info is not None:
-            raise exc_info[0](exc_info[1], exc_info[2])
+        try:
+            func(*args, **kwargs)
+        except:
+            cleanup(True)
+            raise
+        cleanup(False)
 
     return newfunc
 
