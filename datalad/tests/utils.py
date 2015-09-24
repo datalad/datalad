@@ -25,6 +25,7 @@ import time
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
+from six import reraise
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir
@@ -549,7 +550,7 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            raise exc_info[0](exc_info[1], exc_info[2])
+            reraise(*exc_info)
 
     return newfunc
 
