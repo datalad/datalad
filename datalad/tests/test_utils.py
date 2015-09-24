@@ -19,7 +19,7 @@ from six import PY3
 
 from os.path import join as opj, isabs, abspath
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
-from ..utils import get_local_file_url
+from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
 from ..support.annexrepo import AnnexRepo
 
@@ -136,6 +136,14 @@ def test_get_local_file_url_linux():
     assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
     assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
     assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
+
+@skip_if_on_windows
+def test_get_url_path_on_fileurls():
+    assert_equal(get_url_path('file:///a'), '/a')
+    assert_equal(get_url_path('file:///a/b'), '/a/b')
+    assert_equal(get_url_path('file:///a/b#id'), '/a/b')
+    assert_equal(get_url_path('file:///a/b?whatever'), '/a/b')
+
 
 def test_get_local_file_url_windows():
     raise SkipTest("TODO")
