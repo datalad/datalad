@@ -23,8 +23,9 @@ from six import PY3
 from six import string_types, text_type, binary_type
 
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol
+from .support.protocol import NullProtocol, DryRunProtocol
 from .utils import on_windows
+from . import cfg
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -346,3 +347,9 @@ def link_file_load(src, dst, dry_run=False):
         shutil.copystat(src_realpath, dst)
     else:
         lgr.log(1, "Hardlinking finished")
+
+def get_runner(*args, **kwargs):
+    if cfg.getboolean('crawl', 'dryrun', default=False):
+        kwargs = kwargs.copy()
+        kwargs['protocol'] = DryRunProtocol()
+    return Runner(*args, **kwargs)

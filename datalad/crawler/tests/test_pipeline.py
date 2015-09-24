@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from os.path import join as opj
 import vcr
 
 from ..nodes.crawl_url import crawl_url
@@ -14,7 +15,7 @@ from ..nodes.matches import *
 from ..pipeline import run_pipeline
 
 from ..nodes.misc import Sink, assign
-from ..nodes.annex import Annexificator
+from ..nodes.annex import Annexificator, initiate_handle
 
 from datalad.tests.utils import eq_, ok_
 from datalad.tests.utils import skip_if_no_module
@@ -71,16 +72,22 @@ def test_basic_openfmri_top_pipeline():
 def test_basic_openfmri_dataset_pipeline_with_annex(path):
     skip_if_no_module('scrapy')  # e.g. not present under Python3
     dataset_index = 1
-    dataset_url = 'https://openfmri.org/dataset/ds%06d' % dataset_index
-    annex = Annexificator(path, create=True,
+    dataset_name = 'ds%06d' % dataset_index
+    dataset_url = 'https://openfmri.org/dataset/' + dataset_name
+    # needs to be a non-existing directory
+    handle_path = opj(path, dataset_name)
+    # we need to pre-initiate handle
+    list(initiate_handle('openfmri', dataset_index, path=handle_path)())
+
+    annex = Annexificator(handle_path, create=False,  # must be already initialized etc
                           options=["-c", "annex.largefiles='exclude=*.txt'"])
 
     pipeline = [
         crawl_url(dataset_url),
         [  # and collect all URLs under "AWS Link"
             css_match('.field-name-field-aws-link a',
-                       xpaths={'url': '@href',
-                               'url_text': 'text()'}),
+                      xpaths={'url': '@href',
+                              'url_text': 'text()'}),
             # TODO:  here we need to provide means to rename some files
             # but first those names need to be extracted... pretty much
             # we need conditional sub-pipelines which do yield (or return?)
@@ -93,8 +100,8 @@ def test_basic_openfmri_dataset_pipeline_with_annex(path):
         ],
         [  # and license information
             css_match('.field-name-field-license a',
-                       xpaths={'url': '@href',
-                               'url_text': 'text()'}),
+                      xpaths={'url': '@href',
+                              'url_text': 'text()'}),
             assign({'filename': 'license.txt'}),
             annex,
         ],
