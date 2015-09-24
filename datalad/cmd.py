@@ -315,8 +315,10 @@ class Runner(object):
         Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
         log the used protocol.
         """
-        lgr.log(level, "Protocol: %s: %s" % (self.protocol.__class__.__name__,
-                                             msg))
+        if isinstance(self.protocol, NullProtocol):
+            lgr.log(level, msg)
+        else:
+            lgr.log(level, "{%s} %s" % (self.protocol.__class__.__name__, msg))
 
 
 # ####
