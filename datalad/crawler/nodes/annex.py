@@ -20,12 +20,15 @@ from ...support.network import get_url_straight_filename, get_url_deposition_fil
 from ... import cfg
 from ...cmd import get_runner
 
+from ..pipeline import crawler_pipeline_section
+
 from logging import getLogger
 lgr = getLogger('datalad.crawl.annex')
 
 _runner = get_runner()
 _call = _runner.call
 _run = _runner.run
+
 
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
@@ -75,8 +78,9 @@ class initiate_handle(object):
     def _save_crawl_config(self, handle_path, name, data):
         crawl_config = opj(handle_path, '.datalad', 'crawl.cfg')
         cfg = SafeConfigParserWithIncludes()
+        cfg.add_section(crawler_pipeline_section)
         def secset(k, v):
-            cfg.set('DEFAULT', k, str(v))
+            cfg.set(crawler_pipeline_section, k, str(v))
         secset('template', self.template)
         secset('collection', self.collection_name)
         secset('name', name)

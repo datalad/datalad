@@ -28,6 +28,7 @@ from .test import Test
 from .get import Get
 from .drop import Drop
 from .crawl import Crawl
+from .oldcrawl import OldCrawl
 from .update import Update
 from .whereis import Whereis
 from .describe import Describe
@@ -69,6 +70,7 @@ _group_misc = (
     [
         Test,
         Crawl,
+        OldCrawl,
         SPARQLQuery,
         SearchHandle,
         SearchCollection,

@@ -8,6 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Module to provide DB for storing crawling/available information"""
 
+from abc import ABCMeta, abstractmethod, abstractproperty
+from six import itervalues
 
 class URLDB(object):
     """Database collating urls for the content across all handles
@@ -21,4 +23,35 @@ class URLDB(object):
 
     allow to query by any known checksum
     """
-    pass
+
+    __metaclass__ = ABCMeta
+
+    @abstractmethod
+    def __contains__(self, url):
+        """Return True if DB knows about this URL """
+        pass
+
+    @abstractmethod
+    def __getitem__(self, url):
+        """Given url, return file names where it was downloaded"""
+        pass
+
+class JsonURLDB(URLDB):
+    """Mimicues original dict-based urldb which was dumped to a json file
+
+    but which also had "public_incoming" mapping to map from incoming
+    filenames to "public".  Following changes would be done programatically now
+    and we will track only "incoming"
+
+    So internally it is just a dictionary of "file: url_info" where url_info is
+    a dict containing mtime, size, and url
+    """
+    def __init__(self):
+        self._data = {}
+
+    def __contains__(self, url):
+        return any(x['url'] == url for x in itervalues(self._data))
+
+    def __contains__(self, url):
+        return any(x['url'] == url for x in itervalues(self._data))
+

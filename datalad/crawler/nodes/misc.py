@@ -17,15 +17,31 @@ class Sink(object):
     """
 
     # TODO: add argument for selection of fields of data to keep
-    def __init__(self):
+    def __init__(self, keys=None, output=None):
+        """
+        Parameters
+        ----------
+        keys : list of str, optional
+          List of keys to store.  If not specified -- entire dictionaries stored
+        output : str, optional
+          If specified, it will be the key in the yielded data to contain all sunk
+          data
+        """
         self.data = []
+        self.keys = keys
+        self.output = output
 
     def get_fields(self, *keys):
-        return [(d[k] for k in keys) for d in self.data]
+        return [[d[k] for k in keys] for d in self.data]
 
     def __call__(self, **data):
         # ??? for some reason didn't work when I made entire thing a list
-        self.data.append(data)
+        if self.keys:
+            raise NotImplementedError("Jason will do it")
+        else:
+            self.data.append(data)
+        if self.output:
+            data = updated(data, {self.output: self.data})
         yield data
 
 

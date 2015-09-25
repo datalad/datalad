@@ -10,46 +10,43 @@
 
 __docformat__ = 'restructuredtext'
 
+
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureChoice
+from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
+
+from logging import getLogger
+lgr = getLogger('datalad.api.crawl')
 
 class Crawl(Interface):
     """Crawl online resource to create or update a handle.
 
     Examples:
 
-      $ datalad crawl cfgs/openfmri.cfg
+      $ datalad crawl  # within a handle having .datalad/crawl/crawl.cfg
     """
     _params_ = dict(
-        configs=Parameter(
+        config=Parameter(
             metavar='file',
-            nargs='+',
-            constraints=EnsureStr(),
+            constraints=EnsureStr() | EnsureNone(),
             doc="""Configuration file(s) defining the structure of the
             'project'"""),
-        existing=Parameter(
-            choices=('check', 'skip'),
-            doc="""How to deal with files already known. 'skip' would
-            entirely skip file without checking if it was modified or
-            not. 'check' would proceed normally updating the file(s) if
-            changed""",
-            constraints=EnsureChoice('check', 'skip')),
-        dry_run=Parameter(
-            args=("-n", "--dry-run"),
-            action="store_true",
-            doc="""Flag if git-annex is to be invoked. If not, commands are
-            only printed to the stdout"""),
-        cache=Parameter(
-            action="store_true",
-            doc="Flag whether to cache fetching of pages and parsing out urls")
     )
 
-    def __call__(self, configs, existing='check', dry_run=False, cache=False):
-        from datalad.api import DoubleAnnexRepo, load_config
+    def __call__(self, config=None):
+        from datalad.crawler.pipeline import load_pipeline_from_config, get_pipeline_config_path
+        from datalad.crawler.pipeline import run_pipeline
+        from datalad.cmdline.helpers import get_repo_instance
 
-        cfg = load_config(configs)
+        if config is None:
+            # get config from the current repository/handle
+            config = get_pipeline_config_path()
 
-        drepo = DoubleAnnexRepo(cfg)
-        drepo.page2annex(existing=existing, dry_run=dry_run,
-                         cache=cache)
+        if not config:
+            raise RuntimeError("Cannot locate crawler config file")
+
+        lgr.info("Loading pipeline definition from %s" % config)
+        pipeline = load_pipeline_from_config(config)
+
+        lgr.info("Running pipeline %s" % pipeline)
+        run_pipeline(pipeline)

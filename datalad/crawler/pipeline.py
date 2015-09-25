@@ -7,7 +7,18 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from os.path import dirname, join as opj, isabs, exists, curdir
+
 from .newmain import lgr
+from ..support.gitrepo import GitRepo
+from ..support.configparserinc import SafeConfigParserWithIncludes
+
+# Name of the section in the config file which would define pipeline parameters
+crawler_pipeline_section = 'crawler_pipeline'
+
+from logging import getLogger
+lgr = getLogger('datalad.crawl.pipeline')
+
 
 class FinishPipeline(Exception):
     """Exception to use to signal that any given pipeline should be stopped
@@ -34,7 +45,7 @@ def run_pipeline_steps(pipeline, **data):
     possibly multiple times if current node is a generator
     """
     if not len(pipeline):
-        return
+        return data
     node, pipeline_tail = pipeline[0], pipeline[1:]
     if isinstance(node, (list, tuple)):
         # we have got a step which is yet another entire pipeline
@@ -49,3 +60,60 @@ def run_pipeline_steps(pipeline, **data):
             # TODO: for heavy debugging we might want to track/report what node has changed in data
             lgr.log(7, " pass %d keys into tail with %d elements" % (len(data_), len(pipeline_tail)))
             run_pipeline_steps(pipeline_tail, **data_)
+
+
+def load_pipeline_from_template(name, opts={}):
+    """Given a name, loads that pipeline from datalad.crawler.pipelines
+
+    and later from other locations
+
+    Parameters
+    ----------
+    name: str
+        Name of the pipeline defining the filename. Or full path to it (TODO)
+    opts: dict, optional
+        Options for the pipeline, passed as **kwargs into the pipeline call
+    """
+
+    if (isabs(name) or exists(name)):
+        raise NotImplementedError("Don't know how to import straight path %s yet" % name)
+
+    # explicit isabs since might not exist
+    filename = name if (isabs(name) or exists(name)) else opj(dirname(__file__), 'pipelines', "%s.py" % name)
+
+    if not exists(filename):
+        raise IOError("Pipeline file %s was not found" % filename)
+
+    mod = __import__('datalad.crawler.pipelines.%s' % name, fromlist=['datalad.crawler.pipelines'])
+    return mod.pipeline(**opts)
+
+
+def load_pipeline_from_config(path):
+    """Given a path to the pipeline configuration file, instantiate a pipeline
+    """
+
+    cfg = SafeConfigParserWithIncludes()
+    cfg.read([path])
+    if cfg.has_section(crawler_pipeline_section):
+        opts = cfg.options(crawler_pipeline_section)
+        # must have template
+        if 'template' not in opts:
+            raise IOError("%s lacks %r field within %s section"
+                          % (path, 'template', crawler_pipeline_section))
+        opts.pop(opts.index('template'))
+        template = cfg.get(crawler_pipeline_section, 'template')
+        pipeline = load_pipeline_from_template(
+            template,
+            {o: cfg.get(crawler_pipeline_section, o) for o in opts})
+    else:
+        raise IOError("Did not fine %s section within %s" % (crawler_pipeline_section, path))
+    return pipeline
+
+def get_pipeline_config_path(repo_path=curdir):
+    """Given a path within a repo, return path to the crawl.cfg"""
+    if not exists(opj(repo_path, '.datalad')):
+        # we need to figure out top path for the repo
+        repo_path = GitRepo.get_toppath(repo_path)
+        if not repo_path:
+            return None
+    return opj(repo_path, '.datalad', 'crawl', 'crawl.cfg')

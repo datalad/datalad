@@ -11,12 +11,16 @@ from os.path import join as opj, exists
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
 
 from ..annex import initiate_handle
+from ...pipeline import load_pipeline_from_config
 
 @with_tempfile(mkdir=True)
 def test_initialize_handle(path):
     handle_path = opj(path, 'test')
-    datas = list(initiate_handle('testtemplate', 'testhandle', path=handle_path)())
-    assert(len(datas), 1); data = datas[0]
+    datas = list(initiate_handle('template', 'testhandle', path=handle_path)())
+    assert(len(datas), 1)
+    data = datas[0]
     eq_(data['handle_path'], handle_path)
-    ok_(exists, opj(handle_path, '.datalad', 'crawl.cfg'))
+    crawl_cfg = opj(handle_path, '.datalad', 'crawl.cfg')
+    ok_(exists, crawl_cfg)
+    pipeline = load_pipeline_from_config(crawl_cfg)
     raise SkipTest("TODO much more")
