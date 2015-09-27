@@ -1,4 +1,4 @@
-datalad (0.0.3+git338-g2464524-1) neurodebian-devel; urgency=low
+datalad (0.0.3+git395-g330fa6a-1) neurodebian-devel; urgency=low
 
   [ Yaroslav Halchenko ]
   * Initial Debian packaging
@@ -8,4 +8,4 @@ datalad (0.0.3+git338-g2464524-1) neurodebian-devel; urgency=low
     package. All relevant dependencies are satisfied by the tightly coupled
     'python-datalad' package.
 
- -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 21 Sep 2015 11:13:34 -0400
+ -- Yaroslav Halchenko <debian@onerussian.com>  Sun, 27 Sep 2015 01:05:41 -0400
