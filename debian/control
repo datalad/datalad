@@ -15,6 +15,7 @@ Build-Depends:
  python-argcomplete,
  python-bs4,
  python-git (>= 1.0.1+git137~),
+ python-html5lib,
  python-joblib,
  python-mock,
  python-nose,
@@ -67,6 +68,7 @@ Depends:
 Recommends:
  patool,
  python-bs4,
+ python-html5lib,
  python-joblib,
  python-testtools,
  python-mock,
