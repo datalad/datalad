@@ -49,8 +49,35 @@ def get_url_deposition_filename(url):
     finally:
         r.close()
 
-def get_url_straight_filename(url):
-    return os.path.basename(urlunquote(urlsplit(url).path))
+def get_url_straight_filename(url, strip=[], allowdir=False):
+    """Get file/dir name of the last path component of the URL
+
+    Parameters
+    ----------
+    strip: list, optional
+      If provided, listed names will not be considered and their
+      parent directory will be selected
+    allowdir: bool, optional
+      If url points to a "directory" (ends with /), empty string
+      would be returned unless allowdir is True, in which case the
+      name of the directory would be returned
+    """
+    path = urlunquote(urlsplit(url).path)
+    path_parts = path.split('/')
+
+    if allowdir:
+        # strip empty ones
+        while len(path_parts) > 1 and not path_parts[-1]:
+            path_parts = path_parts[:-1]
+
+    if strip:
+        while path_parts and path_parts[-1] in strip:
+            path_parts = path_parts[:-1]
+
+    if path_parts:
+        return path_parts[-1]
+    else:
+        return None
 
 def get_url_response_stamp(url, response_info):
     size, mtime = None, None

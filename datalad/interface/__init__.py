@@ -26,6 +26,7 @@ from .sparql_query import SPARQLQuery
 from .uninstall_handle import UninstallHandle
 from .test import Test
 from .get import Get
+from .drop import Drop
 from .crawl import Crawl
 from .update import Update
 from .whereis import Whereis
@@ -36,6 +37,7 @@ from .upgrade_handle import UpgradeHandle
 from .search_handle import SearchHandle
 from .publish_handle import PublishHandle
 from .search_collection import SearchCollection
+from .publish_collection import PublishCollection
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -45,6 +47,7 @@ _group_collection = (
         RegisterCollection,
         UnregisterCollection,
         ListCollection,
+        PublishCollection,
     ])
 
 _group_handle = (
@@ -56,6 +59,7 @@ _group_handle = (
         UninstallHandle,
         ListHandles,
         Get,
+        Drop,
         UpgradeHandle,
         PublishHandle,
     ])

@@ -38,7 +38,9 @@ def test_runner_dry(tempfile):
 
     # test dry command call
     cmd = 'echo Testing dry run > %s' % tempfile
-    ret = runner.run(cmd)
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        ret = runner.run(cmd)
+        assert_equal(cml.out.rstrip(), "{DryRunProtocol} Running: %s" % cmd)
     assert_equal(("DRY", "DRY"), ret,
                  "Output of dry run (%s): %s" % (cmd, ret))
     assert_equal(shlex.split(cmd, posix=not on_windows), dry[0]['command'])
@@ -142,10 +144,10 @@ def test_runner_log_stdout():
             kw['shell'] = True
         with swallow_logs(logging.DEBUG) as cm:
             ret = runner.run(cmd, log_stdout=True, **kw)
-            eq_(cm.lines[0], "Protocol: NullProtocol: Running: %s" % cmd)
+            eq_(cm.lines[0], "Running: %s" % cmd)
             if not on_windows:
                 # we can just count on sanity
-                eq_(cm.lines[1], "Protocol: NullProtocol: stdout| stdout-"
+                eq_(cm.lines[1], "stdout| stdout-"
                                  "Message should be logged")
             else:
                 # echo outputs quoted lines for some reason, so relax check
