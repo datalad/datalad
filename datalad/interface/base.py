@@ -12,6 +12,20 @@
 
 __docformat__ = 'restructuredtext'
 
+def get_interface_groups():
+    from .. import interface as _interfaces
+
+    grps = []
+    # auto detect all available interfaces and generate a function-based
+    # API from them
+    for _item in _interfaces.__dict__:
+        if not _item.startswith('_group_'):
+            continue
+        grp_name = _item[7:]
+        grp = getattr(_interfaces, _item)
+        grps.append((grp_name,) + grp)
+    return grps
+
 
 def dedent_docstring(text):
     import textwrap
@@ -67,7 +81,7 @@ def update_docstring_with_parameters(func, params):
                 default=defaults[defaults_idx] if defaults_idx >= 0 else None,
                 has_default=defaults_idx >= 0)
             doc += '\n'
-    # assign the ammended docs
+    # assign the amended docs
     func.__doc__ = doc
     return func
 
@@ -105,11 +119,13 @@ class Interface(object):
                 # use parameter name as default argument name
                 parser_args = (template % arg.replace('_', '-'),)
             else:
-                parser_args = cmd_args
+                parser_args = [c.replace('_', '-') for c in cmd_args]
             parser_kwargs = param.cmd_kwargs
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
             help = param._doc
+            if help and help[-1] != '.':
+                help += '.'
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
                 # include value contraint description and default

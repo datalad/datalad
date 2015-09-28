@@ -88,7 +88,8 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
+from ..utils import chpwd, getpwd
 
 
 def ok_clean_git_annex_proxy(path):
@@ -97,15 +98,15 @@ def ok_clean_git_annex_proxy(path):
     # TODO: May be let's make a method of AnnexRepo for this purpose
 
     ar = AnnexRepo(path)
-    cwd = os.getcwd()
-    os.chdir(path)
+    cwd = getpwd()
+    chpwd(path)
 
     try:
         out = ar.annex_proxy("git status")
     except CommandNotAvailableError as e:
         raise SkipTest
     finally:
-        os.chdir(cwd)
+        chpwd(cwd)
 
     assert_in("nothing to commit, working directory clean", out[0], "git-status output via proxy not plausible: %s" % out[0])
 
@@ -135,9 +136,14 @@ def ok_clean_git(path, annex=True, untracked=[]):
 
 
 def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepoOld(path)
+    repo = AnnexRepo(path)
     assert(filename in repo.get_indexed_files())  # file is known to Git
-    assert(annexed == os.path.islink(opj(path, filename)))
+    try:
+        repo.get_file_key(filename)
+        in_annex = True
+    except FileNotInAnnexError as e:
+        in_annex = False
+    assert(annexed == in_annex)
 
 #
 # Helpers to test symlinks
@@ -192,7 +198,7 @@ def ok_annex_get(ar, files, network=True):
         ar.annex_get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
-            ok_('100%' in cmo.err or '100.0%' in cmo.err)
+            ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
     # verify that load was fetched
     ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
@@ -238,7 +244,7 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
 
 
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
-    os.chdir(path_to_serve_from)
+    chpwd(path_to_serve_from)
     httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
     queue.put(httpd.server_port)
     httpd.serve_forever()
@@ -355,7 +361,8 @@ def with_tempfile(t, *targs, **tkwargs):
 def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
     #           if flavors == 'auto' else flavors
-    flavors_ = (['local', 'clone', 'local-url'] if not on_windows else ['network', 'network-clone']) \
+    flavors_ = (['local', 'clone', 'local-url', 'network'] if not on_windows
+                else ['network', 'network-clone']) \
                if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
@@ -464,7 +471,13 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
         flavors_ = _get_resolved_flavors(flavors)
 
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
-        assert(testrepos_uris)
+        # we should always have at least one repo to test on, unless explicitly only
+        # network was requested by we are running without networked tests
+        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
+            assert(testrepos_uris)
+        else:
+            if not testrepos_uris:
+                raise SkipTest("No non-networked repos to test on")
 
         for uri in testrepos_uris:
             if __debug__:
@@ -479,6 +492,27 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
     return newfunc
 with_testrepos.__test__ = False
 
+def skip_if_no_network(func):
+    """Skip test completely in NONETWORK settings
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+            raise SkipTest("Skipping since no network settings")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_if_on_windows(func):
+    """Skip test completely under Windows
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows:
+            raise SkipTest("Skipping on Windows")
+        return func(*args, **kwargs)
+    return newfunc
+
 
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
@@ -488,29 +522,65 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
     @wraps(func)
     def newfunc(*args, **kwargs):
         cwd_before = os.getcwd()
-        exc_info = None
+        pwd_before = getpwd()
+
+        def cleanup(was_exception):
+            """Helper to perform cleanup actions/checks.
+
+            Done so to overcome difficulty of re-raising the original exception
+            with original stack in python3
+            """
+            try:
+                cwd_after = os.getcwd()
+            except OSError as e:
+                lgr.warning("Failed to getcwd: %s" % e)
+                cwd_after = None
+
+            if cwd_after != cwd_before:
+                chpwd(pwd_before)
+                if not ok_to_chdir:
+                    lgr.warning(
+                        "%s changed cwd to %s. Mitigating and changing back to %s"
+                        % (func, cwd_after, pwd_before))
+                    # If there was already exception raised, we better re-raise
+                    # that one since it must be more important, so not masking it
+                    # here with our assertion
+                    if not was_exception:
+                        assert_equal(cwd_before, cwd_after,
+                                     "CWD changed from %s to %s" % (cwd_before, cwd_after))
+
         try:
             func(*args, **kwargs)
         except:
-            exc_info = sys.exc_info()
+            cleanup(True)
+            raise
+        cleanup(False)
+
+    return newfunc
+
+@optional_args
+def run_under_dir(func, newdir='.'):
+    """Decorator to run tests under another directory
+
+    It is somewhat ugly since we can't really chdir
+    back to a directory which had a symlink in its path.
+    So using this decorator has potential to move entire
+    testing run under the dereferenced directory name -- sideeffect.
+
+    The only way would be to instruct testing framework (i.e. nose
+    in our case ATM) to run a test by creating a new process with
+    a new cwd
+    """
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        pwd_before = getpwd()
+        try:
+            chpwd(newdir)
+            func(*args, **kwargs)
         finally:
-            cwd_after = os.getcwd()
+            chpwd(pwd_before)
 
-        if cwd_after != cwd_before:
-            os.chdir(cwd_before)
-            if not ok_to_chdir:
-                lgr.warning(
-                    "%s changed cwd to %s. Mitigating and changing back to %s"
-                    % (func, cwd_after, cwd_before))
-                # If there was already exception raised, we better re-raise
-                # that one since it must be more important, so not masking it
-                # here with our assertion
-                if exc_info is None:
-                    assert_equal(cwd_before, cwd_after,
-                                 "CWD changed from %s to %s" % (cwd_before, cwd_after))
-
-        if exc_info is not None:
-            raise exc_info[0](exc_info[1], exc_info[2])
 
     return newfunc
 

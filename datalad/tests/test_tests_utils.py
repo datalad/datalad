@@ -11,17 +11,21 @@ import platform
 import sys
 import os
 import random
+import traceback
 
 from bs4 import BeautifulSoup
 from glob import glob
 from os.path import exists, join as opj, basename
 
+from six import PY2
 from six import text_type
 from six.moves.urllib.request import urlopen
 
 from mock import patch
 from nose.tools import assert_in, assert_not_in, assert_true
 from nose import SkipTest
+
+from ..utils import getpwd, chpwd
 
 from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     with_tempfile, with_testrepos, with_tree, \
@@ -32,6 +36,8 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
 
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
+from .utils import skip_if_no_network
+from .utils import run_under_dir
 
 #
 # Test with_tempfile, especially nested invocations
@@ -91,7 +97,9 @@ def test_with_testrepos():
 
     check_with_testrepos()
 
-    eq_(len(repos), 2 if on_windows else 3)  # local, local-url, clone
+    eq_(len(repos),
+        2 if on_windows # TODO -- would fail now in DTGALAD_TESTS_NONETWORK mode
+          else (3 if os.environ.get('DATALAD_TESTS_NONETWORK') else 4))  # local, local-url, clone, network
 
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):
@@ -143,7 +151,7 @@ def test_get_most_obscure_supported_name():
     if platform.system() in ('Linux', 'Darwin'):
         eq_(n, OBSCURE_FILENAMES[1])
     else:
-        # ATM noone else is as good
+        # ATM no one else is as good
         ok_(n in OBSCURE_FILENAMES[2:])
 
 
@@ -220,38 +228,53 @@ def test_nok_startswith():
     assert_raises(AssertionError, nok_startswith, 'abc', 'abc')
 
 
-def test_assert_cwd_unchanged():
-    orig_dir = os.getcwd()
+def _test_assert_Xwd_unchanged(func):
+    orig_cwd = os.getcwd()
+    orig_pwd = getpwd()
 
     @assert_cwd_unchanged
     def do_chdir():
-        os.chdir(os.pardir)
+        func(os.pardir)
 
-    assert_raises(AssertionError, do_chdir)
-    eq_(orig_dir, os.getcwd(),
-        "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
+    with assert_raises(AssertionError) as cm:
+        do_chdir()
+
+    eq_(orig_cwd, os.getcwd(),
+        "assert_cwd_unchanged didn't return us back to cwd %s" % orig_cwd)
+    eq_(orig_pwd, getpwd(),
+        "assert_cwd_unchanged didn't return us back to pwd %s" % orig_pwd)
+
+def test_assert_Xwd_unchanged():
+    yield _test_assert_Xwd_unchanged, os.chdir
+    yield _test_assert_Xwd_unchanged, chpwd
 
 
-def test_assert_cwd_unchanged_ok_chdir():
+def _test_assert_Xwd_unchanged_ok_chdir(func):
     # Test that we are not masking out other "more important" exceptions
 
-    orig_dir = os.getcwd()
+    orig_cwd = os.getcwd()
+    orig_pwd = getpwd()
 
     @assert_cwd_unchanged(ok_to_chdir=True)
     def do_chdir_value_error():
-        os.chdir(os.pardir)
+        func(os.pardir)
 
     with swallow_logs() as cml:
         do_chdir_value_error()
-        eq_(orig_dir, os.getcwd(),
-            "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
+        eq_(orig_cwd, os.getcwd(),
+            "assert_cwd_unchanged didn't return us back to cwd %s" % orig_cwd)
+        eq_(orig_pwd, getpwd(),
+            "assert_cwd_unchanged didn't return us back to cwd %s" % orig_pwd)
         assert_not_in("Mitigating and changing back", cml.out)
 
+def test_assert_Xwd_unchanged_ok_chdir():
+    yield _test_assert_Xwd_unchanged_ok_chdir, os.chdir
+    yield _test_assert_Xwd_unchanged_ok_chdir, chpwd
 
 def test_assert_cwd_unchanged_not_masking_exceptions():
     # Test that we are not masking out other "more important" exceptions
 
-    orig_dir = os.getcwd()
+    orig_cwd = os.getcwd()
 
     @assert_cwd_unchanged
     def do_chdir_value_error():
@@ -259,9 +282,17 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         raise ValueError("error exception")
 
     with swallow_logs() as cml:
-        assert_raises(ValueError, do_chdir_value_error)
-        eq_(orig_dir, os.getcwd(),
-            "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
+        with assert_raises(ValueError) as cm:
+            do_chdir_value_error()
+        # retrospect exception
+        if PY2:
+            # could not figure out how to make it legit for PY3
+            # but on manual try -- works, and exception traceback is not masked out
+            exc_info = sys.exc_info()
+            assert_in('raise ValueError("error exception")', traceback.format_exception(*exc_info)[-2])
+
+        eq_(orig_cwd, os.getcwd(),
+            "assert_cwd_unchanged didn't return us back to %s" % orig_cwd)
         assert_in("Mitigating and changing back", cml.out)
 
     # and again but allowing to chdir
@@ -272,8 +303,8 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
 
     with swallow_logs() as cml:
         assert_raises(ValueError, do_chdir_value_error)
-        eq_(orig_dir, os.getcwd(),
-            "assert_cwd_unchanged didn't return us back to %s" % orig_dir)
+        eq_(orig_cwd, os.getcwd(),
+            "assert_cwd_unchanged didn't return us back to %s" % orig_cwd)
         assert_not_in("Mitigating and changing back", cml.out)
 
 
@@ -353,3 +384,39 @@ def test_assert_re_in():
 
     # shouldn't "match" the emty list
     assert_raises(AssertionError, assert_re_in, "", [])
+
+
+def test_skip_if_no_network():
+    cleaned_env = os.environ.copy()
+    cleaned_env.pop('DATALAD_TESTS_NONETWORK', None)
+    # we need to run under cleaned env to make sure we actually test in both conditions
+    with patch('os.environ', cleaned_env):
+        @skip_if_no_network
+        def somefunc(a1):
+            return a1
+        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+            assert_raises(SkipTest, somefunc, 1)
+        with patch.dict('os.environ', {}):
+            eq_(somefunc(1), 1)
+
+
+@assert_cwd_unchanged
+@with_tempfile(mkdir=True)
+def test_run_under_dir(d):
+    orig_pwd = getpwd()
+    orig_cwd = os.getcwd()
+
+    @run_under_dir(d)
+    def f(arg, kwarg=None):
+        eq_(arg, 1)
+        eq_(kwarg, 2)
+        eq_(getpwd(), d)
+
+    f(1, 2)
+    eq_(getpwd(), orig_pwd)
+    eq_(os.getcwd(), orig_cwd)
+
+    # and if fails
+    assert_raises(AssertionError, f, 1, 3)
+    eq_(getpwd(), orig_pwd)
+    eq_(os.getcwd(), orig_cwd)

@@ -24,6 +24,7 @@ from six import string_types, text_type, binary_type
 
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol
+from .utils import on_windows
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -210,10 +211,10 @@ class Runner(object):
 
             if self.protocol.records_ext_commands:
                 prot_exc = None
-                prot_id = self.protocol.start_section(shlex.split(cmd)
-                                                      if isinstance(cmd,
-                                                                    string_types)
-                                                      else cmd)
+                prot_id = self.protocol.start_section(
+                    shlex.split(cmd, posix=not on_windows)
+                    if isinstance(cmd, string_types)
+                    else cmd)
 
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream,
@@ -268,9 +269,10 @@ class Runner(object):
 
         else:
             if self.protocol.records_ext_commands:
-                self.protocol.add_section(shlex.split(cmd)
-                                            if isinstance(cmd, string_types)
-                                            else cmd, None)
+                self.protocol.add_section(shlex.split(cmd,
+                                                      posix=not on_windows)
+                                          if isinstance(cmd, string_types)
+                                          else cmd, None)
             out = ("DRY", "DRY")
 
         return out
@@ -313,8 +315,10 @@ class Runner(object):
         Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
         log the used protocol.
         """
-        lgr.log(level, "Protocol: %s: %s" % (self.protocol.__class__.__name__,
-                                             msg))
+        if isinstance(self.protocol, NullProtocol):
+            lgr.log(level, msg)
+        else:
+            lgr.log(level, "{%s} %s" % (self.protocol.__class__.__name__, msg))
 
 
 # ####

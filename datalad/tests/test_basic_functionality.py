@@ -22,8 +22,11 @@ from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
 from ..support.collection import Collection, MetaCollection
 from ..support.metadatahandler import PlainTextImporter, PAV, PROV, DCTERMS, \
     DCTYPES, DLNS, DCAT, FOAF, EMP, Literal, URIRef
-from ..tests.utils import ok_clean_git, with_tempfile, ok_, with_tree
+from ..tests.utils import ok_clean_git, ok_clean_git_annex_proxy, \
+    with_tempfile, ok_, with_tree
 from ..utils import get_local_file_url, rmtree
+
+from .utils import skip_if_no_network
 
 # Note: For the actual commands use the following to determine paths to
 # the local master collection, configs, etc.:
@@ -45,9 +48,10 @@ def test_local_master(m_path):
     assert_equal(local_master.get_handle_list(), [])
 
 
+@skip_if_no_network
 @with_tempfile
 def test_register_collection(m_path):
-
+    # TODO: redo using locally established collection
     test_url = "https://github.com/bpoldrack/ExampleCollection.git"
     test_name = test_url.split('/')[-1].rstrip('.git')
     assert_equal(test_name, 'ExampleCollection')
@@ -93,7 +97,10 @@ def test_create_handle(m_path, h_path):
     # create the handle repository:
     handle = HandleRepo(h_path, name="MyHandleDefaultName")
 
-    ok_clean_git(h_path, annex=True)
+    if handle.is_direct_mode():
+        ok_clean_git_annex_proxy(h_path)
+    else:
+        ok_clean_git(h_path, annex=True)
     ok_(os.path.exists(opj(h_path, '.datalad')))
     ok_(os.path.isdir(opj(h_path, '.datalad')))
     ok_(os.path.exists(opj(h_path, '.datalad', 'datalad.ttl')))
@@ -129,7 +136,10 @@ def test_add_handle_to_collection(m_path, c_path, h_path):
 
     ok_clean_git(local_master.path, annex=False)
     ok_clean_git(collection.path, annex=False)
-    ok_clean_git(handle.path, annex=True)
+    if handle.is_direct_mode():
+        ok_clean_git_annex_proxy(handle.path)
+    else:
+        ok_clean_git(handle.path, annex=True)
     assert_equal(collection.get_handle_list(), ["MyHandle"])
     assert_equal(local_master.get_handle_list(), ["MyHandle"])
     assert_equal(set(local_master.git_get_files(collection.name + '/master')),
@@ -168,7 +178,10 @@ def test_install_handle(m_path, c_path, h_path, install_path):
     installed_handle = HandleRepo(install_path, handle_backend.url)
     local_master.add_handle(installed_handle, name=handle_by_name)
 
-    ok_clean_git(install_path, annex=True)
+    if installed_handle.is_direct_mode():
+        ok_clean_git_annex_proxy(install_path)
+    else:
+        ok_clean_git(install_path, annex=True)
     ok_clean_git(local_master.path, annex=False)
     assert_equal(set(installed_handle.git_get_files()),
                  {opj('.datalad', 'datalad.ttl'),
@@ -178,9 +191,10 @@ def test_install_handle(m_path, c_path, h_path, install_path):
     assert_equal(installed_handle.name, "MyHandle")
 
 
+@skip_if_no_network
 @with_tempfile
 def test_unregister_collection(m_path):
-
+    # TODO: redo using locally established collection
     # setup:
     m_path = opj(m_path, 'localcollection')
     local_master = CollectionRepo(m_path, name='local')
@@ -215,9 +229,22 @@ def test_uninstall_handle(m_path, c_path, h_path, install_path):
     # test setup:
     ok_clean_git(local_master.path, annex=False)
     ok_clean_git(collection.path, annex=False)
-    ok_clean_git(handle.path, annex=True)
+    if handle.is_direct_mode():
+        ok_clean_git_annex_proxy(handle.path)
+    else:
+        ok_clean_git(handle.path, annex=True)
     assert_equal(collection.get_handle_list(), ["MyHandle"])
     assert_equal(local_master.get_handle_list(), ["MyCollection/MyHandle"])
+
+
+    # retrieve path of handle:
+
+    q_col = local_master.get_handle_list()[0].split('/')[0]
+    q_hdl = local_master.get_handle_list()[0].split('/')[1]
+
+    handle_backend = CollectionRepoHandleBackend(repo=local_master, key=q_hdl,
+                                                 branch=q_col + '/master')
+    assert_equal(handle_backend.url, get_local_file_url(h_path))
 
     # uninstall handle:
     local_master.remove_handle("MyCollection/MyHandle")
@@ -225,7 +252,7 @@ def test_uninstall_handle(m_path, c_path, h_path, install_path):
 
     ok_clean_git(local_master.path, annex=False)
     assert_equal(local_master.get_handle_list(), [])
-    assert_false(os.path.exists(h_path))
+    ok_(not os.path.exists(h_path))
 
 
 @with_tempfile
@@ -293,7 +320,7 @@ def test_query_collection(c_path, h_path, md_hdl):
     # no use here.
     # Note: This uri construction has to change.
     import os
-    content_uri = URIRef(get_local_file_url(os.getcwd() + '/#content'))
+    content_uri = URIRef(get_local_file_url(os.getcwd()) + '/#content')
 
     assert_equal(len(results2), 2)
     assert_in((Literal("MyHandle"), URIRef(get_local_file_url(h_path))),
@@ -389,8 +416,30 @@ def test_query_metacollection(m_path, c_path1, c_path2, h_path1, h_path2,
                                    ?p foaf:name "another one" .}}"""
     results2 = \
         metacollection.conjunctive_graph.query(query_handle_certain_author2)
-    # returns both handles and their locations:
+    # returns handle2 and its location:
     assert_equal(len(results2), 1)
     assert_in((Literal("handle2"), URIRef(get_local_file_url(h_path2))),
-              results)
+              results2)
 
+    # query for handle with any appearance of a string "Benjamin Poldrack":
+    uni_query_1 = """SELECT ?g ?r {GRAPH ?g {?r rdf:type dlns:Handle .
+                                             ?s ?p ?o .
+                                             FILTER regex(?o, "Benjamin Poldrack", "i")}}"""
+
+    results3 = metacollection.conjunctive_graph.query(uni_query_1)
+    # returns both handles and their locations:
+    assert_equal(len(results3), 2)
+    assert_in((Literal("handle1"), URIRef(get_local_file_url(h_path1))),
+              results3)
+    assert_in((Literal("handle2"), URIRef(get_local_file_url(h_path2))),
+              results3)
+
+    # query for handle with any appearance of a string "This is a license file"
+    uni_query_2 = """SELECT ?g ?r {GRAPH ?g {?r rdf:type dlns:Handle .
+                                             ?s ?p ?o .
+                                             FILTER regex(?o, "This is a license file", "i")}}"""
+    results4 = metacollection.conjunctive_graph.query(uni_query_2)
+    # returns handle1 and its location:
+    assert_equal(len(results4), 1)
+    assert_in((Literal("handle1"), URIRef(get_local_file_url(h_path1))),
+              results4)

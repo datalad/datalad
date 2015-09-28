@@ -65,10 +65,21 @@ def test_version():
     in_("Permission is hereby granted", out)
 
 
-def test_help():
-    stdout, stderr = run_main(['--help'])
+def test_help_np():
+    with patch.dict('os.environ', {'DATALAD_HELP2MAN': '1'}):
+        stdout, stderr = run_main(['--help-np'])
 
     # Let's extract section titles:
-    sections = list(filter(re.compile('[a-zA-Z ]{4,50}:').match, stdout.split('\n')))
-    ok_(sections[0].startswith('Usage:'))  # == Usage: nosetests [-h] if running using nose
-    assert_equal(sections[1:], ['Positional arguments:', 'Options:'])
+    # enough of bin/datalad and .tox/py27/bin/datalad -- guarantee consistency! ;)
+    ok_(stdout.startswith('Usage: datalad'))
+    # Sections start/end with * if ran under DATALAD_HELP2MAN mode
+    sections = [l[1:-1] for l in filter(re.compile('^\*.*\*$').match, stdout.split('\n'))]
+    # but order is still not guaranteed (dict somewhere)! TODO
+    # see https://travis-ci.org/datalad/datalad/jobs/80519004
+    # thus testing sets
+    assert_equal(set(sections),
+                 {'Commands for collection handling',
+                  'Commands for handle operations',
+                  'Miscellaneous commands',
+                  'General information',
+                  'Global options'})

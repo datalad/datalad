@@ -12,6 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 import argparse
+import os
 import re
 import sys
 
@@ -20,8 +21,6 @@ from ..log import is_interactive
 
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-#        import pydb; pydb.debugger()
-
         if is_interactive() and option_string == '--help':
             # lets use the manpage on mature systems ...
             try:
@@ -40,9 +39,23 @@ class HelpAction(argparse.Action):
         else:
             helpstr = parser.format_help()
         # better for help2man
-        helpstr = re.sub(r'optional arguments:', 'options:', helpstr)
-        # yoh: TODO for datalad + help2man
-        #helpstr = re.sub(r'positional arguments:\n.*\n', '', helpstr)
+        # For main command -- should be different sections. And since we are in
+        # heavy output massaging mode...
+        if "commands for collection" in helpstr.lower():
+            opt_args_str = '*Global options*'
+            pos_args_str = '*Commands*'
+            # tune up usage -- default one is way too heavy
+            helpstr = re.sub('^[uU]sage: .*?\n\s*\n',
+                             'Usage: datalad [global-opts] command [command-opts]\n\n',
+                             helpstr,
+                             flags=re.MULTILINE | re.DOTALL)
+            # And altogether remove section with long list of commands
+            helpstr = re.sub(r'positional arguments:\s*\n\s*{.*}\n', '', helpstr)
+        else:
+            opt_args_str = "*Options*"
+            pos_args_str = "*Arguments*"
+        helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
+        helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
         # convert all heading to have the first character uppercase
         headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
         helpstr = re.subn(
@@ -57,6 +70,14 @@ class HelpAction(argparse.Action):
             usage_length = len(usagestr)
             usagestr = re.subn(r'\s+', ' ', usagestr.replace('\n', ' '))[0]
             helpstr = '%s\n%s' % (usagestr, helpstr[usage_length:])
+
+        if os.environ.get('DATALAD_HELP2MAN'):
+            # Convert 1-line command descriptions to remove leading -
+            helpstr = re.sub('\n\s*-\s*([-a-z0-9]*):\s*?([^\n]*)', r"\n'\1':\n  \2\n", helpstr)
+        else:
+            # Those *s intended for man formatting do not contribute to readability in regular text mode
+            helpstr = helpstr.replace('*', '')
+
         print(helpstr)
         sys.exit(0)
 
@@ -104,3 +125,85 @@ class RegexpType(object):
             return re.compile(string)
         else:
             return None
+
+
+from os import curdir
+def get_repo_instance(path=curdir, class_=None):
+    """Returns an instance of appropriate datalad repository for path.
+
+    Check whether a certain path is inside a known type of repository and
+    returns an instance representing it. May also check for a certain type
+    instead of detecting the type of repository.
+
+    Parameters:
+    -----------
+    path: str
+      path to check; default: current working directory
+
+    class_: class
+      if given, check whether path is inside a repository, that can be
+      represented as an instance of the passed class.
+
+    Raises
+    ------
+    RuntimeError, in case cwd is not inside a known repository.
+    """
+
+    from os.path import join as opj, ismount, exists, abspath, expanduser, \
+        expandvars, normpath, isabs
+    from git.exc import InvalidGitRepositoryError
+    from ..support.gitrepo import GitRepo
+    from ..support.annexrepo import AnnexRepo
+    from ..support.handlerepo import HandleRepo
+    from ..support.collectionrepo import CollectionRepo
+    from ..support.exceptions import CollectionBrokenError
+
+    dir_ = abspath(expandvars(expanduser(path)))
+    abspath_ = path if isabs(path) else dir_
+    if class_ is not None:
+        if class_ == CollectionRepo:
+            type_ = "collection"
+        elif class_ == HandleRepo:
+            type_ = "handle"
+        elif class_ == AnnexRepo:
+            type_ = "annex"
+        elif class_ == GitRepo:
+            type_ = "git"
+        else:
+            raise RuntimeError("Unknown class %s." % str(class_))
+
+    while not ismount(dir_):  # TODO: always correct termination?
+        if exists(opj(dir_, '.git')):
+            # found git dir
+            if class_ is None:
+                # detect repo type:
+                try:
+                    return HandleRepo(dir_, create=False)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return AnnexRepo(dir_, create=False)
+                except RuntimeError as e:
+                    pass
+                try:
+                    return CollectionRepo(dir_, create=False)
+                except CollectionBrokenError as e:
+                    pass
+                try:
+                    return GitRepo(dir_, create=False)
+                except InvalidGitRepositoryError as e:
+                    raise RuntimeError("No datalad repository found in %s" %
+                                       abspath_)
+            else:
+                try:
+                    return class_(dir_)
+                except (RuntimeError, InvalidGitRepositoryError) as e:
+                    raise RuntimeError("No %s repository found in %s" %
+                                       (type_, abspath_))
+        else:
+            dir_ = normpath(opj(dir_, ".."))
+
+    if class_ is not None:
+        raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
+    else:
+        raise RuntimeError("No datalad repository found in %s" % abspath_)

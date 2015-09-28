@@ -14,14 +14,15 @@ __docformat__ = 'restructuredtext'
 import argparse
 import logging
 import sys
+import os
 import textwrap
 
 import datalad
 from datalad.log import lgr
 
 from datalad.cmdline import helpers
-from ..interface.base import dedent_docstring
-from ..utils import setup_exceptionhook
+from ..interface.base import dedent_docstring, get_interface_groups
+from ..utils import setup_exceptionhook, chpwd
 
 
 def _license_info():
@@ -55,13 +56,10 @@ def setup_parser():
         fromfile_prefix_chars='@',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
-    DataLad aims to expose (scientific) data available online as a unified data
-    distribution with the convenience of git-annex repositories as a backend.
-
-    datalad command line tool facilitates initial construction and update of
-    harvested online datasets.  It supports following commands
-    """),
-        epilog='"Geet My Data"',
+            DataLad provides a unified data distribution with the convenience of git-annex
+            repositories as a backend.  datalad command line tool allows to manipulate
+            (obtain, create, update, publish, etc.) datasets and their collections."""),
+        epilog='"Control Your Data"',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False)
     # common options
@@ -75,6 +73,14 @@ def setup_parser():
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
             help="do not catch exceptions and show exception traceback")
+    parser.add_argument(
+        '-C', action='append', dest='change_path', metavar='PATH',
+        help="""Run as if datalad was started in <path> instead
+        of the current working directory. When multiple -C options are given,
+        each subsequent non-absolute -C <path> is interpreted relative to the
+        preceding -C <path>. This option affects the interpretations of the
+        path names in that they are made relative to the working directory
+        caused by the -C option.""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -92,69 +98,74 @@ def setup_parser():
 
     # subparsers
     subparsers = parser.add_subparsers()
-    # for all subcommand modules it can find
-    cmd_short_description = []
-    from ..interface.base import Interface as _Interface
-    from .. import interface as _interfaces
 
     # auto detect all available interfaces and generate a function-based
     # API from them
-    for _item in _interfaces.__dict__:
-        _intfcls = getattr(_interfaces, _item)
-        try:
-            if not issubclass(_intfcls, _Interface):
-                continue
-        except TypeError:
-            continue
-        _intf = _intfcls()
+    grp_short_descriptions = []
+    interface_groups = get_interface_groups()
+    for grp_name, grp_descr, _interfaces in interface_groups:
+        # for all subcommand modules it can find
+        cmd_short_descriptions = []
 
-        cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
-        # deal with optional parser args
-        if hasattr(_intf, 'parser_args'):
-            parser_args = _intf.parser_args
-        else:
-            parser_args = dict(formatter_class=argparse.RawDescriptionHelpFormatter)
-        # use class description, if no explicit description is available
-            parser_args['description'] = dedent_docstring(_intf.__doc__)
-        # create subparser, use module suffix as cmd name
-        subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
-        # all subparser can report the version
-        helpers.parser_add_common_opt(
-            subparser, 'version',
-            version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
-                                             _license_info()))
-        # our own custom help for all commands
-        helpers.parser_add_common_opt(subparser, 'help')
-        helpers.parser_add_common_opt(subparser, 'log_level')
-        # let module configure the parser
-        _intf.setup_parser(subparser)
-        # logger for command
+        for _intfcls in _interfaces:
+            _intf = _intfcls()
 
-        # configure 'run' function for this command
-        subparser.set_defaults(func=_intf.call_from_parser,
-                               logger=logging.getLogger(_intf.__module__))
-        # store short description for later
-        sdescr = getattr(_intf, 'short_description',
-                         parser_args['description'].split('\n')[0])
-        cmd_short_description.append((cmd_name, sdescr))
+            cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
+            # deal with optional parser args
+            if hasattr(_intf, 'parser_args'):
+                parser_args = _intf.parser_args
+            else:
+                parser_args = dict(formatter_class=argparse.RawDescriptionHelpFormatter)
+            # use class description, if no explicit description is available
+                parser_args['description'] = dedent_docstring(_intf.__doc__)
+            # create subparser, use module suffix as cmd name
+            subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
+            # all subparser can report the version
+            helpers.parser_add_common_opt(
+                subparser, 'version',
+                version='datalad %s %s\n\n%s' % (cmd_name, datalad.__version__,
+                                                 _license_info()))
+            # our own custom help for all commands
+            helpers.parser_add_common_opt(subparser, 'help')
+            helpers.parser_add_common_opt(subparser, 'log_level')
+            # let module configure the parser
+            _intf.setup_parser(subparser)
+            # logger for command
+
+            # configure 'run' function for this command
+            subparser.set_defaults(func=_intf.call_from_parser,
+                                   logger=logging.getLogger(_intf.__module__))
+            # store short description for later
+            sdescr = getattr(_intf, 'short_description',
+                             parser_args['description'].split('\n')[0])
+            cmd_short_descriptions.append((cmd_name, sdescr))
+        grp_short_descriptions.append(cmd_short_descriptions)
 
     # create command summary
     cmd_summary = []
-    for cd in cmd_short_description:
-        cmd_summary.append('%s\n%s\n\n'
-                           % (cd[0],
-                              textwrap.fill(
-                                  cd[1],
-                                  75,
-                                  initial_indent=' ' * 4,
-                                  subsequent_indent=' ' * 4)))
+    for i, grp in enumerate(interface_groups):
+        grp_descr = grp[1]
+        grp_cmds = grp_short_descriptions[i]
+
+        cmd_summary.append('\n*%s*\n' % (grp_descr,))
+        for cd in grp_cmds:
+            cmd_summary.append('  - %s:  %s'
+                               % (cd[0],
+                                  textwrap.fill(
+                                      cd[1].rstrip(' .'),
+                                      75,
+                                      #initial_indent=' ' * 4,
+                                      subsequent_indent=' ' * 8)))
+    # we need one last formal section to not have the trailed be
+    # confused with the last command group
+    cmd_summary.append('\n*General information*\n')
     parser.description = '%s\n%s\n\n%s' \
         % (parser.description,
            '\n'.join(cmd_summary),
            textwrap.fill(dedent_docstring("""\
     Detailed usage information for individual commands is
-    available via command-specific help options, i.e.:
-    %s <command> --help""") % sys.argv[0],
+    available via command-specific --help, i.e.:
+    datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
     return parser
 
@@ -169,9 +180,18 @@ def generate_api_call(cmdlineargs=None):
 
 
 def main(cmdlineargs=None):
+    # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser()
+    try:
+        import argcomplete
+        argcomplete.autocomplete(parser)
+    except ImportError:
+        pass
     # parse cmd args
     cmdlineargs = parser.parse_args(cmdlineargs)
+    if not cmdlineargs.change_path is None:
+        for path in cmdlineargs.change_path:
+            chpwd(path)
     # run the function associated with the selected command
     if cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure

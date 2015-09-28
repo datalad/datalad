@@ -17,6 +17,12 @@ matrix:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
+  - python: 2.7
+    env:
+    - DATALAD_TESTS_NONETWORK=1
+    # must operate nicely with those env variables set
+    - http_proxy=
+    - https_proxy=
   - python: 3.3
   - python: 3.4
 # not there -- don't try!
@@ -31,21 +37,29 @@ before_install:
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - sudo apt-get install git-annex-standalone zip
+  - sudo apt-get install git-annex-standalone zip help2man
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - git submodule update --init --recursive
   - cd ..; pip install -q coveralls; cd -
   - pip install -r requirements.txt
+  # Verify that setup.py build doesn't puke
+  - python setup.py build
   - pip install -e .
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
 
 script:
+  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO --failed
+  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
+  # Verify that we can render manpages
+  - make manpages
 
 after_success:
   - coveralls
 
 after_failure:
+  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   - DATALAD_LOGLEVEL=DEBUG $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --with-cov --cover-package datalad --logging-level=DEBUG --failed
+  - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
