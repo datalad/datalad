@@ -9,8 +9,11 @@
 """Various small nodes
 """
 
+from six import iteritems
+
 from datalad.support.network import get_url_deposition_filename, get_url_straight_filename
 from datalad.utils import updated
+from ..pipeline import FinishPipeline
 
 class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
@@ -43,6 +46,10 @@ class Sink(object):
         if self.output:
             data = updated(data, {self.output: self.data})
         yield data
+
+    def clean(self):
+        """Clean out collected data"""
+        self.data = []
 
 
 class rename(object):
@@ -83,4 +90,36 @@ def get_deposition_filename(**data):
     """For the URL request content filename deposition
     """
     yield updated(data, {'filename': get_url_deposition_filename(data['url'])})
+
+class interrupt_if(object):
+    """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
+
+    def __init__(self, values):
+        """
+
+        Parameters
+        ----------
+        values: dict
+          Key/value pairs to compare arrived data against.  Would raise
+          FinishPipeline if all keys have matched target values
+        """
+        self.values = values
+
+    def __call__(self, **data):
+        for k, v in iteritems(self.values):
+            if not (k in data and v == data[k]):
+                # do nothing and pass the data further
+                yield data
+                # and quit
+                return
+        raise FinishPipeline
+
+class xrange_node(object):
+    def __init__(self, n, output='output'):
+        self.n = n
+        self.output = output
+
+    def __call__(self, **data):
+        for i in xrange(self.n):
+            yield updated(data, {self.output: i})
 

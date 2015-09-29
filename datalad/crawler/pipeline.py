@@ -6,6 +6,15 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Pipeline functionality.
+
+Pipeline is depicted by a simple list or tuple of nodes or other nested pipelines.
+Each pipeline node is a callable which receives a dictionary (commonly named `data`),
+does some processing and yields (once or multiple times) derived dictionary (commonly
+a shallow copy of original dict).  For a node to be parametrized it should be
+implemented as a callable (i.e. define __call__) class, which could obtain parameters
+in its constructor.
+"""
 
 from os.path import dirname, join as opj, isabs, exists, curdir
 

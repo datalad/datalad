@@ -9,8 +9,11 @@
 
 import vcr
 from ..misc import get_deposition_filename
+from ..misc import xrange_node
+from ..misc import interrupt_if
+from ...pipeline import FinishPipeline
 
-from nose.tools import eq_
+from nose.tools import eq_, assert_raises
 from nose import SkipTest
 
 # TODO: redo on a local example
@@ -29,3 +32,16 @@ def test_assign():
 
 def test_rename():
     raise SkipTest('TODO')
+
+def test_xrange_node():
+    eq_(list(xrange_node(1)()), [{'output': 0}])
+    eq_(list(xrange_node(2)()), [{'output': 0}, {'output': 1}])
+
+def test_interrupt_if():
+    n = interrupt_if({'v1': 'done'})
+    assert_raises(FinishPipeline, n(v1='done').next)
+    assert_raises(FinishPipeline, n(v1='done', someother=123).next)
+    tdict = dict(v1='not yet', someother=123)
+    # and that we would interrupt while matching multiple values
+    eq_(list(n(**tdict)), [tdict])
+    assert_raises(FinishPipeline, interrupt_if(tdict)(**tdict).next)

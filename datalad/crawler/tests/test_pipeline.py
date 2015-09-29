@@ -12,9 +12,9 @@ import vcr
 
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import *
-from ..pipeline import run_pipeline
+from ..pipeline import run_pipeline, FinishPipeline
 
-from ..nodes.misc import Sink, assign
+from ..nodes.misc import Sink, assign, xrange_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
 
 from datalad.tests.utils import eq_, ok_
@@ -108,3 +108,41 @@ def test_basic_openfmri_dataset_pipeline_with_annex(path):
     ]
 
     run_pipeline(pipeline)
+
+def test_pipeline_linear_simple():
+    sink = Sink()
+    pipeline = [
+        xrange_node(2, "out1"),
+        xrange_node(3, "out2"),
+        sink
+    ]
+    pipeline_output = run_pipeline(pipeline)
+    eq_(pipeline_output, None)  # by default no output produced
+    eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
+                    {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}])
+
+    # if we extend pipeline with matching interrupt_if, the entire pipeline should
+    # stop at that matching point, but otherwise there should be no crash etc
+    sink.clean()
+    pipeline_output = run_pipeline(pipeline + [interrupt_if({'out1': 0, 'out2': 1})])
+    eq_(pipeline_output, None)  # by default no output produced
+    eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}])
+
+def test_pipeline_linear_nested():
+    sink = Sink()
+    sink2 = Sink()
+    pipeline = [
+        xrange_node(2, "out1"),
+        [
+            xrange_node(3, "out2"),
+            sink
+        ],
+        sink2
+    ]
+    pipeline_output = run_pipeline(pipeline)
+    eq_(pipeline_output, None)  # by default no output produced
+    eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
+                    {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}])
+    # and output is not seen outside of the nested pipeline
+    eq_(sink2.data, [{'out1': 0}, {'out1': 1}])
+
