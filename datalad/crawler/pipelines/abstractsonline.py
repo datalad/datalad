@@ -20,14 +20,14 @@ class dump_csv(object):
         self.filename = filename
         self.delimiter = delimiter
 
-    def __call__(self, **data):
+    def __call__(self, data):
         # should be taken from data
         filename = data['filename'] if not self.filename else self.filename
         # TODO do actual dumping of keys of data as csv file
         yield data
 
 
-def parse_abstract(**data):
+def parse_abstract(data):
     data = data.copy()
     # TODO do parsing here and assign all interesting fields to data[] fields
     yield data

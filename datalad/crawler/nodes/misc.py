@@ -37,7 +37,7 @@ class Sink(object):
     def get_fields(self, *keys):
         return [[d[k] for k in keys] for d in self.data]
 
-    def __call__(self, **data):
+    def __call__(self, data):
         # ??? for some reason didn't work when I made entire thing a list
         if self.keys:
             raise NotImplementedError("Jason will do it")
@@ -62,7 +62,7 @@ class rename(object):
         """
         self.mapping = mapping
 
-    def __call__(self, **data):
+    def __call__(self, data):
         # TODO: unittest
         data = data.copy()
         for from_, to_ in self.mapping:
@@ -76,17 +76,17 @@ class assign(object):
         self.assignments = assignments
         self.interpolate = interpolate
 
-    def __call__(self, **data):
+    def __call__(self, data):
         for k, v in self.assignments.items():
             data[k] = v % data if self.interpolate else v
         yield data
 
 #class prune(object):
 
-def get_url_filename(**data):
+def get_url_filename(data):
     yield updated(data, {'filename': get_url_straight_filename(data['url'])})
 
-def get_deposition_filename(**data):
+def get_deposition_filename(data):
     """For the URL request content filename deposition
     """
     yield updated(data, {'filename': get_url_deposition_filename(data['url'])})
@@ -105,7 +105,7 @@ class interrupt_if(object):
         """
         self.values = values
 
-    def __call__(self, **data):
+    def __call__(self, data):
         for k, v in iteritems(self.values):
             if not (k in data and v == data[k]):
                 # do nothing and pass the data further
@@ -119,7 +119,7 @@ class xrange_node(object):
         self.n = n
         self.output = output
 
-    def __call__(self, **data):
+    def __call__(self, data={}):
         for i in xrange(self.n):
             yield updated(data, {self.output: i})
 

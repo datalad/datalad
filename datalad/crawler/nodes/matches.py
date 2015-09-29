@@ -44,7 +44,7 @@ class ExtractorMatch(object):
     def _select_and_extract(self, selector, query, data):
         raise NotImplementedError
 
-    def __call__(self, **data):
+    def __call__(self, data):
         input = data.pop(self._input) if self._pop_input else data[self._input]
 
         if isinstance(input, Response):

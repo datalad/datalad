@@ -56,7 +56,7 @@ class crawl_url(object):
         if matchers:
             lgr.debug("Looking for more URLs at %s using %s", url, matchers)
             for matcher in (matchers if isinstance(matchers, (list, tuple)) else [matchers]):
-                for data_matched in matcher(**data_):
+                for data_matched in matcher(data_):
                     if 'url' not in data_matched:
                         lgr.warning("Got data without a url from %s" % matcher)
                         continue
@@ -65,12 +65,12 @@ class crawl_url(object):
                         yield data_matched_
 
 
-    def __call__(self, **data):
+    def __call__(self, data={}):
         #assert(data == {}) # atm assume we are the first of mogican
         url = data[self._input] if not self._url else self._url
         return self._visit_url(url, data)
 
-    def recurse(self, **data):
+    def recurse(self, data):
         """Recurse into the page - self._url gets ignored"""
         return self._visit_url(data[self._input], data)
 

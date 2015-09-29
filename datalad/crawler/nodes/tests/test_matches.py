@@ -39,11 +39,11 @@ def _test_match_basic(matcher, query):
                 xpaths={'text': 'text()'},
                 csss={'favorite': '.class1::text'})
 
-    mg = m(response="<div></div>")
+    mg = m(dict(response="<div></div>"))
     ok_(inspect.isgenerator(mg))
     eq_(list(mg), [])  # there should be no hits
 
-    mg = m(response=sample1.response)
+    mg = m(dict(response=sample1.response))
     ok_(inspect.isgenerator(mg))
     hits = list(mg)
     eq_(len(hits), 3)
@@ -62,7 +62,7 @@ def test_match_basic():
 def test_a_href_match_basic():
     m = a_href_match('.*')
 
-    mg = m(response=sample1.response)
+    mg = m(dict(response=sample1.response))
     ok_(inspect.isgenerator(mg))
     hits = list(mg)
     eq_(len(hits), 3)
@@ -72,7 +72,7 @@ def test_a_href_match_basic():
     eq_([u['url'] for u in hits], sample1.a_url_hrefs)
 
     # if we do provide original url where it comes from -- result urls should be full
-    mg = m(response=sample1.response, url="http://w.example.com:888/d/")
+    mg = m(dict(response=sample1.response, url="http://w.example.com:888/d/"))
     ok_(inspect.isgenerator(mg))
     hits = list(mg)
     eq_(len(hits), 3)
@@ -84,7 +84,7 @@ def test_a_href_match_basic():
 def test_a_href_match_pattern1():
     m = a_href_match('.*buga/(?P<custom>.*)/.*')
 
-    hits = list(m(response=sample1.response))
+    hits = list(m(dict(response=sample1.response)))
     eq_(len(hits), 1)
     hit = hits[0]
     eq_(hit['url'], 'buga/duga/du')
@@ -93,7 +93,7 @@ def test_a_href_match_pattern1():
 def test_a_href_match_pattern2():
     m = a_href_match('.*(?P<custom>.a).*')
 
-    hits = list(m(response=sample1.response))
+    hits = list(m(dict(response=sample1.response)))
     eq_(len(hits), 2)
     eq_([u['url'] for u in hits], ['buga/duga/du', 'http://example.com'])
     eq_([u['custom'] for u in hits], ['ga', 'xa'])
@@ -102,7 +102,7 @@ def test_a_href_match_pattern3():
     # that we would match if top url was provided as well
     m = a_href_match('.*(?P<custom>bu..).*')
 
-    hits = list(m(response=sample1.response, url="http://w.buxxxx.com/"))
+    hits = list(m(dict(response=sample1.response, url="http://w.buxxxx.com/")))
     eq_(len(hits), 2)
     eq_([u['url'] for u in hits], ['http://w.buxxxx.com/', 'http://w.buxxxx.com/buga/duga/du'])
     eq_([u['custom'] for u in hits], ['buxx', 'buga'])

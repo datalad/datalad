@@ -93,7 +93,7 @@ class initiate_handle(object):
         with open(crawl_config, 'w') as f:
             cfg.write(f)
 
-    def __call__(self, **data):
+    def __call__(self, data={}):
         # figure out directory where create such a handle
         handle_name = self.handle_name or data['handle_name']
         if self.path is None:
@@ -172,7 +172,7 @@ class Annexificator(object):
                              "Please adjust pipeline to provide one" % url)
         return filename
 
-    def __call__(self, **data):  # filename=None, get_deposition_filename=False):
+    def __call__(self, data):  # filename=None, get_deposition_filename=False):
         url = data.get('url')
 
         # figure out the filename. If deposition one was needed, pipeline should

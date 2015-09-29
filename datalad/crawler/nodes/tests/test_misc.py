@@ -22,7 +22,7 @@ from nose import SkipTest
 @vcr.use_cassette('fixtures/vcr_cassettes/brain-map.org-1.yaml')
 def test_get_deposition_filename():
     input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
-    output = list(get_deposition_filename(**input))
+    output = list(get_deposition_filename(input))
     assert(len(output), 1)
     eq_(output[0]['filename'], 'T1.nii.gz')
 
@@ -39,9 +39,9 @@ def test_xrange_node():
 
 def test_interrupt_if():
     n = interrupt_if({'v1': 'done'})
-    assert_raises(FinishPipeline, n(v1='done').next)
-    assert_raises(FinishPipeline, n(v1='done', someother=123).next)
+    assert_raises(FinishPipeline, n(dict(v1='done')).next)
+    assert_raises(FinishPipeline, n(dict(v1='done', someother=123)).next)
     tdict = dict(v1='not yet', someother=123)
     # and that we would interrupt while matching multiple values
-    eq_(list(n(**tdict)), [tdict])
-    assert_raises(FinishPipeline, interrupt_if(tdict)(**tdict).next)
+    eq_(list(n(tdict)), [tdict])
+    assert_raises(FinishPipeline, interrupt_if(tdict)(tdict).next)
