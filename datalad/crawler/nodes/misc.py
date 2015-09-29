@@ -83,3 +83,4 @@ def get_deposition_filename(**data):
     """For the URL request content filename deposition
     """
     yield updated(data, {'filename': get_url_deposition_filename(data['url'])})
+

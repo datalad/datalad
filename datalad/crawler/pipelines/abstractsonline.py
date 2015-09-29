@@ -40,7 +40,7 @@ def pipeline(mkey=None, outputfile=None):
       #                         output='abstract_fields',
       #                         exclude_keys=('', 'Disclosures:')),
       return [
-        [   # {'return': True},
+        [   # {'return_last': True, },
             crawler,
             a_href_match('.*/Browse.aspx'),
             crawler.recurse,
