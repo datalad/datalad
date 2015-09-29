@@ -17,9 +17,9 @@ from ..pipeline import run_pipeline, FinishPipeline
 from ..nodes.misc import Sink, assign, xrange_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
 
-from datalad.tests.utils import eq_, ok_
-from datalad.tests.utils import skip_if_no_module
-from datalad.tests.utils import with_tempfile
+from ...tests.utils import eq_, ok_, assert_raises
+from ...tests.utils import skip_if_no_module
+from ...tests.utils import with_tempfile
 
 
 @vcr.use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
@@ -128,6 +128,9 @@ def test_pipeline_linear_simple():
     eq_(pipeline_output, None)  # by default no output produced
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}])
 
+def test_pipeline_unknown_opts():
+    assert_raises(ValueError, run_pipeline, [{'xxx': 1}])
+
 def test_pipeline_linear_nested():
     sink = Sink()
     sink2 = Sink()
@@ -139,10 +142,54 @@ def test_pipeline_linear_nested():
         ],
         sink2
     ]
+    all_pairs = [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
+                 {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}]
     pipeline_output = run_pipeline(pipeline)
     eq_(pipeline_output, None)  # by default no output produced
-    eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
-                    {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}])
+    eq_(sink.data, all_pairs)
     # and output is not seen outside of the nested pipeline
     eq_(sink2.data, [{'out1': 0}, {'out1': 1}])
 
+    # Let's make nested pipeline yield all
+    sink.clean()
+    sink2.clean()
+    pipeline[1].insert(0, {'output': 'outputs'})
+
+    pipeline_output = run_pipeline(pipeline)
+    eq_(pipeline_output, None)  # by default no output produced
+    eq_(sink.data, all_pairs)
+    # and output was passed outside from the nested pipeline
+    eq_(sink2.data, all_pairs)
+
+    # Let's make it yield the last-output one
+    sink2.clean()
+    pipeline[1][0] = {'output': 'last-output'}
+    pipeline_output = run_pipeline(pipeline)
+    eq_(pipeline_output, None)  # by default no output produced
+    # only the last output from the nested pipeline appeared outside
+    eq_(sink2.data, [{'out1': 0, 'out2': 2}, {'out1': 1, 'out2': 2}])
+
+    # Let's now add output to the top-most pipeline
+    pipeline.insert(0, {'output': 'outputs'})
+    pipeline_output = run_pipeline(pipeline)
+    eq_(pipeline_output, [{'out1': 0, 'out2': 2}, {'out1': 1, 'out2': 2}])
+
+    # and if we ask only for the last one
+    pipeline[0] = {'output': 'last-output'}
+    pipeline_output = run_pipeline(pipeline)
+    eq_(pipeline_output, [{'out1': 1, 'out2': 2}])
+
+def test_pipeline_recursive():
+    def less3(data):
+        """a little helper which would not yield whenever input x>3"""
+        if data['x'] < 3:
+            yield updated(data, dict(x=data['x']+1))
+
+    pipeline = [
+        {'loop': True, 'output': 'outputs'},
+        less3,
+    ]
+    pipeline_output = run_pipeline(pipeline, dict(x=0))
+    eq_(pipeline_output, [{'x': 1}, {'x': 2}, {'x': 3}])
+
+#def test_pipeline_recursive

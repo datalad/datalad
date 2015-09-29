@@ -19,6 +19,7 @@ in its constructor.
 from os.path import dirname, join as opj, isabs, exists, curdir
 
 from .newmain import lgr
+from ..utils import updated
 from ..support.gitrepo import GitRepo
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
@@ -34,45 +35,119 @@ class FinishPipeline(Exception):
     """
     pass
 
-# TODO: should may be pipeline return data as well?
-#       or may be it should return some stats or smth else than the data
-#       use-case: not sure yet. cons: we would need explicit "terminators" for the pipelins
+# Options which could augment behavior of the pipeline, could be specified
+# only on top of it
+PIPELINE_OPTS = dict(
+    # nested_pipeline_inherits_opts=True,
+    # would use or not values yielded by the nested pipeline
+    output='input',    # last-output, outputs, input+outputs
+    loop=False,        # either to feed results into itself (until None returned)
+)
+
 def run_pipeline(pipeline, data=None):
     """Run a pipeline
 
-    Pipeline is just a list of actions or other pipelines (lists, tuples)
+    Pipeline is just a list of actions or other pipelines (lists, tuples).
+    Unlike nodes it is not yielding the result data but either returns
+    a list of the results (with a single element if output=='last-output',
+    empty list if =='none' or all results if =='all')
     """
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
     data = data or {}
-    try:
-        run_pipeline_steps(pipeline, data)
-    except FinishPipeline as e:
-        lgr.debug("Got a signal that pipeline %s is 'finished'" % pipeline)
+    opts = PIPELINE_OPTS.copy()
+    if not len(pipeline):
+        return
 
-def run_pipeline_steps(pipeline, data):
+    # options for this pipeline
+    if isinstance(pipeline[0], dict):
+        newopts, pipeline = (pipeline[0], pipeline[1:])
+        opts = updated(opts, newopts)
+
+    # verify that we know about all specified options
+    unknown_opts = set(opts).difference(set(PIPELINE_OPTS))
+    if unknown_opts:
+        raise ValueError("Unknown pipeline options %s" % str(unknown_opts))
+
+    data_to_process = [data]
+    output = opts['output']
+    if output not in ('input',  'last-output', 'outputs', 'input+outputs'):
+        raise ValueError("Unknown output=%r" % output)
+
+    results = [] if 'input' not in output else ([data] if data else [])
+    data_out = None
+    while data_to_process:
+        data_in = data_to_process.pop(0)
+        try:
+            for data_out in run_pipeline_steps(pipeline, data_in, output=output):
+                if opts['loop']:
+                    data_to_process.append(data_out)
+                if 'outputs' in output:
+                    results.append(data_out)
+        except FinishPipeline as e:
+            # TODO: decide what we would like to do -- skip that particular pipeline run
+            # or all subsequent or may be go back and only skip that generated result
+            lgr.debug("Got a signal that pipeline %s is 'finished'" % pipeline)
+
+    # TODO: this implementation is somewhat bad since all the output logic is
+    # duplicated within run_pipeline_steps, but it is probably unavoidable because of
+    # loop option
+    if output == 'last-output':
+        return [data_out] if data_out else None
+    elif output == 'input':
+        return [data] if data else None
+    else:
+        return results
+
+
+def run_pipeline_steps(pipeline, data, output='none'):
     """Actually run pipeline steps, feeding yielded results to the next node
 
     Recursive beast which runs a single node and then recurses to run the rest,
-    possibly multiple times if current node is a generator
+    possibly multiple times if current node is a generator.
+    It yields output from the node/nested pipelines, as directed by output
+    argument.
     """
-
     if not len(pipeline):
-        return data
+        return
+
     node, pipeline_tail = pipeline[0], pipeline[1:]
+
+    data_in_to_loop = None
     if isinstance(node, (list, tuple)):
         # we have got a step which is yet another entire pipeline
-        run_pipeline(node, data)
-        # there is no yielding or results from a pipeline
-        # and we just then go to the next
-        run_pipeline_steps(pipeline_tail, data)
-    else:  # it is a "node" which should generate us stuff to feed into the rest of the pipeline
-        # TODO: may be allow non generators
+        pipeline_results = run_pipeline(node, data)
+        # TODO: I think here I am creating a potential side-effect/confusing behavior
+        # that decision to pass original data or data from pipeline would depend not
+        # on the pipeline opts but on what it returns, which is not good...
+        if pipeline_results:
+            # should be similar to as running a node
+            data_in_to_loop = pipeline_results
+        else:
+            # there is no yielding or results from a pipeline
+            # and we just then go to the tail with
+            #data_in_to_loop = [data]
+            data_in_to_loop = []
+    else:  # it is a "node" which should generate (or return) us an iterable to feed
+           # its elements into the rest of the pipeline
         lgr.debug("Node: %s" % node)
-        for data_ in node(data):
+        data_in_to_loop = node(data)
+
+    data_out = None
+    for data_ in data_in_to_loop:
+        if pipeline_tail:
             # TODO: for heavy debugging we might want to track/report what node has changed in data
             lgr.log(7, " pass %d keys into tail with %d elements" % (len(data_), len(pipeline_tail)))
-            run_pipeline_steps(pipeline_tail, data_)
+            for data_out in run_pipeline_steps(pipeline_tail, data_, output=output):
+                if 'outputs' in output:
+                    yield data_out
+        else:
+            data_out = data_
+            if 'outputs' in output:
+                yield data_out
+
+    if output == 'last-output' and data_out:
+        yield data_out
 
 
 def load_pipeline_from_template(name, opts={}):
