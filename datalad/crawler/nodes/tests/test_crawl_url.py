@@ -40,7 +40,7 @@ def test_recurse_loop_http(path, url):
     # test recursive loop as implemented by pipeline
     crawler = crawl_url(url)
     pipeline = [
-        {'output': 'outputs'},
+        {'output': 'outputs'},  # just to simplify testing here
         crawler,
         [
             {'loop': True, 'output': 'input+outputs'},

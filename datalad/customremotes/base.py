@@ -17,7 +17,7 @@ import sys
 from os.path import exists, join as opj, basename, realpath, dirname
 from traceback import format_exc
 
-from six.moves import xrange
+from six.moves import range
 
 from ..cmd import Runner
 from ..support.protocol import ProtocolInterface
@@ -91,7 +91,7 @@ send () {
             # comment out all the past entries
             with open(_file) as f:
                 entries = f.readlines()
-            for i in xrange(len(self.HEADER.split(os.linesep)), len(entries)):
+            for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):
                     entries[i] = '#' + e

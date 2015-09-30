@@ -221,7 +221,7 @@ class PublishCollection(Interface):
         # check for existing publish branches:
         from random import choice
         from string import letters
-        p_branch = "publish_" + ''.join(choice(letters) for i in xrange(6))
+        p_branch = "publish_" + ''.join(choice(letters) for i in range(6))
         local_collection_repo.git_checkout(p_branch, '-b')
 
         importer = CustomImporter('Collection', 'Collection', DLNS.this)

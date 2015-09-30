@@ -44,13 +44,16 @@ PIPELINE_OPTS = dict(
     loop=False,        # either to feed results into itself (until None returned)
 )
 
-def run_pipeline(pipeline, data=None):
-    """Run a pipeline
 
-    Pipeline is just a list of actions or other pipelines (lists, tuples).
-    Unlike nodes it is not yielding the result data but either returns
-    a list of the results (with a single element if output=='last-output',
-    empty list if =='none' or all results if =='all')
+def run_pipeline(*args, **kwargs):
+    """Run pipeline and assemble results into a list"""
+    output = list(xrun_pipeline(*args, **kwargs))
+    return output if output else None
+
+
+def xrun_pipeline(pipeline, data=None):
+    """Yield results from the pipeline.
+
     """
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
@@ -74,34 +77,34 @@ def run_pipeline(pipeline, data=None):
     if output not in ('input',  'last-output', 'outputs', 'input+outputs'):
         raise ValueError("Unknown output=%r" % output)
 
-    results = [] if 'input' not in output else ([data] if data else [])
+    if ('input' in output) and data:
+        yield data
+
     data_out = None
     while data_to_process:
         data_in = data_to_process.pop(0)
         try:
-            for data_out in run_pipeline_steps(pipeline, data_in, output=output):
+            for data_out in xrun_pipeline_steps(pipeline, data_in, output=output):
                 if opts['loop']:
                     data_to_process.append(data_out)
                 if 'outputs' in output:
-                    results.append(data_out)
+                    yield data_out
         except FinishPipeline as e:
             # TODO: decide what we would like to do -- skip that particular pipeline run
             # or all subsequent or may be go back and only skip that generated result
             lgr.debug("Got a signal that pipeline %s is 'finished'" % pipeline)
 
     # TODO: this implementation is somewhat bad since all the output logic is
-    # duplicated within run_pipeline_steps, but it is probably unavoidable because of
+    # duplicated within xrun_pipeline_steps, but it is probably unavoidable because of
     # loop option
     if output == 'last-output':
-        return [data_out] if data_out else None
-    elif output == 'input':
-        return [data] if data else None
-    else:
-        return results
+        if data_out:
+            yield data_out
 
 
-def run_pipeline_steps(pipeline, data, output='none'):
+def xrun_pipeline_steps(pipeline, data, output='input'):
     """Actually run pipeline steps, feeding yielded results to the next node
+    and yielding results back
 
     Recursive beast which runs a single node and then recurses to run the rest,
     possibly multiple times if current node is a generator.
@@ -113,20 +116,16 @@ def run_pipeline_steps(pipeline, data, output='none'):
 
     node, pipeline_tail = pipeline[0], pipeline[1:]
 
-    data_in_to_loop = None
     if isinstance(node, (list, tuple)):
         # we have got a step which is yet another entire pipeline
-        pipeline_results = run_pipeline(node, data)
-        # TODO: I think here I am creating a potential side-effect/confusing behavior
-        # that decision to pass original data or data from pipeline would depend not
-        # on the pipeline opts but on what it returns, which is not good...
-        if pipeline_results:
+        pipeline_gen = xrun_pipeline(node, data)
+        if pipeline_gen:
             # should be similar to as running a node
-            data_in_to_loop = pipeline_results
+            data_in_to_loop = pipeline_gen
         else:
-            # there is no yielding or results from a pipeline
-            # and we just then go to the tail with
-            #data_in_to_loop = [data]
+            # pipeline can return None, and in such a case
+            # just do not process its output (which is None)
+            lgr.log(7, "Pipeline %s returned None", node)
             data_in_to_loop = []
     else:  # it is a "node" which should generate (or return) us an iterable to feed
            # its elements into the rest of the pipeline
@@ -138,7 +137,7 @@ def run_pipeline_steps(pipeline, data, output='none'):
         if pipeline_tail:
             # TODO: for heavy debugging we might want to track/report what node has changed in data
             lgr.log(7, " pass %d keys into tail with %d elements" % (len(data_), len(pipeline_tail)))
-            for data_out in run_pipeline_steps(pipeline_tail, data_, output=output):
+            for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
                 if 'outputs' in output:
                     yield data_out
         else:

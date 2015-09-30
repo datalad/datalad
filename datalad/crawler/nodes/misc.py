@@ -114,12 +114,12 @@ class interrupt_if(object):
                 return
         raise FinishPipeline
 
-class xrange_node(object):
+class range_node(object):
     def __init__(self, n, output='output'):
         self.n = n
         self.output = output
 
     def __call__(self, data={}):
-        for i in xrange(self.n):
+        for i in range(self.n):
             yield updated(data, {self.output: i})
 

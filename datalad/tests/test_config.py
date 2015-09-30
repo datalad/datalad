@@ -17,7 +17,7 @@ def test_config_empty():
     eq_(config._get_file_candidates(), [])
     # nevertheless we should be able to specify variables via env
 
-    assert_raises(ValueError, config.getboolean, 'tests', 'nonetwork')
+    assert_raises(ValueError, config.getboolean, 'tests', 'somenonexistingone')
     with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
         config.reload()
         ok_(config.getboolean('tests', 'nonetwork'))

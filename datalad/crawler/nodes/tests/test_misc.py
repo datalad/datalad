@@ -8,10 +8,13 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import vcr
+from six import next
 from ..misc import get_deposition_filename
-from ..misc import xrange_node
+from ..misc import range_node
 from ..misc import interrupt_if
 from ...pipeline import FinishPipeline
+
+from datalad.tests.utils import skip_if_no_network
 
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
@@ -19,11 +22,12 @@ from nose import SkipTest
 # TODO: redo on a local example
 # TODO: seems vcr fetches entire response not just the header which makes this test url
 #       in particular not appropriate
+@skip_if_no_network
 @vcr.use_cassette('fixtures/vcr_cassettes/brain-map.org-1.yaml')
 def test_get_deposition_filename():
     input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
     output = list(get_deposition_filename(input))
-    assert(len(output), 1)
+    eq_(len(output), 1)
     eq_(output[0]['filename'], 'T1.nii.gz')
 
 def test_assign():
@@ -33,15 +37,15 @@ def test_assign():
 def test_rename():
     raise SkipTest('TODO')
 
-def test_xrange_node():
-    eq_(list(xrange_node(1)()), [{'output': 0}])
-    eq_(list(xrange_node(2)()), [{'output': 0}, {'output': 1}])
+def test_range_node():
+    eq_(list(range_node(1)()), [{'output': 0}])
+    eq_(list(range_node(2)()), [{'output': 0}, {'output': 1}])
 
 def test_interrupt_if():
     n = interrupt_if({'v1': 'done'})
-    assert_raises(FinishPipeline, n(dict(v1='done')).next)
-    assert_raises(FinishPipeline, n(dict(v1='done', someother=123)).next)
+    assert_raises(FinishPipeline, next, n(dict(v1='done')))
+    assert_raises(FinishPipeline, next, n(dict(v1='done', someother=123)))
     tdict = dict(v1='not yet', someother=123)
     # and that we would interrupt while matching multiple values
     eq_(list(n(tdict)), [tdict])
-    assert_raises(FinishPipeline, interrupt_if(tdict)(tdict).next)
+    assert_raises(FinishPipeline, next, interrupt_if(tdict)(tdict))

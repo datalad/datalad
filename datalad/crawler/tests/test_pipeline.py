@@ -14,14 +14,16 @@ from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import *
 from ..pipeline import run_pipeline, FinishPipeline
 
-from ..nodes.misc import Sink, assign, xrange_node, interrupt_if
+from ..nodes.misc import Sink, assign, range_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
 
 from ...tests.utils import eq_, ok_, assert_raises
 from ...tests.utils import skip_if_no_module
 from ...tests.utils import with_tempfile
+from ...tests.utils import skip_if_no_network
 
 
+@skip_if_no_network
 @vcr.use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
 def test_basic_openfmri_top_pipeline():
     skip_if_no_module('scrapy')  # e.g. not present under Python3
@@ -67,6 +69,8 @@ def test_basic_openfmri_top_pipeline():
     eq_(len(all_licenses), len(urls))
     #print('\n'.join(map(str, all_licenses)))
 
+
+@skip_if_no_network
 @vcr.use_cassette('fixtures/vcr_cassettes/openfmri-1.yaml')
 @with_tempfile(mkdir=True)
 def test_basic_openfmri_dataset_pipeline_with_annex(path):
@@ -112,8 +116,8 @@ def test_basic_openfmri_dataset_pipeline_with_annex(path):
 def test_pipeline_linear_simple():
     sink = Sink()
     pipeline = [
-        xrange_node(2, "out1"),
-        xrange_node(3, "out2"),
+        range_node(2, "out1"),
+        range_node(3, "out2"),
         sink
     ]
     pipeline_output = run_pipeline(pipeline)
@@ -135,9 +139,9 @@ def test_pipeline_linear_nested():
     sink = Sink()
     sink2 = Sink()
     pipeline = [
-        xrange_node(2, "out1"),
+        range_node(2, "out1"),
         [
-            xrange_node(3, "out2"),
+            range_node(3, "out2"),
             sink
         ],
         sink2
