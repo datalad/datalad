@@ -192,6 +192,7 @@ class Annexificator(object):
         #     self.db.set_filename(url, filename)
         # # figure out if we need to download it
         # #if self.mode in ('relaxed', 'fast'):
-
+        # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
+        # with subsequent "drop" leaves no record that it ever was here
 
         yield data  # There might be more to it!
