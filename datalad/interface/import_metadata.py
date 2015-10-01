@@ -79,7 +79,8 @@ class ImportMetadata(Interface):
         # TODO: Should we accept a pure annex and create a handle repo from it?
         if isinstance(repo, HandleRepo):
             repo.import_metadata(ImporterDict[format], files=path,
-                                 about_uri=subject)
+                                 about_uri=subject if subject is not None
+                                 else DLNS.this)
         elif isinstance(repo, CollectionRepo):
             if handle is None:
                 # collection level

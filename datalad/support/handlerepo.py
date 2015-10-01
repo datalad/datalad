@@ -300,7 +300,7 @@ class HandleRepo(AnnexRepo):
         Expects either `files` or `data` to be not `None`.
 
         Parameters:
-        ___________
+        -----------
         importer: class
           the importer to be used; has to be a subclass of MetadataImporter
         files: str or list of str
