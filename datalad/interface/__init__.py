@@ -26,6 +26,7 @@ from .sparql_query import SPARQLQuery
 from .uninstall_handle import UninstallHandle
 from .test import Test
 from .get import Get
+from .drop import Drop
 from .crawl import Crawl
 from .update import Update
 from .whereis import Whereis
@@ -59,6 +60,7 @@ _group_handle = (
         UninstallHandle,
         ListHandles,
         Get,
+        Drop,
         UpgradeHandle,
         PublishHandle,
     ])

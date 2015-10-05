@@ -11,11 +11,13 @@ import platform
 import sys
 import os
 import random
+import traceback
 
 from bs4 import BeautifulSoup
 from glob import glob
 from os.path import exists, join as opj, basename
 
+from six import PY2
 from six import text_type
 from six.moves.urllib.request import urlopen
 
@@ -234,7 +236,9 @@ def _test_assert_Xwd_unchanged(func):
     def do_chdir():
         func(os.pardir)
 
-    assert_raises(AssertionError, do_chdir)
+    with assert_raises(AssertionError) as cm:
+        do_chdir()
+
     eq_(orig_cwd, os.getcwd(),
         "assert_cwd_unchanged didn't return us back to cwd %s" % orig_cwd)
     eq_(orig_pwd, getpwd(),
@@ -278,7 +282,15 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         raise ValueError("error exception")
 
     with swallow_logs() as cml:
-        assert_raises(ValueError, do_chdir_value_error)
+        with assert_raises(ValueError) as cm:
+            do_chdir_value_error()
+        # retrospect exception
+        if PY2:
+            # could not figure out how to make it legit for PY3
+            # but on manual try -- works, and exception traceback is not masked out
+            exc_info = sys.exc_info()
+            assert_in('raise ValueError("error exception")', traceback.format_exception(*exc_info)[-2])
+
         eq_(orig_cwd, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to %s" % orig_cwd)
         assert_in("Mitigating and changing back", cml.out)

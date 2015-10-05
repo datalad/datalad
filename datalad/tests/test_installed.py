@@ -9,6 +9,7 @@
 """Test invocation of datalad utilities "as is installed"
 """
 
+from mock import patch
 from .utils import ok_startswith, eq_, \
     ignore_nose_capturing_stdout, assert_cwd_unchanged
 
@@ -18,7 +19,9 @@ from datalad.support.exceptions import CommandError
 def check_run_and_get_output(cmd):
     runner = Runner()
     try:
-        output = runner.run(["datalad", "--help"])
+        # suppress log output happen it was set to high values
+        with patch.dict('os.environ', {'DATALAD_LOGLEVEL': 'WARN'}):
+            output = runner.run(["datalad", "--help"])
     except CommandError as e:
         raise AssertionError("'datalad --help' failed to start normally. "
                              "Exited with %d and output %s" % (e.code, (e.stdout, e.stderr)))

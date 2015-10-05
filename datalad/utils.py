@@ -9,8 +9,9 @@
 
 import collections
 import six.moves.builtins as __builtin__
-from six.moves.urllib.parse import quote as urlquote
+from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
+import re
 import logging
 import shutil, stat, os, sys
 import tempfile
@@ -76,6 +77,10 @@ def get_local_file_url(fname):
         furl = "file://%s" % urlquote(fname)
     return furl
 
+def get_url_path(url):
+    """Given a file:// url, return the path itself"""
+
+    return urlunquote(urlsplit(url).path)
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable

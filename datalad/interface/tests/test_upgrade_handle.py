@@ -32,13 +32,13 @@ def test_upgrade_handle(path):
     repo.git_remote_remove('origin')
     with assert_raises(RuntimeError) as ex:
         upgrade_handle(path)
-    ok_startswith(format(ex.exception), 'No remotes were found for %s' % path)
+    ok_startswith(str(ex.exception), 'No remotes were found for %s' % path)
 
     # remove .git altogether
     rmtree(opj(path, '.git'))
     with assert_raises(RuntimeError) as ex:
         upgrade_handle(path)
-    ok_startswith(format(ex.exception), 'No handle repository found in %s' % path)
+    ok_startswith(str(ex.exception), 'No handle repository found in %s' % path)
 
 
 # TODO: test actual upgrade:
