@@ -14,14 +14,17 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, isdir
+from os.path import join as opj, abspath, expanduser, expandvars, isdir, exists
+from appdirs import AppDirs
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoHandleBackend
 from datalad.support.handlerepo import HandleRepo
-from appdirs import AppDirs
+from datalad.support.metadatahandler import CustomImporter
+from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
+
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -65,14 +68,16 @@ class InstallHandle(Interface):
                              "make sense." % local_master.name)
 
         name_prefix = None
+        handle_name = None
         if parts[0] in local_master.git_get_remotes() \
                 and len(parts) >= 2:
             # 'handle' starts with a name of a known collection, followed by at
             # least a second part, separated by '/'.
             # Therefore assuming it's a handle's key, not an url
 
+            handle_name = handle[len(parts[0])+1:]
             url = CollectionRepoHandleBackend(repo=local_master,
-                                              key=handle[len(parts[0])+1:],
+                                              key=handle_name,
                                               branch=parts[0] + '/master').url
             name_prefix = parts[0] + '/'
 
@@ -92,10 +97,37 @@ class InstallHandle(Interface):
         # install the handle:
         installed_handle = HandleRepo(abspath(expandvars(expanduser(path))),
                                       url, create=True)
-        local_name = name or installed_handle.name
+        local_name = name or handle_name or installed_handle.name
         if name_prefix is not None:
             local_name = name_prefix + local_name
 
         local_master.add_handle(installed_handle, name=local_name)
 
-        # TODO: metadata: priority: handle->collection->nothing
+        # Import metadata of the handel, if there's any.
+        # Priorities: First try to get metadata from the handle itself,
+        # if there's none, then get whatever is stored in the collection it was
+        # installed from.
+        # TODO: Discuss this approach. May be it makes more sense to always use
+        # the metadata from the collection, if the handle was installed that
+        # way.
+
+        if exists(opj(installed_handle.path, HANDLE_META_DIR,
+                      REPO_STD_META_FILE)):
+            local_master.import_metadata_to_handle(CustomImporter,
+                                                   key=local_name,
+                                                   files=opj(
+                                                       installed_handle.path,
+                                                       HANDLE_META_DIR))
+        elif name_prefix is not None:
+            # installed from  collection
+            # get the metadata from that remote collection:
+            metadata = dict()
+            files = [f for f in local_master.git_get_files(
+                name_prefix + 'master') if f.startswith(handle_name)]
+            for file_ in files:
+                metadata[file_[len(handle_name) + 1:]] = \
+                    local_master.git_get_file_content(file_,
+                                                      name_prefix + 'master')
+            local_master.import_metadata_to_handle(CustomImporter,
+                                                   key=local_name,
+                                                   data=metadata)
