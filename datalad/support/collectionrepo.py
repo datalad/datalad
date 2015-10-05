@@ -513,11 +513,12 @@ class CollectionRepo(GitRepo):
         # check for existing metadata sources to determine the name for the
         # new one:
         # TODO: the numbering is shit ;) Use a hash or sth.
+        # TODO: Additionally, the name of the source should contain
+        # collection's name OR the handle's name!
         src_name = "%s_import%d" % (self.name,
                                     len([src for src in
                                          cfg_graph.objects(about_uri,
-                                                           DLNS.usesSrc)])
-                                    + 1)
+                                                           DLNS.usesSrc)]) + 1)
 
         if files is not None and data is None:
             # treat it as a metadata source, that can be used again later on.
@@ -529,10 +530,12 @@ class CollectionRepo(GitRepo):
             elif isinstance(files, list):
                 [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f)))
                  for f in files]
+            remove_import_branch = False
 
         elif files is None and data is not None:
             # just metadata to read, nothing we can refer to later on
-            pass
+            # Therefore remove the import branch afterwards
+            remove_import_branch = True
         else:
             raise ValueError("Either 'files' or 'data' have to be passed.")
 
@@ -556,6 +559,9 @@ class CollectionRepo(GitRepo):
         # TODO: Check this out
         self.git_checkout(active_branch, options="-f")
         self.git_merge(src_name)
+
+        if remove_import_branch:
+            self.git_remove_branch(src_name)
 
     def import_metadata_to_handle(self, importer, key, files=None, data=None,
                                   about_uri=None):
