@@ -30,6 +30,7 @@ from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
 from appdirs import AppDirs
+from six.moves.urllib.parse import urlparse
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -90,13 +91,25 @@ class ImportMetadata(Interface):
                 repo.import_metadata_to_handle(ImporterDict[format], handle,
                                                files=path, about_uri=subject)
 
-        # TODO: Update local collection metadata, by fetching modified collection
-        # or import new metadata of the modified local handle
-                
+        # Update metadata of local master collection:
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
-        # update if it is a registered collection:
+
         if isinstance(repo, CollectionRepo):
+            # update master if it is a registered collection:
             for c in local_master.git_get_remotes():
                 if repo.path == local_master.git_get_remote_url(c):
                     local_master.git_fetch(c)
+        elif isinstance(repo, HandleRepo):
+            # update master if it is an installed handle:
+            for h in local_master.get_handle_list():
+                if repo.path == urlparse(
+                        CollectionRepoHandleBackend(local_master, h).url).path:
+                    local_master.import_metadata_to_handle(CustomImporter,
+                                                           key=h,
+                                                           files=opj(
+                                                               repo.path,
+                                                               HANDLE_META_DIR))
+
+        # TODO: What to do in case of a handle, if it is part of another
+        # locally available collection than just the master?
