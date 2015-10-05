@@ -170,3 +170,16 @@ class Describe(Interface):
         elif isinstance(repo, CollectionRepo):
             repo.git_add(files)
             repo.git_commit("Metadata changed.")
+
+
+        # TODO: Update local collection metadata, by fetching modified collection
+        # or import new metadata of the modified local handle. What to do if
+        # handle is part of another collection than just the master?
+
+        local_master = CollectionRepo(opj(dirs.user_data_dir,
+                                      'localcollection'))
+        # update if it is a registered collection:
+        if isinstance(repo, CollectionRepo):
+            for c in local_master.git_get_remotes():
+                if repo.path == local_master.git_get_remote_url(c):
+                    local_master.git_fetch(c)

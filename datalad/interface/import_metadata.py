@@ -90,3 +90,13 @@ class ImportMetadata(Interface):
                 repo.import_metadata_to_handle(ImporterDict[format], handle,
                                                files=path, about_uri=subject)
 
+        # TODO: Update local collection metadata, by fetching modified collection
+        # or import new metadata of the modified local handle
+                
+        local_master = CollectionRepo(opj(dirs.user_data_dir,
+                                      'localcollection'))
+        # update if it is a registered collection:
+        if isinstance(repo, CollectionRepo):
+            for c in local_master.git_get_remotes():
+                if repo.path == local_master.git_get_remote_url(c):
+                    local_master.git_fetch(c)
