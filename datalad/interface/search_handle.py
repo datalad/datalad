@@ -24,6 +24,8 @@ from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from appdirs import AppDirs
+from six.moves.urllib.parse import urlparse
+
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -59,5 +61,17 @@ class SearchHandle(Interface):
 
         results = metacollection.conjunctive_graph.query(query_string)
 
-        for row in results:
-            print(row)
+        rows = [row.asdict() for row in results]
+        handles = list()
+        locations = list()
+        for row in rows:
+            handles.append(str(row['g']))
+            parsed_uri = urlparse(row['r'])
+            if parsed_uri.scheme == 'file':
+                locations.append(parsed_uri.path)
+            else:
+                locations.append(str(row['r']))
+
+        width = max(len(h) for h in handles)
+        for h, l in zip(handles, locations):
+            print "%s\t%s" % (h.ljust(width), l)
