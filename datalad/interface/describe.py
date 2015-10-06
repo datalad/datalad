@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from os import curdir
+from os import curdir, listdir
 from os.path import exists, join as opj, isfile
 from .base import Interface
 from ..support.param import Parameter
@@ -169,7 +169,7 @@ class Describe(Interface):
         if isinstance(repo, HandleRepo):
             repo.add_to_git(files, "Metadata changed.")
         elif isinstance(repo, CollectionRepo):
-            repo.git_add(files)
+            repo.git_add([f for f in listdir(repo.path) if f.endswith(".ttl")])
             repo.git_commit("Metadata changed.")
 
         # Update metadata of local master collection:
