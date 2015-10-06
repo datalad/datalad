@@ -512,13 +512,19 @@ class CollectionRepo(GitRepo):
 
         # check for existing metadata sources to determine the name for the
         # new one:
-        # TODO: the numbering is shit ;) Use a hash or sth.
-        # TODO: Additionally, the name of the source should contain
-        # collection's name OR the handle's name!
-        src_name = "%s_import%d" % (self.name,
-                                    len([src for src in
-                                         cfg_graph.objects(about_uri,
-                                                           DLNS.usesSrc)]) + 1)
+
+        known_branches = self.git_get_branches()
+        known_sources = [src for src in cfg_graph.objects(about_uri,
+                                                          DLNS.usesSrc)]
+        src_name_prefix = filter(str.isalnum, str(about_uri))
+        from random import choice
+        from string import letters
+        while True:
+            src_name = src_name_prefix + "_import_" + \
+                       ''.join(choice(letters) for i in xrange(6))
+            if src_name not in known_branches and \
+                        URIRef(src_name) not in known_sources:
+                break
 
         if files is not None and data is None:
             # treat it as a metadata source, that can be used again later on.
