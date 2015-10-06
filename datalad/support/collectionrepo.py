@@ -544,7 +544,17 @@ class CollectionRepo(GitRepo):
         im.import_data(files=files, data=data)
 
         # add new config statements:
-        im.get_graphs()[REPO_CONFIG_FILE[:-4]] += cfg_graph
+        graphs = im.get_graphs()
+        graphs[REPO_CONFIG_FILE[:-4]] += cfg_graph
+
+        # replace possible "this"-statements in metadata source by the now used
+        # 'about_uri':
+        if about_uri != DLNS.this:
+            for g in graphs:
+                for s, p, o in graphs[g]:
+                    if s == DLNS.this:
+                        graphs[g].add((about_uri, p, o))
+                        graphs[g].remove((s, p, o))
 
         # create import branch:
         active_branch = self.git_get_active_branch()
