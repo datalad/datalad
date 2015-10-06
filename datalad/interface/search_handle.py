@@ -74,4 +74,4 @@ class SearchHandle(Interface):
 
         width = max(len(h) for h in handles)
         for h, l in zip(handles, locations):
-            print "%s\t%s" % (h.ljust(width), l)
+            print("%s\t%s" % (h.ljust(width), l))

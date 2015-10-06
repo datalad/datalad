@@ -516,12 +516,19 @@ class CollectionRepo(GitRepo):
         known_branches = self.git_get_branches()
         known_sources = [src for src in cfg_graph.objects(about_uri,
                                                           DLNS.usesSrc)]
-        src_name_prefix = filter(str.isalnum, str(about_uri))
+
+        from six import PY3
+        if PY3:
+            src_name_prefix = "".join(filter(str.isalnum, str(about_uri)))
+            lgr.error("DEBUG: type: %s\nvalue: %s" % (type(src_name_prefix), src_name_prefix))
+        else:
+            src_name_prefix = filter(str.isalnum, str(about_uri))
         from random import choice
-        from string import letters
+        from string import ascii_letters
+        from six.moves import xrange
         while True:
             src_name = src_name_prefix + "_import_" + \
-                       ''.join(choice(letters) for i in xrange(6))
+                       ''.join(choice(ascii_letters) for i in xrange(6))
             if src_name not in known_branches and \
                         URIRef(src_name) not in known_sources:
                 break
