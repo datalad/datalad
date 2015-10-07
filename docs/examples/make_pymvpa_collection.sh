@@ -1,5 +1,6 @@
 #!/bin/sh
-# A little script to prepare PyMVPA demo collection based on data used in tutorials etc
+# A little script to prepare PyMVPA demo collection based on data used in
+# tutorials etc
 
 set -eu
 
@@ -7,9 +8,27 @@ echo "I: adding haxby2001"
 # Haxby 2001 -- the main demo dataset
 datalad install-handle http://data.pymvpa.org/datasets/haxby2001/.git
 
+# getting its content, since publishing can't clone the repo, we need to push
+# content to the published handle and therefore we would loose the connection
+# to content, that is not addurl'ed but just available via the original annex.
+# Note: May be therefore use "git annex get . --from=origin" to not unnecessarily
+# get things, that are reachable from the published handle (and any clone of
+# it)? Need to add that option to datalad get.
+(
+    cd haxby2001
+    echo "I: getting haxby2001 content"
+    datalad get .
+)
+
 # Extracted/processed pieces from haxby2001
 echo "I: adding tutorial_data"
 datalad install-handle http://data.pymvpa.org/datasets/tutorial_data/.git
+# same as above
+(
+    cd tutorial_data
+    echo "I: getting tutorial_data content"
+    datalad get .
+)
 
 echo "I: creating MNIST handle"
 datalad create-handle mnist
@@ -29,6 +48,12 @@ datalad create-handle mnist
 # analysis scripts use PyMVPA heavily so it is a worthwhile addition
 echo "I: adding forrest_gump dataset"
 datalad install-handle http://psydata.ovgu.de/forrest_gump/.git
+# Disabled for now - it's just a lot. Not needed for testing.
+#(
+#    cd forrest_gump
+#    echo "I: getting forrest_gump content"
+#    datalad get .
+#)
 
 # new plain collection
 echo "I: creating PyMVPA collection"
@@ -42,8 +67,8 @@ done
 
 cd pymvpa_collection
 # XXX this should pull in the new handle meta-data, but doesn't ???
-echo "I: updating collection"
-datalad update
+#echo "I: updating collection"
+#datalad update
 
 echo "I: describing collection"
 datalad describe \
@@ -52,3 +77,4 @@ datalad describe \
     --description "Collection of datasets useful for PyMVPA demonstrations and tutorials"
 
 # TODO: publish as http://collections.datalad.org/pymvpa
+# datalad publish-collection ssh://collections.datalad.org/pymvpa pymvpa
