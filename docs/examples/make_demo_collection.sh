@@ -53,6 +53,8 @@ cd ..
 
 # grab a plain git annex repo
 datalad install-handle http://psydata.ovgu.de/forrest_gump/.git demo_handle2
+# Note (ben): Without getting its content (at least '--from=origin'), that content
+# can't be published.
 
 # new plain collection
 datalad create-collection demo_collection
@@ -67,7 +69,6 @@ datalad describe --author "Datalad demo people" --license 'CC0' --description "A
 cd ..
 
 cd demo_collection
-# XXX this should pull in the new handle meta-data, but doesn't ???
-datalad update
 # this leads to all of .git being commited with the meta data change
+# Note (ben): should work now
 datalad describe --author "Datalad demo people" --license 'CC0' --description "All my little handles"

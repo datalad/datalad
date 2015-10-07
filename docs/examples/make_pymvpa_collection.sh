@@ -48,11 +48,12 @@ datalad create-handle mnist
 # analysis scripts use PyMVPA heavily so it is a worthwhile addition
 echo "I: adding forrest_gump dataset"
 datalad install-handle http://psydata.ovgu.de/forrest_gump/.git
-(
-    cd forrest_gump
-    echo "I: getting forrest_gump content"
-    datalad get .
-)
+# Disabled for now - it's just a lot. Not needed for testing.
+#(
+#    cd forrest_gump
+#    echo "I: getting forrest_gump content"
+#    datalad get .
+#)
 
 # new plain collection
 echo "I: creating PyMVPA collection"
