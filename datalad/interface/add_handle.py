@@ -85,7 +85,7 @@ class AddHandle(Interface):
         if exists(opj(handle_repo.path, HANDLE_META_DIR,
                       REPO_STD_META_FILE)):
             collection_repo.import_metadata_to_handle(CustomImporter,
-                                                      key=name,
+                                                      key=name if name is not None else handle_repo.name,
                                                       files=opj(
                                                           handle_repo.path,
                                                           HANDLE_META_DIR))
