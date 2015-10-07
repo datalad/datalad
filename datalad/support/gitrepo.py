@@ -518,3 +518,6 @@ class GitRepo(object):
 
     def git_merge(self, name):
         self._git_custom_command('', 'git merge %s' % name)
+
+    def git_remove_branch(self, branch):
+        self._git_custom_command('', 'git branch -D %s' % branch)
