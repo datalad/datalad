@@ -112,6 +112,11 @@ class PublishCollection(Interface):
         local_collection_repo = get_repo_instance(
             abspath(expandvars(expanduser(c_path))), CollectionRepo)
 
+        available_handles = [key for key in
+                             local_collection_repo.get_handle_list()
+                             if exists(urlparse(CollectionRepoHandleBackend(
+                                 local_collection_repo, key).url).path)]
+
         parsed_target = urlparse(target)  # => scheme, path
 
         from pkg_resources import resource_filename
@@ -154,7 +159,8 @@ class PublishCollection(Interface):
 
             script_options = "%s DATALAD_COL_%s" % (parsed_target.path,
                                                     local_collection_repo.name)
-            for key in local_collection_repo.get_handle_list():
+            for key in available_handles:
+                # prepare repos for locally available handles only
                 script_options += " %s" % key
 
             cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
@@ -184,7 +190,7 @@ class PublishCollection(Interface):
                 out, err = runner.run(["sh", prepare_script_path,
                                        target_path,
                                        "DATALAD_COL_" + local_collection_repo.name]
-                                      + local_collection_repo.get_handle_list())
+                                      + available_handles)
             except CommandError as e:
                 lgr.error("Preparation script failed: %s" % str(e))
 
@@ -196,7 +202,7 @@ class PublishCollection(Interface):
         results = parse_script_output(out, err)
 
         script_failed = False
-        for name in local_collection_repo.get_handle_list() + \
+        for name in available_handles + \
                 ["DATALAD_COL_" + local_collection_repo.name]:
             if not results[name]['init']:
                 lgr.error("Server setup for %s failed." % name)
@@ -208,7 +214,7 @@ class PublishCollection(Interface):
         # Now, all the handles:
         from .publish_handle import PublishHandle
         handle_publisher = PublishHandle()
-        for handle_name in local_collection_repo.get_handle_list():
+        for handle_name in available_handles:
 
             # get location:
             handle_loc = urlparse(CollectionRepoHandleBackend(
@@ -326,7 +332,7 @@ class PublishCollection(Interface):
                                        target_path,
                                        "DATALAD_COL_" +
                                        local_collection_repo.name]
-                                      + local_collection_repo.get_handle_list())
+                                      + available_handles)
             except CommandError as e:
                 lgr.error("Clean-up script failed: %s" % str(e))
 

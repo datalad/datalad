@@ -66,9 +66,6 @@ for h in haxby2001 tutorial_data mnist forrest_gump; do
 done
 
 cd pymvpa_collection
-# XXX this should pull in the new handle meta-data, but doesn't ???
-#echo "I: updating collection"
-#datalad update
 
 echo "I: describing collection"
 datalad describe \

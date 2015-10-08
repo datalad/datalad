@@ -52,11 +52,11 @@ git commit -m "CZE and BUL switched to 'kein Ausbau' (no expansion)"
 cd ..
 
 # grab a plain git annex repo
-datalad install-handle http://psydata.ovgu.de/forrest_gump/.git demo_handle2
+#datalad install-handle http://psydata.ovgu.de/forrest_gump/.git demo_handle2
 # Use special remote to link the content to original annex
-cd demo_handle2
-git annex initremote orig_src type=git location=http://psydata.ovgu.de/forrest_gump/.git autoenable=true
-cd ..
+#cd demo_handle2
+#git annex initremote orig_src type=git location=http://psydata.ovgu.de/forrest_gump/.git autoenable=true
+#cd ..
 
 # handle meta data
 cd demo_handle1
@@ -68,7 +68,8 @@ datalad create-collection demo_collection
 
 # add all handles
 datalad add-handle demo_handle1 demo_collection
-datalad add-handle demo_handle2 demo_collection
+datalad add-handle http://psydata.ovgu.de/forrest_gump/.git demo_collection demo_handle2
+#datalad add-handle demo_handle2 demo_collection
 
 # collection metadata
 cd demo_collection
