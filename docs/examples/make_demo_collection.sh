@@ -53,8 +53,10 @@ cd ..
 
 # grab a plain git annex repo
 datalad install-handle http://psydata.ovgu.de/forrest_gump/.git demo_handle2
-# Note (ben): Without getting its content (at least '--from=origin'), that content
-# can't be published.
+# Use special remote to link the content to original annex
+cd demo_handle2
+git annex initremote orig_src type=git location=http://psydata.ovgu.de/forrest_gump/.git autoenable=true
+cd ..
 
 # handle meta data
 cd demo_handle1
@@ -68,9 +70,9 @@ datalad create-collection demo_collection
 datalad add-handle demo_handle1 demo_collection
 datalad add-handle demo_handle2 demo_collection
 
+# collection metadata
 cd demo_collection
-# this leads to all of .git being committed with the meta data change
-# Note (ben): should work now
 datalad describe --author "Datalad demo people" --license 'CC0' --description "All my little handles"
+cd ..
 
 # datalad publish-collection ssh://collections.datalad.org/demo demo_collection

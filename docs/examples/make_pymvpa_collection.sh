@@ -14,20 +14,20 @@ datalad install-handle http://data.pymvpa.org/datasets/haxby2001/.git
 # Note: May be therefore use "git annex get . --from=origin" to not unnecessarily
 # get things, that are reachable from the published handle (and any clone of
 # it)? Need to add that option to datalad get.
-(
-    cd haxby2001
-    echo "I: getting haxby2001 content"
-    datalad get .
-)
+#(
+#    cd haxby2001
+#    echo "I: getting haxby2001 content"
+#    datalad get .
+#)
 
 # Extracted/processed pieces from haxby2001
 echo "I: adding tutorial_data"
 datalad install-handle http://data.pymvpa.org/datasets/tutorial_data/.git
-# same as above
+# use the special remote approach to link original content:
 (
     cd tutorial_data
-    echo "I: getting tutorial_data content"
-    datalad get .
+    echo "I: adding origin as special remote to tutorial_data"
+    git annex initremote orig_src type=git location=http://data.pymvpa.org/datasets/tutorial_data/.git autoenable=true
 )
 
 echo "I: creating MNIST handle"
