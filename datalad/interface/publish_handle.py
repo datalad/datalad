@@ -131,10 +131,10 @@ class PublishHandle(Interface):
         local_handle_repo.git_push("%s +git-annex:git-annex" % remote)
 
         # 3. copy locally available files:
-        for file in local_handle_repo.get_annexed_files():
-            if local_handle_repo.file_has_content(file):
+        for file_ in local_handle_repo.get_annexed_files():
+            if local_handle_repo.file_has_content(file_):
                 local_handle_repo._annex_custom_command(
-                    '', "git annex copy %s --to=%s" % (file, remote))
+                    '', "git annex copy %s --to=%s" % (file_, remote))
 
         # Note: Currently, this is only relevant, when publish-handle is called
         # directly (with local target). Obviously doesn't work remotely!

@@ -22,6 +22,7 @@ from ..support.collectionrepo import CollectionRepo, GitRepo, \
 from ..support.handlerepo import HandleRepo
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
+from datalad.cmd import CommandError
 from ..consts import REPO_STD_META_FILE, HANDLE_META_DIR
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
@@ -159,7 +160,10 @@ class PublishCollection(Interface):
             cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
                       (control_path, parsed_target.hostname, script_options)
             cmd_str += " < %s" % prepare_script_path
-            out, err = runner.run(cmd_str)
+            try:
+                out, err = runner.run(cmd_str)
+            except CommandError as e:
+                lgr.error("Preparation script failed: %s" % str(e))
 
             # set GIT-SSH:
             environ['GIT_SSH'] = resource_filename('datalad',
@@ -176,10 +180,14 @@ class PublishCollection(Interface):
             collection_url = baseurl + '/' + "DATALAD_COL_" + \
                              local_collection_repo.name
 
-            out, err = runner.run(["sh", prepare_script_path,
-                                   target_path,
-                                   "DATALAD_COL_" + local_collection_repo.name]
-                                  + local_collection_repo.get_handle_list())
+            try:
+                out, err = runner.run(["sh", prepare_script_path,
+                                       target_path,
+                                       "DATALAD_COL_" + local_collection_repo.name]
+                                      + local_collection_repo.get_handle_list())
+            except CommandError as e:
+                lgr.error("Preparation script failed: %s" % str(e))
+
         else:
             raise RuntimeError("Don't know scheme '%s'." %
                                parsed_target.scheme)
@@ -209,8 +217,9 @@ class PublishCollection(Interface):
             try:
                 handle_repo = get_repo_instance(handle_loc, HandleRepo)
             except RuntimeError as e:
-                lgr.error("No handle available at %s. Skip." % handle_loc)
-                raise e
+                lgr.error("'%s': No handle available at %s. Skip." %
+                          (handle_name, handle_loc))
+                continue
 
             handle_publisher(None, handle=handle_loc,
                              url=baseurl + '/' + handle_name)
@@ -229,7 +238,8 @@ class PublishCollection(Interface):
         importer.import_data(local_collection_repo.path)
         graphs = importer.get_graphs()
         orig_uri = graphs[REPO_STD_META_FILE[0:-4]].value(predicate=RDF.type,
-                                                          object=DLNS.Handle)
+                                                          object=DLNS.Collection)
+
         # correct collection uri
         new_uri = URIRef(collection_url)
         for graph_name in graphs:
@@ -268,6 +278,8 @@ class PublishCollection(Interface):
             graphs[REPO_STD_META_FILE[0:-4]].remove((new_uri, DCTERMS.hasPart, o))
             graphs[REPO_STD_META_FILE[0:-4]].add((new_uri, DCTERMS.hasPart, o_new))
 
+        # TODO: correct handle uris in collection (./handle_key/datalad.ttl, ...)
+
         # TODO: add commit reference
 
         importer.store_data(local_collection_repo.path)
@@ -295,17 +307,28 @@ class PublishCollection(Interface):
             cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
                       (control_path, parsed_target.hostname, script_options)
             cmd_str += " < %s" % cleanup_script_path
-            out, err = runner.run(cmd_str)
+            try:
+                out, err = runner.run(cmd_str)
+            except CommandError as e:
+                lgr.error("Clean-up script failed: %s" % str(e))
 
             # stop controlmaster:
             cmd_str = "ssh -O stop -S %s %s" % (control_path,
                                                 parsed_target.hostname)
-            out, err = runner.run(cmd_str)
+            try:
+                out, err = runner.run(cmd_str)
+            except CommandError as e:
+                lgr.error("Stopping ssh control master failed: %s" % str(e))
+
         else:
-            out, err = runner.run(["sh", cleanup_script_path,
-                                   target_path,
-                                   "DATALAD_COL_" + local_collection_repo.name]
-                                  + local_collection_repo.get_handle_list())
+            try:
+                out, err = runner.run(["sh", cleanup_script_path,
+                                       target_path,
+                                       "DATALAD_COL_" +
+                                       local_collection_repo.name]
+                                      + local_collection_repo.get_handle_list())
+            except CommandError as e:
+                lgr.error("Clean-up script failed: %s" % str(e))
 
         # TODO: final check, whether everything is fine
         # Delete publish branch:

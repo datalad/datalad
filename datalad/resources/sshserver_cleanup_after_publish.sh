@@ -26,7 +26,7 @@ for name in "$@"; do
     cd "$name"
     git checkout master
     printf "DATALAD_HANDLE_REPO_%s: checkout_master DATALAD_END\n" "$name"
-    git annex get .
+    git annex get . || true
     printf "DATALAD_HANDLE_REPO_%s: annex_get_all DATALAD_END\n" "$name"
     cd "$curdir"
 done

@@ -56,6 +56,11 @@ datalad install-handle http://psydata.ovgu.de/forrest_gump/.git demo_handle2
 # Note (ben): Without getting its content (at least '--from=origin'), that content
 # can't be published.
 
+# handle meta data
+cd demo_handle1
+datalad describe --author "Datalad demo people" --license 'CC0' --description "All these is to know about demos"
+cd ..
+
 # new plain collection
 datalad create-collection demo_collection
 
@@ -63,12 +68,9 @@ datalad create-collection demo_collection
 datalad add-handle demo_handle1 demo_collection
 datalad add-handle demo_handle2 demo_collection
 
-# handle meta data
-cd demo_handle1
-datalad describe --author "Datalad demo people" --license 'CC0' --description "All these is to know about demos"
-cd ..
-
 cd demo_collection
-# this leads to all of .git being commited with the meta data change
+# this leads to all of .git being committed with the meta data change
 # Note (ben): should work now
 datalad describe --author "Datalad demo people" --license 'CC0' --description "All my little handles"
+
+# datalad publish-collection ssh://collections.datalad.org/demo demo_collection
