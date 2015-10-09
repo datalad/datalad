@@ -29,6 +29,7 @@ for name in "$@"; do
     # call init to do things like enabling special remotes
     git annex init
     printf "DATALAD_HANDLE_REPO_%s: annex_init DATALAD_END\n" "$name"
+    # TODO: getting the content may be an option instead.
     git annex get . || true
     printf "DATALAD_HANDLE_REPO_%s: annex_get_all DATALAD_END\n" "$name"
     cd "$curdir"
