@@ -227,8 +227,11 @@ class PublishCollection(Interface):
                           (handle_name, handle_loc))
                 continue
 
+            annex_ssh = "-S %s" % control_path \
+                if parsed_target.scheme == 'ssh' else None
             handle_publisher(None, handle=handle_loc,
-                             url=baseurl + '/' + handle_name)
+                             url=baseurl + '/' + handle_name,
+                             ssh_options=annex_ssh)
 
         # TODO: check success => go on with collection
 
