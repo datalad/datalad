@@ -6,6 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
 from .support.handlerepo import HandleRepo
 
