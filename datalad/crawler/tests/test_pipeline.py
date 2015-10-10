@@ -8,7 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os.path import join as opj
-import vcr
 
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import *
@@ -21,11 +20,12 @@ from ...tests.utils import eq_, ok_, assert_raises
 from ...tests.utils import skip_if_no_module
 from ...tests.utils import with_tempfile
 from ...tests.utils import skip_if_no_network
+from ...tests.utils import use_cassette
 
 
 @skip_if_no_network
-@vcr.use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
-def test_basic_openfmri_top_pipeline():
+@use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
+def __test_basic_openfmri_top_pipeline():
     skip_if_no_module('scrapy')  # e.g. not present under Python3
     sink1 = Sink()
     sink2 = Sink()
@@ -71,9 +71,9 @@ def test_basic_openfmri_top_pipeline():
 
 
 @skip_if_no_network
-@vcr.use_cassette('fixtures/vcr_cassettes/openfmri-1.yaml')
+@use_cassette('fixtures/vcr_cassettes/openfmri-1.yaml')
 @with_tempfile(mkdir=True)
-def test_basic_openfmri_dataset_pipeline_with_annex(path):
+def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     skip_if_no_module('scrapy')  # e.g. not present under Python3
     dataset_index = 1
     dataset_name = 'ds%06d' % dataset_index

@@ -7,7 +7,6 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import vcr
 from six import next
 from ..misc import get_deposition_filename
 from ..misc import range_node
@@ -15,6 +14,7 @@ from ..misc import interrupt_if
 from ...pipeline import FinishPipeline
 
 from datalad.tests.utils import skip_if_no_network
+from datalad.tests.utils import use_cassette
 
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
@@ -23,7 +23,7 @@ from nose import SkipTest
 # TODO: seems vcr fetches entire response not just the header which makes this test url
 #       in particular not appropriate
 @skip_if_no_network
-@vcr.use_cassette('fixtures/vcr_cassettes/brain-map.org-1.yaml')
+@use_cassette('fixtures/vcr_cassettes/brain-map.org-1.yaml')
 def test_get_deposition_filename():
     input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
     output = list(get_deposition_filename(input))

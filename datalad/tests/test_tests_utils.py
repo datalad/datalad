@@ -38,6 +38,7 @@ from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import run_under_dir
+from .utils import use_cassette
 
 #
 # Test with_tempfile, especially nested invocations
@@ -420,3 +421,18 @@ def test_run_under_dir(d):
     assert_raises(AssertionError, f, 1, 3)
     eq_(getpwd(), orig_pwd)
     eq_(os.getcwd(), orig_cwd)
+
+
+def test_use_cassette_if_no_vcr():
+    # just test that our do nothing decorator does the right thing if vcr is not present
+    try:
+        import vcr
+        raise SkipTest("vcr is present, can't test behavior without vcr")
+    except ImportError:
+        pass
+
+    @use_cassette("some_path")
+    def checker(x):
+        return x + 1
+
+    eq_(checker(1), 2)

@@ -42,6 +42,28 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 
+try:
+    # TEMP: Just to overcome problem with testing on jessie with older requests
+    # https://github.com/kevin1024/vcrpy/issues/215
+    import vcr.patch as _vcrp
+    import requests as _
+    try:
+        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
+    except ImportError:
+        def returnnothing(*args, **kwargs):
+            return()
+        _vcrp.CassettePatcherBuilder._requests = returnnothing
+    from vcr import use_cassette
+except ImportError:
+    # If there is no vcr.py -- provide a do nothing decorator for use_cassette
+    def use_cassette(*args, **kwargs):
+        def do_nothing_decorator(t):
+            @wraps(t)
+            def wrapper(*args, **kwargs):
+                return t(*args, **kwargs)
+            return wrapper
+        return do_nothing_decorator
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
