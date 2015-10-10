@@ -14,13 +14,16 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, isdir
+from os.path import join as opj, abspath, expanduser, expandvars, isdir, exists
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoHandleBackend
 from datalad.support.handlerepo import HandleRepo
+from datalad.support.metadatahandler import CustomImporter
+from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
+
 from appdirs import AppDirs
 from six.moves.urllib.parse import urlparse
 
@@ -77,6 +80,15 @@ class AddHandle(Interface):
         handle_repo = HandleRepo(h_path, create=False)
         collection_repo = CollectionRepo(c_path, create=False)
         collection_repo.add_handle(handle_repo, name=name)
+
+        # get handle's metadata, if there's any:
+        if exists(opj(handle_repo.path, HANDLE_META_DIR,
+                      REPO_STD_META_FILE)):
+            collection_repo.import_metadata_to_handle(CustomImporter,
+                                                      key=name,
+                                                      files=opj(
+                                                          handle_repo.path,
+                                                          HANDLE_META_DIR))
 
         # TODO: More sophisticated: Check whether the collection is registered.
         # Might be a different name than collection_repo.name or not at all.

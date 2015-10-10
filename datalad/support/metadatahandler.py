@@ -124,6 +124,15 @@ class MetadataImporter(object):
                                                       RDF.type,
                                                       DLNS.Collection))
 
+    def get_graphs(self):
+        """gets the imported data
+
+        Returns:
+        --------
+        dict of rdflib.Graph
+        """
+        return self._graphs
+
     @abstractmethod
     def import_data(self, files=None, data=None):
         """The actual import routine
@@ -367,15 +376,6 @@ class CustomImporter(MetadataImporter):
             for key in data:
                 self._graphs[basename(key).rstrip('.ttl')] = \
                     Graph().parse(data=data[key], format="turtle")
-
-    def get_graphs(self):
-        """gets the imported data
-
-        Returns:
-        --------
-        dict of rdflib.Graph
-        """
-        return self._graphs
 
     def set_graphs(self, graphs):
         """sets the metadata

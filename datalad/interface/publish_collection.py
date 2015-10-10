@@ -220,8 +220,9 @@ class PublishCollection(Interface):
         # prepare publish branch in local collection:
         # check for existing publish branches:
         from random import choice
-        from string import letters
-        p_branch = "publish_" + ''.join(choice(letters) for i in range(6))
+        from string import ascii_letters
+        from six.moves import xrange
+        p_branch = "publish_" + ''.join(choice(ascii_letters) for i in xrange(6))
         local_collection_repo.git_checkout(p_branch, '-b')
 
         importer = CustomImporter('Collection', 'Collection', DLNS.this)

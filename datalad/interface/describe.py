@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from os import curdir
+from os import curdir, listdir
 from os.path import exists, join as opj, isfile
 from .base import Interface
 from ..support.param import Parameter
@@ -26,6 +26,7 @@ from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
 from appdirs import AppDirs
+from six.moves.urllib.parse import urlparse
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -168,5 +169,28 @@ class Describe(Interface):
         if isinstance(repo, HandleRepo):
             repo.add_to_git(files, "Metadata changed.")
         elif isinstance(repo, CollectionRepo):
-            repo.git_add(files)
+            repo.git_add([f for f in listdir(repo.path) if f.endswith(".ttl")])
             repo.git_commit("Metadata changed.")
+
+        # Update metadata of local master collection:
+        local_master = CollectionRepo(opj(dirs.user_data_dir,
+                                      'localcollection'))
+
+        if isinstance(repo, CollectionRepo):
+            # update master if it is a registered collection:
+            for c in local_master.git_get_remotes():
+                if repo.path == local_master.git_get_remote_url(c):
+                    local_master.git_fetch(c)
+        elif isinstance(repo, HandleRepo):
+            # update master if it is an installed handle:
+            for h in local_master.get_handle_list():
+                if repo.path == urlparse(
+                        CollectionRepoHandleBackend(local_master, h).url).path:
+                    local_master.import_metadata_to_handle(CustomImporter,
+                                                           key=h,
+                                                           files=opj(
+                                                               repo.path,
+                                                               HANDLE_META_DIR))
+
+        # TODO: What to do in case of a handle, if it is part of another
+        # locally available collection than just the master?
