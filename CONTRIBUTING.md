@@ -11,6 +11,7 @@ Files organization
     - `cmdline/` contains commands for the command line interface.  See any of
       the `cmd_*.py` files here for an example
     - `crawler/` functionality relevant for `crawl`ing operation of DataLad
+    - `customremotes/` support of datalad custom special remotes for annex
     - `tests/` all unit- and regression- tests
         - `utils.py` provides convenience helpers used by unit-tests such as
           `@with_tree`, `@serve_path_via_http` and other decorators
