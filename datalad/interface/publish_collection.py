@@ -112,6 +112,11 @@ class PublishCollection(Interface):
         local_collection_repo = get_repo_instance(
             abspath(expandvars(expanduser(c_path))), CollectionRepo)
 
+        available_handles = [key for key in
+                             local_collection_repo.get_handle_list()
+                             if exists(urlparse(CollectionRepoHandleBackend(
+                                 local_collection_repo, key).url).path)]
+
         parsed_target = urlparse(target)  # => scheme, path
 
         from pkg_resources import resource_filename
@@ -154,7 +159,8 @@ class PublishCollection(Interface):
 
             script_options = "%s DATALAD_COL_%s" % (parsed_target.path,
                                                     local_collection_repo.name)
-            for key in local_collection_repo.get_handle_list():
+            for key in available_handles:
+                # prepare repos for locally available handles only
                 script_options += " %s" % key
 
             cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
@@ -184,7 +190,7 @@ class PublishCollection(Interface):
                 out, err = runner.run(["sh", prepare_script_path,
                                        target_path,
                                        "DATALAD_COL_" + local_collection_repo.name]
-                                      + local_collection_repo.get_handle_list())
+                                      + available_handles)
             except CommandError as e:
                 lgr.error("Preparation script failed: %s" % str(e))
 
@@ -196,7 +202,7 @@ class PublishCollection(Interface):
         results = parse_script_output(out, err)
 
         script_failed = False
-        for name in local_collection_repo.get_handle_list() + \
+        for name in available_handles + \
                 ["DATALAD_COL_" + local_collection_repo.name]:
             if not results[name]['init']:
                 lgr.error("Server setup for %s failed." % name)
@@ -208,7 +214,7 @@ class PublishCollection(Interface):
         # Now, all the handles:
         from .publish_handle import PublishHandle
         handle_publisher = PublishHandle()
-        for handle_name in local_collection_repo.get_handle_list():
+        for handle_name in available_handles:
 
             # get location:
             handle_loc = urlparse(CollectionRepoHandleBackend(
@@ -221,8 +227,11 @@ class PublishCollection(Interface):
                           (handle_name, handle_loc))
                 continue
 
+            annex_ssh = "-S %s" % control_path \
+                if parsed_target.scheme == 'ssh' else None
             handle_publisher(None, handle=handle_loc,
-                             url=baseurl + '/' + handle_name)
+                             url=baseurl + '/' + handle_name,
+                             ssh_options=annex_ssh)
 
         # TODO: check success => go on with collection
 
@@ -268,9 +277,26 @@ class PublishCollection(Interface):
                     raise RuntimeError("No handle found for path '%s'." % path)
 
                 o_new = URIRef(baseurl + '/' + hdl_name)
+                # replacements for collection level:
                 replacements.append((o, o_new))
+
+                # replace in collection's handle storage:
+                hdl_dir = opj(local_collection_repo.path,
+                              local_collection_repo._key2filename(hdl_name))
+                hdl_importer = CustomImporter('Collection', 'Handle', o)
+                hdl_importer.import_data(hdl_dir)
+                hdl_graphs = hdl_importer.get_graphs()
+                for g in hdl_graphs:
+                    import rdflib
+                    rdflib.Graph()
+                    for pre, obj in hdl_graphs[g].predicate_objects(o):
+                        hdl_graphs[g].remove((o, pre, obj))
+                        hdl_graphs[g].add((o_new, pre, obj))
+                hdl_importer.store_data(hdl_dir)
+                local_collection_repo.git_add(hdl_dir)
+
             else:
-                # TODO: what to do? We have a locally not available handle
+                # We have a locally not available handle
                 # in that collection, that therefore can't be published.
                 # Just skip for now and assume uri simply doesn't change.
                 continue
@@ -278,9 +304,7 @@ class PublishCollection(Interface):
             graphs[REPO_STD_META_FILE[0:-4]].remove((new_uri, DCTERMS.hasPart, o))
             graphs[REPO_STD_META_FILE[0:-4]].add((new_uri, DCTERMS.hasPart, o_new))
 
-        # TODO: correct handle uris in collection (./handle_key/datalad.ttl, ...)
-
-        # TODO: add commit reference
+        # TODO: add commit reference?
 
         importer.store_data(local_collection_repo.path)
         [local_collection_repo.git_add(graph_name + '.ttl')
@@ -326,7 +350,7 @@ class PublishCollection(Interface):
                                        target_path,
                                        "DATALAD_COL_" +
                                        local_collection_repo.name]
-                                      + local_collection_repo.get_handle_list())
+                                      + available_handles)
             except CommandError as e:
                 lgr.error("Clean-up script failed: %s" % str(e))
 
