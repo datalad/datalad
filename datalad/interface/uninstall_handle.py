@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 
 from os.path import join as opj
+import logging
 
 from appdirs import AppDirs
 from six.moves.urllib.parse import urlparse
@@ -27,6 +28,7 @@ from ..utils import rmtree
 
 dirs = AppDirs("datalad", "datalad.org")
 
+lgr = logging.getLogger('datalad.interface.uninstall-handle')
 
 class UninstallHandle(Interface):
     """Uninstall a handle.
@@ -51,6 +53,10 @@ class UninstallHandle(Interface):
         # converting file-scheme url to local path:
         path = urlparse(CollectionRepoHandleBackend(local_master,
                                                     handle).url).path
-        rmtree(path)
+        try:
+            rmtree(path)
+        except OSError as e:
+            lgr.warning("Couldn't delete %s:\n%s" % (path, str(e)))
+
         local_master.remove_handle(handle)
 
