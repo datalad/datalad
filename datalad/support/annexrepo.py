@@ -119,6 +119,8 @@ class AnnexRepo(GitRepo):
                                             create=create)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
+                lgr.warning("Experienced issues while cloning. "
+                            "Trying to fix it, using git-annex-fsck.")
                 fix_it = True
             else:
                 raise e
