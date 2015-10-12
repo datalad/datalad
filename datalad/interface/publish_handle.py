@@ -55,10 +55,16 @@ class PublishHandle(Interface):
             args=('remote',),
             doc="name for the remote to add to the local handle",
             nargs="?",
+            constraints=EnsureStr() | EnsureNone()),
+        ssh_options=Parameter(
+            args=('--ssh-options',),
+            doc="options to pass to ssh",
+            nargs="?",
             constraints=EnsureStr() | EnsureNone())
         )
 
-    def __call__(self, target, handle=curdir, url=None, remote=None):
+    def __call__(self, target, handle=curdir, url=None, remote=None,
+                 ssh_options=None):
 
         local_handle_repo = get_repo_instance(
             abspath(expandvars(expanduser(handle))), HandleRepo)
@@ -131,10 +137,13 @@ class PublishHandle(Interface):
         local_handle_repo.git_push("%s +git-annex:git-annex" % remote)
 
         # 3. copy locally available files:
-        for file in local_handle_repo.get_annexed_files():
-            if local_handle_repo.file_has_content(file):
-                local_handle_repo._annex_custom_command(
-                    '', "git annex copy %s --to=%s" % (file, remote))
+        annex_ssh = "-c annex.ssh-options=\"%s\"" % ssh_options \
+            if ssh_options is not None else ''
+        for file_ in local_handle_repo.get_annexed_files():
+            if local_handle_repo.file_has_content(file_):
+                cmd_str = "git annex copy %s %s --to=%s" % (annex_ssh, file_,
+                                                            remote)
+                local_handle_repo._annex_custom_command('', cmd_str)
 
         # Note: Currently, this is only relevant, when publish-handle is called
         # directly (with local target). Obviously doesn't work remotely!
