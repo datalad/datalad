@@ -113,17 +113,20 @@ class AnnexRepo(GitRepo):
           fresh git clone). Note that if `create=True`, then initialization
           would happen
         """
+        fix_it = false
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
                                             create=create)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
-                self._annex_init()
-                self.annex_fsck()
+                fix_it = True
             else:
                 raise e
 
         self.always_commit = always_commit
+        if fix_it:
+            self._annex_init()
+            self.annex_fsck()
 
         # Check whether an annex already exists at destination
         if not exists(opj(self.path, '.git', 'annex')):
