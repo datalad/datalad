@@ -53,7 +53,10 @@ cd ..
 
 # grab a plain git annex repo
 datalad install-handle http://psydata.ovgu.de/forrest_gump/.git demo_handle2
-# Use special remote to link the content to original annex
+# Install the handle, but don't get the actual content. Instead, link to the
+# original annex by using git-annex' special remote, that then can also be used
+# by the published handle later on.
+Use special remote to link the content to original annex
 cd demo_handle2
 git annex initremote orig_src type=git location=http://psydata.ovgu.de/forrest_gump/.git autoenable=true
 cd ..

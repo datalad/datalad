@@ -35,52 +35,16 @@ datalad create-handle mnist
 # add the handle to the collection
 datalad add-handle mnist pymvpa
 
-# Now, we want to add several already existing annexes/handles. There are
-# different possibilities to do this.
-# We want to publish the collection later on, including the handles. So we need
-# to make sure, that the to-be published handles grant access to their actual
-# content.
-#
-# First option:
-# Install that handle locally, get all of its content, that therefore can be
-# pushed on publishing. This approach is necessary only, if we actually want to
-# change the content or the origin is not publicly available or we want to
-# provide an additional copy of that content. This approach could be combined
-# with the second one, to link several sources of the content.
-
 echo "I: adding haxby2001"
 # Haxby 2001 -- the main demo dataset
-datalad install-handle http://data.pymvpa.org/datasets/haxby2001/.git
-(
-    cd haxby2001
-    echo "I: getting haxby2001 content"
-    datalad get .
-)
-
-# add the handle to the collection
-datalad add-handle haxby2001 pymvpa
-
-
-# Second option:
-# Install the handle, but don't get the actual content. Instead, link to the
-# original annex by using git-annex' special remote, that then can also be used
-# by the published handle later on.
+datalad add-handle http://data.pymvpa.org/datasets/haxby2001/.git pymvpa haxby2001
 
 echo "I: adding tutorial_data"
-datalad install-handle http://data.pymvpa.org/datasets/tutorial_data/.git
-(
-    cd tutorial_data
-    echo "I: adding origin as special remote to tutorial_data"
-    git annex initremote orig_src type=git location=http://data.pymvpa.org/datasets/tutorial_data/.git autoenable=true
-)
-
-# add the handle to the collection
-datalad add-handle tutorial_data pymvpa
+datalad add-handle http://data.pymvpa.org/datasets/tutorial_data/.git pymvpa tutorial_data
 
 # Forrest gump dataset, although not yet used in PyMVPA stock materials,
 # analysis scripts use PyMVPA heavily so it is a worthwhile addition
 #
-# Third option:
 # As long as we don't want to change anything in the handle/annex, but just
 # include it in the collection, we don't need to install it at all.
 # Instead, just add the remote location as a handle to the collection.
