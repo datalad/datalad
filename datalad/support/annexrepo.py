@@ -113,7 +113,7 @@ class AnnexRepo(GitRepo):
           fresh git clone). Note that if `create=True`, then initialization
           would happen
         """
-        fix_it = false
+        fix_it = False
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
                                             create=create)
