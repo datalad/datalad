@@ -22,7 +22,7 @@ from functools import wraps
 
 from six.moves.configparser import NoOptionError
 
-from .gitrepo import GitRepo, normalize_path, normalize_paths
+from .gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
 from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 from ..utils import on_windows
@@ -113,8 +113,15 @@ class AnnexRepo(GitRepo):
           fresh git clone). Note that if `create=True`, then initialization
           would happen
         """
-        super(AnnexRepo, self).__init__(path, url, runner=runner,
-                                        create=create)
+        try:
+            super(AnnexRepo, self).__init__(path, url, runner=runner,
+                                            create=create)
+        except GitCommandError as e:
+            if create and "Clone succeeded, but checkout failed." in str(e):
+                self._annex_init()
+                self.annex_fsck()
+            else:
+                raise e
 
         self.always_commit = always_commit
 
@@ -667,3 +674,6 @@ class AnnexRepo(GitRepo):
         """
 
         return [self.get_file_key(f).split('-')[0] for f in files]
+
+    def annex_fsck(self):
+        self._run_annex_command('fsck')
