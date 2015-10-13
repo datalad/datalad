@@ -24,6 +24,7 @@ internals and/or contributing to the project.
 
 * [![Coverage Status](https://coveralls.io/repos/datalad/datalad/badge.png?branch=master)](https://coveralls.io/r/datalad/datalad)
 
+* [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org)
 
 # Dependencies
 
