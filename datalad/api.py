@@ -8,8 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
-from .support.handlerepo import HandleRepo
-
 from .interface.base import update_docstring_with_parameters as _update_docstring
 from .interface.base import get_interface_groups as _get_interface_groups
 from . import interface as _interfaces
