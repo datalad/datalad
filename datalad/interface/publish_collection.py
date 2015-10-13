@@ -143,7 +143,7 @@ class PublishCollection(Interface):
             var_run_user_datalad = "/var/run/user/%s/datalad" % geteuid()
             assure_dir(var_run_user_datalad)
             control_path = "%s/%s" % (var_run_user_datalad, parsed_target.netloc)
-            control_path += ":22" if parsed_target.port is None else None
+            control_path += ":%s" % parsed_target.port if parsed_target.port else ""
 
             # start controlmaster:
 
