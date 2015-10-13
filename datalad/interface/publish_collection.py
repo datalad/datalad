@@ -170,6 +170,8 @@ class PublishCollection(Interface):
                 out, err = runner.run(cmd_str)
             except CommandError as e:
                 lgr.error("Preparation script failed: %s" % str(e))
+                out = e.stdout
+                err = e.stderr
 
             # set GIT-SSH:
             environ['GIT_SSH'] = resource_filename('datalad',
@@ -193,6 +195,8 @@ class PublishCollection(Interface):
                                       + available_handles)
             except CommandError as e:
                 lgr.error("Preparation script failed: %s" % str(e))
+                out = e.stdout
+                err = e.stderr
 
         else:
             raise RuntimeError("Don't know scheme '%s'." %
