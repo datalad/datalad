@@ -149,7 +149,7 @@ class PublishCollection(Interface):
 
             cmd_str = "ssh -o \"ControlMaster=yes\" -o \"ControlPath=%s\" " \
                       "-o \"ControlPersist=yes\" %s exit" % \
-                      (control_path,  parsed_target.hostname)
+                      (control_path, parsed_target.netloc)
             lgr.error("DEBUG: %s" % cmd_str)
             import subprocess
             proc = subprocess.Popen(cmd_str, shell=True)
@@ -164,7 +164,7 @@ class PublishCollection(Interface):
                 script_options += " %s" % key
 
             cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
-                      (control_path, parsed_target.hostname, script_options)
+                      (control_path, parsed_target.netloc, script_options)
             cmd_str += " < %s" % prepare_script_path
             try:
                 out, err = runner.run(cmd_str)
@@ -329,7 +329,7 @@ class PublishCollection(Interface):
         # checkout master in published collection:
         if parsed_target.scheme == 'ssh':
             cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
-                      (control_path, parsed_target.hostname, script_options)
+                      (control_path, parsed_target.netloc, script_options)
             cmd_str += " < %s" % cleanup_script_path
             try:
                 out, err = runner.run(cmd_str)
@@ -338,7 +338,7 @@ class PublishCollection(Interface):
 
             # stop controlmaster:
             cmd_str = "ssh -O stop -S %s %s" % (control_path,
-                                                parsed_target.hostname)
+                                                parsed_target.netloc)
             try:
                 out, err = runner.run(cmd_str)
             except CommandError as e:
