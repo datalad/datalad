@@ -25,7 +25,7 @@ Entry Point
    datalad
    
 .. the rest of the modules are relative to the top-level
-.. currentmodule:: datalad.interface
+.. currentmodule:: datalad
 
 Basic Facilities
 =================
@@ -33,29 +33,5 @@ Basic Facilities
 .. autosummary::
    :toctree: generated
 
-   add_handle
-   base
-   crawl
-   create_collection
-   create_handle
-   describe
-   drop
-   get
-   import_metadata
-   install_handle
-   list_collections
-   list_handles
-   publish_collection
-   publish_handle
-   pull
-   push
-   register_collection
-   search_collection
-   search_handle
-   sparql_query
-   test
-   uninstall_handle
-   unregister_collection
-   update
-   upgrade_handle
-   whereis
+   api
+   support

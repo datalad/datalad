@@ -3,47 +3,64 @@
 
 .. automodule:: {{ fullname }}
 
-   {% if classes %}
-   .. inheritance-diagram:: {{ fullname }}
-      :parts: 1
+.. currentmodule:: {{ fullname }}
 
-   {% endif %}
+{% block members %}
+{% if name.endswith('api') and members %}
+.. autosummary::
+   :toctree:
+{% for item in members if not item.startswith('_') %}
+   {{ item }}
+{%- endfor %}
 
-   {% block functions %}
-   {% if functions or methods %}
-   .. rubric:: Functions
+.. toctree::
+{%- for item in members if not item.startswith('_') %}
+   {{ fullname}}.{{ item }}
+{%- endfor %}
+{% endif %}
 
-   .. autosummary::
-      :toctree:
-   {% for item in functions %}
-      {{ item }}
-   {%- endfor %}
-   {% for item in methods %}
-      {{ item }}
-   {%- endfor %}
-   {% endif %}
-   {% endblock %}
+.. autosummary::
+{%- for item in members if not item.startswith('_') %}
+   {{ fullname }}.{{ item }}
+{%- endfor %}
 
-   {% block classes %}
-   {% if classes %}
-   .. rubric:: Classes
+{% endblock %}
 
-   .. autosummary::
-      :toctree:
-   {% for item in classes %}
-      {{ item }}
-   {%- endfor %}
-   {% endif %}
-   {% endblock %}
+{% block functions %}
+{% if functions or methods %}
+.. rubric:: Functions
 
-   {% block exceptions %}
-   {% if exceptions %}
-   .. rubric:: Exceptions
+.. autosummary::
+   :toctree:
+{% for item in functions %}
+   {{ item }}
+{%- endfor %}
+{% for item in methods %}
+   {{ item }}
+{%- endfor %}
+{% endif %}
+{% endblock %}
 
-   .. autosummary::
-      :toctree:
-   {% for item in classes %}
-      {{ item }}
-   {%- endfor %}
-   {% endif %}
-   {% endblock %}
+{% block classes %}
+{% if classes %}
+.. rubric:: Classes
+
+.. autosummary::
+   :toctree:
+{% for item in classes %}
+   {{ item }}
+{%- endfor %}
+{% endif %}
+{% endblock %}
+
+{% block exceptions %}
+{% if exceptions %}
+.. rubric:: Exceptions
+
+.. autosummary::
+   :toctree:
+{% for item in classes %}
+   {{ item }}
+{%- endfor %}
+{% endif %}
+{% endblock %}
