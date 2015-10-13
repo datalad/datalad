@@ -2,6 +2,7 @@
 /.coverage
 /venv*
 /build
+/docs/build
 /.tox
 /repos
 /tmp
