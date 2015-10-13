@@ -32,6 +32,7 @@ git -C "$COL_REPO_NAME" init $git_init_options
 printf "DATALAD_COLLECTION_REPO_%s: init DATALAD_END\n" "$COL_REPO_NAME"
 git -C "$COL_REPO_NAME" update-server-info
 printf "DATALAD_COLLECTION_REPO_%s: update-server-info DATALAD_END\n" "$COL_REPO_NAME"
+# TODO: this is specific for initial installation and might fail upon updates
 mv $COL_REPO_NAME/.git/hooks/post-update.sample $COL_REPO_NAME/.git/hooks/post-update
 printf "DATALAD_COLLECTION_REPO_%s: post-update hook DATALAD_END\n" "$COL_REPO_NAME"
 
