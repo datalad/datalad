@@ -449,7 +449,7 @@ class GitRepo(object):
         """
 
         self._git_custom_command('', 'git fetch %s %s' %
-                                        (options, name))
+                                        (options, name), expect_stderr=True)
 
     def git_get_remote_url(self, name):
         """We need to know, where to clone from, if a remote is
@@ -477,7 +477,8 @@ class GitRepo(object):
         """
         # TODO: May be check for the need of -b options herein?
 
-        self._git_custom_command('', 'git checkout %s %s' % (options, name))
+        self._git_custom_command('', 'git checkout %s %s' % (options, name),
+                                 expect_stderr=True)
 
     def git_get_files(self, branch="HEAD"):
         """Get a list of files in git.
