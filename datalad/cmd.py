@@ -20,7 +20,7 @@ import shutil
 import shlex
 
 from six import PY3
-from six import string_types, text_type, binary_type
+from six import string_types, binary_type
 
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol
@@ -29,6 +29,7 @@ from .utils import on_windows
 lgr = logging.getLogger('datalad.cmd')
 
 _TEMP_std = sys.stdout, sys.stderr
+
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
@@ -77,12 +78,14 @@ class Runner(object):
         cmd: str or callable
            command string to be executed via shell or callable to be called.
 
-        *args and **kwargs:
+        `*args`:
+        `**kwargs`:
            see Runner.run() and Runner.call() for available arguments.
 
         Raises
         ------
-        TypeError if cmd is neither a string nor a callable.
+        TypeError
+          if cmd is neither a string nor a callable.
         """
 
         if isinstance(cmd, string_types) or isinstance(cmd, list):
@@ -284,7 +287,8 @@ class Runner(object):
         its arguments to `commands` otherwise.
 
         f : callable
-        *args, **kwargs:
+
+        `*args`, `**kwargs`:
           Callable arguments
         """
         if self.protocol.do_execute_callables:
