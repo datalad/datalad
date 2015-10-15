@@ -51,15 +51,15 @@ def _normalize_path(base_dir, path):
     is intended to be used in repository classes, which means that
     `base_dir` usually will be the repository's base directory.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     path: str
         path to be normalized
     base_dir: str
         directory to serve as base to normalized, relative paths
 
-    Returns:
-    --------
+    Returns
+    -------
     str:
         path, that is a relative path with respect to `base_dir`
     """
@@ -180,7 +180,8 @@ def _remove_empty_items(list_):
     ----------
     list_: list of str
 
-    Returns:
+    Returns
+    -------
     list of str
     """
     if not isinstance(list_, list):
@@ -281,8 +282,8 @@ class GitRepo(object):
     def git_add(self, files):
         """Adds file(s) to the repository.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: list
             list of paths to add
         """
@@ -308,12 +309,13 @@ class GitRepo(object):
     def git_remove(self, files, **kwargs):
         """Remove files.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: str
           list of paths to remove
-        Returns:
-        --------
+
+        Returns
+        -------
         [str]
           list of successfully removed files.
         """
@@ -326,8 +328,8 @@ class GitRepo(object):
     def git_commit(self, msg=None, options=None):
         """Commit changes to git.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         msg: str
             commit-message
         options:
@@ -342,8 +344,8 @@ class GitRepo(object):
     def get_indexed_files(self):
         """Get a list of files in git's index
 
-        Returns:
-        --------
+        Returns
+        -------
         list
             list of paths rooting in git's base dir
         """
@@ -354,8 +356,8 @@ class GitRepo(object):
     def git_get_branches(self):
         """Get all branches of the repo.
 
-        Returns:
-        -----------
+        Returns
+        -------
         [str]
             Names of all branches of this repository.
         """
@@ -365,7 +367,7 @@ class GitRepo(object):
     def git_get_remote_branches(self):
         """Get all branches of all remotes of the repo.
 
-        Returns:
+        Returns
         -----------
         [str]
             Names of all remote branches.
@@ -394,14 +396,14 @@ class GitRepo(object):
         for proof of concept without the need to figure out, how this is done
         via GitPython.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: list of files
         cmd_str: str
             arbitrary command str. `files` is appended to that string.
 
-        Returns:
-        --------
+        Returns
+        -------
         stdout, stderr
         """
         
@@ -485,12 +487,13 @@ class GitRepo(object):
 
         Lists the files in the (remote) branch.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         branch: str
           Name of the branch to query.
-        Returns:
-        --------
+
+        Returns
+        -------
         [str]
           list of files.
         """
@@ -507,8 +510,8 @@ class GitRepo(object):
     def git_get_file_content(self, file_, branch='HEAD'):
         """
 
-        Returns:
-        --------
+        Returns
+        -------
         [str]
           content of file_ as a list of lines.
         """

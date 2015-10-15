@@ -135,8 +135,8 @@ def get_repo_instance(path=curdir, class_=None):
     returns an instance representing it. May also check for a certain type
     instead of detecting the type of repository.
 
-    Parameters:
-    -----------
+    Parameters
+    ----------
     path: str
       path to check; default: current working directory
 

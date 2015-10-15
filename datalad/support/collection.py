@@ -38,8 +38,8 @@ class CollectionBackend(object):
 
         The dictionary contains the handles that belong to the collection.
 
-        Returns:
-        --------
+        Returns
+        -------
         dictionary of Handle
           keys are the handles' names, values the corresponding Handle
           instances
@@ -52,8 +52,8 @@ class CollectionBackend(object):
 
         Returns named Graph.
 
-        Returns:
-        --------
+        Returns
+        -------
         rdflib.Graph
         """
 
@@ -64,8 +64,8 @@ class CollectionBackend(object):
         Commits changes of the runtime representation `collection` to the
         backend. Accepts a commit message.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         collection: Collection
         msg: str
         """
