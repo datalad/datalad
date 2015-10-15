@@ -8,30 +8,74 @@ Module Reference
 ****************
 
 This module reference extends the manual with a comprehensive overview of the
-currently available functionality, that is built into datalad. However, instead
-of a full list including every single line of the datalad code base, this
-reference limits itself to the relevant pieces of the application programming
-interface (API) that are of particular interest to users of this framework.
+available functionality built into datalad.  Each module in the package is
+documented by a general summary of its purpose and the list of classes and
+functions it provides.
 
-Each module in the package is documented by a general summary of its
-purpose and the list of classes and functions it provides.
-
-Entry Point
-===========
-
-.. autosummary::
-   :toctree: generated
-
-   datalad
-   
-.. the rest of the modules are relative to the top-level
 .. currentmodule:: datalad
 
-Basic Facilities
-=================
+High-level user interface
+=========================
 
 .. autosummary::
    :toctree: generated
 
    api
-   support
+
+Plumbing
+========
+
+.. autosummary::
+   :toctree: generated
+
+   auto
+   cmd
+   consts
+   db
+   log
+   utils
+   version
+   support.annexrepo
+   support.archives
+   support.collection
+   support.collectionrepo
+   support.configparserinc
+   customremotes.main
+   customremotes.base
+   customremotes.archive
+
+Configuration management
+========================
+
+.. autosummary::
+   :toctree: generated
+
+   config.base
+
+Crawler
+=======
+
+.. autosummary::
+   :toctree: generated
+
+   crawler.main
+
+Test infrastructure
+===================
+
+.. autosummary::
+   :toctree: generated
+
+   tests.utils
+   tests.utils_testrepos
+   tests.heavyoutput
+
+Command line interface infrastructure
+=====================================
+
+.. autosummary::
+   :toctree: generated
+
+   cmdline.main
+   cmdline.helpers
+   cmdline.common_args
