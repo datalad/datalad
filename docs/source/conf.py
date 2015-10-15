@@ -40,7 +40,7 @@ extensions = [
     'sphinx.ext.ifconfig',
     'sphinx.ext.inheritance_diagram',
     'sphinx.ext.viewcode',
-    'numpydoc.numpydoc' or 'sphinxext.numpydoc',
+    'sphinx.ext.napoleon',
 ]
 
 # for the module reference
