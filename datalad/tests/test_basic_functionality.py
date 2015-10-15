@@ -271,7 +271,7 @@ def test_query_collection(c_path, h_path, md_hdl):
     h_repo = HandleRepo(h_path)
     c_repo = CollectionRepo(c_path, name="MyCollection")
     c_repo.add_handle(h_repo, "MyHandle")
-    c_repo.add_metadata_src_to_handle(PlainTextImporter, "MyHandle", md_hdl)
+    c_repo.import_metadata_to_handle(PlainTextImporter, "MyHandle", md_hdl)
     collection = Collection(CollectionRepoBackend(c_repo))
 
     # TODO: Bindings should be done in collection class:
@@ -370,8 +370,8 @@ def test_query_metacollection(m_path, c_path1, c_path2, h_path1, h_path2,
     h_repo2 = HandleRepo(h_path2)
     c_repo1.add_handle(h_repo1, name="handle1")
     c_repo2.add_handle(h_repo2, name="handle2")
-    c_repo1.add_metadata_src_to_handle(PlainTextImporter, "handle1", md1)
-    c_repo2.add_metadata_src_to_handle(PlainTextImporter, "handle2", md2)
+    c_repo1.import_metadata_to_handle(PlainTextImporter, "handle1", md1)
+    c_repo2.import_metadata_to_handle(PlainTextImporter, "handle2", md2)
     local_master.git_remote_add("collection1", c_path1)
     local_master.git_fetch("collection1")
     local_master.git_remote_add("collection2", c_path2)

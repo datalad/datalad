@@ -6,8 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-
-from .support.handlerepo import HandleRepo
+"""Python DataLad API exposing user-oriented commands (also available via CLI)"""
 
 from .interface.base import update_docstring_with_parameters as _update_docstring
 from .interface.base import get_interface_groups as _get_interface_groups
