@@ -1,3 +1,9 @@
+datalad (0.1-1) neurodebian-devel; urgency=medium
+
+  * Fresh upstream release with a sketch of publishing functionality
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Wed, 14 Oct 2015 22:21:42 -0400
+
 datalad (0.0.4-1) neurodebian-devel; urgency=low
 
   [ Yaroslav Halchenko ]
