@@ -58,13 +58,13 @@ class ProtocolInterface(object):
         To call before the command call to be recorded.
         To be used with a corresponding call of end_section().
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         cmd: list
          The actual command and its options/arguments as a list
 
-        Returns:
-        --------
+        Returns
+        -------
         int
           An id of the started section to be used as argument of the
           corresponding call of end_section().
@@ -78,8 +78,8 @@ class ProtocolInterface(object):
         To call after the command call to be recorded.
         This ends the section defined by `id` as returned by start_section().
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         id: int
         exception: Exception
           The exception raised by the command if any or None otherwise.
@@ -98,8 +98,8 @@ class ProtocolInterface(object):
         This is an alternative to the use of start_section() and end_section().
         In opposition to start_section, this one can be called anytime.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         cmd: list
           The actual command and its options/arguments as a list
         exception: Exception
@@ -112,8 +112,8 @@ class ProtocolInterface(object):
         """Indicates whether or not the protocol is supposed to include
         external command calls.
 
-        Returns:
-        --------
+        Returns
+        -------
         bool
         """
         raise NotImplementedError
@@ -123,8 +123,8 @@ class ProtocolInterface(object):
         """Indicates whether or not the protocol is supposed to include
         calls of python callables.
 
-        Returns:
-        --------
+        Returns
+        -------
         bool
         """
         raise NotImplementedError
@@ -134,8 +134,8 @@ class ProtocolInterface(object):
         """Indicates whether or not the called commands are
         supposed to actually be executed.
 
-        Returns:
-        --------
+        Returns
+        -------
         bool
         """
         raise NotImplementedError
@@ -145,8 +145,8 @@ class ProtocolInterface(object):
         """Indicates whether or not the callables are supposed to actually
         be executed.
 
-        Returns:
-        --------
+        Returns
+        -------
         bool
         """
         raise NotImplementedError
@@ -154,8 +154,8 @@ class ProtocolInterface(object):
     def write_to_file(self, file_):
         """Writes the protocol to file.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         file_: str
           path of the file, the protocol is written to.
         """

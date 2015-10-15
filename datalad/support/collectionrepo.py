@@ -66,12 +66,12 @@ class CollectionRepoHandleBackend(HandleBackend):
         """
         Gets metadata graph for the handle (all files in collection or just
         `files`)
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: list of str
 
-        Returns:
-        --------
+        Returns
+        -------
         rdflib.Graph
         """
         cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
@@ -145,8 +145,8 @@ class CollectionRepoBackend(CollectionBackend):
 
     def __init__(self, repo, branch=None):
         """
-        Parameters:
-        -----------
+        Parameters
+        ----------
         repo: CollectionRepo or str
           in case of a string it's interpreted as being the path to the
           repository in question.
@@ -173,8 +173,8 @@ class CollectionRepoBackend(CollectionBackend):
     def get_handles(self):
         """Get the metadata of all handles in `branch`.
 
-        Returns:
-        --------
+        Returns
+        -------
         dictionary of Handle
 
         """
@@ -295,8 +295,8 @@ class CollectionRepo(GitRepo):
     def __init__(self, path, url=None, name=None, runner=None, create=True):
         """
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         path: str
           path to git repository. In case it's not an absolute path, it's
           relative to os.getcwd()
@@ -489,8 +489,8 @@ class CollectionRepo(GitRepo):
         import_metadata_to_collection.
         Expects either `files` or `data` to be not `None`.
 
-        Parameters:
-        ___________
+        Parameters
+        __________
         target_path: str
           path to the metadata files. Depends on whether to add to collection
           level metadata or a handle of the collection
@@ -646,8 +646,8 @@ class CollectionRepo(GitRepo):
     def add_handle(self, handle, name=None):
         """Adds a handle to the collection repository.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         handle: str or HandleRepo or HandleBackend
           URL of the handle or an instance of either HandleRepo or HandleBackend.
         name: str

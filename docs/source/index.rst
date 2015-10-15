@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
 
    usecases/index
+   modref
 
 >>> import datalad
 >>> print(datalad.__version__)

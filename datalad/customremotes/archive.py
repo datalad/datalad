@@ -206,7 +206,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         """
 
         Replies
-        -------
 
         CHECKURL-CONTENTS Size|UNKNOWN Filename
             Indicates that the requested url has been verified to exist.
@@ -256,7 +255,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         TODO: just proxy the call to annex for underlying tarball
 
         Replies
-        -------
 
         CHECKPRESENT-SUCCESS Key
             Indicates that a key has been positively verified to be present in
