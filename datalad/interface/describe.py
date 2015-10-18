@@ -33,6 +33,22 @@ dirs = AppDirs("datalad", "datalad.org")
 
 class Describe(Interface):
     """Add metadata to the repository in cwd.
+
+    Allows for adding basic metadata like author, description or license to
+    a collection or handle. It's also possible to attach these metadata
+    properties to different entities than just the repos, which is intended to
+    be used for sub entities in the metadata. In that case the subject to be
+    described has to be identified by its URI, which is used as its reference
+    in the RDF data.
+    This command is for use within a handle's or a collection's repository.
+    It's manipulating the metadata of the repository in the current working
+    directory.
+
+    Examples:
+
+    $ datalad describe --author "Some guy" \
+            --author-email "some.guy@example.com" \
+            --license MIT
     """
     # TODO: A lot of doc ;)
 

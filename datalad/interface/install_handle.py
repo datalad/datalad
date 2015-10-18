@@ -36,6 +36,9 @@ dirs = AppDirs("datalad", "datalad.org")
 class InstallHandle(Interface):
     """Install a handle.
 
+    Installing a handle means to create a local repository clone of the handle
+    to be installed. Additionally, that clone is registered with datalad.
+
     Examples:
 
       $ datalad install-handle http://psydata.ovgu.de/forrest_gump

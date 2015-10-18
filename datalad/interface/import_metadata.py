@@ -41,8 +41,21 @@ ImporterDict = {"plain-text": PlainTextImporter}
 
 class ImportMetadata(Interface):
     """Import metadata to the repository in cwd.
+
+    Make metadata available to datalad. This may involve metadata, that is
+    available from within the repository but not yet known to datalad or
+    metadata that comes from any outside location.
+    There are different importers, that can be used to read that metadata
+    depending on its format.
+
+    Example:
+
+    ~/MyHandle$ datalad import-metadata plain-text /path/to/my/textfiles
+
+    ~/MyCollection$ datalad import-metadata plain-text /path/to/my/textfiles \
+            MyHandle
     """
-    # TODO: A lot of doc ;)
+    # TODO: Check and doc sub entities
 
     _params_ = dict(
 
@@ -67,7 +80,7 @@ class ImportMetadata(Interface):
                 "level metadata.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, format, path, subject=None, handle=None):
+    def __call__(self, format, path, handle=None, subject=None):
 
         if len(path) == 1:
             if exists(path[0]) and isdir(path[0]):
