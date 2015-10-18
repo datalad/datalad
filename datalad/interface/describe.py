@@ -19,7 +19,9 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
 from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
-from ..support.handlerepo import HandleRepo
+from datalad.support.collection import Collection
+from datalad.support.handle import Handle
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
@@ -85,7 +87,22 @@ class Describe(Interface):
     def __call__(self, subject=None, author=None, author_orcid=None,
                  author_email=None, author_page=None, license=None,
                  description=None):
+        """
 
+        Parameters
+        ----------
+        subject:
+        author:
+        author_orcid:
+        author_email:
+        author_page:
+        license:
+        description:
+
+        Returns
+        -------
+        Handle or Collection
+        """
         repo = get_repo_instance()
 
         # TODO: use path constants!
@@ -210,3 +227,8 @@ class Describe(Interface):
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
+
+        if isinstance(repo, CollectionRepo):
+            return Collection(CollectionRepoBackend(repo))
+        elif isinstance(repo, HandleRepo):
+            return Handle(HandleRepoBackend(repo))

@@ -28,9 +28,16 @@ class ListCollection(Interface):
     """List all collections known to datalad."""
 
     def __call__(self):
+        """
+
+        Returns
+        -------
+        list of str
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
         for collection in local_master.git_get_remotes():
             print(collection)
 
+        return local_master.git_get_remotes()

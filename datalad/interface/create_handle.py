@@ -50,6 +50,17 @@ class CreateHandle(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, path=curdir, name=None):
+        """
+
+        Parameters
+        ----------
+        path:
+        name:
+
+        Returns
+        -------
+        HandleRepo
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'), create=True)
@@ -57,3 +68,5 @@ class CreateHandle(Interface):
         new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
                                 name=name, create=True)
         local_master.add_handle(new_handle, name=name)
+
+        return new_handle

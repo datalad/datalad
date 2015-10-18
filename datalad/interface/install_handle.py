@@ -61,6 +61,18 @@ class InstallHandle(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, handle, path=None, name=None):
+        """
+
+        Parameters
+        ----------
+        handle:
+        path:
+        name:
+
+        Returns
+        -------
+        HandleRepo
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
@@ -185,3 +197,5 @@ class InstallHandle(Interface):
             local_master.import_metadata_to_handle(CustomImporter,
                                                    key=local_name,
                                                    data=metadata)
+
+        return installed_handle

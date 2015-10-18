@@ -39,6 +39,16 @@ class Whereis(Interface):
             constraints=EnsureStr()))
 
     def __call__(self, key):
+        """
+
+        Parameters
+        ---------
+        key:
+
+        Returns
+        -------
+        str
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
@@ -50,4 +60,6 @@ class Whereis(Interface):
         else:
             lgr.error("Unknown name '%s'" % key)
 
-        print(urlparse(location).path)
+        result = urlparse(location).path
+        print(result)
+        return result

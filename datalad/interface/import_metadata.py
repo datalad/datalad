@@ -22,7 +22,10 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone, EnsureListOf
 from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
-from ..support.handlerepo import HandleRepo
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from datalad.support.collection import Collection
+from datalad.support.handle import Handle
+
 from ..support.metadatahandler import PlainTextImporter, CustomImporter, \
     URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -81,6 +84,19 @@ class ImportMetadata(Interface):
             constraints=EnsureStr() | EnsureNone()),)
 
     def __call__(self, format, path, handle=None, subject=None):
+        """
+
+        Parameters
+        ----------
+        format:
+        path:
+        handle:
+        subject:
+
+        Returns
+        -------
+        Handle or Collection
+        """
 
         if len(path) == 1:
             if exists(path[0]) and isdir(path[0]):
@@ -126,3 +142,8 @@ class ImportMetadata(Interface):
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
+
+        if isinstance(repo, CollectionRepo):
+            return Collection(CollectionRepoBackend(repo))
+        elif isinstance(repo, HandleRepo):
+            return Handle(HandleRepoBackend(repo))

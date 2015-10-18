@@ -59,9 +59,20 @@ class AddHandle(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, handle, collection, name=None):
+        """
 
-        # TODO: - add a remote handle by its url
-        #       - handle and collection can be addressed via name or path/url
+        Parameters
+        ----------
+        handle:
+        collection:
+        name:
+
+        Returns
+        -------
+        CollectionRepoHandleBackend
+        """
+
+        # TODO: - handle and collection can be addressed via name or path/url
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))
@@ -109,3 +120,7 @@ class AddHandle(Interface):
         # TODO: More sophisticated: Check whether the collection is registered.
         # Might be a different name than collection_repo.name or not at all.
         local_master.git_fetch(collection_repo.name)
+
+        return CollectionRepoHandleBackend(collection_repo,
+                                           name if name is not None
+                                           else handle_repo.name)

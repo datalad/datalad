@@ -49,6 +49,17 @@ class CreateCollection(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, path=curdir, name=None):
+        """
+
+        Parameters
+        ----------
+        path:
+        name:
+
+        Returns
+        -------
+        CollectionRepo
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))
@@ -62,3 +73,5 @@ class CreateCollection(Interface):
         # register with local master:
         local_master.git_remote_add(new_collection.name, new_collection.path)
         local_master.git_fetch(new_collection.name)
+
+        return new_collection

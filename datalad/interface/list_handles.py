@@ -28,9 +28,16 @@ class ListHandles(Interface):
     """List all locally installed handles."""
 
     def __call__(self):
+        """
+
+        Returns
+        -------
+        list of str
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
         for handle in local_master.get_handle_list():
             print(handle)
+        return local_master.get_handle_list()
 
