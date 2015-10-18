@@ -26,7 +26,11 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class Whereis(Interface):
-    """Find a handle or collection by its name"""
+    """Gets the location of a handle or collection.
+
+    Finds a handle or collection on local filesystem by its name and returns
+    the path to that location.
+    """
 
     _params_ = dict(
         key=Parameter(

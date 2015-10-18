@@ -25,7 +25,12 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class UnregisterCollection(Interface):
-    """Unregister a collection with datalad."""
+    """Unregister a collection with datalad.
+
+    Makes that collection unknown to datalad. This means it's no longer
+    included in searches and it's not available as a source of handles,
+    for example.
+    """
     _params_ = dict(
         name=Parameter(
             doc="name of the collection to unregister",
