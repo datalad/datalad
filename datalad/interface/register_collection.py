@@ -26,7 +26,17 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class RegisterCollection(Interface):
-    """Register a collection with datalad."""
+    """Registers a collection with datalad.
+
+    Registering a remote collection with datalad allows for including their
+    metadata in searches, installing handles they contain and so on.
+    Once registered you can keep track of the current state of the remote
+    collection.
+
+    Example:
+        $ datalad register-collection \
+        http://collections.datalad.org/demo/DATALAD_COL_demo_collection
+    """
     _params_ = dict(
         url=Parameter(
             doc="url of the collection",

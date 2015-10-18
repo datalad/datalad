@@ -31,7 +31,19 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class AddHandle(Interface):
-    """Add a handle to a collection."""
+    """Adds a handle to a collection.
+
+    This results in the handle to be included in the collection.
+    Optionally you can give it a new name, that is used to reference that
+    handle via the collection it is now in.
+    Example:
+
+        $ datalad add-handle MyPreciousHandle MyFancyCollection NewFancyHandle
+
+        $ datalad add-handle MyPreciousHandle MyFancyCollection
+
+        inside/MyPreciousHandle$ datalad add-handle . MyFancyCollection
+    """
     _params_ = dict(
         handle=Parameter(
             doc="path to or name of the handle",

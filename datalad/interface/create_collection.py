@@ -25,7 +25,16 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class CreateCollection(Interface):
-    """Create a new collection."""
+    """Create a new collection.
+
+    Creates an empty collection repository and registers it with datalad.
+    You can give it name, to be used by datalad to address that collection.
+    Otherwise the base directory's name of the repository is used.
+
+    Example:
+
+        $ datalad create-collection /some/where/my_collection MyFirstCollection
+    """
     _params_ = dict(
         path=Parameter(
             args=('path',),
