@@ -88,17 +88,6 @@ class Describe(Interface):
                  author_email=None, author_page=None, license=None,
                  description=None):
         """
-
-        Parameters
-        ----------
-        subject:
-        author:
-        author_orcid:
-        author_email:
-        author_page:
-        license:
-        description:
-
         Returns
         -------
         Handle or Collection

@@ -18,9 +18,10 @@ from os.path import join as opj, abspath, expanduser, expandvars, isdir
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collectionrepo import CollectionRepo, \
+    CollectionRepoBackend
+from datalad.support.collection import Collection
 from appdirs import AppDirs
-from ..log import lgr
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -49,6 +50,11 @@ class RegisterCollection(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, url, name=None):
+        """
+        Returns
+        -------
+        Collection
+        """
 
         # check whether url is a local path:
         if isdir(abspath(expandvars(expanduser(url)))):
@@ -84,3 +90,6 @@ class RegisterCollection(Interface):
                                       'localcollection'))
         local_master.git_remote_add(name, url)
         local_master.git_fetch(name)
+
+        return Collection(CollectionRepoBackend(local_master,
+                                                name + "/master"))

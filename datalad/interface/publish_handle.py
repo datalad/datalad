@@ -17,7 +17,8 @@ from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.handlerepo import HandleRepo
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handle import Handle
 from ..support.annexrepo import AnnexRepo
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -65,6 +66,11 @@ class PublishHandle(Interface):
 
     def __call__(self, target, handle=curdir, url=None, remote=None,
                  ssh_options=None):
+        """
+        Returns
+        -------
+        Handle
+        """
 
         local_handle_repo = get_repo_instance(
             abspath(expandvars(expanduser(handle))), HandleRepo)
@@ -153,3 +159,5 @@ class PublishHandle(Interface):
 
         # finally:
         local_handle_repo.git_checkout("master")
+
+        return Handle(HandleRepoBackend(local_handle_repo, remote + "/master"))

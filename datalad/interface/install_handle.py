@@ -20,12 +20,13 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoHandleBackend
+from datalad.support.handle import Handle
 from datalad.support.metadatahandler import CustomImporter
 from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
 
 from appdirs import AppDirs
 
-from ..support.handlerepo import HandleRepo
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.network import get_url_straight_filename
 from ..utils import getpwd, get_url_path
 from .base import Interface
@@ -62,16 +63,9 @@ class InstallHandle(Interface):
 
     def __call__(self, handle, path=None, name=None):
         """
-
-        Parameters
-        ----------
-        handle:
-        path:
-        name:
-
         Returns
         -------
-        HandleRepo
+        Handle
         """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
@@ -198,4 +192,4 @@ class InstallHandle(Interface):
                                                    key=local_name,
                                                    data=metadata)
 
-        return installed_handle
+        return Handle(HandleRepoBackend(installed_handle))

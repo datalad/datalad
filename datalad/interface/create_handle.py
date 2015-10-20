@@ -19,7 +19,8 @@ from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
-from datalad.support.handlerepo import HandleRepo
+from datalad.support.handlerepo import HandleRepo, HandleRepoBackend
+from datalad.support.handle import Handle
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -51,15 +52,9 @@ class CreateHandle(Interface):
 
     def __call__(self, path=curdir, name=None):
         """
-
-        Parameters
-        ----------
-        path:
-        name:
-
         Returns
         -------
-        HandleRepo
+        Handle
         """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
@@ -69,4 +64,4 @@ class CreateHandle(Interface):
                                 name=name, create=True)
         local_master.add_handle(new_handle, name=name)
 
-        return new_handle
+        return Handle(HandleRepoBackend(new_handle))

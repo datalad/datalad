@@ -18,7 +18,9 @@ from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collectionrepo import CollectionRepo, \
+    CollectionRepoBackend
+from datalad.support.collection import Collection
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -49,16 +51,11 @@ class CreateCollection(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, path=curdir, name=None):
+        # TODO: Collection => graph => lazy
         """
-
-        Parameters
-        ----------
-        path:
-        name:
-
         Returns
         -------
-        CollectionRepo
+        Collection
         """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
@@ -74,4 +71,4 @@ class CreateCollection(Interface):
         local_master.git_remote_add(new_collection.name, new_collection.path)
         local_master.git_fetch(new_collection.name)
 
-        return new_collection
+        return Collection(CollectionRepoBackend(new_collection))

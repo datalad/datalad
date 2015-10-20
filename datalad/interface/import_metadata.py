@@ -85,14 +85,6 @@ class ImportMetadata(Interface):
 
     def __call__(self, format, path, handle=None, subject=None):
         """
-
-        Parameters
-        ----------
-        format:
-        path:
-        handle:
-        subject:
-
         Returns
         -------
         Handle or Collection

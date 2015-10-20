@@ -40,11 +40,6 @@ class Whereis(Interface):
 
     def __call__(self, key):
         """
-
-        Parameters
-        ---------
-        key:
-
         Returns
         -------
         str

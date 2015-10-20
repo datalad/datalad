@@ -18,7 +18,9 @@ from os.path import join as opj, abspath
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
-from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collectionrepo import CollectionRepo, \
+    CollectionRepoBackend
+from datalad.support.collection import Collection
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -29,10 +31,9 @@ class ListCollection(Interface):
 
     def __call__(self):
         """
-
         Returns
         -------
-        list of str
+        list of Collection
         """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
@@ -40,4 +41,6 @@ class ListCollection(Interface):
         for collection in local_master.git_get_remotes():
             print(collection)
 
-        return local_master.git_get_remotes()
+        return [Collection(CollectionRepoBackend(local_master,
+                                                 branch=remote + "/master"))
+                for remote in local_master.git_get_remotes()]

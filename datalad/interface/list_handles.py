@@ -18,7 +18,9 @@ from os.path import join as opj, abspath
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
-from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collectionrepo import CollectionRepo, \
+    CollectionRepoHandleBackend
+from datalad.support.handle import Handle
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -32,12 +34,14 @@ class ListHandles(Interface):
 
         Returns
         -------
-        list of str
+        list of Handle
         """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
         for handle in local_master.get_handle_list():
             print(handle)
-        return local_master.get_handle_list()
+
+        return [Handle(CollectionRepoHandleBackend(local_master, key))
+                for key in local_master.get_handle_list()]
 

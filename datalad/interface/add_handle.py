@@ -20,7 +20,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoHandleBackend
-from datalad.support.handlerepo import HandleRepo
+from datalad.support.handlerepo import HandleRepo, Handle
 from datalad.support.metadatahandler import CustomImporter
 from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
 
@@ -60,16 +60,9 @@ class AddHandle(Interface):
 
     def __call__(self, handle, collection, name=None):
         """
-
-        Parameters
-        ----------
-        handle:
-        collection:
-        name:
-
         Returns
         -------
-        CollectionRepoHandleBackend
+        Handle
         """
 
         # TODO: - handle and collection can be addressed via name or path/url
@@ -121,6 +114,6 @@ class AddHandle(Interface):
         # Might be a different name than collection_repo.name or not at all.
         local_master.git_fetch(collection_repo.name)
 
-        return CollectionRepoHandleBackend(collection_repo,
-                                           name if name is not None
-                                           else handle_repo.name)
+        return Handle(CollectionRepoHandleBackend(collection_repo,
+                                                  name if name is not None
+                                                  else handle_repo.name))

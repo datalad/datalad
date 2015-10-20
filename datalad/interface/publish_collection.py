@@ -92,9 +92,13 @@ class PublishCollection(Interface):
 
     def __call__(self, target, collection=curdir, baseurl=None,
                  remote_name=None):
+        """
+        Returns
+        -------
+        Collection
+        """
 
-        # Note:
-        # ssh-target: ssh://someone@somewhere/deeper/in/there
+        # TODO: Note: Yarik's git mtheirs for publishing branches!
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))
@@ -362,3 +366,6 @@ class PublishCollection(Interface):
         # Delete publish branch:
         local_collection_repo._git_custom_command('', 'git branch -D %s'
                                                   % p_branch)
+
+        return Collection(CollectionRepoBackend(local_collection_repo,
+                                                remote_name + "/master"))
