@@ -136,7 +136,7 @@ class PublishCollection(Interface):
             if baseurl is None:
                 baseurl = target
             collection_url = baseurl + '/' + local_collection_repo.name + \
-                             ".datalad_collection"
+                             ".datalad-collection"
 
             # build control master:
             from datalad.utils import assure_dir
@@ -157,7 +157,7 @@ class PublishCollection(Interface):
 
             # prepare target repositories:
 
-            script_options = "%s %s.datalad_collection" % (parsed_target.path,
+            script_options = "%s %s.datalad-collection" % (parsed_target.path,
                                                     local_collection_repo.name)
             for key in available_handles:
                 # prepare repos for locally available handles only
@@ -186,13 +186,13 @@ class PublishCollection(Interface):
             if baseurl is None:
                 baseurl = target_path
             collection_url = baseurl + '/' + local_collection_repo.name + \
-                             ".datalad_collection"
+                             ".datalad-collection"
 
             try:
                 out, err = runner.run(["sh", prepare_script_path,
                                        target_path,
                                        local_collection_repo.name +
-                                       ".datalad_collection"]
+                                       ".datalad-collection"]
                                       + available_handles)
             except CommandError as e:
                 lgr.error("Preparation script failed: %s" % str(e))
@@ -208,7 +208,7 @@ class PublishCollection(Interface):
 
         script_failed = False
         for name in available_handles + \
-                [local_collection_repo.name + ".datalad_collection"]:
+                [local_collection_repo.name + ".datalad-collection"]:
             if not results[name]['init']:
                 lgr.error("Server setup for %s failed." % name)
                 script_failed = True
@@ -354,7 +354,7 @@ class PublishCollection(Interface):
                 out, err = runner.run(["sh", cleanup_script_path,
                                        target_path,
                                        local_collection_repo.name +
-                                       ".datalad_collection"]
+                                       ".datalad-collection"]
                                       + available_handles)
             except CommandError as e:
                 lgr.error("Clean-up script failed: %s" % str(e))
