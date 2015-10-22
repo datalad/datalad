@@ -8,7 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Pipeline to scrape abstracts information from online resource (e.g. for SfN 2015)"""
 
-from ..nodes.crawl_url import crawl_url
+# from ..nodes.crawl_url import crawl_url
+from ..nodes.scrape_url import crawl_url
 from ..nodes.matches import a_href_match, xpath_match
 from ..nodes.misc import Sink
 
