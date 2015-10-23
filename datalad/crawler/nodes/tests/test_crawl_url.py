@@ -10,7 +10,8 @@
 
 from datalad.tests.utils import eq_, ok_
 from datalad.tests.utils import serve_path_via_http, with_tree
-from ..crawl_url import crawl_url
+# from ..crawl_url import crawl_url
+from ..scrape_url import crawl_url
 from ..matches import a_href_match
 from ...pipeline import run_pipeline
 

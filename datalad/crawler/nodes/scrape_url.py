@@ -23,42 +23,6 @@ lgr = getLogger('datalad.crawl.scrape_url')
 
 
 
-def fetch_page(url):
-
-    # use scapy to fetch the page like what was done from the import here: 
-    # from ...support.network import fetch_page
-
-    page = []
-    
-    class ScrapySpider(CrawlSpider):
-        name = "scrapyspider"     # NOTE this must be uncommented for the spider to work
-        allowed_domains = ["abstractsonline.com"]
-
-        start_urls = [url]
-        # TODO
-        # rules = [...]
-
-        # settings = get_project_settings()
-        # settings.setdict({'LOG_ENABLED': False})
-
-
-        # def parse_methods(self):
-            # # TODO implement some methods to parsing the pages here
-            # pass
-        def parse(self, response):
-            page.append(response.body)
-            return response.body
-
-
-    settings = Settings()
-    # settings.setdict({'LOG_ENABLED': False})
-    settings.setdict({'LOG_LEVEL': 'CRITICAL'})   # http://doc.scrapy.org/en/latest/topics/settings.html#log-level
-    process = CrawlerProcess(settings)
-    # process = CrawlerProcess()    # for settings set inside the crawler just do this
-    process.crawl(ScrapySpider())
-    process.start()
-    return page[0]
-
 
 class crawl_url(object):
     """Given a source url, perform the initial crawling of the page, i.e. simply
@@ -88,32 +52,56 @@ class crawl_url(object):
 
 
     def _visit_url(self, url, data):
-        if url in self._seen:
-            return
-        self._seen.add(url)
 
-        lgr.debug("Visiting %s" % url)
-        page = fetch_page(url)
+        visited_pages = []
 
-        with open('/tmp/wscrapy.txt', 'w') as f:
-            f.write(url)
-            f.write(page)
+        class ScrapySpider(CrawlSpider):
+            name = "scrapyspider"     # NOTE this must be uncommented for the spider to work
+            # allowed_domains = ["abstractsonline.com"]
 
-        data_ = updated(data, zip(self._output, (page, url)))
-        yield data_
+            start_urls = [url]
 
-        # now recurse if matchers were provided
-        matchers = self._matchers
-        if matchers:
-            lgr.debug("Looking for more URLs at %s using %s", url, matchers)
-            for matcher in (matchers if isinstance(matchers, (list, tuple)) else [matchers]):
-                for data_matched in matcher(data_):
-                    if 'url' not in data_matched:
-                        lgr.warning("Got data without a url from %s" % matcher)
-                        continue
-                    # proxy findings
-                    for data_matched_ in self._visit_url(data_matched['url'], data_matched):
-                        yield data_matched_
+            # settings = get_project_settings()
+            # settings.setdict({'LOG_ENABLED': False})
+
+
+            def parse(self_, response):
+
+                if response.url in self._seen:
+                    yield
+                self._seen.add(response.url)
+
+                visited_pages.append((response.body, response.url))
+
+                data_ = updated(data, zip(self._output, visited_pages[-1]))
+                matchers = self._matchers
+                if matchers:
+                    lgr.debug("Looking for more URLs at %s using %s", url, matchers)
+                    for matcher in (matchers if isinstance(matchers, (list, tuple)) else [matchers]):
+                        for data_matched in matcher(data_):
+                            if 'url' not in data_matched:
+                                lgr.warning("Got data without a url from %s" % matcher)
+                                continue
+                            # proxy findings
+                            # for data_matched_ in self._visit_url(data_matched['url'], data_matched):
+                                # yield data_matched_
+
+                            print 'url', data_matched['url']
+                            yield scrapy.Request(data_matched['url']#, callback=self.parse, 
+                                                )
+
+
+        settings = Settings()
+        # settings.setdict({'LOG_ENABLED': False})
+        settings.setdict({'LOG_LEVEL': 'CRITICAL'})   # http://doc.scrapy.org/en/latest/topics/settings.html#log-level
+        process = CrawlerProcess(settings)
+        # process = CrawlerProcess()    # for settings set inside the crawler just do this
+        process.crawl(ScrapySpider())
+        process.start()
+
+        for page, url in visited_pages:
+            data_ = updated(data, zip(self._output, (page, url)))
+            yield data_
 
 
     def __call__(self, data={}):
