@@ -11,9 +11,11 @@ import collections
 import six.moves.builtins as __builtin__
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
-import re
 import logging
-import shutil, stat, os, sys
+import shutil
+import stat
+import os
+import sys
 import tempfile
 import platform
 import gc
@@ -118,7 +120,8 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
        Either to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
-    *args, **kwargs :
+    `*args` :
+    `**kwargs` :
        Passed into shutil.rmtree call
     """
     # Give W permissions back only to directories, no need to bother with files
@@ -169,7 +172,7 @@ def optional_args(decorator):
             @my_decorator
             def function(): pass
 
-        Calls decorator with decorator(f, *args, **kwargs)"""
+        Calls decorator with decorator(f, `*args`, `**kwargs`)"""
 
     @wraps(decorator)
     def wrapper(*args, **kwargs):

@@ -61,8 +61,8 @@ class MetadataImporter(object):
         descriptor'. You can add additional graphs to the `self._graphs`
         dictionary.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         target_class: str
           the type of repo, the metadata is to be imported to;
           either "Handle" or "Collection"
@@ -127,8 +127,8 @@ class MetadataImporter(object):
     def get_graphs(self):
         """gets the imported data
 
-        Returns:
-        --------
+        Returns
+        -------
         dict of rdflib.Graph
         """
         return self._graphs
@@ -145,8 +145,8 @@ class MetadataImporter(object):
         repository only, for example.
         This means: Either `files` or `data` has to be provided by the caller.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: str or list of str
           Either a path to the file or directory to be imported or a list
           containing paths to the files.
@@ -173,8 +173,8 @@ class MetadataImporter(object):
         The default implementation just stores every graph stored in
         `self._graphs['key']` in the file 'key.ttl'.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         path: str
           path to the directory to save the metadata in.
         """
@@ -214,8 +214,8 @@ class PlainTextImporter(MetadataImporter):
 
 
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: str or list of str
           a path to the file or directory to be imported or a list containing
           such paths.
@@ -380,8 +380,8 @@ class CustomImporter(MetadataImporter):
     def set_graphs(self, graphs):
         """sets the metadata
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         graphs: dict of rdflib.Graph
             the keys are expected to be the filenames without ending as
             returned by `get_graphs`.

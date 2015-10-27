@@ -14,7 +14,7 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj, basename, realpath, dirname
+from os.path import exists, join as opj, realpath, dirname
 from traceback import format_exc
 
 from six.moves import range
@@ -214,7 +214,7 @@ class AnnexCustomRemote(object):
 
         Parameters
         ----------
-        *args: list of strings
+        `*args`: list of strings
            arguments to be joined by a space and passed to git-annex
         """
         msg = " ".join(map(str, args))
@@ -394,13 +394,16 @@ class AnnexCustomRemote(object):
     def req_CHECKURL(self, url):
         """
         The remote replies with one of CHECKURL-FAILURE, CHECKURL-CONTENTS, or CHECKURL-MULTI.
+
         CHECKURL-CONTENTS Size|UNKNOWN Filename
             Indicates that the requested url has been verified to exist.
             The Size is the size in bytes, or use "UNKNOWN" if the size could not be determined.
             The Filename can be empty (in which case a default is used), or can specify a filename that is suggested to be used for this url.
+
         CHECKURL-MULTI Url Size|UNKNOWN Filename ...
             Indicates that the requested url has been verified to exist, and contains multiple files, which can each be accessed using their own url.
             Note that since a list is returned, neither the Url nor the Filename can contain spaces.
+
         CHECKURL-FAILURE
             Indicates that the requested url could not be accessed.
         """

@@ -72,6 +72,7 @@ class SearchHandle(Interface):
             else:
                 locations.append(str(row['r']))
 
-        width = max(len(h) for h in handles)
-        for h, l in zip(handles, locations):
-            print("%s\t%s" % (h.ljust(width), l))
+        if handles:
+            width = max(len(h) for h in handles)
+            for h, l in zip(handles, locations):
+                print("%s\t%s" % (h.ljust(width), l))

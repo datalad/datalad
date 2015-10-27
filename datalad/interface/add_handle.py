@@ -56,14 +56,18 @@ class AddHandle(Interface):
 
         if isdir(abspath(expandvars(expanduser(handle)))):
             h_path = abspath(expandvars(expanduser(handle)))
+            handle_repo = HandleRepo(h_path, create=False)
         elif handle in local_master.get_handle_list():
             h_path = urlparse(CollectionRepoHandleBackend(repo=local_master,
                                                  key=handle).url).path
+            handle_repo = HandleRepo(h_path, create=False)
             if not isdir(h_path):
                 raise RuntimeError("Invalid path to handle '%s':\n%s" %
                                    (handle, h_path))
 
-        # TODO: allow for remote handles
+        elif urlparse(handle).scheme != '':  # rudimentary plausibility check for now
+            # treat as a remote annex
+            handle_repo = handle
         else:
             raise RuntimeError("Unknown handle '%s'." % handle)
 
@@ -77,15 +81,15 @@ class AddHandle(Interface):
         else:
             raise RuntimeError("Unknown collection '%s'." % collection)
 
-        handle_repo = HandleRepo(h_path, create=False)
         collection_repo = CollectionRepo(c_path, create=False)
         collection_repo.add_handle(handle_repo, name=name)
 
         # get handle's metadata, if there's any:
-        if exists(opj(handle_repo.path, HANDLE_META_DIR,
-                      REPO_STD_META_FILE)):
+        if isinstance(handle_repo, HandleRepo) and \
+                exists(opj(handle_repo.path, HANDLE_META_DIR,
+                           REPO_STD_META_FILE)):
             collection_repo.import_metadata_to_handle(CustomImporter,
-                                                      key=name,
+                                                      key=name if name is not None else handle_repo.name,
                                                       files=opj(
                                                           handle_repo.path,
                                                           HANDLE_META_DIR))

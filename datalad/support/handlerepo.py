@@ -209,8 +209,8 @@ class HandleRepo(AnnexRepo):
     def _commit(self, msg):
         """Commit changes to repository
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         msg: str
             commit-message
         """
@@ -261,8 +261,8 @@ class HandleRepo(AnnexRepo):
     def get_metadata(self, files=None):
         """Get a Graph containing the handle's metadata
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: list of str
             metadata files within the datalad directory of the handle to
             be read. Default: All files are read.
@@ -299,8 +299,8 @@ class HandleRepo(AnnexRepo):
 
         Expects either `files` or `data` to be not `None`.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         importer: class
           the importer to be used; has to be a subclass of MetadataImporter
         files: str or list of str

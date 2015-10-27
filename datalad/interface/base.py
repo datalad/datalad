@@ -42,7 +42,7 @@ def dedent_docstring(text):
         return textwrap.dedent(text)
 
 
-def update_docstring_with_parameters(func, params):
+def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
     """Generate a useful docstring from a parameter spec
 
     Amends any existing docstring of a callable with a textual
@@ -56,9 +56,7 @@ def update_docstring_with_parameters(func, params):
     if not defaults is None:
         ndefaults = len(defaults)
     # start documentation with what the callable brings with it
-    doc = func.__doc__
-    if doc is None:
-        doc = u''
+    doc = prefix if prefix else u''
     if len(args) > 1:
         if len(doc):
             doc += '\n'
@@ -81,6 +79,7 @@ def update_docstring_with_parameters(func, params):
                 default=defaults[defaults_idx] if defaults_idx >= 0 else None,
                 has_default=defaults_idx >= 0)
             doc += '\n'
+    doc += suffix if suffix else u""
     # assign the amended docs
     func.__doc__ = doc
     return func
@@ -88,8 +87,6 @@ def update_docstring_with_parameters(func, params):
 
 class Interface(object):
     """Base class for interface implementations"""
-    def __init__(self):
-        self.__call__.__func__.__doc__ = dedent_docstring(self.__doc__)
 
     def setup_parser(self, parser):
         # XXX needs safety check for name collisions

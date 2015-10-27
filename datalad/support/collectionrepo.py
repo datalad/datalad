@@ -66,12 +66,12 @@ class CollectionRepoHandleBackend(HandleBackend):
         """
         Gets metadata graph for the handle (all files in collection or just
         `files`)
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: list of str
 
-        Returns:
-        --------
+        Returns
+        -------
         rdflib.Graph
         """
         cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
@@ -145,8 +145,8 @@ class CollectionRepoBackend(CollectionBackend):
 
     def __init__(self, repo, branch=None):
         """
-        Parameters:
-        -----------
+        Parameters
+        ----------
         repo: CollectionRepo or str
           in case of a string it's interpreted as being the path to the
           repository in question.
@@ -173,8 +173,8 @@ class CollectionRepoBackend(CollectionBackend):
     def get_handles(self):
         """Get the metadata of all handles in `branch`.
 
-        Returns:
-        --------
+        Returns
+        -------
         dictionary of Handle
 
         """
@@ -295,8 +295,8 @@ class CollectionRepo(GitRepo):
     def __init__(self, path, url=None, name=None, runner=None, create=True):
         """
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         path: str
           path to git repository. In case it's not an absolute path, it's
           relative to os.getcwd()
@@ -329,24 +329,30 @@ class CollectionRepo(GitRepo):
             importer.import_data(opj(self.path, REPO_CONFIG_FILE))
         elif not create:
             raise CollectionBrokenError("Missing %s in git: %s." %
-                                        (REPO_CONFIG_FILE, path))
+                                        (REPO_CONFIG_FILE, self.path))
         if REPO_STD_META_FILE in self.get_indexed_files():
             importer.import_data(opj(self.path, REPO_STD_META_FILE))
         elif not create:
             raise CollectionBrokenError("Missing %s in git: %s." %
-                                        (REPO_STD_META_FILE, path))
+                                        (REPO_STD_META_FILE, self.path))
         graphs = importer.get_graphs()
 
         # collection settings:
         # if there is no name statement, add it:
-        if len([subj for subj in graphs[REPO_CONFIG_FILE[0:-4]].objects(DLNS.this,
-                                                          RDFS.label)]) == 0:
+        self_uri = graphs[REPO_CONFIG_FILE[0:-4]].value(predicate=RDF.type,
+                                                        object=DLNS.Collection)
+
+        if len([subj for subj in
+                graphs[REPO_CONFIG_FILE[0:-4]].objects(subject=self_uri,
+                                                       predicate=RDFS.label)]) \
+                == 0:
             if create:
-                graphs[REPO_CONFIG_FILE[0:-4]].add((DLNS.this, RDFS.label,
-                                      Literal(name or basename(self.path))))
+                graphs[REPO_CONFIG_FILE[0:-4]].add(
+                    (self_uri, RDFS.label,
+                     Literal(name or basename(self.path))))
             else:
                 raise CollectionBrokenError("Missing label in %s." %
-                                            REPO_CONFIG_FILE)
+                                            opj(self.path, REPO_CONFIG_FILE))
 
         importer.set_graphs(graphs)  # necessary?
         importer.store_data(self.path)
@@ -372,14 +378,17 @@ class CollectionRepo(GitRepo):
 
     # TODO: Consider using preferred label for the name
     def get_name(self):
-        return str(self._get_cfg().value(subject=DLNS.this,
+        graph = self._get_cfg()
+        self_uri = graph.value(predicate=RDF.type, object=DLNS.Collection)
+        return str(self._get_cfg().value(subject=self_uri,
                                          predicate=RDFS.label))
 
     def set_name(self, name):
         graph = self._get_cfg()
-        for old_name in graph.objects(DLNS.this, RDFS.label):
-            graph.remove((DLNS.this, RDFS.label, old_name))
-        graph.add((DLNS.this, RDFS.label, Literal(name)))
+        self_uri = graph.value(predicate=RDF.type, object=DLNS.Collection)
+        for old_name in graph.objects(self_uri, RDFS.label):
+            graph.remove((self_uri, RDFS.label, old_name))
+        graph.add((self_uri, RDFS.label, Literal(name)))
         self._set_cfg(graph, "Changed name.")
 
     name = property(get_name, set_name)
@@ -480,8 +489,8 @@ class CollectionRepo(GitRepo):
         import_metadata_to_collection.
         Expects either `files` or `data` to be not `None`.
 
-        Parameters:
-        ___________
+        Parameters
+        __________
         target_path: str
           path to the metadata files. Depends on whether to add to collection
           level metadata or a handle of the collection
@@ -637,8 +646,8 @@ class CollectionRepo(GitRepo):
     def add_handle(self, handle, name=None):
         """Adds a handle to the collection repository.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         handle: str or HandleRepo or HandleBackend
           URL of the handle or an instance of either HandleRepo or HandleBackend.
         name: str

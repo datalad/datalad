@@ -58,6 +58,11 @@ class InstallHandle(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, handle, path=None, name=None):
+        """
+        Returns
+        -------
+        Handle
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))

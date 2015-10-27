@@ -21,7 +21,8 @@ except ImportError:
 
 import logging
 
-from os.path import dirname, abspath, pardir, join as opj, exists, basename
+from os.path import dirname, abspath, pardir, join as opj, exists, basename, lexists
+from git.exc import InvalidGitRepositoryError
 
 from .support.annexrepo import AnnexRepo
 from .support.gitrepo import GitRepo
@@ -131,13 +132,17 @@ class AutomagicIO(object):
 
         if not self._autoget:
             return
+        # if filepath is not there at all (program just "checked" if it could access it
+        if not lexists(filepath):
+            lgr.log(1, "Not testing/getting file %s since it is not there", filepath)
+            return
         # deduce directory for filepath
         filedir = dirname(filepath)
         try:
             # TODO: verify logic for create -- we shouldn't 'annexify' non-annexified
             # see https://github.com/datalad/datalad/issues/204
             annex = get_repo_instance(filedir)
-        except RuntimeError as e:
+        except (RuntimeError, InvalidGitRepositoryError) as e:
             # must be not under annex etc
             return
         if not isinstance(annex, AnnexRepo):

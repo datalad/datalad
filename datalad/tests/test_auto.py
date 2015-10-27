@@ -11,6 +11,9 @@
 
 import os
 from os.path import join as opj, dirname
+
+from mock import patch
+
 from .utils import with_testrepos
 from .utils import assert_raises, eq_, ok_, assert_false, assert_true
 from .utils import swallow_outputs
@@ -96,6 +99,12 @@ def _test_proxying_open(generate_load, verify_load, repo):
     assert_raises(IOError, verify_load, fpath1_2)
 
     with AutomagicIO():
+        # verify that it doesn't even try to get files which do not exist
+        with patch('datalad.support.annexrepo.AnnexRepo.annex_get') as gricm:
+            # if we request absent file
+            assert_raises(IOError, open, fpath1_2+"_", 'r')
+            # no get should be called
+            assert_false(gricm.called)
         verify_load(fpath1_2)
         verify_load(fpath2_2)
         # and even if we drop it -- we still can get it no problem

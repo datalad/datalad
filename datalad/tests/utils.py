@@ -331,7 +331,8 @@ def with_tempfile(t, *targs, **tkwargs):
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    *targs, **tkwargs:
+    `*targs`:
+    `**tkwargs`:
         All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
         the function t.  If no 'prefix' argument is provided, it will be
@@ -465,12 +466,12 @@ def _get_testrepos_uris(regex, flavors):
 
 @optional_args
 def with_testrepos(t, regex='.*', flavors='auto', skip=False):
-    """Decorator to provide a test repository available locally and/or over the Internet
+    """Decorator to provide a local/remote test repository
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
-    where top-level name describes nature/identifier of the test repository, and
-    there could be multiple instances (e.g. generated differently) of the same
-    "content"
+    where top-level name describes nature/identifier of the test repository,
+    and there could be multiple instances (e.g. generated differently) of the
+    same "content"
 
     Parameters
     ----------
@@ -479,17 +480,17 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
     flavors : {'auto', 'local', 'local-url', 'clone', 'network', 'network-clone'} or list of thereof, optional
       What URIs to provide.  E.g. 'local' would just provide path to the
       repository, while 'network' would provide url of the remote location
-      available on Internet containing the test repository.  'clone' would clone repository
-      first to a temporary location. 'network-clone' would first clone from the network
-      location. 'auto' would include the list of appropriate
-      ones (e.g., no 'network*' flavors if network tests are "forbidden").
+      available on Internet containing the test repository.  'clone' would
+      clone repository first to a temporary location. 'network-clone' would
+      first clone from the network location. 'auto' would include the list of
+      appropriate ones (e.g., no 'network*' flavors if network tests are
+      "forbidden").
 
     Examples
     --------
-
-        @with_testrepos('basic')
-        def test_write(repo):
-            assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
+    >>> @with_testrepos('basic')
+    >>> def test_write(repo):
+    ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
 
