@@ -525,3 +525,9 @@ class GitRepo(object):
 
     def git_remove_branch(self, branch):
         self._git_custom_command('', 'git branch -D %s' % branch)
+
+    def git_ls_remote(self, remote, options=None):
+        self._git_custom_command('', 'git ls-remote %s %s' %
+                                 (options if options is not None else '',
+                                  remote))
+        # TODO: Return values?

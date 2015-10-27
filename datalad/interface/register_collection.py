@@ -15,12 +15,16 @@ __docformat__ = 'restructuredtext'
 
 from os import curdir
 from os.path import join as opj, abspath, expanduser, expandvars, isdir
+import re
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoBackend
 from datalad.support.collection import Collection
+from datalad.cmd import CommandError
+from datalad.log import lgr
+
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
@@ -56,6 +60,9 @@ class RegisterCollection(Interface):
         Collection
         """
 
+        local_master = CollectionRepo(opj(dirs.user_data_dir,
+                                      'localcollection'))
+
         # check whether url is a local path:
         if isdir(abspath(expandvars(expanduser(url)))):
             url = abspath(expandvars(expanduser(url)))
@@ -65,29 +72,45 @@ class RegisterCollection(Interface):
                 name = repo.name
 
         else:
-            # assume it's a git url:
+            # Try to auto complete collection's url:
+            url += '/' if not url.endswith('/') else ''
+            url_completions = [url,
+                               url + '.git',
+                               url + url.rstrip('/').split('/')[-1] +
+                               '.datalad-collection/.git']
+
+            url_ok = False
+            for address in url_completions:
+                try:
+                    # use ls-remote to verify git can talk to that repository:
+                    local_master.git_ls_remote(address, "-h")
+                    url = address
+                    url_ok = True
+                    break
+                except CommandError as e:
+                    if re.match("fatal.+?%s.+?not found" % url, e.stderr):
+                        continue
+                    else:
+                        lgr.error("Registering collection failed.\n%s" % e)
+                        return
+
+            if not url_ok:
+                lgr.error("Registering collection failed. "
+                          "Couldn't find remote repository.")
+                return
+
             if name is None:
                 # derive name from url:
-                parts = url.split('/')
-                parts.reverse()
-                catch_next = False
-                for part in parts:
-                    if catch_next:
-                        name = part
-                        break
-                    elif part == '.git':
-                        catch_next = True
-                    elif part.endswith('.git'):
-                        name = part[0:-4]
-                        break
-                    else:
-                        pass
+                parts = url.rstrip('/').split('/')
+                if parts[-1] == '.git':
+                    name = parts[-2]
+                elif parts[-1].endswith('.git'):
+                    name = parts[-1][0:-4]
+                elif parts[-1].endswith('.datalad-collection'):
+                    name = parts[-1][0:-19]
+                else:
+                    name = parts[-1]
 
-        if name is None:  # still no name?
-            raise RuntimeError("Couldn't derive a name from %s" % url)
-
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
         local_master.git_remote_add(name, url)
         local_master.git_fetch(name)
 
