@@ -31,7 +31,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class AddHandle(Interface):
-    """Adds a handle to a collection.
+    """Add a handle to a collection.
 
     This results in the handle to be included in the collection.
     Optionally you can give it a new name, that is used to reference that

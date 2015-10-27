@@ -27,7 +27,7 @@ dirs = AppDirs("datalad", "datalad.org")
 
 
 class RegisterCollection(Interface):
-    """Registers a collection with datalad.
+    """Register a collection with datalad.
 
     Registering a remote collection with datalad allows for including their
     metadata in searches, installing handles they contain and so on.
