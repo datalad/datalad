@@ -36,15 +36,29 @@ def parse_abstract(data):
 
 
 def pipeline(mkey=None, outputfile=None):
-
+    # import pudb; pu.db
+    sink_abstracts = Sink(output='abstracts')
     matchers = [a_href_match('.*/Browse.aspx'),
-                a_href_match('.*/BrowseResults.aspx?date=(?P<date>[/0-9]*)'),
-                a_href_match('.*/ViewSession.aspx?.*'),
-                a_href_match('.*/ViewAbstract.aspx?mID=.*')]
 
-    crawler = crawl_url('http://www.abstractsonline.com/plan/start.aspx?mkey={%s}' % mkey,
-                        matchers=matchers)
-    return
+                # a_href_match('.*/BrowseResults.aspx?date=(?P<date>[/0-9]*)'),
+                # a_href_match('.*/BrowseResults\.aspx\?date\='),
+                a_href_match('.*/BrowseResults\.aspx\?date\=10/15/2015'),
+
+                a_href_match('.*/ViewSession.aspx?.*'),
+                a_href_match('.*/ViewAbstract.aspx?mID=.*'),
+               ]
+
+    url = 'http://www.abstractsonline.com/plan/start.aspx?mkey={%s}' % mkey
+    crawler = crawl_url(url, matchers=matchers)
+
+    return [[crawler,
+            xpath_match('//table[@cellpadding=3]'),
+            parse_abstract,
+            sink_abstracts,
+            ],
+           dump_csv(keys=('title', 'authors', '...'), filename=outputfile),
+           ]
+
 
     sink_abstracts = Sink(output='abstracts')
     # fields_sink = sink_dict(key='field', values='raw_value',

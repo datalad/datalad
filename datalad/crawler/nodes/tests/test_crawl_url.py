@@ -37,8 +37,6 @@ def check_recurse_loop_http(crawl_url_, path, url):
     def visit(url, matchers):
         crawled_urls = sorted((d['url'].replace(url, '')
                                 for d in crawl_url_(url, matchers=matchers)()))
-        # crawled_urls2 = sorted((d['url'].replace(url, '')
-                                # for d in crawl_url_(url, matchers=matchers)()))
         return crawled_urls
 
     eq_(visit(url, [a_href_match('.*')]), target_pages)
@@ -46,6 +44,8 @@ def check_recurse_loop_http(crawl_url_, path, url):
 
 def test_recurse_loop_http():
     yield check_recurse_loop_http, crawl_url
+    yield check_recurse_loop_http, scrapy_crawl_url
+    # now test that scrapy/twisted can be restarted again
     yield check_recurse_loop_http, scrapy_crawl_url
 
 
