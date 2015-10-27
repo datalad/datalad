@@ -10,8 +10,8 @@
 
 from datalad.tests.utils import eq_, ok_
 from datalad.tests.utils import serve_path_via_http, with_tree
-# from ..crawl_url import crawl_url
-from ..scrape_url import crawl_url
+from ..crawl_url import crawl_url
+from ..scrape_url import crawl_url as scrapy_crawl_url
 from ..matches import a_href_match
 from ...pipeline import run_pipeline
 
@@ -28,16 +28,30 @@ pages_loop = dict(
     )
 )
 
+target_pages = ['', 'page2.html', 'page3.html', 'page4.html', 'page5.html']
+
+
 @with_tree(**pages_loop)
 @serve_path_via_http()
-def test_recurse_loop_http(path, url):
+def check_recurse_loop_http(crawl_url_, path, url):
     def visit(url, matchers):
-        return sorted((d['url'].replace(url, '')
-                       for d in crawl_url(url, matchers=matchers)()))
+        crawled_urls = sorted((d['url'].replace(url, '')
+                                for d in crawl_url_(url, matchers=matchers)()))
+        # crawled_urls2 = sorted((d['url'].replace(url, '')
+                                # for d in crawl_url_(url, matchers=matchers)()))
+        return crawled_urls
 
-    target_pages = ['', 'page2.html', 'page3.html', 'page4.html', 'page5.html']
     eq_(visit(url, [a_href_match('.*')]), target_pages)
 
+
+def test_recurse_loop_http():
+    yield check_recurse_loop_http, crawl_url
+    yield check_recurse_loop_http, scrapy_crawl_url
+
+
+@with_tree(**pages_loop)
+@serve_path_via_http()
+def test_recurse_loop_http2(path, url):
     # test recursive loop as implemented by pipeline
     crawler = crawl_url(url)
     pipeline = [

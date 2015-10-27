@@ -67,33 +67,39 @@ class crawl_url(object):
 
             def parse(self_, response):
 
-                if response.url in self._seen:
-                    yield
-                self._seen.add(response.url)
+                # print '------------------'
+                # print response.url
+                # # print self._seen
+                # print [page_url for page_html, page_url in visited_pages] 
+                # print '------------------'
 
-                visited_pages.append((response.body, response.url))
+                if not response.url in self._seen:
+                    self._seen.add(response.url)
 
-                data_ = updated(data, zip(self._output, visited_pages[-1]))
-                matchers = self._matchers
-                if matchers:
-                    lgr.debug("Looking for more URLs at %s using %s", url, matchers)
-                    for matcher in (matchers if isinstance(matchers, (list, tuple)) else [matchers]):
-                        for data_matched in matcher(data_):
-                            if 'url' not in data_matched:
-                                lgr.warning("Got data without a url from %s" % matcher)
-                                continue
-                            # proxy findings
-                            # for data_matched_ in self._visit_url(data_matched['url'], data_matched):
-                                # yield data_matched_
+                    visited_pages.append((response.body, response.url))
 
-                            print 'url', data_matched['url']
-                            yield scrapy.Request(data_matched['url']#, callback=self.parse, 
-                                                )
+                    data_ = updated(data, zip(self._output, visited_pages[-1]))
+                    matchers = self._matchers
+                    # import pudb; pu.db
+                    if matchers:
+                        lgr.debug("Looking for more URLs at %s using %s", response.url, [m._query for m in matchers])
+                        for matcher in (matchers if isinstance(matchers, (list, tuple)) else [matchers]):
+                            print '=========================='
+                            print matcher._query
+                            print '=========================='
+                            for data_matched in matcher(data_):
+                                if 'url' not in data_matched:
+                                    lgr.warning("Got data without a url from %s" % matcher)
+                                    continue
+
+                                # print 'url', data_matched['url']
+                                yield scrapy.Request(data_matched['url']#, callback=self.parse, 
+                                                    )
 
 
         settings = Settings()
         # settings.setdict({'LOG_ENABLED': False})
-        settings.setdict({'LOG_LEVEL': 'CRITICAL'})   # http://doc.scrapy.org/en/latest/topics/settings.html#log-level
+        # settings.setdict({'LOG_LEVEL': 'CRITICAL'})   # http://doc.scrapy.org/en/latest/topics/settings.html#log-level
         process = CrawlerProcess(settings)
         # process = CrawlerProcess()    # for settings set inside the crawler just do this
         process.crawl(ScrapySpider())
@@ -112,25 +118,6 @@ class crawl_url(object):
 
     def recurse(self, data):
         """Recurse into the page - self._url gets ignored"""
-        return self._visit_url(data[self._input], data)
-
-
-"""
-    for extractors, actions in conditionals:
-        extractors = _assure_listuple(extractors)
-        actions = _assure_listuple(actions)
-        seen_urls = set()
-        for extractor in extractors:
-            for url, meta_ in extractor(parent_url, meta=meta):
-                if url in seen_urls:
-                    continue
-                file = None
-                # progress through actions while possibly augmenting the url, file, and/or meta_
-                for action in actions:
-                    # TODO: may be we should return a dict with whatever that action
-                    # found necessary to change, update local state and pass into
-                    url, file, meta_ = \
-                        action(parent_url=parent_url, url=url, file=file, meta=meta_)
-                seen_urls.add(url)
-"""
+        raise NotImplementedError
+        # return self._visit_url(data[self._input], data)
 
