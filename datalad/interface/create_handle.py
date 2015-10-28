@@ -63,5 +63,7 @@ class CreateHandle(Interface):
         new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
                                 name=name, create=True)
         local_master.add_handle(new_handle, name=name)
+        # TODO: get metadata, in case there is some already.
+        # This implicates the option to use create-handle on an existing annex.
 
         return Handle(HandleRepoBackend(new_handle))

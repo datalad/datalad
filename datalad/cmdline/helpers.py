@@ -207,3 +207,61 @@ def get_repo_instance(path=curdir, class_=None):
         raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
     else:
         raise RuntimeError("No datalad repository found in %s" % abspath_)
+
+
+# Do some centralizing of things needed by the datalad API:
+# TODO: May be there should be a dedicated class for the master collection.
+# For now just use helper functions to clean up the implementations of the API.
+# Design decision about this also depends on redesigning the handle/collection
+# classes (Metadata class => Backends => Repos).
+# The local master used by datalad is not a technically special
+# collection, but a collection with a special purpose for its "user",
+# who is datalad. So, deriving a class from Collection(Repo) and make common
+# tasks methods of this class might be an option either way. Also might become
+# handy, once we decide to have several "masters" (user-level, sys-level, etc.)
+
+
+from appdirs import AppDirs
+from datalad.support.collectionrepo import CollectionRepo
+from os.path import join as opj
+
+dirs = AppDirs("datalad", "datalad.org")
+datalad_master = CollectionRepo(opj(dirs.user_data_dir, 'localcollection'))
+
+
+# Notes:
+# ------
+# collection:
+# handle at 'path'? => return Handle/HandleRepo
+#
+# is 'handle' in collection?, get Handle/HandleRepo
+#
+# same for collections
+#   - is_registered?
+#   - get the instance
+#   - get the path/url
+#   - get registered Collections
+#
+# register collection? (remote add (check for duplicates); fetch)
+#
+# "register" handle? (and add metadata to master) => integrate the latter into
+# add_handle (CollectionRepo)
+#
+# get handle's path; list of handles paths => could be done via
+# Handle instances.
+#
+#
+# what to do about addressing the local master itself via its name?
+#  - when is it needed?
+#  - when it should be showed, when it shouldn't?
+#
+#
+# check whether 'handle' is a key ("{collection}/{handle}")
+# or a local path or an url
+
+# Tasks:
+# ------
+#
+# - get a handle by its name or path or url => different type of return value?
+# - (un)register a collection
+# - check what type of repo is at path and return it (see get_repo_instance)
