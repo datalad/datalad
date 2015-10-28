@@ -8,7 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 # now with some recursive structure of directories
 
-from datalad.tests.utils import eq_, ok_
+from six import PY2
+from datalad.tests.utils import eq_
 from datalad.tests.utils import serve_path_via_http, with_tree
 from ..crawl_url import crawl_url
 from ..scrape_url import crawl_url as scrapy_crawl_url
@@ -44,9 +45,12 @@ def check_recurse_loop_http(crawl_url_, path, url):
 
 def test_recurse_loop_http():
     yield check_recurse_loop_http, crawl_url
-    yield check_recurse_loop_http, scrapy_crawl_url
-    # now test that scrapy/twisted can be restarted again
-    yield check_recurse_loop_http, scrapy_crawl_url
+
+    if PY2:
+        # Skip testing of scrapy based crawler using py3 (not fully ported yet).
+        yield check_recurse_loop_http, scrapy_crawl_url
+        # run again to test that scrapy/twisted can be restarted from the same proc
+        yield check_recurse_loop_http, scrapy_crawl_url
 
 
 @with_tree(**pages_loop)

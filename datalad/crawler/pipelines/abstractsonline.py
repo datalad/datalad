@@ -39,13 +39,15 @@ def pipeline(mkey=None, outputfile=None):
     # import pudb; pu.db
     sink_abstracts = Sink(output='abstracts')
     matchers = [a_href_match('.*/Browse.aspx'),
-
                 # a_href_match('.*/BrowseResults.aspx?date=(?P<date>[/0-9]*)'),
-                # a_href_match('.*/BrowseResults\.aspx\?date\='),
+                # a_href_match('.*/ViewSession.aspx?.*'),
+                # a_href_match('.*/ViewAbstract.aspx?mID=.*'),
                 a_href_match('.*/BrowseResults\.aspx\?date\=10/15/2015'),
+                a_href_match('.*/ViewSession\.aspx\?.*'),
+                           # 'ViewSession\.aspx\?'
+                a_href_match('.*/ViewAbstract\.aspx\?mID\=.*'),
+                           # 'ViewAbstract\.aspx\?mID\='
 
-                a_href_match('.*/ViewSession.aspx?.*'),
-                a_href_match('.*/ViewAbstract.aspx?mID=.*'),
                ]
 
     url = 'http://www.abstractsonline.com/plan/start.aspx?mkey={%s}' % mkey

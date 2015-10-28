@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Basic crawler for the web using scrapy
+"""Basic web crawler/scraper using scrapy
 """
 
 from ...utils import updated
@@ -24,8 +24,9 @@ lgr = getLogger('datalad.crawl.scrape_url')
 
 
 class crawl_url(object):
-    """Given a source url, perform the initial crawling of the page, i.e. simply
-    bloody fetch it and pass along
+    """Given a source url, perform crawling of the page.
+    NOTE this implementation depends on scrapy, which 
+    has not yet been ported to python3. 
     """
 
     def __init__(self, url=None, matchers=None, input='url',
