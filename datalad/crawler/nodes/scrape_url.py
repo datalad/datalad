@@ -25,8 +25,8 @@ lgr = getLogger('datalad.crawl.scrape_url')
 
 class crawl_url(object):
     """Given a source url, perform crawling of the page.
-    NOTE this implementation depends on scrapy, which 
-    has not yet been ported to python3. 
+    NOTE: this implementation depends on scrapy, which
+    has not yet been fully ported to python3.
     """
 
     def __init__(self, url=None, matchers=None, input='url',
