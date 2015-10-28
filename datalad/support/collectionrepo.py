@@ -437,8 +437,16 @@ class CollectionRepo(GitRepo):
 
     # ### repo methods:
 
-    # TODO: add and remove are inconsistent in use of name/key of a handle;
-    # Will figure out, what's needed while writing the test cases:
+    def get_handles(self, branch=None):
+        """Get a list of Handle instances.
+
+        This is different to get_handle_list(), which provides a list of handle
+        names.
+        """
+
+        return [Handle(CollectionRepoHandleBackend(self, key=key,
+                                                   branch=branch))
+                for key in self.get_handle_list(branch=branch)]
 
     def get_handle_repos(self, branch=None):
         """Get a list of HandleRepo instances.
