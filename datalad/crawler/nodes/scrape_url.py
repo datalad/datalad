@@ -109,4 +109,3 @@ class crawl_url(object):
         """Recurse into the page - self._url gets ignored"""
         # return self._visit_url(data[self._input], data)
         raise NotImplementedError
-
