@@ -31,7 +31,7 @@ except ImportError:
 
 # somewhat superseeded by  test_proxying_open_regular but still does
 # some additional testing, e.g. non-context manager style of invocation
-@with_testrepos('basic', flavors=['clone'])
+@with_testrepos('basic_annex', flavors=['clone'])
 def test_proxying_open_testrepobased(repo):
     TEST_CONTENT = "123\n"
     fname = 'test-annex.dat'

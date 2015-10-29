@@ -19,7 +19,7 @@ from ...tests.utils import with_testrepos
 from ...tests.utils import assert_cwd_unchanged
 from ...utils import chpwd
 
-@with_testrepos('basic', flavors=['clone'])
+@with_testrepos('basic_annex', flavors=['clone'])
 @assert_cwd_unchanged(ok_to_chdir=True)
 @patch('datalad.support.annexrepo.AnnexRepo.annex_get')
 def test_get_basic(repo_path, annex_get_mocked):

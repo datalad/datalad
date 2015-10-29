@@ -69,8 +69,8 @@ class TestRepo(object):
         raise NotImplementedError("Should be implemented in sub-classes")
 
 
-class BasicTestRepo(TestRepo):
-    """Creates a basic test repository"""
+class BasicAnnexTestRepo(TestRepo):
+    """Creates a basic test git-annex repository"""
 
     REPO_CLASS = AnnexRepo
 
