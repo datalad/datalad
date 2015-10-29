@@ -98,8 +98,8 @@ def test_with_testrepos():
     check_with_testrepos()
 
     eq_(len(repos),
-        2 if on_windows # TODO -- would fail now in DTGALAD_TESTS_NONETWORK mode
-          else (3 if os.environ.get('DATALAD_TESTS_NONETWORK') else 4))  # local, local-url, clone, network
+        2 if on_windows # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
+          else (15 if os.environ.get('DATALAD_TESTS_NONETWORK') else 16))  # local, local-url, clone, network
 
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):

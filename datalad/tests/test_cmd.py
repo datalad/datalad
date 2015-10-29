@@ -245,7 +245,7 @@ def test_link_file_load(tempfile):
     os.unlink(tempfile2)  # TODO: next two with_tempfile
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_runner_failure(dir_):
 
     runner = Runner()
