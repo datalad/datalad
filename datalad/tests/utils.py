@@ -409,18 +409,25 @@ else:
     local_testrepo_flavors = ['network-clone']
 
 from .utils_testrepos import BasicTestRepo, TestRepo
-_basic_test_repo = BasicTestRepo()
-_TESTREPOS = {'basic':
-                  {'network': 'git://github.com/datalad/testrepo--basic--r1',
-                   'local': _basic_test_repo.path,
-                   'local-url': _basic_test_repo.url}}
+
+_TESTREPOS = None
 
 def _get_testrepos_uris(regex, flavors):
+    global _TESTREPOS
+    # we should instantiate those whenever test repos actually asked for
+    # TODO: just absorb all this lazy construction within some class
+    if not _TESTREPOS:
+        _basic_test_repo = BasicTestRepo()
+        _TESTREPOS = {'basic':
+                      {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                       'local': _basic_test_repo.path,
+                       'local-url': _basic_test_repo.url}}
+        # assure that now we do have those test repos created -- delayed
+        # their creation until actually used
+        if not on_windows:
+            _basic_test_repo.create()
+
     uris = []
-    # assure that now we do have those test repos created -- delayed
-    # their creation until actually used
-    if not on_windows:
-        _basic_test_repo.create()
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
             continue
