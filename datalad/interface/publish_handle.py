@@ -25,9 +25,7 @@ from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
 from ..consts import REPO_STD_META_FILE, HANDLE_META_DIR
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class PublishHandle(Interface):

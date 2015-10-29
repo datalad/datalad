@@ -26,10 +26,8 @@ from datalad.cmd import CommandError
 from ..consts import REPO_STD_META_FILE, HANDLE_META_DIR
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
+from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 def parse_script_output(out, err):
@@ -100,8 +98,7 @@ class PublishCollection(Interface):
 
         # TODO: Note: Yarik's git mtheirs for publishing branches!
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
+        local_master = get_datalad_master()
 
         if isdir(abspath(expandvars(expanduser(collection)))):
             c_path = abspath(expandvars(expanduser(collection)))

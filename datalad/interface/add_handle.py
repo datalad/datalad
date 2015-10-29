@@ -23,11 +23,9 @@ from datalad.support.collectionrepo import CollectionRepo, \
 from datalad.support.handlerepo import HandleRepo, Handle
 from datalad.support.metadatahandler import CustomImporter
 from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
+from datalad.cmdline.helpers import get_datalad_master
 
-from appdirs import AppDirs
 from six.moves.urllib.parse import urlparse
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 class AddHandle(Interface):
@@ -66,9 +64,7 @@ class AddHandle(Interface):
         """
 
         # TODO: - handle and collection can be addressed via name or path/url
-
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
+        local_master = get_datalad_master()
 
         if isdir(abspath(expandvars(expanduser(handle)))):
             h_path = abspath(expandvars(expanduser(handle)))

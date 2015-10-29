@@ -21,9 +21,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoBackend
 from datalad.support.collection import Collection
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class ListCollection(Interface):
@@ -36,8 +34,7 @@ class ListCollection(Interface):
         list of Collection
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
         for collection in local_master.git_get_remotes():
             print(collection)
 

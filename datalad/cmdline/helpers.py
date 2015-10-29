@@ -224,9 +224,12 @@ def get_repo_instance(path=curdir, class_=None):
 from appdirs import AppDirs
 from datalad.support.collectionrepo import CollectionRepo
 from os.path import join as opj
+from datalad.consts import DATALAD_COLLECTION_NAME
 
 dirs = AppDirs("datalad", "datalad.org")
-datalad_master = CollectionRepo(opj(dirs.user_data_dir, 'localcollection'))
+def get_datalad_master():
+    return CollectionRepo(opj(dirs.user_data_dir, DATALAD_COLLECTION_NAME),
+                          create=True)
 
 
 # Notes:

@@ -21,9 +21,7 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo, HandleRepoBackend
 from datalad.support.handle import Handle
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class CreateHandle(Interface):
@@ -57,8 +55,7 @@ class CreateHandle(Interface):
         Handle
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'), create=True)
+        local_master = get_datalad_master()
 
         new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
                                 name=name, create=True)

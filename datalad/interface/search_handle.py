@@ -25,11 +25,8 @@ from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
+from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
-
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 class SearchHandle(Interface):
@@ -50,8 +47,7 @@ class SearchHandle(Interface):
         Handle
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         metacollection = MetaCollection(
             [local_master.get_backend_from_branch(remote + "/master")

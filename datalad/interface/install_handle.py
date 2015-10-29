@@ -23,15 +23,12 @@ from datalad.support.collectionrepo import CollectionRepo, \
 from datalad.support.handle import Handle
 from datalad.support.metadatahandler import CustomImporter
 from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
-
-from appdirs import AppDirs
+from datalad.cmdline.helpers import get_datalad_master
 
 from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.network import get_url_straight_filename
 from ..utils import getpwd, get_url_path
 from .base import Interface
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 class InstallHandle(Interface):
@@ -68,8 +65,7 @@ class InstallHandle(Interface):
         Handle
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         # check whether 'handle' is a key ("{collection}/{handle}")
         # or a local path or an url:

@@ -19,18 +19,19 @@ from os.path import join as opj, exists
 from ...utils import swallow_logs
 from ...api import install_handle
 
-from ...support.annexrepo import AnnexRepo
-from ...tests.utils import ok_, eq_
+from ...tests.utils import ok_, eq_, assert_cwd_unchanged
 from ...tests.utils import assert_raises
 from ...tests.utils import with_testrepos
 from ...tests.utils import with_tempfile
+from ...consts import DATALAD_COLLECTION_NAME
 
-#@assert_cwd_unchanged
-@with_testrepos('basic_annex', flavors=['clone'])
+
+@assert_cwd_unchanged
+@with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def test_install_handle_basic(handle_url, path, lcpath):
-    ok_(not exists(opj(lcpath, "localcollection")))
+    ok_(not exists(opj(lcpath, DATALAD_COLLECTION_NAME)))
     # TODO: make it saner see https://github.com/datalad/datalad/issues/234
     # apparently can't mock a property
     #with patch('datalad.interface.install_handle.dirs.user_data_dir', lcpath):
@@ -38,11 +39,11 @@ def test_install_handle_basic(handle_url, path, lcpath):
     class mocked_dirs:
         user_data_dir = lcpath
 
-    with patch('datalad.interface.install_handle.dirs', mocked_dirs), \
+    with patch('datalad.cmdline.helpers.dirs', mocked_dirs), \
         swallow_logs() as cml:
         install_handle(handle_url, path)
         # TODO: verify output value, see https://github.com/datalad/datalad/issues/236
-        ok_(exists(opj(lcpath, "localcollection")))
+        ok_(exists(opj(lcpath, DATALAD_COLLECTION_NAME)))
 
         # we should be able to install handle again to the same location
         install_handle(handle_url, path)

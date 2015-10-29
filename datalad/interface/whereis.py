@@ -18,11 +18,10 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
 from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
+from datalad.cmdline.helpers import get_datalad_master
 from ..log import lgr
-from appdirs import AppDirs
-from six.moves.urllib.parse import urlparse
 
-dirs = AppDirs("datalad", "datalad.org")
+from six.moves.urllib.parse import urlparse
 
 
 class Whereis(Interface):
@@ -45,8 +44,7 @@ class Whereis(Interface):
         str
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if key in local_master.git_get_remotes():
             location = CollectionRepoBackend(local_master, key).url

@@ -16,7 +16,6 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 import logging
 
-from appdirs import AppDirs
 from six.moves.urllib.parse import urlparse
 
 from .base import Interface
@@ -25,10 +24,10 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoHandleBackend
 from ..utils import rmtree
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 lgr = logging.getLogger('datalad.interface.uninstall-handle')
+
 
 class UninstallHandle(Interface):
     """Uninstall a handle.
@@ -47,8 +46,7 @@ class UninstallHandle(Interface):
 
     def __call__(self, handle):
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if handle not in local_master.get_handle_list():
             raise ValueError("Handle '%s' unknown." % handle)

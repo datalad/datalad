@@ -24,10 +24,7 @@ from datalad.support.collectionrepo import CollectionRepo, \
 from datalad.support.collection import Collection
 from datalad.cmd import CommandError
 from datalad.log import lgr
-
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class RegisterCollection(Interface):
@@ -60,8 +57,7 @@ class RegisterCollection(Interface):
         Collection
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         # check whether url is a local path:
         if isdir(abspath(expandvars(expanduser(url)))):
