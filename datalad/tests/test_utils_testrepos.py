@@ -11,7 +11,9 @@
 """
 from os.path import join as pathjoin
 
-from .utils_testrepos import BasicAnnexTestRepo
+from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+    BasicHandleTestRepo, BasicCollectionTestRepo, MetadataPTHandleTestRepo
+from ..consts import REPO_STD_META_FILE, REPO_CONFIG_FILE, HANDLE_META_DIR
 from .utils import with_tempfile, assert_true, ok_clean_git, \
     ok_clean_git_annex_proxy
 from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
@@ -31,6 +33,7 @@ def _test_BasicAnnexTestRepo(repodir):
     else:
         ok_clean_git(trepo.path)
     ok_file_under_git(trepo.path, 'test.dat')
+    ok_file_under_git(trepo.path, 'INFO.txt')
     ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
     if not trepo.repo.is_crippled_fs():
         ok_broken_symlink(pathjoin(trepo.path, 'test-annex.dat'))
@@ -49,3 +52,54 @@ def test_BasicAnnexTestRepo_random_location_generated():
 @with_tempfile()
 def test_BasicAnnexTestRepo(path):
     yield _test_BasicAnnexTestRepo, path
+
+
+@with_tempfile()
+def test_BasicGitTestRepo(path):
+    trepo = BasicGitTestRepo(path)
+    trepo.create()
+    ok_clean_git(trepo.path, annex=False)
+    ok_file_under_git(trepo.path, 'test.dat')
+    ok_file_under_git(trepo.path, 'INFO.txt')
+
+
+@with_tempfile()
+def test_BasicHandleTestRepo(path):
+    trepo = BasicHandleTestRepo(path)
+    trepo.create()
+    if trepo.repo.is_direct_mode():
+        ok_clean_git_annex_proxy(trepo.path)
+    else:
+        ok_clean_git(trepo.path, annex=True)
+    ok_file_under_git(trepo.path, 'test.dat')
+    ok_file_under_git(trepo.path, 'INFO.txt')
+    ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
+    ok_file_under_git(trepo.path, pathjoin(HANDLE_META_DIR, REPO_STD_META_FILE))
+    ok_file_under_git(trepo.path, pathjoin(HANDLE_META_DIR, REPO_CONFIG_FILE))
+
+
+@with_tempfile()
+def test_BasicCollectionTestRepo(path):
+    trepo = BasicCollectionTestRepo(path)
+    trepo.create()
+    ok_clean_git(trepo.path, annex=False)
+    ok_file_under_git(trepo.path, REPO_STD_META_FILE)
+    ok_file_under_git(trepo.path, REPO_CONFIG_FILE)
+
+
+@with_tempfile()
+def test_MetadataPTHandleTestRepo(path):
+    trepo = MetadataPTHandleTestRepo(path)
+    trepo.create()
+    if trepo.repo.is_direct_mode():
+        ok_clean_git_annex_proxy(trepo.path)
+    else:
+        ok_clean_git(trepo.path, annex=True)
+    ok_file_under_git(trepo.path, 'test.dat')
+    ok_file_under_git(trepo.path, 'INFO.txt')
+    ok_file_under_git(trepo.path, 'test-annex.dat', annexed=True)
+    ok_file_under_git(trepo.path, pathjoin(HANDLE_META_DIR, REPO_STD_META_FILE))
+    ok_file_under_git(trepo.path, pathjoin(HANDLE_META_DIR, REPO_CONFIG_FILE))
+    ok_file_under_git(trepo.path, 'LICENSE')
+    ok_file_under_git(trepo.path, 'AUTHORS')
+    ok_file_under_git(trepo.path, 'README')
