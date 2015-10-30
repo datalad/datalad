@@ -19,7 +19,7 @@ from nose.tools import assert_is_instance, assert_in
 from six.moves.urllib.parse import urlparse
 
 from ...utils import swallow_logs
-from ...api import install_handle
+from ...api import install_handle, register_collection
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_testrepos, with_tempfile
 from ...cmdline.helpers import get_repo_instance, get_datalad_master
@@ -68,4 +68,36 @@ def test_install_handle_from_url(handle_url, path, lcpath):
         eq_(str(cm.exception), '%s already exists, and is not a handle' % lcpath)
 
 
-# TODO: test install from registered collection by name
+@assert_cwd_unchanged
+@with_testrepos('collection', flavors=['local-url'])
+@with_tempfile()
+@with_tempfile(mkdir=True)
+def test_install_handle_from_collection(collection_url, path, lcpath):
+
+    class mocked_dirs:
+        user_data_dir = lcpath
+
+    with patch('datalad.cmdline.helpers.dirs', mocked_dirs), \
+        swallow_logs() as cml:
+        collection = register_collection(collection_url, name="TEST_COLLECTION")
+        handle = install_handle("TEST_COLLECTION/BasicHandle", path)
+
+        # get repo to read what was actually installed and raise exceptions,
+        # if repo is not a valid handle:
+        installed_repo = get_repo_instance(path, HandleRepo)
+
+        # evaluate return value:
+        assert_is_instance(handle, Handle,
+                           "install_handle() returns object of "
+                           "incorrect class: %s" % type(handle))
+
+        eq_(handle.name, installed_repo.name)
+        eq_(urlparse(handle.url).path, installed_repo.path)
+
+        # handle is known to datalad:
+        assert_in("TEST_COLLECTION/BasicHandle",
+                  get_datalad_master().get_handle_list())
+
+        # we should be able to install handle again to the same location
+        install_handle("TEST_COLLECTION/BasicHandle", path)
+

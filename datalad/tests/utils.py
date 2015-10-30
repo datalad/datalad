@@ -443,8 +443,8 @@ def _get_testrepos_uris(regex, flavors):
                         {'local': _md_pt_handle_test_repo.path,
                          'local-url': _md_pt_handle_test_repo.url},
                       'collection':
-                          {'local': _collection_test_repo.path,
-                           'local-url': _collection_test_repo.url}}
+                        {'local': _collection_test_repo.path,
+                         'local-url': _collection_test_repo.url}}
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
         if not on_windows:
@@ -453,6 +453,7 @@ def _get_testrepos_uris(regex, flavors):
             _basic_collection_test_repo.create()
             _basic_git_test_repo.create()
             _md_pt_handle_test_repo.create()
+            _collection_test_repo.create()
     uris = []
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
