@@ -22,7 +22,10 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone, EnsureListOf
 from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
-from ..support.handlerepo import HandleRepo
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from datalad.support.collection import Collection
+from datalad.support.handle import Handle
+
 from ..support.metadatahandler import PlainTextImporter, CustomImporter, \
     URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -41,8 +44,21 @@ ImporterDict = {"plain-text": PlainTextImporter}
 
 class ImportMetadata(Interface):
     """Import metadata to the repository in cwd.
+
+    Make metadata available to datalad. This may involve metadata, that is
+    available from within the repository but not yet known to datalad or
+    metadata that comes from any outside location.
+    There are different importers, that can be used to read that metadata
+    depending on its format.
+
+    Example:
+
+    ~/MyHandle$ datalad import-metadata plain-text /path/to/my/textfiles
+
+    ~/MyCollection$ datalad import-metadata plain-text /path/to/my/textfiles \
+            MyHandle
     """
-    # TODO: A lot of doc ;)
+    # TODO: Check and doc sub entities
 
     _params_ = dict(
 
@@ -67,7 +83,12 @@ class ImportMetadata(Interface):
                 "level metadata.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, format, path, subject=None, handle=None):
+    def __call__(self, format, path, handle=None, subject=None):
+        """
+        Returns
+        -------
+        Handle or Collection
+        """
 
         if len(path) == 1:
             if exists(path[0]) and isdir(path[0]):
@@ -113,3 +134,8 @@ class ImportMetadata(Interface):
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
+
+        if isinstance(repo, CollectionRepo):
+            return Collection(CollectionRepoBackend(repo))
+        elif isinstance(repo, HandleRepo):
+            return Handle(HandleRepoBackend(repo))

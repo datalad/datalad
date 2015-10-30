@@ -19,14 +19,24 @@ from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
-from datalad.support.handlerepo import HandleRepo
+from datalad.support.handlerepo import HandleRepo, HandleRepoBackend
+from datalad.support.handle import Handle
 from appdirs import AppDirs
 
 dirs = AppDirs("datalad", "datalad.org")
 
 
 class CreateHandle(Interface):
-    """Create a new handle."""
+    """Create a new handle.
+
+    Creates an empty handle repository and registers it with datalad.
+    You can give it name, to be used by datalad to address that handle.
+    Otherwise the base directory's name of the repository is used.
+
+    Example:
+
+        $ datalad create-handle /some/where/first_handle MyFirstHandle
+    """
     _params_ = dict(
         path=Parameter(
             args=('path',),
@@ -41,6 +51,11 @@ class CreateHandle(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, path=curdir, name=None):
+        """
+        Returns
+        -------
+        Handle
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'), create=True)
@@ -48,3 +63,7 @@ class CreateHandle(Interface):
         new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
                                 name=name, create=True)
         local_master.add_handle(new_handle, name=name)
+        # TODO: get metadata, in case there is some already.
+        # This implicates the option to use create-handle on an existing annex.
+
+        return Handle(HandleRepoBackend(new_handle))

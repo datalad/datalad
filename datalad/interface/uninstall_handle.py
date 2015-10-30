@@ -33,6 +33,9 @@ lgr = logging.getLogger('datalad.interface.uninstall-handle')
 class UninstallHandle(Interface):
     """Uninstall a handle.
 
+    Uninstall a before installed handle. This unregisters the handle with
+    datalad and deletes the repository.
+
     Examples:
 
       $ datalad uninstall-handle MyCoolHandle

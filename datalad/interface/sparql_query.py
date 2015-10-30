@@ -41,6 +41,11 @@ class SPARQLQuery(Interface):
             constraints=EnsureListOf(string_types) | EnsureNone()))
 
     def __call__(self, query, collections=None):
+        """
+        Returns
+        -------
+        rdflib.query.QueryResult
+        """
 
         # TODO: sanity checks for the query;
 
@@ -83,3 +88,5 @@ class SPARQLQuery(Interface):
                 out += "\t%s" % col
             out.lstrip('\t')
             print(out)
+
+        return results

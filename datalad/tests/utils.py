@@ -408,25 +408,46 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicTestRepo, TestRepo
+from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
+    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo
 
 _TESTREPOS = None
+
 
 def _get_testrepos_uris(regex, flavors):
     global _TESTREPOS
     # we should instantiate those whenever test repos actually asked for
     # TODO: just absorb all this lazy construction within some class
     if not _TESTREPOS:
-        _basic_test_repo = BasicTestRepo()
-        _TESTREPOS = {'basic':
-                      {'network': 'git://github.com/datalad/testrepo--basic--r1',
-                       'local': _basic_test_repo.path,
-                       'local-url': _basic_test_repo.url}}
+        _basic_annex_test_repo = BasicAnnexTestRepo()
+        _basic_handle_test_repo = BasicHandleTestRepo()
+        _basic_collection_test_repo = BasicCollectionTestRepo()
+        _basic_git_test_repo = BasicGitTestRepo()
+        _md_pt_handle_test_repo = MetadataPTHandleTestRepo()
+        _TESTREPOS = {'basic_annex':
+                        {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                         'local': _basic_annex_test_repo.path,
+                         'local-url': _basic_annex_test_repo.url},
+                      'basic_annex_handle':
+                        {'local': _basic_handle_test_repo.path,
+                         'local-url': _basic_handle_test_repo.url},
+                      'basic_git':
+                        {'local': _basic_git_test_repo.path,
+                         'local-url': _basic_git_test_repo.url},
+                      'basic_git_collection':
+                        {'local': _basic_collection_test_repo.path,
+                         'local-url': _basic_collection_test_repo.url},
+                      'meta_pt_annex_handle':
+                        {'local': _md_pt_handle_test_repo.path,
+                         'local-url': _md_pt_handle_test_repo.url}}
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
         if not on_windows:
-            _basic_test_repo.create()
-
+            _basic_annex_test_repo.create()
+            _basic_handle_test_repo.create()
+            _basic_collection_test_repo.create()
+            _basic_git_test_repo.create()
+            _md_pt_handle_test_repo.create()
     uris = []
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
@@ -467,7 +488,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
 
     Examples
     --------
-    >>> @with_testrepos('basic')
+    >>> @with_testrepos('basic_annex')
     >>> def test_write(repo):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 

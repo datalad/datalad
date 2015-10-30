@@ -372,7 +372,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
     assert_equal({'branch2', 'branch3'}, set(branches1))
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('basic_git', flavors=local_testrepo_flavors)
 @with_tempfile
 @with_tempfile
 def test_GitRepo_get_files(src, path, path2clone):
@@ -380,8 +380,8 @@ def test_GitRepo_get_files(src, path, path2clone):
     # TODO: THIS DOES NOT WORK AS EXPECTED! SEE gitrepo.py!
 
     gr = GitRepo(path, src)
-    assert_equal({'INFO.txt', 'test-annex.dat', 'test.dat'},
-                 set(gr.git_get_files()))
+    assert_in('INFO.txt', gr.git_get_files())
+    assert_in('test.dat', gr.git_get_files())
     #gr.git_checkout('new_branch', '-b')
     ##filename = get_most_obscure_supported_name()
     #filename = 'another_file.dat'

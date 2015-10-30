@@ -92,9 +92,13 @@ class PublishCollection(Interface):
 
     def __call__(self, target, collection=curdir, baseurl=None,
                  remote_name=None):
+        """
+        Returns
+        -------
+        Collection
+        """
 
-        # Note:
-        # ssh-target: ssh://someone@somewhere/deeper/in/there
+        # TODO: Note: Yarik's git mtheirs for publishing branches!
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                           'localcollection'))
@@ -135,8 +139,8 @@ class PublishCollection(Interface):
 
             if baseurl is None:
                 baseurl = target
-            collection_url = baseurl + '/' + "DATALAD_COL_" + \
-                             local_collection_repo.name
+            collection_url = baseurl + '/' + local_collection_repo.name + \
+                             ".datalad-collection"
 
             # build control master:
             from datalad.utils import assure_dir
@@ -157,7 +161,7 @@ class PublishCollection(Interface):
 
             # prepare target repositories:
 
-            script_options = "%s DATALAD_COL_%s" % (parsed_target.path,
+            script_options = "%s %s.datalad-collection" % (parsed_target.path,
                                                     local_collection_repo.name)
             for key in available_handles:
                 # prepare repos for locally available handles only
@@ -185,13 +189,14 @@ class PublishCollection(Interface):
             target_path = abspath(expandvars(expanduser(parsed_target.path)))
             if baseurl is None:
                 baseurl = target_path
-            collection_url = baseurl + '/' + "DATALAD_COL_" + \
-                             local_collection_repo.name
+            collection_url = baseurl + '/' + local_collection_repo.name + \
+                             ".datalad-collection"
 
             try:
                 out, err = runner.run(["sh", prepare_script_path,
                                        target_path,
-                                       "DATALAD_COL_" + local_collection_repo.name]
+                                       local_collection_repo.name +
+                                       ".datalad-collection"]
                                       + available_handles)
             except CommandError as e:
                 lgr.error("Preparation script failed: %s" % str(e))
@@ -207,7 +212,7 @@ class PublishCollection(Interface):
 
         script_failed = False
         for name in available_handles + \
-                ["DATALAD_COL_" + local_collection_repo.name]:
+                [local_collection_repo.name + ".datalad-collection"]:
             if not results[name]['init']:
                 lgr.error("Server setup for %s failed." % name)
                 script_failed = True
@@ -352,8 +357,8 @@ class PublishCollection(Interface):
             try:
                 out, err = runner.run(["sh", cleanup_script_path,
                                        target_path,
-                                       "DATALAD_COL_" +
-                                       local_collection_repo.name]
+                                       local_collection_repo.name +
+                                       ".datalad-collection"]
                                       + available_handles)
             except CommandError as e:
                 lgr.error("Clean-up script failed: %s" % str(e))
@@ -362,3 +367,6 @@ class PublishCollection(Interface):
         # Delete publish branch:
         local_collection_repo._git_custom_command('', 'git branch -D %s'
                                                   % p_branch)
+
+        return Collection(CollectionRepoBackend(local_collection_repo,
+                                                remote_name + "/master"))

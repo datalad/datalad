@@ -28,7 +28,7 @@ from .utils import *
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos('.*annex.*')
 @with_tempfile
 def test_AnnexRepo_instance_from_clone(src, dst):
 
@@ -45,7 +45,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)
@@ -68,7 +68,7 @@ def test_AnnexRepo_instance_brand_new(path):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['local', 'network'])
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
@@ -85,7 +85,7 @@ def test_AnnexRepo_get(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos('.*annex.*')
 @with_tempfile
 def test_AnnexRepo_crippled_filesystem(src, dst):
 
@@ -107,7 +107,7 @@ def test_AnnexRepo_crippled_filesystem(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
@@ -122,7 +122,7 @@ def test_AnnexRepo_is_direct_mode(path):
 
 
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos('.*annex.*')
 @with_tempfile
 def test_AnnexRepo_set_direct_mode(src, dst):
 
@@ -139,7 +139,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add(src, annex_path):
 
@@ -164,7 +164,7 @@ def test_AnnexRepo_annex_add(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo(annex_path, src)
@@ -173,7 +173,7 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_key(src, annex_path):
 
@@ -194,7 +194,7 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
-@with_testrepos(flavors=['local', 'network'])
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_file_has_content(src, annex_path):
 
@@ -225,7 +225,7 @@ def test_AnnexRepo_options_decorator():
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add_to_git(src, dst):
 
@@ -241,7 +241,7 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
     assert_in(filename, ar.get_indexed_files())
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tree(tree=(('about.txt', 'Lots of abouts'),))
 @serve_path_via_http()
 @with_tempfile
@@ -293,7 +293,7 @@ def test_AnnexRepo_web_remote(src, sitepath, siteurl, dst):
     assert_equal(len(l), 1)
     assert_false(ar.file_has_content(testfile))
 
-@with_testrepos(flavors=['local', 'network'])
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo(dst, src, backend='MD5')
@@ -359,7 +359,7 @@ def test_AnnexRepo_backend_option(path, url):
     assert_true(ar.get_file_backend(f) == 'SHA1'
                 for f in ar.get_indexed_files() if 'faraway' in f)
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
     #init local test-annex before cloning:
@@ -442,7 +442,7 @@ def test_AnnexRepo_always_commit(path):
                        if commit.startswith('commit')])
     assert_equal(num_commits, 4)
 
-@with_testrepos('basic', flavors=['clone'])
+@with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_on_uninited_annex(path):
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
     annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without

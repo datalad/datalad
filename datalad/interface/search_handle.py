@@ -17,7 +17,9 @@ from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo
+from ..support.collectionrepo import CollectionRepo, \
+    CollectionRepoHandleBackend
+from ..support.handle import Handle
 from ..support.collection import MetaCollection
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -42,6 +44,11 @@ class SearchHandle(Interface):
             constraints=EnsureStr()))
 
     def __call__(self, search):
+        """
+        Returns
+        -------
+        Handle
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
@@ -76,3 +83,8 @@ class SearchHandle(Interface):
             width = max(len(h) for h in handles)
             for h, l in zip(handles, locations):
                 print("%s\t%s" % (h.ljust(width), l))
+
+            return [Handle(CollectionRepoHandleBackend(local_master, handle))
+                    for handle in handles]
+        else:
+            return []

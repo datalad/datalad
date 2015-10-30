@@ -17,13 +17,14 @@ from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo
-from ..support.collection import MetaCollection
+from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend
+from ..support.collection import MetaCollection, Collection
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from appdirs import AppDirs
+from six.moves.urllib.parse import urlparse
 
 dirs = AppDirs("datalad", "datalad.org")
 
@@ -40,6 +41,14 @@ class SearchCollection(Interface):
             constraints=EnsureStr()))
 
     def __call__(self, search):
+        """
+        Returns
+        -------
+        list of Collection
+        """
+
+        # TODO: currently returns collections uri instead of path, which may
+        # lead to DLNS.this being printed put.
 
         # TODO: since search-handle and search-collection only slightly differ,
         # build a search call, that's more general and both can use
@@ -63,5 +72,23 @@ class SearchCollection(Interface):
 
         results = metacollection.conjunctive_graph.query(query_string)
 
-        for row in results:
-            print(row)
+        rows = [row.asdict() for row in results]
+        collections = list()
+        locations = list()
+        for row in rows:
+            collections.append(str(row['g']))
+            parsed_uri = urlparse(row['r'])
+            if parsed_uri.scheme == 'file':
+                locations.append(parsed_uri.path)
+            else:
+                locations.append(str(row['r']))
+
+        if collections:
+            width = max(len(c) for c in collections)
+            for c, l in zip(collections, locations):
+                print("%s\t%s" % (c.ljust(width), l))
+
+            return [Collection(CollectionRepoBackend(local_master, col + "/master"))
+                    for col in collections]
+        else:
+            return []
