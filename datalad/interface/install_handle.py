@@ -30,12 +30,19 @@ from ..support.network import get_url_straight_filename
 from ..utils import getpwd, get_url_path
 from .base import Interface
 
+# TODO: Should the URI of the installed handle be corrected to "this" after
+# cloning? Probably depends on decision whether we always want to use "this"
+# instead of a "real" URI.
+
 
 class InstallHandle(Interface):
     """Install a handle.
 
     Installing a handle means to create a local repository clone of the handle
     to be installed. Additionally, that clone is registered with datalad.
+    Installing a handle into an existing directory is not possible, except if
+    a handle with the same name already exists therein. In the latter case,
+    the cloning will be skipped.
 
     Examples:
 
@@ -55,15 +62,29 @@ class InstallHandle(Interface):
                 "directory with the name from the url will be used",
             constraints=EnsureStr() | EnsureNone()),
         name=Parameter(
-            doc="local name of the installed handle",
+            doc="local name of the installed handle. If not provided, the name"
+                "of the installation directory will be used.",
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, handle, path=None, name=None):
         """
+        Examples
+        --------
+        >>> from datalad.api import install_handle, list_handles, whereis
+        >>> def test_install_handle_simple():
+        ...     assert("forrest_gump" not in [h.name for h in list_handles()])
+        ...     handle = install_handle("http://psydata.ovgu.de/forrest_gump/.git")
+        ...     assert(os.path.exists(os.path.join(getpwd(), 'forrest_gump', '.git', 'annex')))
+        ...     assert(handle.name == "forrest_gump")
+        ...     assert(handle.name in [h.name for h in list_handles()])
+        ...     assert(os.path.join(getpwd(), 'forrest_gump') == whereis("forrest_gump"))
+
         Returns
         -------
         Handle
         """
+        # TODO: doctest apparently detected by nose and passed, but doesn't
+        # seem to actually be executed yet.
 
         local_master = get_datalad_master()
 
@@ -189,3 +210,4 @@ class InstallHandle(Interface):
                                                    data=metadata)
 
         return Handle(HandleRepoBackend(installed_handle))
+    
