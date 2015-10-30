@@ -369,6 +369,8 @@ class CustomImporter(MetadataImporter):
 
             for file_ in files:
                 if not isdir(file_):
+                    if not file_.endswith(".ttl"):
+                        continue
                     self._graphs[basename(file_).rstrip('.ttl')] = \
                         Graph().parse(file_, format="turtle")
 

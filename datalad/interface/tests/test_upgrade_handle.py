@@ -23,7 +23,7 @@ from ...tests.utils import ok_startswith
 from ...utils import rmtree
 
 @assert_cwd_unchanged
-@with_testrepos('basic_annex', flavors=['clone'])
+@with_testrepos('.*annex.*', flavors=['clone'])
 def test_upgrade_handle(path):
     upgrade_handle(path)  # shouldn't fail if nothing to upgrade
 
