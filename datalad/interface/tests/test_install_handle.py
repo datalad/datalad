@@ -31,7 +31,7 @@ from ...support.handlerepo import HandleRepo
 @with_testrepos('.*annex.*', flavors=['clone'])  # should work for any annex
 @with_tempfile()
 @with_tempfile(mkdir=True)
-def test_install_handle_basic(handle_url, path, lcpath):
+def test_install_handle_from_url(handle_url, path, lcpath):
 
     class mocked_dirs:
         user_data_dir = lcpath
