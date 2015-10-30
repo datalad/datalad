@@ -20,7 +20,7 @@ from ...utils import swallow_logs
 from ...api import install_handle
 
 from ...support.annexrepo import AnnexRepo
-from ...tests.utils import ok_, eq_
+from ...tests.utils import ok_, eq_, ok_startswith, assert_in
 from ...tests.utils import assert_raises
 from ...tests.utils import with_testrepos
 from ...tests.utils import with_tempfile
@@ -34,6 +34,11 @@ def test_install_handle_basic(handle_url, path, lcpath):
     # TODO: make it saner see https://github.com/datalad/datalad/issues/234
     # apparently can't mock a property
     #with patch('datalad.interface.install_handle.dirs.user_data_dir', lcpath):
+
+    # Docstring verbatim copied from InstallHandle class
+    ok_startswith(install_handle.__doc__, 'Install a handle')
+    assert_in("\nParameters\n-------", install_handle.__doc__)
+    assert_in("\nReturns\n-------\n", install_handle.__doc__)
 
     class mocked_dirs:
         user_data_dir = lcpath
