@@ -21,7 +21,8 @@ from six.moves.urllib.parse import urlparse
 from ...utils import swallow_logs
 from ...api import install_handle, register_collection
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
-    with_testrepos, with_tempfile
+    with_testrepos, with_tempfile, ok_startswith, assert_in, with_testrepos, \
+    with_tempfile
 from ...cmdline.helpers import get_repo_instance, get_datalad_master
 from ...support.handle import Handle
 from ...support.handlerepo import HandleRepo
@@ -32,6 +33,11 @@ from ...support.handlerepo import HandleRepo
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def test_install_handle_from_url(handle_url, path, lcpath):
+
+    # Docstring verbatim copied from InstallHandle class
+    ok_startswith(install_handle.__doc__, 'Install a handle')
+    assert_in("\nParameters\n-------", install_handle.__doc__)
+    assert_in("\nReturns\n-------\n", install_handle.__doc__)
 
     class mocked_dirs:
         user_data_dir = lcpath
