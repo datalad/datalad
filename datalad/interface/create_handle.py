@@ -28,8 +28,9 @@ class CreateHandle(Interface):
     """Create a new handle.
 
     Creates an empty handle repository and registers it with datalad.
-    You can give it name, to be used by datalad to address that handle.
+    You can give it a name to be used by datalad to address that handle.
     Otherwise the base directory's name of the repository is used.
+    Either way, it's not possible to use the same name twice.
 
     Example:
 

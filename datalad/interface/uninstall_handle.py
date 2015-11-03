@@ -46,6 +46,8 @@ class UninstallHandle(Interface):
 
     def __call__(self, handle):
 
+        # TODO: unifying: also accept path to handle
+
         local_master = get_datalad_master()
 
         if handle not in local_master.get_handle_list():

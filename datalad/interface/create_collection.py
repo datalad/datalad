@@ -28,8 +28,9 @@ class CreateCollection(Interface):
     """Create a new collection.
 
     Creates an empty collection repository and registers it with datalad.
-    You can give it name, to be used by datalad to address that collection.
+    You can give it name to be used by datalad to address that collection.
     Otherwise the base directory's name of the repository is used.
+    Either way, it's not possible to use the same name twice.
 
     Example:
 

@@ -13,16 +13,14 @@
 __docformat__ = 'restructuredtext'
 
 import re
-
 from mock import patch
-from nose.tools import assert_is_instance, assert_in
+from nose.tools import assert_is_instance
 from six.moves.urllib.parse import urlparse
 
 from ...utils import swallow_logs
 from ...api import install_handle, register_collection
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
-    with_testrepos, with_tempfile, ok_startswith, assert_in, with_testrepos, \
-    with_tempfile
+    with_testrepos, with_tempfile, ok_startswith, assert_in, ok_clean_git
 from ...cmdline.helpers import get_repo_instance, get_datalad_master
 from ...support.handle import Handle
 from ...support.handlerepo import HandleRepo
@@ -43,12 +41,15 @@ def test_install_handle_from_url(handle_url, path, lcpath):
         user_data_dir = lcpath
 
     with patch('datalad.cmdline.helpers.dirs', mocked_dirs), \
-        swallow_logs() as cml:
+            swallow_logs() as cml:
         return_value = install_handle(handle_url, path)
 
         # get repo to read what was actually installed and raise exceptions,
         # if repo is not a valid handle:
         installed_repo = get_repo_instance(path, HandleRepo)
+
+        # test the repo itself:
+        ok_clean_git(path, annex=True)
 
         # evaluate return value:
         assert_is_instance(return_value, Handle,
@@ -84,7 +85,7 @@ def test_install_handle_from_collection(collection_url, path, lcpath):
         user_data_dir = lcpath
 
     with patch('datalad.cmdline.helpers.dirs', mocked_dirs), \
-        swallow_logs() as cml:
+            swallow_logs() as cml:
         collection = register_collection(collection_url, name="TEST_COLLECTION")
         handle = install_handle("TEST_COLLECTION/BasicHandle", path)
 
@@ -107,3 +108,6 @@ def test_install_handle_from_collection(collection_url, path, lcpath):
         # we should be able to install handle again to the same location
         install_handle("TEST_COLLECTION/BasicHandle", path)
 
+
+
+# TODO: test parameter 'name'

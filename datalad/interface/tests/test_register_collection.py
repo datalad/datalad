@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-import re
 from os.path import basename
 from mock import patch
 from nose.tools import assert_is_instance, assert_in, assert_not_in
@@ -35,7 +34,7 @@ def test_register_collection(collection_url, lcpath):
         user_data_dir = lcpath
     name = basename(collection_url)
     with patch('datalad.cmdline.helpers.dirs', mocked_dirs), \
-        swallow_logs() as cml:
+            swallow_logs() as cml:
         assert_not_in(name, get_datalad_master().git_get_remotes())
 
         return_value = register_collection(collection_url)
@@ -57,3 +56,6 @@ def test_register_collection(collection_url, lcpath):
         new_name = name + "_2"
         register_collection(collection_url, name=new_name)
         assert_in(new_name, get_datalad_master().git_get_remotes())
+
+
+# TODO: register with new name
