@@ -50,11 +50,12 @@ class TestRepo(object):
     def url(self):
         return get_local_file_url(self.path)
 
-    def create_file(self, name, content, annex=False):
+    def create_file(self, name, content, add=True, annex=False):
         filename = pathjoin(self.path, name)
         with open(filename, 'wb') as f:
             f.write(content.encode())
-        (self.repo.annex_add if annex else self.repo.git_add)(name)
+        if add:
+            (self.repo.annex_add if annex else self.repo.git_add)(name)
 
     def create(self):
         if self._created:

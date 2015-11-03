@@ -533,12 +533,4 @@ class GitRepo(object):
     @property
     def dirty(self):
         """Returns true if there is uncommitted changes or files not known to index"""
-        repo = self.repo
-        if not repo.head.is_valid():
-            # if not valid but entries present -- dirty
-            # TODO:  verify this logic more ;)
-            return bool(repo.index.entries)
-        return bool(
-            len(repo.index.diff(repo.head.commit))
-            or len(repo.untracked_files)
-        )
+        return self.repo.is_dirty(untracked_files=True)
