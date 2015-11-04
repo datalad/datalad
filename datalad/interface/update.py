@@ -30,6 +30,10 @@ dirs = AppDirs("datalad", "datalad.org")
 class Update(Interface):
     """Update information from a remote repository.
 
+    Gets information about changes from remote repositories. These are
+    registered collections or the original source repositories of your
+    installed handles, for example.
+
     Examples:
 
     Updating registered collections

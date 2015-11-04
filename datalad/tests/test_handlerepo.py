@@ -33,7 +33,7 @@ from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_HandleRepo(src, dst):
 
@@ -49,7 +49,7 @@ def test_HandleRepo(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_HandleRepo_direct(src, dst):
 
@@ -61,7 +61,7 @@ def test_HandleRepo_direct(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
 def test_Handle_instance_from_existing(path):
 
     raise SkipTest
@@ -94,7 +94,7 @@ def test_HandleRepo_instance_brand_new(path):
 
 
 @ignore_nose_capturing_stdout
-@with_testrepos(flavors=['local', 'network'])
+@with_testrepos('.*handle.*', flavors=['local', 'network'])
 @with_tempfile
 def test_HandleRepo_get(src, dst):
 
@@ -111,7 +111,7 @@ def test_HandleRepo_get(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_HandleRepo_add_to_annex(src, dst):
 
@@ -136,7 +136,7 @@ def test_HandleRepo_add_to_annex(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_HandleRepo_add_to_git(src, dst):
 
@@ -156,7 +156,7 @@ def test_HandleRepo_add_to_git(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_HandleRepo_commit(src, path):
 

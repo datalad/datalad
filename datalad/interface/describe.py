@@ -19,7 +19,9 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
 from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
-from ..support.handlerepo import HandleRepo
+from datalad.support.collection import Collection
+from datalad.support.handle import Handle
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
@@ -33,6 +35,22 @@ dirs = AppDirs("datalad", "datalad.org")
 
 class Describe(Interface):
     """Add metadata to the repository in cwd.
+
+    Allows for adding basic metadata like author, description or license to
+    a collection or handle. It's also possible to attach these metadata
+    properties to different entities than just the repos, which is intended to
+    be used for sub entities in the metadata. In that case the subject to be
+    described has to be identified by its URI, which is used as its reference
+    in the RDF data.
+    This command is for use within a handle's or a collection's repository.
+    It's manipulating the metadata of the repository in the current working
+    directory.
+
+    Examples:
+
+    $ datalad describe --author "Some guy" \
+            --author-email "some.guy@example.com" \
+            --license MIT
     """
     # TODO: A lot of doc ;)
 
@@ -69,7 +87,11 @@ class Describe(Interface):
     def __call__(self, subject=None, author=None, author_orcid=None,
                  author_email=None, author_page=None, license=None,
                  description=None):
-
+        """
+        Returns
+        -------
+        Handle or Collection
+        """
         repo = get_repo_instance()
 
         # TODO: use path constants!
@@ -194,3 +216,8 @@ class Describe(Interface):
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
+
+        if isinstance(repo, CollectionRepo):
+            return Collection(CollectionRepoBackend(repo))
+        elif isinstance(repo, HandleRepo):
+            return Handle(HandleRepoBackend(repo))
