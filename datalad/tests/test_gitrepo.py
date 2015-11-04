@@ -29,7 +29,7 @@ from .utils import swallow_logs
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import assert_re_in
-from .utils_testrepos import BasicTestRepo
+from .utils_testrepos import BasicHandleTestRepo
 
 
 @assert_cwd_unchanged
@@ -413,7 +413,7 @@ def test_GitRepo_get_toppath(repo, tempdir):
     assert_equal(GitRepo.get_toppath(tempdir), None)
 
 def test_GitRepo_dirty():
-    trepo = BasicTestRepo()
+    trepo = BasicHandleTestRepo()
     repo = trepo.repo
     # empty at this point -- should not be dirty as well. TODO
     assert_false(repo.dirty)
