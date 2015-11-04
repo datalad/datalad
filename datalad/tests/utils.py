@@ -412,7 +412,7 @@ from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
     BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo
 
 _TESTREPOS = None
-
+from . import _TEMP_PATHS_GENERATED
 
 def _get_testrepos_uris(regex, flavors):
     global _TESTREPOS

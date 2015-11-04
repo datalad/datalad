@@ -138,6 +138,9 @@ def rmtemp(f, *args, **kwargs):
     environment variable is defined
     """
     if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        if not os.path.lexists(f):
+            lgr.debug("Path %s does not exist, so can't be removed" % f)
+            return
         lgr.log(5, "Removing temp file: %s" % f)
         # Can also be a directory
         if os.path.isdir(f):
@@ -148,7 +151,7 @@ def rmtemp(f, *args, **kwargs):
                     os.unlink(f)
                 except OSError as e:
                     if i < 9:
-                        sleep(0.5)
+                        sleep(0.1)
                         continue
                     else:
                         raise
