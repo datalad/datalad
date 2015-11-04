@@ -218,6 +218,10 @@ class DryRunProtocol(ProtocolInterface):
     def start_section(self, cmd):
         id_ = len(self._sections)
         self._sections.append({'command': cmd})
+        # TODO: it somewhat duplicates how currently all the dry running is
+        # reported... but without it I seems to have no dry run logging at
+        # all for e.g. "datalad crawl" command
+        # lgr.info("DRY: %s" % cmd)
         return id_
 
     def end_section(self, id_, exception):

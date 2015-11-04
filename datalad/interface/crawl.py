@@ -18,6 +18,8 @@ from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
 
+from .. import cfg
+
 class Crawl(Interface):
     """Crawl online resource to create or update a handle.
 
@@ -26,6 +28,11 @@ class Crawl(Interface):
       $ datalad crawl  # within a handle having .datalad/crawl/crawl.cfg
     """
     _params_ = dict(
+        dry_run=Parameter(
+            args=("-n", "--dry-run"),
+            action="store_true",
+            doc="""Flag if file manipulations to be invoked (e.g., adding to git/annex).
+            If not, commands are only printed to the stdout"""),
         config=Parameter(
             metavar='file',
             constraints=EnsureStr() | EnsureNone(),
@@ -33,10 +40,16 @@ class Crawl(Interface):
             'project'"""),
     )
 
-    def __call__(self, config=None):
+    def __call__(self, config=None, dry_run=False):
         from datalad.crawler.pipeline import load_pipeline_from_config, get_pipeline_config_path
         from datalad.crawler.pipeline import run_pipeline
         from datalad.cmdline.helpers import get_repo_instance
+
+        # TODO: centralize via _params_ handling
+        if dry_run:
+            if not 'crawl' in cfg.sections():
+                cfg.add_section('crawl')
+            cfg.set('crawl', 'dryrun', "True")
 
         if config is None:
             # get config from the current repository/handle

@@ -73,10 +73,12 @@ class rename(object):
 
 class assign(object):
     def __init__(self, assignments, interpolate=False):
+        assert(isinstance(assignments, dict))
         self.assignments = assignments
         self.interpolate = interpolate
 
     def __call__(self, data):
+        data = data.copy()  # we need to operate on a copy
         for k, v in self.assignments.items():
             data[k] = v % data if self.interpolate else v
         yield data
@@ -115,6 +117,10 @@ class interrupt_if(object):
         raise FinishPipeline
 
 class range_node(object):
+    """A node yielding incrementing integers in a data field (output by default)
+
+    Primarily for testing
+    """
     def __init__(self, n, output='output'):
         self.n = n
         self.output = output

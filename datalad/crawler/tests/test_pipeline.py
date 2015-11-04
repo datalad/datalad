@@ -17,10 +17,33 @@ from ..nodes.misc import Sink, assign, range_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
 
 from ...tests.utils import eq_, ok_, assert_raises
+from ...tests.utils import assert_in
 from ...tests.utils import skip_if_no_module
 from ...tests.utils import with_tempfile
 from ...tests.utils import skip_if_no_network
 from ...tests.utils import use_cassette
+
+from logging import getLogger
+lgr = getLogger('datalad.crawl.tests')
+
+
+class AssertOrder(object):
+    """Helper to verify that nodes executed in correct order
+
+    Counter _call gets incremented with each invocation of the _call
+    """
+    def __init__(self):
+        self._call = 0
+
+    def __call__(self, numbers):
+        if isinstance(numbers, int):
+            numbers = {numbers}
+        def _assert_order(data):
+            self._call += 1
+            lgr.debug("#%d invocation of %s " % (self._call, self))
+            assert_in(self._call, numbers)
+            yield data
+        return _assert_order
 
 
 @skip_if_no_network
@@ -135,14 +158,36 @@ def test_pipeline_linear_simple():
 def test_pipeline_unknown_opts():
     assert_raises(ValueError, run_pipeline, [{'xxx': 1}])
 
+def test_pipeline_linear_nested_order():
+    sink = Sink()
+    sink2 = Sink()
+    assert_order = AssertOrder()
+
+    pipeline = [
+        assert_order(1),
+        range_node(2, "out1"),
+        assert_order({2, 5}),
+        [
+            assert_order({3, 6}),
+            range_node(3, "out2"),
+            sink,
+        ],
+        assert_order({4, 7}),
+        sink2
+    ]
+    pipeline_output = run_pipeline(pipeline)
+
+
 def test_pipeline_linear_nested():
     sink = Sink()
     sink2 = Sink()
+    assert_order = AssertOrder()
+
     pipeline = [
         range_node(2, "out1"),
         [
             range_node(3, "out2"),
-            sink
+            sink,
         ],
         sink2
     ]

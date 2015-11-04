@@ -19,12 +19,13 @@ in its constructor.
 from os.path import dirname, join as opj, isabs, exists, curdir
 
 from .newmain import lgr
+from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR
 from ..utils import updated
 from ..support.gitrepo import GitRepo
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 # Name of the section in the config file which would define pipeline parameters
-crawler_pipeline_section = 'crawler_pipeline'
+CRAWLER_PIPELINE_SECTION = 'crawler'
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.pipeline')
@@ -55,6 +56,14 @@ def xrun_pipeline(pipeline, data=None):
     """Yield results from the pipeline.
 
     """
+    id_pipeline = "Pipe #%s" % id(pipeline)
+
+    def _log(msg, *args):
+        """Helper for uniform debug messages"""
+        lgr.log(5, "%s: " + msg, id_pipeline, *args)
+
+    _log("%s", pipeline)
+
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
     data = data or {}
@@ -77,29 +86,39 @@ def xrun_pipeline(pipeline, data=None):
     if output not in ('input',  'last-output', 'outputs', 'input+outputs'):
         raise ValueError("Unknown output=%r" % output)
 
-    if ('input' in output) and data:
-        yield data
-
     data_out = None
     while data_to_process:
+        _log("processing data. %d left to go", len(data_to_process)-1)
         data_in = data_to_process.pop(0)
         try:
-            for data_out in xrun_pipeline_steps(pipeline, data_in, output=output):
+            for idata_out, data_out in enumerate(xrun_pipeline_steps(pipeline, data_in, output=output)):
+                _log("got new %dth output", idata_out)
                 if opts['loop']:
+                    _log("extending list of data to process due to loop option")
                     data_to_process.append(data_out)
                 if 'outputs' in output:
+                    _log("yielding output")
                     yield data_out
         except FinishPipeline as e:
             # TODO: decide what we would like to do -- skip that particular pipeline run
             # or all subsequent or may be go back and only skip that generated result
-            lgr.debug("Got a signal that pipeline %s is 'finished'" % pipeline)
+            _log("got a signal that pipeline is 'finished'")
 
     # TODO: this implementation is somewhat bad since all the output logic is
     # duplicated within xrun_pipeline_steps, but it is probably unavoidable because of
     # loop option
     if output == 'last-output':
         if data_out:
+            _log("yielding last-output")
             yield data_out
+
+    # Input should be yielded last since otherwise it might ruin the flow for typical
+    # pipelines which do not expect anything beyond going step by step
+    if ('input' in output) and data:
+        _log("finally yielding input data as instructed")
+        yield data
+
+
 
 
 def xrun_pipeline_steps(pipeline, data, output='input'):
@@ -117,6 +136,7 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
     node, pipeline_tail = pipeline[0], pipeline[1:]
 
     if isinstance(node, (list, tuple)):
+        lgr.debug("Pipe: %s" % str(node))
         # we have got a step which is yet another entire pipeline
         pipeline_gen = xrun_pipeline(node, data)
         if pipeline_gen:
@@ -125,7 +145,7 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
         else:
             # pipeline can return None, and in such a case
             # just do not process its output (which is None)
-            lgr.log(7, "Pipeline %s returned None", node)
+            lgr.log(7, "Pipeline generator %s returned None", node)
             data_in_to_loop = []
     else:  # it is a "node" which should generate (or return) us an iterable to feed
            # its elements into the rest of the pipeline
@@ -136,7 +156,8 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
     for data_ in data_in_to_loop:
         if pipeline_tail:
             # TODO: for heavy debugging we might want to track/report what node has changed in data
-            lgr.log(7, " pass %d keys into tail with %d elements" % (len(data_), len(pipeline_tail)))
+            lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
+            lgr.log(4, " passed keys: %s", data_.keys())
             for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
                 if 'outputs' in output:
                     yield data_out
@@ -147,6 +168,11 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
 
     if output == 'last-output' and data_out:
         yield data_out
+
+def load_template_pipeline(name, **opts):
+
+    mod = __import__('datalad.crawler.pipelines.%s' % name, fromlist=['datalad.crawler.pipelines'])
+    return mod.pipeline(**opts)
 
 
 def load_pipeline_from_template(name, opts={}):
@@ -171,8 +197,7 @@ def load_pipeline_from_template(name, opts={}):
     if not exists(filename):
         raise IOError("Pipeline file %s was not found" % filename)
 
-    mod = __import__('datalad.crawler.pipelines.%s' % name, fromlist=['datalad.crawler.pipelines'])
-    return mod.pipeline(**opts)
+    return load_template_pipeline(name, **opts)
 
 
 def load_pipeline_from_config(path):
@@ -181,26 +206,26 @@ def load_pipeline_from_config(path):
 
     cfg = SafeConfigParserWithIncludes()
     cfg.read([path])
-    if cfg.has_section(crawler_pipeline_section):
-        opts = cfg.options(crawler_pipeline_section)
+    if cfg.has_section(CRAWLER_PIPELINE_SECTION):
+        opts = cfg.options(CRAWLER_PIPELINE_SECTION)
         # must have template
         if 'template' not in opts:
             raise IOError("%s lacks %r field within %s section"
-                          % (path, 'template', crawler_pipeline_section))
+                          % (path, 'template', CRAWLER_PIPELINE_SECTION))
         opts.pop(opts.index('template'))
-        template = cfg.get(crawler_pipeline_section, 'template')
+        template = cfg.get(CRAWLER_PIPELINE_SECTION, 'template')
         pipeline = load_pipeline_from_template(
             template,
-            {o: cfg.get(crawler_pipeline_section, o) for o in opts})
+            {o: cfg.get(CRAWLER_PIPELINE_SECTION, o) for o in opts})
     else:
-        raise IOError("Did not fine %s section within %s" % (crawler_pipeline_section, path))
+        raise IOError("Did not find section %r within %s" % (CRAWLER_PIPELINE_SECTION, path))
     return pipeline
 
 def get_pipeline_config_path(repo_path=curdir):
     """Given a path within a repo, return path to the crawl.cfg"""
-    if not exists(opj(repo_path, '.datalad')):
+    if not exists(opj(repo_path, HANDLE_META_DIR)):
         # we need to figure out top path for the repo
         repo_path = GitRepo.get_toppath(repo_path)
         if not repo_path:
             return None
-    return opj(repo_path, '.datalad', 'crawl', 'crawl.cfg')
+    return opj(repo_path, CRAWLER_META_DIR, 'crawl.cfg')

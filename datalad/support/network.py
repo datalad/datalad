@@ -88,23 +88,36 @@ def get_url_response_stamp(url, response_info):
             response_info['Last-modified']))
     return dict(size=size, mtime=mtime, url=url)
 
-def __download(url, filename=None, filename_only=False):
+def __download_file(url, filename):
     # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
     request = Request(url)
-    request.add_header('Accept-encoding', 'gzip,deflate')
+    #request.add_header('Accept-encoding', 'gzip,deflate')
     r = urlopen(request)
     try:
-        filename = filename or getFileName(url, r)
-        if not filename_only:
-            with open(filename, 'wb') as f:
-                if r.info().get('Content-Encoding') == 'gzip':
-                    buf = StringIO(r.read())
-                    src = gzip.GzipFile(fileobj=buf)
-                else:
-                    src = r
-                shutil.copyfileobj(src, f)
+        with open(filename, 'wb') as f:
+            if False: # r.info().get('Content-Encoding') == 'gzip':
+                buf = StringIO(r.read())
+                src = gzip.GzipFile(fileobj=buf)
+            else:
+                src = r
+            shutil.copyfileobj(src, f)
     finally:
         r.close()
+    return filename
+
+from ..cmd import get_runner
+
+def _download_file(url, filename):
+    """TEMP: use wget to download url into a file"""
+
+    # comment -- it sucks with reporting -- too much or too little.
+    # our magical wrapping experiences problems here
+    get_runner().run(["wget", "-O", filename, url],
+                     log_online=True,  # so we see what is going on
+                     #log_stderr=True, # doesn't work as necessary
+                     expect_stderr=True,
+                     log_stdout=False  # wget produces no stdout and then our beast would halt waiting for it
+                     )
     return filename
 
 def retry_urlopen(url, retries=3):
@@ -560,3 +573,32 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
 
     return repo_filename, downloaded, updated, downloaded_size
 
+
+# TODO should it be a node maybe?
+class SimpleURLStamper(object):
+    """Gets a simple stamp about the URL: {url, time, size} of whatever was provided in the header
+    """
+    def __init__(self, mode='full'):
+        self.mode = mode
+
+    def __call__(self, url):
+        # Extracted from above madness
+        # TODO: add mode alike to 'relaxed' where we would not
+        # care about content-deposition filename
+        # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
+        request = Request(url)
+
+        # No traffic compression since we do not know how to identify
+        # exactly either it has to be decompressed
+        # request.add_header('Accept-encoding', 'gzip,deflate')
+        #
+        # TODO: think about stamping etc -- we seems to be redoing
+        # what git-annex does for us already... not really
+        r = retry_urlopen(request)
+        try:
+            r_info = r.info()
+            r_stamp = get_url_response_stamp(url, r_info)
+
+            return dict(mtime=r_stamp['mtime'], size=r_stamp['size'], url=url)
+        finally:
+            r.close()

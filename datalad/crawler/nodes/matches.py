@@ -63,7 +63,8 @@ class ExtractorMatch(object):
                 if not selectors_dict:
                     continue
                 for key in selectors_dict:
-                    key_extracted = entry_method(selectors_dict[key]).extract()
+                    selector_ = selectors_dict[key]
+                    key_extracted = entry_method(selector_).extract()
                     if not len(key_extracted):
                         # TODO: warning, make mandatory to have a hit if expected?
                         continue
@@ -73,7 +74,7 @@ class ExtractorMatch(object):
                         else:
                             lgr.warn(
                                 "Got multiple selections for xpath query %s. "
-                                "Keeping only the first one: %s" % (repr(query), key_extracted[0]))
+                                "Keeping only the first one: %s" % (repr(selector_), key_extracted[0]))
                     data_[key] = key_extracted[0]
             yield data_
 
@@ -141,6 +142,8 @@ class AExtractorMatch(ExtractorMatch):
             data_['url'] = url
             data_['url_href'] = url_href
             data_['url_text'] = url_e.xpath('text()').extract_first()
+            lgr.log(5, "Matched %(url)s" % data_)
+
             yield url_e, data_
 
 class a_href_match(AExtractorMatch):

@@ -48,27 +48,6 @@ def initiate_handle(directory, template, **params):
 
 
 
-# All below should get under 'pipelines' and properly "instrumented"
-
-def initiate_openfmri_handle(directory, uri):
-    if exists(directory):
-        lgr.info("Skipping %s since already exists" % directory)
-    # TODO:
-
-
-def crawl_openfmri():
-    # TODO: get to 'incoming branch'
-    return [
-        crawl_url("https://openfmri.org/datasets"),
-        a_href_match("(?P<url>.*/dataset/(?P<dataset_dir>ds0*(?P<dataset>[1-9][0-9]*)))$"),
-        initiate_handle(
-                        uri="%{url}s",
-                        directory="openfmri/%{dataset_dir}s",
-                        template="openfmri",
-                        # further any additional options
-                        dataset="%{dataset}s")
-    ]
-
 
 from os.path import curdir
 def crawl_openfmri_dataset(dataset, path=curdir):
@@ -161,13 +140,13 @@ class GenerateRatholeRadioCue(object):
 
 def crawl_ratholeradio():
     annexer = Annexificator(options=["-c", "annex.largefiles='exclude=*.cue and exclude=*.txt'"],
-                                  mode='relaxed')
+                            mode='relaxed')
     # TODO: url = get_crawl_config(directory)
     # TODO: cd directory
     return [
         crawl_url('http://ratholeradio.org'),
         a_href_match('http://ratholeradio\.org/.*/ep(?P<episode>[0-9]*)/'),
-        recurse_crawl(url="%{url}s"),
+        crawl_url.recurse(url="%{url}s"),
         # stop -- how to recurse entirely?...
         page_match('http://ratholeradio\.org/(?P<year>[0-9]*)/(?P<month>[0-9]*)/ep(?P<episode>[0-9]*)/'),
         a_href_match('.*\.ogg', xpaths='TODO'),
