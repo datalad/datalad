@@ -29,6 +29,12 @@ from six.moves.urllib.parse import urlparse
 
 class SearchCollection(Interface):
     """Search for a collection.
+
+    Searches for collections, based on a search string.
+    If a collection's metadata contains a property of that collection, whose
+    value contains the string, the collection is included in the result.
+    This counts for collection level metadata only.
+    It does not involve metadata of handles, contained in a collection.
     """
     # TODO: A lot of doc ;)
 

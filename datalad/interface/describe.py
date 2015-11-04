@@ -93,7 +93,6 @@ class Describe(Interface):
         """
         repo = get_repo_instance()
 
-        # TODO: use path constants!
         if isinstance(repo, CollectionRepo):
             target_class = 'Collection'
             if subject in [repo.name, None]:

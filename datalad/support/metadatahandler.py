@@ -291,20 +291,31 @@ class PlainTextImporter(MetadataImporter):
                 continue
             parts = author.split()
 
+            # TODO: This has to become at least as flexible as api.describe:
             # create author's node:
-            if parts[-1].startswith('<') and parts[-1].endswith('>'):
-                node = URIRef(parts[-1][1:-1])
-                name = Literal(author[0:-len(parts[-1])-1].strip())
-            else:
+            node = None
+            name = None
+            for part in parts:
+                if part.startswith('<') and part.endswith('>'):
+                    if '@' in part:  # rudimentary check for email
+                        node = URIRef("mailto:" + part[1:-1])
+                    else:
+                        node = URIRef(part[1:-1])
+                    name = Literal(author[0:-len(part)-1].strip())
+                    break
+
+            if node is None:
                 node = EMP.__getattr__("author" + str(i))
                 i += 1
+            if name is None:
                 name = Literal(author.strip())
 
             self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
                                                         PROV.Person))
             self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
                                                         FOAF.Person))
-            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, FOAF.name, name))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, FOAF.name,
+                                                        Literal(name)))
 
             # the actual 'authoring' relation:
             self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,

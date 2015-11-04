@@ -31,6 +31,10 @@ from six.moves.urllib.parse import urlparse
 
 class SearchHandle(Interface):
     """Search for a handle.
+
+    Searches for handles, based on a search string.
+    If a handle's metadata contains a property of that handle, whose
+    value contains the string, the handle is included in the result.
     """
     # TODO: A lot of doc ;)
 
@@ -44,7 +48,7 @@ class SearchHandle(Interface):
         """
         Returns
         -------
-        Handle
+        list of Handle
         """
 
         local_master = get_datalad_master()

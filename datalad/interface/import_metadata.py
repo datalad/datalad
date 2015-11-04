@@ -83,7 +83,7 @@ class ImportMetadata(Interface):
                 "level metadata.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, format, path, handle=None, subject=None):
+    def __call__(self, format, path, subject=None, handle=None):
         """
         Returns
         -------

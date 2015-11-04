@@ -67,7 +67,8 @@ def test_install_handle_from_url(handle_url, path, lcpath):
 
         with assert_raises(ValueError) as cm:
             install_handle(handle_url, path, name="some different name")
-        ok_(re.match('Different handle .* is already installed under %s' % path, str(cm.exception)))
+        ok_(re.match('Different handle .* is already installed under %s' % path,
+                     str(cm.exception)))
 
         # We have no check for orin
         with assert_raises(RuntimeError) as cm:
