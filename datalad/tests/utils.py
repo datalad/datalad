@@ -43,6 +43,10 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 
+from . import _TEMP_PATHS_GENERATED
+
+# temp paths used by clones
+_TEMP_PATHS_CLONES = set()
 
 def create_tree_archive(path, name, load, overwrite=False):
     """Given an archive `name`, create under `path` with specified `load` tree
@@ -399,7 +403,7 @@ def clone_url(url):
     runner = Runner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
-    open(opj(tdir, ".git", "remove-me"), "w").write("Please")  # signal for it to be removed after
+    _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
 
@@ -412,7 +416,6 @@ from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
     BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo
 
 _TESTREPOS = None
-
 
 def _get_testrepos_uris(regex, flavors):
     global _TESTREPOS
@@ -515,8 +518,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
-                # ad-hoc but works
-                if exists(uri) and exists(opj(uri, ".git", "remove-me")):
+                if uri in _TEMP_PATHS_CLONES:
+                    _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
                 pass  # might need to provide additional handling so, handle
     return newfunc
