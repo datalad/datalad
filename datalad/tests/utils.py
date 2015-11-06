@@ -332,9 +332,10 @@ def with_tempfile(t, *targs, **tkwargs):
         # dir=... will override this.
         mkdir = tkwargs_.pop('mkdir', False)
 
-
         filename = {False: tempfile.mktemp,
                     True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
+        filename = realpath(filename)
+
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
