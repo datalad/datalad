@@ -25,15 +25,16 @@ from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
+from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
-
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 class SearchHandle(Interface):
     """Search for a handle.
+
+    Searches for handles, based on a search string.
+    If a handle's metadata contains a property of that handle, whose
+    value contains the string, the handle is included in the result.
     """
     # TODO: A lot of doc ;)
 
@@ -47,11 +48,10 @@ class SearchHandle(Interface):
         """
         Returns
         -------
-        Handle
+        list of Handle
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         metacollection = MetaCollection(
             [local_master.get_backend_from_branch(remote + "/master")

@@ -32,10 +32,10 @@ from ..support.metadatahandler import PlainTextImporter, CustomImporter, \
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
-from appdirs import AppDirs
+from datalad.cmdline.helpers import get_datalad_master
+
 from six.moves.urllib.parse import urlparse
 
-dirs = AppDirs("datalad", "datalad.org")
 
 # TODO: Move elsewhere, may be even create it automatically from known
 # importers
@@ -83,7 +83,7 @@ class ImportMetadata(Interface):
                 "level metadata.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, format, path, handle=None, subject=None):
+    def __call__(self, format, path, subject=None, handle=None):
         """
         Returns
         -------
@@ -113,8 +113,7 @@ class ImportMetadata(Interface):
                                                files=path, about_uri=subject)
 
         # Update metadata of local master collection:
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if isinstance(repo, CollectionRepo):
             # update master if it is a registered collection:

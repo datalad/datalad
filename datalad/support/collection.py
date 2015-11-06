@@ -183,6 +183,10 @@ class Collection(dict):
     def name(self):
         return str(self.meta.identifier)
 
+    @property
+    def url(self):
+        return self._backend.url
+
     def __delitem__(self, key):
 
         lgr.error("__delitem__ called.")

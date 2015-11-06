@@ -19,9 +19,7 @@ from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class UnregisterCollection(Interface):
@@ -38,6 +36,5 @@ class UnregisterCollection(Interface):
 
     def __call__(self, name):
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
         local_master.git_remote_remove(name)

@@ -22,9 +22,7 @@ from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
 from ..support.handlerepo import HandleRepo
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class Update(Interface):
@@ -60,8 +58,7 @@ class Update(Interface):
 
         # TODO: use name of local master, instead of --all option!
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if key == curdir:
             try:

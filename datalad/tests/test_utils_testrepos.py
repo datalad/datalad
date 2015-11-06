@@ -12,10 +12,11 @@
 from os.path import join as pathjoin
 
 from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
-    BasicHandleTestRepo, BasicCollectionTestRepo, MetadataPTHandleTestRepo
+    BasicHandleTestRepo, BasicCollectionTestRepo, MetadataPTHandleTestRepo, \
+    CollectionTestRepo
 from ..consts import REPO_STD_META_FILE, REPO_CONFIG_FILE, HANDLE_META_DIR
 from .utils import with_tempfile, assert_true, ok_clean_git, \
-    ok_clean_git_annex_proxy
+    ok_clean_git_annex_proxy, eq_
 from .utils import ok_file_under_git, ok_broken_symlink, ok_good_symlink
 from .utils import swallow_outputs
 from .utils import on_windows
@@ -103,3 +104,17 @@ def test_MetadataPTHandleTestRepo(path):
     ok_file_under_git(trepo.path, 'LICENSE')
     ok_file_under_git(trepo.path, 'AUTHORS')
     ok_file_under_git(trepo.path, 'README')
+
+
+@with_tempfile()
+def test_CollectionTestRepo(path):
+    trepo = CollectionTestRepo(path)
+    trepo.create()
+    ok_clean_git(trepo.path, annex=False)
+    eq_(set(trepo.repo.get_handle_list()), {"BasicHandle", "MetadataHandle"})
+    ok_file_under_git(trepo.path, REPO_STD_META_FILE)
+    ok_file_under_git(trepo.path, REPO_CONFIG_FILE)
+    ok_file_under_git(trepo.path, pathjoin("BasicHandle", REPO_STD_META_FILE))
+    ok_file_under_git(trepo.path, pathjoin("BasicHandle", REPO_CONFIG_FILE))
+    ok_file_under_git(trepo.path, pathjoin("MetadataHandle", REPO_STD_META_FILE))
+    ok_file_under_git(trepo.path, pathjoin("MetadataHandle", REPO_CONFIG_FILE))

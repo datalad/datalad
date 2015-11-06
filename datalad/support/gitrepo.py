@@ -447,15 +447,15 @@ class GitRepo(object):
         """
 
         v = "-v" if verbose else ''
-        self._git_custom_command('', 'git remote %s update %s' %
-                                        (name, v))
+        self._git_custom_command('', 'git remote %s update %s' % (name, v),
+                                 expect_stderr=True)
 
     def git_fetch(self, name, options=''):
         """
         """
 
-        self._git_custom_command('', 'git fetch %s %s' %
-                                        (options, name), expect_stderr=True)
+        self._git_custom_command('', 'git fetch %s %s' % (options, name),
+                                 expect_stderr=True)
 
     def git_get_remote_url(self, name):
         """We need to know, where to clone from, if a remote is
@@ -470,13 +470,15 @@ class GitRepo(object):
         """
         """
 
-        return self._git_custom_command('', 'git pull %s %s' % (options, name))
+        return self._git_custom_command('', 'git pull %s %s' % (options, name),
+                                 expect_stderr=True)
 
     def git_push(self, name='', options=''):
         """
         """
 
-        self._git_custom_command('', 'git push %s %s' % (options, name))
+        self._git_custom_command('', 'git push %s %s' % (options, name),
+                                 expect_stderr=True)
 
     def git_checkout(self, name, options=''):
         """

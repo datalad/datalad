@@ -43,6 +43,11 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 
+from . import _TEMP_PATHS_GENERATED
+
+# temp paths used by clones
+_TEMP_PATHS_CLONES = set()
+
 try:
     # TEMP: Just to overcome problem with testing on jessie with older requests
     # https://github.com/kevin1024/vcrpy/issues/215
@@ -360,9 +365,10 @@ def with_tempfile(t, *targs, **tkwargs):
         # dir=... will override this.
         mkdir = tkwargs_.pop('mkdir', False)
 
-
         filename = {False: tempfile.mktemp,
                     True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
+        filename = realpath(filename)
+
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
@@ -427,7 +433,7 @@ def clone_url(url):
     runner = Runner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
-    open(opj(tdir, ".git", "remove-me"), "w").write("Please")  # signal for it to be removed after
+    _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
 
@@ -437,10 +443,10 @@ else:
     local_testrepo_flavors = ['network-clone']
 
 from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
-    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo
+    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo, \
+    CollectionTestRepo
 
 _TESTREPOS = None
-
 
 def _get_testrepos_uris(regex, flavors):
     global _TESTREPOS
@@ -452,6 +458,7 @@ def _get_testrepos_uris(regex, flavors):
         _basic_collection_test_repo = BasicCollectionTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
         _md_pt_handle_test_repo = MetadataPTHandleTestRepo()
+        _collection_test_repo = CollectionTestRepo()
         _TESTREPOS = {'basic_annex':
                         {'network': 'git://github.com/datalad/testrepo--basic--r1',
                          'local': _basic_annex_test_repo.path,
@@ -467,7 +474,10 @@ def _get_testrepos_uris(regex, flavors):
                          'local-url': _basic_collection_test_repo.url},
                       'meta_pt_annex_handle':
                         {'local': _md_pt_handle_test_repo.path,
-                         'local-url': _md_pt_handle_test_repo.url}}
+                         'local-url': _md_pt_handle_test_repo.url},
+                      'collection':
+                        {'local': _collection_test_repo.path,
+                         'local-url': _collection_test_repo.url}}
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
         if not on_windows:
@@ -476,6 +486,7 @@ def _get_testrepos_uris(regex, flavors):
             _basic_collection_test_repo.create()
             _basic_git_test_repo.create()
             _md_pt_handle_test_repo.create()
+            _collection_test_repo.create()
     uris = []
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
@@ -543,8 +554,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
-                # ad-hoc but works
-                if exists(uri) and exists(opj(uri, ".git", "remove-me")):
+                if uri in _TEMP_PATHS_CLONES:
+                    _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
                 pass  # might need to provide additional handling so, handle
     return newfunc

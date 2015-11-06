@@ -23,14 +23,18 @@ from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
+from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 class SearchCollection(Interface):
     """Search for a collection.
+
+    Searches for collections, based on a search string.
+    If a collection's metadata contains a property of that collection, whose
+    value contains the string, the collection is included in the result.
+    This counts for collection level metadata only.
+    It does not involve metadata of handles, contained in a collection.
     """
     # TODO: A lot of doc ;)
 
@@ -54,8 +58,7 @@ class SearchCollection(Interface):
         # build a search call, that's more general and both can use
         # This one should allow for searching for other entities as well
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         metacollection = MetaCollection(
             [local_master.get_backend_from_branch(remote + "/master")

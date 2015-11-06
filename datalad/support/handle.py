@@ -118,5 +118,5 @@ class Handle(object):
 
     @property
     def name(self):
-        return self.meta.identifier
+        return str(self.meta.identifier)
 

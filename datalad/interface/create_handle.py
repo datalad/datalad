@@ -21,17 +21,16 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo, HandleRepoBackend
 from datalad.support.handle import Handle
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class CreateHandle(Interface):
     """Create a new handle.
 
     Creates an empty handle repository and registers it with datalad.
-    You can give it name, to be used by datalad to address that handle.
+    You can give it a name to be used by datalad to address that handle.
     Otherwise the base directory's name of the repository is used.
+    Either way, it's not possible to use the same name twice.
 
     Example:
 
@@ -57,8 +56,7 @@ class CreateHandle(Interface):
         Handle
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'), create=True)
+        local_master = get_datalad_master()
 
         new_handle = HandleRepo(abspath(expandvars(expanduser(path))),
                                 name=name, create=True)

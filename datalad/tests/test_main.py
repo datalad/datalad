@@ -15,9 +15,11 @@ from os.path import join, exists, lexists, isdir
 from nose.exc import SkipTest
 
 from .utils import eq_, ok_, assert_greater, \
-     with_tree, serve_path_via_http, sorted_files, rmtree, create_tree_archive, \
+     with_tree, serve_path_via_http, sorted_files, create_tree_archive, \
      md5sum, ok_clean_git, ok_file_under_git, get_most_obscure_supported_name, \
-     on_windows
+     on_windows, on_osx
+from ..utils import rmtemp
+
 from ..crawler.oldconfig import EnhancedConfigParser
 from ..crawler.main import DoubleAnnexRepo
 from ..db import load_db
@@ -127,7 +129,7 @@ def check_page2annex_same_incoming_and_public(mode, path, url):
     verify_nothing_was_done(stats2_dry)
     ok_clean_git(dout)
 
-    rmtree(dout, True)
+    rmtemp(dout)
 
 def test_page2annex_same_incoming_and_public():
     for mode in ('download',
@@ -330,8 +332,8 @@ def check_page2annex_separate_public(separate, mode, incoming_destiny, path, url
 
     # TODO: "removal" mode, when files get removed"
 
-    rmtree(dout, True)
-    rmtree(din, True)
+    rmtemp(dout)
+    rmtemp(din)
 
 def test_page2annex_separate_public():
     # separate lines for easy selection for debugging of a particular
@@ -399,5 +401,5 @@ def test_page2annex_recurse(path, url):
         [obscure, '1/1 f.txt', '1/d/1d',     #u'2/юнякод.txt',
                                     '2/d/1d', '2/f/1d', 'test.txt'])
 
-    #rmtree(dout, True)
-    #rmtree(din, True)
+    rmtemp(dout)
+    rmtemp(din)
