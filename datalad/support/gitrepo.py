@@ -260,6 +260,14 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
+    def __eq__(self, obj):
+        """Decides whether or not two instances of this class are equal.
+
+        This is done by comparing the base repository path.
+        """
+        return self.path == obj.path
+
+
     @classmethod
     def get_toppath(cls, path):
         """Return top-level of a repository given the path.

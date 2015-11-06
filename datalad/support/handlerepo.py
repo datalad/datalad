@@ -161,18 +161,6 @@ class HandleRepo(AnnexRepo):
         config_handler.store_data(opj(self.path, HANDLE_META_DIR))
         self.add_to_git(self._cfg_file, commit_msg)
 
-    def __eq__(self, obj):
-        """Decides whether or not two instances of this class are equal.
-
-        This is done by comparing the base repository path.
-        Note: There is a second meaning of 'equal' handles, meaning that
-        they have the same datalad id. However, at the level of instances of
-        this class, 'equal' means, that the both of them are representing the
-        very same repository.
-        """
-        # TODO: Move this to GitRepo, since it is true for all the repositories
-        return self.path == obj.path
-
     # TODO: Consider using preferred label for the name
     def get_name(self):
         return str(self._get_cfg().value(subject=DLNS.this,
