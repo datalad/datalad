@@ -336,9 +336,10 @@ def with_tempfile(t, *targs, **tkwargs):
         # dir=... will override this.
         mkdir = tkwargs_.pop('mkdir', False)
 
-
         filename = {False: tempfile.mktemp,
                     True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
+        filename = realpath(filename)
+
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
@@ -413,7 +414,8 @@ else:
     local_testrepo_flavors = ['network-clone']
 
 from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
-    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo
+    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo, \
+    CollectionTestRepo
 
 _TESTREPOS = None
 
@@ -427,6 +429,7 @@ def _get_testrepos_uris(regex, flavors):
         _basic_collection_test_repo = BasicCollectionTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
         _md_pt_handle_test_repo = MetadataPTHandleTestRepo()
+        _collection_test_repo = CollectionTestRepo()
         _TESTREPOS = {'basic_annex':
                         {'network': 'git://github.com/datalad/testrepo--basic--r1',
                          'local': _basic_annex_test_repo.path,
@@ -442,7 +445,10 @@ def _get_testrepos_uris(regex, flavors):
                          'local-url': _basic_collection_test_repo.url},
                       'meta_pt_annex_handle':
                         {'local': _md_pt_handle_test_repo.path,
-                         'local-url': _md_pt_handle_test_repo.url}}
+                         'local-url': _md_pt_handle_test_repo.url},
+                      'collection':
+                        {'local': _collection_test_repo.path,
+                         'local-url': _collection_test_repo.url}}
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
         if not on_windows:
@@ -451,6 +457,7 @@ def _get_testrepos_uris(regex, flavors):
             _basic_collection_test_repo.create()
             _basic_git_test_repo.create()
             _md_pt_handle_test_repo.create()
+            _collection_test_repo.create()
     uris = []
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):

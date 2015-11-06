@@ -20,10 +20,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoHandleBackend, CollectionRepoBackend
 from datalad.support.handle import Handle
-
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class ListHandles(Interface):
@@ -49,8 +46,7 @@ class ListHandles(Interface):
         list of Handle
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
         handle_list = list()
         if remote:
             for remote_branch in local_master.git_get_remote_branches():

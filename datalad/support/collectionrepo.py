@@ -197,9 +197,10 @@ class CollectionRepoBackend(CollectionBackend):
         col_node = std.value(predicate=RDF.type, object=DLNS.Collection)
         col_name = std.value(subject=col_node, predicate=RDFS.label)
 
-        # additional files in collection's basedir:
+        # additional turtle files in collection's basedir:
         files = [file_ for file_ in self.repo.git_get_files(branch=self.branch)
-                 if file_ == basename(file_) and file_ != REPO_CONFIG_FILE]
+                 if file_ == basename(file_) and file_ != REPO_CONFIG_FILE and
+                 file_.endswith(".ttl")]
 
         out = Graph(identifier=col_name)  # avoid type 'URIRef' or sth.
 

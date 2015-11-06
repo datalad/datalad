@@ -171,18 +171,16 @@ class BasicCollectionTestRepo(BasicGitTestRepo):
     REPO_CLASS = CollectionRepo
 
 
+class CollectionTestRepo(BasicCollectionTestRepo):
+    """Creates a collection repository with two handles."""
 
+    REPO_CLASS = CollectionRepo
 
-# class CollectionTestRepo(BasicCollectionTestRepo):
-#     """Creates a collection repository with two handles."""
-#
-#     REPO_CLASS = CollectionRepo
-#
-#     def populate(self):
-#         super(BasicCollectionTestRepo, self).populate()
-#         basic_handle = BasicHandleTestRepo()
-#         basic_handle.create()
-#         md_handle = MetadataPTHandleTestRepo()
-#         md_handle.create()
-#         self.repo.add_handle(basic_handle, "BasicHandle")
-#         self.repo.add_handle(md_handle, "MetadataHandle")
+    def populate(self):
+        super(CollectionTestRepo, self).populate()
+        basic_handle = BasicHandleTestRepo()
+        basic_handle.create()
+        md_handle = MetadataPTHandleTestRepo()
+        md_handle.create()
+        self.repo.add_handle(basic_handle.repo, "BasicHandle")
+        self.repo.add_handle(md_handle.repo, "MetadataHandle")

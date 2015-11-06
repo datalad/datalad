@@ -27,10 +27,9 @@ from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
-from appdirs import AppDirs
-from six.moves.urllib.parse import urlparse
+from datalad.cmdline.helpers import get_datalad_master
 
-dirs = AppDirs("datalad", "datalad.org")
+from six.moves.urllib.parse import urlparse
 
 
 class Describe(Interface):
@@ -94,7 +93,6 @@ class Describe(Interface):
         """
         repo = get_repo_instance()
 
-        # TODO: use path constants!
         if isinstance(repo, CollectionRepo):
             target_class = 'Collection'
             if subject in [repo.name, None]:
@@ -195,8 +193,7 @@ class Describe(Interface):
             repo.git_commit("Metadata changed.")
 
         # Update metadata of local master collection:
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if isinstance(repo, CollectionRepo):
             # update master if it is a registered collection:

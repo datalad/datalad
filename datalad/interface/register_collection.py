@@ -16,6 +16,7 @@ __docformat__ = 'restructuredtext'
 from os import curdir
 from os.path import join as opj, abspath, expanduser, expandvars, isdir
 import re
+
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
@@ -24,10 +25,7 @@ from datalad.support.collectionrepo import CollectionRepo, \
 from datalad.support.collection import Collection
 from datalad.cmd import CommandError
 from datalad.log import lgr
-
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class RegisterCollection(Interface):
@@ -36,7 +34,9 @@ class RegisterCollection(Interface):
     Registering a remote collection with datalad allows for including their
     metadata in searches, installing handles they contain and so on.
     Once registered you can keep track of the current state of the remote
-    collection.
+    collection by using update.
+    This command tries to auto complete a given url in case it is not pointing
+    directly to a valid git repository.
 
     Example:
         $ datalad register-collection \
@@ -54,14 +54,24 @@ class RegisterCollection(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, url, name=None):
+        # TODO: After publishing new demo collection, adapt doctest
         """
+        Examples
+        --------
+        >>> from datalad.api import register_collection, list_collections
+        >>> def test_register_collection_simple():
+        ...     assert(col.name not in [c.name for c in list_collections()])
+        ...     col =register_collection("http://collections.datalad.org/demo/DATALAD_COL_demo_collection")
+        ...     assert(col.name in [c.name for c in list_collections()])
+        ...     assert(col.url == "http://collections.datalad.org/demo/DATALAD_COL_demo_collection/.git")
+        ...     assert(col.name == "DATALAD_COL_demo_collection")
+
         Returns
         -------
         Collection
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         # check whether url is a local path:
         if isdir(abspath(expandvars(expanduser(url)))):

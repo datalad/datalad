@@ -6,15 +6,9 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""constants for datalad
+"""cmdline tests
+
 """
 
-# file names for metadata of collections and handles:
-REPO_STD_META_FILE = 'datalad.ttl'
-REPO_CONFIG_FILE = 'config.ttl'
+__docformat__ = 'restructuredtext'
 
-# directory containing prepared metadata of a handle repository:
-HANDLE_META_DIR = ".datalad"
-
-# name of local master collection:
-DATALAD_COLLECTION_NAME = "datalad-local"

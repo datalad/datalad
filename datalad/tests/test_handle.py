@@ -51,8 +51,8 @@ def test_Handle_meta(path):
     repo = HandleRepo(path)
     repo_md = repo.get_metadata()
     handle = Handle(HandleRepoBackend(repo))
-    assert_equal(handle.name, URIRef(repo.name))
-    assert_equal(handle.name, handle.meta.identifier)
+    assert_equal(handle.name, repo.name)
+    assert_equal(handle.name, str(handle.meta.identifier))
     [assert_in(triple, handle.meta) for triple in repo_md]
     assert_equal(len(handle.meta), len(repo_md))
     assert_equal(handle.meta.identifier, repo_md.identifier)

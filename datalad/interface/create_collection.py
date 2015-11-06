@@ -21,17 +21,16 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoBackend
 from datalad.support.collection import Collection
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class CreateCollection(Interface):
     """Create a new collection.
 
     Creates an empty collection repository and registers it with datalad.
-    You can give it name, to be used by datalad to address that collection.
+    You can give it name to be used by datalad to address that collection.
     Otherwise the base directory's name of the repository is used.
+    Either way, it's not possible to use the same name twice.
 
     Example:
 
@@ -58,8 +57,8 @@ class CreateCollection(Interface):
         Collection
         """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
+        local_master = get_datalad_master()
+
         # create the collection:
         new_collection = CollectionRepo(abspath(expandvars(expanduser(path))),
                                         name=name, create=True)
