@@ -14,7 +14,7 @@ import os
 from os.path import join as opj, exists, realpath
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_in, assert_false
+    assert_equal, assert_in, assert_false, assert_not_equal
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
 from ..support.gitrepo import GitRepo, normalize_paths, _normalize_path
@@ -29,6 +29,7 @@ from .utils import swallow_logs
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import assert_re_in
+from .utils import ok_
 
 
 @assert_cwd_unchanged
@@ -80,6 +81,19 @@ def test_GitRepo_instance_from_not_existing(path, path2):
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     assert_true(exists(opj(path, '.git')))
     ok_clean_git(path, annex=False)
+
+
+@with_tempfile
+@with_tempfile
+def test_GitRepo_equals(path1, path2):
+
+    repo1 = GitRepo(path1)
+    repo2 = GitRepo(path1)
+    ok_(repo1 == repo2)
+    assert_equal(repo1, repo2)
+    repo2 = GitRepo(path2)
+    assert_not_equal(repo1, repo2)
+    ok_(repo1 != repo2)
 
 
 @assert_cwd_unchanged
