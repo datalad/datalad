@@ -198,19 +198,6 @@ def test_HandleRepo_id(path1, path2):
 
 
 @with_tempfile
-@with_tempfile
-def test_HandleRepo_equals(path1, path2):
-
-    handle1 = HandleRepo(path1)
-    handle2 = HandleRepo(path1)
-    ok_(handle1 == handle2)
-    assert_equal(handle1, handle2)
-    handle2 = HandleRepo(path2)
-    assert_not_equal(handle1, handle2)
-    ok_(handle1 != handle2)
-
-
-@with_tempfile
 def test_HandleRepo_name(path):
     # tests get_name and set_name
     h = HandleRepo(path)
