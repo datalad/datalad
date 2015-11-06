@@ -19,7 +19,8 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
 from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
     CollectionRepoHandleBackend
-from ..support.handlerepo import HandleRepo
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handle import Handle
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
@@ -46,6 +47,11 @@ class UpgradeHandle(Interface):
             action="store_true"))
 
     def __call__(self, handle=curdir, upgrade_data=False):
+        """
+        Returns
+        -------
+        Handle
+        """
 
         local_master = CollectionRepo(opj(dirs.user_data_dir,
                                       'localcollection'))
@@ -82,3 +88,5 @@ class UpgradeHandle(Interface):
         if upgrade_data:
             # upgrade content:
             repo.get(files_to_upgrade)
+
+        return Handle(HandleRepoBackend(repo))

@@ -20,15 +20,13 @@ from ...utils import swallow_logs
 from ...api import install_handle
 
 from ...support.annexrepo import AnnexRepo
-from ...tests.utils import ok_, eq_
-from ...tests.utils import ok_startswith
-from ...tests.utils import assert_in
+from ...tests.utils import ok_, eq_, ok_startswith, assert_in
 from ...tests.utils import assert_raises
 from ...tests.utils import with_testrepos
 from ...tests.utils import with_tempfile
 
 #@assert_cwd_unchanged
-@with_testrepos('basic', flavors=['clone'])
+@with_testrepos('basic_annex', flavors=['clone'])
 @with_tempfile()
 @with_tempfile(mkdir=True)
 def test_install_handle_basic(handle_url, path, lcpath):

@@ -20,12 +20,13 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo, \
     CollectionRepoHandleBackend
+from datalad.support.handle import Handle
 from datalad.support.metadatahandler import CustomImporter
 from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
 
 from appdirs import AppDirs
 
-from ..support.handlerepo import HandleRepo
+from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.network import get_url_straight_filename
 from ..utils import getpwd, get_url_path
 from .base import Interface
@@ -35,6 +36,9 @@ dirs = AppDirs("datalad", "datalad.org")
 
 class InstallHandle(Interface):
     """Install a handle.
+
+    Installing a handle means to create a local repository clone of the handle
+    to be installed. Additionally, that clone is registered with datalad.
 
     Examples:
 
@@ -187,3 +191,5 @@ class InstallHandle(Interface):
             local_master.import_metadata_to_handle(CustomImporter,
                                                    key=local_name,
                                                    data=metadata)
+
+        return Handle(HandleRepoBackend(installed_handle))
