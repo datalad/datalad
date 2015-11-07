@@ -9,7 +9,8 @@
 """Various small nodes
 """
 
-from six import iteritems
+import inspect
+from six import iteritems, string_types
 
 from datalad.support.network import get_url_deposition_filename, get_url_straight_filename
 from datalad.utils import updated
@@ -34,7 +35,7 @@ class Sink(object):
         self.keys = keys
         self.output = output
 
-    def get_fields(self, *keys):
+    def get_values(self, *keys):
         return [[d[k] for k in keys] for d in self.data]
 
     def __call__(self, data):
@@ -53,7 +54,7 @@ class Sink(object):
 
 
 class rename(object):
-    """Rename fields in data for subsequent nodes
+    """Rename some items (i.e. change keys) in data for subsequent nodes
     """
     def __init__(self, mapping):
         """
@@ -72,7 +73,23 @@ class rename(object):
 
 
 class assign(object):
+    """Class node to provide assignment of items in data
+
+    With "interpolate" it allows for
+
+    """
+    # TODO: may be allow values to be a callable taking data in, so almost like
+    # a node, but not yielding and just returning some value based on the data?
     def __init__(self, assignments, interpolate=False):
+        """
+
+        Parameters
+        ----------
+        assignments: dict
+          keys: values pairs
+        interpolate: bool, optional
+          Either interpolate provided values using data
+        """
         assert(isinstance(assignments, dict))
         self.assignments = assignments
         self.interpolate = interpolate
@@ -117,7 +134,7 @@ class interrupt_if(object):
         raise FinishPipeline
 
 class range_node(object):
-    """A node yielding incrementing integers in a data field (output by default)
+    """A node yielding incrementing integers in a data item (output by default)
 
     Primarily for testing
     """
@@ -129,3 +146,69 @@ class range_node(object):
         for i in range(self.n):
             yield updated(data, {self.output: i})
 
+def _string_as_list(x):
+    if isinstance(x, string_types):
+        return [x]
+    return x
+
+def func_to_node(func, args=(), kwargs=(), outputs=()):
+    """Generate a node out of an arbitrary function
+
+    If provided function returns a generator, each item returned separately
+
+    Parameters
+    ----------
+    args: list or tuple, optional
+      Names of keys in data values of which will be given to the func
+    kwargs: list or tuple, optional
+      Names of keys in data which will be given to the func as keyword arguments
+    outputs: str or list or tuple, optional
+      Names of keys to store output of the function in
+    """
+
+    def func_node(data):
+        kwargs_ = {}
+        args_ = []
+        for k in _string_as_list(args):
+            args_.append(data[k])
+        for k in _string_as_list(kwargs):
+            kwargs_[k] = data[k]
+
+        out = func(*args_, **kwargs_)
+
+        if not inspect.isgenerator(out):
+            # for uniform handling below
+            out = [out]
+
+        for return_value in out:
+            if outputs:
+                outputs_ = _string_as_list(outputs)
+                # we need to place it into copy of data
+                data_ = data.copy()
+                if len(outputs_) > 1:
+                    # we were requested to have multiple outputs,
+                    # then function should have provided matching multiple values
+                    assert(len(return_value) == len(outputs_))
+                else:
+                    return_value = [return_value]  # for uniformicity
+
+                for k, v in zip(outputs_, return_value):
+                    data_[k] = v
+                yield data_
+            else:
+                # TODO: does it make sense to yield the same multiple times ever
+                # if we don't modify it???
+                yield data
+
+    in_args = list(_string_as_list(args)) + list(_string_as_list(kwargs))
+    func_node.__doc__ = """Function %s wrapped into a node
+
+It expects %s keys to be provided in the data and output will be assigned to %s
+keys in the output
+""" % (
+        func.__name__ if hasattr(func, '__name__') else '',
+        ', '.join(in_args) if in_args else "no",
+        ', '.join(_string_as_list(outputs)) if outputs else "no"
+    )
+
+    return func_node

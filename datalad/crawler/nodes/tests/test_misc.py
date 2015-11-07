@@ -11,10 +11,14 @@ from six import next
 from ..misc import get_deposition_filename
 from ..misc import range_node
 from ..misc import interrupt_if
+from ..misc import func_to_node
 from ...pipeline import FinishPipeline
 
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
+from datalad.tests.utils import ok_generator
+from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_equal
 
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
@@ -49,3 +53,20 @@ def test_interrupt_if():
     # and that we would interrupt while matching multiple values
     eq_(list(n(tdict)), [tdict])
     assert_raises(FinishPipeline, next, interrupt_if(tdict)(tdict))
+
+def test_func_to_node():
+    int_node = func_to_node(int)  # node which requires nothing and nothing of output is used
+    assert(int_node.__doc__)
+    in_dict = {'in': 1}
+    ok_generator(int_node(in_dict))
+
+    # xrange is not considered to be a generator
+    def xrange_(n):
+        for x in xrange(n):
+            yield x
+
+    xrange_node = func_to_node(xrange_, args='in', outputs='out')
+    assert_in('assigned to out', xrange_node.__doc__)
+    range_node_gen = xrange_node(in_dict)
+    ok_generator(range_node_gen)
+    assert_equal(list(range_node_gen), [{'in': 1, 'out': 0}])
