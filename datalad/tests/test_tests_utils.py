@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from glob import glob
 from os.path import exists, join as opj, basename
 
-from six import PY2
+from six import PY2, PY3
 from six import text_type
 from six.moves.urllib.request import urlopen
 
@@ -34,6 +34,7 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
+from .utils import ok_generator
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
@@ -227,6 +228,23 @@ def test_nok_startswith():
     nok_startswith('abc', 'c')
     assert_raises(AssertionError, nok_startswith, 'abc', 'a')
     assert_raises(AssertionError, nok_startswith, 'abc', 'abc')
+
+def test_ok_generator():
+    def func(a, b=1):
+        return a+b
+    def gen(a, b=1):
+        yield a+b
+    if PY2:
+        # not sure how to determine if xrange is a generator
+        assert_raises(AssertionError, ok_generator, xrange(2))
+        assert_raises(AssertionError, ok_generator, range(2))
+    if PY3:
+        ok_generator(range)
+        assert_raises(AssertionError, ok_generator, range(2))
+    assert_raises(AssertionError, ok_generator, gen)
+    ok_generator(gen(1))
+    assert_raises(AssertionError, ok_generator, func)
+    assert_raises(AssertionError, ok_generator, func(1))
 
 
 def _test_assert_Xwd_unchanged(func):

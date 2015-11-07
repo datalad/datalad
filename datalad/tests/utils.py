@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import inspect
 import shutil
 import stat
 import os
@@ -241,6 +242,8 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+def ok_generator(gen):
+    assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
 
 #
 # Decorators
