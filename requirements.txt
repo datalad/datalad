@@ -11,3 +11,6 @@ appdirs
 # scrapy>=1.0.3
 https://github.com/scrapy/scrapy/archive/master.zip
 vcrpy
+keyring
+boto
+mimetypes
