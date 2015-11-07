@@ -34,13 +34,17 @@ def test_version_url():
 
     eq_(get_versioned_url("someurl"), "someurl")  # should just return original one
     assert_raises(RuntimeError, get_versioned_url, "someurl", guarantee_versioned=True)
+
     # TODO: on a bucket without versioning
+    url = "http://datalad-test0-nonversioned.s3.amazonaws.com/2versions-removed-recreated.txt"
+    eq_(get_versioned_url(url), url)
+    eq_(get_versioned_url(url, return_all=True), [url])
 
     assert_raises(NotImplementedError, get_versioned_url, "s3://buga")
 
-    urls = get_versioned_url("http://datalad-test0.s3.amazonaws.com/2versions-removed-recreated.txt",
+    urls = get_versioned_url("http://datalad-test0-versioned.s3.amazonaws.com/2versions-removed-recreated.txt",
                              return_all=True, verify=True)
     eq_(len(set(urls)), len(urls))  # all unique
     for url in urls:
         # so we didn't grab other files along with the same prefix
-        assert(url.startswith('http://datalad-test0.s3.amazonaws.com/2versions-removed-recreated.txt?versionId='))
+        assert(url.startswith('http://datalad-test0-versioned.s3.amazonaws.com/2versions-removed-recreated.txt?versionId='))

@@ -94,19 +94,24 @@ def set_bucket_public_access_policy(bucket):
       ]
     }""" % bucket.name)
 
-
-def gen_bucket_test0(bucket_name="datalad-test0"):
-
+def gen_test_bucket(bucket_name):
     conn = get_bucket_connection(S3_ADMIN_CREDENTIAL)
     # assure we have none
     try:
         bucket = conn.get_bucket(bucket_name)
         lgr.info("Deleting existing bucket %s" % bucket.name)
         prune_and_delete_bucket(bucket)
+    except:
+        # so nothing to worry about
+        pass
     finally:
         pass
 
-    bucket = conn.create_bucket(bucket_name)
+    return conn.create_bucket(bucket_name)
+
+def _gen_bucket_test0(bucket_name="datalad-test0", versioned=True):
+
+    bucket = gen_test_bucket(bucket_name)
 
     # Enable web access to that bucket to everyone
     bucket.configure_website('index.html')
@@ -117,8 +122,9 @@ def gen_bucket_test0(bucket_name="datalad-test0"):
     files("1version-nonversioned1.txt")
     files("2versions-nonversioned1.txt")
 
-    # make bucket versioned AFTER we uploaded one file already
-    bucket.configure_versioning(True)
+    if versioned:
+        # make bucket versioned AFTER we uploaded one file already
+        bucket.configure_versioning(True)
 
     files("2versions-nonversioned1.txt")
     files("2versions-nonversioned1.txt_sameprefix")
@@ -143,6 +149,11 @@ def gen_bucket_test0(bucket_name="datalad-test0"):
 
     return bucket
 
+def gen_bucket_test0_versioned():
+    return _gen_bucket_test0('datalad-test0-versioned', versioned=True)
+
+def gen_bucket_test0_nonversioned():
+    return _gen_bucket_test0('datalad-test0-nonversioned', versioned=False)
 
 import urllib2
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, urlencode
@@ -241,6 +252,12 @@ if __name__ == '__main__':
     lgr.setLevel(logging.INFO)
     # TODO: proper cmdline
     if len(sys.argv)>1 and sys.argv[1] == "generate":
-        locals()['gen_bucket_%s' % sys.argv[2]]()
+        name = sys.argv[2]
+        if name.lower() == 'all':
+            for f in locals().keys():
+                if f.startswith('gen_bucket_'):
+                    locals()[f]()
+        else:
+            locals()['gen_bucket_%s' % name]()
     else:
         print "nothing todo"
