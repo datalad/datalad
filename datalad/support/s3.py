@@ -224,7 +224,8 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             assert(all_keys[0].is_latest)
             for key in all_keys:
                 version_id = key.version_id
-                query = ((url_rec.query + "&") if url_rec.query else "")                          + "versionId=%s" % version_id
+                query = ((url_rec.query + "&") if url_rec.query else "") \
+                        + "versionId=%s" % version_id
                 url_versioned = urlunparse(url_rec._replace(query=query))
                 all_versions.append(url_versioned)
                 if verify:

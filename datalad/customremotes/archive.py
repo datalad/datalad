@@ -68,6 +68,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
     # could well be class method
     def _parse_url(self, url):
+        assert(url[:len(self.url_prefix)] == self.url_prefix)
         key, file_ = url[len(self.url_prefix):].split('/', 1)
         return key, file_
 
@@ -190,14 +191,14 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # TODO: proxy query to the underlying tarball under annex that if
         # tarball was removed (not available at all) -- report success,
         # otherwise failure (current the only one)
-        key, file = self._get_akey_afile(key)
+        akey, afile = self._get_akey_afile(key)
         if False:
             # TODO: proxy, checking present of local tarball is not sufficient
             #  not exists(self.get_key_path(key)):
-            self.send("REMOVE-SUCCESS", key)
+            self.send("REMOVE-SUCCESS", akey)
         else:
-            self.send("REMOVE-FAILURE", key,
-                      "Cannot remove from the present tarball")
+            self.send("REMOVE-FAILURE", akey,
+                      "Removal from file archives is not supported")
 
     def req_WHEREIS(self, key):
         """
