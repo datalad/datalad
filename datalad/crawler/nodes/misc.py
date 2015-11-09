@@ -151,27 +151,29 @@ def _string_as_list(x):
         return [x]
     return x
 
-def func_to_node(func, args=(), kwargs=(), outputs=()):
+def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=()):
     """Generate a node out of an arbitrary function
 
     If provided function returns a generator, each item returned separately
 
     Parameters
     ----------
-    args: list or tuple, optional
+    data_args: list or tuple, optional
       Names of keys in data values of which will be given to the func
-    kwargs: list or tuple, optional
+    data_kwargs: list or tuple, optional
       Names of keys in data which will be given to the func as keyword arguments
+    kwargs: dict, optional
+      Additional keyword arguments to pass into the function
     outputs: str or list or tuple, optional
       Names of keys to store output of the function in
     """
 
     def func_node(data):
-        kwargs_ = {}
+        kwargs_ = kwargs.copy()
         args_ = []
-        for k in _string_as_list(args):
+        for k in _string_as_list(data_args):
             args_.append(data[k])
-        for k in _string_as_list(kwargs):
+        for k in _string_as_list(data_kwargs):
             kwargs_[k] = data[k]
 
         out = func(*args_, **kwargs_)
@@ -200,15 +202,16 @@ def func_to_node(func, args=(), kwargs=(), outputs=()):
                 # if we don't modify it???
                 yield data
 
-    in_args = list(_string_as_list(args)) + list(_string_as_list(kwargs))
+    in_args = list(_string_as_list(data_args)) + list(_string_as_list(data_kwargs))
     func_node.__doc__ = """Function %s wrapped into a node
 
 It expects %s keys to be provided in the data and output will be assigned to %s
-keys in the output
+keys in the output.%s
 """ % (
         func.__name__ if hasattr(func, '__name__') else '',
         ', '.join(in_args) if in_args else "no",
-        ', '.join(_string_as_list(outputs)) if outputs else "no"
+        ', '.join(_string_as_list(outputs)) if outputs else "no",
+        (' Additional keyword arguments: %s' % kwargs) if kwargs else ""
     )
 
     return func_node

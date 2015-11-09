@@ -19,6 +19,7 @@ from datalad.tests.utils import use_cassette
 from datalad.tests.utils import ok_generator
 from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_false
 
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
@@ -61,12 +62,21 @@ def test_func_to_node():
     ok_generator(int_node(in_dict))
 
     # xrange is not considered to be a generator
-    def xrange_(n):
-        for x in xrange(n):
+    def xrange_(n, offset=0):
+        for x in range(offset, offset+n):
             yield x
 
-    xrange_node = func_to_node(xrange_, args='in', outputs='out')
+    xrange_node = func_to_node(xrange_, data_args='in', outputs='out')
     assert_in('assigned to out', xrange_node.__doc__)
+    assert_false('Additional keyword arguments' in xrange_node.__doc__)
     range_node_gen = xrange_node(in_dict)
     ok_generator(range_node_gen)
     assert_equal(list(range_node_gen), [{'in': 1, 'out': 0}])
+
+    # with additional kwargs
+    xrange_node = func_to_node(xrange_, data_args='in', outputs='out', kwargs={'offset': 10})
+    assert_in('assigned to out', xrange_node.__doc__)
+    assert_in('Additional keyword arguments', xrange_node.__doc__)
+    range_node_gen = xrange_node(in_dict)
+    ok_generator(range_node_gen)
+    assert_equal(list(range_node_gen), [{'in': 1, 'out': 10}])

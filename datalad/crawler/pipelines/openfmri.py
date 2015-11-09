@@ -12,7 +12,9 @@
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
+from ..nodes.misc import func_to_node
 from ..nodes.annex import Annexificator
+from ...support.s3 import get_versioned_url
 from ...utils import updated
 
 # Possibly instantiate a logger if you would like to log
@@ -38,8 +40,12 @@ def pipeline(dataset):
     return [
         annex.switch_branch('incoming'),
         crawl_url(dataset_url),
+        # TODO: needs fixing of the openfmri bucket
+        # email sent out
+        #func_to_node(get_versioned_url, kwargs={'guarantee_versioned': True,
+        #                                        'verify': True})
         [  # changelog
-           a_href_match(".*release_history.txt"), # , limit=1
+           a_href_match(".*release_history.txt"),  # , limit=1
            assign({'filename': 'changelog.txt'}),
            annex,
         ],

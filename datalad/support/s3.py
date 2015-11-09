@@ -20,7 +20,7 @@ from os.path import splitext
 
 import keyring
 import logging
-import datalad.log
+import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
 
 # TODO: should become a config option and managed along with the rest
@@ -155,7 +155,7 @@ def gen_bucket_test0_versioned():
 def gen_bucket_test0_nonversioned():
     return _gen_bucket_test0('datalad-test0-nonversioned', versioned=False)
 
-import urllib2
+from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, urlencode
 
 def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=False,
@@ -229,7 +229,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
                 all_versions.append(url_versioned)
                 if verify:
                     # it would throw HTTPError exception if not accessible
-                    _ = urllib2.urlopen(urllib2.Request(url))
+                    _ = urlopen(Request(url))
                 was_versioned = True
                 if not return_all:
                     break
@@ -260,4 +260,4 @@ if __name__ == '__main__':
         else:
             locals()['gen_bucket_%s' % name]()
     else:
-        print "nothing todo"
+        print("nothing todo")

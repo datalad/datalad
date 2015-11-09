@@ -22,6 +22,7 @@ from .utils import use_cassette
 @use_cassette('fixtures/vcr_cassettes/s3_test0.yaml')
 def test_version_url():
     if not keyring.get_password(S3_TEST_CREDENTIAL, 'secret_id'):
+        # will skip under tox as well -- some environ variable(s) must be passed
         raise SkipTest("Do not have access to S3 key/secret.  Test skipped")
     eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz"),
         "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?versionId=null")

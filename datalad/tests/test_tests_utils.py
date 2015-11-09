@@ -234,13 +234,10 @@ def test_ok_generator():
         return a+b
     def gen(a, b=1):
         yield a+b
+    # not sure how to determine if xrange is a generator
     if PY2:
-        # not sure how to determine if xrange is a generator
         assert_raises(AssertionError, ok_generator, xrange(2))
-        assert_raises(AssertionError, ok_generator, range(2))
-    if PY3:
-        ok_generator(range)
-        assert_raises(AssertionError, ok_generator, range(2))
+    assert_raises(AssertionError, ok_generator, range(2))
     assert_raises(AssertionError, ok_generator, gen)
     ok_generator(gen(1))
     assert_raises(AssertionError, ok_generator, func)
