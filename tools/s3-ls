@@ -8,6 +8,8 @@ from boto.s3.key import Key
 from boto.exception import S3ResponseError
 from ConfigParser import SafeConfigParser
 
+from six.moves.urllib.request import urlopen, Request
+from six.moves.urllib.error import HTTPError
 
 #bucket_prefix = 'datalad-test0-versioned/3versions-allversioned.txt'
 #bucket_prefix = 'openfmri/ds001/demographics.txt'
@@ -32,18 +34,23 @@ bucket_name, prefix = bucket_prefix.split('/', 1)
 print("Connecting to bucket: %s" % bucket_name)
 
 bucket = conn.get_bucket(bucket_name)
-prefix_all_versions = bucket.list_versions(prefix)
+prefix_all_versions = list(bucket.list_versions(prefix))
 
-e = list(prefix_all_versions)[0]
-
+max_length = max((len(e.name) for e in prefix_all_versions))
 for e in prefix_all_versions:
-    print("%s %40s" % (e.last_modified, e.name), end=' ')
+    print(("%%%ds %%s" % max_length) % (e.name, e.last_modified), end=' ')
     if isinstance(e, Key):
+        url = "http://{e.bucket.name}.s3.amazonaws.com/{e.name}?versionId={e.version_id}".format(e=e)
+        try:
+            _ = urlopen(Request(url))
+            urlok = "OK"
+        except HTTPError as err:
+            urlok = "E: %s" % err.code
         try:
             acl = e.get_acl()
         except S3ResponseError as err:
             acl = err.message
-        print("ver:%32s acl:%s" % (e.version_id, acl))
+        print("ver:%32s acl:%s url: %s [%s]" % (e.version_id, acl, url, urlok))
     else:
         print("del")
 
