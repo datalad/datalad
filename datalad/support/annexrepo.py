@@ -330,7 +330,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('add', annex_options=options + files,
                                 backend=backend)
 
-    def annex_proxy(self, git_cmd):
+    def annex_proxy(self, git_cmd, **kwargs):
         """Use git-annex as a proxy to git
 
         This is needed in case we are in direct mode, since there's no git
@@ -340,6 +340,8 @@ class AnnexRepo(GitRepo):
         ----------
         git_cmd: str
             the actual git command
+        **kwargs: dict, optional
+            passed to _run_annex_command
 
         Returns
         -------
@@ -362,7 +364,8 @@ class AnnexRepo(GitRepo):
                                        annex_options=['--'] +
                                                      shlex.split(
                                                          git_cmd,
-                                                         posix=not on_windows))
+                                                         posix=not on_windows),
+                                       **kwargs)
 
     @normalize_path
     def get_file_key(self, file_):
@@ -459,7 +462,7 @@ class AnnexRepo(GitRepo):
 
         if self.is_direct_mode():
             cmd_list = ['git', '-c', 'core.bare=false', 'add'] + files
-            self.cmd_call_wrapper.run(cmd_list)
+            self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
             # TODO: use options with git_add instead!
         else:
             self.git_add(files)
