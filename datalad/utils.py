@@ -194,7 +194,7 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
     # operate on a copy of tkwargs to avoid any side-effects

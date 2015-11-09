@@ -11,13 +11,16 @@
 """
 
 from distutils.version import StrictVersion
+import hashlib
 import patoolib
 # There were issues, so let's stay consistently with recent version
 assert(StrictVersion(patoolib.__version__) >= "1.7")
 
 import os
-from os.path import join as opj, exists
+import tempfile
+from os.path import join as opj, exists, abspath, basename
 from six import next
+from six.moves.urllib.parse import unquote as urlunquote
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -47,7 +50,12 @@ import patoolib.util
 # And I don't want to mock for every invocation
 from ..support.exceptions import CommandError
 from ..utils import swallow_outputs
+from ..utils import rmtemp
 from ..cmd import Runner
+from ..consts import ARCHIVES_TEMP_DIR
+from ..utils import rotree, rmtree
+from ..utils import get_tempfile_kwargs
+
 _runner = Runner()
 
 def _patool_run(cmd, verbosity=0, **kwargs):
@@ -181,3 +189,148 @@ def compress_files(files, archive, path=None, overwrite=True):
             lgr.debug("patool gave stdout:\n%s" % cmo.out)
         if cmo.err:
             lgr.debug("patool gave stderr:\n%s" % cmo.err)
+
+
+def _get_cached_filename(archive):
+    """A helper to generate a filename which has original filename and additional suffix
+    which wouldn't collide across files with the same name from different locations
+    """
+    return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
+
+
+class ArchivesCache(object):
+    """Cache to maintain extracted archives
+
+    Parameters
+    ----------
+    path : str
+      Directory where to keep the cache
+    """
+    # TODO: make caching persistent across sessions/runs, with cleanup
+    # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
+    #       all up
+    def __init__(self, toppath=None):
+
+        if toppath:
+            path = opj(toppath, ARCHIVES_TEMP_DIR)
+        else:
+            path = tempfile.mktemp(**get_tempfile_kwargs())
+        self._path = path
+        # TODO?  assure that it is absent or we should allow for it to persist a bit?
+        #if exists(path):
+        #    self._clean_cache()
+        self._archives = {}
+
+        lgr.debug("Initiating clean cache for the archives under %s" % self.path)
+
+        if not exists(path):
+            try:
+                self._made_path = True
+                os.makedirs(path)
+                lgr.info("Cache initialized")
+            except:
+                lgr.error("Failed to initialize cached under %s" % path)
+                raise
+        else:
+            self._made_path = False
+
+    @property
+    def path(self):
+        return self._path
+
+    def clean(self):
+        for aname, a in self._archives.items():
+            a.clean()
+            del self._archives[aname]
+        if self._made_path:
+            rmtemp(self.path)
+
+    def get_archive(self, archive):
+        if archive not in self._archives:
+            self._archives[archive] = \
+                ExtractedArchive(archive, opj(self.path, "%s_datalad" % _get_cached_filename(archive)))
+        return self._archives[archive]
+
+    def __getitem__(self, archive):
+        return self.get_archive(archive)
+
+
+class ExtractedArchive(object):
+    """Container for the extracted archive
+    """
+    def __init__(self, archive, path=None):
+        self._archive = archive
+        # TODO: bad location for extracted archive -- use tempfile
+        if not path:
+            path = tempfile.mktemp(**get_tempfile_kwargs(prefix=_get_cached_filename(archive)))
+        self._path = path
+
+    def __repr__(self):
+        return "%s(%r, path=%r)" % (self.__class__.__name__, self._archive, self.path)
+
+    def clean(self):
+        if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+            lgr.info("As instructed, not cleaning up the cache under %s"
+                     % self._path)
+            return
+        lgr.debug("Cleaning up the cache")
+        if exists(self._path):
+            # TODO:  we must be careful here -- to not modify permissions of files
+            #        only of directories
+            rmtree(self._path)
+
+    @property
+    def path(self):
+        """Given an archive -- return full path to it within cache (extracted)
+        """
+        return self._path
+
+    def _assure_extracted(self):
+        """Return path to the extracted `archive`.  Extract archive if necessary
+        """
+        path = self.path
+        if not exists(path):
+            # we need to extract the archive
+            # TODO: extract to _tmp and then move in a single command so we
+            # don't end up picking up broken pieces
+            lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
+            os.makedirs(path)
+            assert(exists(path))
+
+            decompress_file(self._archive, path, leading_directories=None)
+
+            lgr.debug("Adjusting permissions to R/O for the extracted content")
+            rotree(path)
+            assert(exists(path))
+        return path
+
+    # TODO: remove?
+    #def has_file_ready(self, afile):
+    #    lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
+    #    return exists(self.get_extracted_filename(afile))
+
+    def get_extracted_filename(self, afile):
+        """Return full path to the `afile` within extracted `archive`
+
+        It does not actually extract any archive
+        """
+        return opj(self.path, urlunquote(afile))
+
+    def get_extracted_file(self, afile):
+        lgr.debug("Requested file {afile} from archive {self._archive}".format(**locals()))
+        # TODO: That could be a good place to provide "compatibility" layer if
+        # filenames within archive are too obscure for local file system.
+        # We could somehow adjust them while extracting and here channel back
+        # "fixed" up names since they are only to point to the load
+        self._assure_extracted()
+        path = self.get_extracted_filename(afile)
+        # TODO: make robust
+        lgr.log(1, "Verifying that %s exists" % abspath(path))
+        assert exists(path), "%s must exist" % path
+        return path
+
+    # TODO -- inject cleanup upon destroy
+    # def __del__(self):
+    #    self._clean_cache()
+
+

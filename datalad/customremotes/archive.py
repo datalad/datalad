@@ -18,105 +18,10 @@ from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 
-
 from ..cmd import link_file_load, Runner
-from ..utils import rotree, rmtree
 from ..support.exceptions import CommandError
-from ..support.archives import decompress_file
-
+from ..support.archives import ArchivesCache
 from .base import AnnexCustomRemote
-
-class AnnexArchiveCache(object):
-    """Cache to maintain extracted archives
-
-    Parameters
-    ----------
-    path : str
-      Directory where to keep the cache
-    """
-    # TODO: make caching persistent across sessions/runs, with cleanup
-    # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
-    #       all up
-    def __init__(self, path):
-        #if exists(path):
-        #    self._clean_cache()
-
-        self._path = path
-
-        lgr.debug("Initiating clean cache under %s" % self.path)
-
-        if not exists(path):
-            try:
-                os.makedirs(path)
-                lgr.info("Cache initialized")
-            except:
-                lgr.error("Failed to initialize cached under %s"
-                           % (self.path))
-                raise
-
-    @property
-    def path(self):
-        return self._path
-
-    def clean(self):
-        if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-            lgr.info("As instructed, not cleaning up the cache under %s"
-                     % self.path)
-            return
-        lgr.debug("Cleaning up the cache")
-        if exists(self._path):
-            # TODO:  we must be careful here -- to not modify permissions of files
-            #        only of directories
-            rmtree(self._path)
-
-    def get_extracted_path(self, archive):
-        """Given an archive -- return full path to it within cache (extracted)
-        """
-        return opj(self._path, "%s_" % basename(archive))
-
-    def get_file_path(self, archive, afile):
-        """Return full path to the `afile` within extracted `archive`"""
-        return opj(self.get_extracted_path(archive), afile)
-
-    # TODO: remove?
-    def has_file_ready(self, archive, afile):
-        lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
-        return exists(self.get_file_path(archive, afile))
-
-    def get_extracted_archive(self, archive):
-        """Return path to the extracted `archive`.  Extract archive if necessary
-        """
-        earchive = self.get_extracted_path(archive)
-        if not exists(earchive):
-            # we need to extract the archive
-            # TODO: extract to _tmp and then move in a single command so we
-            # don't end up picking up broken pieces
-            lgr.debug("Extracting {archive} under {earchive}".format(**locals()))
-            os.makedirs(earchive)
-            assert(exists(earchive))
-
-            decompress_file(archive, earchive, leading_directories=None)
-
-            lgr.debug("Adjusting permissions to R/O for the extracted content")
-            rotree(earchive)
-            assert(exists(earchive))
-        return earchive
-
-    def get_extracted_file(self, archive, afile):
-        lgr.debug("Requested file {afile} from archive {archive}".format(**locals()))
-        # TODO: That could be a good place to provide "compatibility" layer if
-        # filenames within archive are too obscure for local file system.
-        # We could somehow adjust them while extracting and here channel back
-        # "fixed" up names since they are only to point to the load
-        path = opj(self.get_extracted_archive(archive), urlunquote(afile))
-        # TODO: make robust
-        lgr.log(1, "Verifying that %s exists" % abspath(path))
-        assert exists(path), "%s must exist" % path
-        return path
-
-    # TODO -- inject cleanup upon destroy
-    # def __del__(self):
-    #    self._clean_cache()
 
 
 class AnnexArchiveCustomRemote(AnnexCustomRemote):
@@ -135,14 +40,11 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # heuristic let's use the most recently asked one
 
         self._last_url = None  # for heuristic to choose among multiple URLs
-        self._cache_dir = opj(self.path, '.git', 'datalad', 'tmp', 'archives')
-        self._cache = None
+        self._cache = ArchivesCache(self.path)
 
     def stop(self, *args):
         """Stop communication with annex"""
-        if self._cache:
-            self._cache.clean()
-            self._cache = None
+        self._cache.clean()
         super(AnnexArchiveCustomRemote, self).stop(*args)
 
     # Should it become a class method really?
@@ -162,8 +64,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
     @property
     def cache(self):
-        if self._cache is None:
-            self._cache = AnnexArchiveCache(self._cache_dir)
         return self._cache
 
     # could well be class method
@@ -231,8 +131,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         akey, afile = self._parse_url(url)
 
         # if for testing we want to force getting the archive extracted
-        # _ = self.cache.get_extracted_archive(self._get_key_path(akey)) # TEMP
-        efile = self.cache.get_file_path(akey, afile)
+        # _ = self.cache._assure_extracted(self._get_key_path(akey)) # TEMP
+        efile = self.cache[akey].get_extracted_filename(afile)
         if exists(efile):
             size = os.stat(efile).st_size
         else:
@@ -345,7 +245,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  actually patool doesn't support extraction of a single file
         #  https://github.com/wummel/patool/issues/20
         # so
-        apath = self.cache.get_extracted_file(akey_path, afile)
+        apath = self.cache[akey_path].get_extracted_file(afile)
         link_file_load(apath, path)
         self.send('TRANSFER-SUCCESS', cmd, key)
 

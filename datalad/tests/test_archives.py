@@ -8,10 +8,12 @@ from .utils import assert_true, assert_false, eq_, \
     with_tree, with_tempfile, swallow_outputs, on_windows
 
 from ..support.archives import decompress_file, compress_files, unixify_path
+from ..support.archives import ExtractedArchive, ArchivesCache
 
 from .utils import get_most_obscure_supported_name, assert_raises
+from .utils import assert_in
 
-fn_in_archive_obscure = get_most_obscure_supported_name()
+fn_in_archive_obscure = "abc" # get_most_obscure_supported_name()
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
 fn_archive_obscure_ext = fn_archive_obscure + '.tar.gz'
 
@@ -87,3 +89,40 @@ def test_compress_file():
     yield check_compress_file, '.tar.gz'
     yield check_compress_file, '.tar'
     # yield check_compress_file, '.zip'
+
+@with_tree(**tree_simplearchive)
+def test_ExtractedArchive(path):
+    archive = opj(path, fn_archive_obscure_ext)
+    earchive = ExtractedArchive(archive)
+    assert_false(exists(earchive.path))
+    assert_in(os.path.basename(archive), earchive.path)
+
+    fpath = opj(fn_archive_obscure,  # lead directory
+                fn_in_archive_obscure)
+    extracted = earchive.get_extracted_filename(fpath)
+    eq_(extracted, opj(earchive.path, fpath))
+    assert_false(exists(extracted))  # not yet
+
+    extracted_ = earchive.get_extracted_file(fpath)
+    eq_(extracted, extracted_)
+    assert_true(exists(extracted))  # now it should
+
+    earchive.clean()
+    if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        assert_false(exists(earchive.path))
+
+#@with_tree(**tree_simplearchive)
+#@with_tree(**tree_simplearchive)
+def test_ArchivesCache():
+    # we don't actually need to test archives handling itself
+    path1 = "/zuba/duba"
+    path2 = "/zuba/duba2"
+    cache = ArchivesCache()
+    archive1_path = opj(path1, fn_archive_obscure_ext)
+    archive2_path = opj(path2, fn_archive_obscure_ext)
+    cached_archive1_path = cache[archive1_path].path
+    assert_false(cache[archive1_path].path == cache[archive2_path].path)
+    assert_true(cache[archive1_path] is cache[archive1_path])
+    cache.clean()
+    assert_false(exists(cached_archive1_path))
+    assert_false(exists(cache.path))
