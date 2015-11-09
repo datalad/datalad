@@ -34,11 +34,25 @@ bucket_name, prefix = bucket_prefix.split('/', 1)
 print("Connecting to bucket: %s" % bucket_name)
 
 bucket = conn.get_bucket(bucket_name)
+
+info = []
+for iname, imeth in [
+    ("Versioning", bucket.get_versioning_status),
+    ("   Website", bucket.get_website_endpoint),
+    ("       ACL", bucket.get_acl),
+]:
+    try:
+        ival = imeth()
+    except:
+        ival = "N/A"
+    info.append(" {iname}: {ival}".format(**locals()))
+print("Bucket info:\n %s" % '\n '.join(info))
+
 prefix_all_versions = list(bucket.list_versions(prefix))
 
 max_length = max((len(e.name) for e in prefix_all_versions))
 for e in prefix_all_versions:
-    print(("%%%ds %%s" % max_length) % (e.name, e.last_modified), end=' ')
+    print(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), end=' ')
     if isinstance(e, Key):
         url = "http://{e.bucket.name}.s3.amazonaws.com/{e.name}?versionId={e.version_id}".format(e=e)
         try:
@@ -50,7 +64,7 @@ for e in prefix_all_versions:
             acl = e.get_acl()
         except S3ResponseError as err:
             acl = err.message
-        print("ver:%32s acl:%s url: %s [%s]" % (e.version_id, acl, url, urlok))
+        print("ver:%-32s  acl:%s  %s [%s]" % (e.version_id, acl, url, urlok))
     else:
         print("del")
 
