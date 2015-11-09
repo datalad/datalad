@@ -1,0 +1,49 @@
+#!/usr/bin/python
+# coding: utf-8
+
+from __future__ import print_function
+import sys
+import boto
+from boto.s3.key import Key
+from boto.exception import S3ResponseError
+from ConfigParser import SafeConfigParser
+
+
+#bucket_prefix = 'datalad-test0-versioned/3versions-allversioned.txt'
+#bucket_prefix = 'openfmri/ds001/demographics.txt'
+#config_file = '/home/yoh/.s3cfg-datalad'
+
+if len(sys.argv) != 3:
+    sys.stderr.write("Format: %s s3cmd-config-file bucket/prefix" % sys.argv[0])
+
+config_file, bucket_prefix = sys.argv[1:3]
+
+if bucket_prefix.startswith('s3://'):
+    bucket_prefix = bucket_prefix[5:]
+
+config = SafeConfigParser(); config.read(config_file)
+
+access_key = config.get('default', 'access_key')
+secret_key = config.get('default', 'secret_key')
+
+
+conn = boto.connect_s3(access_key, secret_key)
+bucket_name, prefix = bucket_prefix.split('/', 1)
+print("Connecting to bucket: %s" % bucket_name)
+
+bucket = conn.get_bucket(bucket_name)
+prefix_all_versions = bucket.list_versions(prefix)
+
+e = list(prefix_all_versions)[0]
+
+for e in prefix_all_versions:
+    print("%s %40s" % (e.last_modified, e.name), end=' ')
+    if isinstance(e, Key):
+        try:
+            acl = e.get_acl()
+        except S3ResponseError as err:
+            acl = err.message
+        print("ver:%32s acl:%s" % (e.version_id, acl))
+    else:
+        print("del")
+
