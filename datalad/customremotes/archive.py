@@ -24,6 +24,8 @@ from ..support.archives import ArchivesCache
 from .base import AnnexCustomRemote
 
 
+# TODO: RF functionality not specific to being a custom remote (loop etc)
+#       into a separate class
 class AnnexArchiveCustomRemote(AnnexCustomRemote):
     """Special custom remote allowing to obtain files from archives
 
@@ -47,8 +49,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         self._cache.clean()
         super(AnnexArchiveCustomRemote, self).stop(*args)
 
-    # Should it become a class method really?
-    # @classmethod
     def get_file_url(self, archive_file=None, archive_key=None, file=None):
         """Given archive (file or a key) and a file -- compose URL for access
         """
@@ -56,8 +56,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         if archive_file is not None:
             if archive_key is not None:
                 raise ValueError("Provide archive_file or archive_key - not both")
-            archive_key = self._get_file_key(archive_file)
-        # todo (out, err) = annex('lookupkey a.tar.gz')
+            archive_key = self.repo.get_file_key(archive_file)
         assert(archive_key is not None)
         file_quoted = urlquote(file)
         return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
@@ -66,7 +65,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def cache(self):
         return self._cache
 
-    # could well be class method
     def _parse_url(self, url):
         assert(url[:len(self.url_prefix)] == self.url_prefix)
         key, file_ = url[len(self.url_prefix):].split('/', 1)
@@ -132,7 +130,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         akey, afile = self._parse_url(url)
 
         # if for testing we want to force getting the archive extracted
-        # _ = self.cache._assure_extracted(self._get_key_path(akey)) # TEMP
+        # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
         efile = self.cache[akey].get_extracted_filename(afile)
         if exists(efile):
             size = os.stat(efile).st_size
@@ -140,11 +138,14 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             size = 'UNKNOWN'
 
         # But reply that present only if archive is present
-        if exists(self._get_key_path(akey)):
+        # TODO: this would throw exception if not present, so this statement is kinda bogus
+        try:
+            # throws exception if not present
+            akey_rpath = self.repo.get_contentlocation(akey)
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
             self.send("CHECKURL-CONTENTS", size)#, basename(afile))
-        else:
+        except CommandError:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
@@ -173,9 +174,10 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
         akey, afile = self._get_akey_afile(key)
-        if exists(self._get_key_path(akey)):
+        try:
+            self.repo.get_contentlocation(akey)
             self.send("CHECKPRESENT-SUCCESS", key)
-        else:
+        except CommandError:
             # TODO: proxy the same to annex itself to verify check for archive.
             # If archive is no longer available -- then CHECKPRESENT-FAILURE
             self.send("CHECKPRESENT-UNKNOWN", key)
@@ -226,7 +228,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
         akey, afile = self._get_akey_afile(key)
         try:
-            akey_path = self._get_key_path(akey)
+            akey_path = self.repo.get_contentlocation(akey)
         except CommandError:
             # TODO: make it more stringent?
             # Command could have fail to run if key was not present locally yet
@@ -234,7 +236,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             try:
                 self.runner(["git-annex", "get", "--key", akey],
                             cwd=self.path)
-                akey_path = self._get_key_path(akey)
+                akey_path = self.repo.get_contentlocation(akey)
                 assert(exists(akey_path))
             except Exception as e:
                 self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"

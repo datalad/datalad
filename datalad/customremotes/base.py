@@ -21,6 +21,8 @@ from six.moves import range
 
 from ..cmd import Runner
 from ..support.protocol import ProtocolInterface
+from ..support.annexrepo import AnnexRepo
+from ..cmdline.helpers import get_repo_instance
 
 import logging
 
@@ -166,7 +168,7 @@ class AnnexCustomRemote(object):
 
     AVAILABILITY = DEFAULT_AVAILABILITY
 
-    def __init__(self, path='.', cost=DEFAULT_COST): # , availability=DEFAULT_AVAILABILITY):
+    def __init__(self, path=None, cost=DEFAULT_COST): # , availability=DEFAULT_AVAILABILITY):
         """
         Parameters
         ----------
@@ -184,9 +186,13 @@ class AnnexCustomRemote(object):
         self.fin = sys.stdin
         self.fout = sys.stdout
 
-        self.path = path
+        self.repo = get_repo_instance(class_=AnnexRepo) \
+            if not path \
+            else AnnexRepo(path, create=False, init=False)
 
-        self._progress = 0 # transmission to be reported back if available
+        self.path = self.repo.path
+
+        self._progress = 0  # transmission to be reported back if available
         self.cost = cost
         #self.availability = availability.upper()
         assert(self.AVAILABILITY.upper() in ("LOCAL", "GLOBAL"))
@@ -498,18 +504,10 @@ class AnnexCustomRemote(object):
             else:
                 break
         urls_ = [u for u in urls
-                if u.startswith(self.url_prefix)]
+                 if u.startswith(self.url_prefix)]
         assert(urls_ == urls)
         self.heavydebug("Received URLS: %s" % urls)
         return urls
-
-    def _get_file_key(self, file):
-        """Return KEY for a given file
-        """
-        # TODO: should actually be implemented by AnnexRepo
-        (out, err) = \
-            self.runner(['git-annex', 'lookupkey', file], cwd=self.path)
-        return out.rstrip(os.linesep)
 
     def _get_key_path(self, key):
         """Return path to the KEY file

@@ -195,7 +195,9 @@ def _get_cached_filename(archive):
     """A helper to generate a filename which has original filename and additional suffix
     which wouldn't collide across files with the same name from different locations
     """
-    return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
+    #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
+    # per se there is no reason to maintain any long original name here.
+    return hashlib.md5(archive.encode()).hexdigest()[:10]
 
 
 class ArchivesCache(object):
@@ -203,19 +205,23 @@ class ArchivesCache(object):
 
     Parameters
     ----------
-    path : str
-      Directory where to keep the cache
+    toppath : str
+      Top directory under .git/ of which temp directory would be created.
+      If not provided -- random tempdir is used
+    allow_existing : bool, optional
+      Passed over into generated ExtractedArchives
     """
     # TODO: make caching persistent across sessions/runs, with cleanup
     # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
     #       all up
-    def __init__(self, toppath=None):
+    def __init__(self, toppath=None, allow_existing=True):
 
         if toppath:
             path = opj(toppath, ARCHIVES_TEMP_DIR)
         else:
             path = tempfile.mktemp(**get_tempfile_kwargs())
         self._path = path
+        self.allow_existing = allow_existing
         # TODO?  assure that it is absent or we should allow for it to persist a bit?
         #if exists(path):
         #    self._clean_cache()
@@ -239,7 +245,7 @@ class ArchivesCache(object):
         return self._path
 
     def clean(self):
-        for aname, a in self._archives.items():
+        for aname, a in list(self._archives.items()):
             a.clean()
             del self._archives[aname]
         if self._made_path:
@@ -248,7 +254,8 @@ class ArchivesCache(object):
     def get_archive(self, archive):
         if archive not in self._archives:
             self._archives[archive] = \
-                ExtractedArchive(archive, opj(self.path, "%s_datalad" % _get_cached_filename(archive)))
+                ExtractedArchive(archive, opj(self.path, _get_cached_filename(archive)),
+                                 allow_existing=self.allow_existing)
         return self._archives[archive]
 
     def __getitem__(self, archive):
@@ -258,11 +265,15 @@ class ArchivesCache(object):
 class ExtractedArchive(object):
     """Container for the extracted archive
     """
-    def __init__(self, archive, path=None):
+    def __init__(self, archive, path=None, allow_existing=True):
         self._archive = archive
         # TODO: bad location for extracted archive -- use tempfile
         if not path:
             path = tempfile.mktemp(**get_tempfile_kwargs(prefix=_get_cached_filename(archive)))
+
+        if exists(path) and not allow_existing:
+            raise RuntimeError("Directory %s already exists whenever instructed to not allow "
+                               "existing ones" % path)
         self._path = path
 
     def __repr__(self):
@@ -285,7 +296,7 @@ class ExtractedArchive(object):
         """
         return self._path
 
-    def _assure_extracted(self):
+    def assure_extracted(self):
         """Return path to the extracted `archive`.  Extract archive if necessary
         """
         path = self.path
@@ -299,8 +310,9 @@ class ExtractedArchive(object):
 
             decompress_file(self._archive, path, leading_directories=None)
 
-            lgr.debug("Adjusting permissions to R/O for the extracted content")
-            rotree(path)
+            # TODO: must optional since we might to use this content, move it into the tree etc
+            # lgr.debug("Adjusting permissions to R/O for the extracted content")
+            # rotree(path)
             assert(exists(path))
         return path
 
@@ -316,13 +328,22 @@ class ExtractedArchive(object):
         """
         return opj(self.path, urlunquote(afile))
 
+    def get_extracted_files(self):
+        """Generator to provide filenames which are available under extracted archive
+        """
+        path = self.assure_extracted()
+        path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
+        for root, dirs, files in os.walk(path):
+            for name in files:
+                yield opj(root, name)[path_len:]
+
     def get_extracted_file(self, afile):
         lgr.debug("Requested file {afile} from archive {self._archive}".format(**locals()))
         # TODO: That could be a good place to provide "compatibility" layer if
         # filenames within archive are too obscure for local file system.
         # We could somehow adjust them while extracting and here channel back
         # "fixed" up names since they are only to point to the load
-        self._assure_extracted()
+        self.assure_extracted()
         path = self.get_extracted_filename(afile)
         # TODO: make robust
         lgr.log(1, "Verifying that %s exists" % abspath(path))

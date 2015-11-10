@@ -12,8 +12,9 @@ from ..support.archives import ExtractedArchive, ArchivesCache
 
 from .utils import get_most_obscure_supported_name, assert_raises
 from .utils import assert_in
+from .utils import ok_generator
 
-fn_in_archive_obscure = "abc" # get_most_obscure_supported_name()
+fn_in_archive_obscure = get_most_obscure_supported_name()
 fn_archive_obscure = fn_in_archive_obscure.replace('a', 'b')
 fn_archive_obscure_ext = fn_archive_obscure + '.tar.gz'
 
@@ -95,7 +96,8 @@ def test_ExtractedArchive(path):
     archive = opj(path, fn_archive_obscure_ext)
     earchive = ExtractedArchive(archive)
     assert_false(exists(earchive.path))
-    assert_in(os.path.basename(archive), earchive.path)
+    # no longer the case -- just using hash for now
+    # assert_in(os.path.basename(archive), earchive.path)
 
     fpath = opj(fn_archive_obscure,  # lead directory
                 fn_in_archive_obscure)
@@ -106,6 +108,15 @@ def test_ExtractedArchive(path):
     extracted_ = earchive.get_extracted_file(fpath)
     eq_(extracted, extracted_)
     assert_true(exists(extracted))  # now it should
+
+    extracted_files = earchive.get_extracted_files()
+    ok_generator(extracted_files)
+    eq_(sorted(extracted_files),
+        sorted([
+            # ['bbc/3.txt', 'bbc/abc']
+            opj(fn_archive_obscure, fn_in_archive_obscure),
+            opj(fn_archive_obscure, '3.txt')
+        ]))
 
     earchive.clean()
     if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):

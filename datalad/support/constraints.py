@@ -303,7 +303,8 @@ class AltConstraints(Constraint):
                 return c(value)
             except Exception as e:
                 e_list.append(e)
-        raise ValueError("all alternative constraints violated")
+        raise ValueError("all alternative constraints (%s) violated while testing value %r"
+                         % (self.constraints, value))
 
     def long_description(self):
         cs = [c.long_description() for c in self.constraints if hasattr(c, 'long_description')]
