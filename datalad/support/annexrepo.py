@@ -611,6 +611,36 @@ class AnnexRepo(GitRepo):
         out, err = self._run_annex_command('find')
         return out.splitlines()
 
+    def get_contentlocation(self, key):
+        """Get location of the key content
+
+        Normally under .git/annex objects in indirect mode and within file
+        tree in direct mode.
+
+        Unfortunately there is no (easy) way to discriminate situations
+        when given key is simply incorrect (not known to annex) or its content
+        not currently present -- in both cases annex just silently exits with -1
+
+
+        Parameters
+        ----------
+        key: str
+            key
+
+        Returns
+        -------
+        str
+            path relative to the current directory
+        """
+
+        # TODO: batchable
+
+        cmd_str = 'git annex contentlocation %s' % key  # have a string for messages
+
+        out, err = self._run_annex_command('contentlocation',
+                                           annex_options=[key],
+                                           expect_fail=True)
+        return out.rstrip(linesep).splitlines()[0]
 
 # TODO: ---------------------------------------------------------------------
     @normalize_paths(match_return_type=False)
