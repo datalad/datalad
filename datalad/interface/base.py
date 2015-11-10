@@ -146,4 +146,5 @@ class Interface(object):
         from inspect import getargspec
         argnames = getargspec(self.__call__)[0]
         kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
+        # import pudb; pu.db
         return self(**kwargs)

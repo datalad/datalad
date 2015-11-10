@@ -193,7 +193,7 @@ def load_pipeline_from_config(path):
             template,
             {o: cfg.get(crawler_pipeline_section, o) for o in opts})
     else:
-        raise IOError("Did not fine %s section within %s" % (crawler_pipeline_section, path))
+        raise IOError("Did not find %s section within %s" % (crawler_pipeline_section, path))
     return pipeline
 
 def get_pipeline_config_path(repo_path=curdir):

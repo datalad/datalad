@@ -8,7 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Pipeline to scrape abstracts information from online resource (e.g. for SfN 2015)"""
 
-from ..nodes.crawl_url import crawl_url
+# from ..nodes.crawl_url import crawl_url
+from ..nodes.scrape_url import crawl_url
+
 from ..nodes.matches import a_href_match, xpath_match
 from ..nodes.misc import Sink
 
@@ -34,41 +36,68 @@ def parse_abstract(data):
 
 
 def pipeline(mkey=None, outputfile=None):
-      crawler = crawl_url('http://www.abstractsonline.com/plan/start.aspx?mkey={%s}' % mkey)
-      sink_abstracts = Sink(output='abstracts')
-      # fields_sink = sink_dict(key='field', values='raw_value',
-      #                         output='abstract_fields',
-      #                         exclude_keys=('', 'Disclosures:')),
-      return [
-        [   # {'return_last': True, },
-            crawler,
-            a_href_match('.*/Browse.aspx'),
+    # import pudb; pu.db
+    sink_abstracts = Sink(output='abstracts')
+    matchers = [a_href_match('.*/Browse.aspx'),
+                # a_href_match('.*/BrowseResults.aspx?date=(?P<date>[/0-9]*)'),
+                # a_href_match('.*/ViewSession.aspx?.*'),
+                # a_href_match('.*/ViewAbstract.aspx?mID=.*'),
+                a_href_match('.*/BrowseResults\.aspx\?date\=10/15/2015'),
+                a_href_match('.*/ViewSession\.aspx\?.*'),
+                           # 'ViewSession\.aspx\?'
+                a_href_match('.*/ViewAbstract\.aspx\?mID\=.*'),
+                           # 'ViewAbstract\.aspx\?mID\='
+
+               ]
+
+    url = 'http://www.abstractsonline.com/plan/start.aspx?mkey={%s}' % mkey
+    crawler = crawl_url(url, matchers=matchers)
+
+    return [[crawler,
+            xpath_match('//table[@cellpadding=3]'),
+            parse_abstract,
+            sink_abstracts,
+            ],
+           dump_csv(keys=('title', 'authors', '...'), filename=outputfile),
+           ]
+
+
+    sink_abstracts = Sink(output='abstracts')
+    # fields_sink = sink_dict(key='field', values='raw_value',
+    #                         output='abstract_fields',
+    #                         exclude_keys=('', 'Disclosures:')),
+    return [
+    [   # {'return_last': True, },
+        crawler,
+        a_href_match('.*/Browse.aspx'),
+        crawler.recurse,
+
+        a_href_match('.*/BrowseResults.aspx?date=(?P<date>[/0-9]*)'),
+        crawler.recurse,
+        a_href_match('.*/ViewSession.aspx?.*'),
+        crawler.recurse,
+        a_href_match('.*/ViewAbstract.aspx?mID=.*'),
+
+        #[
             crawler.recurse,
-            a_href_match('.*/BrowseResults.aspx?date=(?P<date>[/0-9]*)'),
-            crawler.recurse,
-            a_href_match('.*/ViewSession.aspx?.*'),
-            crawler.recurse,
-            a_href_match('.*/ViewAbstract.aspx?mID=.*'),
-            #[
-              crawler.recurse,
-              #fields_sink.reset,
-              #xpath_match('//td[@class="ViewAbstractDataLabel"]',
-              #   xpaths={'field': 'normalize-space(text())',
-              #           'raw_value': 'following-sibling::td'}),
-              xpath_match('//table[@cellpadding=3]'),
-              # TODO:  do not match one by one, just get entire DIV and parse itout
-              # into interesting fields
-              parse_abstract,
-              sink_abstracts,
-              #return_from_pipeline(['abstract_fields'])
-            #],
-            # process_fields(key='abstract_fields',
-            #                funcs={'Program#/Poster#:': extract_td_text,
-            #                       'Authors:': fancy_authors_extractor,
-            #                       {'Presentation time:', 'Presenter at Poster:'}: extract_date,
-            #                       ...},
-            #                default_func=extract_td_text),
-            # dump_dict(keys=('...'), filename='output.csv')
-        ],
-        dump_csv(keys=('title', 'authors', '...'), filename=outputfile)
-      ]
+            #fields_sink.reset,
+            #xpath_match('//td[@class="ViewAbstractDataLabel"]',
+            #   xpaths={'field': 'normalize-space(text())',
+            #           'raw_value': 'following-sibling::td'}),
+            xpath_match('//table[@cellpadding=3]'),
+            # TODO:  do not match one by one, just get entire DIV and parse itout
+            # into interesting fields
+            parse_abstract,
+            sink_abstracts,
+            #return_from_pipeline(['abstract_fields'])
+        #],
+        # process_fields(key='abstract_fields',
+        #                funcs={'Program#/Poster#:': extract_td_text,
+        #                       'Authors:': fancy_authors_extractor,
+        #                       {'Presentation time:', 'Presenter at Poster:'}: extract_date,
+        #                       ...},
+        #                default_func=extract_td_text),
+        # dump_dict(keys=('...'), filename='output.csv')
+    ],
+    dump_csv(keys=('title', 'authors', '...'), filename=outputfile)
+    ]
