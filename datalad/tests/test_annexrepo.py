@@ -11,7 +11,7 @@
 """
 
 import gc
-from os.path import exists
+from os.path import exists, islink
 from git.exc import GitCommandError
 from six import PY3
 from six.moves.urllib.parse import urljoin, urlsplit
@@ -442,6 +442,7 @@ def test_AnnexRepo_always_commit(path):
                        if commit.startswith('commit')])
     assert_equal(num_commits, 4)
 
+
 @with_testrepos('basic_annex', flavors=['clone'])
 def test_AnnexRepo_on_uninited_annex(path):
     assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
@@ -451,6 +452,96 @@ def test_AnnexRepo_on_uninited_annex(path):
     with swallow_outputs():
         annex.annex_get('test-annex.dat')
         assert_true(annex.file_has_content('test-annex.dat'))
+
+
+@assert_cwd_unchanged
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile
+def test_AnnexRepo_commit(src, path):
+
+    ds = AnnexRepo(path, src)
+    filename = opj(path, get_most_obscure_supported_name())
+    with open(filename, 'w') as f:
+        f.write("File to add to git")
+    ds.annex_add(filename)
+
+    if ds.is_direct_mode():
+        assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
+    else:
+        assert_raises(AssertionError, ok_clean_git, path, annex=True)
+
+    ds.commit("test _commit")
+    if ds.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
+
+
+@assert_cwd_unchanged
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile
+def test_AnnexRepo_add_to_git(src, dst):
+
+    ds = AnnexRepo(dst, src)
+
+    filename = get_most_obscure_supported_name()
+    filename_abs = opj(dst, filename)
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
+    ds.add_to_git(filename_abs)
+
+    if ds.is_direct_mode():
+        ok_clean_git_annex_proxy(dst)
+    else:
+        ok_clean_git(dst, annex=True)
+    ok_file_under_git(dst, filename)
+    assert_raises(FileInGitError, ds.get_file_key, filename)
+
+
+@assert_cwd_unchanged
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile
+def test_AnnexRepo_add_to_annex(src, dst):
+
+    ds = AnnexRepo(dst, src)
+    filename = get_most_obscure_supported_name()
+    filename_abs = opj(dst, filename)
+    with open(filename_abs, 'w') as f:
+        f.write("What to write?")
+    ds.add_to_annex(filename)
+
+    if not ds.is_direct_mode():
+        assert_true(islink(filename_abs),
+                    "Annexed file is not a link.")
+        ok_clean_git(dst, annex=True)
+    else:
+        assert_false(islink(filename_abs),
+                     "Annexed file is link in direct mode.")
+        ok_clean_git_annex_proxy(dst)
+
+    key = ds.get_file_key(filename)
+    assert_false(key == '')
+    # could test for the actual key, but if there's something and no
+    # exception raised, it's fine anyway.
+
+
+@ignore_nose_capturing_stdout
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
+@with_tempfile
+def test_AnnexRepo_get(src, dst):
+
+    ds = AnnexRepo(dst, src)
+    assert_is_instance(ds, AnnexRepo, "AnnexRepo was not created.")
+    testfile = 'test-annex.dat'
+    testfile_abs = opj(dst, testfile)
+    assert_false(ds.file_has_content("test-annex.dat"))
+    with swallow_outputs() as cmo:
+        ds.get(testfile)
+    assert_true(ds.file_has_content("test-annex.dat"))
+    f = open(testfile_abs, 'r')
+    assert_equal(f.readlines(), ['123\n'],
+                 "test-annex.dat's content doesn't match.")
+
 
 # TODO:
 #def annex_initremote(self, name, options):

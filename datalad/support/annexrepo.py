@@ -241,7 +241,6 @@ class AnnexRepo(GitRepo):
             # it's actually indirect mode.
             return False
 
-
     def is_crippled_fs(self):
         """Indicates whether or not git-annex considers current filesystem 'crippled'.
 
@@ -315,6 +314,15 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('get', annex_options=options + files,
                                 log_stdout=True, log_stderr=False,
                                 log_online=True, expect_stderr=True)
+
+    # TODO: Moved from HandleRepo. Just a temporary alias.
+    # When renaming is done, melt with annex_get
+    def get(self, files):
+        """get the actual content of files
+
+        This command gets the actual content of the files in `list`.
+        """
+        self.annex_get(files)
 
     @normalize_paths
     def annex_add(self, files, backend=None, options=None):
@@ -464,6 +472,43 @@ class AnnexRepo(GitRepo):
         else:
             self.git_add(files)
 
+    # TODO: Just moved from HandleRepo. Melt with annex_add_to_git and rename.
+    @normalize_paths
+    def add_to_git(self, files, commit_msg="Added file(s) to git."):
+        """Add file(s) directly to git
+
+        Adds files directly to git and commits.
+
+        Parameters
+        ----------
+        commit_msg: str
+            commit message
+        files: list
+            list of paths to add to git; Can also be a str, in case of a single
+            path.
+        """
+        self.annex_add_to_git(files)
+        self.commit(commit_msg)
+
+    @normalize_paths
+    def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
+        """Add file(s) to the annex.
+
+        Adds files to the annex and commits.
+
+        Parameters
+        ----------
+        commit_msg: str
+            commit message
+        files: list
+            list of paths to add to the annex; Can also be a str, in case of a
+            single path.
+        """
+
+        self.annex_add(files)
+        self.commit(commit_msg)
+
+
     def annex_initremote(self, name, options):
         """Creates a new special remote
 
@@ -608,6 +653,17 @@ class AnnexRepo(GitRepo):
         out, err = self._run_annex_command('find')
         return out.splitlines()
 
+    def commit(self, msg):
+        """
+
+        Parameters
+        ----------
+        msg: str
+        """
+        if self.is_direct_mode():
+            self.annex_proxy('git commit -m "%s"' % msg)
+        else:
+            self.git_commit(msg)
 
 # TODO: ---------------------------------------------------------------------
     @normalize_paths(match_return_type=False)

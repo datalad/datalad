@@ -11,7 +11,7 @@
 """
 
 import os
-from os.path import join as opj, exists, basename, islink
+from os.path import join as opj, exists, basename
 
 from nose import SkipTest
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
@@ -64,14 +64,11 @@ def test_HandleRepo_direct(src, dst):
 @with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
 def test_Handle_instance_from_existing(path):
 
-    raise SkipTest
-    # TODO: provide a testrepo, which is a Handle already!
-    # check for commit SHA, file content etc. Everything should
+    # TODO: check for commit SHA, file content etc. Everything should
     # be identical
 
-    gr = HandleRepo(path)
+    gr = HandleRepo(path, create=False, init=False)
     assert_is_instance(gr, HandleRepo, "HandleRepo was not created.")
-    assert_true(exists(opj(path, '.datalad')))
 
 
 @ignore_nose_capturing_stdout
@@ -91,110 +88,6 @@ def test_HandleRepo_instance_brand_new(path):
     assert_true(exists(opj(path, '.datalad')))
     assert_true(exists(opj(path, '.datalad', REPO_STD_META_FILE)))
     assert_true(exists(opj(path, '.datalad', REPO_CONFIG_FILE)))
-
-
-@ignore_nose_capturing_stdout
-@with_testrepos('.*handle.*', flavors=['local', 'network'])
-@with_tempfile
-def test_HandleRepo_get(src, dst):
-
-    ds = HandleRepo(dst, src)
-    assert_is_instance(ds, HandleRepo, "AnnexRepo was not created.")
-    testfile = 'test-annex.dat'
-    testfile_abs = opj(dst, testfile)
-    assert_false(ds.file_has_content("test-annex.dat"))
-    with swallow_outputs() as cmo:
-        ds.get(testfile)
-    assert_true(ds.file_has_content("test-annex.dat"))
-    f = open(testfile_abs, 'r')
-    assert_equal(f.readlines(), ['123\n'], "test-annex.dat's content doesn't match.")
-
-
-@assert_cwd_unchanged
-@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
-@with_tempfile
-def test_HandleRepo_add_to_annex(src, dst):
-
-    ds = HandleRepo(dst, src)
-    filename = get_most_obscure_supported_name()
-    filename_abs = opj(dst, filename)
-    with open(filename_abs, 'w') as f:
-        f.write("What to write?")
-    ds.add_to_annex(filename)
-
-    if not ds.is_direct_mode():
-        assert_true(islink(filename_abs), "Annexed file is not a link.")
-        ok_clean_git(dst, annex=True)
-    else:
-        assert_false(islink(filename_abs), "Annexed file is link in direct mode.")
-        ok_clean_git_annex_proxy(dst)
-
-    key = ds.get_file_key(filename)
-    assert_false(key == '')
-    # could test for the actual key, but if there's something and no exception raised, it's fine anyway.
-
-
-
-@assert_cwd_unchanged
-@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
-@with_tempfile
-def test_HandleRepo_add_to_git(src, dst):
-
-    ds = HandleRepo(dst, src)
-
-    filename = get_most_obscure_supported_name()
-    filename_abs = opj(dst, filename)
-    with open(filename_abs, 'w') as f:
-        f.write("What to write?")
-    ds.add_to_git(filename_abs)
-
-    if ds.is_direct_mode():
-        ok_clean_git_annex_proxy(dst)
-    else:
-        ok_clean_git(dst, annex=True)
-    assert_raises(FileInGitError, ds.get_file_key, filename)
-
-
-@assert_cwd_unchanged
-@with_testrepos('.*handle.*', flavors=local_testrepo_flavors)
-@with_tempfile
-def test_HandleRepo_commit(src, path):
-
-    ds = HandleRepo(path, src)
-    filename = opj(path, get_most_obscure_supported_name())
-    with open(filename, 'w') as f:
-        f.write("File to add to git")
-    ds.annex_add(filename)
-
-    if ds.is_direct_mode():
-        assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
-    else:
-        assert_raises(AssertionError, ok_clean_git, path, annex=True)
-
-    ds._commit("test _commit")
-    if ds.is_direct_mode():
-        ok_clean_git_annex_proxy(path)
-    else:
-        ok_clean_git(path, annex=True)
-
-
-@with_tempfile
-@with_tempfile
-def test_HandleRepo_id(path1, path2):
-
-    raise SkipTest
-
-    # # check id is generated:
-    # handle1 = HandleRepo(path1)
-    # id1 = handle1.datalad_id()
-    # assert_is_not_none(id1)
-    # assert_is_instance(id1, basestring)
-    # assert_equal(id1,
-    #              handle1.repo.config_reader().get_value("annex", "uuid"))
-    #
-    # # check clone has same id:
-    # handle2 = HandleRepo(path2, path1)
-    # assert_equal(id1, handle2.datalad_id())
 
 
 @with_tempfile

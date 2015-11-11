@@ -162,7 +162,7 @@ class MetadataPTHandleTestRepo(BasicHandleTestRepo):
                          'someone else\n'
                          'digital native <https://www.myfancypage.com/digital>\n',
                          annex=False)
-        self.repo._commit("Metadata files created.")
+        self.repo.commit("Metadata files created.")
 
 
 class BasicCollectionTestRepo(BasicGitTestRepo):

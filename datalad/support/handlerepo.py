@@ -93,7 +93,7 @@ class HandleRepo(AnnexRepo):
     """
 
     def __init__(self, path, url=None, direct=False, runner=None, backend=None,
-                 name=None, create=True):
+                 name=None, create=True, init=False):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -118,7 +118,7 @@ class HandleRepo(AnnexRepo):
 
         super(HandleRepo, self).__init__(path, url, direct=direct,
                                          runner=runner, backend=backend,
-                                         create=create)
+                                         create=create, init=init)
 
         self.datalad_path = HANDLE_META_DIR
         self._cfg_file = opj(HANDLE_META_DIR, REPO_CONFIG_FILE)
@@ -174,72 +174,6 @@ class HandleRepo(AnnexRepo):
         self._set_cfg(graph, "Changed name.")
 
     name = property(get_name, set_name)
-
-    @property
-    def datalad_id(self):
-        """Get the datalad identifier of the handle.
-
-        This is a read-only property.
-
-        Returns
-        -------
-        str
-        """
-        raise NotImplementedError("datalad id not used anymore")
-
-    def get(self, files):
-        """get the actual content of files
-
-        This command gets the actual content of the files in `list`.
-        """
-        self.annex_get(files)
-
-    def _commit(self, msg):
-        """Commit changes to repository
-
-        Parameters
-        ----------
-        msg: str
-            commit-message
-        """
-
-        if self.is_direct_mode():
-            self.annex_proxy('git commit -m "%s"' % msg)
-        else:
-            self.git_commit(msg)
-
-    def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
-        """Add file(s) to the annex.
-
-        Adds files to the annex and commits.
-
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to the annex; Can also be a str, in case of a
-            single path.
-        """
-
-        self.annex_add(files)
-        self._commit(commit_msg)
-
-    def add_to_git(self, files, commit_msg="Added file(s) to git."):
-        """Add file(s) directly to git
-
-        Adds files directly to git and commits.
-
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to git; Can also be a str, in case of a single
-            path.
-        """
-        self.annex_add_to_git(files)
-        self._commit(commit_msg)
 
     def get_handle(self, branch=None):
         """Convenience method to create a `Handle` instance.
