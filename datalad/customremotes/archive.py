@@ -129,19 +129,20 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
         akey, afile = self._parse_url(url)
 
-        # if for testing we want to force getting the archive extracted
-        # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
-        efile = self.cache[akey].get_extracted_filename(afile)
-        if exists(efile):
-            size = os.stat(efile).st_size
-        else:
-            size = 'UNKNOWN'
-
         # But reply that present only if archive is present
         # TODO: this would throw exception if not present, so this statement is kinda bogus
         try:
             # throws exception if not present
-            akey_rpath = self.repo.get_contentlocation(akey)
+            akey_path = opj(self.path, self.repo.get_contentlocation(akey))
+
+            # if for testing we want to force getting the archive extracted
+            # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
+            efile = self.cache[akey_path].get_extracted_filename(afile)
+            if exists(efile):
+                size = os.stat(efile).st_size
+            else:
+                size = 'UNKNOWN'
+
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
             self.send("CHECKURL-CONTENTS", size)#, basename(afile))
@@ -228,7 +229,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
         akey, afile = self._get_akey_afile(key)
         try:
-            akey_path = self.repo.get_contentlocation(akey)
+            akey_path = opj(self.path, self.repo.get_contentlocation(akey))
         except CommandError:
             # TODO: make it more stringent?
             # Command could have fail to run if key was not present locally yet

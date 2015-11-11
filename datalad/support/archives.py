@@ -254,7 +254,8 @@ class ArchivesCache(object):
     def get_archive(self, archive):
         if archive not in self._archives:
             self._archives[archive] = \
-                ExtractedArchive(archive, opj(self.path, _get_cached_filename(archive)),
+                ExtractedArchive(archive,
+                                 opj(self.path, _get_cached_filename(archive)),
                                  allow_existing=self.allow_existing)
         return self._archives[archive]
 
