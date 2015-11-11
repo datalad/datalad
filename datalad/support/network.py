@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import time
+import shelve
 
 from six import string_types
 from six.moves.urllib.request import urlopen, Request
@@ -22,13 +23,18 @@ from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
 from six.moves.urllib.error import URLError
 from six.moves import StringIO
 
+# NOTE not sure if this needs to use `six`
+import urllib
+
 from bs4 import BeautifulSoup
+import appdirs
 
 import logging
 lgr = logging.getLogger('datalad.network')
 
 from joblib import Memory
 memory = Memory(cachedir="/tmp/datalad", verbose=1)
+
 
 def get_response_deposition_filename(response_info):
     if 'Content-Disposition' in response_info:
@@ -41,6 +47,7 @@ def get_response_deposition_filename(response_info):
             return filename
     return None
 
+
 def get_url_deposition_filename(url):
     request = Request(url)
     r = retry_urlopen(request)
@@ -49,8 +56,10 @@ def get_url_deposition_filename(url):
     finally:
         r.close()
 
+
 def get_url_straight_filename(url):
     return os.path.basename(urlunquote(urlsplit(url).path))
+
 
 def get_url_response_stamp(url, response_info):
     size, mtime = None, None
@@ -60,6 +69,54 @@ def get_url_response_stamp(url, response_info):
         mtime = calendar.timegm(email.utils.parsedate(
             response_info['Last-modified']))
     return dict(size=size, mtime=mtime, url=url)
+
+
+def get_cookie_db():
+    # FIXME 'datalad' should prolly come from elsewhere
+    cookies_file = os.path.join(appdirs.user_config_dir(), 'datalad', 'cookies.db')
+    if not os.path.exists(cookies_file):
+        os.makedirs(cookies_file)
+    cookies_db = shelve.open(cookies_file, writeback=True)
+    return cookies_db
+
+
+def __urlopen(ds_provider, url, username=None, password=None, additional_header_vals=None):
+    ''' url:  website to get cookie from
+        additional_vals:  a dict of additional key/val pairs to pass
+            into the header along with the username & password
+    '''
+
+    cookies_db = get_cookie_db()
+    if ds_provider in cookies_db:
+        # TODO
+        # if cookie is expired/doesn't work/etc:
+        #   then need to get new one
+        # else:
+        cookie = cookies_db[ds_provider]
+        opener = urllib2.build_opener()
+        opener.addheaders.append(("Cookie", cookie))
+
+        resp = opener.open(url)
+    else:
+        if username and password:   # FIXME need better check to make sure they work
+            header_vals = dict(username=username, password=password, submit='Login')    # last one should be passed into additional_header_vals
+            if additional_header_vals:
+                header_vals.update(additional_header_vals)
+            data = urllib.urlencode(header_vals)
+            req = Request(url, data)
+        else:
+            req = Request(url)
+        resp = urlopen(req)
+
+        if 'set-cookie' in resp.headers:
+            cookie = resp.headers['set-cookie']
+        if 'set-cookie2' in resp.headers:
+            cookie2 = resp.headers['set-cookie2']
+        if 'set-cookie3' in resp.headers:
+            cookie3 = resp.headers['set-cookie3']
+        cookies_db[ds_provider] = cookie #FIXME this isn't right, but not sure how to store mulitple cookies (maybe cookie jar)
+    return resp
+
 
 def __download(url, filename=None, filename_only=False):
     # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
@@ -80,10 +137,11 @@ def __download(url, filename=None, filename_only=False):
         r.close()
     return filename
 
+
 def retry_urlopen(url, retries=3):
     for t in range(retries):
         try:
-            return urlopen(url)
+            return __urlopen(url)
         except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
             if t == retries - 1:
@@ -95,10 +153,10 @@ def retry_urlopen(url, retries=3):
 # thus implementing simple decorators
 def _fetch_page(url, retries=3):
     lgr.debug("Fetching %s" % url)
-    openurl = retry_urlopen(url, retries=retries)
+    response = retry_urlopen(url, retries=retries)
     for t in range(retries):
         try:
-            page = openurl.read()
+            page = response.read()
             break
         except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
@@ -108,11 +166,13 @@ def _fetch_page(url, retries=3):
     lgr.info("Fetched %d bytes page from %s" % (len(page), url))
     return page
 
+
 def fetch_page(url, retries=3, cache=False):
     if cache:
         return memory.eval(_fetch_page, url, retries=retries)
     else:
         return _fetch_page(url, retries=retries)
+
 
 def is_url_quoted(url):
     """Return either URL looks being already quoted
@@ -141,6 +201,7 @@ def _parse_urls(page):
         urls.append((href, link.text, link))
     return urls
 
+
 def parse_urls(page, cache=False):
     if False:  # cache:
         # disabled until bs4 addresses Pickling issue
@@ -148,6 +209,7 @@ def parse_urls(page, cache=False):
         return memory.eval(_parse_urls, page)
     else:
         return _parse_urls(page)
+
 
 def same_website(url_rec, u_rec):
     """Decide either a link leads to external site
@@ -169,6 +231,7 @@ def same_website(url_rec, u_rec):
     # could go to the parent and that is ok.  Figure out when it was
     # desired not to go to the parent -- we might need explicit option
     # and u_rec.path.startswith(url_rec.path)):
+
 
 def dgurljoin(u_path, url):
     url_rec = urlparse(url)  # probably duplicating parsing :-/ TODO
@@ -293,6 +356,7 @@ def filter_urls(urls,
                    and not
                    ((exclude_href and re.search(exclude_href, url))
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
+
 
 # TODO: RF move db_incoming and modes logic outside?
 def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run=False,
