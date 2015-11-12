@@ -11,13 +11,20 @@
 __docformat__ = 'restructuredtext'
 
 from mock import patch
+from nose.tools import assert_is_instance
+
+from os import mkdir
 from os.path import join as opj, exists
 from ..helpers import get_datalad_master, get_repo_instance
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, ok_clean_git, \
-    with_tempfile, SkipTest
+    with_tempfile, SkipTest, with_testrepos
 from ...support.collectionrepo import CollectionRepo
+from ...support.handlerepo import HandleRepo
+from ...support.annexrepo import AnnexRepo
+from ...support.gitrepo import GitRepo
 from ...consts import DATALAD_COLLECTION_NAME
+from ...utils import chpwd, getpwd
 
 
 @assert_cwd_unchanged
@@ -38,6 +45,117 @@ def test_get_datalad_master(path):
         get_repo_instance(lcpath, CollectionRepo)
 
 
-# TODO:
-def test_get_repo_instance():
-    raise SkipTest
+@assert_cwd_unchanged
+@with_testrepos('^basic_git$', flavors=['clone'])
+def test_get_repo_instance_git(path):
+
+    # get instance from path:
+    repo = get_repo_instance(path, GitRepo)
+    assert_is_instance(repo, GitRepo)
+    eq_(repo.path, path)
+
+    old_pwd = getpwd()
+
+    # get instance from current dir:
+    chpwd(path)
+    repo = get_repo_instance()
+    assert_is_instance(repo, GitRepo)
+    eq_(repo.path, path)
+
+    # get instance from current subdir:
+    new_subdir = opj(path, "subdir")
+    mkdir(new_subdir)
+    chpwd(new_subdir)
+    eq_(new_subdir, getpwd())
+    repo = get_repo_instance()
+    assert_is_instance(repo, GitRepo)
+    eq_(repo.path, path)
+
+    chpwd(old_pwd)
+
+
+@assert_cwd_unchanged
+@with_testrepos('.*annex.*', flavors=['clone'])
+def test_get_repo_instance_annex(path):
+
+    # get instance from path:
+    repo = get_repo_instance(path, AnnexRepo)
+    assert_is_instance(repo, AnnexRepo)
+    eq_(repo.path, path)
+
+    old_pwd = getpwd()
+
+    # get instance from current dir:
+    chpwd(path)
+    repo = get_repo_instance()
+    assert_is_instance(repo, AnnexRepo)
+    eq_(repo.path, path)
+
+    # get instance from current subdir:
+    new_subdir = opj(path, "subdir")
+    mkdir(new_subdir)
+    chpwd(new_subdir)
+    eq_(new_subdir, getpwd())
+    repo = get_repo_instance()
+    assert_is_instance(repo, AnnexRepo)
+    eq_(repo.path, path)
+
+    chpwd(old_pwd)
+
+
+@assert_cwd_unchanged
+@with_testrepos('.*handle.*', flavors=['clone'])
+def test_get_repo_instance_handle(path):
+
+    # get instance from path:
+    repo = get_repo_instance(path, HandleRepo)
+    assert_is_instance(repo, HandleRepo)
+    eq_(repo.path, path)
+
+    old_pwd = getpwd()
+
+    # get instance from current dir:
+    chpwd(path)
+    repo = get_repo_instance()
+    assert_is_instance(repo, HandleRepo)
+    eq_(repo.path, path)
+
+    # get instance from current subdir:
+    new_subdir = opj(path, "subdir")
+    mkdir(new_subdir)
+    chpwd(new_subdir)
+    eq_(new_subdir, getpwd())
+    repo = get_repo_instance()
+    assert_is_instance(repo, HandleRepo)
+    eq_(repo.path, path)
+
+    chpwd(old_pwd)
+
+
+@assert_cwd_unchanged
+@with_testrepos('.*collection.*', flavors=['clone'])
+def test_get_repo_instance_collection(path):
+
+    # get instance from path:
+    repo = get_repo_instance(path, CollectionRepo)
+    assert_is_instance(repo, CollectionRepo)
+    eq_(repo.path, path)
+
+    old_pwd = getpwd()
+
+    # get instance from current dir:
+    chpwd(path)
+    repo = get_repo_instance()
+    assert_is_instance(repo, CollectionRepo)
+    eq_(repo.path, path)
+
+    # get instance from current subdir:
+    new_subdir = opj(path, "subdir")
+    mkdir(new_subdir)
+    chpwd(new_subdir)
+    eq_(new_subdir, getpwd())
+    repo = get_repo_instance()
+    assert_is_instance(repo, CollectionRepo)
+    eq_(repo.path, path)
+
+    chpwd(old_pwd)
