@@ -14,7 +14,7 @@ from mock import patch
 from nose.tools import assert_is_instance
 
 from os import mkdir
-from os.path import join as opj, exists
+from os.path import join as opj, exists, realpath
 from ..helpers import get_datalad_master, get_repo_instance
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, ok_clean_git, \
@@ -52,7 +52,7 @@ def test_get_repo_instance_git(path):
     # get instance from path:
     repo = get_repo_instance(path, GitRepo)
     assert_is_instance(repo, GitRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     old_pwd = getpwd()
 
@@ -60,7 +60,7 @@ def test_get_repo_instance_git(path):
     chpwd(path)
     repo = get_repo_instance()
     assert_is_instance(repo, GitRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     # get instance from current subdir:
     new_subdir = opj(path, "subdir")
@@ -69,7 +69,7 @@ def test_get_repo_instance_git(path):
     eq_(new_subdir, getpwd())
     repo = get_repo_instance()
     assert_is_instance(repo, GitRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     chpwd(old_pwd)
 
@@ -81,7 +81,7 @@ def test_get_repo_instance_annex(path):
     # get instance from path:
     repo = get_repo_instance(path, AnnexRepo)
     assert_is_instance(repo, AnnexRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     old_pwd = getpwd()
 
@@ -89,7 +89,7 @@ def test_get_repo_instance_annex(path):
     chpwd(path)
     repo = get_repo_instance()
     assert_is_instance(repo, AnnexRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     # get instance from current subdir:
     new_subdir = opj(path, "subdir")
@@ -98,7 +98,7 @@ def test_get_repo_instance_annex(path):
     eq_(new_subdir, getpwd())
     repo = get_repo_instance()
     assert_is_instance(repo, AnnexRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     chpwd(old_pwd)
 
@@ -110,7 +110,7 @@ def test_get_repo_instance_handle(path):
     # get instance from path:
     repo = get_repo_instance(path, HandleRepo)
     assert_is_instance(repo, HandleRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     old_pwd = getpwd()
 
@@ -118,7 +118,7 @@ def test_get_repo_instance_handle(path):
     chpwd(path)
     repo = get_repo_instance()
     assert_is_instance(repo, HandleRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     # get instance from current subdir:
     new_subdir = opj(path, "subdir")
@@ -127,7 +127,7 @@ def test_get_repo_instance_handle(path):
     eq_(new_subdir, getpwd())
     repo = get_repo_instance()
     assert_is_instance(repo, HandleRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     chpwd(old_pwd)
 
@@ -139,7 +139,7 @@ def test_get_repo_instance_collection(path):
     # get instance from path:
     repo = get_repo_instance(path, CollectionRepo)
     assert_is_instance(repo, CollectionRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     old_pwd = getpwd()
 
@@ -147,7 +147,7 @@ def test_get_repo_instance_collection(path):
     chpwd(path)
     repo = get_repo_instance()
     assert_is_instance(repo, CollectionRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     # get instance from current subdir:
     new_subdir = opj(path, "subdir")
@@ -156,6 +156,6 @@ def test_get_repo_instance_collection(path):
     eq_(new_subdir, getpwd())
     repo = get_repo_instance()
     assert_is_instance(repo, CollectionRepo)
-    eq_(repo.path, path)
+    eq_(realpath(repo.path), realpath(path))
 
     chpwd(old_pwd)
