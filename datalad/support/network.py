@@ -25,6 +25,7 @@ from six.moves import StringIO
 
 # NOTE not sure if this needs to use `six`
 import urllib
+from urllib2 import build_opener
 
 from bs4 import BeautifulSoup
 import appdirs
@@ -71,21 +72,31 @@ def get_url_response_stamp(url, response_info):
     return dict(size=size, mtime=mtime, url=url)
 
 
+# FIXME should make into a decorator so that it closes the cookie_db upon exiting whatever func uses it
 def get_cookie_db():
-    # FIXME 'datalad' should prolly come from elsewhere
-    cookies_file = os.path.join(appdirs.user_config_dir(), 'datalad', 'cookies.db')
+    cookies_file = os.path.join(appdirs.user_config_dir(), 'datalad', 'cookies.db') # FIXME prolly shouldn't hardcode 'datalad'
     if not os.path.exists(cookies_file):
         os.makedirs(cookies_file)
     cookies_db = shelve.open(cookies_file, writeback=True)
     return cookies_db
 
 
-def __urlopen(ds_provider, url, username=None, password=None, additional_header_vals=None):
+def get_tld(url):
+    # maybe use this instead to be safe:  https://pypi.python.org/pypi/tld
+    if not url.startswith('http'):  # urlparse needs to have urls start with this
+        url = 'http://' + url
+    website = urlparse.urlparse(url)[1]
+    # domain = '.'.join(website.split('.')[1:])
+    # print domain
+    return website
+
+
+def __urlopen(url, username=None, password=None, additional_header_vals=None):
     ''' url:  website to get cookie from
         additional_vals:  a dict of additional key/val pairs to pass
             into the header along with the username & password
     '''
-
+    ds_provider = get_tld(url)
     cookies_db = get_cookie_db()
     if ds_provider in cookies_db:
         # TODO
@@ -93,13 +104,12 @@ def __urlopen(ds_provider, url, username=None, password=None, additional_header_
         #   then need to get new one
         # else:
         cookie = cookies_db[ds_provider]
-        opener = urllib2.build_opener()
-        opener.addheaders.append(("Cookie", cookie))
-
+        opener = build_opener()
+        opener.addheaders.append(("Cookie", cookie))    # FIXME this isn't right if there are more than one cookie for this ds provider
         resp = opener.open(url)
     else:
         if username and password:   # FIXME need better check to make sure they work
-            header_vals = dict(username=username, password=password, submit='Login')    # last one should be passed into additional_header_vals
+            header_vals = dict(username=username, password=password, submit='Login')    # last one should be passed in additional_header_vals
             if additional_header_vals:
                 header_vals.update(additional_header_vals)
             data = urllib.urlencode(header_vals)
@@ -108,12 +118,11 @@ def __urlopen(ds_provider, url, username=None, password=None, additional_header_
             req = Request(url)
         resp = urlopen(req)
 
-        if 'set-cookie' in resp.headers:
-            cookie = resp.headers['set-cookie']
-        if 'set-cookie2' in resp.headers:
-            cookie2 = resp.headers['set-cookie2']
-        if 'set-cookie3' in resp.headers:
-            cookie3 = resp.headers['set-cookie3']
+        cookies = []
+        for k,v in resp.headers.iteritems():
+            k = k.lower()
+            if k.startswith('set-cookie'):
+               cookies.append(v)
         cookies_db[ds_provider] = cookie #FIXME this isn't right, but not sure how to store mulitple cookies (maybe cookie jar)
     return resp
 
