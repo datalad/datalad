@@ -9,12 +9,15 @@
 """High-level interface for adding content of an archive under annex control
 
 """
+from __future__ import print_function
 
 __docformat__ = 'restructuredtext'
 
 
 import re
 import os
+import shlex
+
 from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath
 from .base import Interface
 from ..consts import ARCHIVES_SPECIAL_REMOTE
@@ -22,15 +25,19 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone, EnsureListOf
 
 from ..support.annexrepo import AnnexRepo
-from ..support.archives import ArchivesCache
+from ..support.strings import apply_replacement_rules
 from ..cmdline.helpers import get_repo_instance
-from ..utils import getpwd
+from ..utils import getpwd, rmtree
 
 from six import string_types
 from six.moves.urllib.parse import urlparse
 
 
-from ..log import lgr
+from ..log import logging
+lgr = logging.getLogger('datalad.interfaces.add_archive_content')
+
+# TODO: may be we could enable separate logging or add a flag to enable
+# all but by default to print only the one associated with this given action
 
 class AddArchiveContent(Interface):
     """Add content of an archive under git annex control.
@@ -51,20 +58,28 @@ class AddArchiveContent(Interface):
             doc="""Flag to delete original archive from the filesystem/git in current tree.
                    Note that it will be of no effect if --key is given."""),
         overwrite=Parameter(
-            args=("-o", "--overwrite"),
+            args=("-O", "--overwrite"),
             action="store_true",
             doc="""Flag to replace an existing file if new file from archive has the same name"""
         ),
         exclude=Parameter(
             args=("-e", "--exclude"),
-            nargs='?',
-            doc="""Regular expression for filenames which to exclude from being added to annex""",
+            action='append',
+            doc="""Regular expression for filenames which to exclude from being added to annex.
+            Applied after --rename if that one is specified.  For exact matching, use anchoring.""",
             constraints=EnsureStr() | EnsureNone()
         ),
         rename=Parameter(
             args=("-r", "--rename"),
-            nargs='?',
-            doc="""Regular expressions to rename files before being added under git""",
+            action='append',
+            doc="""Regular expressions to rename files before being added under git.
+            First letter defines how to split provided string into two parts:
+            Python regular expression (with groups), and replacement string.""",
+            constraints=EnsureStr(min_len=2) | EnsureNone()
+        ),
+        annex_options=Parameter(
+            args=("-o", "--annex-options"),
+            doc="""Additional options to pass to git-annex""",
             constraints=EnsureStr() | EnsureNone()
         ),
         key=Parameter(
@@ -89,61 +104,51 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, delete=False, key=False, exclude=None, rename=None, overwrite=False):
+    def __call__(self, archive, delete=False, key=False, exclude=None, rename=None, overwrite=False,
+                 annex_options=None):
         """
         Returns
         -------
         annex
         """
 
-        annex_options = None
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex
         annex = get_repo_instance(class_=AnnexRepo)
-
-        # are we in subdirectory?
-        # move all of this logic into a helper function with proper testing etc
-        subdir = relpath(annex.path, getpwd())
-        if subdir != curdir:
-            raise NotImplemented("see https://github.com/datalad/datalad/issues/292")
-
-        """
-        annexpath = realpath(annex.path)
-        pwdpath = realpath(getpwd())
-        if annexpath < pwdpath:
-            subdir = pwdpath[len(annexpath)+1:]
-        elif annexpath > pwdpath:
-            raise RuntimeError("magic failed: PWD of %s is shorter than of annex %s."
-                               " Some unsupported yet symlinking?" % (pwdpath, annexpath))
-        else:
-            subdir = curdir
-        """
-        # but it is given relative to the top
-        reltop = relpath(annex.path, getpwd())
+        annex.always_commit = False
 
         # TODO: somewhat too cruel -- may be an option or smth...
         if annex.dirty:
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
-        # print "Got ", archive, key, exclude, rename
+        # are we in a subdirectory?
+        # get the path relative to the top
+        # TODO: check in direct mode
+        reltop = relpath(annex.path, getpwd())
 
         if not key:
             # we were given a file which must exist
             assert(exists(archive))
+            origin = archive
             key = annex.get_file_key(archive)
+        else:
+            origin = key
 
         if not key:
             # TODO: allow for it to be under git???  how to reference then?
-            raise ValueError("Provided file is not under annex, can't operate")
+            raise NotImplementedError(
+                "Provided file is not under annex.  We don't support yet adding everything "
+                "straight to git"
+            )
 
         # and operate from now on the key or whereever content available "canonically"
         try:
-            key_archive = annex.get_contentlocation(key)
+            key_path = annex.get_contentlocation(key)
         except:
             raise RuntimeError("Content of %s seems to be N/A.  Fetch it first" % key)
 
-        key_archive = opj(reltop, key_archive)
+        key_path = opj(reltop, key_path)
         # now we simply need to go through every file in that archive and
 
         from datalad.customremotes.archive import AnnexArchiveCustomRemote
@@ -151,47 +156,90 @@ class AddArchiveContent(Interface):
         annexarchive = AnnexArchiveCustomRemote(path=annex.path)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = False
-        earchive = annexarchive.cache[key_archive]
+        earchive = annexarchive.cache[key_path]
 
         # TODO: check if may be it was already added
-        annex.annex_initremote(
-            ARCHIVES_SPECIAL_REMOTE,
-            ['encryption=none', 'type=external', 'externaltype=dl+archive',
-             'autoenable=true'])
+        if ARCHIVES_SPECIAL_REMOTE not in annex.git_get_remotes():
+            lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
+            annex.annex_initremote(
+                ARCHIVES_SPECIAL_REMOTE,
+                ['encryption=none', 'type=external', 'externaltype=dl+archive',
+                 'autoenable=true'])
+        else:
+            lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
 
         try:
+            stats = dict(n=0, add_git=0, add_annex=0, skip=0, overwritten=0, renamed=0)
             for extracted_file in earchive.get_extracted_files():
-
+                stats['n'] += 1
                 extracted_path = opj(earchive.path, extracted_file)
+                # preliminary target name which might get modified by renames
                 target_file = extracted_file
 
-                if exclude:
-                    raise NotImplementedError
-                    lgr.debug("Skipping %s since matched exclude pattern" % extracted_file)
-                    continue
-
                 if rename:
-                    # tunes target_file
-                    raise NotImplementedError
+                    target_file_ = target_file
+                    target_file_ = apply_replacement_rules(rename, target_file_)
+                    if target_file_ != target_file:
+                        stats['renamed'] += 1
+                        target_file = target_file_
 
-
-                if lexists(target_file) and not overwrite:
-                    raise RuntimeError()
+                if exclude:
+                    try:  # since we need to skip outside loop from inside loop
+                        for regexp in exclude:
+                            if re.search(regexp, target_file):
+                                lgr.debug("Skipping {target_file} since contains {regexp} pattern".format(**locals()))
+                                stats['skip'] += 1
+                                raise StopIteration
+                    except StopIteration:
+                        continue
 
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
+
                 lgr.info("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
                 target_path = opj(getpwd(), target_file)
+                if lexists(target_file):
+                    if not overwrite:
+                        raise RuntimeError(
+                            "File {} already exists, but new (?) file {} was instructed "
+                            "to be placed there while overwrite=False".format(target_file, extracted_file))
+                    stats['overwritten'] += 1
+                    # to make sure it doesn't conflict -- might have been a tree
+                    rmtree(target_file)
                 os.renames(extracted_path, target_path)
-                annex.annex_add(target_path, options=annex_options)
-                # fails
-                #annex.annex_addurl_to_file(target_file, url)
-                annex.annex_addurl_to_file(target_file, url, options=['--relaxed'])
-                #annex.annex_addurl_to_file(target_path, url)
+
+                lgr.debug("Adding {target_path} to annex pointing to {url}".format(**locals()))
+                annex.annex_add(
+                    target_path,
+                    options=shlex.split(annex_options) if annex_options else []
+                )
+                # above action might add to git or to annex
+                if annex.file_has_content(target_path):
+                    # if not --  it was added to git, if in annex, it is present and output is True
+                    annex.annex_addurl_to_file(target_file, url, options=['--relaxed'])
+                    stats['add_annex'] += 1
+                else:
+                    lgr.debug("File {} was added to git, not adding url".format(target_file))
+                    stats['add_git'] += 1
+
+                del target_file  # Done with target_file -- just to have clear end of the loop
+
             if delete and archive:
+                lgr.debug("Removing the original archive {}".format(archive))
                 annex.git_remove(archive)
-            # more meaningful message
-            annex.git_commit("Added content from archive under key %s" % key)
+
+            annex.git_commit(
+                "Added content extracted from " + origin + """
+
+Processed: {n}
+Skipped: {skip}
+Renamed: {renamed}
+Added
+ to git: {add_git}
+ to annex: {add_annex}
+Overwritten: {overwritten}
+""".format(**stats))
         finally:
             # remove what is left and/or everything upon failure
             earchive.clean()
         return annex
+
