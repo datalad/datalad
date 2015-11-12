@@ -25,7 +25,8 @@ from six.moves import StringIO
 
 # NOTE not sure if this needs to use `six`
 import urllib
-from urllib2 import build_opener
+import urllib2
+import cookielib
 
 from bs4 import BeautifulSoup
 import appdirs
@@ -103,9 +104,9 @@ def __urlopen(url, username=None, password=None, additional_header_vals=None):
         # if cookie is expired/doesn't work/etc:
         #   then need to get new one
         # else:
-        cookie = cookies_db[ds_provider]
-        opener = build_opener()
-        opener.addheaders.append(("Cookie", cookie))    # FIXME this isn't right if there are more than one cookie for this ds provider
+        cookie = cookies_db[ds_provider]    # TODO what format should these be in exactly if multiple cookies sent previously
+        cjar = cookielib.FileCookieJar(cookie)
+        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cjar))
         resp = opener.open(url)
     else:
         if username and password:   # FIXME need better check to make sure they work
@@ -123,7 +124,7 @@ def __urlopen(url, username=None, password=None, additional_header_vals=None):
             k = k.lower()
             if k.startswith('set-cookie'):
                cookies.append(v)
-        cookies_db[ds_provider] = cookie #FIXME this isn't right, but not sure how to store mulitple cookies (maybe cookie jar)
+        cookies_db[ds_provider] = ' '.join(cookies) #FIXME this isn't right, but not sure how to store mulitple cookies (maybe cookie jar)
     return resp
 
 
