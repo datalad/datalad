@@ -300,7 +300,7 @@ class CollectionRepo(GitRepo):
         ----------
         path: str
           path to git repository. In case it's not an absolute path, it's
-          relative to os.getcwd()
+          relative to PWD
 
         url: str
           url to the to-be-cloned repository. Requires valid git url

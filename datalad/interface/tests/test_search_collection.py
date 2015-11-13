@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from os import getcwd, chdir
 from os.path import basename, exists, isdir, join as opj
 from mock import patch
 from nose.tools import assert_is_instance, assert_not_in
@@ -20,7 +19,7 @@ from six.moves.urllib.parse import urlparse
 
 from ...api import search_collection, import_metadata, install_handle, \
     create_collection, add_handle, describe
-from ...utils import swallow_logs
+from ...utils import swallow_logs, getpwd, chpwd
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_testrepos, with_tempfile, ok_startswith, assert_in, ok_clean_git
 from ...cmdline.helpers import get_repo_instance, get_datalad_master
@@ -48,8 +47,8 @@ def test_search_collection(hurl, hpath, cpath, lcpath):
         handle = install_handle(hurl, hpath)
         collection = create_collection(cpath)
         add_handle(hpath, cpath)
-        current_dir = getcwd()
-        chdir(cpath)
+        current_dir = getpwd()
+        chpwd(cpath)
         # import handle metadata
         import_metadata(format="plain-text", path=hpath, handle=handle.name)
 
@@ -63,7 +62,7 @@ def test_search_collection(hurl, hpath, cpath, lcpath):
         # create some collection level metadata:
         describe(author="Benjamin Poldrack",
                  description="This a description.")
-        chdir(current_dir)
+        chpwd(current_dir)
 
         # search again:
         clist = search_collection("Poldrack")
