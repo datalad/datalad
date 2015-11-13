@@ -82,9 +82,9 @@ def _normalize_path(base_dir, path):
         else:
             pass
 
-    elif commonprefix([getpwd(), base_dir]) == base_dir:
+    elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
         # If we are inside repository, rebuilt relative paths.
-        path = opj(getpwd(), path)
+        path = opj(realpath(getpwd()), path)
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
