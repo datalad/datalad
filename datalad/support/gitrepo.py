@@ -12,7 +12,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
 
-from os import getcwd, linesep
+from os import linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
 from os.path import dirname, basename
 import logging
@@ -27,7 +27,7 @@ from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
-from ..utils import optional_args, on_windows
+from ..utils import optional_args, on_windows, getpwd
 from ..utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
@@ -47,7 +47,7 @@ def _normalize_path(base_dir, path):
 
     Checks whether `path` is beneath `base_dir` and normalize it.
     Additionally paths are converted into relative paths with respect to
-    `base_dir`, considering os.getcwd() in case of relative paths. This
+    `base_dir`, considering PWD in case of relative paths. This
     is intended to be used in repository classes, which means that
     `base_dir` usually will be the repository's base directory.
 
@@ -82,9 +82,9 @@ def _normalize_path(base_dir, path):
         else:
             pass
 
-    elif commonprefix([getcwd(), base_dir]) == base_dir:
+    elif commonprefix([getpwd(), base_dir]) == base_dir:
         # If we are inside repository, rebuilt relative paths.
-        path = opj(getcwd(), path)
+        path = opj(getpwd(), path)
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -211,7 +211,7 @@ class GitRepo(object):
         ----------
         path: str
           path to the git repository; In case it's not an absolute path,
-          it's relative to os.getcwd()
+          it's relative to PWD
         url: str
           url to the to-be-cloned repository. Requires a valid git url
           according to:

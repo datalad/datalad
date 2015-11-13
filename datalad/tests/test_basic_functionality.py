@@ -24,7 +24,7 @@ from ..support.metadatahandler import PlainTextImporter, PAV, PROV, DCTERMS, \
     DCTYPES, DLNS, DCAT, FOAF, EMP, Literal, URIRef
 from ..tests.utils import ok_clean_git, ok_clean_git_annex_proxy, \
     with_tempfile, ok_, with_tree
-from ..utils import get_local_file_url, rmtree
+from ..utils import get_local_file_url, rmtree, getpwd
 
 from .utils import skip_if_no_network
 
@@ -320,7 +320,7 @@ def test_query_collection(c_path, h_path, md_hdl):
     # no use here.
     # Note: This uri construction has to change.
     import os
-    content_uri = URIRef(get_local_file_url(os.getcwd()) + '/#content')
+    content_uri = URIRef(get_local_file_url(getpwd()) + '/#content')
 
     assert_equal(len(results2), 2)
     assert_in((Literal("MyHandle"), URIRef(get_local_file_url(h_path))),
