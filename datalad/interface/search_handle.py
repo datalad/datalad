@@ -84,7 +84,7 @@ class SearchHandle(Interface):
             for h, l in zip(handles, locations):
                 print("%s\t%s" % (h.ljust(width), l))
 
-            return [Handle(CollectionRepoHandleBackend(local_master, handle))
+            return [CollectionRepoHandleBackend(local_master, handle)
                     for handle in handles]
         else:
             return []

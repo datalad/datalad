@@ -64,5 +64,9 @@ def test_search_handle(hurl, hpath, hpath2, lcpath):
             assert_is_instance(item, Handle)
         eq_(len(hlist), 1)
         # TODO: Replace, when Handle.__eq__ is implemented:
+
+        # TODO: For some reason handle.name is suddenly None.
+        # Guess 'import_metadata' fails to keep it. Look into it after
+        # merging master!
         eq_(hlist[0].name, handle.name)
         eq_(urlparse(hlist[0].url).path, hpath)

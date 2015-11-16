@@ -158,4 +158,4 @@ class PublishHandle(Interface):
         # finally:
         local_handle_repo.git_checkout("master")
 
-        return Handle(HandleRepoBackend(local_handle_repo, remote + "/master"))
+        return HandleRepoBackend(local_handle_repo, remote + "/master")

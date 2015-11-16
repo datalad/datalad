@@ -192,7 +192,7 @@ class HandleRepo(AnnexRepo):
     def get_handle(self, branch=None):
         """Convenience method to create a `Handle` instance.
         """
-        return Handle(HandleRepoBackend(self, branch))
+        return HandleRepoBackend(self, branch)
 
     def get_metadata(self, files=None, branch=None):
         """Get a Graph containing the handle's metadata

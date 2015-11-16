@@ -54,15 +54,15 @@ class ListHandles(Interface):
                     continue
                 for h in CollectionRepoBackend(
                         local_master, branch=remote_branch).get_handles():
-                    handle_list.append(Handle(
+                    handle_list.append(
                         CollectionRepoHandleBackend(local_master, key=h,
-                                                    branch=remote_branch)))
+                                                    branch=remote_branch))
                     remote_name = '/'.join(remote_branch.split('/')[:-1])
                     print("%s/%s" % (remote_name, h))
         else:
             for handle in local_master.get_handle_list():
-                handle_list.append(Handle(
-                    CollectionRepoHandleBackend(local_master, handle)))
+                handle_list.append(
+                    CollectionRepoHandleBackend(local_master, handle))
                 print(handle)
 
         return handle_list

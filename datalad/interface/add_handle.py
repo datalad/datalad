@@ -110,6 +110,6 @@ class AddHandle(Interface):
         # Might be a different name than collection_repo.name or not at all.
         local_master.git_fetch(collection_repo.name)
 
-        return Handle(CollectionRepoHandleBackend(collection_repo,
-                                                  name if name is not None
-                                                  else handle_repo.name))
+        return CollectionRepoHandleBackend(collection_repo,
+                                           name if name is not None
+                                           else handle_repo.name)

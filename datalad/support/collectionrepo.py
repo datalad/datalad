@@ -155,8 +155,7 @@ class CollectionRepoBackend(CollectionBackend):
 
         # load handles from branch
         for key in self.repo.get_handle_list(self.branch):
-            out[key] = Handle(src=CollectionRepoHandleBackend(
-                self.repo, key, self.branch))
+            out[key] = CollectionRepoHandleBackend(self.repo, key, self.branch)
         return out
 
     def get_collection(self):
@@ -743,7 +742,7 @@ class CollectionRepo(GitRepo):
                      file_.endswith(".ttl") and
                      basename(file_) != REPO_CONFIG_FILE]
 
-        out = Graph(identifier=URIRef(key))
+        out = Graph(identifier=Literal(key))
         for file_ in files:
             file_str = '\n'.join(self.git_get_file_content(file_, branch))
             out.parse(data=file_str, format="turtle")

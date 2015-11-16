@@ -86,4 +86,4 @@ class UpgradeHandle(Interface):
             # upgrade content:
             repo.get(files_to_upgrade)
 
-        return Handle(HandleRepoBackend(repo))
+        return HandleRepoBackend(repo)

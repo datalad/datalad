@@ -70,8 +70,7 @@ def test_Collection_constructor(path, h_path):
 @with_tempfile
 def test_Collection_setitem(path):
     collection = Collection(name="new_collection")
-    handle1 = Handle(HandleRepoBackend(HandleRepo(path, name="handle1")))
-    handle2 = Handle(name="handle2")
+    handle1 = HandleRepoBackend(HandleRepo(path, name="handle1"))
 
     collection["handle1"] = handle1
     assert_equal(set(iterkeys(collection)), {"handle1"})
@@ -92,7 +91,7 @@ def test_Collection_setitem(path):
     #           collection.meta)
 
 
-    collection["handle2"] = handle2
+
 
     #ok_(False, collection.meta.serialize(format="turtle"))
 
@@ -104,7 +103,7 @@ def test_Collection_setitem(path):
 @with_tempfile
 def test_Collection_delitem(path):
     collection = Collection(name="new_collection")
-    handle1 = Handle(HandleRepoBackend(HandleRepo(path, name="handle1")))
+    handle1 = HandleRepoBackend(HandleRepo(path, name="handle1"))
     collection["handle1"] = handle1
     del collection["handle1"]
 

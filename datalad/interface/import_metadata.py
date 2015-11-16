@@ -137,4 +137,4 @@ class ImportMetadata(Interface):
         if isinstance(repo, CollectionRepo):
             return Collection(CollectionRepoBackend(repo))
         elif isinstance(repo, HandleRepo):
-            return Handle(HandleRepoBackend(repo))
+            return HandleRepoBackend(repo)

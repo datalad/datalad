@@ -209,5 +209,4 @@ class InstallHandle(Interface):
                                                    key=local_name,
                                                    data=metadata)
 
-        return Handle(HandleRepoBackend(installed_handle))
-    
+        return HandleRepoBackend(installed_handle)
