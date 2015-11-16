@@ -101,7 +101,7 @@ def rotree(path, ro=True, chmod_files=True):
     else:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode | stat.S_IWRITE | stat.S_IREAD)
 
-    for root, dirs, files in os.walk(path):
+    for root, dirs, files in os.walk(path, followlinks=False):
         if chmod_files:
             for f in files:
                 fullf = opj(root, f)
@@ -127,8 +127,13 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-    rotree(path, ro=False, chmod_files=chmod_files)
-    shutil.rmtree(path, *args, **kwargs)
+
+    if not os.path.islink(path):
+        rotree(path, ro=False, chmod_files=chmod_files)
+        shutil.rmtree(path, *args, **kwargs)
+    else:
+        # just remove the symlink
+        os.unlink(path)
 
 
 def rmtemp(f, *args, **kwargs):
@@ -417,18 +422,6 @@ def updated(d, update):
     d.update(update)
     return d
 
-def chpwd(path):
-    """Wrapper around os.chdir which also adjusts environ['PWD']
-
-    The reason is that otherwise PWD is simply inherited from the shell
-    and we have no ability to assess directory path without dereferencing
-    symlinks
-    """
-    if not isabs(path):
-        path = normpath(opj(getpwd(), path))
-    os.chdir(path)  # for grep people -- ok, to chdir here!
-    os.environ['PWD'] = path
-
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
 
@@ -438,3 +431,32 @@ def getpwd():
         return os.environ['PWD']
     except KeyError:
         return os.getcwd()
+
+class chpwd(object):
+    """Wrapper around os.chdir which also adjusts environ['PWD']
+
+    The reason is that otherwise PWD is simply inherited from the shell
+    and we have no ability to assess directory path without dereferencing
+    symlinks.
+
+    If used as a context manager it allows to temporarily change directory
+    to the given path
+    """
+    def __init__(self, path, mkdir=False):
+        if not isabs(path):
+            path = normpath(opj(getpwd(), path))
+        if not os.path.exists(path) and mkdir:
+            self._mkdir = True
+            os.mkdir(path)
+        else:
+            self._mkdir = False
+        self._prev_pwd = getpwd()
+        os.chdir(path)  # for grep people -- ok, to chdir here!
+        os.environ['PWD'] = path
+
+    def __enter__(self):
+        # nothing more to do really, chdir was in the constructor
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        chpwd(self._prev_pwd)

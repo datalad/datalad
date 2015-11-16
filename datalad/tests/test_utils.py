@@ -21,7 +21,7 @@ from collections import OrderedDict
 
 from ..utils import updated
 from ..utils import get_local_file_url
-from os.path import join as opj, isabs, abspath
+from os.path import join as opj, isabs, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
 from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
@@ -181,16 +181,30 @@ def test_getpwd_symlink(tdir):
     sdir = opj(tdir, 's1')
     pwd_orig = getpwd()
     os.symlink('.', sdir)
+    s1dir = opj(sdir, 's1')
+    s2dir = opj(sdir, 's2')
     try:
         chpwd(sdir)
         pwd = getpwd()
         eq_(pwd, sdir)
         chpwd('s1')
-        eq_(getpwd(), opj(sdir, 's1'))
+        eq_(getpwd(), s1dir)
         chpwd('.')
-        eq_(getpwd(), opj(sdir, 's1'))
+        eq_(getpwd(), s1dir)
         chpwd('..')
         eq_(getpwd(), sdir)
     finally:
         chpwd(pwd_orig)
 
+    # test context handler way of use
+    with chpwd(s1dir):
+        eq_(getpwd(), s1dir)
+    eq_(getpwd(), pwd_orig)
+
+    assert_false(exists(s2dir))
+    with assert_raises(OSError):
+        with chpwd(s2dir):
+            pass
+    with chpwd(s2dir, mkdir=True):
+        ok_(exists(s2dir))
+        eq_(getpwd(), s2dir)
