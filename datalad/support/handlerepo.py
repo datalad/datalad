@@ -24,58 +24,65 @@ from six import string_types
 from .annexrepo import AnnexRepo
 from .metadatahandler import MetadataImporter, CustomImporter, Graph, Literal, \
     DLNS, RDFS
-from .handle import HandleBackend, Handle
-from ..utils import assure_dir
+from .handle import Handle
+from .exceptions import ReadOnlyBackendError
+from ..utils import assure_dir, get_local_file_url
 from ..consts import HANDLE_META_DIR, REPO_CONFIG_FILE, REPO_STD_META_FILE
 
 lgr = logging.getLogger('datalad.handlerepo')
 
 
-class HandleRepoBackend(HandleBackend):
+class HandleRepoBackend(Handle):
     # TODO: Name. See corresponding naming for CollectionBackend and find
     # a solution for both of them
-    """HandleBackend for handle repositories.
+    """Handle backend for handle repositories.
 
-    Implements a HandleBackend pointing to a handle repository branch.
+    Implements a Handle pointing to a handle repository branch.
     """
 
-    # TODO: Currently the branch is always the active branch of the handle.
-    # So, the branch-option of the constructor has no effect and is just a
-    # placeholder, serving as a reminder. Implementing it may be involves some
-    # changes in the HandleRepo-class, so it's returning infos from the
-    # branch's config file.
+    def __init__(self, repo, branch=None, files=None):
 
-    def __init__(self, repo, branch=None):
+        super(HandleRepoBackend, self).__init__()
 
         if not isinstance(repo, HandleRepo):
-            e_msg = "Can't deal with type '%s' to access a handle repository." \
+            e_msg = "Can't deal with type %s to access a handle repository." \
                     % type(repo)
             lgr.error(e_msg)
             raise TypeError(e_msg)
         else:
             self._repo = repo
 
-        self._branch = branch or self._repo.git_get_active_branch()
+        if branch is None:
+            self._branch = self._repo.git_get_active_branch()
+        elif branch in self._repo.git_get_branches() + \
+                self._repo.git_get_remote_branches():
+            self._branch = branch
+        else:
+            raise ValueError("Unknown branch '%s' of repository at %s." %
+                             (branch, self._repo.path))
+
+        # we can't write to a remote branch:
+        self.is_read_only = self._branch.split('/')[0] in \
+                            self._repo.git_get_remotes()
+        self._files = files
+
+    def update_metadata(self):
+        self._graph = self._repo.get_metadata(self._files, branch=self._branch)
+
+    def commit_metadata(self, msg="Handle metadata updated."):
+        if self.is_read_only:
+            raise ReadOnlyBackendError("Can't commit to handle '%s'.\n"
+                                       "(Repository: %s\tBranch: %s." %
+                                       (self.name, self._repo.path,
+                                        self._branch))
+
+        self._repo.set_metadata(self._graph, branch=self._branch)
 
     @property
     def url(self):
-        return self._repo.path
+        return get_local_file_url(self._repo.path)
 
-    def get_name(self):
-        return self._repo.name
-
-    def set_name(self, name):
-        self._repo.name = name
-
-    name = property(get_name, set_name)
-
-    def get_metadata(self, files=None):
-        return self._repo.get_metadata(files)
-
-    def set_metadata(self, meta, msg=None):
-        self._repo.set_metadata(meta, msg)
-
-    metadata = property(get_metadata, set_metadata)
+    # TODO: set_name? See Handle.
 
 
 class HandleRepo(AnnexRepo):
@@ -180,7 +187,7 @@ class HandleRepo(AnnexRepo):
         """
         return Handle(HandleRepoBackend(self, branch))
 
-    def get_metadata(self, files=None):
+    def get_metadata(self, files=None, branch=None):
         """Get a Graph containing the handle's metadata
 
         Parameters
@@ -211,7 +218,7 @@ class HandleRepo(AnnexRepo):
             joined_graph += graphs[key]
         return joined_graph
 
-    def set_metadata(self, graph, msg="Metadata saved."):
+    def set_metadata(self, graph, msg="Metadata saved.", branch=None):
         raise NotImplementedError
 
     def import_metadata(self, importer, files=None, data=None,

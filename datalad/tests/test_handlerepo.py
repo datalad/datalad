@@ -21,12 +21,12 @@ from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, FOAF
 
 from ..support.handlerepo import HandleRepo, HandleRepoBackend, AnnexRepo
-from ..support.exceptions import FileInGitError
+from ..support.exceptions import FileInGitError, ReadOnlyBackendError
 from ..support.metadatahandler import DLNS, RDFS
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
-    get_most_obscure_supported_name, swallow_outputs, ok_
+    get_most_obscure_supported_name, swallow_outputs, ok_, get_local_file_url, ok_startswith, eq_
 
 from .utils import local_testrepo_flavors
 from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
@@ -131,9 +131,23 @@ def test_HandleRepo_get_metadata(path):
 def test_HandleRepoBackend_constructor(path):
     repo = HandleRepo(path)
     backend = HandleRepoBackend(repo)
-    assert_equal(backend._branch, repo.git_get_active_branch())
-    assert_equal(backend._repo, repo)
-    assert_equal(backend.url, repo.path)
+    eq_(backend._branch, repo.git_get_active_branch())
+    eq_(backend._repo, repo)
+    eq_(backend.url, get_local_file_url(repo.path))
+    eq_(backend.is_read_only, False)
+
+    # not existing branch:
+    with assert_raises(ValueError) as cm:
+        HandleRepoBackend(repo, branch="something")
+    ok_startswith(str(cm.exception), "Unknown branch")
+
+    # wrong source class:
+    with assert_raises(TypeError) as cm:
+        HandleRepoBackend(AnnexRepo(path, create=False))
+    ok_startswith(str(cm.exception),
+                  "Can't deal with type "
+                  "<class 'datalad.support.annexrepo.AnnexRepo'>")
+
 
 
 @with_tempfile
@@ -142,19 +156,25 @@ def test_HandleRepoBackend_name(path):
     backend = HandleRepoBackend(repo)
 
     # get name:
-    assert_equal(backend.name, repo.name)
-
+    # TODO: Assertion still correct?
+    eq_(backend.name, repo.name)
     # set name:
-    backend.name = "new_name"
-    assert_equal(backend.name, "new_name")
-    assert_equal(repo.name, "new_name")
+    with assert_raises(AttributeError) as cm:
+        backend.name = "new_name"
 
 
 @with_tempfile
-def test_HandleRepoBackend_metadata(path):
+def test_HandleRepoBackend_meta(path):
     repo = HandleRepo(path)
+    repo_graph = repo.get_metadata()
     backend = HandleRepoBackend(repo)
-    assert_equal(backend.metadata,
-                 repo.get_metadata())
-    assert_equal(backend.metadata.identifier,
-                 URIRef(repo.name))
+    backend.update_metadata()
+    eq_(backend._graph, repo_graph)
+    eq_(backend.meta, repo_graph)
+
+    # commit:
+    # not implemented yet in HandleRepo:
+    assert_raises(NotImplementedError, backend.commit_metadata)
+    # If read only should raise exception anyway:
+    backend.is_read_only = True
+    assert_raises(ReadOnlyBackendError, backend.commit_metadata)

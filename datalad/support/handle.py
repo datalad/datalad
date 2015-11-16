@@ -132,8 +132,7 @@ class Handle(object):
 
     def get_metadata(self):
         if self._graph is None:
-            lgr.debug("Updating graph of handle '%s' from backend." %
-                      self.name)
+            lgr.debug("Updating handle graph from backend.")
             self.update_metadata()
         return self._graph
 
