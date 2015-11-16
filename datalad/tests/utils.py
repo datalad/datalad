@@ -123,6 +123,7 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 from ..utils import chpwd, getpwd
 
@@ -174,13 +175,30 @@ def ok_file_under_git(path, filename=None, annexed=False):
     if filename is None:
         # path provides the path and the name
         path, filename = pathsplit(path)
-    repo = AnnexRepo(path, create=False)
-    assert(filename in repo.get_indexed_files())  # file is known to Git
+
     try:
-        repo.get_file_key(filename)
-        in_annex = True
-    except FileNotInAnnexError as e:
+        # if succeeds when must not (not `annexed`) -- fail
+        repo = AnnexRepo(path, create=False)
+        annex = True
+    except RuntimeError as e:
+        # TODO: make a dedicated Exception
+        if "No annex found" in e.message:
+            repo = GitRepo(path, create=False)
+            annex = False
+        else:
+            raise
+
+    assert(filename in repo.get_indexed_files())  # file is known to Git
+
+    if annex:
+        try:
+            repo.get_file_key(filename)
+            in_annex = True
+        except FileNotInAnnexError as e:
+            in_annex = False
+    else:
         in_annex = False
+
     assert(annexed == in_annex)
 
 #
