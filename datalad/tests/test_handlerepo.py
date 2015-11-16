@@ -127,9 +127,9 @@ def test_HandleRepo_get_metadata(path):
 
 # testing HandleRepoBackend:
 
-@with_tempfile
+@with_testrepos('.*handle.*', flavors=['local'])
 def test_HandleRepoBackend_constructor(path):
-    repo = HandleRepo(path)
+    repo = HandleRepo(path, create=False)
     backend = HandleRepoBackend(repo)
     eq_(backend._branch, repo.git_get_active_branch())
     eq_(backend._repo, repo)
@@ -153,9 +153,9 @@ def test_HandleRepoBackend_constructor(path):
                   "<class 'datalad.support.annexrepo.AnnexRepo'>")
 
 
-@with_tempfile
+@with_testrepos('.*handle.*', flavors=['local'])
 def test_HandleRepoBackend_name(path):
-    repo = HandleRepo(path)
+    repo = HandleRepo(path, create=False)
     backend = HandleRepoBackend(repo)
 
     # get name:
@@ -166,9 +166,9 @@ def test_HandleRepoBackend_name(path):
         backend.name = "new_name"
 
 
-@with_tempfile
+@with_testrepos('.*handle.*', flavors=['local'])
 def test_HandleRepoBackend_meta(path):
-    repo = HandleRepo(path)
+    repo = HandleRepo(path, create=False)
     repo_graph = repo.get_metadata()
     backend = HandleRepoBackend(repo)
     backend.update_metadata()
@@ -178,6 +178,6 @@ def test_HandleRepoBackend_meta(path):
     # commit:
     # not implemented yet in HandleRepo:
     assert_raises(NotImplementedError, backend.commit_metadata)
-    # If read only should raise exception anyway:
+    # If read only, should raise exception anyway:
     backend.is_read_only = True
     assert_raises(ReadOnlyBackendError, backend.commit_metadata)

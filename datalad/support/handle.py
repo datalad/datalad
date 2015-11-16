@@ -19,57 +19,6 @@ from.exceptions import ReadOnlyBackendError
 lgr = logging.getLogger('datalad.handle')
 
 
-class HandleBackend(object):
-    """Interface to be implemented by backends for handles.
-
-    Abstract class defining an interface, that needs to be implemented
-    by any class that aims to provide a backend for handles.
-    """
-
-    __metaclass__ = ABCMeta
-
-    @abstractproperty
-    def url(self):
-        """url of the physical representation of a handle.
-
-        This is a read-only property, since an url can only be provided by a
-        physically existing handle. It doesn't make sense to tell a backend to
-        change it.
-
-        Returns
-        -------
-        str
-        """
-        pass
-
-    @abstractmethod
-    def get_metadata(self, files=None):
-        """Get a graph containing the handle's metadata.
-
-        Returns
-        -------
-        rdflib.Graph
-        """
-        # TODO: doc `files` and may be find a more general name
-        pass
-
-    @abstractmethod
-    def set_metadata(self, meta, msg=None):
-        """Set the metadata of a handle.
-
-        A backend can deny to write handle data. In that case is should raise
-        an exception.
-
-        TODO: Define a ReadOnlyException or sth.
-
-        Parameters
-        ----------
-        meta: rdflib.Graph
-        msg: optionally a "commit-message"
-        """
-        pass
-
-
 class Handle(object):
     """Representation of a Handle's metadata.
 

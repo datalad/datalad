@@ -18,7 +18,7 @@ from rdflib import Graph, URIRef
 
 from .gitrepo import GitRepo, _remove_empty_items
 from .handlerepo import HandleRepo
-from .handle import Handle, HandleBackend
+from .handle import Handle
 from .exceptions import CollectionBrokenError, ReadOnlyBackendError
 from .collection import Collection, CollectionBackend
 from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
@@ -631,17 +631,17 @@ class CollectionRepo(GitRepo):
 
         Parameters
         ----------
-        handle: str or HandleRepo or HandleBackend
-          URL of the handle or an instance of either HandleRepo or HandleBackend.
+        handle: str or HandleRepo or Handle
+          URL of the handle or an instance of either HandleRepo or Handle.
         name: str
           name of the handle within the collection. This name is required to be
           unique with respect to the collection. If a HandleRepo or
-          HandleBackend is passed, the name stored therein is the default.
+          Handle is passed, the name stored therein is the default.
           If `handle` is just an URL, a name is required.
         """
-        if isinstance(handle, HandleBackend):
+        if isinstance(handle, Handle):
             uri = URIRef(handle.url)
-            name = name or handle.get_metadata().identifier
+            name = name or handle.name
 
         if isinstance(handle, HandleRepo):
             uri = URIRef(get_local_file_url(handle.path))
