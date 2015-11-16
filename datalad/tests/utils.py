@@ -29,7 +29,7 @@ from six.moves.BaseHTTPServer import HTTPServer
 from six import reraise
 
 from functools import wraps
-from os.path import exists, realpath, join as opj, pardir, split as pathsplit
+from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
@@ -43,6 +43,7 @@ from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
+from ..cmdline.helpers import get_repo_instance
 
 from . import _TEMP_PATHS_GENERATED
 
@@ -178,21 +179,23 @@ def ok_file_under_git(path, filename=None, annexed=False):
 
     try:
         # if succeeds when must not (not `annexed`) -- fail
-        repo = AnnexRepo(path, create=False)
+        repo = get_repo_instance(path, class_=AnnexRepo)
         annex = True
     except RuntimeError as e:
         # TODO: make a dedicated Exception
-        if "No annex found" in e.message:
-            repo = GitRepo(path, create=False)
+        if "No annex repository found in" in e.message:
+            repo = get_repo_instance(path, class_=GitRepo)
             annex = False
         else:
             raise
-
-    assert(filename in repo.get_indexed_files())  # file is known to Git
+    # path to the file within the repository
+    file_repo_dir = os.path.relpath(path, repo.path)
+    file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
+    assert(file_repo_path in repo.get_indexed_files())  # file is known to Git
 
     if annex:
         try:
-            repo.get_file_key(filename)
+            repo.get_file_key(file_repo_path)
             in_annex = True
         except FileNotInAnnexError as e:
             in_annex = False
