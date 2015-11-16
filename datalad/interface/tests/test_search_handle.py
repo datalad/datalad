@@ -12,14 +12,13 @@
 
 __docformat__ = 'restructuredtext'
 
-from os import getcwd, chdir
 from mock import patch
 from nose.tools import assert_is_instance, assert_not_in
 from six.moves.urllib.parse import urlparse
 
 from ...api import search_handle, import_metadata, install_handle, \
     create_handle
-from ...utils import swallow_logs
+from ...utils import swallow_logs, getpwd, chpwd
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_testrepos, with_tempfile, ok_startswith, assert_in, ok_clean_git
 from ...cmdline.helpers import get_repo_instance, get_datalad_master
@@ -51,10 +50,10 @@ def test_search_handle(hurl, hpath, hpath2, lcpath):
         eq_(hlist, [])
 
         # import handle metadata
-        current_dir = getcwd()
-        chdir(hpath)
+        current_dir = getpwd()
+        chpwd(hpath)
         import_metadata(format="plain-text", path=hpath)
-        chdir(current_dir)
+        chpwd(current_dir)
 
         # now, search again:
         hlist = search_handle("Poldrack")

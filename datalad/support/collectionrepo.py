@@ -300,7 +300,7 @@ class CollectionRepo(GitRepo):
         ----------
         path: str
           path to git repository. In case it's not an absolute path, it's
-          relative to os.getcwd()
+          relative to PWD
 
         url: str
           url to the to-be-cloned repository. Requires valid git url
@@ -326,6 +326,7 @@ class CollectionRepo(GitRepo):
 
         importer = CustomImporter('Collection', 'Collection', DLNS.this)
         # load existing files:
+
         if REPO_CONFIG_FILE in self.get_indexed_files():
             importer.import_data(opj(self.path, REPO_CONFIG_FILE))
         elif not create:
@@ -355,13 +356,14 @@ class CollectionRepo(GitRepo):
                 raise CollectionBrokenError("Missing label in %s." %
                                             opj(self.path, REPO_CONFIG_FILE))
 
-        importer.set_graphs(graphs)  # necessary?
-        importer.store_data(self.path)
-        self.git_add([REPO_CONFIG_FILE, REPO_STD_META_FILE])
+        if create:
+            importer.set_graphs(graphs)  # necessary?
+            importer.store_data(self.path)
+            self.git_add([REPO_CONFIG_FILE, REPO_STD_META_FILE])
 
-        if not self.repo.head.is_valid() or \
-                self.repo.index.diff(self.repo.head.commit):
-            self.git_commit("Initialized collection metadata.")
+            if not self.repo.head.is_valid() or \
+                    self.repo.index.diff(self.repo.head.commit):
+                self.git_commit("Initialized collection metadata.")
 
     def _get_cfg(self):
         config_handler = CustomImporter('Collection', 'Collection', DLNS.this)

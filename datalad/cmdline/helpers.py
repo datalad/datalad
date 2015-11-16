@@ -196,9 +196,9 @@ def get_repo_instance(path=curdir, class_=None):
                                        abspath_)
             else:
                 try:
-                    return class_(dir_)
+                    return class_(dir_, create=False)
                 except (RuntimeError, InvalidGitRepositoryError) as e:
-                    raise RuntimeError("No %s repository found in %s" %
+                    raise RuntimeError("No %s repository found in %s." %
                                        (type_, abspath_))
         else:
             dir_ = normpath(opj(dir_, ".."))

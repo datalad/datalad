@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from os import chdir, getcwd
 from os.path import basename, exists, isdir, join as opj
 
 from mock import patch
@@ -20,7 +19,7 @@ from nose.tools import assert_is_instance, assert_not_in
 from six.moves.urllib.parse import urlparse
 
 from ...api import describe, create_handle, create_collection
-from ...utils import swallow_logs
+from ...utils import swallow_logs, getpwd, chpwd
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_testrepos, with_tempfile, ok_startswith, assert_in, ok_clean_git
 from ...support.metadatahandler import DLNS, PAV, DCTERMS, URIRef, RDF, FOAF, \
@@ -57,14 +56,14 @@ def test_describe_handle_simple(path, lcpath):
             0)
 
         # describe currently has to run within the repository to describe:
-        current_dir = getcwd()
-        chdir(path)
+        current_dir = getpwd()
+        chpwd(path)
         handle_after = describe(author="Some author",
                                 author_email="some.author@example.com",
                                 author_page="http://example.com/someauthor",
                                 license="A license text.",
                                 description="This a description.")
-        chdir(current_dir)
+        chpwd(current_dir)
 
         assert_is_instance(handle_after, Handle)
 
@@ -143,14 +142,14 @@ def test_describe_collection_simple(path, lcpath):
             0)
 
         # describe currently has to run within the repository to describe:
-        current_dir = getcwd()
-        chdir(path)
+        current_dir = getpwd()
+        chpwd(path)
         collection_after = describe(author="Some author",
                                     author_email="some.author@example.com",
                                     author_page="http://example.com/someauthor",
                                     license="A license text.",
                                     description="This a description.")
-        chdir(current_dir)
+        chpwd(current_dir)
 
         assert_is_instance(collection_after, Collection)
 
@@ -205,12 +204,12 @@ def test_describe_collection_simple(path, lcpath):
 @with_tempfile(mkdir=True)
 def test_describe_outside_repo(path):
 
-    current_dir = getcwd()
-    chdir(path)
+    current_dir = getpwd()
+    chpwd(path)
     with assert_raises(RuntimeError) as cm:
         describe(author="Some author")
     eq_(str(cm.exception), "No datalad repository found in %s" % path)
-    chdir(current_dir)
+    chpwd(current_dir)
 
 
 # TODO: sub-entities
