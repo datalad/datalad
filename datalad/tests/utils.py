@@ -29,7 +29,7 @@ from six.moves.BaseHTTPServer import HTTPServer
 from six import reraise
 
 from functools import wraps
-from os.path import exists, realpath, join as opj, pardir
+from os.path import exists, realpath, join as opj, pardir, split as pathsplit
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
@@ -170,8 +170,11 @@ def ok_clean_git(path, annex=True, untracked=[]):
         eq_(head_diffs, [])
 
 
-def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepo(path)
+def ok_file_under_git(path, filename=None, annexed=False):
+    if filename is None:
+        # path provides the path and the name
+        path, filename = pathsplit(path)
+    repo = AnnexRepo(path, create=False)
     assert(filename in repo.get_indexed_files())  # file is known to Git
     try:
         repo.get_file_key(filename)
