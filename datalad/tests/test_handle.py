@@ -12,11 +12,12 @@
 
 from nose import SkipTest
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_false, assert_is_not_none, assert_not_equal, assert_in
+    assert_equal, assert_false, assert_is_not_none, assert_not_equal, assert_in, eq_, ok_
 
 from ..support.handlerepo import HandleRepo, HandleRepoBackend
-from ..support.handle import Handle
-from ..support.metadatahandler import URIRef, Literal, RDF, DLNS
+from ..support.handle import Handle, RuntimeHandle
+from ..support.exceptions import ReadOnlyBackendError
+from ..support.metadatahandler import URIRef, Literal, RDF, DLNS, Graph
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
@@ -24,42 +25,18 @@ from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
 from ..utils import get_local_file_url
 
 
-@with_tempfile
-def test_Handle_constructor(path):
-    repo = HandleRepo(path)
-    # backend constructor
-    handle = Handle(HandleRepoBackend(repo))
-    assert_equal(handle.url, repo.path)
-    assert_in((DLNS.this, RDF.type, DLNS.Handle),
-              handle.meta)
+def test_RuntimeHandle():
 
-    # copy constructor:
-    handle2 = Handle(handle)
-    assert_equal(handle2.url, repo.path)
-    assert_in((DLNS.this, RDF.type, DLNS.Handle),
-              handle2.meta)
-
-    # empty:
-    handle3 = Handle(name="empty_handle")
-    assert_equal(handle3.meta.identifier, Literal("empty_handle"))
-    assert_in((DLNS.this, RDF.type, DLNS.Handle),
-              handle.meta)
-
-
-@with_tempfile
-def test_Handle_meta(path):
-    repo = HandleRepo(path)
-    repo_md = repo.get_metadata()
-    handle = Handle(HandleRepoBackend(repo))
-    assert_equal(handle.name, repo.name)
-    assert_equal(handle.name, str(handle.meta.identifier))
-    [assert_in(triple, handle.meta) for triple in repo_md]
-    assert_equal(len(handle.meta), len(repo_md))
-    assert_equal(handle.meta.identifier, repo_md.identifier)
-
-    # TODO: set metadata. (See handlerepo)
-    #       set name?
-
-
-def test_Handle_commit():
-    raise SkipTest
+    name = "TestHandle"
+    handle = RuntimeHandle(name)
+    eq_(name, handle.name)
+    ok_(handle.url is None)
+    assert_is_instance(handle.meta, Graph)
+    g = Graph(identifier="NewName")
+    handle.meta = g
+    eq_("NewName", handle.name)
+    eq_(handle.meta, g)
+    assert_raises(ReadOnlyBackendError, handle.commit_metadata)
+    eq_("<Handle name=NewName "
+        "(<class 'datalad.support.handle.RuntimeHandle'>)>",
+        handle.__repr__())

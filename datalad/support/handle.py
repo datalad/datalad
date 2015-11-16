@@ -12,11 +12,8 @@
 import logging
 from abc import ABCMeta, abstractmethod, abstractproperty
 
-from rdflib import URIRef, Graph, Literal
-
-from ..support.metadatahandler import DLNS, RDF
-
-from .annexrepo import AnnexRepo
+from .metadatahandler import DLNS, RDF, Graph, Literal
+from.exceptions import ReadOnlyBackendError
 
 
 lgr = logging.getLogger('datalad.handle')
@@ -76,47 +73,108 @@ class HandleBackend(object):
 class Handle(object):
     """Representation of a Handle's metadata.
 
-    Independent on its physical representation.
+    Abstract base class defining an interface, that needs to be implemented
+    by any class that aims to provide a backend for handles.
+    An instance of a derived class serves as a runtime representation of the
+    handle's metadata. That metadata is represented by a named graph.
+    'update_metadata' and 'commit_metadata' are used to synchronize that graph
+    with the physical backend.
+
     """
 
-    # TODO: May be all the data like url, id should directly go into the
-    # metadata graph. If we need them without a desire to query/build the
-    # metadata graph we would likely use HandleRepo instead of Handle anyway.
+    __metaclass__ = ABCMeta
 
-    def __init__(self, src=None, name=None):
-        # TODO: Handling of 'name' option. See Collections.
+    def __init__(self):
+        self._graph = None
 
-        if isinstance(src, HandleBackend):
-            self._backend = src
-            self.url = self._backend.url
-            self.meta = self._backend.get_metadata()
+    def __repr__(self):
+        return "<Handle name=%s (%s)>" % (self.name, type(self))
 
-        elif isinstance(src, Handle):
-            # TODO: Correct behaviour of copy constructor?
-            self._backend = src._backend
-            self.meta = src.meta
-            self.url = src.url
+    @abstractproperty
+    def url(self):
+        """url of the physical representation of a handle.
 
-        elif src is None:
-            self._backend = None
-            self.meta = Graph(identifier=Literal(name))
-            self.meta.add((DLNS.this, RDF.type, DLNS.Handle))
-            self.url = None
+        This is a read-only property, since an url can only be provided by a
+        physically existing handle. It doesn't make sense to tell a backend to
+        change it.
 
-        else:
-            e_msg = "Invalid source for Handle: %s." % type(src)
-            lgr.error(e_msg)
-            raise TypeError(e_msg)
+        Returns
+        -------
+        str
+        """
+        pass
 
-    def commit(self, msg="Handle updated."):
+    @abstractmethod
+    def update_metadata(self):
+        """Update the graph containing the handle's metadata.
 
-        if not self._backend:
-            lgr.error("Missing handle backend.")
-            raise RuntimeError("Missing handle backend.")
+        Called to update 'self._graph' from the handle's backend.
+        Creates a named graph, whose identifier is the name of the handle.
+        """
+        pass
 
-        self._backend.set_metadata(self.meta, msg)
+    @abstractmethod
+    def commit_metadata(self, msg="Metadata updated."):
+        """Commit the metadata graph of a handle to its storage backend.
+
+        A backend can deny to write handle data. In that case is should raise
+        a ReadOnlyBackendError.
+
+        Parameters
+        ----------
+        msg: optional commit message.
+
+        Raises
+        ------
+        ReadOnlyBackendError
+        """
+        pass
+
+    def get_metadata(self):
+        if self._graph is None:
+            lgr.debug("Updating graph of handle '%s' from backend." %
+                      self.name)
+            self.update_metadata()
+        return self._graph
+
+    # TODO: Not sure yet, whether setting the graph directly should
+    # be allowed. This involves change of the identifier, which may
+    # mess up things. Therefore may be don't let the user set it.
+    # Triples can be modified anyway.
+    # This also leads to the thought of renaming routine, which would need
+    # to copy the entire graph to a new one with a new identifier.
+    def set_metadata(self, graph):
+        self._graph = graph
+
+    meta = property(get_metadata, set_metadata)
 
     @property
     def name(self):
         return str(self.meta.identifier)
+
+
+class RuntimeHandle(Handle):
+    """Pure runtime Handle without a persistent backend.
+
+    This kind of a handle can only be used as a "virtual" handle, that has no
+    physical storage.
+
+    Note: For now, there is no usecase.
+    It serves as an example and a test case.
+    """
+
+    def __init__(self, name):
+        super(RuntimeHandle, self).__init__()
+        self._graph = Graph(identifier=Literal(name))
+        self._graph.add((DLNS.this, RDF.type, DLNS.Handle))
+
+    @property
+    def url(self):
+        return None
+
+    def update_metadata(self):
+        pass
+
+    def commit_metadata(self, msg="Metadata updated."):
+        raise ReadOnlyBackendError("Can't commit RuntimeHandle.")
 
