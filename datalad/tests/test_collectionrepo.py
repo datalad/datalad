@@ -28,8 +28,8 @@ from ..support.metadatahandler import DLNS, RDF, RDFS, DCTERMS
 from ..tests.utils import with_tempfile, with_testrepos, \
     assert_cwd_unchanged, on_windows, on_linux, ok_clean_git_annex_proxy, \
     swallow_logs, swallow_outputs, in_, with_tree, \
-    get_most_obscure_supported_name, ok_clean_git, ok_
-from ..support.exceptions import CollectionBrokenError
+    get_most_obscure_supported_name, ok_clean_git, ok_, ok_startswith, eq_
+from ..support.exceptions import CollectionBrokenError, ReadOnlyBackendError
 from ..utils import get_local_file_url
 from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
 
@@ -352,69 +352,62 @@ def test_CollectionRepoHandleBackend_constructor(path1, path2, h1_path, h2_path)
 
     # constructors to test:
     be1 = CollectionRepoHandleBackend(clt, "handle1")
-    be2 = CollectionRepoHandleBackend(clt, "master/handle1")
-    be3 = CollectionRepoHandleBackend(clt, "handle1", "master")
-    be4 = CollectionRepoHandleBackend(clt, "handle2", "remoterepo/master")
-    be5 = CollectionRepoHandleBackend(clt, "handle2", "remoterepo")
-    # TODO: Should also be possible: key="remoterepo/handle2" with no branch passed.
+    be2 = CollectionRepoHandleBackend(clt, "handle1", "master")
+    be3 = CollectionRepoHandleBackend(clt, "handle2", "remoterepo/master")
 
-    assert_raises(RuntimeError, CollectionRepoHandleBackend,
-                  clt, "notexisting")
+    with assert_raises(ValueError) as cm:
+        CollectionRepoHandleBackend(clt, "NotExisting")
+    ok_startswith(str(cm.exception), "Unknown handle NotExisting")
 
-    # tests:
-    assert_equal(be1._path, "handle1")
-    assert_equal(be2._path, "handle1")
-    assert_equal(be3._path, "handle1")
-    assert_equal(be4._path, "handle2")
-    assert_equal(be5._path, "handle2")
+    with assert_raises(ValueError) as cm:
+        CollectionRepoHandleBackend(clt, "handle1", branch="NotExisting")
+    ok_startswith(str(cm.exception), "Unknown branch NotExisting")
+
+    with assert_raises(TypeError) as cm:
+        CollectionRepoHandleBackend(GitRepo(path1, create=False), "handle1")
+    ok_startswith(str(cm.exception),
+                  "Can't deal with type "
+                  "<class 'datalad.support.gitrepo.GitRepo'>")
 
     assert_false(be1.is_read_only)
     assert_false(be2.is_read_only)
-    assert_false(be3.is_read_only)
-    ok_(be4.is_read_only)
-    ok_(be5.is_read_only)
+    ok_(be3.is_read_only)
 
     assert_equal(be1.url, get_local_file_url(h1_path))
     assert_equal(be2.url, get_local_file_url(h1_path))
-    assert_equal(be3.url, get_local_file_url(h1_path))
-    assert_equal(be4.url, get_local_file_url(h2_path))
-    assert_equal(be5.url, get_local_file_url(h2_path))
+    assert_equal(be3.url, get_local_file_url(h2_path))
+
+    for backend in [be1, be2, be3]:
+        eq_("<Handle name=%s (<class "
+            "'datalad.support.collectionrepo.CollectionRepoHandleBackend'>)>"
+            % backend.name,
+            backend.__repr__())
 
 
-@with_tempfile
-@with_tempfile
-@with_tempfile
-@with_tempfile
-def test_CollectionRepoHandleBackend_get_metadata(path1, path2, h1_path,
-                                                  h2_path):
-    # setup
-    clt = CollectionRepo(path1, name='testcollection')
-    clt2 = CollectionRepo(path2, name='testcollection2')
-    h1 = HandleRepo(h1_path)
-    h2 = HandleRepo(h2_path)
-    clt.add_handle(h1, "handle1")
-    clt2.add_handle(h2, "handle2")
-    clt.git_remote_add("remoterepo", path2)
-    clt.git_fetch("remoterepo")
+@with_testrepos('collection', flavors=['local'])
+def test_CollectionRepoHandleBackend_name(path):
+    repo = CollectionRepo(path, create=False)
+    backend = CollectionRepoHandleBackend(repo, "BasicHandle")
 
-    # backends:
-    be1 = CollectionRepoHandleBackend(clt, "handle1")
-    be2 = CollectionRepoHandleBackend(clt, "handle2", "remoterepo")
-
-    # metadata:
-    meta1 = be1.get_metadata()
-    meta2 = be2.get_metadata()
-
-    # tests:
-    assert_equal(meta1.identifier, Literal("handle1"))
-    assert_equal(meta2.identifier, Literal("handle2"))
-    assert_equal(len(meta1), 1)
-    assert_equal(len(meta2), 1)
-    assert_in((URIRef(get_local_file_url(h1_path)), RDF.type, DLNS.Handle),
-              meta1)
-    assert_in((URIRef(get_local_file_url(h2_path)), RDF.type, DLNS.Handle),
-              meta2)
+    # get name:
+    eq_(backend.name, "BasicHandle")
+    # set name:
+    with assert_raises(AttributeError) as cm:
+        backend.name = "new_name"
 
 
-def test_CollectionRepoHandleBackend_set_metadata():
-    raise SkipTest
+@with_testrepos('collection', flavors=['local'])
+def test_CollectionRepoHandleBackend_meta(path):
+    repo = CollectionRepo(path, create=False)
+    repo_graph = repo.get_handle_graph("BasicHandle")
+    backend = CollectionRepoHandleBackend(repo, "BasicHandle")
+    backend.update_metadata()
+    eq_(backend._graph, repo_graph)
+    eq_(backend.meta, repo_graph)
+
+    # commit:
+    # not implemented yet in CollectionRepo:
+    assert_raises(NotImplementedError, backend.commit_metadata)
+    # If read only should raise exception anyway:
+    backend.is_read_only = True
+    assert_raises(ReadOnlyBackendError, backend.commit_metadata)

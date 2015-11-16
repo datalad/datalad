@@ -135,6 +135,10 @@ def test_HandleRepoBackend_constructor(path):
     eq_(backend._repo, repo)
     eq_(backend.url, get_local_file_url(repo.path))
     eq_(backend.is_read_only, False)
+    eq_("<Handle name=%s "
+        "(<class 'datalad.support.handlerepo.HandleRepoBackend'>)>"
+        % backend.name,
+        backend.__repr__())
 
     # not existing branch:
     with assert_raises(ValueError) as cm:
@@ -147,7 +151,6 @@ def test_HandleRepoBackend_constructor(path):
     ok_startswith(str(cm.exception),
                   "Can't deal with type "
                   "<class 'datalad.support.annexrepo.AnnexRepo'>")
-
 
 
 @with_tempfile

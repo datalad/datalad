@@ -19,7 +19,7 @@ from rdflib import Graph, URIRef
 from .gitrepo import GitRepo, _remove_empty_items
 from .handlerepo import HandleRepo
 from .handle import Handle, HandleBackend
-from .exceptions import CollectionBrokenError
+from .exceptions import CollectionBrokenError, ReadOnlyBackendError
 from .collection import Collection, CollectionBackend
 from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
     MetadataImporter, DCTERMS, RDF
@@ -29,100 +29,73 @@ from ..consts import REPO_STD_META_FILE, REPO_CONFIG_FILE
 lgr = logging.getLogger('datalad.collectionrepo')
 
 
-class CollectionRepoHandleBackend(HandleBackend):
-    """HandleBackend for collection repositories.
+class CollectionRepoHandleBackend(Handle):
+    """Handle backend for collection repositories.
 
-    Implements a HandleBackend retrieving its data from a branch of a
-    collection repository. This is a read-only backend for Handle, since a
-    collection only contains a cache of the metadata of handles.
+    Implements a Handle backend retrieving its data from a branch of a
+    collection repository.
     """
-    # TODO: raise proper Exceptions on write access
-    # TODO: Better name of these classes
-    # TODO: Update docs!
 
-    def __init__(self, repo, key, branch=None):
-        self.repo = repo
-        self.branch = branch if branch is not None \
-            else self.repo.git_get_active_branch()
-        self.key = key
-        self._path = self.repo._key2filename(self.key)
-        self._cfg_file = opj(self._path, REPO_CONFIG_FILE)
-        self._std_file = opj(self._path, REPO_STD_META_FILE)
+    def __init__(self, repo, key, branch=None, files=None):
+        """
 
-        # remote branch? => read-only
-        branch_parts = self.branch.split('/')
-        if branch_parts[0] in self.repo.git_get_remotes():
-            self.is_read_only = True
-            if len(branch_parts) == 1:
-                # remote name without branch
-                self.branch += "/master"
+        :param repo:
+        :param key:
+        :param branch:
+        :param files:
+        :return:
+        """
+        super(CollectionRepoHandleBackend, self).__init__()
+
+        if not isinstance(repo, CollectionRepo):
+            e_msg = "Can't deal with type %s to access " \
+                    "a collection repository." % type(repo)
+            lgr.error(e_msg)
+            raise TypeError(e_msg)
         else:
-            self.is_read_only = False
+            self._repo = repo
 
-        if self._std_file not in self.repo.git_get_files(self.branch):
-            raise RuntimeError("Handle '%s' not available." % self.key)
+        if branch is None:
+            self._branch = self._repo.git_get_active_branch()
+        elif branch in self._repo.git_get_branches() + \
+                self._repo.git_get_remote_branches():
+            self._branch = branch
+        else:
+            raise ValueError("Unknown branch %s of repository at %s." %
+                             (branch, self._repo.path))
 
-    def get_metadata(self, files=None):
-        """
-        Gets metadata graph for the handle (all files in collection or just
-        `files`)
-        Parameters
-        ----------
-        files: list of str
+        if key not in self._repo.get_handle_list(self._branch):
+            raise ValueError("Unknown handle %s in branch %s of repository %s."
+                             % (key, self._branch, self._repo.path))
+        self._key = key
 
-        Returns
-        -------
-        rdflib.Graph
-        """
-        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                           self.branch))
-        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+        # we can't write to a remote branch:
+        self.is_read_only = self._branch.split('/')[0] in \
+                            self._repo.git_get_remotes()
 
-        h_node = cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
-        h_name = cfg_graph.value(subject=h_node, predicate=RDFS.label)
+        self._files = files
 
-        # additional files in handle's dir:
-        if files is None:
-            files = [file_
-                     for file_ in self.repo.git_get_files(branch=self.branch)
-                     if file_.startswith(self.repo._key2filename(self.key))
-                     and basename(file_) != REPO_CONFIG_FILE]
+    def update_metadata(self):
+        self._graph = self._repo.get_handle_graph(self._key, self._branch,
+                                                  self._files)
 
-        out = Graph(identifier=h_name)
-        for file_ in files:
-            file_str = '\n'.join(self.repo.git_get_file_content(file_,
-                                                                self.branch))
-            out.parse(data=file_str, format="turtle")
-
-        # Note: See note in CollectionRepoBackend.get_collection
-        return out
-
-    def set_metadata(self, meta, msg="Handle metadata updated."):
-
+    def commit_metadata(self, msg="Handle metadata updated."):
         if self.is_read_only:
-            raise RuntimeWarning("Can't write to read-only handle.")
+            raise ReadOnlyBackendError("Can't commit to handle '%s'.\n"
+                                       "(Repository: %s\tBranch: %s." %
+                                       (self.name, self._repo.path,
+                                        self._branch))
 
-        # save current branch ...
-        current_branch = self.repo.git_get_active_branch()
+        # TODO: different graphs, file names, etc. See CollectionRepo
+        # Same goes for HandleRepo/HandleRepoBackend
+        self._repo.store_handle_graph(self._graph, self._key,
+                                      branch=self._branch)
 
-        if self.branch != current_branch:
-            # ... and switch to the one to be changed:
-            self.repo.git_checkout(self.branch)
-
-        assure_dir(opj(self.repo.path, self._path))
-        meta.serialize(self._std_file, format="turtle")
-        self.repo.git_add(self._std_file)
-        self.repo.git_commit(msg=msg)
-
-        if self.branch != current_branch:
-            self.repo.git_checkout(current_branch)
+    # TODO: set_name? See Handle.
 
     @property
     def url(self):
-        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                           self.branch))
-        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-        return str(cfg_graph.value(predicate=RDF.type, object=DLNS.Handle))
+        return str(self.meta.value(predicate=RDF.type, object=DLNS.Handle))
 
 
 class CollectionRepoBackend(CollectionBackend):
@@ -749,3 +722,103 @@ class CollectionRepo(GitRepo):
 
         self.git_add(REPO_STD_META_FILE)
         self.git_commit("Removed handle %s." % key)
+
+    def get_handle_graph(self, key, branch=None, files=None):
+        """
+
+        :param key:
+        :param branch:
+        :param files:
+        :return:
+        """
+
+        if branch is None:
+            branch = self.git_get_active_branch()
+
+        # by default read all ttl-files except handle's REPO_CONFIG_FILE
+        if files is None:
+            files = [file_
+                     for file_ in self.git_get_files(branch=branch)
+                     if file_.startswith(self._key2filename(key)) and
+                     file_.endswith(".ttl") and
+                     basename(file_) != REPO_CONFIG_FILE]
+
+        out = Graph(identifier=URIRef(key))
+        for file_ in files:
+            file_str = '\n'.join(self.git_get_file_content(file_, branch))
+            out.parse(data=file_str, format="turtle")
+
+        return out
+
+    # TODO:
+    def store_handle_graph(self, graph, key, branch=None):
+        # TODO How to determine filename?
+        raise NotImplementedError
+
+
+    # From former CollectionRepoHandleBackend:
+
+
+        #     constructor: #####################################
+        #
+        #
+        # self._path = self.repo._key2filename(self.key)
+        # self._cfg_file = opj(self._path, REPO_CONFIG_FILE)
+        # self._std_file = opj(self._path, REPO_STD_META_FILE)
+        #
+        # ########################
+    #
+    def get_metadata(self, files=None):
+        """
+        Gets metadata graph for the handle (all files in collection or just
+        `files`)
+        Parameters
+        ----------
+        files: list of str
+
+        Returns
+        -------
+        rdflib.Graph
+        """
+        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
+                                                           self.branch))
+        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+
+        h_node = cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
+        h_name = cfg_graph.value(subject=h_node, predicate=RDFS.label)
+
+        # additional files in handle's dir:
+        if files is None:
+            files = [file_
+                     for file_ in self.repo.git_get_files(branch=self.branch)
+                     if file_.startswith(self.repo._key2filename(self.key))
+                     and basename(file_) != REPO_CONFIG_FILE]
+
+        out = Graph(identifier=h_name)
+        for file_ in files:
+            file_str = '\n'.join(self.repo.git_get_file_content(file_,
+                                                                self.branch))
+            out.parse(data=file_str, format="turtle")
+
+        # Note: See note in CollectionRepoBackend.get_collection
+        return out
+    #
+    # def set_metadata(self, meta, msg="Handle metadata updated."):
+    #
+    #     if self.is_read_only:
+    #         raise RuntimeWarning("Can't write to read-only handle.")
+    #
+    #     # save current branch ...
+    #     current_branch = self.repo.git_get_active_branch()
+    #
+    #     if self.branch != current_branch:
+    #         # ... and switch to the one to be changed:
+    #         self.repo.git_checkout(self.branch)
+    #
+    #     assure_dir(opj(self.repo.path, self._path))
+    #     meta.serialize(self._std_file, format="turtle")
+    #     self.repo.git_add(self._std_file)
+    #     self.repo.git_commit(msg=msg)
+    #
+    #     if self.branch != current_branch:
+    #         self.repo.git_checkout(current_branch)

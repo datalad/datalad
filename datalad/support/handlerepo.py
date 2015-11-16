@@ -41,6 +41,13 @@ class HandleRepoBackend(Handle):
     """
 
     def __init__(self, repo, branch=None, files=None):
+        """
+
+        :param repo:
+        :param branch:
+        :param files:
+        :return:
+        """
 
         super(HandleRepoBackend, self).__init__()
 
