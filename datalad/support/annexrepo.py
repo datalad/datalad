@@ -62,8 +62,8 @@ class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
 
     Paths given to any of the class methods will be interpreted as relative
-    to os.getcwd(), in case this is currently beneath AnnexRepo's base dir
-    (`self.path`). If os.getcwd() is outside of the repository, relative paths
+    to PWD, in case this is currently beneath AnnexRepo's base dir
+    (`self.path`). If PWD is outside of the repository, relative paths
     will be interpreted as relative to `self.path`. Absolute paths will be
     accepted either way.
     """
@@ -83,7 +83,7 @@ class AnnexRepo(GitRepo):
         ----------
         path: str
           path to git-annex repository. In case it's not an absolute path, it's
-          relative to os.getcwd()
+          relative to PWD
 
         url: str, optional
           url to the to-be-cloned repository. Requires valid git url

@@ -158,7 +158,7 @@ def test_normalize_path(git_path):
 
     # cwd is currently outside the repo, so any relative path
     # should be interpreted as relative to `annex_path`
-    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, os.getcwd())
+    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, getpwd())
 
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
@@ -230,7 +230,7 @@ def test_GitRepo_files_decorator():
     assert_equal(test_instance.decorated_many(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
-    file_to_test = opj(os.getcwd(), 'somewhere', 'else', obscure_filename)
+    file_to_test = opj(getpwd(), 'somewhere', 'else', obscure_filename)
     assert_raises(FileNotInRepositoryError, test_instance.decorated_many,
                   file_to_test)
 
