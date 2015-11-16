@@ -86,11 +86,19 @@ class AddArchiveContent(Interface):
             args=("--key",),
             action="store_true",
             doc="""Flag to signal if provided archive is not actually a filename on its own but an annex key"""),
+        copy=Parameter(
+            args=("--copy",),
+            action="store_true",
+            doc="""Flag to copy the content of the archive instead of moving."""),
+        commit=Parameter(
+            args=("--no-commit",),
+            action="store_false",
+            dest="commit",
+            doc="""Flag to not commit upon completion."""),
+        # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
             doc="archive file or a key (if --key option specified)",
             constraints=EnsureStr()),
-        # TODO:
-        # options to pass into annex, e.g. on which files go directly to git and which to annex ... bleh
     )
 
         # use-case from openfmri pipeline
@@ -105,7 +113,7 @@ class AddArchiveContent(Interface):
         #     ),
 
     def __call__(self, archive, delete=False, key=False, exclude=None, rename=None, overwrite=False,
-                 annex_options=None):
+                 annex_options=None, copy=False, commit=True):
         """
         Returns
         -------
@@ -115,7 +123,6 @@ class AddArchiveContent(Interface):
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex
         annex = get_repo_instance(class_=AnnexRepo)
-        annex.always_commit = False
 
         # TODO: somewhat too cruel -- may be an option or smth...
         if annex.dirty:
@@ -129,7 +136,8 @@ class AddArchiveContent(Interface):
 
         if not key:
             # we were given a file which must exist
-            assert(exists(archive))
+            if not exists(archive):
+                raise ValueError("Archive {} does not exist".format(archive))
             origin = archive
             key = annex.get_file_key(archive)
         else:
@@ -169,7 +177,11 @@ class AddArchiveContent(Interface):
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
 
         try:
+            old_always_commit = annex.always_commit
+            annex.always_commit = False
+
             stats = dict(n=0, add_git=0, add_annex=0, skip=0, overwritten=0, renamed=0)
+
             for extracted_file in earchive.get_extracted_files():
                 stats['n'] += 1
                 extracted_path = opj(earchive.path, extracted_file)
@@ -205,7 +217,11 @@ class AddArchiveContent(Interface):
                     stats['overwritten'] += 1
                     # to make sure it doesn't conflict -- might have been a tree
                     rmtree(target_file)
-                os.renames(extracted_path, target_path)
+
+                if copy:
+                    raise NotImplementedError("Not yet copying from 'persistent' cache")
+                else:
+                    os.renames(extracted_path, target_path)
 
                 lgr.debug("Adding {target_path} to annex pointing to {url}".format(**locals()))
                 annex.annex_add(
@@ -227,8 +243,9 @@ class AddArchiveContent(Interface):
                 lgr.debug("Removing the original archive {}".format(archive))
                 annex.git_remove(archive)
 
-            annex.git_commit(
-                "Added content extracted from " + origin + """
+            if commit:
+                annex.git_commit(
+                    "Added content extracted from " + origin + """
 
 Processed: {n}
 Skipped: {skip}
@@ -239,7 +256,8 @@ Added
 Overwritten: {overwritten}
 """.format(**stats))
         finally:
+            annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure
             earchive.clean()
-        return annex
 
+        return annex
