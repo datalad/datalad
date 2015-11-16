@@ -162,9 +162,7 @@ class AnnexRepo(GitRepo):
             writer.release()
 
     def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
-                           log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=False, expect_fail=False,
-                           backend=None):
+                           backend=None, **kwargs):
         """Helper to run actual git-annex calls
 
         Unifies annex command calls.
@@ -181,13 +179,8 @@ class AnnexRepo(GitRepo):
             backend to be used by this command; Currently this can also be
             achieved by having an item '--backend=XXX' in annex_options.
             This may change.
-        log_stdout,
-        log_stderr,
-        log_online,
-        expect_stderr,
-        expect_fail: bool
-            these are passed to the respective options of
-            datalad.cmd.Runner.run()
+        **kwargs
+            these are passed as additional kwargs to datalad.cmd.Runner.run()
 
         Raises
         ------
@@ -211,12 +204,7 @@ class AnnexRepo(GitRepo):
         cmd_list += [annex_cmd] + backend + debug + annex_options
 
         try:
-            return self.cmd_call_wrapper.run(cmd_list,
-                                             log_stdout=log_stdout,
-                                             log_stderr=log_stderr,
-                                             log_online=log_online,
-                                             expect_stderr=expect_stderr,
-                                             expect_fail=expect_fail)
+            return self.cmd_call_wrapper.run(cmd_list, **kwargs)
         except CommandError as e:
             if "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
