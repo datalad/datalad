@@ -6,32 +6,27 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class Handle
+"""Test implementation of classes Handle, RuntimeHandle
 
 """
 
-from nose import SkipTest
-from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_false, assert_is_not_none, assert_not_equal, assert_in, eq_, ok_
+from nose.tools import assert_is_instance
 
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.handle import Handle, RuntimeHandle
 from ..support.exceptions import ReadOnlyBackendError
-from ..support.metadatahandler import URIRef, Literal, RDF, DLNS, Graph
-from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
-    ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
-    get_most_obscure_supported_name, swallow_outputs, ok_
-from ..utils import get_local_file_url
+from ..support.metadatahandler import RDF, DLNS, Graph
+from .utils import ok_, eq_, assert_raises
 
 
 def test_RuntimeHandle():
 
     name = "TestHandle"
     handle = RuntimeHandle(name)
+    assert_is_instance(handle, Handle)
     eq_(name, handle.name)
     ok_(handle.url is None)
     assert_is_instance(handle.meta, Graph)
+    eq_(handle.meta.value(subject=DLNS.this, predicate=RDF.type), DLNS.Handle)
     g = Graph(identifier="NewName")
     handle.meta = g
     eq_("NewName", handle.name)
@@ -40,3 +35,4 @@ def test_RuntimeHandle():
     eq_("<Handle name=NewName "
         "(<class 'datalad.support.handle.RuntimeHandle'>)>",
         handle.__repr__())
+

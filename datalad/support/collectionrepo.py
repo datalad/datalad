@@ -74,10 +74,33 @@ class CollectionRepoHandleBackend(Handle):
                             self._repo.git_get_remotes()
 
         self._files = files
+        self.sub_graphs = dict()
+
+    def set_metadata(self, data):
+        """
+
+        :param data: dict of Graph
+        :return:
+        """
+        if not isinstance(data, dict):
+            raise TypeError("Unexpected type of data: %s. "
+                            "Expects a dictionary of sub-graphs." %
+                            type(data))
+        for subgraph in data:
+            if not isinstance(data[subgraph], Graph):
+                raise TypeError("Sub-graph '%s' is of type %s. "
+                                "Expected: rdflib.Graph." %
+                                (subgraph, type(data[subgraph])))
+            self.sub_graphs[subgraph] = data[subgraph]
+
+    meta = property(Handle.get_metadata, set_metadata)
 
     def update_metadata(self):
-        self._graph = self._repo.get_handle_graph(self._key, self._branch,
-                                                  self._files)
+        self.sub_graphs = self._repo.get_handle_graphs(self._key, self._branch,
+                                                       self._files)
+        self._graph = Graph(identifier=Literal(self._key))
+        for key in self.sub_graphs:
+            self._graph += self.sub_graphs[key]
 
     def commit_metadata(self, msg="Handle metadata updated."):
         if self.is_read_only:
@@ -336,6 +359,9 @@ class CollectionRepo(GitRepo):
             if not self.repo.head.is_valid() or \
                     self.repo.index.diff(self.repo.head.commit):
                 self.git_commit("Initialized collection metadata.")
+
+    def __repr__(self):
+        return "<CollectionRepo path=%s (%s)>" % (self.path, type(self))
 
     def _get_cfg(self):
         config_handler = CustomImporter('Collection', 'Collection', DLNS.this)
@@ -724,7 +750,7 @@ class CollectionRepo(GitRepo):
         self.git_add(REPO_STD_META_FILE)
         self.git_commit("Removed handle %s." % key)
 
-    def get_handle_graph(self, key, branch=None, files=None):
+    def get_handle_graphs(self, key, branch=None, files=None):
         """
 
         :param key:
@@ -744,11 +770,12 @@ class CollectionRepo(GitRepo):
                      file_.endswith(".ttl") and
                      basename(file_) != REPO_CONFIG_FILE]
 
-        out = Graph(identifier=Literal(key))
+        graphs = dict()
         for file_ in files:
             file_str = '\n'.join(self.git_get_file_content(file_, branch))
-            out.parse(data=file_str, format="turtle")
-        return out
+            graphs[file_.rstrip(".ttl")] = Graph().parse(data=file_str,
+                                                      format="turtle")
+        return graphs
 
     # TODO:
     def store_handle_graph(self, graph, key, branch=None):

@@ -91,8 +91,8 @@ class Handle(object):
     # Triples can be modified anyway.
     # This also leads to the thought of renaming routine, which would need
     # to copy the entire graph to a new one with a new identifier.
-    def set_metadata(self, graph):
-        self._graph = graph
+    def set_metadata(self, data):
+        self._graph = data
 
     meta = property(get_metadata, set_metadata)
 
@@ -125,4 +125,3 @@ class RuntimeHandle(Handle):
 
     def commit_metadata(self, msg="Metadata updated."):
         raise ReadOnlyBackendError("Can't commit RuntimeHandle.")
-

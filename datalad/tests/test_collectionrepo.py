@@ -399,9 +399,21 @@ def test_CollectionRepoHandleBackend_name(path):
 @with_testrepos('collection', flavors=['local'])
 def test_CollectionRepoHandleBackend_meta(path):
     repo = CollectionRepo(path, create=False)
-    repo_graph = repo.get_handle_graph("BasicHandle")
+
+    repo_graph = Graph(identifier=Literal("BasicHandle"))
+    repo_graphs = repo.get_handle_graphs("BasicHandle")
+    for key in repo_graphs:
+        repo_graph += repo_graphs[key]
+
     backend = CollectionRepoHandleBackend(repo, "BasicHandle")
     backend.update_metadata()
+    # TODO: Avoid the need to manually call update here
+
+    eq_(backend.sub_graphs.keys(), repo_graphs.keys())
+    for key in backend.sub_graphs.keys():
+        eq_(set(iter(backend.sub_graphs[key])),
+            set(iter(repo_graphs[key])))
+
     eq_(backend._graph, repo_graph)
     eq_(backend.meta, repo_graph)
 

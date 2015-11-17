@@ -22,7 +22,7 @@ from rdflib.namespace import RDF, FOAF
 
 from ..support.handlerepo import HandleRepo, HandleRepoBackend, AnnexRepo
 from ..support.exceptions import FileInGitError, ReadOnlyBackendError
-from ..support.metadatahandler import DLNS, RDFS
+from ..support.metadatahandler import DLNS, RDFS, PlainTextImporter
 from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     ignore_nose_capturing_stdout, \
     on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
@@ -105,25 +105,20 @@ def test_HandleRepo_name(path):
 
 @with_tempfile
 def test_HandleRepo_get_metadata(path):
-    repo = HandleRepo(path)
+    repo = HandleRepo(path, create=True)
 
     # default
-    graph = repo.get_metadata()
+    graphs = repo.get_metadata()
+    eq_(len(graphs), 2)
+    assert_in(REPO_CONFIG_FILE[:-4], graphs)
+    assert_in(REPO_STD_META_FILE[:-4], graphs)
     assert_in((DLNS.this, RDF.type, DLNS.Handle),
-              graph)
+              graphs[REPO_STD_META_FILE[:-4]])
     assert_in((DLNS.this, RDFS.label, Literal(repo.name)),
-              graph)
-    assert_equal(len(graph), 2)
-    assert_equal(graph.identifier, URIRef(repo.name))
+              graphs[REPO_CONFIG_FILE[:-4]])
 
-    # single file:
-    graph2 = repo.get_metadata([REPO_STD_META_FILE])
-    assert_in((DLNS.this, RDF.type, DLNS.Handle),
-              graph2)
-    assert_equal(len(graph2), 1)
-
-
-
+    # TODO: Use handle with several metadata files and
+    # only load them partially.
 
 # testing HandleRepoBackend:
 
@@ -159,7 +154,6 @@ def test_HandleRepoBackend_name(path):
     backend = HandleRepoBackend(repo)
 
     # get name:
-    # TODO: Assertion still correct?
     eq_(backend.name, repo.name)
     # set name:
     with assert_raises(AttributeError) as cm:
@@ -169,15 +163,26 @@ def test_HandleRepoBackend_name(path):
 @with_testrepos('.*handle.*', flavors=['local'])
 def test_HandleRepoBackend_meta(path):
     repo = HandleRepo(path, create=False)
-    repo_graph = repo.get_metadata()
+
+    repo_graph = Graph(identifier=Literal(repo.name))
+    repo_graphs = repo.get_metadata()
+    for key in repo_graphs:
+        repo_graph += repo_graphs[key]
+
     backend = HandleRepoBackend(repo)
     backend.update_metadata()
+
+    eq_(backend.sub_graphs.keys(), repo_graphs.keys())
+    for key in backend.sub_graphs.keys():
+        eq_(set(iter(backend.sub_graphs[key])),
+            set(iter(repo_graphs[key])))
     eq_(backend._graph, repo_graph)
     eq_(backend.meta, repo_graph)
 
     # commit:
     # not implemented yet in HandleRepo:
     assert_raises(NotImplementedError, backend.commit_metadata)
-    # If read only, should raise exception anyway:
+
+    # If read only, should raise exception:
     backend.is_read_only = True
     assert_raises(ReadOnlyBackendError, backend.commit_metadata)

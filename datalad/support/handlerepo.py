@@ -22,8 +22,8 @@ from rdflib import URIRef, RDF
 from six import string_types
 
 from .annexrepo import AnnexRepo
-from .metadatahandler import MetadataImporter, CustomImporter, Graph, Literal, \
-    DLNS, RDFS
+from .metadatahandler import MetadataImporter, CustomImporter, Graph, \
+    Literal, DLNS, RDFS
 from .handle import Handle
 from .exceptions import ReadOnlyBackendError
 from ..utils import assure_dir, get_local_file_url
@@ -72,23 +72,59 @@ class HandleRepoBackend(Handle):
         self.is_read_only = self._branch.split('/')[0] in \
                             self._repo.git_get_remotes()
         self._files = files
+        self.sub_graphs = dict()
 
-        # TODO: subgraphs!
+    def set_metadata(self, data):
+        """
+
+        :param data: dict of Graph
+        :return:
+        """
+        if not isinstance(data, dict):
+            raise TypeError("Unexpected type of data: %s. "
+                            "Expects a dictionary of sub-graphs." %
+                            type(data))
+        for subgraph in data:
+            if not isinstance(data[subgraph], Graph):
+                raise TypeError("Sub-graph '%s' is of type %s. "
+                                "Expected: rdflib.Graph." %
+                                (subgraph, type(data[subgraph])))
+            self.sub_graphs[subgraph] = data[subgraph]
+
+    meta = property(Handle.get_metadata, set_metadata)
 
     def update_metadata(self):
-        self._graph = self._repo.get_metadata(self._files, branch=self._branch)
+        """
+
+        :return:
+        """
+        self.sub_graphs = self._repo.get_metadata(self._files,
+                                                  branch=self._branch)
+
+        self._graph = Graph(identifier=Literal(self._repo.name))
+        for key in self.sub_graphs:
+            self._graph += self.sub_graphs[key]
 
     def commit_metadata(self, msg="Handle metadata updated."):
+        """
+
+        :param msg:
+        :return:
+        """
         if self.is_read_only:
             raise ReadOnlyBackendError("Can't commit to handle '%s'.\n"
-                                       "(Repository: %s\tBranch: %s." %
+                                       "(Repository: %s\tBranch: %s)" %
                                        (self.name, self._repo.path,
                                         self._branch))
 
-        self._repo.set_metadata(self._graph, branch=self._branch)
+        self._repo.set_metadata(self.sub_graphs, branch=self._branch)
 
     @property
     def url(self):
+        """
+
+        :return:
+        """
         return get_local_file_url(self._repo.path)
 
     # TODO: set_name? See Handle.
@@ -164,6 +200,9 @@ class HandleRepo(AnnexRepo):
             self.add_to_git([self._cfg_file, self._md_file],
                             "Initialized handle metadata.")
 
+    def __repr__(self):
+        return "<HandleRepo path=%s (%s)>" % (self.path, type(self))
+
     def _get_cfg(self):
         config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
         config_handler.import_data(opj(self.path, self._cfg_file))
@@ -223,12 +262,12 @@ class HandleRepo(AnnexRepo):
         handler.import_data(files)
         graphs = handler.get_graphs()
 
-        joined_graph = Graph(identifier=self.name)
-        for key in graphs:
-            joined_graph += graphs[key]
-        return joined_graph
+        # joined_graph = Graph(identifier=self.name)
+        # for key in graphs:
+        #     joined_graph += graphs[key]
+        return graphs
 
-    def set_metadata(self, graph, msg="Metadata saved.", branch=None):
+    def set_metadata(self, graphs, msg="Metadata saved.", branch=None):
         raise NotImplementedError
 
     def import_metadata(self, importer, files=None, data=None,
