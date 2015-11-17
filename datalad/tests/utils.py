@@ -44,7 +44,7 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 from ..cmdline.helpers import get_repo_instance
-
+from ..consts import ARCHIVES_TEMP_DIR
 from . import _TEMP_PATHS_GENERATED
 
 # temp paths used by clones
@@ -173,6 +173,10 @@ def ok_clean_git(path, annex=True, untracked=[]):
 
 
 def ok_file_under_git(path, filename=None, annexed=False):
+    """Test if file is present and under git/annex control
+
+    If relative path provided, then test from current directory
+    """
     if filename is None:
         # path provides the path and the name
         path, filename = pathsplit(path)
@@ -183,11 +187,12 @@ def ok_file_under_git(path, filename=None, annexed=False):
         annex = True
     except RuntimeError as e:
         # TODO: make a dedicated Exception
-        if "No annex repository found in" in e.message:
+        if "No annex repository found in" in str(e):
             repo = get_repo_instance(path, class_=GitRepo)
             annex = False
         else:
             raise
+
     # path to the file within the repository
     file_repo_dir = os.path.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
@@ -195,7 +200,8 @@ def ok_file_under_git(path, filename=None, annexed=False):
 
     if annex:
         try:
-            repo.get_file_key(file_repo_path)
+            # operates on relative to curdir path
+            repo.get_file_key(opj(path, filename))
             in_annex = True
         except FileNotInAnnexError as e:
             in_annex = False
@@ -269,6 +275,26 @@ def ok_annex_get(ar, files, network=True):
 def ok_generator(gen):
     assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
 
+def ok_archives_caches(repopath, n=1, persistent=None):
+    """Given a path to repository verify number of archives
+
+    Parameters
+    ----------
+    repopath : str
+      Path to the repository
+    n : int, optional
+      Number of archives directories to expect
+    persistent: bool or None, optional
+      If None -- both persistent and not count.
+    """
+    # looking into subdirectories
+    glob_ptn = opj(repopath,
+                   ARCHIVES_TEMP_DIR + {None: '*', True: '', False: '-*'}[persistent],
+                   '*')
+    dirs = glob.glob(glob_ptn)
+    assert_equal(len(dirs), n,
+                 msg="Found following dirs when needed %d of them: %s" % (n, dirs))
+
 #
 # Decorators
 #
@@ -315,7 +341,7 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
 def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
     """
-    
+
     @wraps(tfunc)
     def newfunc(*args, **kwargs):
 

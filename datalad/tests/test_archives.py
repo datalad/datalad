@@ -1,5 +1,11 @@
-#emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
-#ex: set sts=4 ts=4 sw=4 noet:
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
 from os.path import join as opj, exists
@@ -128,7 +134,10 @@ def test_ArchivesCache():
     # we don't actually need to test archives handling itself
     path1 = "/zuba/duba"
     path2 = "/zuba/duba2"
-    cache = ArchivesCache()
+    # should not be able to create a persistent cache without topdir
+    assert_raises(ValueError, ArchivesCache, persistent=True)
+    cache = ArchivesCache()  # by default -- non persistent
+
     archive1_path = opj(path1, fn_archive_obscure_ext)
     archive2_path = opj(path2, fn_archive_obscure_ext)
     cached_archive1_path = cache[archive1_path].path
@@ -137,3 +146,10 @@ def test_ArchivesCache():
     cache.clean()
     assert_false(exists(cached_archive1_path))
     assert_false(exists(cache.path))
+
+    # test del
+    cache = ArchivesCache()  # by default -- non persistent
+    assert_true(exists(cache.path))
+    cache_path = cache.path
+    del cache
+    assert_false(exists(cache_path))

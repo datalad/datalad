@@ -13,7 +13,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 """
 
 from os import linesep
-from os.path import join as opj, exists
+from os.path import join as opj, exists, relpath
 import logging
 import json
 import shlex
@@ -25,7 +25,7 @@ from six.moves.configparser import NoOptionError
 from .gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
 from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
-from ..utils import on_windows
+from ..utils import on_windows, getpwd
 
 
 lgr = logging.getLogger('datalad.annex')
@@ -504,21 +504,24 @@ class AnnexRepo(GitRepo):
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
 
-    def annex_addurls(self, urls, options=None, backend=None):
+    def annex_addurls(self, urls, options=None, backend=None, cwd=None):
         """Downloads each url to its own file, which is added to the annex.
 
         Parameters
         ----------
         urls: list
 
-        options: list
+        options: list, optional
             options to the annex command
+
+        cwd: string, optional
+            working directory from within which to invoke git-annex
         """
         options = options[:] if options else []
 
         self._run_annex_command('addurl', annex_options=options + urls,
                                 backend=backend, log_online=True,
-                                log_stderr=False)
+                                log_stderr=False, cwd=cwd)
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
 
@@ -548,7 +551,7 @@ class AnnexRepo(GitRepo):
         """
         options = options[:] if options else []
 
-        self._run_annex_command('drop', annex_options=files + options)
+        self._run_annex_command('drop', annex_options=options + files)
 
     @normalize_paths
     def annex_whereis(self, files):
@@ -618,7 +621,7 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         str
-            path relative to the current directory
+            path relative to the top directory of the repository
         """
 
         # TODO: batchable
@@ -628,7 +631,9 @@ class AnnexRepo(GitRepo):
         out, err = self._run_annex_command('contentlocation',
                                            annex_options=[key],
                                            expect_fail=True)
-        return out.rstrip(linesep).splitlines()[0]
+        path = out.rstrip(linesep).splitlines()[0]
+        return path
+
 
 # TODO: ---------------------------------------------------------------------
     @normalize_paths(match_return_type=False)

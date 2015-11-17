@@ -442,7 +442,7 @@ def test_use_cassette_if_no_vcr():
     # just test that our do nothing decorator does the right thing if vcr is not present
     try:
         import vcr
-        raise SkipTest("vcr is present, can't test behavior without vcr")
+        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
     except ImportError:
         pass
 

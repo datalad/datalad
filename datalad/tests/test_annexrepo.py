@@ -470,3 +470,11 @@ def test_AnnexRepo_get_contentlocation(path):
     # they both should point to the same location eventually
     eq_(os.path.realpath(opj(annex.path, fname)),
         os.path.realpath(opj(annex.path, key_location)))
+
+    # TODO: test how it would look if done under a subdir
+    with chpwd('subdir', mkdir=True):
+        key_location = annex.get_contentlocation(key)
+        # they both should point to the same location eventually
+        eq_(os.path.realpath(opj(annex.path, fname)),
+            os.path.realpath(opj(annex.path, key_location)))
+

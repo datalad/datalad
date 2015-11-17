@@ -18,9 +18,11 @@ assert(StrictVersion(patoolib.__version__) >= "1.7")
 
 import os
 import tempfile
-from os.path import join as opj, exists, abspath, basename
+from os.path import join as opj, exists, abspath, basename, isabs, normpath, relpath, pardir, isdir
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
+
+from ..utils import getpwd
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -199,6 +201,14 @@ def _get_cached_filename(archive):
     # per se there is no reason to maintain any long original name here.
     return hashlib.md5(archive.encode()).hexdigest()[:10]
 
+import string
+import random
+def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):
+    """Return a random ID composed from digits and uppercase letters
+
+    upper-case so we are tollerant to unlikely collisions on dummy FSs
+    """
+    return ''.join(random.choice(chars) for _ in range(size))
 
 class ArchivesCache(object):
     """Cache to maintain extracted archives
@@ -208,28 +218,36 @@ class ArchivesCache(object):
     toppath : str
       Top directory under .git/ of which temp directory would be created.
       If not provided -- random tempdir is used
-    allow_existing : bool, optional
+    persistent : bool, optional
       Passed over into generated ExtractedArchives
     """
     # TODO: make caching persistent across sessions/runs, with cleanup
     # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
     #       all up
-    def __init__(self, toppath=None, allow_existing=True):
+    def __init__(self, toppath=None, persistent=False):
 
+        self._toppath = toppath
         if toppath:
             path = opj(toppath, ARCHIVES_TEMP_DIR)
+            if not persistent:
+                tempsuffix = "-" + _get_random_id()
+                lgr.debug("For non-persistent archives using %s suffix forpath %s",
+                          tempsuffix, path )
+                path += tempsuffix
         else:
+            if persistent:
+                raise ValueError("%s cannot be persistent since no toppath was provided" % self)
             path = tempfile.mktemp(**get_tempfile_kwargs())
         self._path = path
-        self.allow_existing = allow_existing
+        self.persistent = persistent
         # TODO?  assure that it is absent or we should allow for it to persist a bit?
         #if exists(path):
         #    self._clean_cache()
         self._archives = {}
 
-        lgr.debug("Initiating clean cache for the archives under %s" % self.path)
-
+        # TODO: begging for a race condition
         if not exists(path):
+            lgr.debug("Initiating clean cache for the archives under %s" % self.path)
             try:
                 self._made_path = True
                 os.makedirs(path)
@@ -238,58 +256,102 @@ class ArchivesCache(object):
                 lgr.error("Failed to initialize cached under %s" % path)
                 raise
         else:
+            lgr.debug("Not initiating existing cache for the archives under %s" % self.path)
             self._made_path = False
+
 
     @property
     def path(self):
         return self._path
 
-    def clean(self):
+    def clean(self, force=False):
         for aname, a in list(self._archives.items()):
-            a.clean()
+            a.clean(force=force)
             del self._archives[aname]
-        if self._made_path:
-            rmtemp(self.path)
+        # Probably we should not rely on _made_path and not bother if persistent removing it
+        # if ((not self.persistent) or force) and self._made_path:
+        #     lgr.debug("Removing the entire archives cache under %s" % self.path)
+        #     rmtemp(self.path)
+        if (not self.persistent) or force:
+             lgr.debug("Removing the entire archives cache under %s" % self.path)
+             rmtemp(self.path)
+
+    def _get_normalized_archive_path(self, archive):
+        """Return full path to archive
+
+        So we have consistent operation from different subdirs,
+        while referencing archives from the topdir
+
+        TODO: why do we need it???
+        """
+        if not isabs(archive) and self._toppath:
+            out = normpath(opj(self._toppath, archive))
+            if relpath(out, self._toppath).startswith(pardir):
+                raise RuntimeError("%s points outside of the topdir %s"
+                                   % (archive, self._toppath))
+            if isdir(out):
+                raise RuntimeError("got a directory here... bleh")
+            return out
+        return archive
 
     def get_archive(self, archive):
+        archive = self._get_normalized_archive_path(archive)
+
         if archive not in self._archives:
             self._archives[archive] = \
                 ExtractedArchive(archive,
                                  opj(self.path, _get_cached_filename(archive)),
-                                 allow_existing=self.allow_existing)
+                                 persistent=self.persistent)
+
         return self._archives[archive]
 
     def __getitem__(self, archive):
         return self.get_archive(archive)
 
+    def __delitem__(self, archive):
+        archive = self._get_normalized_archive_path(archive)
+        self._archives[archive].clean()
+        del self._archives[archive]
+
+    def __del__(self):
+        try:
+            # we can at least try
+            if not self.persistent:
+                self.clean()
+        except:
+            pass
+
 
 class ExtractedArchive(object):
     """Container for the extracted archive
     """
-    def __init__(self, archive, path=None, allow_existing=True):
+    def __init__(self, archive, path=None, persistent=False):
         self._archive = archive
         # TODO: bad location for extracted archive -- use tempfile
         if not path:
             path = tempfile.mktemp(**get_tempfile_kwargs(prefix=_get_cached_filename(archive)))
 
-        if exists(path) and not allow_existing:
-            raise RuntimeError("Directory %s already exists whenever instructed to not allow "
-                               "existing ones" % path)
+        if exists(path) and not persistent:
+            raise RuntimeError("Directory %s already exists whenever it should not "
+                               "persist" % path)
+        self._persistent = persistent
         self._path = path
 
     def __repr__(self):
         return "%s(%r, path=%r)" % (self.__class__.__name__, self._archive, self.path)
 
-    def clean(self):
-        if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-            lgr.info("As instructed, not cleaning up the cache under %s"
-                     % self._path)
-            return
-        lgr.debug("Cleaning up the cache")
+    def clean(self, force=False):
+        # would interfere with tests
+        # if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        #     lgr.info("As instructed, not cleaning up the cache under %s"
+        #              % self._path)
+        #     return
         if exists(self._path):
-            # TODO:  we must be careful here -- to not modify permissions of files
-            #        only of directories
-            rmtree(self._path)
+            if (not self._persistent) or force:
+                lgr.debug("Cleaning up the cache for %s under %s", self._archive, self._path)
+                # TODO:  we must be careful here -- to not modify permissions of files
+                #        only of directories
+                rmtree(self._path)
 
     @property
     def path(self):
@@ -334,7 +396,7 @@ class ExtractedArchive(object):
         """
         path = self.assure_extracted()
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
-        for root, dirs, files in os.walk(path):
+        for root, dirs, files in os.walk(path): # TEMP
             for name in files:
                 yield opj(root, name)[path_len:]
 
@@ -351,8 +413,11 @@ class ExtractedArchive(object):
         assert exists(path), "%s must exist" % path
         return path
 
-    # TODO -- inject cleanup upon destroy
-    # def __del__(self):
-    #    self._clean_cache()
+    def __del__(self):
+        try:
+            if self._persistent:
+                self.clean()
+        except:
+            pass
 
 
