@@ -121,7 +121,7 @@ class LoggerHelper(object):
         logging.Logger
         """
         # By default mimic previously talkative behavior
-        logtarget = self._get_environ('LOGTARGET', logtarget or 'stdout')
+        logtarget = self._get_environ('LOGTARGET', logtarget or 'stderr')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
