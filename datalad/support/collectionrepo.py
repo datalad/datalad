@@ -419,8 +419,8 @@ class CollectionRepo(GitRepo):
         names.
         """
 
-        return [Handle(CollectionRepoHandleBackend(self, key=key,
-                                                   branch=branch))
+        return [CollectionRepoHandleBackend(self, key=key,
+                                            branch=branch)
                 for key in self.get_handle_list(branch=branch)]
 
     def get_handle_repos(self, branch=None):
@@ -748,7 +748,6 @@ class CollectionRepo(GitRepo):
         for file_ in files:
             file_str = '\n'.join(self.git_get_file_content(file_, branch))
             out.parse(data=file_str, format="turtle")
-
         return out
 
     # TODO:

@@ -73,6 +73,8 @@ class HandleRepoBackend(Handle):
                             self._repo.git_get_remotes()
         self._files = files
 
+        # TODO: subgraphs!
+
     def update_metadata(self):
         self._graph = self._repo.get_metadata(self._files, branch=self._branch)
 
@@ -220,6 +222,7 @@ class HandleRepo(AnnexRepo):
 
         handler.import_data(files)
         graphs = handler.get_graphs()
+
         joined_graph = Graph(identifier=self.name)
         for key in graphs:
             joined_graph += graphs[key]
@@ -256,8 +259,8 @@ class HandleRepo(AnnexRepo):
 
         # TODO: check whether cfg-file even exists, otherwise create a basic one.
         cfg_graph = Graph().parse(opj(self.path, HANDLE_META_DIR,
-                                          REPO_CONFIG_FILE),
-                                      format="turtle")
+                                      REPO_CONFIG_FILE),
+                                  format="turtle")
 
         # check for existing metadata sources to determine the name for the
         # new one:
@@ -269,17 +272,17 @@ class HandleRepo(AnnexRepo):
                                     + 1)
 
         # graph containing just new config statements:
-        cfg_graph = Graph()
+        cfg_graph_new = Graph()
 
         if files is not None and data is None:
             # treat it as a metadata source, that can be used again later on.
             src_node = URIRef(src_name)
             # add config-entries for that source:
-            cfg_graph.add((about_uri, DLNS.usesSrc, src_node))
+            cfg_graph_new.add((about_uri, DLNS.usesSrc, src_node))
             if isinstance(files, string_types):
-                cfg_graph.add((src_node, DLNS.usesFile, URIRef(files)))
+                cfg_graph_new.add((src_node, DLNS.usesFile, URIRef(files)))
             elif isinstance(files, list):
-                [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f)))
+                [cfg_graph_new.add((src_node, DLNS.usesFile, URIRef(f)))
                  for f in files]
 
         elif files is None and data is not None:
@@ -293,13 +296,13 @@ class HandleRepo(AnnexRepo):
         im.import_data(files=files, data=data)
 
         # add new config statements:
-        im.get_graphs()[REPO_CONFIG_FILE[:-4]] += cfg_graph
-
+        im.get_graphs()[REPO_CONFIG_FILE[:-4]] += cfg_graph + cfg_graph_new
         # create import branch:
         active_branch = self.git_get_active_branch()
         self.git_checkout(name=src_name, options='-b')
 
         im.store_data(opj(self.path, HANDLE_META_DIR))
+
         self.add_to_git(opj(self.path, HANDLE_META_DIR))
 
         # switching back and merge:
