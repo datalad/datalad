@@ -138,6 +138,7 @@ class AddArchiveContent(Interface):
             # we were given a file which must exist
             if not exists(archive):
                 raise ValueError("Archive {} does not exist".format(archive))
+            # TODO: support adding archives content from outside the annex/repo
             origin = archive
             key = annex.get_file_key(archive)
         else:
@@ -152,16 +153,17 @@ class AddArchiveContent(Interface):
 
         # and operate from now on the key or whereever content available "canonically"
         try:
-            key_path = annex.get_contentlocation(key)
+            key_path = annex.get_contentlocation(key) # , relative_to_top=True)
         except:
             raise RuntimeError("Content of %s seems to be N/A.  Fetch it first" % key)
 
-        key_path = opj(reltop, key_path)
+        #key_path = opj(reltop, key_path)
         # now we simply need to go through every file in that archive and
 
         from datalad.customremotes.archive import AnnexArchiveCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
-        annexarchive = AnnexArchiveCustomRemote(path=annex.path)
+        # TODO: whenever copy strategy is implemented, we could reuse persistent cache
+        annexarchive = AnnexArchiveCustomRemote(path=annex.path, persistent_cache=False)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = False
         earchive = annexarchive.cache[key_path]
@@ -181,7 +183,7 @@ class AddArchiveContent(Interface):
             annex.always_commit = False
 
             stats = dict(n=0, add_git=0, add_annex=0, skip=0, overwritten=0, renamed=0)
-
+            #import pdb; pdb.set_trace()
             for extracted_file in earchive.get_extracted_files():
                 stats['n'] += 1
                 extracted_path = opj(earchive.path, extracted_file)
@@ -224,10 +226,11 @@ class AddArchiveContent(Interface):
                     os.renames(extracted_path, target_path)
 
                 lgr.debug("Adding {target_path} to annex pointing to {url}".format(**locals()))
-                annex.annex_add(
-                    target_path,
-                    options=shlex.split(annex_options) if annex_options else []
-                )
+                if annex_options:
+                    if isinstance(annex_options, string_types):
+                        annex_options = shlex.split(annex_options)
+                annex.annex_add(target_path, options=annex_options)
+
                 # above action might add to git or to annex
                 if annex.file_has_content(target_path):
                     # if not --  it was added to git, if in annex, it is present and output is True

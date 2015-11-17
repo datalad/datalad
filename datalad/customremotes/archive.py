@@ -21,6 +21,7 @@ lgr = logging.getLogger('datalad.customremotes.archive')
 from ..cmd import link_file_load, Runner
 from ..support.exceptions import CommandError
 from ..support.archives import ArchivesCache
+from ..utils import getpwd
 from .base import AnnexCustomRemote
 
 
@@ -35,14 +36,14 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     PREFIX = "archive"
     AVAILABILITY = "local"
 
-    def __init__(self, *args, **kwargs):
-        super(AnnexArchiveCustomRemote, self).__init__(*args, **kwargs)
+    def __init__(self, persistent_cache=True, **kwargs):
+        super(AnnexArchiveCustomRemote, self).__init__(**kwargs)
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
 
         self._last_url = None  # for heuristic to choose among multiple URLs
-        self._cache = ArchivesCache(self.path)
+        self._cache = ArchivesCache(self.path, persistent=persistent_cache)
 
     def stop(self, *args):
         """Stop communication with annex"""
@@ -70,6 +71,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         key, file_ = url[len(self.url_prefix):].split('/', 1)
         return key, file_
 
+    #
     # Helper methods
     def _get_key_url(self, key):
         """Given a key, figure out the URL
@@ -133,7 +135,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # TODO: this would throw exception if not present, so this statement is kinda bogus
         try:
             # throws exception if not present
-            akey_path = opj(self.path, self.repo.get_contentlocation(akey))
+            akey_path = opj(self.path, self.repo.get_contentlocation(akey))#, relative_to_top=True))
 
             # if for testing we want to force getting the archive extracted
             # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
@@ -236,12 +238,13 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             # Thus retrieve the key using annex
             try:
                 self.runner(["git-annex", "get", "--key", akey],
-                            cwd=self.path)
+                            cwd=self.path, expect_stderr=True)
                 akey_path = self.repo.get_contentlocation(akey)
-                assert(exists(akey_path))
+                assert exists(opj(self.repo.path, akey_path)), "Key file %s is not present" % akey_path
             except Exception as e:
-                self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"
-                           % locals())
+                #from celery.contrib import rdb
+                #rdb.set_trace()
+                self.error("Failed to fetch {akey} containing {key}: {e}".format(**locals()))
                 return
 
         # Extract that bloody file from the bloody archive
@@ -249,6 +252,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  actually patool doesn't support extraction of a single file
         #  https://github.com/wummel/patool/issues/20
         # so
+        pwd = getpwd()
+        lgr.debug("Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
         apath = self.cache[akey_path].get_extracted_file(afile)
         link_file_load(apath, path)
         self.send('TRANSFER-SUCCESS', cmd, key)
