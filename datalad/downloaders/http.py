@@ -17,6 +17,7 @@ __docformat__ = 'restructuredtext'
 from six.moves.urllib.parse import urlparse
 
 from ..ui import ui
+from .providers import providers_info
 
 from logging import getLogger
 lgr = getLogger('datalad.http')
@@ -79,7 +80,7 @@ class HTTPDownloader(object):
         # would just call the corresponding method (logic "DOWNLOAD SHIT" here)
         # BEGINNING:
         # if returned None for unknown, True if requires, False if not
-        needs_authentication = creds.needs_authentication(url)
+        needs_authentication = providers_info.needs_authentication(url)
         if needs_authentication:
             used_old_cookies = self._authenticate(url, allow_old_cookie=True)
 
@@ -124,7 +125,7 @@ class HTTPDownloader(object):
                     if ui.yesno(
                             title="Authentication to access {url} has failed".format(url=url),
                             text="Do you want to enter other credentials in case they were updated?"):
-                        creds.get_credentials(url, new=True)
+                        providers_info.get_credentials(url, new=True)
                         # TODO GOTO BEGINNING
                     else:
                         raise DownloadError("Failed to download from %s given available credentials" % url)
@@ -137,18 +138,10 @@ class HTTPDownloader(object):
                     assert(needs_authentication is None)
                     # So we didn't know if authentication necessary, and it seems to be necessary, so
                     # Let's ask the user to setup authentication mechanism for this website
+                    raise AccessDeniedError(
+                        "Access to %s was denied but we don't know about this data provider. "
+                        "You would need to configure data provider authentication using TODO " % url)
 
-
-            creds.get_credentials(url)
-
-        success = True
-        if not success:
-            self._authenticate(url, allow_old_cookie=False)
-            # TRY TO DOWNLOAD SHIT AGAIN
-            if not success:
-                lgr.debug("Bail")
-                raise DownloadError("URL %s failed to download" % url)
-        # borrow functionality from __download
         raise NotImplementedError()
 
     def check(self, url):

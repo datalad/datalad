@@ -53,6 +53,9 @@ class DialogUI(object):
         else:
             raise RuntimeError("must not happen but did")
 
+    def message(self, msg):
+        self.out.write(msg)
+
     def getpass(self):
         return getpass()
 

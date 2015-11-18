@@ -45,68 +45,81 @@ class ProvidersInformation(object):
 
         For sample configs look into datalad/downloaders/configs/providers.cfg
         """
-        providers_config = SafeConfigParserWithIncludes()
+        # TODO: separate out loading from creation, so we could e.g. add new providers etc
+        self._load()
+
+    def _load(self):
+        config = SafeConfigParserWithIncludes()
         # TODO: support all those other paths
-        providers_config.read([pathjoin(dirname(abspath(__file__)),
+        config.read([pathjoin(dirname(abspath(__file__)),
                                         'configs',
                                         'providers.cfg')])
 
         self.providers = {}
-        for section in providers_config.sections():
-            if section.startswith('provider:'):
-                name = section.split(':', 1)[1]
-                self.providers[name] = {
-                    o: providers_config.get(section, o) for o in providers_config.options(section)
+        self.credentials = {}
+        self._providers_ordered = []  # list with all known url_re's which will be used, with ones matching coming upfront
+        for section in config.sections():
+            if ':' in section:
+                type_, name = section.split(':', 1)
+                assert(type_ in {'provider', 'credential'})
+                items = getattr(self, type_ + "s")[name] = {
+                    o: config.get(section, o) for o in config.options(section)
                 }
+                items['name'] = name  # duplication of name in the key and entry so we could lpace into _providers_ordered for now
+                getattr(self, '_validate_' + type_)(items)
             else:
                 lgr.warning("Do not know how to treat section %s here" % section)
+
+    def _validate_provider(self, items):
+        assert ('authentication_type' in items)
+        authentication_type = items['authentication_type']
+        assert (authentication_type in {'html_form',  'aws-s3', 'xnat', 'none'})  # 'user_password', 's3'
+        if authentication_type == 'html_form':
+            assert 'html_form_url' in items, "Provider {name} lacks 'html_form_url' whenever authentication_type = html_form".format(**items)
+
+        # bringing url_re to "standard" format of a list and populating _providers_ordered
+        url_res = items['url_re'] = items['url_re'].split('\n')
+        assert url_res, "current implementation relies on having url_re defined"
+        self._providers_ordered.append(items)
+
+    def _validate_credential(self, items):
+        assert ('type' in items)
+        authentication_type = items['type']
+        assert (authentication_type in {'user_password', 'aws-s3'})  # 'user_password', 's3'
+
+
+    def get_matching_provider(self, url):
+        nproviders = len(self._providers_ordered)
+        for i in range(nproviders):
+            provider = self._providers_ordered[i]
+            for url_re in provider['url_re']:
+                if re.match(url_re, url):
+                    if i != 0:
+                        # place it first
+                        # TODO: optimize with smarter datastructures if this becomes a burden
+                        del self._providers_ordered[i]
+                        self._providers_ordered = [provider] + self._providers_ordered
+                        assert(len(self._providers_ordered) == nproviders)
+                    return provider
 
     def __contains__(self, url):
         # go through the known ones, and if found a match -- return True, if not False
         raise NotImplementedError
 
-    def get(self, url, field=None):
-        # if no field == return all values as a dict
-        raise NotImplementedError
-
-
-# TODO: use keyring module for now
-class Credentials(object):
-    """The interface to the credentials stored by some backend
-
-        - current handle .datalad/creds/
-        - user dir  ~/.config/datalad/creds/
-        - system-wide datalad installation/config /etc/datalad/creds/
-
-        Just load all the files, for now in the form of
-
-        [credentials:crcns]
-        # url_re = ....         ; optional
-        url = https://crcns.org/request-account/   ; url where to request credentials
-        type = user_password    ; (user_password|s3_keys(access_key,secret_key for S3)
-
-        where actual fields would be stored in a keyring relying on the OS
-        provided secure storage
-
-    """
-
-    def __init__(self):
-        self.providers = ProvidersInformation()
-        self._items = {}
-        self._load()  # populate items with information from the those files
-
-    def _load(self):
-        raise NotImplementedError()
-
-    def needs_credentials(self, url):
-        return "TODO: url known to self._items" or url in self.providers
+    def needs_authentication(self, url):
+        provider = self.get_matching_provider(url)
+        if provider is None:
+            return None
+        return provider['authentication_type'].lower() != 'none'
 
     def get_credentials(self, url, new=False):
+        """Ask user to enter credentials for a provider matching url
+        """
         # find a match among _items
-        name = resolve_url_to_name(self._items, url)
-        if new or not name:
+        provider = self.get_matching_provider(url)
+        if new or not provider:
             rec = self._get_new_record_ui(url)
-            rec['url_re'] = "TODO"  # figure out
+            rec['url_re'] = "TODO"  # present to user and ask to edit
             name = urlparse(url).netloc
             self._items[name] = rec
             if ui.yesno("Do you want to store credentials for %s" % name):
@@ -122,13 +135,13 @@ class Credentials(object):
     def _get_new_record_ui(self, url):
         # TODO: should be a dialog with the fields appropriate for this particular
         # type of credentials
-        ui.message("To access %s we would need credentials.")
+        ui.message("To access %s we would need credentials." % url)
         if url in self.providers:
-            self.providers
             ui.message("If you don't yet have credentials, please visit %s"
                        % self.providers.get(url, 'credentials_url'))
         return { 'user': ui.question("Username:"),
                  'password': ui.password() }
 
 
-# creds = Credentials()
+lgr.debug("Initializing data providers credentials interface")
+providers_info = ProvidersInformation()
