@@ -23,10 +23,11 @@ from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
 from six.moves.urllib.error import URLError
 from six.moves import StringIO
 
-# NOTE not sure if this needs to use `six`
+# TODO not sure what needs to use `six` here yet
 import urllib
 import urllib2
 import cookielib
+import requests
 
 from bs4 import BeautifulSoup
 import appdirs
@@ -75,10 +76,10 @@ def get_url_response_stamp(url, response_info):
 
 # FIXME should make into a decorator so that it closes the cookie_db upon exiting whatever func uses it
 def get_cookie_db():
-    cookies_file = os.path.join(appdirs.user_config_dir(), 'datalad', 'cookies.db') # FIXME prolly shouldn't hardcode 'datalad'
-    if not os.path.exists(cookies_file):
-        os.makedirs(cookies_file)
-    cookies_db = shelve.open(cookies_file, writeback=True)
+    cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad') # FIXME prolly shouldn't hardcode 'datalad'
+    if not os.path.exists(cookies_dir):
+        os.makedirs(cookies_dir)
+    cookies_db = shelve.open(os.path.join(cookies_dir, 'cookies.db'), writeback=True)
     return cookies_db
 
 
@@ -92,40 +93,98 @@ def get_tld(url):
     return website
 
 
-def __urlopen(url, username=None, password=None, additional_header_vals=None):
+def __urlopen(url, header_vals=None):
     ''' url:  website to get cookie from
         additional_vals:  a dict of additional key/val pairs to pass
             into the header along with the username & password
     '''
+
+    # cookies_file = os.path.join(appdirs.user_config_dir(), 'datalad', 'cookies.txt')
     ds_provider = get_tld(url)
     cookies_db = get_cookie_db()
+
+    cj = cookielib.CookieJar()
+    # cjf = cookielib.MozillaCookieJar(cookies_file)
+    # cjf.save()
+    # cjf.load()
+    opener = urllib2.build_opener(      # this handles redirects by default
+                urllib2.HTTPCookieProcessor(cj))
+    # urllib2.install_opener(opener)
+
     if ds_provider in cookies_db:
         # TODO
-        # if cookie is expired/doesn't work/etc:
-        #   then need to get new one
-        # else:
-        cookie = cookies_db[ds_provider]    # TODO what format should these be in exactly if multiple cookies sent previously
-        cjar = cookielib.FileCookieJar(cookie)
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cjar))
+        # if cookie is expired then not sure how to build that exception check in here yet
+        cookie = cookies_db[ds_provider]
+        # cj = cookielib.FileCookieJar(cookie)
+        # cj.set_cookie(cookie)
+        opener.addheaders.append(('Cookie', cookie))
         resp = opener.open(url)
+        pass
     else:
-        if username and password:   # FIXME need better check to make sure they work
-            header_vals = dict(username=username, password=password, submit='Login')    # last one should be passed in additional_header_vals
-            if additional_header_vals:
-                header_vals.update(additional_header_vals)
+        if header_vals:   # FIXME need better check to make sure they work
             data = urllib.urlencode(header_vals)
-            req = Request(url, data)
+            # req = urllib2.Request(url, data)
+            # resp = urllib2.urlopen(url, data)
+            resp = opener.open(url, data)
         else:
-            req = Request(url)
-        resp = urlopen(req)
+            # req = urllib2.Request(url)
+            # resp = urllib2.urlopen(url)
+            resp = opener.open(url)
+        # resp = urllib2.urlopen(req)
 
-        cookies = []
-        for k,v in resp.headers.iteritems():
-            k = k.lower()
-            if k.startswith('set-cookie'):
-               cookies.append(v)
-        cookies_db[ds_provider] = ' '.join(cookies) #FIXME this isn't right, but not sure how to store mulitple cookies (maybe cookie jar)
+        # cj.save()
+
+        # NOTE (see pg. 515)
+        # resp.info also contains the header info
+        # resp.geturl would be the real url (if redirection occured on the passed in url)
+
+        cookies_db[ds_provider] = cj
     return resp
+
+
+# url = 'https://portal.nersc.gov/project/crcns/download/index.php'
+url = 'https://portal.nersc.gov/project/crcns/download/pvc-1'
+# header_vals = dict(username='XXXX', password='XXXX', submit='Login')
+# resp = __urlopen(url, header_vals)
+# print resp.read()
+
+
+def __urlopen_requests(url, header_vals=None):
+
+    ds_provider = get_tld(url)
+    cookies_db = get_cookie_db()
+    sess = requests.Session()
+
+    if ds_provider in cookies_db:
+        # not sure what happens if cookie is expired
+        # cookie_dict = cookies_db[ds_provider]
+        # cookie_jar = requests.utils.cookiejar_from_dict(cookie_dict)
+        cookie_jar = cookies_db[ds_provider]
+        # sess.cookies = cookie_jar
+        resp = sess.get(url, cookies=cookie_jar)
+    else:
+        if header_vals:
+            resp = sess.post(url, data=header_vals)
+        else:
+            resp = sess.get(url)
+
+        # NOTE (see pg. 515)
+        # cookies_dict = requests.utils.dict_from_cookiejar(resp.cookies)
+        # cookies_db[ds_provider] = cookies_dict
+        cookie_jar = resp.cookies
+        cookies_db[ds_provider] = cookie_jar
+    return resp
+
+
+header_vals = dict(username='XXXX', password='XXXX', submit='Login')
+resp = __urlopen(url, header_vals)
+# resp = __urlopen(url)
+print resp.text
+
+resp2 = __urlopen(url)
+print resp2.text
+################################################################
+
 
 
 def __download(url, filename=None, filename_only=False):
