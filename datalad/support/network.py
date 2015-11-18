@@ -87,7 +87,7 @@ def get_tld(url):
     # maybe use this instead to be safe:  https://pypi.python.org/pypi/tld
     if not url.startswith('http'):  # urlparse needs to have urls start with this
         url = 'http://' + url
-    website = urlparse.urlparse(url)[1]
+    website = urlparse(url)[1]
     # domain = '.'.join(website.split('.')[1:])
     # print domain
     return website
@@ -142,13 +142,6 @@ def __urlopen(url, header_vals=None):
     return resp
 
 
-# url = 'https://portal.nersc.gov/project/crcns/download/index.php'
-url = 'https://portal.nersc.gov/project/crcns/download/pvc-1'
-# header_vals = dict(username='XXXX', password='XXXX', submit='Login')
-# resp = __urlopen(url, header_vals)
-# print resp.read()
-
-
 def __urlopen_requests(url, header_vals=None):
 
     ds_provider = get_tld(url)
@@ -176,15 +169,20 @@ def __urlopen_requests(url, header_vals=None):
     return resp
 
 
-header_vals = dict(username='XXXX', password='XXXX', submit='Login')
-resp = __urlopen(url, header_vals)
-# resp = __urlopen(url)
-print resp.text
+def __json_testing():
+    # url = 'https://portal.nersc.gov/project/crcns/download/index.php'
+    url = 'https://portal.nersc.gov/project/crcns/download/pvc-1'
+    # header_vals = dict(username='XXXX', password='XXXX', submit='Login')
+    # resp = __urlopen(url, header_vals)
+    # print resp.read()
 
-resp2 = __urlopen(url)
-print resp2.text
-################################################################
+    header_vals = dict(username='XXXX', password='XXXX', submit='Login')
+    resp = __urlopen(url, header_vals)
+    # resp = __urlopen(url)
+    print resp.text
 
+    resp2 = __urlopen(url)
+    print resp2.text
 
 
 def __download(url, filename=None, filename_only=False):
