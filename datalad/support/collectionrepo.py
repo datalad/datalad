@@ -53,25 +53,25 @@ class CollectionRepoHandleBackend(Handle):
             lgr.error(e_msg)
             raise TypeError(e_msg)
         else:
-            self._repo = repo
+            self.repo = repo
 
         if branch is None:
-            self._branch = self._repo.git_get_active_branch()
-        elif branch in self._repo.git_get_branches() + \
-                self._repo.git_get_remote_branches():
+            self._branch = self.repo.git_get_active_branch()
+        elif branch in self.repo.git_get_branches() + \
+                self.repo.git_get_remote_branches():
             self._branch = branch
         else:
             raise ValueError("Unknown branch %s of repository at %s." %
-                             (branch, self._repo.path))
+                             (branch, self.repo.path))
 
-        if key not in self._repo.get_handle_list(self._branch):
+        if key not in self.repo.get_handle_list(self._branch):
             raise ValueError("Unknown handle %s in branch %s of repository %s."
-                             % (key, self._branch, self._repo.path))
+                             % (key, self._branch, self.repo.path))
         self._key = key
 
         # we can't write to a remote branch:
         self.is_read_only = self._branch.split('/')[0] in \
-                            self._repo.git_get_remotes()
+                            self.repo.git_get_remotes()
 
         self._files = files
         self.sub_graphs = dict()
@@ -96,8 +96,8 @@ class CollectionRepoHandleBackend(Handle):
     meta = property(Handle.get_metadata, set_metadata)
 
     def update_metadata(self):
-        self.sub_graphs = self._repo.get_handle_graphs(self._key, self._branch,
-                                                       self._files)
+        self.sub_graphs = self.repo.get_handle_graphs(self._key, self._branch,
+                                                      self._files)
         self._graph = Graph(identifier=Literal(self._key))
         for key in self.sub_graphs:
             self._graph += self.sub_graphs[key]
@@ -106,13 +106,13 @@ class CollectionRepoHandleBackend(Handle):
         if self.is_read_only:
             raise ReadOnlyBackendError("Can't commit to handle '%s'.\n"
                                        "(Repository: %s\tBranch: %s." %
-                                       (self.name, self._repo.path,
+                                       (self.name, self.repo.path,
                                         self._branch))
 
         # TODO: different graphs, file names, etc. See CollectionRepo
         # Same goes for HandleRepo/HandleRepoBackend
-        self._repo.store_handle_graph(self._graph, self._key,
-                                      branch=self._branch)
+        self.repo.store_handle_graph(self._graph, self._key,
+                                     branch=self._branch)
 
     # TODO: set_name? See Handle.
 

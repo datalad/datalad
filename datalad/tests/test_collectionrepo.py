@@ -407,7 +407,8 @@ def test_CollectionRepoHandleBackend_meta(path):
 
     backend = CollectionRepoHandleBackend(repo, "BasicHandle")
     backend.update_metadata()
-    # TODO: Avoid the need to manually call update here
+    # TODO: Avoid the need to manually call update() here?
+
 
     eq_(backend.sub_graphs.keys(), repo_graphs.keys())
     for key in backend.sub_graphs.keys():
@@ -423,3 +424,5 @@ def test_CollectionRepoHandleBackend_meta(path):
     # If read only should raise exception anyway:
     backend.is_read_only = True
     assert_raises(ReadOnlyBackendError, backend.commit_metadata)
+
+    # TODO: store metadata

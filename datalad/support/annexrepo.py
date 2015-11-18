@@ -161,6 +161,9 @@ class AnnexRepo(GitRepo):
             writer.set_value("annex", "backends", backend)
             writer.release()
 
+    def __repr__(self):
+        return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
+
     def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, expect_fail=False,

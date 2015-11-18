@@ -260,6 +260,9 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
 
+    def __repr__(self):
+        return "<GitRepo path=%s (%s)>" % (self.path, type(self))
+
     def __eq__(self, obj):
         """Decides whether or not two instances of this class are equal.
 

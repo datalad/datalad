@@ -57,22 +57,41 @@ class HandleRepoBackend(Handle):
             lgr.error(e_msg)
             raise TypeError(e_msg)
         else:
-            self._repo = repo
+            self.repo = repo
 
         if branch is None:
-            self._branch = self._repo.git_get_active_branch()
-        elif branch in self._repo.git_get_branches() + \
-                self._repo.git_get_remote_branches():
+            self._branch = self.repo.git_get_active_branch()
+        elif branch in self.repo.git_get_branches() + \
+                self.repo.git_get_remote_branches():
             self._branch = branch
         else:
             raise ValueError("Unknown branch '%s' of repository at %s." %
-                             (branch, self._repo.path))
+                             (branch, self.repo.path))
 
         # we can't write to a remote branch:
         self.is_read_only = self._branch.split('/')[0] in \
-                            self._repo.git_get_remotes()
+                            self.repo.git_get_remotes()
         self._files = files
-        self.sub_graphs = dict()
+        self._sub_graphs = dict()
+
+    def get_subgraphs(self):
+        if self._sub_graphs == dict():
+            self.update_metadata()
+        return self._sub_graphs
+
+    def set_subgraphs(self, graphs):
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of data: %s. "
+                            "Expects a dictionary of sub-graphs." %
+                            type(graphs))
+        for subgraph in graphs:
+            if not isinstance(graphs[subgraph], Graph):
+                raise TypeError("Sub-graph '%s' is of type %s. "
+                                "Expected: rdflib.Graph." %
+                                (subgraph, type(graphs[subgraph])))
+            self._sub_graphs[subgraph] = graphs[subgraph]
+
+    sub_graphs = property(get_subgraphs, set_subgraphs)
 
     def set_metadata(self, data):
         """
@@ -80,30 +99,28 @@ class HandleRepoBackend(Handle):
         :param data: dict of Graph
         :return:
         """
-        if not isinstance(data, dict):
-            raise TypeError("Unexpected type of data: %s. "
-                            "Expects a dictionary of sub-graphs." %
-                            type(data))
-        for subgraph in data:
-            if not isinstance(data[subgraph], Graph):
-                raise TypeError("Sub-graph '%s' is of type %s. "
-                                "Expected: rdflib.Graph." %
-                                (subgraph, type(data[subgraph])))
-            self.sub_graphs[subgraph] = data[subgraph]
+        self.sub_graphs = data
 
-    meta = property(Handle.get_metadata, set_metadata)
+    def get_metadata(self):
+        """
+
+        :return:
+        """
+        self._graph = Graph(identifier=Literal(self.repo.name))
+        for key in self.sub_graphs:
+            self._graph += self.sub_graphs[key]
+
+        return self._graph
+
+    meta = property(get_metadata, set_metadata)
 
     def update_metadata(self):
         """
 
         :return:
         """
-        self.sub_graphs = self._repo.get_metadata(self._files,
-                                                  branch=self._branch)
-
-        self._graph = Graph(identifier=Literal(self._repo.name))
-        for key in self.sub_graphs:
-            self._graph += self.sub_graphs[key]
+        self.sub_graphs = self.repo.get_metadata(self._files,
+                                                 branch=self._branch)
 
     def commit_metadata(self, msg="Handle metadata updated."):
         """
@@ -114,10 +131,10 @@ class HandleRepoBackend(Handle):
         if self.is_read_only:
             raise ReadOnlyBackendError("Can't commit to handle '%s'.\n"
                                        "(Repository: %s\tBranch: %s)" %
-                                       (self.name, self._repo.path,
+                                       (self.name, self.repo.path,
                                         self._branch))
 
-        self._repo.set_metadata(self.sub_graphs, branch=self._branch)
+        self.repo.set_metadata(self.sub_graphs, msg=msg, branch=self._branch)
 
     @property
     def url(self):
@@ -125,7 +142,7 @@ class HandleRepoBackend(Handle):
 
         :return:
         """
-        return get_local_file_url(self._repo.path)
+        return get_local_file_url(self.repo.path)
 
     # TODO: set_name? See Handle.
 
@@ -268,7 +285,42 @@ class HandleRepo(AnnexRepo):
         return graphs
 
     def set_metadata(self, graphs, msg="Metadata saved.", branch=None):
-        raise NotImplementedError
+        """
+
+        :param graphs:
+        :param msg:
+        :param branch:
+        :return:
+        """
+
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of parameter 'graphs' (%s). "
+                            "Expected: dict." % type(graphs))
+
+        files = dict()
+        for key in graphs:
+            if not isinstance(graphs[key], Graph):
+                raise TypeError("Wrong type of graphs['%s'] (%s). "
+                                "Expected: Graph." % (key, type(graphs[key])))
+
+            files[key] = opj(self.path, HANDLE_META_DIR, key + ".ttl")
+
+        active_branch = self.git_get_active_branch()
+        if branch is None:
+            branch = active_branch
+        elif branch not in self.git_get_branches():
+            raise ValueError("Unknown branch '%s'." % branch)
+        else:
+            self.git_checkout(branch)
+
+        for key in graphs:
+            graphs[key].serialize(files[key], format="turtle")
+
+        self.git_add(files.values())
+        self.commit(msg=msg)
+
+        if branch != active_branch:
+            self.git_checkout(active_branch)
 
     def import_metadata(self, importer, files=None, data=None,
                         about_uri=DLNS.this):

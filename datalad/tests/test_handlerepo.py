@@ -15,7 +15,8 @@ from os.path import join as opj, exists, basename
 
 from nose import SkipTest
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_false, assert_is_not_none, assert_not_equal, assert_in
+    assert_equal, assert_false, assert_is_not_none, assert_not_equal, \
+    assert_in, assert_not_in
 from git.exc import GitCommandError
 from rdflib import Graph, URIRef, Literal
 from rdflib.namespace import RDF, FOAF
@@ -29,7 +30,7 @@ from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     get_most_obscure_supported_name, swallow_outputs, ok_, get_local_file_url, ok_startswith, eq_
 
 from .utils import local_testrepo_flavors
-from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
+from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE, HANDLE_META_DIR
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -120,6 +121,69 @@ def test_HandleRepo_get_metadata(path):
     # TODO: Use handle with several metadata files and
     # only load them partially.
 
+
+@with_tempfile
+def test_HandleRepo_set_metadata(path):
+    repo = HandleRepo(path, create=True)
+
+    metadata = dict()
+    metadata['graph1'] = Graph()
+    metadata['graph1'].add((URIRef("http://example.org"),
+                            RDF.type,
+                            DLNS.FakeTerm))
+
+    repo.set_metadata(metadata)
+    ok_clean_git(path, annex=True)
+    target_file_1 = opj(path, HANDLE_META_DIR, "graph1.ttl")
+    ok_(exists(target_file_1))
+    eq_(set(iter(metadata['graph1'])),
+        set(iter(Graph().parse(target_file_1, format="turtle"))))
+
+    # not existing branch:
+    with assert_raises(ValueError) as cm:
+        repo.set_metadata(metadata, branch="notexisting")
+    ok_startswith(str(cm.exception), "Unknown branch")
+
+    # create new branch and switch back:
+    repo.git_checkout("new_branch", "-b")
+    repo.git_checkout("master")
+
+    # store metadata to not checked-out branch:
+    metadata['graph2'] = Graph()
+    metadata['graph2'].add((URIRef("http://example.org"),
+                            RDF.type,
+                            DLNS.AnotherFakeTerm))
+    target_file_2 = opj(path, HANDLE_META_DIR, "graph2.ttl")
+    repo.set_metadata(metadata, branch="new_branch")
+
+    ok_clean_git(path, annex=True)
+    eq_(repo.git_get_active_branch(), "master")
+    ok_(not exists(target_file_2))
+
+    repo.git_checkout("new_branch")
+    ok_(exists(target_file_1))
+    ok_(exists(target_file_2))
+    eq_(set(iter(metadata['graph1'])),
+        set(iter(Graph().parse(target_file_1, format="turtle"))))
+    eq_(set(iter(metadata['graph2'])),
+        set(iter(Graph().parse(target_file_2, format="turtle"))))
+
+    # element of wrong type:
+    metadata['second'] = list()
+    with assert_raises(TypeError) as cm:
+        repo.set_metadata(metadata)
+    ok_startswith(str(cm.exception),
+                  "Wrong type of graphs['second'] (%s)" % list)
+
+    # parameter of wrong type:
+    with assert_raises(TypeError) as cm:
+        repo.set_metadata([1, 2])
+    ok_startswith(str(cm.exception),
+                  "Unexpected type of parameter 'graphs' (%s)" % list)
+
+
+
+
 # testing HandleRepoBackend:
 
 @with_testrepos('.*handle.*', flavors=['local'])
@@ -127,7 +191,7 @@ def test_HandleRepoBackend_constructor(path):
     repo = HandleRepo(path, create=False)
     backend = HandleRepoBackend(repo)
     eq_(backend._branch, repo.git_get_active_branch())
-    eq_(backend._repo, repo)
+    eq_(backend.repo, repo)
     eq_(backend.url, get_local_file_url(repo.path))
     eq_(backend.is_read_only, False)
     eq_("<Handle name=%s "
@@ -160,9 +224,10 @@ def test_HandleRepoBackend_name(path):
         backend.name = "new_name"
 
 
-@with_testrepos('.*handle.*', flavors=['local'])
-def test_HandleRepoBackend_meta(path):
-    repo = HandleRepo(path, create=False)
+@with_testrepos('.*handle.*', flavors=['clone'])
+@with_tempfile
+def test_HandleRepoBackend_meta(url, path):
+    repo = HandleRepo(path, url, create=True)
 
     repo_graph = Graph(identifier=Literal(repo.name))
     repo_graphs = repo.get_metadata()
@@ -172,17 +237,38 @@ def test_HandleRepoBackend_meta(path):
     backend = HandleRepoBackend(repo)
     backend.update_metadata()
 
-    eq_(backend.sub_graphs.keys(), repo_graphs.keys())
+    eq_(set(backend.sub_graphs.keys()), set(repo_graphs.keys()))
     for key in backend.sub_graphs.keys():
         eq_(set(iter(backend.sub_graphs[key])),
             set(iter(repo_graphs[key])))
-    eq_(backend._graph, repo_graph)
     eq_(backend.meta, repo_graph)
 
+    # modify metadata:
+    triple_1 = (URIRef("http://example.org/whatever"), RDF.type, DLNS.FakeTerm)
+    triple_2 = (URIRef("http://example.org/whatever"), RDF.type,
+                DLNS.AnotherFakeTerm)
+    backend.sub_graphs[REPO_STD_META_FILE[:-4]].add(triple_1)
+    test_file = opj(path, HANDLE_META_DIR, "test.ttl")
+    backend.sub_graphs['test'] = Graph()
+    backend.sub_graphs['test'].add(triple_2)
+
+    assert_in(triple_1, backend.meta)
+    assert_in(triple_2, backend.meta)
+
     # commit:
-    # not implemented yet in HandleRepo:
-    assert_raises(NotImplementedError, backend.commit_metadata)
+    backend.commit_metadata()
+
+    ok_clean_git(path, annex=True)
+    ok_(exists(test_file))
+    test_graph_from_file = Graph().parse(test_file, format="turtle")
+    eq_(set(iter(backend.sub_graphs['test'])),
+        set(iter(test_graph_from_file)))
+    assert_in(triple_2, test_graph_from_file)
+    assert_not_in(triple_1, test_graph_from_file)
 
     # If read only, should raise exception:
     backend.is_read_only = True
     assert_raises(ReadOnlyBackendError, backend.commit_metadata)
+
+
+# TODO: test remotes
