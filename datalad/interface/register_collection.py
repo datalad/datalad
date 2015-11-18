@@ -20,8 +20,8 @@ import re
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from datalad.support.collection import Collection
 from datalad.cmd import CommandError
 from datalad.log import lgr

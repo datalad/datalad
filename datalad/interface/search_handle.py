@@ -17,8 +17,8 @@ from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..support.handle import Handle
 from ..support.collection import MetaCollection
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \

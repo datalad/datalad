@@ -6,31 +6,26 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of class HandleRepo and HandleRepoBackend
+"""Test implementation of class HandleRepo
 
 """
 
-import os
+from git.exc import GitCommandError
 from os.path import join as opj, exists, basename
 
-from nose import SkipTest
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_false, assert_is_not_none, assert_not_equal, \
-    assert_in, assert_not_in
-from git.exc import GitCommandError
+    assert_equal, assert_false, assert_in
 from rdflib import Graph, URIRef, Literal
-from rdflib.namespace import RDF, FOAF
-
-from ..support.handlerepo import HandleRepo, HandleRepoBackend, AnnexRepo
-from ..support.exceptions import FileInGitError, ReadOnlyBackendError
-from ..support.metadatahandler import DLNS, RDFS, PlainTextImporter
-from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
-    ignore_nose_capturing_stdout, \
-    on_windows, ok_clean_git, ok_clean_git_annex_proxy, \
-    get_most_obscure_supported_name, swallow_outputs, ok_, get_local_file_url, ok_startswith, eq_
+from rdflib.namespace import RDF
 
 from .utils import local_testrepo_flavors
+from .utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
+    ignore_nose_capturing_stdout, \
+    ok_clean_git, ok_, ok_startswith, eq_
 from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE, HANDLE_META_DIR
+from ..support.handlerepo import HandleRepo, AnnexRepo
+from ..support.metadatahandler import DLNS, RDFS
+
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
@@ -180,94 +175,3 @@ def test_HandleRepo_set_metadata(path):
         repo.set_metadata([1, 2])
     ok_startswith(str(cm.exception),
                   "Unexpected type of parameter 'graphs' (%s)" % list)
-
-
-
-
-# testing HandleRepoBackend:
-
-@with_testrepos('.*handle.*', flavors=['local'])
-def test_HandleRepoBackend_constructor(path):
-    repo = HandleRepo(path, create=False)
-    backend = HandleRepoBackend(repo)
-    eq_(backend._branch, repo.git_get_active_branch())
-    eq_(backend.repo, repo)
-    eq_(backend.url, get_local_file_url(repo.path))
-    eq_(backend.is_read_only, False)
-    eq_("<Handle name=%s "
-        "(<class 'datalad.support.handlerepo.HandleRepoBackend'>)>"
-        % backend.name,
-        backend.__repr__())
-
-    # not existing branch:
-    with assert_raises(ValueError) as cm:
-        HandleRepoBackend(repo, branch="something")
-    ok_startswith(str(cm.exception), "Unknown branch")
-
-    # wrong source class:
-    with assert_raises(TypeError) as cm:
-        HandleRepoBackend(AnnexRepo(path, create=False))
-    ok_startswith(str(cm.exception),
-                  "Can't deal with type "
-                  "<class 'datalad.support.annexrepo.AnnexRepo'>")
-
-
-@with_testrepos('.*handle.*', flavors=['local'])
-def test_HandleRepoBackend_name(path):
-    repo = HandleRepo(path, create=False)
-    backend = HandleRepoBackend(repo)
-
-    # get name:
-    eq_(backend.name, repo.name)
-    # set name:
-    with assert_raises(AttributeError) as cm:
-        backend.name = "new_name"
-
-
-@with_testrepos('.*handle.*', flavors=['clone'])
-@with_tempfile
-def test_HandleRepoBackend_meta(url, path):
-    repo = HandleRepo(path, url, create=True)
-
-    repo_graph = Graph(identifier=Literal(repo.name))
-    repo_graphs = repo.get_metadata()
-    for key in repo_graphs:
-        repo_graph += repo_graphs[key]
-
-    backend = HandleRepoBackend(repo)
-
-    eq_(set(backend.sub_graphs.keys()), set(repo_graphs.keys()))
-    for key in backend.sub_graphs.keys():
-        eq_(set(iter(backend.sub_graphs[key])),
-            set(iter(repo_graphs[key])))
-    eq_(backend.meta, repo_graph)
-
-    # modify metadata:
-    triple_1 = (URIRef("http://example.org/whatever"), RDF.type, DLNS.FakeTerm)
-    triple_2 = (URIRef("http://example.org/whatever"), RDF.type,
-                DLNS.AnotherFakeTerm)
-    backend.sub_graphs[REPO_STD_META_FILE[:-4]].add(triple_1)
-    test_file = opj(path, HANDLE_META_DIR, "test.ttl")
-    backend.sub_graphs['test'] = Graph()
-    backend.sub_graphs['test'].add(triple_2)
-
-    assert_in(triple_1, backend.meta)
-    assert_in(triple_2, backend.meta)
-
-    # commit:
-    backend.commit_metadata()
-
-    ok_clean_git(path, annex=True)
-    ok_(exists(test_file))
-    test_graph_from_file = Graph().parse(test_file, format="turtle")
-    eq_(set(iter(backend.sub_graphs['test'])),
-        set(iter(test_graph_from_file)))
-    assert_in(triple_2, test_graph_from_file)
-    assert_not_in(triple_1, test_graph_from_file)
-
-    # If read only, should raise exception:
-    backend.is_read_only = True
-    assert_raises(ReadOnlyBackendError, backend.commit_metadata)
-
-
-# TODO: test remotes

@@ -17,7 +17,8 @@ from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend
 from ..support.handle import Handle
 from ..support.annexrepo import AnnexRepo
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \

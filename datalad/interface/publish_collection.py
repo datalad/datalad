@@ -17,8 +17,8 @@ from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, GitRepo, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo, GitRepo
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..support.handlerepo import HandleRepo
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -265,7 +265,7 @@ class PublishCollection(Interface):
         # correct handle uris in hasPart statements:
         replacements = []
         from datalad.support.collection import Collection
-        from datalad.support.collectionrepo import CollectionRepoBackend
+        from datalad.support.collection_backends import CollectionRepoBackend
         col_meta = Collection(CollectionRepoBackend(local_collection_repo))
         for o in graphs[REPO_STD_META_FILE[0:-4]].objects(subject=new_uri,
                                                           predicate=DCTERMS.hasPart):

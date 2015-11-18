@@ -16,8 +16,9 @@ from os.path import join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from datalad.cmdline.helpers import get_datalad_master
 from ..log import lgr
 

@@ -17,11 +17,13 @@ from os.path import exists, join as opj, isfile
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from datalad.support.collection import Collection
 from datalad.support.handle import Handle
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend, \
+    CollectionRepoHandleBackend
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance

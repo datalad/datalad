@@ -27,7 +27,9 @@ from ...support.handle import Handle
 from ...support.metadatahandler import DLNS, PAV, DCTERMS, URIRef, RDF, FOAF, \
     PROV, Literal, Graph
 from ...support.handlerepo import HandleRepo
-from ...support.collectionrepo import CollectionRepo, Collection, CollectionRepoBackend
+from ...support.collectionrepo import CollectionRepo
+from datalad.support.collection import Collection
+from datalad.support.collection_backends import CollectionRepoBackend
 from ...consts import REPO_CONFIG_FILE, REPO_STD_META_FILE, HANDLE_META_DIR
 
 

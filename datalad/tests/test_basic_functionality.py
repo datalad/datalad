@@ -17,8 +17,9 @@ from nose.tools import assert_raises, assert_equal, assert_false, assert_in, \
 from six import iterkeys
 
 from ..support.handlerepo import HandleRepo
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..support.collection import Collection, MetaCollection
 from ..support.metadatahandler import PlainTextImporter, PAV, PROV, DCTERMS, \
     DCTYPES, DLNS, DCAT, FOAF, EMP, Literal, URIRef

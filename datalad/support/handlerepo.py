@@ -13,138 +13,20 @@ This layer makes the difference between an arbitrary annex and a
 datalad-managed dataset.
 """
 
-
-import os
-from os.path import join as opj, exists, basename
 import logging
-
-from rdflib import URIRef, RDF
+from os.path import join as opj, basename
 from six import string_types
 
+from rdflib import URIRef
+
+#from datalad.support.handlebackends import HandleRepoBackend
 from .annexrepo import AnnexRepo
 from .metadatahandler import MetadataImporter, CustomImporter, Graph, \
     Literal, DLNS, RDFS
-from .handle import Handle
-from .exceptions import ReadOnlyBackendError
-from ..utils import assure_dir, get_local_file_url
 from ..consts import HANDLE_META_DIR, REPO_CONFIG_FILE, REPO_STD_META_FILE
+from ..utils import assure_dir
 
 lgr = logging.getLogger('datalad.handlerepo')
-
-
-class HandleRepoBackend(Handle):
-    # TODO: Name. See corresponding naming for CollectionBackend and find
-    # a solution for both of them
-    """Handle backend for handle repositories.
-
-    Implements a Handle pointing to a handle repository branch.
-    """
-
-    def __init__(self, repo, branch=None, files=None):
-        """
-
-        :param repo:
-        :param branch:
-        :param files:
-        :return:
-        """
-
-        super(HandleRepoBackend, self).__init__()
-
-        if not isinstance(repo, HandleRepo):
-            e_msg = "Can't deal with type %s to access a handle repository." \
-                    % type(repo)
-            lgr.error(e_msg)
-            raise TypeError(e_msg)
-        else:
-            self.repo = repo
-
-        if branch is None:
-            self._branch = self.repo.git_get_active_branch()
-        elif branch in self.repo.git_get_branches() + \
-                self.repo.git_get_remote_branches():
-            self._branch = branch
-        else:
-            raise ValueError("Unknown branch '%s' of repository at %s." %
-                             (branch, self.repo.path))
-
-        # we can't write to a remote branch:
-        self.is_read_only = self._branch.split('/')[0] in \
-                            self.repo.git_get_remotes()
-        self._files = files
-        self._sub_graphs = dict()
-
-    def get_subgraphs(self):
-        if self._sub_graphs == dict():
-            self.update_metadata()
-        return self._sub_graphs
-
-    def set_subgraphs(self, graphs):
-        if not isinstance(graphs, dict):
-            raise TypeError("Unexpected type of data: %s. "
-                            "Expects a dictionary of sub-graphs." %
-                            type(graphs))
-        for subgraph in graphs:
-            if not isinstance(graphs[subgraph], Graph):
-                raise TypeError("Sub-graph '%s' is of type %s. "
-                                "Expected: rdflib.Graph." %
-                                (subgraph, type(graphs[subgraph])))
-            self._sub_graphs[subgraph] = graphs[subgraph]
-
-    sub_graphs = property(get_subgraphs, set_subgraphs)
-
-    def set_metadata(self, data):
-        """
-
-        :param data: dict of Graph
-        :return:
-        """
-        self.sub_graphs = data
-
-    def get_metadata(self):
-        """
-
-        :return:
-        """
-        self._graph = Graph(identifier=Literal(self.repo.name))
-        for key in self.sub_graphs:
-            self._graph += self.sub_graphs[key]
-
-        return self._graph
-
-    meta = property(get_metadata, set_metadata)
-
-    def update_metadata(self):
-        """
-
-        :return:
-        """
-        self.sub_graphs = self.repo.get_metadata(self._files,
-                                                 branch=self._branch)
-
-    def commit_metadata(self, msg="Handle metadata updated."):
-        """
-
-        :param msg:
-        :return:
-        """
-        if self.is_read_only:
-            raise ReadOnlyBackendError("Can't commit to handle '%s'.\n"
-                                       "(Repository: %s\tBranch: %s)" %
-                                       (self.name, self.repo.path,
-                                        self._branch))
-
-        self.repo.set_metadata(self.sub_graphs, msg=msg, branch=self._branch)
-
-    @property
-    def url(self):
-        """
-
-        :return:
-        """
-        return get_local_file_url(self.repo.path)
-
-    # TODO: set_name? See Handle.
 
 
 class HandleRepo(AnnexRepo):

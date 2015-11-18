@@ -17,9 +17,11 @@ from nose.tools import assert_raises, assert_equal, assert_false, assert_in
 from rdflib import Graph, Literal, URIRef
 from six import iterkeys
 
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend
 from ..support.handle import Handle
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from ..support.collection import Collection, MetaCollection, DLNS, RDF, DCTERMS
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
