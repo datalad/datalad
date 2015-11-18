@@ -9,9 +9,9 @@
 
 from six import iteritems
 
-from ..support.configparserinc import SafeConfigParserWithIncludes
+from datalad.support.configparserinc import SafeConfigParserWithIncludes
 
-from ..support.archives import DECOMPRESSORS
+from datalad.support.archives import DECOMPRESSORS
 
 import logging
 lgr = logging.getLogger('datalad.config')
@@ -107,11 +107,14 @@ class ConfigSection(object):
         For an option X supports a set of ways how to obtain the actual
         value
 
-        'X' -- plain value
-        'X_e' -- evaluation of the expression in the 'context'.
-                 `vars` in this case are not passed into the expression
-                 for the interpolation, and should be used as regular
-                 variables in evaluation
+        'X'
+            plain value
+
+        'X_e'
+            evaluation of the expression in the 'context'.
+            `vars` in this case are not passed into the expression
+            for the interpolation, and should be used as regular
+            variables in evaluation
 
         N.B. String interpolations are also in effect as provided by
         stock ConfigParser

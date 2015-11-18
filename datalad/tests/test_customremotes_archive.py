@@ -14,7 +14,7 @@ from ..customremotes.base import AnnexExchangeProtocol
 from ..customremotes.archive import AnnexArchiveCustomRemote
 from ..cmd import Runner
 from ..support.handlerepo import HandleRepo
-
+from ..consts import ARCHIVES_SPECIAL_REMOTE
 from .utils import *
 
 
@@ -34,6 +34,8 @@ fn_inarchive_obscure = get_most_obscure_supported_name()
 fn_archive_obscure = fn_inarchive_obscure.replace('a', 'b') + '.tar.gz'
 fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 
+#import line_profiler
+#prof = line_profiler.LineProfiler()
 
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
@@ -43,6 +45,7 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
           (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
           (fn_extracted_obscure, '123')))
 @with_tempfile()
+#@prof
 def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     # We could just propagate current environ I guess to versatile our testing
     env = os.environ.copy()
@@ -61,8 +64,10 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
 
     handle = HandleRepo(d, runner=r, direct=direct)
     handle.annex_initremote(
-        'annexed-archives',
-        ['encryption=none', 'type=external', 'externaltype=dl+archive'])
+        ARCHIVES_SPECIAL_REMOTE,
+        ['encryption=none', 'type=external', 'externaltype=dl+archive',
+         'autoenable=true'
+         ])
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
     handle.add_to_annex(fn_archive, "Added tarball")
@@ -77,7 +82,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle.annex_drop(fn_extracted)
 
     list_of_remotes = handle.annex_whereis(fn_extracted)
-    in_('[annexed-archives]', list_of_remotes)
+    in_('[%s]' % ARCHIVES_SPECIAL_REMOTE, list_of_remotes)
 
     assert_false(handle.file_has_content(fn_extracted))
     handle.get(fn_extracted)
@@ -98,7 +103,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
                            runner=Runner(cwd=d2, env=env, protocol=protocol),
                            direct=direct)
     # we still need to enable manually atm that special remote for archives
-    cloned_handle.annex_enableremote('annexed-archives')
+    # cloned_handle.annex_enableremote('annexed-archives')
 
     assert_false(cloned_handle.file_has_content(fn_archive))
     assert_false(cloned_handle.file_has_content(fn_extracted))
@@ -108,6 +113,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_true(cloned_handle.file_has_content(fn_archive))
 
     # TODO: dropurl, addurl without --relaxed, addurl to non-existing file
+    #prof.print_stats()
 
 
 def test_basic_scenario():

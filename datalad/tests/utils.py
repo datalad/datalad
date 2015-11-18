@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import inspect
 import shutil
 import stat
 import os
@@ -25,9 +26,10 @@ import time
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
+from six import reraise
 
 from functools import wraps
-from os.path import exists, realpath, join as opj, pardir
+from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
@@ -41,6 +43,40 @@ from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
+from ..cmdline.helpers import get_repo_instance
+from ..consts import ARCHIVES_TEMP_DIR
+from . import _TEMP_PATHS_GENERATED
+
+# temp paths used by clones
+_TEMP_PATHS_CLONES = set()
+
+try:
+    # TEMP: Just to overcome problem with testing on jessie with older requests
+    # https://github.com/kevin1024/vcrpy/issues/215
+    import vcr.patch as _vcrp
+    import requests as _
+    try:
+        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
+    except ImportError:
+        def returnnothing(*args, **kwargs):
+            return()
+        _vcrp.CassettePatcherBuilder._requests = returnnothing
+    from vcr import use_cassette
+except ImportError:
+    # If there is no vcr.py -- provide a do nothing decorator for use_cassette
+    def use_cassette(*args, **kwargs):
+        def do_nothing_decorator(t):
+            @wraps(t)
+            def wrapper(*args, **kwargs):
+                return t(*args, **kwargs)
+            return wrapper
+        return do_nothing_decorator
+
+def skip_if_no_module(module):
+    try:
+        imp = __import__(module)
+    except ImportError:
+        raise SkipTest("No %s module" % module)
 
 
 def create_tree_archive(path, name, load, overwrite=False):
@@ -88,7 +124,9 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
+from ..utils import chpwd, getpwd
 
 
 def ok_clean_git_annex_proxy(path):
@@ -97,15 +135,15 @@ def ok_clean_git_annex_proxy(path):
     # TODO: May be let's make a method of AnnexRepo for this purpose
 
     ar = AnnexRepo(path)
-    cwd = os.getcwd()
-    os.chdir(path)
+    cwd = getpwd()
+    chpwd(path)
 
     try:
         out = ar.annex_proxy("git status")
     except CommandNotAvailableError as e:
         raise SkipTest
     finally:
-        os.chdir(cwd)
+        chpwd(cwd)
 
     assert_in("nothing to commit, working directory clean", out[0], "git-status output via proxy not plausible: %s" % out[0])
 
@@ -134,10 +172,43 @@ def ok_clean_git(path, annex=True, untracked=[]):
         eq_(head_diffs, [])
 
 
-def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepoOld(path)
-    assert(filename in repo.get_indexed_files())  # file is known to Git
-    assert(annexed == os.path.islink(opj(path, filename)))
+def ok_file_under_git(path, filename=None, annexed=False):
+    """Test if file is present and under git/annex control
+
+    If relative path provided, then test from current directory
+    """
+    if filename is None:
+        # path provides the path and the name
+        path, filename = pathsplit(path)
+
+    try:
+        # if succeeds when must not (not `annexed`) -- fail
+        repo = get_repo_instance(path, class_=AnnexRepo)
+        annex = True
+    except RuntimeError as e:
+        # TODO: make a dedicated Exception
+        if "No annex repository found in" in str(e):
+            repo = get_repo_instance(path, class_=GitRepo)
+            annex = False
+        else:
+            raise
+
+    # path to the file within the repository
+    file_repo_dir = os.path.relpath(path, repo.path)
+    file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
+    assert(file_repo_path in repo.get_indexed_files())  # file is known to Git
+
+    if annex:
+        try:
+            # operates on relative to curdir path
+            repo.get_file_key(opj(path, filename))
+            in_annex = True
+        except FileNotInAnnexError as e:
+            in_annex = False
+    else:
+        in_annex = False
+
+    assert(annexed == in_annex)
 
 #
 # Helpers to test symlinks
@@ -192,7 +263,7 @@ def ok_annex_get(ar, files, network=True):
         ar.annex_get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
-            ok_('100%' in cmo.err or '100.0%' in cmo.err)
+            ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
     # verify that load was fetched
     ok_git_config_not_empty(ar) # whatever we do shouldn't destroy the config file
     has_content = ar.file_has_content(files)
@@ -201,6 +272,28 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+def ok_generator(gen):
+    assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
+
+def ok_archives_caches(repopath, n=1, persistent=None):
+    """Given a path to repository verify number of archives
+
+    Parameters
+    ----------
+    repopath : str
+      Path to the repository
+    n : int, optional
+      Number of archives directories to expect
+    persistent: bool or None, optional
+      If None -- both persistent and not count.
+    """
+    # looking into subdirectories
+    glob_ptn = opj(repopath,
+                   ARCHIVES_TEMP_DIR + {None: '*', True: '', False: '-*'}[persistent],
+                   '*')
+    dirs = glob.glob(glob_ptn)
+    assert_equal(len(dirs), n,
+                 msg="Found following dirs when needed %d of them: %s" % (n, dirs))
 
 #
 # Decorators
@@ -238,7 +331,7 @@ class SilentHTTPHandler(SimpleHTTPRequestHandler):
 
 
 def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragma: no cover
-    os.chdir(path_to_serve_from)
+    chpwd(path_to_serve_from)
     httpd = HTTPServer((hostname, 0), SilentHTTPHandler)
     queue.put(httpd.server_port)
     httpd.serve_forever()
@@ -248,7 +341,7 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
 def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
     """
-    
+
     @wraps(tfunc)
     def newfunc(*args, **kwargs):
 
@@ -296,7 +389,8 @@ def with_tempfile(t, *targs, **tkwargs):
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    *targs, **tkwargs:
+    `*targs`:
+    `**tkwargs`:
         All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
         the function t.  If no 'prefix' argument is provided, it will be
@@ -324,9 +418,10 @@ def with_tempfile(t, *targs, **tkwargs):
         # dir=... will override this.
         mkdir = tkwargs_.pop('mkdir', False)
 
-
         filename = {False: tempfile.mktemp,
                     True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
+        filename = realpath(filename)
+
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
@@ -355,7 +450,8 @@ def with_tempfile(t, *targs, **tkwargs):
 def _get_resolved_flavors(flavors):
     #flavors_ = (['local', 'clone'] + (['local-url'] if not on_windows else [])) \
     #           if flavors == 'auto' else flavors
-    flavors_ = (['local', 'clone', 'local-url'] if not on_windows else ['network', 'network-clone']) \
+    flavors_ = (['local', 'clone', 'local-url', 'network'] if not on_windows
+                else ['network', 'network-clone']) \
                if flavors == 'auto' else flavors
 
     if not isinstance(flavors_, list):
@@ -390,7 +486,7 @@ def clone_url(url):
     runner = Runner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
-    open(opj(tdir, ".git", "remove-me"), "w").write("Please")  # signal for it to be removed after
+    _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
 
@@ -399,19 +495,52 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicTestRepo, TestRepo
-_basic_test_repo = BasicTestRepo()
-_TESTREPOS = {'basic':
-                  {'network': 'git://github.com/datalad/testrepo--basic--r1',
-                   'local': _basic_test_repo.path,
-                   'local-url': _basic_test_repo.url}}
+from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
+    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo, \
+    CollectionTestRepo
+
+_TESTREPOS = None
 
 def _get_testrepos_uris(regex, flavors):
+    global _TESTREPOS
+    # we should instantiate those whenever test repos actually asked for
+    # TODO: just absorb all this lazy construction within some class
+    if not _TESTREPOS:
+        _basic_annex_test_repo = BasicAnnexTestRepo()
+        _basic_handle_test_repo = BasicHandleTestRepo()
+        _basic_collection_test_repo = BasicCollectionTestRepo()
+        _basic_git_test_repo = BasicGitTestRepo()
+        _md_pt_handle_test_repo = MetadataPTHandleTestRepo()
+        _collection_test_repo = CollectionTestRepo()
+        _TESTREPOS = {'basic_annex':
+                        {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                         'local': _basic_annex_test_repo.path,
+                         'local-url': _basic_annex_test_repo.url},
+                      'basic_annex_handle':
+                        {'local': _basic_handle_test_repo.path,
+                         'local-url': _basic_handle_test_repo.url},
+                      'basic_git':
+                        {'local': _basic_git_test_repo.path,
+                         'local-url': _basic_git_test_repo.url},
+                      'basic_git_collection':
+                        {'local': _basic_collection_test_repo.path,
+                         'local-url': _basic_collection_test_repo.url},
+                      'meta_pt_annex_handle':
+                        {'local': _md_pt_handle_test_repo.path,
+                         'local-url': _md_pt_handle_test_repo.url},
+                      'collection':
+                        {'local': _collection_test_repo.path,
+                         'local-url': _collection_test_repo.url}}
+        # assure that now we do have those test repos created -- delayed
+        # their creation until actually used
+        if not on_windows:
+            _basic_annex_test_repo.create()
+            _basic_handle_test_repo.create()
+            _basic_collection_test_repo.create()
+            _basic_git_test_repo.create()
+            _md_pt_handle_test_repo.create()
+            _collection_test_repo.create()
     uris = []
-    # assure that now we do have those test repos created -- delayed
-    # their creation until actually used
-    if not on_windows:
-        _basic_test_repo.create()
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
             continue
@@ -429,12 +558,12 @@ def _get_testrepos_uris(regex, flavors):
 
 @optional_args
 def with_testrepos(t, regex='.*', flavors='auto', skip=False):
-    """Decorator to provide a test repository available locally and/or over the Internet
+    """Decorator to provide a local/remote test repository
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
-    where top-level name describes nature/identifier of the test repository, and
-    there could be multiple instances (e.g. generated differently) of the same
-    "content"
+    where top-level name describes nature/identifier of the test repository,
+    and there could be multiple instances (e.g. generated differently) of the
+    same "content"
 
     Parameters
     ----------
@@ -443,17 +572,17 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
     flavors : {'auto', 'local', 'local-url', 'clone', 'network', 'network-clone'} or list of thereof, optional
       What URIs to provide.  E.g. 'local' would just provide path to the
       repository, while 'network' would provide url of the remote location
-      available on Internet containing the test repository.  'clone' would clone repository
-      first to a temporary location. 'network-clone' would first clone from the network
-      location. 'auto' would include the list of appropriate
-      ones (e.g., no 'network*' flavors if network tests are "forbidden").
+      available on Internet containing the test repository.  'clone' would
+      clone repository first to a temporary location. 'network-clone' would
+      first clone from the network location. 'auto' would include the list of
+      appropriate ones (e.g., no 'network*' flavors if network tests are
+      "forbidden").
 
     Examples
     --------
-
-        @with_testrepos('basic')
-        def test_write(repo):
-            assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
+    >>> @with_testrepos('basic_annex')
+    >>> def test_write(repo):
+    ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
 
@@ -464,7 +593,13 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
         flavors_ = _get_resolved_flavors(flavors)
 
         testrepos_uris = _get_testrepos_uris(regex, flavors_)
-        assert(testrepos_uris)
+        # we should always have at least one repo to test on, unless explicitly only
+        # network was requested by we are running without networked tests
+        if not (os.environ.get('DATALAD_TESTS_NONETWORK') and flavors == ['network']):
+            assert(testrepos_uris)
+        else:
+            if not testrepos_uris:
+                raise SkipTest("No non-networked repos to test on")
 
         for uri in testrepos_uris:
             if __debug__:
@@ -472,12 +607,33 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
-                # ad-hoc but works
-                if exists(uri) and exists(opj(uri, ".git", "remove-me")):
+                if uri in _TEMP_PATHS_CLONES:
+                    _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
                 pass  # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
+
+def skip_if_no_network(func):
+    """Skip test completely in NONETWORK settings
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+            raise SkipTest("Skipping since no network settings")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_if_on_windows(func):
+    """Skip test completely under Windows
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows:
+            raise SkipTest("Skipping on Windows")
+        return func(*args, **kwargs)
+    return newfunc
 
 
 @optional_args
@@ -488,20 +644,25 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
     @wraps(func)
     def newfunc(*args, **kwargs):
         cwd_before = os.getcwd()
+        pwd_before = getpwd()
         exc_info = None
         try:
             func(*args, **kwargs)
         except:
             exc_info = sys.exc_info()
         finally:
-            cwd_after = os.getcwd()
+            try:
+                cwd_after = os.getcwd()
+            except OSError as e:
+                lgr.warning("Failed to getcwd: %s" % e)
+                cwd_after = None
 
         if cwd_after != cwd_before:
-            os.chdir(cwd_before)
+            chpwd(pwd_before)
             if not ok_to_chdir:
                 lgr.warning(
                     "%s changed cwd to %s. Mitigating and changing back to %s"
-                    % (func, cwd_after, cwd_before))
+                    % (func, cwd_after, pwd_before))
                 # If there was already exception raised, we better re-raise
                 # that one since it must be more important, so not masking it
                 # here with our assertion
@@ -510,7 +671,33 @@ def assert_cwd_unchanged(func, ok_to_chdir=False):
                                  "CWD changed from %s to %s" % (cwd_before, cwd_after))
 
         if exc_info is not None:
-            raise exc_info[0](exc_info[1], exc_info[2])
+            reraise(*exc_info)
+
+    return newfunc
+
+@optional_args
+def run_under_dir(func, newdir='.'):
+    """Decorator to run tests under another directory
+
+    It is somewhat ugly since we can't really chdir
+    back to a directory which had a symlink in its path.
+    So using this decorator has potential to move entire
+    testing run under the dereferenced directory name -- sideeffect.
+
+    The only way would be to instruct testing framework (i.e. nose
+    in our case ATM) to run a test by creating a new process with
+    a new cwd
+    """
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        pwd_before = getpwd()
+        try:
+            chpwd(newdir)
+            func(*args, **kwargs)
+        finally:
+            chpwd(pwd_before)
+
 
     return newfunc
 

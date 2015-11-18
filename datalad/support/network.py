@@ -19,7 +19,7 @@ import shelve
 from six import string_types
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit
+from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse
 from six.moves.urllib.error import URLError
 from six.moves import StringIO
 
@@ -60,8 +60,35 @@ def get_url_deposition_filename(url):
         r.close()
 
 
-def get_url_straight_filename(url):
-    return os.path.basename(urlunquote(urlsplit(url).path))
+def get_url_straight_filename(url, strip=[], allowdir=False):
+    """Get file/dir name of the last path component of the URL
+
+    Parameters
+    ----------
+    strip: list, optional
+      If provided, listed names will not be considered and their
+      parent directory will be selected
+    allowdir: bool, optional
+      If url points to a "directory" (ends with /), empty string
+      would be returned unless allowdir is True, in which case the
+      name of the directory would be returned
+    """
+    path = urlunquote(urlsplit(url).path)
+    path_parts = path.split('/')
+
+    if allowdir:
+        # strip empty ones
+        while len(path_parts) > 1 and not path_parts[-1]:
+            path_parts = path_parts[:-1]
+
+    if strip:
+        while path_parts and path_parts[-1] in strip:
+            path_parts = path_parts[:-1]
+
+    if path_parts:
+        return path_parts[-1]
+    else:
+        return None
 
 
 def get_url_response_stamp(url, response_info):
@@ -185,25 +212,37 @@ def __json_testing():
     print resp2.text
 
 
-def __download(url, filename=None, filename_only=False):
+def __download_file(url, filename):
     # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
     request = Request(url)
-    request.add_header('Accept-encoding', 'gzip,deflate')
+    #request.add_header('Accept-encoding', 'gzip,deflate')
     r = urlopen(request)
     try:
-        filename = filename or getFileName(url, r)
-        if not filename_only:
-            with open(filename, 'wb') as f:
-                if r.info().get('Content-Encoding') == 'gzip':
-                    buf = StringIO(r.read())
-                    src = gzip.GzipFile(fileobj=buf)
-                else:
-                    src = r
-                shutil.copyfileobj(src, f)
+        with open(filename, 'wb') as f:
+            if False: # r.info().get('Content-Encoding') == 'gzip':
+                buf = StringIO(r.read())
+                src = gzip.GzipFile(fileobj=buf)
+            else:
+                src = r
+            shutil.copyfileobj(src, f)
     finally:
         r.close()
     return filename
 
+from ..cmd import get_runner
+
+def _download_file(url, filename):
+    """TEMP: use wget to download url into a file"""
+
+    # comment -- it sucks with reporting -- too much or too little.
+    # our magical wrapping experiences problems here
+    get_runner().run(["wget", "-O", filename, url],
+                     log_online=True,  # so we see what is going on
+                     #log_stderr=True, # doesn't work as necessary
+                     expect_stderr=True,
+                     log_stdout=False  # wget produces no stdout and then our beast would halt waiting for it
+                     )
+    return filename
 
 def retry_urlopen(url, retries=3):
     for t in range(retries):
@@ -300,13 +339,17 @@ def same_website(url_rec, u_rec):
     # and u_rec.path.startswith(url_rec.path)):
 
 
-def dgurljoin(u_path, url):
+def dlurljoin(u_path, url):
     url_rec = urlparse(url)  # probably duplicating parsing :-/ TODO
     if url_rec.scheme:
         # independent full url, so just return it
         return url
     if u_path.endswith('/'):  # should here be also a scheme use?
-        return os.path.join(u_path, url)
+        if url.startswith('/'): # jump to the root
+            u_path_rec = urlparse(u_path)
+            return urljoin(urlunparse((u_path_rec.scheme, u_path_rec.netloc, '','','','')), url)
+        else:
+            return os.path.join(u_path, url)
     # TODO: recall where all this dirname came from and bring into the test
     return urljoin(os.path.dirname(u_path) + '/', url)
 
@@ -385,7 +428,7 @@ def collect_urls(url, recurse=None, hot_cache=None, cache=False, memo=None):
                 new_urls = collect_urls(
                     u_full, recurse=recurse, hot_cache=hot_cache, cache=cache,
                     memo=memo)
-                new_fullurls = [(dgurljoin(u_path, url__[0]),) + url__[1:]
+                new_fullurls = [(dlurljoin(u_path, url__[0]),) + url__[1:]
                                  for url__ in new_urls]
                 # and add to their "hrefs" appropriate prefix
                 lgr.log(4, "Adding %d urls collected from %s" % (len(new_fullurls), u_full))
@@ -660,3 +703,32 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
 
     return repo_filename, downloaded, updated, downloaded_size
 
+
+# TODO should it be a node maybe?
+class SimpleURLStamper(object):
+    """Gets a simple stamp about the URL: {url, time, size} of whatever was provided in the header
+    """
+    def __init__(self, mode='full'):
+        self.mode = mode
+
+    def __call__(self, url):
+        # Extracted from above madness
+        # TODO: add mode alike to 'relaxed' where we would not
+        # care about content-deposition filename
+        # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
+        request = Request(url)
+
+        # No traffic compression since we do not know how to identify
+        # exactly either it has to be decompressed
+        # request.add_header('Accept-encoding', 'gzip,deflate')
+        #
+        # TODO: think about stamping etc -- we seems to be redoing
+        # what git-annex does for us already... not really
+        r = retry_urlopen(request)
+        try:
+            r_info = r.info()
+            r_stamp = get_url_response_stamp(url, r_info)
+
+            return dict(mtime=r_stamp['mtime'], size=r_stamp['size'], url=url)
+        finally:
+            r.close()

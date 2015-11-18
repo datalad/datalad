@@ -7,72 +7,24 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from os.path import join
+from mock import patch
+from ..config import ConfigManager
+from .utils import ok_, eq_, assert_raises, assert_greater
 
-from .utils import *
+def test_config_empty():
+    # nothing to load
+    config = ConfigManager(load_default=False)
+    eq_(config._get_file_candidates(), [])
+    # nevertheless we should be able to specify variables via env
 
-from ..api import *
+    assert_raises(ValueError, config.getboolean, 'tests', 'somenonexistingone')
+    with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        config.reload()
+        ok_(config.getboolean('tests', 'nonetwork'))
+        eq_(config.get_as_dtype('tests', 'nonetwork', int), 1)
 
-@with_tempfile(suffix='.cfg')
-def test_eval_value(filename):
-    with open(filename, 'w') as f:
-        f.write("""
-[DEFAULT]
-v1 = 1+2
-# simple evaluation
-v2_e = str(1+2)
-# Simple string interpolations
-v4 = %(var)s
-# mixing both string interpolations and evaluation
-exec = from math import e
-
-       func = lambda x: "fun^%%d" %% x
-# Function to be evaluated with some local variable substitution
-funccall_e = func(%(l)s)
-
-
-[section1]
-v5_e = "%%.2f(%(v1)s)" %% (var+1)
-var_e = "%%.2f" %% (var+2)
-e_e = e
-v1_array_e = [%(v1)s]
-l = 3
-
-[section2]
-l = 4
-
-[section3]
-l = 1
-exec = func = lambda x: "NEW"
-""")
-
-# this one is a tricky one -- probably could still work via iterative refinement of vars
-# while catching InterpolationMissingOptionError
-# v3 = %(v2)s.bak
-
-    cfg = load_config([filename])
-    dcfg = cfg.get_section('DEFAULT')
-    eq_(dcfg.get('v1'), '1+2')
-    eq_(dcfg.get('v2_e'), '3')
-    eq_(dcfg.get('v2_e', raw=True), 'str(1+2)')
-    eq_(dcfg.get('v2'), '3')
-    eq_(dcfg.get('v4', vars=dict(var='1.3333')), '1.3333')
-
-    scfg1 = cfg.get_section('section1')
-    eq_(scfg1.get('v5', vars=dict(var=1.3333)), '2.33(1+2)')
-    eq_(scfg1.get('var', vars=dict(var=1.3333)), '3.33')
-    # now check if exec worked correctly and enriched environment
-    # for those evaluations
-    import math
-    eq_(scfg1.get('e'), math.e)
-    eq_(scfg1.get('v1_array'), [ 3 ])
-    eq_(scfg1.get('funccall'), 'fun^3')
-
-    scfg2 = cfg.get_section('section2')
-    eq_(scfg2.get('funccall'), 'fun^4')
-
-    scfg3 = cfg.get_section('section3')
-    # exec was redefined
-    eq_(scfg3.get('funccall'), 'NEW')
-    eq_(scfg3.get('l'), '1')
-
+def test_config_load():
+    config = ConfigManager()
+    candidates = config._get_file_candidates()
+    assert_greater(len(candidates), 2)  # at least system, user, local
+    assert_greater(5, len(candidates))  # but shouldn't be too many

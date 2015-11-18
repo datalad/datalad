@@ -11,13 +11,15 @@
 """
 
 import gc
+from os.path import exists
 from git.exc import GitCommandError
 from six import PY3
+from six.moves.urllib.parse import urljoin, urlsplit
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
 
-from ..support.annexrepo import AnnexRepo, kwargs_to_options
+from ..support.annexrepo import AnnexRepo, kwargs_to_options, GitRepo
 from ..support.exceptions import CommandNotAvailableError, \
     FileInGitError, FileNotInAnnexError, CommandError
 from ..cmd import Runner
@@ -26,7 +28,7 @@ from .utils import *
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos('.*annex.*')
 @with_tempfile
 def test_AnnexRepo_instance_from_clone(src, dst):
 
@@ -43,7 +45,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_instance_from_existing(path):
 
     ar = AnnexRepo(path)
@@ -56,6 +58,9 @@ def test_AnnexRepo_instance_from_existing(path):
 @with_tempfile
 def test_AnnexRepo_instance_brand_new(path):
 
+    GitRepo(path)
+    assert_raises(RuntimeError, AnnexRepo, path, create=False)
+
     ar = AnnexRepo(path)
     assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
     assert_true(os.path.exists(os.path.join(path, '.git')))
@@ -63,7 +68,7 @@ def test_AnnexRepo_instance_brand_new(path):
 
 @ignore_nose_capturing_stdout
 @assert_cwd_unchanged
-@with_testrepos(flavors=['network'])
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_get(src, dst):
 
@@ -80,44 +85,44 @@ def test_AnnexRepo_get(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos('.*annex.*')
 @with_tempfile
 def test_AnnexRepo_crippled_filesystem(src, dst):
-    # TODO: This test is rudimentary, since platform does not really determine
-    # the filesystem. For now this should work for the buildbots.
-    # Nevertheless: Find a better way to test it.
-    # TODO: just create a fitting git/config without using annex to test it.
 
     ar = AnnexRepo(dst, src)
-    if on_windows:
-        assert_true(ar.is_crippled_fs(),
-                    "Detected non-crippled filesystem on windows.")
-    else:
-        assert_false(ar.is_crippled_fs(),
-                     "Detected crippled filesystem on non-windows.")
+
+    # fake git-annex entries in .git/config:
+    writer = ar.repo.config_writer()
+    writer.set_value("annex", "crippledfilesystem", True)
+    writer.release()
+    assert_true(ar.is_crippled_fs())
+    writer.set_value("annex", "crippledfilesystem", False)
+    writer.release()
+    assert_false(ar.is_crippled_fs())
+    # since we can't remove the entry, just rename it to fake its absence:
+    writer.rename_section("annex", "removed")
+    writer.set_value("annex", "something", "value")
+    writer.release()
+    assert_false(ar.is_crippled_fs())
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 def test_AnnexRepo_is_direct_mode(path):
 
     ar = AnnexRepo(path)
     dm = ar.is_direct_mode()
-    if on_windows:
-        assert_true(dm,
-                    "AnnexRepo.is_direct_mode() returned false on windows.")
+
+    # by default annex should be in direct mode on crippled filesystem and
+    # on windows:
+    if ar.is_crippled_fs() or on_windows:
+        assert_true(dm)
     else:
-        assert_false(dm,
-                     "AnnexRepo.is_direct_mode() returned true on non-windows")
-    # Note: In fact this test isn't totally correct, since you always can
-    # switch to direct mode. So not being on windows doesn't necessarily mean
-    # we are in indirect mode. But how to obtain a "ground truth" to test
-    # against, without making test of is_direct_mode() dependent on
-    # set_direct_mode() and vice versa?
+        assert_false(dm)
 
 
 @assert_cwd_unchanged
-@with_testrepos
+@with_testrepos('.*annex.*')
 @with_tempfile
 def test_AnnexRepo_set_direct_mode(src, dst):
 
@@ -134,7 +139,7 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add(src, annex_path):
 
@@ -159,7 +164,7 @@ def test_AnnexRepo_annex_add(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo(annex_path, src)
@@ -168,7 +173,7 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_key(src, annex_path):
 
@@ -189,7 +194,7 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
-@with_testrepos(flavors=['network'])
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_file_has_content(src, annex_path):
 
@@ -220,7 +225,7 @@ def test_AnnexRepo_options_decorator():
 
 
 @assert_cwd_unchanged
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_annex_add_to_git(src, dst):
 
@@ -236,14 +241,15 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
     assert_in(filename, ar.get_indexed_files())
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tree(tree=(('about.txt', 'Lots of abouts'),))
+@serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_web_remote(src, dst):
+def test_AnnexRepo_web_remote(src, sitepath, siteurl, dst):
 
     ar = AnnexRepo(dst, src)
-
-    testurl = 'http://datalad.org/pages/about.html'
-    testfile = 'datalad.org_pages_about.html'
+    testurl = urljoin(siteurl, 'about.txt')
+    testfile = '%s_about.txt' % urlsplit(testurl).netloc.split(':')[0]
 
     # get the file from remote
     with swallow_outputs() as cmo:
@@ -287,7 +293,7 @@ def test_AnnexRepo_web_remote(src, dst):
     assert_equal(len(l), 1)
     assert_false(ar.file_has_content(testfile))
 
-@with_testrepos(flavors='network')
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
     ar = AnnexRepo(dst, src, backend='MD5')
@@ -353,7 +359,7 @@ def test_AnnexRepo_backend_option(path, url):
     assert_true(ar.get_file_backend(f) == 'SHA1'
                 for f in ar.get_indexed_files() if 'faraway' in f)
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
 def test_AnnexRepo_get_file_backend(src, dst):
     #init local test-annex before cloning:
@@ -389,7 +395,7 @@ def test_AnnexRepo_always_commit(path):
 
     # Now git-annex log should show the addition:
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 1)
     assert_in(file1, out_list[0])
     # check git log of git-annex branch:
@@ -418,13 +424,13 @@ def test_AnnexRepo_always_commit(path):
     # so it should commit the addition at the end. Calling it again should then
     # show two commits.
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in("recording state in git", out_list[1])
 
     out, err = repo._run_annex_command('log')
-    out_list = out.rstrip(os.linesep).split(os.linesep)
+    out_list = out.rstrip(os.linesep).splitlines()
     assert_equal(len(out_list), 2, "Output:\n%s" % out_list)
     assert_in(file1, out_list[0])
     assert_in(file2, out_list[1])
@@ -436,9 +442,39 @@ def test_AnnexRepo_always_commit(path):
                        if commit.startswith('commit')])
     assert_equal(num_commits, 4)
 
+@with_testrepos('basic_annex', flavors=['clone'])
+def test_AnnexRepo_on_uninited_annex(path):
+    assert_false(exists(opj(path, '.git', 'annex'))) # must not be there for this test to be valid
+    annex = AnnexRepo(path, create=False, init=False)  # so we can initialize without
+    # and still can get our things
+    assert_false(annex.file_has_content('test-annex.dat'))
+    with swallow_outputs():
+        annex.annex_get('test-annex.dat')
+        assert_true(annex.file_has_content('test-annex.dat'))
 
 # TODO:
 #def annex_initremote(self, name, options):
 #def annex_enableremote(self, name):
 
+@with_testrepos('basic_annex$', flavors=['clone'])
+def test_AnnexRepo_get_contentlocation(path):
+    annex = AnnexRepo(path, create=False, init=False)
+    fname = 'test-annex.dat'
+    key = annex.get_file_key(fname)
+    # TODO: see if we can avoid this or specify custom exception
+    assert_raises(CommandError, annex.get_contentlocation, key)
+
+    with swallow_outputs() as cmo:
+        annex.annex_get(fname)
+    key_location = annex.get_contentlocation(key)
+    # they both should point to the same location eventually
+    eq_(os.path.realpath(opj(annex.path, fname)),
+        os.path.realpath(opj(annex.path, key_location)))
+
+    # TODO: test how it would look if done under a subdir
+    with chpwd('subdir', mkdir=True):
+        key_location = annex.get_contentlocation(key)
+        # they both should point to the same location eventually
+        eq_(os.path.realpath(opj(annex.path, fname)),
+            os.path.realpath(opj(annex.path, key_location)))
 

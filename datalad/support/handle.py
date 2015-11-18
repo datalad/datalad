@@ -39,8 +39,8 @@ class HandleBackend(object):
         physically existing handle. It doesn't make sense to tell a backend to
         change it.
 
-        Returns:
-        --------
+        Returns
+        -------
         str
         """
         pass
@@ -49,8 +49,8 @@ class HandleBackend(object):
     def get_metadata(self, files=None):
         """Get a graph containing the handle's metadata.
 
-        Returns:
-        --------
+        Returns
+        -------
         rdflib.Graph
         """
         # TODO: doc `files` and may be find a more general name
@@ -65,8 +65,8 @@ class HandleBackend(object):
 
         TODO: Define a ReadOnlyException or sth.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         meta: rdflib.Graph
         msg: optionally a "commit-message"
         """
@@ -118,5 +118,5 @@ class Handle(object):
 
     @property
     def name(self):
-        return self.meta.identifier
+        return str(self.meta.identifier)
 

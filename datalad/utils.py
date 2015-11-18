@@ -9,15 +9,19 @@
 
 import collections
 import six.moves.builtins as __builtin__
+from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
 import logging
-import shutil, stat, os, sys
+import shutil
+import stat
+import os
+import sys
 import tempfile
 import platform
 import gc
 
 from functools import wraps
-from os.path import exists, join as opj
+from os.path import exists, join as opj, isabs, normpath
 from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
@@ -69,12 +73,16 @@ def get_local_file_url(fname):
     """
     if on_windows:
         fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % fname_rep
+        furl = "file:///%s" % urlquote(fname_rep)
         lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
     else:
-        furl = "file://%s" % fname
+        furl = "file://%s" % urlquote(fname)
     return furl
 
+def get_url_path(url):
+    """Given a file:// url, return the path itself"""
+
+    return urlunquote(urlsplit(url).path)
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -93,7 +101,7 @@ def rotree(path, ro=True, chmod_files=True):
     else:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode | stat.S_IWRITE | stat.S_IREAD)
 
-    for root, dirs, files in os.walk(path):
+    for root, dirs, files in os.walk(path, followlinks=False):
         if chmod_files:
             for f in files:
                 fullf = opj(root, f)
@@ -112,14 +120,20 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
        Either to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
-    *args, **kwargs :
+    `*args` :
+    `**kwargs` :
        Passed into shutil.rmtree call
     """
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-    rotree(path, ro=False, chmod_files=chmod_files)
-    shutil.rmtree(path, *args, **kwargs)
+
+    if not os.path.islink(path):
+        rotree(path, ro=False, chmod_files=chmod_files)
+        shutil.rmtree(path, *args, **kwargs)
+    else:
+        # just remove the symlink
+        os.unlink(path)
 
 
 def rmtemp(f, *args, **kwargs):
@@ -129,6 +143,9 @@ def rmtemp(f, *args, **kwargs):
     environment variable is defined
     """
     if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        if not os.path.lexists(f):
+            lgr.debug("Path %s does not exist, so can't be removed" % f)
+            return
         lgr.log(5, "Removing temp file: %s" % f)
         # Can also be a directory
         if os.path.isdir(f):
@@ -139,7 +156,7 @@ def rmtemp(f, *args, **kwargs):
                     os.unlink(f)
                 except OSError as e:
                     if i < 9:
-                        sleep(0.5)
+                        sleep(0.1)
                         continue
                     else:
                         raise
@@ -163,7 +180,7 @@ def optional_args(decorator):
             @my_decorator
             def function(): pass
 
-        Calls decorator with decorator(f, *args, **kwargs)"""
+        Calls decorator with decorator(f, `*args`, `**kwargs`)"""
 
     @wraps(decorator)
     def wrapper(*args, **kwargs):
@@ -182,7 +199,7 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
     # operate on a copy of tkwargs to avoid any side-effects
@@ -396,3 +413,50 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
+def updated(d, update):
+    """Return a copy of the input with the 'update'
+
+    Primarily for updating dictionaries
+    """
+    d = d.copy()
+    d.update(update)
+    return d
+
+def getpwd():
+    """Try to return a CWD without dereferencing possible symlinks
+
+    If no PWD found in the env, output of getcwd() is returned
+    """
+    try:
+        return os.environ['PWD']
+    except KeyError:
+        return os.getcwd()
+
+class chpwd(object):
+    """Wrapper around os.chdir which also adjusts environ['PWD']
+
+    The reason is that otherwise PWD is simply inherited from the shell
+    and we have no ability to assess directory path without dereferencing
+    symlinks.
+
+    If used as a context manager it allows to temporarily change directory
+    to the given path
+    """
+    def __init__(self, path, mkdir=False):
+        if not isabs(path):
+            path = normpath(opj(getpwd(), path))
+        if not os.path.exists(path) and mkdir:
+            self._mkdir = True
+            os.mkdir(path)
+        else:
+            self._mkdir = False
+        self._prev_pwd = getpwd()
+        os.chdir(path)  # for grep people -- ok, to chdir here!
+        os.environ['PWD'] = path
+
+    def __enter__(self):
+        # nothing more to do really, chdir was in the constructor
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        chpwd(self._prev_pwd)

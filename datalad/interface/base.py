@@ -12,6 +12,20 @@
 
 __docformat__ = 'restructuredtext'
 
+def get_interface_groups():
+    from .. import interface as _interfaces
+
+    grps = []
+    # auto detect all available interfaces and generate a function-based
+    # API from them
+    for _item in _interfaces.__dict__:
+        if not _item.startswith('_group_'):
+            continue
+        grp_name = _item[7:]
+        grp = getattr(_interfaces, _item)
+        grps.append((grp_name,) + grp)
+    return grps
+
 
 def dedent_docstring(text):
     import textwrap
@@ -28,7 +42,7 @@ def dedent_docstring(text):
         return textwrap.dedent(text)
 
 
-def update_docstring_with_parameters(func, params):
+def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
     """Generate a useful docstring from a parameter spec
 
     Amends any existing docstring of a callable with a textual
@@ -42,9 +56,7 @@ def update_docstring_with_parameters(func, params):
     if not defaults is None:
         ndefaults = len(defaults)
     # start documentation with what the callable brings with it
-    doc = func.__doc__
-    if doc is None:
-        doc = u''
+    doc = prefix if prefix else u''
     if len(args) > 1:
         if len(doc):
             doc += '\n'
@@ -67,15 +79,14 @@ def update_docstring_with_parameters(func, params):
                 default=defaults[defaults_idx] if defaults_idx >= 0 else None,
                 has_default=defaults_idx >= 0)
             doc += '\n'
-    # assign the ammended docs
+    doc += suffix if suffix else u""
+    # assign the amended docs
     func.__doc__ = doc
     return func
 
 
 class Interface(object):
     """Base class for interface implementations"""
-    def __init__(self):
-        self.__call__.__func__.__doc__ = dedent_docstring(self.__doc__)
 
     def setup_parser(self, parser):
         # XXX needs safety check for name collisions
@@ -105,11 +116,13 @@ class Interface(object):
                 # use parameter name as default argument name
                 parser_args = (template % arg.replace('_', '-'),)
             else:
-                parser_args = cmd_args
+                parser_args = [c.replace('_', '-') for c in cmd_args]
             parser_kwargs = param.cmd_kwargs
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
             help = param._doc
+            if help and help[-1] != '.':
+                help += '.'
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
                 # include value contraint description and default

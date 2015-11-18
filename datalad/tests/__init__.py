@@ -17,13 +17,6 @@ lgr = getLogger("datalad.tests")
 # We will delay generation of some test files/directories until they are
 # actually used but then would remove them here
 _TEMP_PATHS_GENERATED = []
-def teardown_module():
-    from datalad.tests.utils import rmtemp
-    lgr.debug("Teardown tests. " +
-              (("Removing dirs/files: %s" % ', '.join(_TEMP_PATHS_GENERATED))
-                if _TEMP_PATHS_GENERATED else "Nothing to remove"))
-    for path in _TEMP_PATHS_GENERATED:
-        rmtemp(path)
 
 # Give a custom template so we could hunt them down easily
 tempfile.template = os.path.join(tempfile.gettempdir(),

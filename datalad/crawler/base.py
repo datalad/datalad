@@ -6,10 +6,9 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Various supporting utilities usually to interface other toolkits etc
+"""Crawling of external resources (e.g. websites) to get/update datasets
 
 """
 
 __docformat__ = 'restructuredtext'
 
-from .base import *

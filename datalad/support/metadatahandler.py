@@ -18,6 +18,8 @@ from rdflib import Graph, Literal, Namespace, BNode, URIRef
 from rdflib.namespace import RDF, RDFS, FOAF, XSD, DCTERMS
 from rdflib.exceptions import ParserError
 
+from ..consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
+
 # define needed namespaces:
 DLNS = Namespace('http://www.datalad.org/terms/')
 """Namespace for datalad terms.
@@ -59,8 +61,8 @@ class MetadataImporter(object):
         descriptor'. You can add additional graphs to the `self._graphs`
         dictionary.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         target_class: str
           the type of repo, the metadata is to be imported to;
           either "Handle" or "Collection"
@@ -90,33 +92,46 @@ class MetadataImporter(object):
     def _init_datalad_graphs(self):
         """Convenience method to init the datalad descriptor graph"""
 
-        self._graphs['datalad'] = Graph()
-        self._graphs['config'] = Graph()
-        self._graphs['datalad'].bind('prov', PROV)
-        self._graphs['datalad'].bind('dcat', DCAT)
-        self._graphs['datalad'].bind('dctypes', DCTYPES)
-        self._graphs['datalad'].bind('dct', DCTERMS)
-        self._graphs['datalad'].bind('pav', PAV)
-        self._graphs['datalad'].bind('foaf', FOAF)
-        self._graphs['datalad'].bind('dlns', DLNS)
-        self._graphs['config'].bind('dlns', DLNS)
-        self._graphs['datalad'].bind('', EMP)
-        self._graphs['config'].bind('', EMP)
+        self._graphs[REPO_STD_META_FILE[0:-4]] = Graph()
+        self._graphs[REPO_CONFIG_FILE[0:-4]] = Graph()
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('prov', PROV)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dcat', DCAT)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dctypes', DCTYPES)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dct', DCTERMS)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('pav', PAV)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('foaf', FOAF)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('dlns', DLNS)
+        self._graphs[REPO_CONFIG_FILE[0:-4]].bind('dlns', DLNS)
+        self._graphs[REPO_STD_META_FILE[0:-4]].bind('', EMP)
+        self._graphs[REPO_CONFIG_FILE[0:-4]].bind('', EMP)
 
-        # TODO: Find a better prefix than ''. When stored, then parsed with
+        # TODO: Find a better prefix than '#'. When stored, then parsed with
         # rdflib and stored again, it turns to the path of the file,
         # it was stored in!
 
         if self._about_class == 'Handle':
-            self._graphs['datalad'].add((self._about_uri, RDF.type,
-                                         DLNS.Handle))
-            self._graphs['config'].add((self._about_uri, RDF.type,
-                                        DLNS.Handle))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        RDF.type,
+                                                        DLNS.Handle))
+            self._graphs[REPO_CONFIG_FILE[0:-4]].add((self._about_uri,
+                                                      RDF.type,
+                                                      DLNS.Handle))
         elif self._about_class == 'Collection':
-            self._graphs['datalad'].add((self._about_uri, RDF.type,
-                                         DLNS.Collection))
-            self._graphs['config'].add((self._about_uri, RDF.type,
-                                        DLNS.Collection))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        RDF.type,
+                                                        DLNS.Collection))
+            self._graphs[REPO_CONFIG_FILE[0:-4]].add((self._about_uri,
+                                                      RDF.type,
+                                                      DLNS.Collection))
+
+    def get_graphs(self):
+        """gets the imported data
+
+        Returns
+        -------
+        dict of rdflib.Graph
+        """
+        return self._graphs
 
     @abstractmethod
     def import_data(self, files=None, data=None):
@@ -130,8 +145,8 @@ class MetadataImporter(object):
         repository only, for example.
         This means: Either `files` or `data` has to be provided by the caller.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: str or list of str
           Either a path to the file or directory to be imported or a list
           containing paths to the files.
@@ -158,8 +173,8 @@ class MetadataImporter(object):
         The default implementation just stores every graph stored in
         `self._graphs['key']` in the file 'key.ttl'.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         path: str
           path to the directory to save the metadata in.
         """
@@ -199,8 +214,8 @@ class PlainTextImporter(MetadataImporter):
 
 
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: str or list of str
           a path to the file or directory to be imported or a list containing
           such paths.
@@ -247,12 +262,14 @@ class PlainTextImporter(MetadataImporter):
         # TODO: This behaviour is open to discussion, of course.
         # Not entirely sure yet, whether or not this is reasonable.
         if self._about_class == self._target_class:
-            self._graphs['datalad'].add((EMP.datalad, RDF.type,
-                                         PROV.SoftwareAgent))
-            self._graphs['datalad'].add((EMP.datalad, RDFS.label,
-                                         Literal("datalad")))
-            self._graphs['datalad'].add((self._about_uri, PAV.createdWith,
-                                         EMP.datalad))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((EMP.datalad, RDF.type,
+                                                        PROV.SoftwareAgent))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((EMP.datalad,
+                                                        RDFS.label,
+                                                        Literal("datalad")))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        PAV.createdWith,
+                                                        EMP.datalad))
             # TODO: datalad version and may be creation time
 
         # If the metadata is about a handle, we need to add a 'data entity',
@@ -261,10 +278,11 @@ class PlainTextImporter(MetadataImporter):
         # So, we are just stating: "There is something in it,
         # and it's some kind of dataset."
         if self._about_class == 'Handle':
-            self._graphs['datalad'].add((EMP.content, RDF.type,
-                                         DCTYPES.Dataset))
-            self._graphs['datalad'].add((self._about_uri, DCTERMS.hasPart,
-                                         EMP.content))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((EMP.content, RDF.type,
+                                                        DCTYPES.Dataset))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        DCTERMS.hasPart,
+                                                        EMP.content))
 
         # authors:
         i = 1
@@ -273,44 +291,61 @@ class PlainTextImporter(MetadataImporter):
                 continue
             parts = author.split()
 
+            # TODO: This has to become at least as flexible as api.describe:
             # create author's node:
-            if parts[-1].startswith('<') and parts[-1].endswith('>'):
-                node = URIRef(parts[-1][1:-1])
-                name = Literal(author[0:-len(parts[-1])-1].strip())
-            else:
+            node = None
+            name = None
+            for part in parts:
+                if part.startswith('<') and part.endswith('>'):
+                    if '@' in part:  # rudimentary check for email
+                        node = URIRef("mailto:" + part[1:-1])
+                    else:
+                        node = URIRef(part[1:-1])
+                    name = Literal(author[0:-len(part)-1].strip())
+                    break
+
+            if node is None:
                 node = EMP.__getattr__("author" + str(i))
                 i += 1
+            if name is None:
                 name = Literal(author.strip())
 
-            self._graphs['datalad'].add((node, RDF.type, PROV.Person))
-            self._graphs['datalad'].add((node, RDF.type, FOAF.Person))
-            self._graphs['datalad'].add((node, FOAF.name, name))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
+                                                        PROV.Person))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
+                                                        FOAF.Person))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, FOAF.name,
+                                                        Literal(name)))
 
             # the actual 'authoring' relation:
-            self._graphs['datalad'].add((self._about_uri, PAV.createdBy, node))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
+                                                        PAV.createdBy, node))
 
             # same condition as above: If this is about a handle and therefore
             # a node 'EMP.content' was created, consider any author of the
             # handle also an author of its content:
             if self._about_class == 'Handle':
-                self._graphs['datalad'].add((EMP.content, PAV.createdBy, node))
+                self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                    (EMP.content, PAV.createdBy, node))
 
         # description:
         if readme is not None:
-            self._graphs['datalad'].add((self._about_uri, DCTERMS.description,
-                                         Literal(''.join(readme))))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                (self._about_uri, DCTERMS.description,
+                 Literal(''.join(readme))))
 
         # license:
         if license_ is not None:
             if license_.__len__() == 1:
                 # file contains a single line. Treat it as URI of the license:
                 # TODO: How restrictive we want to be? Check for valid url?
-                self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
-                                             URIRef(license_[0])))
+                self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                    (self._about_uri, DCTERMS.license, URIRef(license_[0])))
             else:
                 # file is assumed to contain the actual license
-                self._graphs['datalad'].add((self._about_uri, DCTERMS.license,
-                                             Literal(''.join(license_))))
+                self._graphs[REPO_STD_META_FILE[0:-4]].add(
+                    (self._about_uri, DCTERMS.license,
+                     Literal(''.join(license_))))
 
 
 class CustomImporter(MetadataImporter):
@@ -345,6 +380,8 @@ class CustomImporter(MetadataImporter):
 
             for file_ in files:
                 if not isdir(file_):
+                    if not file_.endswith(".ttl"):
+                        continue
                     self._graphs[basename(file_).rstrip('.ttl')] = \
                         Graph().parse(file_, format="turtle")
 
@@ -353,20 +390,11 @@ class CustomImporter(MetadataImporter):
                 self._graphs[basename(key).rstrip('.ttl')] = \
                     Graph().parse(data=data[key], format="turtle")
 
-    def get_graphs(self):
-        """gets the imported data
-
-        Returns:
-        --------
-        dict of rdflib.Graph
-        """
-        return self._graphs
-
     def set_graphs(self, graphs):
         """sets the metadata
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         graphs: dict of rdflib.Graph
             the keys are expected to be the filenames without ending as
             returned by `get_graphs`.

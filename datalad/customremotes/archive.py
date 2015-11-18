@@ -18,107 +18,15 @@ from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
 
-
 from ..cmd import link_file_load, Runner
-from ..utils import rotree, rmtree
 from ..support.exceptions import CommandError
-from ..support.archives import decompress_file
-
+from ..support.archives import ArchivesCache
+from ..utils import getpwd
 from .base import AnnexCustomRemote
 
-class AnnexArchiveCache(object):
-    """Cache to maintain extracted archives
 
-    Parameters
-    ----------
-    path : str
-      Directory where to keep the cache
-    """
-    # TODO: make caching persistent across sessions/runs, with cleanup
-    # IDEA: extract under .git/annex/tmp so later on annex unused could clean it
-    #       all up
-    def __init__(self, path):
-        #if exists(path):
-        #    self._clean_cache()
-
-        self._path = path
-
-        lgr.debug("Initiating clean cache under %s" % self.path)
-
-        if not exists(path):
-            try:
-                os.makedirs(path)
-                lgr.info("Cache initialized")
-            except:
-                lgr.error("Failed to initialize cached under %s"
-                           % (self.path))
-                raise
-
-    @property
-    def path(self):
-        return self._path
-
-    def clean(self):
-        if os.environ.get('DATALAD_TESTS_KEEPTEMP'):
-            lgr.info("As instructed, not cleaning up the cache under %s"
-                     % self.path)
-            return
-        lgr.debug("Cleaning up the cache")
-        if exists(self._path):
-            # TODO:  we must be careful here -- to not modify permissions of files
-            #        only of directories
-            rmtree(self._path)
-
-    def get_extracted_path(self, archive):
-        """Given an archive -- return full path to it within cache (extracted)
-        """
-        return opj(self._path, "%s_" % basename(archive))
-
-    def get_file_path(self, archive, afile):
-        """Return full path to the `afile` within extracted `archive`"""
-        return opj(self.get_extracted_path(archive), afile)
-
-    # TODO: remove?
-    def has_file_ready(self, archive, afile):
-        lgr.debug("Checking file {afile} from archive {archive}".format(**locals()))
-        return exists(self.get_file_path(archive, afile))
-
-    def get_extracted_archive(self, archive):
-        """Return path to the extracted `archive`.  Extract archive if necessary
-        """
-        earchive = self.get_extracted_path(archive)
-        if not exists(earchive):
-            # we need to extract the archive
-            # TODO: extract to _tmp and then move in a single command so we
-            # don't end up picking up broken pieces
-            lgr.debug("Extracting {archive} under {earchive}".format(**locals()))
-            os.makedirs(earchive)
-            assert(exists(earchive))
-
-            decompress_file(archive, earchive, leading_directories=None)
-
-            lgr.debug("Adjusting permissions to R/O for the extracted content")
-            rotree(earchive)
-            assert(exists(earchive))
-        return earchive
-
-    def get_extracted_file(self, archive, afile):
-        lgr.debug("Requested file {afile} from archive {archive}".format(**locals()))
-        # TODO: That could be a good place to provide "compatibility" layer if
-        # filenames within archive are too obscure for local file system.
-        # We could somehow adjust them while extracting and here channel back
-        # "fixed" up names since they are only to point to the load
-        path = opj(self.get_extracted_archive(archive), urlunquote(afile))
-        # TODO: make robust
-        lgr.log(1, "Verifying that %s exists" % abspath(path))
-        assert exists(path), "%s must exist" % path
-        return path
-
-    # TODO -- inject cleanup upon destroy
-    # def __del__(self):
-    #    self._clean_cache()
-
-
+# TODO: RF functionality not specific to being a custom remote (loop etc)
+#       into a separate class
 class AnnexArchiveCustomRemote(AnnexCustomRemote):
     """Special custom remote allowing to obtain files from archives
 
@@ -128,25 +36,20 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     PREFIX = "archive"
     AVAILABILITY = "local"
 
-    def __init__(self, *args, **kwargs):
-        super(AnnexArchiveCustomRemote, self).__init__(*args, **kwargs)
+    def __init__(self, persistent_cache=True, **kwargs):
+        super(AnnexArchiveCustomRemote, self).__init__(**kwargs)
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
 
         self._last_url = None  # for heuristic to choose among multiple URLs
-        self._cache_dir = opj(self.path, '.git', 'datalad', 'tmp', 'archives')
-        self._cache = None
+        self._cache = ArchivesCache(self.path, persistent=persistent_cache)
 
     def stop(self, *args):
         """Stop communication with annex"""
-        if self._cache:
-            self._cache.clean()
-            self._cache = None
+        self._cache.clean()
         super(AnnexArchiveCustomRemote, self).stop(*args)
 
-    # Should it become a class method really?
-    # @classmethod
     def get_file_url(self, archive_file=None, archive_key=None, file=None):
         """Given archive (file or a key) and a file -- compose URL for access
         """
@@ -154,23 +57,21 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         if archive_file is not None:
             if archive_key is not None:
                 raise ValueError("Provide archive_file or archive_key - not both")
-            archive_key = self._get_file_key(archive_file)
-        # todo (out, err) = annex('lookupkey a.tar.gz')
+            archive_key = self.repo.get_file_key(archive_file)
         assert(archive_key is not None)
         file_quoted = urlquote(file)
         return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
 
     @property
     def cache(self):
-        if self._cache is None:
-            self._cache = AnnexArchiveCache(self._cache_dir)
         return self._cache
 
-    # could well be class method
     def _parse_url(self, url):
+        assert(url[:len(self.url_prefix)] == self.url_prefix)
         key, file_ = url[len(self.url_prefix):].split('/', 1)
         return key, file_
 
+    #
     # Helper methods
     def _get_key_url(self, key):
         """Given a key, figure out the URL
@@ -206,7 +107,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         """
 
         Replies
-        -------
 
         CHECKURL-CONTENTS Size|UNKNOWN Filename
             Indicates that the requested url has been verified to exist.
@@ -231,20 +131,24 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
         akey, afile = self._parse_url(url)
 
-        # if for testing we want to force getting the archive extracted
-        # _ = self.cache.get_extracted_archive(self._get_key_path(akey)) # TEMP
-        efile = self.cache.get_file_path(akey, afile)
-        if exists(efile):
-            size = os.stat(efile).st_size
-        else:
-            size = 'UNKNOWN'
-
         # But reply that present only if archive is present
-        if exists(self._get_key_path(akey)):
+        # TODO: this would throw exception if not present, so this statement is kinda bogus
+        try:
+            # throws exception if not present
+            akey_path = opj(self.path, self.repo.get_contentlocation(akey))#, relative_to_top=True))
+
+            # if for testing we want to force getting the archive extracted
+            # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
+            efile = self.cache[akey_path].get_extracted_filename(afile)
+            if exists(efile):
+                size = os.stat(efile).st_size
+            else:
+                size = 'UNKNOWN'
+
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
             self.send("CHECKURL-CONTENTS", size)#, basename(afile))
-        else:
+        except CommandError:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
@@ -256,7 +160,6 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         TODO: just proxy the call to annex for underlying tarball
 
         Replies
-        -------
 
         CHECKPRESENT-SUCCESS Key
             Indicates that a key has been positively verified to be present in
@@ -274,9 +177,10 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
         akey, afile = self._get_akey_afile(key)
-        if exists(self._get_key_path(akey)):
+        try:
+            self.repo.get_contentlocation(akey)
             self.send("CHECKPRESENT-SUCCESS", key)
-        else:
+        except CommandError:
             # TODO: proxy the same to annex itself to verify check for archive.
             # If archive is no longer available -- then CHECKPRESENT-FAILURE
             self.send("CHECKPRESENT-UNKNOWN", key)
@@ -292,14 +196,14 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # TODO: proxy query to the underlying tarball under annex that if
         # tarball was removed (not available at all) -- report success,
         # otherwise failure (current the only one)
-        key, file = self._get_akey_afile(key)
+        akey, afile = self._get_akey_afile(key)
         if False:
             # TODO: proxy, checking present of local tarball is not sufficient
             #  not exists(self.get_key_path(key)):
-            self.send("REMOVE-SUCCESS", key)
+            self.send("REMOVE-SUCCESS", akey)
         else:
-            self.send("REMOVE-FAILURE", key,
-                      "Cannot remove from the present tarball")
+            self.send("REMOVE-FAILURE", akey,
+                      "Removal from file archives is not supported")
 
     def req_WHEREIS(self, key):
         """
@@ -327,19 +231,20 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
         akey, afile = self._get_akey_afile(key)
         try:
-            akey_path = self._get_key_path(akey)
+            akey_path = opj(self.path, self.repo.get_contentlocation(akey))
         except CommandError:
             # TODO: make it more stringent?
             # Command could have fail to run if key was not present locally yet
             # Thus retrieve the key using annex
             try:
                 self.runner(["git-annex", "get", "--key", akey],
-                            cwd=self.path)
-                akey_path = self._get_key_path(akey)
-                assert(exists(akey_path))
+                            cwd=self.path, expect_stderr=True)
+                akey_path = self.repo.get_contentlocation(akey)
+                assert exists(opj(self.repo.path, akey_path)), "Key file %s is not present" % akey_path
             except Exception as e:
-                self.error("Failed to fetch %{akey}s containing %{key}s: %{e}s"
-                           % locals())
+                #from celery.contrib import rdb
+                #rdb.set_trace()
+                self.error("Failed to fetch {akey} containing {key}: {e}".format(**locals()))
                 return
 
         # Extract that bloody file from the bloody archive
@@ -347,7 +252,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  actually patool doesn't support extraction of a single file
         #  https://github.com/wummel/patool/issues/20
         # so
-        apath = self.cache.get_extracted_file(akey_path, afile)
+        pwd = getpwd()
+        lgr.debug("Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
+        apath = self.cache[akey_path].get_extracted_file(afile)
         link_file_load(apath, path)
         self.send('TRANSFER-SUCCESS', cmd, key)
 

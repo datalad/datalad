@@ -11,21 +11,25 @@
 """
 
 import os
-from os.path import join as opj, exists
+from os.path import join as opj, exists, realpath
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, assert_equal, assert_in
-from git.exc import GitCommandError
+from nose.tools import assert_raises, assert_is_instance, assert_true, \
+    assert_equal, assert_in, assert_false
+from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
-from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
-from datalad.tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, on_windows,\
-    with_tree, get_most_obscure_supported_name, ok_clean_git
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.cmd import Runner
+from ..support.gitrepo import GitRepo, normalize_paths, _normalize_path
+from ..support.exceptions import FileNotInRepositoryError
+from ..cmd import Runner
+from ..utils import getpwd, chpwd
 
+from .utils import with_tempfile, with_testrepos, \
+    assert_cwd_unchanged, on_windows, with_tree, \
+    get_most_obscure_supported_name, ok_clean_git
 from .utils import swallow_logs
-
 from .utils import local_testrepo_flavors
+from .utils import skip_if_no_network
 from .utils import assert_re_in
+from .utils_testrepos import BasicHandleTestRepo
 
 
 @assert_cwd_unchanged
@@ -54,9 +58,26 @@ def test_GitRepo_instance_from_existing(path):
 
 @assert_cwd_unchanged
 @with_tempfile
-def test_GitRepo_instance_brand_new(path):
+@with_tempfile
+def test_GitRepo_instance_from_not_existing(path, path2):
+    # 1. create=False and path doesn't exist:
+    assert_raises(NoSuchPathError, GitRepo, path, create=False)
+    assert_false(exists(path))
 
-    gr = GitRepo(path)
+    # 2. create=False, path exists, but no git repo:
+    os.mkdir(path)
+    assert_true(exists(path))
+    assert_raises(InvalidGitRepositoryError, GitRepo, path, create=False)
+    assert_false(exists(opj(path, '.git')))
+
+    # 3. create=True, path doesn't exist:
+    gr = GitRepo(path2, create=True)
+    assert_is_instance(gr, GitRepo, "GitRepo was not created.")
+    assert_true(exists(opj(path2, '.git')))
+    ok_clean_git(path2, annex=False)
+
+    # 4. create=True, path exists, but no git repo:
+    gr = GitRepo(path, create=True)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     assert_true(exists(opj(path, '.git')))
     ok_clean_git(path, annex=False)
@@ -119,12 +140,12 @@ def test_GitRepo_get_indexed_files(src, path):
 @assert_cwd_unchanged(ok_to_chdir=True)
 def test_normalize_path(git_path):
 
-    cwd = os.getcwd()
+    pwd = getpwd()
     gr = GitRepo(git_path)
 
     # cwd is currently outside the repo, so any relative path
     # should be interpreted as relative to `annex_path`
-    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, os.getcwd())
+    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, getpwd())
 
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
@@ -145,7 +166,7 @@ def test_normalize_path(git_path):
 
     # now we are inside, so relative paths are relative to cwd and have
     # to be converted to be relative to annex_path:
-    os.chdir(opj(git_path, 'd1', 'd2'))
+    chpwd(opj(git_path, 'd1', 'd2'))
 
     result = _normalize_path(gr.path, "testfile")
     assert_equal(result, opj('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
@@ -158,7 +179,7 @@ def test_normalize_path(git_path):
     result = _normalize_path(gr.path, opj(git_path, 'd1', 'testfile'))
     assert_equal(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
-    os.chdir(cwd)
+    chpwd(pwd)
 
 
 def test_GitRepo_files_decorator():
@@ -196,7 +217,7 @@ def test_GitRepo_files_decorator():
     assert_equal(test_instance.decorated_many(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
-    file_to_test = opj(os.getcwd(), 'somewhere', 'else', obscure_filename)
+    file_to_test = opj(getpwd(), 'somewhere', 'else', obscure_filename)
     assert_raises(FileNotInRepositoryError, test_instance.decorated_many,
                   file_to_test)
 
@@ -213,6 +234,7 @@ def test_GitRepo_files_decorator():
     assert_raises(ValueError, test_instance.decorated_one, 1)
 
 
+@skip_if_no_network
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
 def test_GitRepo_remote_add(orig_path, path):
@@ -351,7 +373,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
     assert_equal({'branch2', 'branch3'}, set(branches1))
 
 
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos('basic_git', flavors=local_testrepo_flavors)
 @with_tempfile
 @with_tempfile
 def test_GitRepo_get_files(src, path, path2clone):
@@ -359,8 +381,8 @@ def test_GitRepo_get_files(src, path, path2clone):
     # TODO: THIS DOES NOT WORK AS EXPECTED! SEE gitrepo.py!
 
     gr = GitRepo(path, src)
-    assert_equal({'INFO.txt', 'test-annex.dat', 'test.dat'},
-                 set(gr.git_get_files()))
+    assert_in('INFO.txt', gr.git_get_files())
+    assert_in('test.dat', gr.git_get_files())
     #gr.git_checkout('new_branch', '-b')
     ##filename = get_most_obscure_supported_name()
     #filename = 'another_file.dat'
@@ -378,7 +400,53 @@ def test_GitRepo_get_files(src, path, path2clone):
     #gr2.git_fetch('remoterepo')
 
 
+@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile(mkdir=True)
+def test_GitRepo_get_toppath(repo, tempdir):
+    reporeal = realpath(repo)
+    assert_equal(GitRepo.get_toppath(repo), reporeal)
+    # Generate some nested directory
+    nested = opj(repo, "d1", "d2")
+    os.makedirs(nested)
+    assert_equal(GitRepo.get_toppath(nested), reporeal)
+    # and if not under git, should return None
+    assert_equal(GitRepo.get_toppath(tempdir), None)
 
+def test_GitRepo_dirty():
+    trepo = BasicHandleTestRepo()
+    repo = trepo.repo
+    # empty at this point -- should not be dirty as well. TODO
+    assert_false(repo.dirty)
+    trepo.create()
+    assert_false(repo.dirty)
+
+    # new file added to index
+    trepo.create_file('newfiletest.dat', '123\n', annex=False)
+    assert_true(repo.dirty)
+    repo.git_commit("just a commit")
+    assert_false(repo.dirty)
+
+    # file modified to be the same
+    trepo.create_file('newfiletest.dat', '123\n', annex=False)
+    assert_false(repo.dirty)
+
+    # file modified
+    trepo.create_file('newfiletest.dat', '12\n', annex=False)
+    assert_true(repo.dirty)
+    repo.git_commit("just a commit")
+    assert_false(repo.dirty)
+
+    # new file not added to index
+    trepo.create_file('newfiletest2.dat', '123\n', add=False, annex=False)
+    assert_true(repo.dirty)
+    os.unlink(opj(repo.path, 'newfiletest2.dat'))
+    assert_false(repo.dirty)
+
+    # new annexed file
+    trepo.create_file('newfiletest2.dat', '123\n', annex=True)
+    assert_true(repo.dirty)
+    repo.git_commit("just a commit")
+    assert_false(repo.dirty)
 
 
 

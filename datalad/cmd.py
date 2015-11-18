@@ -20,14 +20,17 @@ import shutil
 import shlex
 
 from six import PY3
-from six import string_types, text_type, binary_type
+from six import string_types, binary_type
 
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol
+from .support.protocol import NullProtocol, DryRunProtocol
+from .utils import on_windows
+from . import cfg
 
 lgr = logging.getLogger('datalad.cmd')
 
 _TEMP_std = sys.stdout, sys.stderr
+
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
@@ -76,12 +79,14 @@ class Runner(object):
         cmd: str or callable
            command string to be executed via shell or callable to be called.
 
-        *args and **kwargs:
+        `*args`:
+        `**kwargs`:
            see Runner.run() and Runner.call() for available arguments.
 
         Raises
         ------
-        TypeError if cmd is neither a string nor a callable.
+        TypeError
+          if cmd is neither a string nor a callable.
         """
 
         if isinstance(cmd, string_types) or isinstance(cmd, list):
@@ -122,7 +127,8 @@ class Runner(object):
                 line = proc.stderr.readline()
                 if line:
                     stderr += line
-                    self._log_err(line.decode(), expect_stderr or expect_fail)
+                    self._log_err(line.decode() if PY3 else line,
+                                  expect_stderr or expect_fail)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -210,10 +216,10 @@ class Runner(object):
 
             if self.protocol.records_ext_commands:
                 prot_exc = None
-                prot_id = self.protocol.start_section(shlex.split(cmd)
-                                                      if isinstance(cmd,
-                                                                    string_types)
-                                                      else cmd)
+                prot_id = self.protocol.start_section(
+                    shlex.split(cmd, posix=not on_windows)
+                    if isinstance(cmd, string_types)
+                    else cmd)
 
             try:
                 proc = subprocess.Popen(cmd, stdout=outputstream,
@@ -268,9 +274,10 @@ class Runner(object):
 
         else:
             if self.protocol.records_ext_commands:
-                self.protocol.add_section(shlex.split(cmd)
-                                            if isinstance(cmd, string_types)
-                                            else cmd, None)
+                self.protocol.add_section(shlex.split(cmd,
+                                                      posix=not on_windows)
+                                          if isinstance(cmd, string_types)
+                                          else cmd, None)
             out = ("DRY", "DRY")
 
         return out
@@ -282,7 +289,8 @@ class Runner(object):
         its arguments to `commands` otherwise.
 
         f : callable
-        *args, **kwargs:
+
+        `*args`, `**kwargs`:
           Callable arguments
         """
         if self.protocol.do_execute_callables:
@@ -313,8 +321,10 @@ class Runner(object):
         Logs at DEBUG-level by default and adds "Protocol:"-prefix in order to
         log the used protocol.
         """
-        lgr.log(level, "Protocol: %s: %s" % (self.protocol.__class__.__name__,
-                                             msg))
+        if isinstance(self.protocol, NullProtocol):
+            lgr.log(level, msg)
+        else:
+            lgr.log(level, "{%s} %s" % (self.protocol.__class__.__name__, msg))
 
 
 # ####
@@ -344,3 +354,10 @@ def link_file_load(src, dst, dry_run=False):
         shutil.copystat(src_realpath, dst)
     else:
         lgr.log(1, "Hardlinking finished")
+
+def get_runner(*args, **kwargs):
+    # TODO:  this is all crawl specific -- should be moved away
+    if cfg.getboolean('crawl', 'dryrun', default=False):
+        kwargs = kwargs.copy()
+        kwargs['protocol'] = DryRunProtocol()
+    return Runner(*args, **kwargs)

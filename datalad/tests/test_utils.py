@@ -17,13 +17,20 @@ import logging
 from mock import patch
 from six import PY3
 
-from os.path import join as opj
+from collections import OrderedDict
+
+from ..utils import updated
+from ..utils import get_local_file_url
+from os.path import join as opj, isabs, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from ..utils import get_local_file_url, get_url_path
+from ..utils import getpwd, chpwd
+from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
-from .utils import on_windows
+from .utils import assert_cwd_unchanged, skip_if_on_windows
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -32,12 +39,15 @@ def test_rotree(d):
     os.makedirs(d2)
     with open(f, 'w') as f_:
         f_.write("LOAD")
+    with swallow_logs():
+        ar = AnnexRepo(d2)
     rotree(d)
-    # we shouldn't be able to delete anything
-    # but if user is reported to be root, weird things could happen as e.g.
-    # if actually a fakeroot -- then it would succeed to remove.  Thus
-    # skipping those tests
-    if on_windows or os.getuid() != 0:
+    # we shouldn't be able to delete anything UNLESS in "crippled" situation:
+    # root, or filesystem is FAT etc
+    # Theoretically annex should declare FS as crippled when ran as root, but
+    # see http://git-annex.branchable.com/bugs/decides_that_FS_is_crippled_under_cowbuilder___40__symlinks_supported_etc__41__/#comment-60c3cbe2710d6865fb9b7d6e247cd7aa
+    # so explicit 'or'
+    if not (ar.is_crippled_fs() or (os.getuid() == 0)):
         assert_raises(OSError, os.unlink, f)
         assert_raises(OSError, shutil.rmtree, d)
         # but file should still be accessible
@@ -124,3 +134,77 @@ def test_md5sum():
 def test_md5sum_archive(d):
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(opj(d, '1.tar.gz'))
+
+def test_updated():
+    d = {}
+    eq_(updated(d, {1: 2}), {1: 2})
+    eq_(d, {})
+
+    d = {'a': 'b'}
+    eq_(updated(d, ((0, 1), (2, 3))), {0: 1, 'a': 'b', 2: 3})
+    eq_(d, {'a': 'b'})
+
+    # and that it would maintain the type
+    d = OrderedDict(((99, 0), ('z', 0), ('a', 0)))
+    d_ = updated(d, {0: 1})
+    ok_(isinstance(d_, OrderedDict))
+    eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
+
+def test_get_local_file_url_linux():
+    assert_equal(get_local_file_url('/a'), 'file:///a')
+    assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
+    assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
+    assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
+
+@skip_if_on_windows
+def test_get_url_path_on_fileurls():
+    assert_equal(get_url_path('file:///a'), '/a')
+    assert_equal(get_url_path('file:///a/b'), '/a/b')
+    assert_equal(get_url_path('file:///a/b#id'), '/a/b')
+    assert_equal(get_url_path('file:///a/b?whatever'), '/a/b')
+
+
+def test_get_local_file_url_windows():
+    raise SkipTest("TODO")
+
+@assert_cwd_unchanged
+def test_getpwd_basic():
+    pwd = getpwd()
+    ok_(isabs(pwd))
+    eq_(os.getcwd(), abspath(pwd))
+
+
+@skip_if_on_windows
+@with_tempfile(mkdir=True)
+@assert_cwd_unchanged
+def test_getpwd_symlink(tdir):
+    sdir = opj(tdir, 's1')
+    pwd_orig = getpwd()
+    os.symlink('.', sdir)
+    s1dir = opj(sdir, 's1')
+    s2dir = opj(sdir, 's2')
+    try:
+        chpwd(sdir)
+        pwd = getpwd()
+        eq_(pwd, sdir)
+        chpwd('s1')
+        eq_(getpwd(), s1dir)
+        chpwd('.')
+        eq_(getpwd(), s1dir)
+        chpwd('..')
+        eq_(getpwd(), sdir)
+    finally:
+        chpwd(pwd_orig)
+
+    # test context handler way of use
+    with chpwd(s1dir):
+        eq_(getpwd(), s1dir)
+    eq_(getpwd(), pwd_orig)
+
+    assert_false(exists(s2dir))
+    with assert_raises(OSError):
+        with chpwd(s2dir):
+            pass
+    with chpwd(s2dir, mkdir=True):
+        ok_(exists(s2dir))
+        eq_(getpwd(), s2dir)

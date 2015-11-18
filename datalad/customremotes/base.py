@@ -14,13 +14,15 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj, basename, realpath, dirname
+from os.path import exists, join as opj, realpath, dirname
 from traceback import format_exc
 
-from six.moves import xrange
+from six.moves import range
 
 from ..cmd import Runner
 from ..support.protocol import ProtocolInterface
+from ..support.annexrepo import AnnexRepo
+from ..cmdline.helpers import get_repo_instance
 
 import logging
 
@@ -91,7 +93,7 @@ send () {
             # comment out all the past entries
             with open(_file) as f:
                 entries = f.readlines()
-            for i in xrange(len(self.HEADER.split(os.linesep)), len(entries)):
+            for i in range(len(self.HEADER.split(os.linesep)), len(entries)):
                 e = entries[i]
                 if e.startswith('recv ') or e.startswith('send '):
                     entries[i] = '#' + e
@@ -166,7 +168,7 @@ class AnnexCustomRemote(object):
 
     AVAILABILITY = DEFAULT_AVAILABILITY
 
-    def __init__(self, path='.', cost=DEFAULT_COST): # , availability=DEFAULT_AVAILABILITY):
+    def __init__(self, path=None, cost=DEFAULT_COST): # , availability=DEFAULT_AVAILABILITY):
         """
         Parameters
         ----------
@@ -184,9 +186,13 @@ class AnnexCustomRemote(object):
         self.fin = sys.stdin
         self.fout = sys.stdout
 
-        self.path = path
+        self.repo = get_repo_instance(class_=AnnexRepo) \
+            if not path \
+            else AnnexRepo(path, create=False, init=False)
 
-        self._progress = 0 # transmission to be reported back if available
+        self.path = self.repo.path
+
+        self._progress = 0  # transmission to be reported back if available
         self.cost = cost
         #self.availability = availability.upper()
         assert(self.AVAILABILITY.upper() in ("LOCAL", "GLOBAL"))
@@ -214,7 +220,7 @@ class AnnexCustomRemote(object):
 
         Parameters
         ----------
-        *args: list of strings
+        `*args`: list of strings
            arguments to be joined by a space and passed to git-annex
         """
         msg = " ".join(map(str, args))
@@ -394,13 +400,16 @@ class AnnexCustomRemote(object):
     def req_CHECKURL(self, url):
         """
         The remote replies with one of CHECKURL-FAILURE, CHECKURL-CONTENTS, or CHECKURL-MULTI.
+
         CHECKURL-CONTENTS Size|UNKNOWN Filename
             Indicates that the requested url has been verified to exist.
             The Size is the size in bytes, or use "UNKNOWN" if the size could not be determined.
             The Filename can be empty (in which case a default is used), or can specify a filename that is suggested to be used for this url.
+
         CHECKURL-MULTI Url Size|UNKNOWN Filename ...
             Indicates that the requested url has been verified to exist, and contains multiple files, which can each be accessed using their own url.
             Note that since a list is returned, neither the Url nor the Filename can contain spaces.
+
         CHECKURL-FAILURE
             Indicates that the requested url could not be accessed.
         """
@@ -495,18 +504,10 @@ class AnnexCustomRemote(object):
             else:
                 break
         urls_ = [u for u in urls
-                if u.startswith(self.url_prefix)]
+                 if u.startswith(self.url_prefix)]
         assert(urls_ == urls)
         self.heavydebug("Received URLS: %s" % urls)
         return urls
-
-    def _get_file_key(self, file):
-        """Return KEY for a given file
-        """
-        # TODO: should actually be implemented by AnnexRepo
-        (out, err) = \
-            self.runner(['git-annex', 'lookupkey', file], cwd=self.path)
-        return out.rstrip(os.linesep)
 
     def _get_key_path(self, key):
         """Return path to the KEY file

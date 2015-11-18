@@ -43,9 +43,9 @@ class ColorFormatter(logging.Formatter):
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False):
-        return ("$BOLD%(asctime)-15s$RESET "
-                + ("%(name)-15s " if log_name else "")
-                + "[%(levelname)s] "
+        return (("" if os.environ.get("DATALAD_LOGNODATE", None) else "$BOLD%(asctime)-15s$RESET ") +
+                ("%(name)-15s " if log_name else "") +
+                "[%(levelname)s] "
                 "%(message)s "
                 "($BOLD%(filename)s$RESET:%(lineno)d)")
 
@@ -121,7 +121,7 @@ class LoggerHelper(object):
         logging.Logger
         """
         # By default mimic previously talkative behavior
-        logtarget = self._get_environ('LOGTARGET', logtarget or 'stdout')
+        logtarget = self._get_environ('LOGTARGET', logtarget or 'stderr')
 
         # Allow for multiple handlers being specified, comma-separated
         if ',' in logtarget:
