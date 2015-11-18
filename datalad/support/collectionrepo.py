@@ -74,7 +74,26 @@ class CollectionRepoHandleBackend(Handle):
                             self.repo.git_get_remotes()
 
         self._files = files
-        self.sub_graphs = dict()
+        self._sub_graphs = dict()
+
+    def get_subgraphs(self):
+        if self._sub_graphs == dict():
+            self.update_metadata()
+        return self._sub_graphs
+
+    def set_subgraphs(self, graphs):
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of data: %s. "
+                            "Expects a dictionary of sub-graphs." %
+                            type(graphs))
+        for subgraph in graphs:
+            if not isinstance(graphs[subgraph], Graph):
+                raise TypeError("Sub-graph '%s' is of type %s. "
+                                "Expected: rdflib.Graph." %
+                                (subgraph, type(graphs[subgraph])))
+            self._sub_graphs[subgraph] = graphs[subgraph]
+
+    sub_graphs = property(get_subgraphs, set_subgraphs)
 
     def set_metadata(self, data):
         """
@@ -82,25 +101,25 @@ class CollectionRepoHandleBackend(Handle):
         :param data: dict of Graph
         :return:
         """
-        if not isinstance(data, dict):
-            raise TypeError("Unexpected type of data: %s. "
-                            "Expects a dictionary of sub-graphs." %
-                            type(data))
-        for subgraph in data:
-            if not isinstance(data[subgraph], Graph):
-                raise TypeError("Sub-graph '%s' is of type %s. "
-                                "Expected: rdflib.Graph." %
-                                (subgraph, type(data[subgraph])))
-            self.sub_graphs[subgraph] = data[subgraph]
+        self.sub_graphs = data
 
-    meta = property(Handle.get_metadata, set_metadata)
+    def get_metadata(self):
+        """
 
-    def update_metadata(self):
-        self.sub_graphs = self.repo.get_handle_graphs(self._key, self._branch,
-                                                      self._files)
+        :return:
+        """
         self._graph = Graph(identifier=Literal(self._key))
         for key in self.sub_graphs:
             self._graph += self.sub_graphs[key]
+
+        return self._graph
+
+    meta = property(get_metadata, set_metadata)
+
+    def update_metadata(self):
+        self.sub_graphs = self.repo.get_handle_graphs(self._key,
+                                                      branch=self._branch,
+                                                      files=self._files)
 
     def commit_metadata(self, msg="Handle metadata updated."):
         if self.is_read_only:
@@ -111,8 +130,8 @@ class CollectionRepoHandleBackend(Handle):
 
         # TODO: different graphs, file names, etc. See CollectionRepo
         # Same goes for HandleRepo/HandleRepoBackend
-        self.repo.store_handle_graph(self._graph, self._key,
-                                     branch=self._branch)
+        self.repo.store_handle_graphs(self.sub_graphs, self._key,
+                                      branch=self._branch, msg=msg)
 
     # TODO: set_name? See Handle.
 
@@ -773,79 +792,38 @@ class CollectionRepo(GitRepo):
         graphs = dict()
         for file_ in files:
             file_str = '\n'.join(self.git_get_file_content(file_, branch))
-            graphs[file_.rstrip(".ttl")] = Graph().parse(data=file_str,
-                                                      format="turtle")
+            graphs[basename(file_).rstrip(".ttl")] = \
+                Graph().parse(data=file_str, format="turtle")
         return graphs
 
-    # TODO:
-    def store_handle_graph(self, graph, key, branch=None):
-        # TODO How to determine filename?
-        raise NotImplementedError
+    def store_handle_graphs(self, graphs, handle, branch=None,
+                            msg="Handle metadata updated."):
 
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of parameter 'graphs' (%s). "
+                            "Expected: dict." % type(graphs))
 
-    # From former CollectionRepoHandleBackend:
+        files = dict()
+        for key in graphs:
+            if not isinstance(graphs[key], Graph):
+                raise TypeError("Wrong type of graphs['%s'] (%s). "
+                                "Expected: Graph." % (key, type(graphs[key])))
 
+            files[key] = opj(self.path, self._key2filename(handle), key + ".ttl")
 
-        #     constructor: #####################################
-        #
-        #
-        # self._path = self.repo._key2filename(self.key)
-        # self._cfg_file = opj(self._path, REPO_CONFIG_FILE)
-        # self._std_file = opj(self._path, REPO_STD_META_FILE)
-        #
-        # ########################
-    #
-    def get_metadata(self, files=None):
-        """
-        Gets metadata graph for the handle (all files in collection or just
-        `files`)
-        Parameters
-        ----------
-        files: list of str
+        active_branch = self.git_get_active_branch()
+        if branch is None:
+            branch = active_branch
+        elif branch not in self.git_get_branches():
+            raise ValueError("Unknown branch '%s'." % branch)
+        else:
+            self.git_checkout(branch)
 
-        Returns
-        -------
-        rdflib.Graph
-        """
-        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                           self.branch))
-        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
+        for key in graphs:
+            graphs[key].serialize(files[key], format="turtle")
 
-        h_node = cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
-        h_name = cfg_graph.value(subject=h_node, predicate=RDFS.label)
+        self.git_add(files.values())
+        self.git_commit(msg)
 
-        # additional files in handle's dir:
-        if files is None:
-            files = [file_
-                     for file_ in self.repo.git_get_files(branch=self.branch)
-                     if file_.startswith(self.repo._key2filename(self.key))
-                     and basename(file_) != REPO_CONFIG_FILE]
-
-        out = Graph(identifier=h_name)
-        for file_ in files:
-            file_str = '\n'.join(self.repo.git_get_file_content(file_,
-                                                                self.branch))
-            out.parse(data=file_str, format="turtle")
-
-        # Note: See note in CollectionRepoBackend.get_collection
-        return out
-    #
-    # def set_metadata(self, meta, msg="Handle metadata updated."):
-    #
-    #     if self.is_read_only:
-    #         raise RuntimeWarning("Can't write to read-only handle.")
-    #
-    #     # save current branch ...
-    #     current_branch = self.repo.git_get_active_branch()
-    #
-    #     if self.branch != current_branch:
-    #         # ... and switch to the one to be changed:
-    #         self.repo.git_checkout(self.branch)
-    #
-    #     assure_dir(opj(self.repo.path, self._path))
-    #     meta.serialize(self._std_file, format="turtle")
-    #     self.repo.git_add(self._std_file)
-    #     self.repo.git_commit(msg=msg)
-    #
-    #     if self.branch != current_branch:
-    #         self.repo.git_checkout(current_branch)
+        if branch != active_branch:
+            self.git_checkout(active_branch)

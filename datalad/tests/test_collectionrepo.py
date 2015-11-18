@@ -11,7 +11,7 @@ CollectionRepoHandleBackend.
 """
 
 import os
-from os.path import join as opj
+from os.path import join as opj, exists
 
 from nose import SkipTest
 from nose.tools import assert_raises, assert_equal, assert_false, assert_in, \
@@ -396,9 +396,10 @@ def test_CollectionRepoHandleBackend_name(path):
         backend.name = "new_name"
 
 
-@with_testrepos('collection', flavors=['local'])
-def test_CollectionRepoHandleBackend_meta(path):
-    repo = CollectionRepo(path, create=False)
+@with_testrepos('collection', flavors=['clone'])
+@with_tempfile
+def test_CollectionRepoHandleBackend_meta(url, path):
+    repo = CollectionRepo(path, url, create=True)
 
     repo_graph = Graph(identifier=Literal("BasicHandle"))
     repo_graphs = repo.get_handle_graphs("BasicHandle")
@@ -406,23 +407,37 @@ def test_CollectionRepoHandleBackend_meta(path):
         repo_graph += repo_graphs[key]
 
     backend = CollectionRepoHandleBackend(repo, "BasicHandle")
-    backend.update_metadata()
-    # TODO: Avoid the need to manually call update() here?
-
 
     eq_(backend.sub_graphs.keys(), repo_graphs.keys())
     for key in backend.sub_graphs.keys():
         eq_(set(iter(backend.sub_graphs[key])),
             set(iter(repo_graphs[key])))
-
-    eq_(backend._graph, repo_graph)
     eq_(backend.meta, repo_graph)
 
+
+    # modify metadata:
+    triple_1 = (URIRef("http://example.org/whatever"), RDF.type, DLNS.FakeTerm)
+    triple_2 = (URIRef("http://example.org/whatever"), RDF.type,
+                DLNS.AnotherFakeTerm)
+    backend.sub_graphs[REPO_STD_META_FILE[:-4]].add(triple_1)
+    test_file = opj(path, repo._key2filename("BasicHandle"), "test.ttl")
+    backend.sub_graphs['test'] = Graph()
+    backend.sub_graphs['test'].add(triple_2)
+
+    assert_in(triple_1, backend.meta)
+    assert_in(triple_2, backend.meta)
+
     # commit:
-    # not implemented yet in CollectionRepo:
-    assert_raises(NotImplementedError, backend.commit_metadata)
-    # If read only should raise exception anyway:
+    backend.commit_metadata()
+
+    ok_clean_git(path, annex=False)
+    ok_(exists(test_file))
+    test_graph_from_file = Graph().parse(test_file, format="turtle")
+    eq_(set(iter(backend.sub_graphs['test'])),
+        set(iter(test_graph_from_file)))
+    assert_in(triple_2, test_graph_from_file)
+    assert_not_in(triple_1, test_graph_from_file)
+
+    # If read only, should raise exception:
     backend.is_read_only = True
     assert_raises(ReadOnlyBackendError, backend.commit_metadata)
-
-    # TODO: store metadata

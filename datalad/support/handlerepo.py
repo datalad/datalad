@@ -316,8 +316,7 @@ class HandleRepo(AnnexRepo):
         for key in graphs:
             graphs[key].serialize(files[key], format="turtle")
 
-        self.git_add(files.values())
-        self.commit(msg=msg)
+        self.add_to_git(files.values(), msg)
 
         if branch != active_branch:
             self.git_checkout(active_branch)

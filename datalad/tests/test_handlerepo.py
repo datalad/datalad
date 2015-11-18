@@ -235,7 +235,6 @@ def test_HandleRepoBackend_meta(url, path):
         repo_graph += repo_graphs[key]
 
     backend = HandleRepoBackend(repo)
-    backend.update_metadata()
 
     eq_(set(backend.sub_graphs.keys()), set(repo_graphs.keys()))
     for key in backend.sub_graphs.keys():
