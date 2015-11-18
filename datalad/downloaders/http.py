@@ -12,9 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
-import re
 
-from six import iteritems
+
 from six.moves.urllib.parse import urlparse
 
 from ..ui import ui
@@ -25,21 +24,37 @@ lgr = getLogger('datalad.http')
 class DownloadError(Exception):
     pass
 
+class AccessDeniedError(DownloadError):
+    pass
 
 class Downloaders(object):
+    """
+    We need custom downloaders to provide authentication
+    and some times not supported by annex protocols (e.g. dl+archive, xnat)
 
-    def __init__(self):
-        self._downloaders = {}
+    Possible downloaders:
 
-    def get_downloader(self, url):
+    https?:// -- classical HTTP protocol
+    ftp?://
+    s3://
+    dl+xnat://    dl+xnat://serverurl:port/dataset/path/within
+    dl+archive: -- archives (TODO: add //)
+    """
+
+    _downloaders = {'http': HTTPDownloader,
+                    'https': HTTPDownloader,
+                    # ... TODO
+                    }
+
+    def __call__(self, url, **kwargs):
         """Generate a new downloader per each website (to maintain the session?)
         """
         url_split = urlparse(url)
         key = (url_split.scheme, url_split.netloc)
-        if key in self._downloaders:
-            return self._downloaders[key]
-        downloader = self._downloaders[key] = HTTPDownloader()
-        return downloader
+        #if key in self._downloaders:
+        return self._downloaders[key](**kwargs)
+        #downloader = self._downloaders[key] = HTTPDownloader()
+        #return downloader
 
 
 class HTTPDownloader(object):
@@ -62,24 +77,31 @@ class HTTPDownloader(object):
         """
         # TODO: possibly wrap this logic outside within a decorator, which
         # would just call the corresponding method (logic "DOWNLOAD SHIT" here)
-
+        # BEGINNING:
+        # if returned None for unknown, True if requires, False if not
         needs_authentication = creds.needs_authentication(url)
         if needs_authentication:
             used_old_cookies = self._authenticate(url, allow_old_cookie=True)
-        # DOWNLOAD_BEGINS
-        # TODO: DOWNLOAD SHIT
 
-        # !!! HTTP specific
-        if response.code in {403}:
-            access_denied = True
-        # TODO: not hardcoded size, and probably we should check header
-        elif response.content-type == 'text/html' and downloaded_size < 100000:
-            # TODO: do matching and decide if it was access_denied
-            # if we have no record on that website -- assume that it was a normal
-            # load since we don't know better
-            access_denied = True
-        else:
+        # DOWNLOAD_BEGINS
+        try:
+            # TODO: DOWNLOAD SHIT
+
+            # !!! HTTP specific
+            if response.code != 200: # in {403}:
+                raise AccessDenied
+            # TODO: not hardcoded size, and probably we should check header
+            elif response.content_type == 'text/html' and downloaded_size < 100000:
+                # TODO: do matching and decide if it was access_denied
+                # if we have no record on that website -- assume that it was a normal
+                # load since we don't know better
+                raise AccessDenied
             access_denied = False
+        except AccessDenied:
+            access_denied = True
+        except DownloadError:
+            # TODO Handle some known ones, otherwise just let it go!
+            raise
 
         if access_denied:
             if needs_authentication:
@@ -96,10 +118,26 @@ class HTTPDownloader(object):
                     #     - allow user to re-enter credentials
                     #  2. authentication mechanisms changed
                     #     - we can't do anything here about that
+                    #  3. bug in out code which would render authentication/cookie handling
+                    #     ineffective
+                    #     - not sure what to do about it
                     if ui.yesno(
-                            title="Authentication to access {url} has failed",
+                            title="Authentication to access {url} has failed".format(url=url),
                             text="Do you want to enter other credentials in case they were updated?"):
-                        creds.
+                        creds.get_credentials(url, new=True)
+                        # TODO GOTO BEGINNING
+                    else:
+                        raise DownloadError("Failed to download from %s given available credentials" % url)
+            else:  # None or False
+                if needs_authentication is False:
+                    # those urls must or should NOT require authentication but we got denied
+                    raise DownloadError("Failed to download from %s, which must be available without "
+                                        "authentication but access was denied" % url)
+                else:
+                    assert(needs_authentication is None)
+                    # So we didn't know if authentication necessary, and it seems to be necessary, so
+                    # Let's ask the user to setup authentication mechanism for this website
+
 
             creds.get_credentials(url)
 
@@ -123,114 +161,3 @@ class HTTPDownloader(object):
         raise NotImplementedError()
 
 
-def resolve_url_to_name(d, url):
-    """Given a directory (e.g. of SiteInformation._items or Credential._items)
-    go through url_re and find the corresponding item and returns its key (i.e. name)
-    """
-
-    for k, rec in iteritems(d):
-        for url_re in rec.get('url_re', '').split('\n'):
-            if url_re:
-                if re.search(url_re, url):
-                    return k
-    return None
-
-
-class SitesInformation(object):
-    def load(self):
-        """Would load information about related/possible websites requiring authentication from
-
-        - current handle .datalad/sites/
-        - user dir  ~/.config/datalad/sites/
-        - system-wide datalad installation/config /etc/datalad/sites/
-
-        Just load all the files, for now in the form of
-
-        [site:crcns]
-        url_re = https?://crcns.org/.*
-        certificates = ??? (uses https)
-        credentials_url = https://crcns.org/request-account/
-        credentials = crcns
-
-        [site:crcns-nersc]
-        url_re = https?://portal.nersc.gov/.*
-        credentials_url = https://crcns.org/request-account/
-        credentials = crcns
-        failed_download_re = <form action=".*" method="post">  # so it went to login page
-        """
-    pass
-
-    def __contains__(self, url):
-        # go through the known ones, and if found a match -- return True, if not False
-        raise NotImplementedError
-
-    def get(self, url, field=None):
-        # if no field == return all values as a dict
-        raise NotImplementedError
-
-
-# TODO: use keyring module for now
-class Credentials(object):
-    """The interface to the credentials stored by some backend
-
-        - current handle .datalad/creds/
-        - user dir  ~/.config/datalad/creds/
-        - system-wide datalad installation/config /etc/datalad/creds/
-
-        Just load all the files, for now in the form of
-
-        [credentials:crcns]
-        # url_re = .... # optional
-        type =    # (user_password|s3_keys(access_key,secret_key for S3)
-        # user = ...
-        # password = ...
-
-        where actual fields would be stored in a keyring relying on the OS
-        provided secure storage
-
-    """
-
-    def __init__(self):
-        self.sites = SitesInformation()
-        self._items = {}
-        self._load()  # populate items with information from the those files
-
-    def _load(self):
-        raise NotImplementedError()
-
-    def needs_credentials(self, url):
-        return "TODO: url known to self._items" or url in self.sites
-
-    def get_credentials(self, url, new=False):
-        # find a match among _items
-        name = resolve_url_to_name(self._items, url)
-        if new or not name:
-            rec = self._get_new_record_ui(url)
-            rec['url_re'] = "TODO"  # figure out
-            name = urlparse(url).netloc
-            self._items[name] = rec
-            if ui.yesno("Do you want to store credentials for %s" % name):
-                self.store_credentials()
-        else:
-            return self._items[name]
-
-
-
-    def store_credentials(self, name):
-        # TODO: store  self._items[name]  in appropriate (user) creds
-        # for later reuse
-        raise NotImplementedError()
-
-    def _get_new_record_ui(self, url):
-        # TODO: should be a dialog with the fields appropriate for this particular
-        # type of credentials
-        ui.message("To access %s we would need credentials.")
-        if url in self.sites:
-            self.sites
-            ui.message("If you don't yet have credentials, please visit %s"
-                       % self.sites.get(url, 'credentials_url'))
-        return { 'user': ui.question("Username:"),
-                 'password': ui.password() }
-
-
-creds = Credentials()
