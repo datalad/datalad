@@ -14,19 +14,25 @@ __docformat__ = 'restructuredtext'
 
 import re
 
-from six.moves import iteritems
+from six import iteritems
 from six.moves.urllib.parse import urlparse
+
+from ..ui import ui
+
+from logging import getLogger
+lgr = getLogger('datalad.http')
 
 class DownloadError(Exception):
     pass
 
 
 class Downloaders(object):
+
     def __init__(self):
         self._downloaders = {}
 
     def get_downloader(self, url):
-        """Generate a new downloader per each website
+        """Generate a new downloader per each website (to maintain the session?)
         """
         url_split = urlparse(url)
         key = (url_split.scheme, url_split.netloc)
@@ -59,11 +65,15 @@ class HTTPDownloader(object):
 
         if creds.needs_authentication(url):
             self._authenticate(url, allow_old_cookie=True)
-        # DOWNLOAD SHIT
+        # TODO: DOWNLOAD SHIT
+
+        if response.code in {403}:
+            access_denied = True
+        elif response.downloaded_size < 1000
         # if 403 (Access denied) -- we do now that it needs authentication
         # but if not sites.needs_authentication(url) -- we didn't know that
         # we had to authenticate
-        if 403:
+        if access_denied:
             creds.get_credentials(url)
 
         success = True
@@ -111,10 +121,15 @@ class SitesInformation(object):
 
         [downloader:crcns]
         url_re = https?://crcns.org/.*
-                 https?://portal.nersc.gov/.*
         certificates = ??? (uses https)
         credentials_url = https://crcns.org/request-account/
+        credentials = crcns
 
+        [downloader:crcns-nersc]
+        url_re = https?://portal.nersc.gov/.*
+        credentials_url = https://crcns.org/request-account/
+        credentials = crcns
+        failed_download_re = <form action=".*" method="post">  # so it went to login page
         """
     pass
 
@@ -127,8 +142,9 @@ class SitesInformation(object):
         raise NotImplementedError
 
 
+# TODO: use keyring module for now
 class Credentials(object):
-    """The store of login:password information
+    """The interface to the credentials stored by some backend
 
         - current handle .datalad/creds/
         - user dir  ~/.config/datalad/creds/
@@ -137,16 +153,20 @@ class Credentials(object):
         Just load all the files, for now in the form of
 
         [credentials:crcns]
-        url_re = .... # optional
-        user = ...
-        password = ...
+        # url_re = .... # optional
+        type =    # (user_password|s3_keys(access_key,secret_key for S3)
+        # user = ...
+        # password = ...
+
+        where actual fields would be stored in a keyring relying on the OS
+        provided secure storage
 
     """
 
     def __init__(self):
         self.sites = SitesInformation()
         self._items = {}
-        self._load() # populate items with information from the those files
+        self._load()  # populate items with information from the those files
 
     def _load(self):
         raise NotImplementedError()
@@ -161,7 +181,7 @@ class Credentials(object):
             return self._items[name]
         else:
             rec = self._get_new_record_ui(url)
-            rec['url_re'] = "TODO" # figure out
+            rec['url_re'] = "TODO"  # figure out
             name = urlparse(url).netloc
             self._items[name] = rec
             if ui.yesno("Do you want to store credentials for %s" % name):

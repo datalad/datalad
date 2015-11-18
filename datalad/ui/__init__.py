@@ -12,3 +12,12 @@
 
 __docformat__ = 'restructuredtext'
 
+from .dialog import DialogUI
+from ..utils import is_interactive
+
+# TODO: implement logic on selection of the ui based on the cfg and environment
+# e.g. we cannot use DialogUI if session is not interactive
+if not is_interactive():
+    ui = None  # TODO
+else:
+    ui = DialogUI()
