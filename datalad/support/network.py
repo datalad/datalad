@@ -126,27 +126,20 @@ def __urlopen(url, header_vals=None):
             into the header along with the username & password
     '''
 
-    # cookies_file = os.path.join(appdirs.user_config_dir(), 'datalad', 'cookies.txt')
     ds_provider = get_tld(url)
     cookies_db = get_cookie_db()
 
     cj = cookielib.CookieJar()
-    # cjf = cookielib.MozillaCookieJar(cookies_file)
-    # cjf.save()
-    # cjf.load()
     opener = urllib2.build_opener(      # this handles redirects by default
                 urllib2.HTTPCookieProcessor(cj))
     # urllib2.install_opener(opener)
 
     if ds_provider in cookies_db:
-        # TODO
-        # if cookie is expired then not sure how to build that exception check in here yet
+        # TODO if cookie is expired then not sure how to build that exception check in here yet
         cookie = cookies_db[ds_provider]
-        # cj = cookielib.FileCookieJar(cookie)
         # cj.set_cookie(cookie)
         opener.addheaders.append(('Cookie', cookie))
         resp = opener.open(url)
-        pass
     else:
         if header_vals:   # FIXME need better check to make sure they work
             data = urllib.urlencode(header_vals)
@@ -159,13 +152,11 @@ def __urlopen(url, header_vals=None):
             resp = opener.open(url)
         # resp = urllib2.urlopen(req)
 
-        # cj.save()
-
         # NOTE (see pg. 515)
         # resp.info also contains the header info
         # resp.geturl would be the real url (if redirection occured on the passed in url)
-
-        cookies_db[ds_provider] = cj
+        if cj:
+            cookies_db[ds_provider] = cj
     return resp
 
 
@@ -176,10 +167,9 @@ def __urlopen_requests(url, header_vals=None):
     sess = requests.Session()
 
     if ds_provider in cookies_db:
-        # not sure what happens if cookie is expired
-        # cookie_dict = cookies_db[ds_provider]
-        # cookie_jar = requests.utils.cookiejar_from_dict(cookie_dict)
-        cookie_jar = cookies_db[ds_provider]
+        # not sure what happens if cookie is expired (need check to that or exception will prolly get thrown)
+        cookie_dict = cookies_db[ds_provider]
+        cookie_jar = requests.utils.cookiejar_from_dict(cookie_dict)
         # sess.cookies = cookie_jar
         resp = sess.get(url, cookies=cookie_jar)
     else:
@@ -188,28 +178,33 @@ def __urlopen_requests(url, header_vals=None):
         else:
             resp = sess.get(url)
 
-        # NOTE (see pg. 515)
-        # cookies_dict = requests.utils.dict_from_cookiejar(resp.cookies)
-        # cookies_db[ds_provider] = cookies_dict
-        cookie_jar = resp.cookies
-        cookies_db[ds_provider] = cookie_jar
+    if resp.cookies:    # (pg. 515)
+        cookies_dict = requests.utils.dict_from_cookiejar(resp.cookies)
+        if ds_provider in cookies_db:
+            cookies_db[ds_provider].update(cookies_dict)
+        else:
+            cookies_db[ds_provider] = cookies_dict
+
     return resp
 
 
-def __json_testing():
+def __testing():
     # url = 'https://portal.nersc.gov/project/crcns/download/index.php'
     url = 'https://portal.nersc.gov/project/crcns/download/pvc-1'
     # header_vals = dict(username='XXXX', password='XXXX', submit='Login')
+    header_vals = dict(username='jgors', password='mju7vfr4', submit='Login')
+
+    # using the stdlib
     # resp = __urlopen(url, header_vals)
     # print resp.read()
 
-    header_vals = dict(username='XXXX', password='XXXX', submit='Login')
-    resp = __urlopen(url, header_vals)
+    # using requests
+    resp = __urlopen_requests(url, header_vals)
     # resp = __urlopen(url)
-    print resp.text
+    print resp.content
 
-    resp2 = __urlopen(url)
-    print resp2.text
+    resp2 = __urlopen_requests(url)     # should work now b/c we have the cookie
+    print resp2.content
 
 
 def __download_file(url, filename):
@@ -247,7 +242,7 @@ def _download_file(url, filename):
 def retry_urlopen(url, retries=3):
     for t in range(retries):
         try:
-            return __urlopen(url)
+            return __urlopen_requests(url)
         except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
             if t == retries - 1:
@@ -262,7 +257,7 @@ def _fetch_page(url, retries=3):
     response = retry_urlopen(url, retries=retries)
     for t in range(retries):
         try:
-            page = response.read()
+            page = response.content   # for using requests
             break
         except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
@@ -527,7 +522,8 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
         # what git-annex does for us already... not really
         r = retry_urlopen(request)
         try:
-            r_info = r.info()
+            # r_info = r.info()
+            r_info = r.headers  # not sure this is the same as .info on urllib2 or what was going on here.
 
             r_stamp = get_url_response_stamp(url, r_info)
             if use_redirected_name and url != r.url:
