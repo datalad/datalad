@@ -22,13 +22,20 @@ lgr = logging.getLogger('datalad.handle')
 class Handle(object):
     """Representation of a Handle's metadata.
 
-    Abstract base class defining an interface, that needs to be implemented
-    by any class that aims to provide a backend for handles.
-    An instance of a derived class serves as a runtime representation of the
-    handle's metadata. That metadata is represented by a named graph.
-    'update_metadata' and 'commit_metadata' are used to synchronize that graph
-    with the physical backend.
+    This is a top-level representation of a handle. In that sense a handle is
+    a set of metadata, represented as a named rdflib.Graph. Parts of the
+    metadata may be accessible directly by an attribute without the need to
+    explicitly query the graph. The latter by now counts especially for the
+    attributes `url` and `name`. Additionally, this kind of a handle is linked
+    to an underlying backend, that may also provide access to the actual
+    content of the handle.
+    Note, that this graph is a runtime object residing in memory. The
+    `update_metadata` and `commit_metadata` methods are meant to be used to
+    synchronize the graph and the underlying storage.
 
+    This is an abstract class, that basically defines a general interface to
+    handles. Any backend to be supported should be implemented by deriving from
+    this class.
     """
 
     __metaclass__ = ABCMeta
@@ -41,7 +48,7 @@ class Handle(object):
 
     @abstractproperty
     def url(self):
-        """url of the physical representation of a handle.
+        """URL of the physical representation of a handle.
 
         This is a read-only property, since an url can only be provided by a
         physically existing handle. It doesn't make sense to tell a backend to
@@ -71,7 +78,8 @@ class Handle(object):
 
         Parameters
         ----------
-        msg: optional commit message.
+        msg: str
+            optional commit message.
 
         Raises
         ------
@@ -94,10 +102,21 @@ class Handle(object):
     def set_metadata(self, data):
         self._graph = data
 
-    meta = property(get_metadata, set_metadata)
+    meta = property(get_metadata, set_metadata, doc="""
+    Named rdflib.Graph representing the metadata of the handle.
+    This is a lazy loading property, that is created only when accessed. Note,
+    that this is not necessarily always in sync with the underlying backend.
+    Therefore `update_metadata` and `commit_metadata` are provided,
+    to explicitly make sure it's synchronized. """)
 
     @property
     def name(self):
+        """Name of the handle.
+
+        Returns
+        -------
+        str
+        """
         return str(self.meta.identifier)
 
 

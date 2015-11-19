@@ -7,7 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """
-Implements several handle backends
+Implements backends for handles.
 """
 import logging
 
@@ -31,18 +31,36 @@ lgr = logging.getLogger('datalad.handle_backends')
 class HandleRepoBackend(Handle):
     # TODO: Name. See corresponding naming for CollectionBackend and find
     # a solution for both of them
-    """Handle backend for handle repositories.
+    """Handle backend using a handle repository.
 
-    Implements a Handle pointing to a handle repository branch.
+    Implements a Handle pointing to a handle repository branch. Such a
+    repository may contain several metadata files, storing parts of the entire
+    graph. By default, all of these files are used, but you can limit it to the
+    ones you need in order to save time and memory.
+    These parts are represented in the attribute `sub_graphs`. Since it is a
+    subclass of Handle, you can still access the entire graph by the
+    attribute `meta`. But in case you need to store changes of the graph
+    to the underlying repository, `sub_graphs` needs to be modified in order to
+    know, what files to store the changes to. Therefore, while `meta` returns a
+    rdflib.Graph, you cannot assign a Graph to it, but only a dict of Graph,
+    which is in fact assigned to `sub_graphs`.
     """
 
     def __init__(self, repo, branch=None, files=None):
         """
 
-        :param repo:
-        :param branch:
-        :param files:
-        :return:
+        Parameters
+        ----------
+        repo: HandleRepo
+            The handle repository, that contains the desired handle.
+        branch: str
+            The branch, that holds the desired handle. Naturally also allows
+            for addressing remote branches.
+            Default: Active branch of the repository.
+        files: list of str
+            Optionally restrict the metadata files to be represented by this
+            instance. This does not only save memory due to a smaller graph,
+            but also saves time for parsing the files and querying the graph.
         """
 
         super(HandleRepoBackend, self).__init__()
@@ -253,8 +271,6 @@ class CollectionRepoHandleBackend(Handle):
                                        (self.name, self.repo.path,
                                         self._branch))
 
-        # TODO: different graphs, file names, etc. See CollectionRepo
-        # Same goes for HandleRepo/HandleRepoBackend
         self.repo.store_handle_graphs(self.sub_graphs, self._key,
                                       branch=self._branch, msg=msg)
 
