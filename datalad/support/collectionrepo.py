@@ -70,8 +70,8 @@ class CollectionRepo(GitRepo):
           if true, creates a collection repository at path, in case there is
           none. Otherwise an exception is raised.
 
-        Raises:
-        -------
+        Raises
+        ------
         CollectionBrokenError
         """
 
@@ -531,6 +531,7 @@ class CollectionRepo(GitRepo):
 
         graphs = dict()
         for file_ in files:
+            # TODO: opj(_key2filname(key), file_)?
             file_str = '\n'.join(self.git_get_file_content(file_, branch))
             graphs[basename(file_).rstrip(".ttl")] = \
                 Graph().parse(data=file_str, format="turtle")

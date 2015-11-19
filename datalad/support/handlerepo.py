@@ -143,6 +143,7 @@ class HandleRepo(AnnexRepo):
             metadata files within the datalad directory of the handle to
             be read. Default: All files are read.
         """
+        # TODO: Doc. returns dict
         # Parameter? May be by default get graph of all files, just some of
         # them otherwise. But how to save then?
         # Just don't save at all (Exception)?
@@ -151,19 +152,23 @@ class HandleRepo(AnnexRepo):
         # Is there some "in namespace" check in rdflib? => what to save to
         # datalad.ttl ==> str.startswith(ns) or URIRef.startswith(ns)
 
+        if branch is None:
+            branch = self.git_get_active_branch()
+
         if files is None:
-            files = opj(self.path, HANDLE_META_DIR)
-        else:
-            files = [opj(self.path, HANDLE_META_DIR, f) for f in files]
+            files = [file_ for file_ in self.git_get_files(branch)
+                     if file_.startswith(HANDLE_META_DIR) and
+                     file_.endswith(".ttl")]
+                    # Note: Think of additionally exclude config.ttl:
+                    # and basename(file_) != REPO_CONFIG_FILE
 
-        handler = CustomImporter('Handle', 'Handle', DLNS.this)
+        graphs = dict()
+        for file_ in files:
+            # TODO: opj(HANDLE_META_DIR, file_)?
+            file_str = '\n'.join(self.git_get_file_content(file_, branch))
+            graphs[basename(file_).rstrip(".ttl")] = \
+                Graph().parse(data=file_str, format="turtle")
 
-        handler.import_data(files)
-        graphs = handler.get_graphs()
-
-        # joined_graph = Graph(identifier=self.name)
-        # for key in graphs:
-        #     joined_graph += graphs[key]
         return graphs
 
     def set_metadata(self, graphs, msg="Metadata saved.", branch=None):

@@ -114,7 +114,28 @@ def test_HandleRepoBackend_meta(url, path):
     assert_raises(ReadOnlyBackendError, backend.commit_metadata)
 
 
-# TODO: test remotes
+@with_testrepos('.*handle.*', flavors=['clone'])
+@with_tempfile
+def test_HandleRepoBackend_remote(url, path):
+    repo = HandleRepo(path, url, create=True)
+
+    backend_remote = HandleRepoBackend(repo, branch="origin/master")
+    backend_local = HandleRepoBackend(repo)
+    ok_(backend_remote.is_read_only)
+    assert_raises(ReadOnlyBackendError, backend_remote.commit_metadata)
+    ok_(not backend_local.is_read_only)
+    eq_(backend_local.name, backend_remote.name)
+
+    # modify local metadata:
+    triple_1 = (URIRef("http://example.org/whatever"), RDF.type, DLNS.FakeTerm)
+    backend_local.sub_graphs[REPO_STD_META_FILE[:-4]].add(triple_1)
+    assert_in(triple_1, backend_local.meta)
+    backend_local.commit_metadata()
+
+    # should not influence remote handle, even after update:
+    assert_not_in(triple_1, backend_remote.meta)
+    backend_remote.update_metadata()
+    assert_not_in(triple_1, backend_remote.meta)
 
 
 @with_tempfile
@@ -223,3 +244,29 @@ def test_CollectionRepoHandleBackend_meta(url, path):
     # If read only, should raise exception:
     backend.is_read_only = True
     assert_raises(ReadOnlyBackendError, backend.commit_metadata)
+
+
+@with_testrepos('collection', flavors=['clone'])
+@with_tempfile
+def test_CollectionRepoHandleBackend_remote(url, path):
+    repo = CollectionRepo(path, url, create=True)
+
+    backend_remote = CollectionRepoHandleBackend(repo, "BasicHandle",
+                                                 branch="origin/master")
+
+    backend_local = CollectionRepoHandleBackend(repo, "BasicHandle")
+    ok_(backend_remote.is_read_only)
+    assert_raises(ReadOnlyBackendError, backend_remote.commit_metadata)
+    ok_(not backend_local.is_read_only)
+    eq_(backend_local.name, backend_remote.name)
+
+    # modify local metadata:
+    triple_1 = (URIRef("http://example.org/whatever"), RDF.type, DLNS.FakeTerm)
+    backend_local.sub_graphs[REPO_STD_META_FILE[:-4]].add(triple_1)
+    assert_in(triple_1, backend_local.meta)
+    backend_local.commit_metadata()
+
+    # should not influence remote handle, even after update:
+    assert_not_in(triple_1, backend_remote.meta)
+    backend_remote.update_metadata()
+    assert_not_in(triple_1, backend_remote.meta)

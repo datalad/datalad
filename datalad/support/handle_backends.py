@@ -65,8 +65,13 @@ class HandleRepoBackend(Handle):
                              (branch, self.repo.path))
 
         # we can't write to a remote branch:
-        self.is_read_only = self._branch.split('/')[0] in \
-                            self.repo.git_get_remotes()
+        if self._branch.split('/')[0] in self.repo.git_get_remotes():
+            self._remote = self._branch.split('/')[0]
+            self.is_read_only = True
+        else:
+            self._remote = None
+            self.is_read_only = False
+
         self._files = files
         self._sub_graphs = dict()
 
@@ -138,7 +143,13 @@ class HandleRepoBackend(Handle):
 
         :return:
         """
-        return get_local_file_url(self.repo.path)
+        if self._remote is not None:
+            # TODO: In case of local FS remote,
+            # currently returns the path not according to file-scheme
+            return self.repo.git_get_remote_url(self._remote)
+        else:
+            return get_local_file_url(self.repo.path)
+
 
     # TODO: set_name? See Handle.
 
@@ -252,3 +263,5 @@ class CollectionRepoHandleBackend(Handle):
     @property
     def url(self):
         return str(self.meta.value(predicate=RDF.type, object=DLNS.Handle))
+        # TODO: DLNS.this? => path/url
+        # Note: Shouldn't be possible to have DLNS.this from handle IN collection!
