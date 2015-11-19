@@ -15,11 +15,10 @@ datalad-managed dataset.
 
 import logging
 from os.path import join as opj, basename
-from six import string_types
+from six import string_types, itervalues
 
 from rdflib import URIRef
 
-#from datalad.support.handlebackends import HandleRepoBackend
 from .annexrepo import AnnexRepo
 from .metadatahandler import MetadataImporter, CustomImporter, Graph, \
     Literal, DLNS, RDFS
@@ -132,6 +131,7 @@ class HandleRepo(AnnexRepo):
     def get_handle(self, branch=None):
         """Convenience method to create a `Handle` instance.
         """
+        from datalad.support.handle_backends import HandleRepoBackend
         return HandleRepoBackend(self, branch)
 
     def get_metadata(self, files=None, branch=None):
@@ -198,7 +198,7 @@ class HandleRepo(AnnexRepo):
         for key in graphs:
             graphs[key].serialize(files[key], format="turtle")
 
-        self.add_to_git(files.values(), msg)
+        self.add_to_git(list(itervalues(files)), msg)
 
         if branch != active_branch:
             self.git_checkout(active_branch)

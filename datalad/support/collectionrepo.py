@@ -12,7 +12,7 @@
 import logging
 import os
 from os.path import join as opj, basename, exists
-from six import string_types
+from six import string_types, itervalues
 
 from rdflib import Graph, URIRef
 
@@ -193,7 +193,6 @@ class CollectionRepo(GitRepo):
             return key[len(parts[0]) + 1:].replace('/', '--')
         else:
             return key.replace('/', '--')
-
 
     # ### repo methods:
 
@@ -563,7 +562,7 @@ class CollectionRepo(GitRepo):
         for key in graphs:
             graphs[key].serialize(files[key], format="turtle")
 
-        self.git_add(files.values())
+        self.git_add(list(itervalues(files)))
         self.git_commit(msg)
 
         if branch != active_branch:

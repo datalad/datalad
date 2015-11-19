@@ -16,11 +16,11 @@ from rdflib import Graph, Literal, RDF
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.exceptions import ReadOnlyBackendError
 from datalad.support.handle import Handle
-from datalad.support.handlerepo import HandleRepo, lgr
+from datalad.support.handlerepo import HandleRepo
 from datalad.support.metadatahandler import DLNS
 from datalad.utils import get_local_file_url
 
-lgr = logging.getLogger('datalad.handlebackends')
+lgr = logging.getLogger('datalad.handle_backends')
 
 
 # TODO: Both of the repo backends for handles share a lot of code.
