@@ -25,6 +25,7 @@ from os.path import join as opj, isabs, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
 from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
+from ..utils import auto_repr
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
@@ -208,3 +209,20 @@ def test_getpwd_symlink(tdir):
     with chpwd(s2dir, mkdir=True):
         ok_(exists(s2dir))
         eq_(getpwd(), s2dir)
+
+
+def test_auto_repr():
+
+    class withoutrepr:
+        def __init__(self):
+            self.a = "does not matter"
+
+    @auto_repr
+    class buga:
+        def __init__(self):
+            self.a = 1
+            self.b = list(range(10))
+            self.c = withoutrepr()
+            self._c = "protect me"
+
+    assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4,...>>, c=<withoutrepr>)")

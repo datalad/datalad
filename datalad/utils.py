@@ -43,6 +43,44 @@ except:  # pragma: no cover
 # Little helpers
 #
 
+
+class auto_repr(object):
+    """Decorator for a class to assign it an automagic quick and dirty __repr__
+
+    It uses public class attributes to prepare repr of a class
+
+    Original idea: http://stackoverflow.com/a/27799004/1265472
+    """
+    @staticmethod
+    def repr(obj):
+        items = []
+        for prop in sorted(obj.__dict__):
+            value = obj.__dict__[prop]
+            if prop.startswith('_'):
+                continue
+            try:
+                if hasattr(value, '__repr__'):
+                    value_repr = repr(value)
+                    if not value_repr.startswith('<') and len(value_repr) > 20:
+                        value_repr = "<<%s...>>" % (value_repr[:15])
+                else:
+                    raise ValueError("gimme class")
+            except:
+                value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
+
+            item = "%s=%s" % (prop, value_repr)
+            items.append(item)
+
+        return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
+
+    def __init__(self, cls):
+        cls.__repr__ = auto_repr.repr
+        self.cls = cls
+
+    def __call__(self, *args, **kwargs):
+        return self.cls(*args, **kwargs)
+
+
 def is_interactive():
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
@@ -460,3 +498,4 @@ class chpwd(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         chpwd(self._prev_pwd)
+
