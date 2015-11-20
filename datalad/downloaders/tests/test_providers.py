@@ -26,7 +26,7 @@ def test_ProvidersInformation_OnStockConfiguration():
         provider = pi.get_matching_provider('https://crcns.org/data....')
         assert_equal(provider['name'], 'crcns')
 
-        provider = pi.get_matching_provider('https://portal.nersc.gov/proj...')
+        provider = pi.get_matching_provider('https://portal.nersc.gov/project/crcns/download/bogus')
         assert_equal(provider['name'], 'crcns-nersc')
 
     assert_equal(pi.needs_authentication('http://google.com'), None)
