@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
-from ..providers import ProvidersInformation
+from ..providers import ProvidersInformation, assure_list_from_str, assure_dict_from_str
 from ...tests.utils import eq_
 from ...tests.utils import assert_in
 from ...tests.utils import assert_equal
@@ -32,3 +32,23 @@ def test_ProvidersInformation_OnStockConfiguration():
     assert_equal(pi.needs_authentication('http://google.com'), None)
     assert_equal(pi.needs_authentication('http://crcns.org/'), True)
     assert_equal(pi.needs_authentication('http://openfmri.org/'), False)
+
+
+def test_assure_list_from_str():
+    assert_equal(assure_list_from_str(''), None)
+    assert_equal( assure_list_from_str([]), None)
+    assert_equal(assure_list_from_str('somestring'), ['somestring'])
+    assert_equal(assure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
+    assert_equal( assure_list_from_str(['something']), ['something'])
+    assert_equal( assure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
+
+
+def test_assure_dict_from_str():
+    assert_equal(assure_dict_from_str(''), None)
+    assert_equal(assure_dict_from_str({}), None)
+    assert_equal(assure_dict_from_str(
+            '__ac_name={user}\n__ac_password={password}\nsubmit=Log in\ncookies_enabled=') == dict(
+             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+    assert_equal(assure_dict_from_str(
+        dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')) == dict(
+             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
