@@ -17,9 +17,10 @@ from os.path import dirname, abspath, join as pathjoin
 
 from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..ui import ui
+from ..utils import auto_repr
 
 from logging import getLogger
-lgr = getLogger('datalad.providers')
+lgr = getLogger('datalad.downloaders.providers')
 
 def resolve_url_to_name(d, url):
     """Given a directory (e.g. of SiteInformation._items or Credential._items)
@@ -118,6 +119,17 @@ class HTMLFormAuthenticator(Authenticator):
 
         pass
 
+
+@auto_repr
+class Provider(object):
+    """Abstract class specifying a provider
+    """
+    def __init__(self, url_re, credential=None, authenticator=None):
+        self.url_re = url_re
+        self.credential = credential
+        self.authenticator = authenticator
+
+@auto_repr
 class ProvidersInformation(object):
 
     def __init__(self):
@@ -151,11 +163,13 @@ class ProvidersInformation(object):
                     o: config.get(section, o) for o in config.options(section)
                 }
                 items['name'] = name  # duplication of name in the key and entry so we could lpace into _providers_ordered for now
-                getattr(self, '_validate_' + type_)(items)
+                getattr(self, '_process_' + type_)(items)
             else:
                 lgr.warning("Do not know how to treat section %s here" % section)
 
-    def _validate_provider(self, items):
+    def _process_provider(self, items):
+        """Process a dictionary specifying the provider and output the Provider instance
+        """
         assert ('authentication_type' in items)
         authentication_type = items['authentication_type']
         assert (authentication_type in {'html_form',  'aws-s3', 'xnat', 'none'})  # 'user_password', 's3'
@@ -168,7 +182,7 @@ class ProvidersInformation(object):
         assert url_res, "current implementation relies on having url_re defined"
         self._providers_ordered.append(items)
 
-    def _validate_credential(self, items):
+    def _process_credential(self, items):
         assert ('type' in items)
         authentication_type = items['type']
         assert (authentication_type in {'user_password', 'aws-s3'})  # 'user_password', 's3'
@@ -229,5 +243,3 @@ class ProvidersInformation(object):
                  'password': ui.password() }
 
 
-lgr.debug("Initializing data providers credentials interface")
-providers_info = ProvidersInformation()

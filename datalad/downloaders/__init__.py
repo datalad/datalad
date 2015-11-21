@@ -14,7 +14,12 @@ __docformat__ = 'restructuredtext'
 
 from six.moves.urllib.parse import urlparse
 
+
 from .http import HTTPDownloader
+from .providers import ProvidersInformation
+
+from logging import getLogger
+lgr = getLogger('datalad.providers')
 
 class Downloaders(object):
     """
@@ -44,3 +49,6 @@ class Downloaders(object):
         return self._downloaders[key](**kwargs)
         #downloader = self._downloaders[key] = HTTPDownloader()
         #return downloader
+
+lgr.debug("Initializing data providers credentials interface")
+providers_info = ProvidersInformation()

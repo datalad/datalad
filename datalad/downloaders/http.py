@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 
 from ..ui import ui
-from .providers import providers_info
+from ..utils import auto_repr
 
 from logging import getLogger
 lgr = getLogger('datalad.http')
@@ -25,12 +25,13 @@ class DownloadError(Exception):
 class AccessDeniedError(DownloadError):
     pass
 
+@auto_repr
 class HTTPDownloader(object):
     """A stateful downloader to maintain a session to the website
     """
 
-    def __init__(self, request_deposition_filename=True):
-        pass
+    def __init__(self, providers_info, request_deposition_filename=True):
+        self.providers_info = providers_info
 
     def get(self, url, path=None):
         """
@@ -47,7 +48,7 @@ class HTTPDownloader(object):
         # would just call the corresponding method (logic "DOWNLOAD SHIT" here)
         # BEGINNING:
         # if returned None for unknown, True if requires, False if not
-        needs_authentication = providers_info.needs_authentication(url)
+        needs_authentication = self.providers_info.needs_authentication(url)
         if needs_authentication:
             used_old_cookies = self._authenticate(url, allow_old_cookie=True)
 
@@ -92,7 +93,7 @@ class HTTPDownloader(object):
                     if ui.yesno(
                             title="Authentication to access {url} has failed".format(url=url),
                             text="Do you want to enter other credentials in case they were updated?"):
-                        providers_info.get_credentials(url, new=True)
+                        self.providers_info.get_credentials(url, new=True)
                         # TODO GOTO BEGINNING
                     else:
                         raise DownloadError("Failed to download from %s given available credentials" % url)
