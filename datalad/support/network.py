@@ -54,8 +54,13 @@ def get_response_deposition_filename(response_info):
 def get_url_deposition_filename(url):
     request = Request(url)
     r = retry_urlopen(request)
+    # things are different in requests
+    if 'requests.' in str(r.__class__):
+        headers = r.headers
+    else:
+        headers = r.info()
     try:
-        return get_response_deposition_filename(r.info())
+        return get_response_deposition_filename(headers)
     finally:
         r.close()
 
@@ -161,8 +166,10 @@ def __urlopen(url, header_vals=None):
 
 
 def __urlopen_requests(url, header_vals=None):
-
-    ds_provider = get_tld(url)
+    # XXX Workaround for now for ... broken code
+    if isinstance(url, urllib2.Request):
+        url = url.get_full_url()
+    ds_provider = get_tld(url).encode()
     cookies_db = get_cookie_db()
     sess = requests.Session()
 
@@ -637,15 +644,17 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 #  request, and would need to deal with aborted transfers etc
                 #  Also then we wouldn't need to drag that 'r' around which was
                 #  originally used only to get target filename and related "stamp"
-                with open(temp_full_filename, 'wb') as f:
-                    # No magical decompression for now
-                    if False: #r.info().get('Content-Encoding') == 'gzip':
-                        buf = StringIO( r.read())
-                        src = gzip.GzipFile(fileobj=buf)
-                    else:
-                        src = r
-                    shutil.copyfileobj(src, f)
-                    downloaded = True
+                # with open(temp_full_filename, 'wb') as f:
+                #     # No magical decompression for now
+                #     if False: #r.info().get('Content-Encoding') == 'gzip':
+                #         buf = StringIO( r.read())
+                #         src = gzip.GzipFile(fileobj=buf)
+                #     else:
+                #         src = r
+                #     shutil.copyfileobj(src, f)
+                # XXX temporary workaround with 'requests' in mind to get bloody url
+                _download_file(r.url, temp_full_filename)
+                downloaded = True
                 downloaded_size = os.stat(temp_full_filename).st_size
 
             except Exception as e:
