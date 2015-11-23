@@ -8,25 +8,27 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
-from ..providers import ProvidersInformation
+from ..providers import Providers
 from ...tests.utils import eq_
 from ...tests.utils import assert_in
 from ...tests.utils import assert_equal
 
 
 def test_ProvidersInformation_OnStockConfiguration():
-    pi = ProvidersInformation()
-    eq_(sorted(pi.providers.keys()), ['crcns', 'crcns-nersc', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'])
+    pi = Providers.from_config_files()
+    eq_(sorted([p.name for p in pi.providers]), ['crcns', 'crcns-nersc', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'])
+
+    # every provider must have url_res
     for n, fields in pi.providers.items():
         assert_in('url_re', fields)
 
     # and then that we didn't screw it up -- cycle few times to verify that we do not
     # somehow remove existing providers while dealing with that "heaplike" list
     for i in range(3):
-        provider = pi.get_matching_provider('https://crcns.org/data....')
+        provider = pi.get_provider('https://crcns.org/data....')
         assert_equal(provider['name'], 'crcns')
 
-        provider = pi.get_matching_provider('https://portal.nersc.gov/project/crcns/download/bogus')
+        provider = pi.get_provider('https://portal.nersc.gov/project/crcns/download/bogus')
         assert_equal(provider['name'], 'crcns-nersc')
 
     assert_equal(pi.needs_authentication('http://google.com'), None)

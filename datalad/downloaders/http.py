@@ -10,31 +10,27 @@
 
 """
 
-__docformat__ = 'restructuredtext'
-
 
 from ..ui import ui
 from ..utils import auto_repr
 
+from .base import BaseDownloader
+from .base import DownloadError, AccessDeniedError
+
 from logging import getLogger
 lgr = getLogger('datalad.http')
 
-class DownloadError(Exception):
-    pass
+__docformat__ = 'restructuredtext'
 
-class AccessDeniedError(DownloadError):
-    pass
 
 @auto_repr
-class HTTPDownloader(object):
+class HTTPDownloader(BaseDownloader):
     """A stateful downloader to maintain a session to the website
     """
 
-    def __init__(self, providers_info, request_deposition_filename=True):
-        self.providers_info = providers_info
-
     def get(self, url, path=None):
-        """
+        """Fetch content as pointed by the URL optionally into a file
+
         Parameters
         ----------
         url : string
@@ -42,7 +38,11 @@ class HTTPDownloader(object):
         path : str, optional
           Either full path to the file, or if exists and a directory
           -- the directory to save under. If just a filename -- store
-          under curdir. If None -- fetch and return.
+          under curdir. If None -- fetch and return the fetched content.
+
+        Returns
+        -------
+        None or bytes
         """
         # TODO: possibly wrap this logic outside within a decorator, which
         # would just call the corresponding method (logic "DOWNLOAD SHIT" here)
@@ -58,15 +58,15 @@ class HTTPDownloader(object):
 
             # !!! HTTP specific
             if response.code != 200: # in {403}:
-                raise AccessDenied
+                raise AccessDeniedError
             # TODO: not hardcoded size, and probably we should check header
             elif response.content_type == 'text/html' and downloaded_size < 100000:
                 # TODO: do matching and decide if it was access_denied
                 # if we have no record on that website -- assume that it was a normal
                 # load since we don't know better
-                raise AccessDenied
+                raise AccessDeniedError
             access_denied = False
-        except AccessDenied:
+        except AccessDeniedError:
             access_denied = True
         except DownloadError:
             # TODO Handle some known ones, otherwise just let it go!
@@ -120,5 +120,3 @@ class HTTPDownloader(object):
           URL to access
         """
         raise NotImplementedError()
-
-

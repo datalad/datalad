@@ -6,20 +6,27 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Sub-module to provide access (as to download/query etc) to the remote sites
+"""Provide access to stuff (html, data files) via HTTP and HTTPS
 
 """
 
 __docformat__ = 'restructuredtext'
 
-from six.moves.urllib.parse import urlparse
 
-
-from .providers import Providers
+from ..utils import auto_repr
 
 from logging import getLogger
-lgr = getLogger('datalad.providers')
+lgr = getLogger('datalad.downloaders')
 
-# TODO: we might not need to instantiate it right here
-lgr.debug("Initializing data providers credentials interface")
-providers = Providers().from_config_files()
+class BaseDownloader(object):
+    """Base class for the downloaders"""
+    pass
+
+# Exceptions.  might migrate elsewhere
+
+class DownloadError(Exception):
+    pass
+
+class AccessDeniedError(DownloadError):
+    pass
+

@@ -34,17 +34,6 @@ def resolve_url_to_name(d, url):
                     return k
     return None
 
-
-class Authenticator(object):
-    """Abstract common class for different types of authentication
-
-    Derived classes should get parameterized with options from the config files
-    from "provider:" sections
-    """
-
-    # TODO: figure out interface
-    pass
-
 def assure_list_from_str(s):
     """Given a multiline string convert it to a list of return None if empty
     """
@@ -68,6 +57,22 @@ def assure_dict_from_str(s):
             raise ValueError("key {k} was already defined in {out} but new value {v} was provided".format(k=k, out=out, v=v))
         out[k] = v
     return out
+
+
+class Authenticator(object):
+    """Abstract common class for different types of authentication
+
+    Derived classes should get parameterized with options from the config files
+    from "provider:" sections
+    """
+
+    # TODO: figure out interface
+    pass
+
+
+class NotImplementedAuthenticator(Authenticator):
+    def __init__(self, *args, **kwargs):
+        raise NotImplementedError()
 
 class HTMLFormAuthenticator(Authenticator):
     def __init__(self, fields, url=None, tagid=None, failure_re=None, success_re=None, **kwargs):
@@ -119,20 +124,119 @@ class HTMLFormAuthenticator(Authenticator):
 
         pass
 
+from .http import HTTPDownloader
 
 @auto_repr
 class Provider(object):
-    """Abstract class specifying a provider
+    """Class to bring together url_res, credential, and authenticator
     """
-    def __init__(self, url_re, credential=None, authenticator=None):
-        self.url_re = url_re
+    # TODO: we might need a lazy loading of the submodules which would provide
+    # specific downloaders while importing needed Python modules "on demand"
+    DOWNLOADERS = {'http': HTTPDownloader,
+                   'https': HTTPDownloader,
+                    # ... TODO
+                  }
+
+    def __init__(self, name, url_res, credential=None, authenticator=None,
+                 downloader=None):
+        """
+        Parameters
+        ----------
+        name: str
+        url_res: list of str
+           Regular expressions
+        credential: Credential, optional
+        authenticator: Authenticator, optional
+        downloader: Downloader, optional
+
+        """
+        self.name = name
+        self.url_res = assure_list_from_str(url_res)
         self.credential = credential
         self.authenticator = authenticator
+        self._downloader = downloader
+
+    @property
+    def downloader(self):
+        return self._downloader
+
+    @staticmethod
+    def get_scheme_from_url(url):
+        url_split = urlparse(url)
+        return url_split.scheme  # , url_split.netloc)
+
+    @classmethod
+    def _get_downloader_class(cls, url):
+        #if key in self._downloaders:
+        key = cls.get_sceme_from_url(url)
+        if key in cls.DOWNLOADERS:
+            return cls.DOWNLOADERS[key]
+        else:
+            raise ValueError("Do not know how to handle url %s for scheme %s. Known: %s"
+                             % (url, key, cls.DOWNLOADERS.keys()))
+
+    def get_downloader(self, url):
+        """Assigns proper downloader given the URL
+
+        If one is known -- verifies its appropriateness for the given url.
+        ATM we do not support multiple types of downloaders per single provider
+        """
+        if self._downloader is None:
+            # we need to create a new one
+            Downloader = self._get_downloader_class(url)
+            # we need to provide it with credentials and authenticator
+            self._downloader = Downloader(credential=self.credential, authenticator=self.authenticator)
+        return self._downloader
+
 
 @auto_repr
-class ProvidersInformation(object):
+class Credential(object):
+    def __init__(self, name, type, url):
+        self.name = name
+        self.type = type
+        self.url = url
 
-    def __init__(self):
+
+@auto_repr
+class Providers(object):
+    """
+
+    So we could provide handling for URLs with corresponding credentials
+    and specific (reusable) downloader.  Internally it contains
+    Providers and interfaces them based on a given URL.  Each provider
+    in turn takes care about associated with it Downloader.
+    """
+
+    # dict to bind authentication_type's to authenticator classes
+    # parameters will be fetched from config file itself
+    AUTHENTICATION_TYPES = {
+        'html_form': HTMLFormAuthenticator,
+        'aws-s3': NotImplementedAuthenticator,  # TODO: check if having '-' is kosher
+        'xnat': NotImplementedAuthenticator,
+        'none': None,
+    }
+
+    CREDENTIAL_TYPES = {
+        'user_password',
+        'aws-s3'
+    }
+
+    def __init__(self, providers=None):
+        """
+        """
+        self._providers = providers or []
+        # a set of providers to handle connections without authentication.
+        # Will be setup one per each protocol schema
+        self._default_providers = {}
+
+    def __getitem__(self, index):
+        return self._providers[index]
+
+    def __iter__(self):
+        return self._providers
+
+    @classmethod
+    def from_config_files(cls, files=None):
         """Would load information about related/possible websites requiring authentication from
 
         - codebase (for now) datalad/downloaders/configs/providers.cfg
@@ -142,54 +246,80 @@ class ProvidersInformation(object):
 
         For sample configs look into datalad/downloaders/configs/providers.cfg
         """
-        # TODO: separate out loading from creation, so we could e.g. add new providers etc
-        self._load()
-
-    def _load(self):
         config = SafeConfigParserWithIncludes()
         # TODO: support all those other paths
-        config.read([pathjoin(dirname(abspath(__file__)),
-                                        'configs',
-                                        'providers.cfg')])
+        if files is None:
+            files = [pathjoin(dirname(abspath(__file__)), 'configs', 'providers.cfg')]
+        config.read(files)
 
-        self.providers = {}
-        self.credentials = {}
-        self._providers_ordered = []  # list with all known url_re's which will be used, with ones matching coming upfront
+        # We need first to load Providers and credentials
+        providers = {}
+        credentials = {}
+
         for section in config.sections():
             if ':' in section:
                 type_, name = section.split(':', 1)
                 assert(type_ in {'provider', 'credential'})
-                items = getattr(self, type_ + "s")[name] = {
+                items = {
                     o: config.get(section, o) for o in config.options(section)
                 }
-                items['name'] = name  # duplication of name in the key and entry so we could lpace into _providers_ordered for now
-                getattr(self, '_process_' + type_)(items)
+                # side-effect -- items get poped
+                locals().get(type_)[name] = getattr(cls, '_process_' + type_)(name, items)
+                if len(items):
+                    raise ValueError("Unprocessed fields left for %s: %s" % (name, str(items)))
             else:
                 lgr.warning("Do not know how to treat section %s here" % section)
 
-    def _process_provider(self, items):
+        # link credentials into providers
+        lgr.debug("Assigning credentials into %d providers" % len(providers))
+        for provider in providers:
+            if provider.credential:
+                if provider.credential not in credentials:
+                    raise ValueError("Unknown credential %s. Known are: %s"
+                                     % (provider.credential, ", ".join(credentials.keys())))
+                providers.credential = credentials[provider.credential]
+
+        return Providers(providers.items())
+
+
+    @classmethod
+    def _process_provider(cls, name, items):
         """Process a dictionary specifying the provider and output the Provider instance
         """
-        assert ('authentication_type' in items)
-        authentication_type = items['authentication_type']
-        assert (authentication_type in {'html_form',  'aws-s3', 'xnat', 'none'})  # 'user_password', 's3'
-        # we do allow empty one now
-        # if authentication_type == 'html_form':
-        #    assert 'html_form_url' in items, "Provider {name} lacks 'html_form_url' whenever authentication_type = html_form".format(**items)
+        assert 'authentication_type' in items, "Must have authentication_type specified"
+
+        auth_type = items.pop('authentication_type')
+        if auth_type not in cls.AUTHENTICATION_TYPES:
+            raise ValueError("Unknown authentication_type=%s. Known are: %s"
+                             % (auth_type, ', '.join(cls.AUTHENTICATION_TYPES)))
+        authenticator = cls.AUTHENTICATION_TYPES[auth_type](
+            # Extract all the fields as keyword arguments
+            **{k[len(auth_type)+1:]: items.pop(k)
+               for k in items.keys()
+               if k.startswith(auth_type+"_")}
+        )
 
         # bringing url_re to "standard" format of a list and populating _providers_ordered
-        url_res = items['url_re'] = items['url_re'].split('\n')
+        url_res = assure_list_from_str(items.pop('url_re'))
         assert url_res, "current implementation relies on having url_re defined"
-        self._providers_ordered.append(items)
 
-    def _process_credential(self, items):
-        assert ('type' in items)
-        authentication_type = items['type']
-        assert (authentication_type in {'user_password', 'aws-s3'})  # 'user_password', 's3'
+        credential = items.get('credential', None)
+
+        # credential instance will be assigned later after all of them are loaded
+        return Provider(name=name, url_res=url_res, authenticator=authenticator,
+                        credential=credential)
+
+    @classmethod
+    def _process_credential(cls, name, items):
+        assert 'type' in items, "Credential must specify type.  Missing in %s" % name
+        cred_type = items.pop('type')
+        return Credential(name=name, type=cred_type, url=items.pop('url', None))
 
 
-    def get_matching_provider(self, url):
-        nproviders = len(self._providers_ordered)
+    def get_provider(self, url):
+        """Given a URL returns matching provider
+        """
+        nproviders = len(self._providers)
         for i in range(nproviders):
             provider = self._providers_ordered[i]
             for url_re in provider['url_re']:
@@ -197,26 +327,35 @@ class ProvidersInformation(object):
                     if i != 0:
                         # place it first
                         # TODO: optimize with smarter datastructures if this becomes a burden
-                        del self._providers_ordered[i]
-                        self._providers_ordered = [provider] + self._providers_ordered
-                        assert(len(self._providers_ordered) == nproviders)
+                        del self._providers[i]
+                        self._providers = [provider] + self._providers
+                        assert(len(self._providers) == nproviders)
                     return provider
+        # None matched -- so we should get a default one per each of used
+        # protocols
+        scheme = Provider.get_scheme_from_url(url)
+        if scheme not in self._default_providers:
+            lgr.debug("Initializing default provider for %s" % scheme)
+            self._default_providers[scheme] = Provider(name="", url_res=["%s://.*" % scheme])
+        lgr.debug("No dedicated provider, returning default one for %s" % scheme)
+        return self._default_providers[scheme]
 
-    def __contains__(self, url):
-        # go through the known ones, and if found a match -- return True, if not False
-        raise NotImplementedError
+
+    #def __contains__(self, url):
+    #    # go through the known ones, and if found a match -- return True, if not False
+    #    raise NotImplementedError
 
     def needs_authentication(self, url):
-        provider = self.get_matching_provider(url)
+        provider = self.get_provider(url)
         if provider is None:
             return None
-        return provider['authentication_type'].lower() != 'none'
+        return provider.authenticator is not None
 
     def get_credentials(self, url, new=False):
         """Ask user to enter credentials for a provider matching url
         """
         # find a match among _items
-        provider = self.get_matching_provider(url)
+        provider = self.get_provider(url)
         if new or not provider:
             rec = self._get_new_record_ui(url)
             rec['url_re'] = "TODO"  # present to user and ask to edit
