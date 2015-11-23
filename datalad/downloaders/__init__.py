@@ -21,5 +21,5 @@ from logging import getLogger
 lgr = getLogger('datalad.providers')
 
 # TODO: we might not need to instantiate it right here
-lgr.debug("Initializing data providers credentials interface")
-providers = Providers().from_config_files()
+# lgr.debug("Initializing data providers credentials interface")
+# providers = Providers().from_config_files()

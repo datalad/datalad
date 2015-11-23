@@ -92,9 +92,9 @@ class Authenticator(object):
 
 class NotImplementedAuthenticator(Authenticator):
     def __init__(self, *args, **kwargs):
-        raise NotImplementedError()
+        lgr.warning("Necessary authenticator is not yet implemented") # raise NotImplementedError()
 
-
+@auto_repr
 class HTMLFormAuthenticator(Authenticator):
     def __init__(self, fields, url=None, tagid=None, failure_re=None, success_re=None, **kwargs):
         """
@@ -219,7 +219,6 @@ class Credential(object):
         self.url = url
 
 
-@auto_repr
 class Providers(object):
     """
 
@@ -251,11 +250,17 @@ class Providers(object):
         # Will be setup one per each protocol schema
         self._default_providers = {}
 
+    def __repr__(self):
+        return "%s(%s)" % (self.__class__.__name__, "" if not self._providers else repr(self._providers))
+
+    def __len__(self):
+        return len(self._providers)
+
     def __getitem__(self, index):
         return self._providers[index]
 
     def __iter__(self):
-        return self._providers
+        return self._providers.__iter__()
 
     @classmethod
     def from_config_files(cls, files=None):
@@ -286,7 +291,7 @@ class Providers(object):
                     o: config.get(section, o) for o in config.options(section)
                 }
                 # side-effect -- items get poped
-                locals().get(type_)[name] = getattr(cls, '_process_' + type_)(name, items)
+                locals().get(type_+"s")[name] = getattr(cls, '_process_' + type_)(name, items)
                 if len(items):
                     raise ValueError("Unprocessed fields left for %s: %s" % (name, str(items)))
             else:
@@ -294,14 +299,14 @@ class Providers(object):
 
         # link credentials into providers
         lgr.debug("Assigning credentials into %d providers" % len(providers))
-        for provider in providers:
+        for provider in providers.values():
             if provider.credential:
                 if provider.credential not in credentials:
                     raise ValueError("Unknown credential %s. Known are: %s"
                                      % (provider.credential, ", ".join(credentials.keys())))
-                providers.credential = credentials[provider.credential]
+                provider.credential = credentials[provider.credential]
 
-        return Providers(providers.items())
+        return Providers(providers.values())
 
 
     @classmethod
@@ -314,18 +319,22 @@ class Providers(object):
         if auth_type not in cls.AUTHENTICATION_TYPES:
             raise ValueError("Unknown authentication_type=%s. Known are: %s"
                              % (auth_type, ', '.join(cls.AUTHENTICATION_TYPES)))
-        authenticator = cls.AUTHENTICATION_TYPES[auth_type](
-            # Extract all the fields as keyword arguments
-            **{k[len(auth_type)+1:]: items.pop(k)
-               for k in items.keys()
-               if k.startswith(auth_type+"_")}
-        )
+
+        if auth_type != 'none':
+            authenticator = cls.AUTHENTICATION_TYPES[auth_type](
+                # Extract all the fields as keyword arguments
+                **{k[len(auth_type)+1:]: items.pop(k)
+                   for k in items.keys()
+                   if k.startswith(auth_type+"_")}
+            )
+        else:
+            authenticator = None
 
         # bringing url_re to "standard" format of a list and populating _providers_ordered
         url_res = assure_list_from_str(items.pop('url_re'))
         assert url_res, "current implementation relies on having url_re defined"
 
-        credential = items.get('credential', None)
+        credential = items.pop('credential', None)
 
         # credential instance will be assigned later after all of them are loaded
         return Provider(name=name, url_res=url_res, authenticator=authenticator,
@@ -338,13 +347,15 @@ class Providers(object):
         return Credential(name=name, type=cred_type, url=items.pop('url', None))
 
 
-    def get_provider(self, url):
+    def get_provider(self, url, only_nondefault=False):
         """Given a URL returns matching provider
         """
         nproviders = len(self._providers)
         for i in range(nproviders):
-            provider = self._providers_ordered[i]
-            for url_re in provider['url_re']:
+            provider = self._providers[i]
+            if not provider.url_res:
+                continue
+            for url_re in provider.url_res:
                 if re.match(url_re, url):
                     if i != 0:
                         # place it first
@@ -353,6 +364,10 @@ class Providers(object):
                         self._providers = [provider] + self._providers
                         assert(len(self._providers) == nproviders)
                     return provider
+
+        if only_nondefault:
+            return None
+
         # None matched -- so we should get a default one per each of used
         # protocols
         scheme = Provider.get_scheme_from_url(url)
@@ -368,7 +383,7 @@ class Providers(object):
     #    raise NotImplementedError
 
     def needs_authentication(self, url):
-        provider = self.get_provider(url)
+        provider = self.get_provider(url, only_nondefault=True)
         if provider is None:
             return None
         return provider.authenticator is not None

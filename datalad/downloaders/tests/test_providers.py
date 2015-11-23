@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
+from ..providers import Provider
 from ..providers import Providers
 from ..providers import assure_list_from_str, assure_dict_from_str
 from ...tests.utils import eq_
@@ -15,26 +16,45 @@ from ...tests.utils import assert_in
 from ...tests.utils import assert_equal
 
 
-def test_ProvidersInformation_OnStockConfiguration():
-    pi = Providers.from_config_files()
-    eq_(sorted([p.name for p in pi.providers]), ['crcns', 'crcns-nersc', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'])
+def test_Providers_OnStockConfiguration():
+    providers = Providers.from_config_files()
+    eq_(sorted([p.name for p in providers]), ['crcns', 'crcns-nersc', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'])
 
     # every provider must have url_res
-    for n, fields in pi.providers.items():
-        assert_in('url_re', fields)
+    for provider in providers:
+        assert(provider.url_res)
 
     # and then that we didn't screw it up -- cycle few times to verify that we do not
     # somehow remove existing providers while dealing with that "heaplike" list
     for i in range(3):
-        provider = pi.get_provider('https://crcns.org/data....')
-        assert_equal(provider['name'], 'crcns')
+        provider = providers.get_provider('https://crcns.org/data....')
+        assert_equal(provider.name, 'crcns')
 
-        provider = pi.get_provider('https://portal.nersc.gov/project/crcns/download/bogus')
-        assert_equal(provider['name'], 'crcns-nersc')
+        provider = providers.get_provider('https://portal.nersc.gov/project/crcns/download/bogus')
+        assert_equal(provider.name, 'crcns-nersc')
 
-    assert_equal(pi.needs_authentication('http://google.com'), None)
-    assert_equal(pi.needs_authentication('http://crcns.org/'), True)
-    assert_equal(pi.needs_authentication('http://openfmri.org/'), False)
+    assert_equal(providers.needs_authentication('http://google.com'), None)
+    assert_equal(providers.needs_authentication('http://crcns.org/'), True)
+    assert_equal(providers.needs_authentication('http://openfmri.org/'), False)
+
+    providers_repr = repr(providers)
+    # should list all the providers atm
+    assert_equal(providers_repr.count('Provider('), len(providers))
+
+
+def test_Providers_default_ones():
+    providers = Providers()  # empty one
+
+    # should return default one
+    http_provider = providers.get_provider("http://example.com")
+    # which must be the same if asked for another one of http
+    http_provider2 = providers.get_provider("http://datalad.org")
+    assert(http_provider is http_provider2)
+
+    # but for another protocol, we would generate a new one
+    crap_provider = providers.get_provider("crap://crap.crap")
+    assert(crap_provider is not http_provider)
+    assert(isinstance(crap_provider, Provider))
 
 
 def test_assure_list_from_str():
