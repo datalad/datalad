@@ -225,4 +225,8 @@ def test_auto_repr():
             self.c = withoutrepr()
             self._c = "protect me"
 
+        def some(self):
+            return "some"
+
     assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4,...>>, c=<withoutrepr>)")
+    assert_equal(buga().some(), "some")
