@@ -221,12 +221,12 @@ def test_auto_repr():
     class buga:
         def __init__(self):
             self.a = 1
-            self.b = list(range(10))
+            self.b = list(range(100))
             self.c = withoutrepr()
             self._c = "protect me"
 
         def some(self):
             return "some"
 
-    assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4,...>>, c=<withoutrepr>)")
+    assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<withoutrepr>)")
     assert_equal(buga().some(), "some")

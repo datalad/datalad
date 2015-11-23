@@ -85,14 +85,19 @@ class Authenticator(object):
     Derived classes should get parameterized with options from the config files
     from "provider:" sections
     """
-
+    requires_authentication = True
     # TODO: figure out interface
     pass
 
 
 class NotImplementedAuthenticator(Authenticator):
     def __init__(self, *args, **kwargs):
-        lgr.warning("Necessary authenticator is not yet implemented") # raise NotImplementedError()
+        lgr.warning("Necessary authenticator is not yet implemented")  # raise NotImplementedError()
+
+class NoneAuthenticator(Authenticator):
+    """Whenever no authentication is necessary and that is stated explicitly"""
+    requires_authentication = False
+    pass
 
 @auto_repr
 class HTMLFormAuthenticator(Authenticator):
@@ -146,6 +151,20 @@ class HTMLFormAuthenticator(Authenticator):
 
         pass
 
+@auto_repr
+class Credential(object):
+    def __init__(self, name, type, url):
+        self.name = name
+        self.type = type
+        self.url = url
+    # TODO: I guess it, or subclasses depending on the type
+    # should implement corresponding handling (get/set) via keyring module
+
+    def enter_new(self):
+        # Use ui., request credential fields corresponding to the type
+        pass
+
+
 from .http import HTTPDownloader
 
 @auto_repr
@@ -184,12 +203,13 @@ class Provider(object):
 
     @staticmethod
     def get_scheme_from_url(url):
+        """Given a URL return scheme to decide which downloader class to use
+        """
         url_split = urlparse(url)
         return url_split.scheme  # , url_split.netloc)
 
     @classmethod
     def _get_downloader_class(cls, url):
-        #if key in self._downloaders:
         key = cls.get_sceme_from_url(url)
         if key in cls.DOWNLOADERS:
             return cls.DOWNLOADERS[key]
@@ -206,17 +226,16 @@ class Provider(object):
         if self._downloader is None:
             # we need to create a new one
             Downloader = self._get_downloader_class(url)
-            # we need to provide it with credentials and authenticator
-            self._downloader = Downloader(credential=self.credential, authenticator=self.authenticator)
+            # we might need to provide it with credentials and authenticator
+            # Let's do via kwargs so we could accomodate cases when downloader does not necessarily
+            # cares about those... duck typing or what it is in action
+            kwargs = {}
+            if self.credential:
+                kwargs['credential'] = self.credential
+            if self.authenticator:
+                kwargs['authenticator'] = self.authenticator
+            self._downloader = Downloader(**kwargs)
         return self._downloader
-
-
-@auto_repr
-class Credential(object):
-    def __init__(self, name, type, url):
-        self.name = name
-        self.type = type
-        self.url = url
 
 
 class Providers(object):
@@ -234,7 +253,7 @@ class Providers(object):
         'html_form': HTMLFormAuthenticator,
         'aws-s3': NotImplementedAuthenticator,  # TODO: check if having '-' is kosher
         'xnat': NotImplementedAuthenticator,
-        'none': None,
+        'none': NoneAuthenticator,
     }
 
     CREDENTIAL_TYPES = {
@@ -377,11 +396,7 @@ class Providers(object):
         lgr.debug("No dedicated provider, returning default one for %s" % scheme)
         return self._default_providers[scheme]
 
-
-    #def __contains__(self, url):
-    #    # go through the known ones, and if found a match -- return True, if not False
-    #    raise NotImplementedError
-
+    # TODO: UNUSED?
     def needs_authentication(self, url):
         provider = self.get_provider(url, only_nondefault=True)
         if provider is None:
