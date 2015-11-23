@@ -39,19 +39,19 @@ def test_ProvidersInformation_OnStockConfiguration():
 
 def test_assure_list_from_str():
     assert_equal(assure_list_from_str(''), None)
-    assert_equal( assure_list_from_str([]), None)
+    assert_equal(assure_list_from_str([]), None)
     assert_equal(assure_list_from_str('somestring'), ['somestring'])
     assert_equal(assure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
-    assert_equal( assure_list_from_str(['something']), ['something'])
-    assert_equal( assure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
+    assert_equal(assure_list_from_str(['something']), ['something'])
+    assert_equal(assure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
 
 
 def test_assure_dict_from_str():
     assert_equal(assure_dict_from_str(''), None)
     assert_equal(assure_dict_from_str({}), None)
     assert_equal(assure_dict_from_str(
-            '__ac_name={user}\n__ac_password={password}\nsubmit=Log in\ncookies_enabled=') == dict(
+            '__ac_name={user}\n__ac_password={password}\nsubmit=Log in\ncookies_enabled='), dict(
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
     assert_equal(assure_dict_from_str(
-        dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')) == dict(
+        dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
