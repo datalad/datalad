@@ -61,7 +61,18 @@ try:
         def returnnothing(*args, **kwargs):
             return()
         _vcrp.CassettePatcherBuilder._requests = returnnothing
-    from vcr import use_cassette
+
+    from vcr import use_cassette as _use_cassette, VCR as _VCR
+
+    def use_cassette(path, return_body=None, **kwargs):
+        """Adapter so we could create/use custom use_cassette with custom parameters
+        """
+        if return_body is not None:
+            my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
+            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
+        else:
+            return _use_cassette(path, **kwargs)  # just a straight one
+
 except ImportError:
     # If there is no vcr.py -- provide a do nothing decorator for use_cassette
     def use_cassette(*args, **kwargs):

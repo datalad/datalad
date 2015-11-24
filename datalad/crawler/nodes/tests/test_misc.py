@@ -28,7 +28,7 @@ from nose import SkipTest
 # TODO: seems vcr fetches entire response not just the header which makes this test url
 #       in particular not appropriate
 @skip_if_no_network
-@use_cassette('fixtures/vcr_cassettes/brain-map.org-1.yaml')
+@use_cassette('fixtures/vcr_cassettes/brain-map.org-1.yaml', return_body='')
 def test_get_disposition_filename():
     input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
     output = list(get_disposition_filename(input))
