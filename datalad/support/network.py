@@ -39,7 +39,7 @@ from joblib import Memory
 memory = Memory(cachedir="/tmp/datalad", verbose=1)
 
 
-def get_response_deposition_filename(response_info):
+def get_response_disposition_filename(response_info):
     if 'Content-Disposition' in response_info:
         # If the response has Content-Disposition, try to get filename from it
         cd = dict(map(
@@ -51,7 +51,7 @@ def get_response_deposition_filename(response_info):
     return None
 
 
-def get_url_deposition_filename(url, headers=None):
+def get_url_disposition_filename(url, headers=None):
     """Get filename as possibly provided by the server in Content-Disposition
     """
     if headers is None:
@@ -65,7 +65,7 @@ def get_url_deposition_filename(url, headers=None):
     else:
         r = None
     try:
-        return get_response_deposition_filename(headers)
+        return get_response_disposition_filename(headers)
     finally:
         if r:
             r.close()
@@ -104,7 +104,7 @@ def get_url_straight_filename(url, strip=[], allowdir=False):
 def get_url_filename(url, headers=None, strip=[]):
     """Get filename from the url, first consulting server about Content-Disposition
     """
-    filename = get_url_deposition_filename(url, headers)
+    filename = get_url_disposition_filename(url, headers)
     if filename:
         return filename
     return get_url_straight_filename(url, strip=[])
@@ -565,7 +565,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 raise RuntimeError("Should not get here")
 
         # TODO: add mode alike to 'relaxed' where we would not
-        # care about content-deposition filename
+        # care about content-disposition filename
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
         request = Request(url)
 
@@ -588,7 +588,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 url_filename = get_url_straight_filename(r.url)
 
             if use_content_name:
-                filename = get_response_deposition_filename(r_info) or url_filename
+                filename = get_response_disposition_filename(r_info) or url_filename
             else:
                 filename = url_filename
 
@@ -767,7 +767,7 @@ class SimpleURLStamper(object):
     def __call__(self, url):
         # Extracted from above madness
         # TODO: add mode alike to 'relaxed' where we would not
-        # care about content-deposition filename
+        # care about content-disposition filename
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
         request = Request(url)
 

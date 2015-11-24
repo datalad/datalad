@@ -12,7 +12,7 @@
 import inspect
 from six import iteritems, string_types
 
-from datalad.support.network import get_url_deposition_filename, get_url_straight_filename
+from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
 from datalad.utils import updated
 from ..pipeline import FinishPipeline
 
@@ -105,10 +105,10 @@ class assign(object):
 def get_url_filename(data):
     yield updated(data, {'filename': get_url_straight_filename(data['url'])})
 
-def get_deposition_filename(data):
-    """For the URL request content filename deposition
+def get_disposition_filename(data):
+    """For the URL request content filename disposition
     """
-    yield updated(data, {'filename': get_url_deposition_filename(data['url'])})
+    yield updated(data, {'filename': get_url_disposition_filename(data['url'])})
 
 class interrupt_if(object):
     """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""

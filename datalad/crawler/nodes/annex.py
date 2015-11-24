@@ -19,7 +19,7 @@ from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo
 from ...support.annexrepo import AnnexRepo
 from ...support.handlerepo import HandleRepo
-from ...support.network import get_url_straight_filename, get_url_deposition_filename
+from ...support.network import get_url_straight_filename, get_url_disposition_filename
 # temporarily until
 # http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
 from ...support.network import _download_file
@@ -204,17 +204,17 @@ class Annexificator(object):
         filename = get_url_straight_filename(url)
         # if still no filename
         if not filename:
-            filename = get_url_deposition_filename(url)
+            filename = get_url_disposition_filename(url)
         if not filename:
             raise ValueError("No filename was figured out for %s. "
                              "Please adjust pipeline to provide one" % url)
         return filename
 
-    def __call__(self, data):  # filename=None, get_deposition_filename=False):
+    def __call__(self, data):  # filename=None, get_disposition_filename=False):
         url = data.get('url')
 
 
-        # figure out the filename. If deposition one was needed, pipeline should
+        # figure out the filename. If disposition one was needed, pipeline should
         # have had it explicitly
         filename = data['filename'] if 'filename' in data else self._get_filename_from_url(url)
 
