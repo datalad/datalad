@@ -173,74 +173,11 @@ def get_tld(url):
     return website
 
 
-def __urlopen(url, header_vals=None):
-    ''' url:  website to get cookie from
-        additional_vals:  a dict of additional key/val pairs to pass
-            into the header along with the username & password
-    '''
-
-    ds_provider = get_tld(url)
-    cookies_db = get_cookie_db()
-
-    cj = cookielib.CookieJar()
-    opener = urllib2.build_opener(      # this handles redirects by default
-                urllib2.HTTPCookieProcessor(cj))
-    # urllib2.install_opener(opener)
-
-    if ds_provider in cookies_db:
-        # TODO if cookie is expired then not sure how to build that exception check in here yet
-        cookie = cookies_db[ds_provider]
-        # cj.set_cookie(cookie)
-        opener.addheaders.append(('Cookie', cookie))
-        resp = opener.open(url)
-    else:
-        if header_vals:   # FIXME need better check to make sure they work
-            data = urllib.urlencode(header_vals)
-            # req = urllib2.Request(url, data)
-            # resp = urllib2.urlopen(url, data)
-            resp = opener.open(url, data)
-        else:
-            # req = urllib2.Request(url)
-            # resp = urllib2.urlopen(url)
-            resp = opener.open(url)
-        # resp = urllib2.urlopen(req)
-
-        # NOTE (see pg. 515)
-        # resp.info also contains the header info
-        # resp.geturl would be the real url (if redirection occured on the passed in url)
-        if cj:
-            cookies_db[ds_provider] = cj
-    return resp
-
-
 def __urlopen_requests(url, header_vals=None):
     # XXX Workaround for now for ... broken code
     if isinstance(url, urllib2.Request):
         url = url.get_full_url()
-    ds_provider = get_tld(url).encode()
-    cookies_db = get_cookie_db()
-    sess = requests.Session()
-
-    if ds_provider in cookies_db:
-        # not sure what happens if cookie is expired (need check to that or exception will prolly get thrown)
-        cookie_dict = cookies_db[ds_provider]
-        cookie_jar = requests.utils.cookiejar_from_dict(cookie_dict)
-        # sess.cookies = cookie_jar
-        resp = sess.get(url, cookies=cookie_jar)
-    else:
-        if header_vals:
-            resp = sess.post(url, data=header_vals)
-        else:
-            resp = sess.get(url)
-
-    if resp.cookies:    # (pg. 515)
-        cookies_dict = requests.utils.dict_from_cookiejar(resp.cookies)
-        if ds_provider in cookies_db:
-            cookies_db[ds_provider].update(cookies_dict)
-        else:
-            cookies_db[ds_provider] = cookies_dict
-
-    return resp
+    return requests.Session().get(url)
 
 
 def __testing():
