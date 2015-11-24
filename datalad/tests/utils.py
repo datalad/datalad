@@ -295,6 +295,12 @@ def ok_archives_caches(repopath, n=1, persistent=None):
     assert_equal(len(dirs), n,
                  msg="Found following dirs when needed %d of them: %s" % (n, dirs))
 
+def ok_file_has_content(path, content):
+    """Verify that file exists and has expected content"""
+    assert(exists(path))
+    with open(path, 'r') as f:
+        assert_equal(f.read(), content)
+
 #
 # Decorators
 #

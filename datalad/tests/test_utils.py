@@ -32,6 +32,7 @@ from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
+from .utils import assure_dict_from_str, assure_list_from_str
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -230,3 +231,23 @@ def test_auto_repr():
 
     assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<withoutrepr>)")
     assert_equal(buga().some(), "some")
+
+
+def test_assure_list_from_str():
+    assert_equal(assure_list_from_str(''), None)
+    assert_equal(assure_list_from_str([]), None)
+    assert_equal(assure_list_from_str('somestring'), ['somestring'])
+    assert_equal(assure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
+    assert_equal(assure_list_from_str(['something']), ['something'])
+    assert_equal(assure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
+
+
+def test_assure_dict_from_str():
+    assert_equal(assure_dict_from_str(''), None)
+    assert_equal(assure_dict_from_str({}), None)
+    assert_equal(assure_dict_from_str(
+            '__ac_name={user}\n__ac_password={password}\nsubmit=Log in\ncookies_enabled='), dict(
+             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+    assert_equal(assure_dict_from_str(
+        dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
+             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))

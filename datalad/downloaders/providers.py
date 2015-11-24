@@ -18,6 +18,10 @@ from os.path import dirname, abspath, join as pathjoin
 from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..ui import ui
 from ..utils import auto_repr
+from ..utils import assure_list_from_str
+
+from .base import NoneAuthenticator, NotImplementedAuthenticator
+from .http import HTMLFormAuthenticator
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')
@@ -35,134 +39,57 @@ def resolve_url_to_name(d, url):
     return None
 
 
-def assure_list_from_str(s):
-    """Given a multiline string convert it to a list of return None if empty
 
-    Parameters
-    ----------
-    s: str or list
-    """
-
-    if not s:
-        return None
-
-    if isinstance(s, list):
-        return s
-    return s.split('\n')
-
-
-def assure_dict_from_str(s):
-    """Given a multiline string with key=value items convert it to a dictionary
-
-    Parameters
-    ----------
-    s: str or dict
-
-    Returns None if input s is empty
-    """
-
-    if not s:
-        return None
-
-    if isinstance(s, dict):
-        return s
-
-    out = {}
-    for value_str in assure_list_from_str(s):
-        if '=' not in value_str:
-            raise ValueError("{} is not in key=value format".format(repr(value_str)))
-        k, v = value_str.split('=', 1)
-        if k in out:
-            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
-            raise ValueError(err)
-        out[k] = v
-    return out
-
-
-class Authenticator(object):
-    """Abstract common class for different types of authentication
-
-    Derived classes should get parameterized with options from the config files
-    from "provider:" sections
-    """
-    requires_authentication = True
-    # TODO: figure out interface
-    pass
-
-
-class NotImplementedAuthenticator(Authenticator):
-    def __init__(self, *args, **kwargs):
-        lgr.warning("Necessary authenticator is not yet implemented")  # raise NotImplementedError()
-
-class NoneAuthenticator(Authenticator):
-    """Whenever no authentication is necessary and that is stated explicitly"""
-    requires_authentication = False
-    pass
-
-@auto_repr
-class HTMLFormAuthenticator(Authenticator):
-    def __init__(self, fields, url=None, tagid=None, failure_re=None, success_re=None, **kwargs):
-        """
-
-        Example specification in the .ini config file
-        [provider:crcns]
-        ...
-        credential = crcns ; is not given to authenticator as is
-        authentication_type = html_form
-        html_form_url = https://crcns.org/login_form
-        html_form_tagid = login_form
-        html_form_fields = __ac_name={user}
-                   __ac_password={password}
-                   submit=Log in
-                   form.submitted=1
-                   js_enabled=0
-                   cookies_enabled=
-        html_form_failure_re = (Login failed|Please log in)
-        html_form_success_re = You are now logged in
-
-        Parameters
-        ----------
-        fields : str or dict
-          String or a dictionary, which will be used (along with credential) information
-          to feed into the form
-        url : str, optional
-          URL where to find the form to authenticate.  If not provided, an original query url
-          which will be provided to the __call__ of the authenticator will be used, so on that
-          request it must provide the HTML form. If not -- error will be raised
-        tagid : str, optional
-          id of the HTML <form> in the document to use. If None, and page contains a single form,
-          that one will be used.  If multiple forms -- error will be raise
-        failure_re : str or list of str, optional
-        success_re : str or list of str, optional
-          Regular expressions to determine either login has failed or succeeded.
-          TODO: we might condition when it gets ran
-        """
-
-        super(HTMLFormAuthenticator, self).__init__(**kwargs)
-        self.fields = assure_dict_from_str(fields)
-        self.url = url
-        self.tagid = tagid
-        self.failure_re = assure_list_from_str(failure_re)
-        self.success_re = assure_list_from_str(success_re)
-
-    def authenticate(self, url, credential):
-        # we should use specified URL for this authentication first
-        form_url = self.url if self.url else url
-
-        pass
+import keyring
 
 @auto_repr
 class Credential(object):
+    TYPES = {
+        'user_password': ('user', 'password'),
+        'aws-s3': ('key_id', 'secret_id')
+    }
+
     def __init__(self, name, type, url):
         self.name = name
+        if not type in self.TYPES:
+            raise ValueError("I do not know type %s credential. Known: %s"
+                             % (type, self.TYPES.keys()))
         self.type = type
         self.url = url
-    # TODO: I guess it, or subclasses depending on the type
-    # should implement corresponding handling (get/set) via keyring module
 
+    # TODO: I guess it, or subclasses depending on the type
     def enter_new(self):
         # Use ui., request credential fields corresponding to the type
+        # TODO: this is duplication with __call__
+        for f in self.TYPES[self.type]:
+            v = ui.question("Please enter the %s field" % f,
+                            title="Authentication necessary for %s" % self.name,
+                            hidden=True)
+            keyring.set_password(self.uid, f, v)
         pass
+
+    @property
+    def uid(self):
+        return "datalad-%s" % (self.name)
+
+    # should implement corresponding handling (get/set) via keyring module
+    def __call__(self):
+        # TODO: redo not stupid way
+        uid = self.uid
+        credentials = {}
+        for f in self.TYPES[self.type]:
+            v = keyring.get_password(uid, f)
+            while v is None:  # was not known
+                v = ui.question("Please enter the %s field" % f,
+                                title="Authentication necessary for %s" % self.name,
+                                hidden=True)
+            keyring.set_password(uid, f, v)
+            credentials[f] = v
+
+        #values = [keyring.get_password(uid, f) for f in fields]
+        #if not all(values):
+        # TODO: Fancy form
+        return credentials
 
 
 from .http import HTTPDownloader
@@ -210,7 +137,7 @@ class Provider(object):
 
     @classmethod
     def _get_downloader_class(cls, url):
-        key = cls.get_sceme_from_url(url)
+        key = cls.get_scheme_from_url(url)
         if key in cls.DOWNLOADERS:
             return cls.DOWNLOADERS[key]
         else:

@@ -200,6 +200,50 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s" % f)
 
 
+def assure_list_from_str(s):
+    """Given a multiline string convert it to a list of return None if empty
+
+    Parameters
+    ----------
+    s: str or list
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, list):
+        return s
+    return s.split('\n')
+
+
+def assure_dict_from_str(s):
+    """Given a multiline string with key=value items convert it to a dictionary
+
+    Parameters
+    ----------
+    s: str or dict
+
+    Returns None if input s is empty
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, dict):
+        return s
+
+    out = {}
+    for value_str in assure_list_from_str(s):
+        if '=' not in value_str:
+            raise ValueError("{} is not in key=value format".format(repr(value_str)))
+        k, v = value_str.split('=', 1)
+        if k in out:
+            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            raise ValueError(err)
+        out[k] = v
+    return out
+
+
 #
 # Decorators
 #

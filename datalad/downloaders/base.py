@@ -30,3 +30,27 @@ class DownloadError(Exception):
 class AccessDeniedError(DownloadError):
     pass
 
+#
+# Authenticators    XXX might go into authenticators.py
+#
+
+class Authenticator(object):
+    """Abstract common class for different types of authentication
+
+    Derived classes should get parameterized with options from the config files
+    from "provider:" sections
+    """
+    requires_authentication = True
+    # TODO: figure out interface
+    pass
+
+
+class NotImplementedAuthenticator(Authenticator):
+    def __init__(self, *args, **kwargs):
+        lgr.warning("Necessary authenticator is not yet implemented")  # raise NotImplementedError()
+
+class NoneAuthenticator(Authenticator):
+    """Whenever no authentication is necessary and that is stated explicitly"""
+    requires_authentication = False
+    pass
+

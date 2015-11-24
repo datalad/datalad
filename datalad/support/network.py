@@ -51,18 +51,24 @@ def get_response_deposition_filename(response_info):
     return None
 
 
-def get_url_deposition_filename(url):
-    request = Request(url)
-    r = retry_urlopen(request)
-    # things are different in requests
-    if 'requests.' in str(r.__class__):
-        headers = r.headers
+def get_url_deposition_filename(url, headers=None):
+    """Get filename as possibly provided by the server in Content-Disposition
+    """
+    if headers is None:
+        request = Request(url)
+        r = retry_urlopen(request)
+        # things are different in requests
+        if 'requests.' in str(r.__class__):
+            headers = r.headers
+        else:
+            headers = r.info()
     else:
-        headers = r.info()
+        r = None
     try:
         return get_response_deposition_filename(headers)
     finally:
-        r.close()
+        if r:
+            r.close()
 
 
 def get_url_straight_filename(url, strip=[], allowdir=False):
@@ -95,6 +101,13 @@ def get_url_straight_filename(url, strip=[], allowdir=False):
     else:
         return None
 
+def get_url_filename(url, headers=None, strip=[]):
+    """Get filename from the url, first consulting server about Content-Disposition
+    """
+    filename = get_url_deposition_filename(url, headers)
+    if filename:
+        return filename
+    return get_url_straight_filename(url, strip=[])
 
 def get_url_response_stamp(url, response_info):
     size, mtime = None, None
@@ -107,13 +120,48 @@ def get_url_response_stamp(url, response_info):
 
 
 # FIXME should make into a decorator so that it closes the cookie_db upon exiting whatever func uses it
-def get_cookie_db():
-    cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad') # FIXME prolly shouldn't hardcode 'datalad'
-    if not os.path.exists(cookies_dir):
-        os.makedirs(cookies_dir)
-    cookies_db = shelve.open(os.path.join(cookies_dir, 'cookies.db'), writeback=True)
-    return cookies_db
+class CookiesDB(object):
+    """Some little helper to deal with cookies
 
+    Lazy loading from the shelved dictionary
+
+    TODO: this is not multiprocess or multithread safe implementation due to shelve auto saving etc
+    """
+    def __init__(self, filename=None):
+        self._filename = filename
+        self._cookies_db = None
+
+    def _load(self):
+        if self._filename:
+            filename = self._filename
+            cookies_dir = os.path.dirname(filename)
+        else:
+            cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad')  # FIXME prolly shouldn't hardcode 'datalad'
+            filename = os.path.join(cookies_dir, 'cookies.db')
+
+        # TODO: guarantee restricted permissions
+
+        if not os.path.exists(cookies_dir):
+            os.makedirs(cookies_dir)
+
+        self._cookies_db = shelve.open(filename, writeback=True)
+
+    def _get_provider(self, url):
+        if self._cookies_db is None:
+            self._load()
+        return get_tld(url)
+
+    def __getitem__(self, url):
+        return self._cookies_db[self._get_provider(url)]
+
+    def __setitem__(self, url, value):
+        self._cookies_db[self._get_provider(url)] = value
+
+    def __contains__(self, url):
+        return self._get_provider(url) in self._cookies_db
+
+# TODO -- convert into singleton pattern for CookiesDB
+cookies_db = CookiesDB()
 
 def get_tld(url):
     # maybe use this instead to be safe:  https://pypi.python.org/pypi/tld

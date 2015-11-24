@@ -22,7 +22,7 @@ class DialogUI(object):
     def __init__(self, out=sys.stdout):
         self.out = sys.stdout
 
-    def question(self, text, title=None, choices=None):
+    def question(self, text, title=None, choices=None, hidden=False):
         if title:
             self.out.write(title + "\n")
         if choices is not None:
@@ -33,7 +33,7 @@ class DialogUI(object):
         while not done:
             self.out.write(msg + ": ")
 
-            response = raw_input()
+            response = raw_input() if not hidden else getpass('')
             if choices:
                 if response not in choices:
                     self.error("%s is not among choices: %s. Repeat your answer"
@@ -55,9 +55,6 @@ class DialogUI(object):
 
     def message(self, msg):
         self.out.write(msg)
-
-    def getpass(self):
-        return getpass()
 
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
