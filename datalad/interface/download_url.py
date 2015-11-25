@@ -20,6 +20,7 @@ from os.path import isdir, curdir
 
 from .base import Interface
 from ..ui import ui
+from ..utils import assure_list_from_str
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 from ..downloaders import Providers
@@ -47,26 +48,38 @@ class DownloadURL(Interface):
             metavar='url',
             nargs='+'),
         overwrite=Parameter(
-            args=("--overwrite",),
+            args=("--overwrite", "-o"),
             action="store_true",
             doc="""Flag to overwrite it if target file exists"""),
-        output=Parameter(
-            args=("--output", '-o'),
+        stop_on_failure=Parameter(
+            args=("--stop-on-failure", "-x"),
+            action="store_true",
+            doc="""Flag to stop subsequent downloads upon first failure to download"""),
+        path=Parameter(
+            args=("--path", '-O'),
             doc="Path (filename or directory path) where to store downloaded file(s). "
                 "In case of multiple URLs provided, must point to a directory.  Otherwise current "
                 "directory is used",
             constraints=EnsureStr() | EnsureNone())
     )
 
-    def __call__(self, urls, output, overwrite):
+    def __call__(self, urls, path=None, overwrite=False, stop_on_failure=False):
+        """
+        Returns
+        -------
+        list of str
+          downloaded succesfully files
+        """
+        urls = assure_list_from_str(urls)
+
         if len(urls):
-            if output:
-                if not(isdir(output)):
+            if path:
+                if not(isdir(path)):
                     raise ValueError(
-                        "When specifying multiple urls, --output should point to "
-                        "an existing directory. Got %r" % output)
-        if not output:
-            output = curdir
+                        "When specifying multiple urls, --path should point to "
+                        "an existing directory. Got %r" % path)
+        if not path:
+            path = curdir
 
         # TODO setup fancy ui.progressbars doing this in parallel and reporting overall progress
         # in % of urls which were already downloaded
@@ -74,18 +87,20 @@ class DownloadURL(Interface):
         downloaded_paths, failed_urls = [], []
         for url in urls:
             # somewhat "ugly"
-            # providers.get_provider(url).get_downloader(url).download(url, path=output)
+            # providers.get_provider(url).get_downloader(url).download(url, path=path)
             # for now -- via sugaring
             # TODO: should be done within progress bar inside
             ui.message(url + " -> ", cr=False)
             try:
-                downloaded_path = providers.download(url, path=output, overwrite=overwrite)
+                downloaded_path = providers.download(url, path=path, overwrite=overwrite)
                 downloaded_paths.append(downloaded_path)
                 ui.message(downloaded_path)
             except Exception as e:
                 failed_urls.append(url)
                 ui.error(e)
+                if stop_on_failure:
+                    break
         if failed_urls:
-            raise RuntimeError("%d urls failed to download" % len(failed_urls))
+            raise RuntimeError("%d url(s) failed to download" % len(failed_urls))
         return downloaded_paths
 
