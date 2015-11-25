@@ -20,7 +20,7 @@ from ..utils import assure_list_from_str, assure_dict_from_str
 from ..ui import ui
 from ..utils import auto_repr
 from ..support.network import get_url_filename
-from ..support.network import cookies_db
+from ..support.cookies import cookies_db
 
 from .base import Authenticator
 from .base import BaseDownloader

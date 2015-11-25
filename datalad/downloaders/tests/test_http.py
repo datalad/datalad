@@ -16,6 +16,7 @@ from ..providers import Providers  # to test against crcns
 
 from mock import patch, mock_open
 from ...tests.utils import assert_in
+from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
 from ...tests.utils import assert_raises
 from ...tests.utils import ok_file_has_content
@@ -55,7 +56,8 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # By default should not overwrite the file
     assert_raises(DownloadError, download, furl, tfpath)
     # but be able to redownload whenever overwrite==True
-    download(furl, tfpath, overwrite=True)
+    downloaded_path = download(furl, tfpath, overwrite=True)
+    assert_equal(downloaded_path, tfpath)
     ok_file_has_content(tfpath, 'abc')
 
     # Some errors handling

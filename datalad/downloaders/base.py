@@ -42,12 +42,13 @@ class Authenticator(object):
     """
     requires_authentication = True
     # TODO: figure out interface
-    pass
 
+    def authenticate(self, *args, **kwargs):
+        if self.requires_authentication:
+            raise NotImplementedError("Authentication for %s not yet implemented" % self.__class__)
 
 class NotImplementedAuthenticator(Authenticator):
-    def __init__(self, *args, **kwargs):
-        lgr.warning("Necessary authenticator is not yet implemented")  # raise NotImplementedError()
+    pass
 
 class NoneAuthenticator(Authenticator):
     """Whenever no authentication is necessary and that is stated explicitly"""

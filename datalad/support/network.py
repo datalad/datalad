@@ -14,20 +14,17 @@ import os
 import re
 import shutil
 import time
-import shelve
 
 from six import string_types
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse
 from six.moves.urllib.error import URLError
-from six.moves import StringIO
 
 # TODO not sure what needs to use `six` here yet
 import requests
 
 from bs4 import BeautifulSoup
-import appdirs
 
 import logging
 lgr = logging.getLogger('datalad.network')
@@ -115,50 +112,6 @@ def get_url_response_stamp(url, response_info):
             response_info['Last-modified']))
     return dict(size=size, mtime=mtime, url=url)
 
-
-# FIXME should make into a decorator so that it closes the cookie_db upon exiting whatever func uses it
-class CookiesDB(object):
-    """Some little helper to deal with cookies
-
-    Lazy loading from the shelved dictionary
-
-    TODO: this is not multiprocess or multi-thread safe implementation due to shelve auto saving etc
-    """
-    def __init__(self, filename=None):
-        self._filename = filename
-        self._cookies_db = None
-
-    def _load(self):
-        if self._filename:
-            filename = self._filename
-            cookies_dir = os.path.dirname(filename)
-        else:
-            cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad')  # FIXME prolly shouldn't hardcode 'datalad'
-            filename = os.path.join(cookies_dir, 'cookies.db')
-
-        # TODO: guarantee restricted permissions
-
-        if not os.path.exists(cookies_dir):
-            os.makedirs(cookies_dir)
-
-        self._cookies_db = shelve.open(filename, writeback=True)
-
-    def _get_provider(self, url):
-        if self._cookies_db is None:
-            self._load()
-        return get_tld(url)
-
-    def __getitem__(self, url):
-        return self._cookies_db[self._get_provider(url)]
-
-    def __setitem__(self, url, value):
-        self._cookies_db[self._get_provider(url)] = value
-
-    def __contains__(self, url):
-        return self._get_provider(url) in self._cookies_db
-
-# TODO -- convert into singleton pattern for CookiesDB
-cookies_db = CookiesDB()
 
 def get_tld(url):
     # maybe use this instead to be safe:  https://pypi.python.org/pypi/tld
@@ -598,6 +551,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 #         src = r
                 #     shutil.copyfileobj(src, f)
                 # XXX temporary workaround with 'requests' in mind to get bloody url
+
                 _download_file(r.url, temp_full_filename)
                 downloaded = True
                 downloaded_size = os.stat(temp_full_filename).st_size

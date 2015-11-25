@@ -107,8 +107,10 @@ class DialogUI(object):
         else:
             raise RuntimeError("must not happen but did")
 
-    def message(self, msg):
+    def message(self, msg, cr=True):
         self.out.write(msg)
+        if cr:
+            self.out.write('\n')
 
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)

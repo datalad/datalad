@@ -309,6 +309,7 @@ class Providers(object):
                         del self._providers[i]
                         self._providers = [provider] + self._providers
                         assert(len(self._providers) == nproviders)
+                    lgr.debug("Returning provider %s for url %s", provider, url)
                     return provider
 
         if only_nondefault:
@@ -323,41 +324,44 @@ class Providers(object):
         lgr.debug("No dedicated provider, returning default one for %s" % scheme)
         return self._default_providers[scheme]
 
-    # TODO: UNUSED?
-    def needs_authentication(self, url):
-        provider = self.get_provider(url, only_nondefault=True)
-        if provider is None:
-            return None
-        return provider.authenticator is not None
+    # Sugarings to get easier access to downloaders
+    def download(self, url, *args, **kwargs):
+        return self.get_provider(url).get_downloader(url).download(url, *args, **kwargs)
 
-    def get_credentials(self, url, new=False):
-        """Ask user to enter credentials for a provider matching url
-        """
-        # find a match among _items
-        provider = self.get_provider(url)
-        if new or not provider:
-            rec = self._get_new_record_ui(url)
-            rec['url_re'] = "TODO"  # present to user and ask to edit
-            name = urlparse(url).netloc
-            self._items[name] = rec
-            if ui.yesno("Do you want to store credentials for %s" % name):
-                self.store_credentials()
-        else:
-            return self._items[name]
-
-    def store_credentials(self, name):
-        # TODO: store  self._items[name]  in appropriate (user) creds
-        # for later reuse
-        raise NotImplementedError()
-
-    def _get_new_record_ui(self, url):
-        # TODO: should be a dialog with the fields appropriate for this particular
-        # type of credentials
-        ui.message("To access %s we would need credentials." % url)
-        if url in self.providers:
-            ui.message("If you don't yet have credentials, please visit %s"
-                       % self.providers.get(url, 'credentials_url'))
-        return { 'user': ui.question("Username:"),
-                 'password': ui.password() }
-
+    # # TODO: UNUSED?
+    # def needs_authentication(self, url):
+    #     provider = self.get_provider(url, only_nondefault=True)
+    #     if provider is None:
+    #         return None
+    #     return provider.authenticator is not None
+    #
+    # def get_credentials(self, url, new=False):
+    #     """Ask user to enter credentials for a provider matching url
+    #     """
+    #     # find a match among _items
+    #     provider = self.get_provider(url)
+    #     if new or not provider:
+    #         rec = self._get_new_record_ui(url)
+    #         rec['url_re'] = "TODO"  # present to user and ask to edit
+    #         name = urlparse(url).netloc
+    #         self._items[name] = rec
+    #         if ui.yesno("Do you want to store credentials for %s" % name):
+    #             self.store_credentials()
+    #     else:
+    #         return self._items[name]
+    #
+    # def store_credentials(self, name):
+    #     # TODO: store  self._items[name]  in appropriate (user) creds
+    #     # for later reuse
+    #     raise NotImplementedError()
+    #
+    # def _get_new_record_ui(self, url):
+    #     # TODO: should be a dialog with the fields appropriate for this particular
+    #     # type of credentials
+    #     ui.message("To access %s we would need credentials." % url)
+    #     if url in self.providers:
+    #         ui.message("If you don't yet have credentials, please visit %s"
+    #                    % self.providers.get(url, 'credentials_url'))
+    #     return { 'user': ui.question("Username:"),
+    #              'password': ui.password() }
 
