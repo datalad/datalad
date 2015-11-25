@@ -15,6 +15,8 @@ __docformat__ = 'restructuredtext'
 import sys
 from getpass import getpass
 
+from ..utils import auto_repr
+
 # Example APIs which might be useful to look for "inspiration"
 #  man debconf-devel
 #  man zenity
@@ -43,35 +45,57 @@ for i in xrange(10):
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
 
-
+@auto_repr
 class DialogUI(object):
-    def __init__(self, out=sys.stdout):
-        self.out = sys.stdout
 
-    def question(self, text, title=None, choices=None, hidden=False):
+    def __init__(self, out=sys.stdout):
+        self.out = out
+
+    def question(self, text,
+                 title=None, choices=None,
+                 default=None,
+                 hidden=False):
+        # Do initial checks first
+        if default and default not in choices:
+            raise ValueError("default value %r is not among choices: %s"
+                             % (default, choices))
         if title:
             self.out.write(title + "\n")
+
+        def mark_default(x):
+            return "[%s]" % x \
+                if default is not None and x == default \
+                else x
+
         if choices is not None:
-            msg = "%s (choices: %s)" % (text, ' '.join(choices))
+            msg = "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
         else:
             msg = text
-        done = False
-        while not done:
+
+        attempt = 0
+        while True:
+            attempt += 1
+            if attempt >= 100:
+                raise RuntimeError("This is 100th attempt. Something really went wrong")
+
             self.out.write(msg + ": ")
+            self.out.flush()
 
             # TODO: raw_input works only if stdin was not controlled by
             # (e.g. if coming from annex).  So we might need to do the
             # same trick as get_pass() does while directly dealing with /dev/pty
             # and provide per-OS handling with stdin being override
             response = raw_input() if not hidden else getpass('')
-            if choices:
-                if response not in choices:
-                    self.error("%s is not among choices: %s. Repeat your answer"
-                               % (response, choices))
-                else:
-                    done = True
-            else:
-                done = True
+
+            if not response and default:
+                response = default
+                break
+
+            if choices and response not in choices:
+                self.error("%r is not among choices: %s. Repeat your answer"
+                           % (response, choices))
+                continue
+            break
         return response
 
     def yesno(self, *args, **kwargs):
@@ -88,9 +112,3 @@ class DialogUI(object):
 
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
-
-
-if __name__ == '__main__':
-    ui = DialogUI()
-    ui.yesno("Found no credentials for CRCNS.org.  Do you have any?",
-             title="Danger zone")
