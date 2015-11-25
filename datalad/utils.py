@@ -45,14 +45,15 @@ except:  # pragma: no cover
 
 def shortened_repr(value, l=30):
     try:
-        if hasattr(value, '__repr__'):
+        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
             value_repr = repr(value)
             if not value_repr.startswith('<') and len(value_repr) > l:
                 value_repr = "<<%s...>>" % (value_repr[:l-8])
+            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
+                raise ValueError("I hate those useless long reprs")
         else:
             raise ValueError("gimme class")
     except Exception as e:
-        #import pdb; pdb.set_trace()
         value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
     return value_repr
 

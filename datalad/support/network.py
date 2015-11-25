@@ -24,9 +24,6 @@ from six.moves.urllib.error import URLError
 from six.moves import StringIO
 
 # TODO not sure what needs to use `six` here yet
-import urllib
-import urllib2
-import cookielib
 import requests
 
 from bs4 import BeautifulSoup
@@ -125,7 +122,7 @@ class CookiesDB(object):
 
     Lazy loading from the shelved dictionary
 
-    TODO: this is not multiprocess or multithread safe implementation due to shelve auto saving etc
+    TODO: this is not multiprocess or multi-thread safe implementation due to shelve auto saving etc
     """
     def __init__(self, filename=None):
         self._filename = filename
@@ -175,49 +172,12 @@ def get_tld(url):
 
 def __urlopen_requests(url, header_vals=None):
     # XXX Workaround for now for ... broken code
-    if isinstance(url, urllib2.Request):
+    if isinstance(url, Request):
         url = url.get_full_url()
     return requests.Session().get(url)
 
 
-def __testing():
-    # url = 'https://portal.nersc.gov/project/crcns/download/index.php'
-    url = 'https://portal.nersc.gov/project/crcns/download/pvc-1'
-    # header_vals = dict(username='XXXX', password='XXXX', submit='Login')
-    header_vals = dict(username='jgors', password='mju7vfr4', submit='Login')
-
-    # using the stdlib
-    # resp = __urlopen(url, header_vals)
-    # print resp.read()
-
-    # using requests
-    resp = __urlopen_requests(url, header_vals)
-    # resp = __urlopen(url)
-    print resp.content
-
-    resp2 = __urlopen_requests(url)     # should work now b/c we have the cookie
-    print resp2.content
-
-
-def __download_file(url, filename):
-    # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
-    request = Request(url)
-    #request.add_header('Accept-encoding', 'gzip,deflate')
-    r = urlopen(request)
-    try:
-        with open(filename, 'wb') as f:
-            if False: # r.info().get('Content-Encoding') == 'gzip':
-                buf = StringIO(r.read())
-                src = gzip.GzipFile(fileobj=buf)
-            else:
-                src = r
-            shutil.copyfileobj(src, f)
-    finally:
-        r.close()
-    return filename
-
 from ..cmd import get_runner
-
 def _download_file(url, filename):
     """TEMP: use wget to download url into a file"""
 

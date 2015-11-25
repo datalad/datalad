@@ -47,7 +47,7 @@ def test_download_url(toppath, topurl):
     dout = opj(toppath, 'down')
     # TODO move tempfile/tempdir setup/cleanup into fixture(s)
     os.mkdir(dout)
-    with open(fname, 'w') as fd:
+    with open(fname, 'wb') as fd:
         fd.write("How do I know what to say?\n".encode())
     furl = "%s/%s" % (topurl, f)
 

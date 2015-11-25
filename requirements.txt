@@ -13,3 +13,4 @@ https://github.com/scrapy/scrapy/archive/master.zip
 vcrpy
 keyring
 boto
+requests

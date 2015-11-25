@@ -31,7 +31,6 @@ def fake_open(write_=None):
         """file which does nothing"""
         if write_:
             def write(self, *args, **kwargs):
-                print "I aM HERE"
                 write_(*args, **kwargs)
         def close(self):
             pass
