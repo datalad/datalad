@@ -17,7 +17,33 @@ from getpass import getpass
 
 # Example APIs which might be useful to look for "inspiration"
 #  man debconf-devel
+#  man zenity
 #
+# "Fancy" output of progress etc in the terminal:
+# - docker has multiple simultaneous progressbars.  Apparently "navigation"
+#   is obtained with escape characters in the terminal.
+#   see docker/pkg/jsonmessage/jsonmessage.go or following snippet
+"""
+from time import sleep
+import sys
+
+out = sys.stderr
+for i in xrange(10):
+  diff = 2
+  if i:
+      out.write("%c[%dA" % (27, diff))
+  out.write("%d\n%d\n" % (i, i ** 2))
+  sleep(0.5)
+"""
+# They also use JSON representation for the message which might provide a nice abstraction
+# Other useful codes
+#         // <ESC>[2K = erase entire current line
+#        fmt.Fprintf(out, "%c[2K\r", 27)
+# and code in docker: pkg/progressreader/progressreader.go pkg/streamformatter/streamformatter.go
+#
+# reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
+
+
 class DialogUI(object):
     def __init__(self, out=sys.stdout):
         self.out = sys.stdout
@@ -33,6 +59,10 @@ class DialogUI(object):
         while not done:
             self.out.write(msg + ": ")
 
+            # TODO: raw_input works only if stdin was not controlled by
+            # (e.g. if coming from annex).  So we might need to do the
+            # same trick as get_pass() does while directly dealing with /dev/pty
+            # and provide per-OS handling with stdin being override
             response = raw_input() if not hidden else getpass('')
             if choices:
                 if response not in choices:
