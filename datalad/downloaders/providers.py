@@ -328,13 +328,14 @@ class Providers(object):
     def download(self, url, *args, **kwargs):
         return self.get_provider(url).get_downloader(url).download(url, *args, **kwargs)
 
+    def needs_authentication(self, url):
+        provider = self.get_provider(url, only_nondefault=True)
+        if provider is None:
+            return None
+        return provider.authenticator is not None
+
+
     # # TODO: UNUSED?
-    # def needs_authentication(self, url):
-    #     provider = self.get_provider(url, only_nondefault=True)
-    #     if provider is None:
-    #         return None
-    #     return provider.authenticator is not None
-    #
     # def get_credentials(self, url, new=False):
     #     """Ask user to enter credentials for a provider matching url
     #     """
