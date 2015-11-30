@@ -252,7 +252,7 @@ class Providers(object):
                                      % (provider.credential, ", ".join(credentials.keys())))
                 provider.credential = credentials[provider.credential]
 
-        return Providers(providers.values())
+        return Providers(list(providers.values()))
 
 
     @classmethod
@@ -270,7 +270,7 @@ class Providers(object):
             authenticator = cls.AUTHENTICATION_TYPES[auth_type](
                 # Extract all the fields as keyword arguments
                 **{k[len(auth_type)+1:]: items.pop(k)
-                   for k in items.keys()
+                   for k in list(items.keys())
                    if k.startswith(auth_type+"_")}
             )
         else:
