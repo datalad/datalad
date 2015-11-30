@@ -399,6 +399,7 @@ class HTTPDownloader(BaseDownloader):
         # TODO: may be move all the path dealing logic here
         # but then it might require sending request anyways for Content-Disposition
         # so probably nah
+        lgr.info("Downloading %r into %r", url, path)
         return self._access(self._download, url, path=path, **kwargs)
 
 

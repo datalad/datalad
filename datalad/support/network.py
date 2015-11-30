@@ -130,19 +130,6 @@ def __urlopen_requests(url, header_vals=None):
     return requests.Session().get(url)
 
 
-from ..cmd import get_runner
-def _download_file(url, filename):
-    """TEMP: use wget to download url into a file"""
-
-    # comment -- it sucks with reporting -- too much or too little.
-    # our magical wrapping experiences problems here
-    get_runner().run(["wget", "-O", filename, url],
-                     log_online=True,  # so we see what is going on
-                     #log_stderr=True, # doesn't work as necessary
-                     expect_stderr=True,
-                     log_stdout=False  # wget produces no stdout and then our beast would halt waiting for it
-                     )
-    return filename
 
 def retry_urlopen(url, retries=3):
     for t in range(retries):
@@ -368,12 +355,19 @@ def filter_urls(urls,
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
 
 
+# TEMP: abomination to support use of providers in code using _download_file
+_old_fashion_download_providers = None
 # TODO: RF move db_incoming and modes logic outside?
 def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run=False,
                  add_mode='download',
                  use_content_name=False,
                  use_redirected_name=True,
                  force_download=False):
+    global _old_fashion_download_providers
+    from ..downloaders.providers import Providers
+    if _old_fashion_download_providers is None:
+        _old_fashion_download_providers = Providers() # so only default handlers
+
     downloaded, updated, downloaded_size = False, False, 0
     # so we could check and remove it to keep it clean
     temp_full_filename = None
@@ -552,7 +546,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 #     shutil.copyfileobj(src, f)
                 # XXX temporary workaround with 'requests' in mind to get bloody url
 
-                _download_file(r.url, temp_full_filename)
+                _ = _old_fashion_download_providers.download(r.url, path=temp_full_filename, allow_old_session=False)
                 downloaded = True
                 downloaded_size = os.stat(temp_full_filename).st_size
 
