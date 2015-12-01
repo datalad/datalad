@@ -10,13 +10,19 @@
 
 __docformat__ = 'restructuredtext'
 
+from six import PY2
 from six.moves import StringIO
+import six.moves.builtins as __builtin__
 
 from mock import patch
 from ...tests.utils import eq_
 from ...tests.utils import assert_raises
 from ...tests.utils import assert_re_in
 from ..dialog import DialogUI
+
+def patch_input(**kwargs):
+    """A helper to provide mocked cm patching input function which was renamed in PY3"""
+    return patch.object(__builtin__, 'raw_input' if PY2 else 'input', **kwargs)
 
 def test_question_choices():
 
@@ -33,7 +39,7 @@ def test_question_choices():
         for entered_value, expected_value in [(default_value, default_value),
                                               ('', default_value),
                                               ('cc', 'cc')]:
-            with patch('__builtin__.raw_input', return_value=entered_value):
+            with patch_input(return_value=entered_value):
                 out = StringIO()
                 response = DialogUI(out=out).question("prompt", choices=sorted(choices), default=default_value)
                 eq_(response, expected_value)
@@ -45,6 +51,6 @@ def test_question_choices():
     assert_raises(ValueError, ui.question, "prompt", choices=['a'], default='b')
     eq_(out.getvalue(), '')
 
-    with patch('__builtin__.raw_input', return_value='incorrect'):
+    with patch_input(return_value='incorrect'):
         assert_raises(RuntimeError, ui.question, "prompt", choices=['a', 'b'])
     assert_re_in(".*prompt.*ERROR: .incorrect. is not among choices.*", out.getvalue())

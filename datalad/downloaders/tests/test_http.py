@@ -9,12 +9,14 @@
 """Tests for http downloader"""
 
 from os.path import join as opj
+import six.moves.builtins as __builtin__
 
 from ..http import HTTPDownloader
 from ..http import DownloadError
 from ..providers import Providers  # to test against crcns
 
-from mock import patch, mock_open
+# BTW -- mock_open is not in mock on wheezy (Debian 7.x)
+from mock import patch
 from ...tests.utils import assert_in
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
@@ -65,7 +67,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # XXX obscure mocking since impossible to mock write alone
     # and it still results in some warning being spit out
     with swallow_logs(), \
-         patch('__builtin__.open', fake_open(write_=_raise_IOError)):
+         patch.object(__builtin__, 'open', fake_open(write_=_raise_IOError)):
         assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
 
     # TODO: access denied scenario

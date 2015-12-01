@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import sys
+from six import PY2
 from getpass import getpass
 
 from ..utils import auto_repr
@@ -98,7 +99,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
             # (e.g. if coming from annex).  So we might need to do the
             # same trick as get_pass() does while directly dealing with /dev/pty
             # and provide per-OS handling with stdin being override
-            response = raw_input() if not hidden else getpass('')
+            response = (raw_input if PY2 else input)() if not hidden else getpass('')
 
             if not response and default:
                 response = default
