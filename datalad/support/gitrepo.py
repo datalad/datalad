@@ -529,9 +529,12 @@ class GitRepo(object):
           content of file_ as a list of lines.
         """
 
-        out, err = self._git_custom_command(
-            '', 'git cat-file blob %s:%s' % (branch, file_))
-        return out.rstrip(linesep).splitlines()
+        return self.repo.commit(branch).tree[file_].data_stream.read().splitlines()
+        # TODO: keep splitlines?
+
+        #out, err = self._git_custom_command(
+        #    '', 'git cat-file blob %s:%s' % (branch, file_))
+        #return out.rstrip(linesep).splitlines()
 
     def git_merge(self, name):
         self._git_custom_command('', 'git merge %s' % name)
