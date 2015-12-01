@@ -16,6 +16,7 @@ import sys
 from getpass import getpass
 
 from ..utils import auto_repr
+from .base import InteractiveUI
 
 # Example APIs which might be useful to look for "inspiration"
 #  man debconf-devel
@@ -46,10 +47,22 @@ for i in xrange(10):
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
 
 @auto_repr
-class DialogUI(object):
+class ConsoleLog(object):
 
     def __init__(self, out=sys.stdout):
         self.out = out
+
+    def message(self, msg, cr=True):
+        self.out.write(msg)
+        if cr:
+            self.out.write('\n')
+
+    def error(self, error):
+        self.out.write("ERROR: %s\n" % error)
+
+
+@auto_repr
+class DialogUI(ConsoleLog, InteractiveUI):
 
     def question(self, text,
                  title=None, choices=None,
@@ -97,20 +110,3 @@ class DialogUI(object):
                 continue
             break
         return response
-
-    def yesno(self, *args, **kwargs):
-        response = self.question(*args, choices=['yes', 'no'], **kwargs).rstrip('\n')
-        if response == 'yes':
-            return True
-        elif response == 'no':
-            return False
-        else:
-            raise RuntimeError("must not happen but did")
-
-    def message(self, msg, cr=True):
-        self.out.write(msg)
-        if cr:
-            self.out.write('\n')
-
-    def error(self, error):
-        self.out.write("ERROR: %s\n" % error)
