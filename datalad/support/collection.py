@@ -159,11 +159,6 @@ class Collection(dict):
         return ConjunctiveGraph(store=self.store).query(query)
 
 
-
-
-
-
-
 class MetaCollection(dict):
     """A collection of collections.
 
@@ -195,9 +190,6 @@ class MetaCollection(dict):
             for item in src:
                 if isinstance(item, Collection):
                     self[str(item.name)] = item
-                elif isinstance(item, CollectionBackend):
-                    new_item = Collection(src=item)
-                    self[str(new_item.name)] = new_item
                 else:
                     e_msg = "Can't retrieve collection from %s." % type(item)
                     lgr.error(e_msg)
@@ -207,8 +199,6 @@ class MetaCollection(dict):
             for key in src:
                 if isinstance(src[key], Collection):
                     self[key] = src[key]
-                elif isinstance(src[key], CollectionBackend):
-                    self[key] = Collection(src=src[key])
                 else:
                     e_msg = "Can't retrieve collection from %s." % \
                             type(src[key])

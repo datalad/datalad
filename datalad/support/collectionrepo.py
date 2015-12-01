@@ -568,3 +568,57 @@ class CollectionRepo(GitRepo):
 
         if branch != active_branch:
             self.git_checkout(active_branch)
+
+    def get_collection_graphs(self, branch=None, files=None):
+
+        if branch is None:
+            branch = self.git_get_active_branch()
+
+        # by default read all ttl-files in base dir:
+        if files is None:
+            files = [file_
+                     for file_ in self.git_get_files(branch=branch)
+                     if os.sep not in file_ and
+                     file_.endswith(".ttl")]
+                    # Note: Think of additionally exclude config.ttl:
+                    # and file_ != REPO_CONFIG_FILE
+
+        graphs = dict()
+        for file_ in files:
+            file_str = '\n'.join(self.git_get_file_content(file_, branch))
+            graphs[file_.rstrip(".ttl")] = \
+                Graph().parse(data=file_str, format="turtle")
+        return graphs
+
+    def set_collection_graphs(self, graphs, branch=None,
+                              msg="Collection metadata updated."):
+
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of parameter 'graphs' (%s). "
+                            "Expected: dict." % type(graphs))
+
+        files = dict()
+        for key in graphs:
+            if not isinstance(graphs[key], Graph):
+                raise TypeError("Wrong type of graphs['%s'] (%s). "
+                                "Expected: Graph." % (key, type(graphs[key])))
+
+            files[key] = opj(self.path, key + ".ttl")
+
+        active_branch = self.git_get_active_branch()
+        if branch is None:
+            branch = active_branch
+        elif branch not in self.git_get_branches():
+            raise ValueError("Unknown branch '%s'." % branch)
+        else:
+            self.git_checkout(branch)
+
+        for key in graphs:
+            graphs[key].serialize(files[key], format="turtle")
+
+        self.git_add(list(itervalues(files)))
+        self.git_commit(msg)
+
+        if branch != active_branch:
+            self.git_checkout(active_branch)
+
