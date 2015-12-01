@@ -24,6 +24,7 @@ from ...tests.utils import serve_path_via_http, with_tree
 from ...tests.utils import swallow_logs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
+from ...tests.utils import SkipTest
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
@@ -78,6 +79,8 @@ def test_authenticate_crcns(d):
     url = 'https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5'
     fpath = opj(d, 'checksums.md5')
     crcns = providers.get_provider(url)
+    if not crcns.credential.is_known:
+        raise SkipTest("This test requires known credentials for CRCNS")
     downloader = crcns.get_downloader(url)
     downloader.download(url, path=d)
     with open(fpath) as f:

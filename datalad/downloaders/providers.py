@@ -72,6 +72,11 @@ class Credential(object):
     def uid(self):
         return "datalad-%s" % (self.name)
 
+    @property
+    def is_known(self):
+        uid = self.uid
+        return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
+
     # should implement corresponding handling (get/set) via keyring module
     def __call__(self):
         # TODO: redo not stupid way
