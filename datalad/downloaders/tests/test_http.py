@@ -74,7 +74,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # TODO: access denied detection
 
 
-@use_cassette('fixtures/vcr_cassettes/crcns-alm-1-auth.yaml')
+# @use_cassette('fixtures/vcr_cassettes/crcns-alm-1-auth.yaml')
 @with_tempfile(mkdir=True)
 def test_authenticate_crcns(d):
     providers = Providers.from_config_files()
@@ -93,3 +93,42 @@ test_authenticate_crcns.tags = ['external-portal']
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
+
+
+
+
+import httpretty, requests, sure
+
+# TODO
+# def test_HTMLFormAuthenticator_constructor():
+    # pass
+
+url = 'https://portal.nersc.gov/project/crcns/download/pvc-1'
+html = '''<html><body>
+  <form action="/project/crcns/download/index.php" method="post">
+   <input type="hidden" name="fn" value="pvc-1" />
+   <table>
+   <tr><td>username:</td><td><input type="text" name="username" /></td></tr>
+   <tr><td>password:</td><td><input type="password" name="password" /></td></tr>
+   </table>
+   <input type="submit" name="submit" value="Login" /></form>
+</body></html>''',
+header_vals = dict(username='myusername', password='mypassword', submit='Login')
+
+@httpretty.activate
+def test_HTMLFormAuthenticator_authenticate_crcns(url=url, fields=header_vals):
+
+    httpretty.register_uri(httpretty.POST, url,
+                           body=html,
+                           status=200)
+
+    response = requests.post(url, data=header_vals)
+    sure.expect(response.status_code).to.equal(200)
+
+
+def test_HTMLFormAuthenticator_authenticate_crcns2(url=url, fields=header_vals):
+
+    httpretty.register_uri(httpretty.POST, url,
+                           body=html,
+                           status=200)
+    # TODO fill out this stuff where the datalad commands would go (like the stuff in test_authenticate_crcns above)
