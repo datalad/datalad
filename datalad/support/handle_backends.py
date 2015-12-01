@@ -11,7 +11,7 @@ Implements backends for handles.
 """
 import logging
 
-from rdflib import Graph, Literal, RDF
+from rdflib import Graph, Literal, RDF, RDFS
 
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.exceptions import ReadOnlyBackendError
@@ -280,4 +280,38 @@ class CollectionRepoHandleBackend(Handle):
     def url(self):
         return str(self.meta.value(predicate=RDF.type, object=DLNS.Handle))
         # TODO: DLNS.this? => path/url
-        # Note: Shouldn't be possible to have DLNS.this from handle IN collection!
+        # Note: Shouldn't be possible to have DLNS.this from handle
+        # WITHIN a collection!
+
+        # TODO: Provide path/url without the need to load 'meta'?
+        #       => explicitly from datalad or config
+        #    or => from collection-level
+
+        # git_remote_url? Nope. That would be a collection.
+
+
+class RuntimeHandle(Handle):
+    """Pure runtime Handle without a persistent backend.
+
+    This kind of a handle can only be used as a "virtual" handle, that has no
+    physical storage.
+
+    Note: For now, there is no usecase.
+    It serves as an example and a test case.
+    """
+
+    def __init__(self, name):
+        super(RuntimeHandle, self).__init__()
+        self._graph = Graph(identifier=Literal(name))
+        self._graph.add((DLNS.this, RDF.type, DLNS.Handle))
+        self._graph.add((DLNS.this, RDFS.label, Literal(name)))
+
+    @property
+    def url(self):
+        return None
+
+    def update_metadata(self):
+        pass
+
+    def commit_metadata(self, msg="Metadata updated."):
+        raise ReadOnlyBackendError("Can't commit RuntimeHandle.")

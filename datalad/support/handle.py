@@ -12,10 +12,6 @@
 import logging
 from abc import ABCMeta, abstractmethod, abstractproperty
 
-from .metadatahandler import DLNS, RDF, Graph, Literal
-from.exceptions import ReadOnlyBackendError
-
-
 lgr = logging.getLogger('datalad.handle')
 
 
@@ -46,9 +42,13 @@ class Handle(object):
     def __repr__(self):
         return "<Handle name=%s (%s)>" % (self.name, type(self))
 
+    def __eq__(self, other):
+        # abstract?
+        raise NotImplementedError("TODO")
+
     @abstractproperty
     def url(self):
-        """URL of the physical representation of a handle.
+        """URL of the physical representation of the handle.
 
         This is a read-only property, since an url can only be provided by a
         physically existing handle. It doesn't make sense to tell a backend to
@@ -69,6 +69,7 @@ class Handle(object):
         """
         pass
 
+    # TODO: Maybe rename to just commit?
     @abstractmethod
     def commit_metadata(self, msg="Metadata updated."):
         """Commit the metadata graph of a handle to its storage backend.
@@ -102,12 +103,13 @@ class Handle(object):
     def set_metadata(self, data):
         self._graph = data
 
+    # TODO: read-only in name?
     meta = property(get_metadata, set_metadata, doc="""
     Named rdflib.Graph representing the metadata of the handle.
     This is a lazy loading property, that is created only when accessed. Note,
     that this is not necessarily always in sync with the underlying backend.
     Therefore `update_metadata` and `commit_metadata` are provided,
-    to explicitly make sure it's synchronized. """)
+    to explicitly make sure it's synchronized.""")
 
     @property
     def name(self):
@@ -118,29 +120,3 @@ class Handle(object):
         str
         """
         return str(self.meta.identifier)
-
-
-class RuntimeHandle(Handle):
-    """Pure runtime Handle without a persistent backend.
-
-    This kind of a handle can only be used as a "virtual" handle, that has no
-    physical storage.
-
-    Note: For now, there is no usecase.
-    It serves as an example and a test case.
-    """
-
-    def __init__(self, name):
-        super(RuntimeHandle, self).__init__()
-        self._graph = Graph(identifier=Literal(name))
-        self._graph.add((DLNS.this, RDF.type, DLNS.Handle))
-
-    @property
-    def url(self):
-        return None
-
-    def update_metadata(self):
-        pass
-
-    def commit_metadata(self, msg="Metadata updated."):
-        raise ReadOnlyBackendError("Can't commit RuntimeHandle.")

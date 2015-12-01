@@ -12,7 +12,8 @@
 
 from nose.tools import assert_is_instance
 
-from ..support.handle import Handle, RuntimeHandle
+from ..support.handle import Handle
+from datalad.support.handle_backends import RuntimeHandle
 from ..support.exceptions import ReadOnlyBackendError
 from ..support.metadatahandler import RDF, DLNS, Graph
 from .utils import ok_, eq_, assert_raises
