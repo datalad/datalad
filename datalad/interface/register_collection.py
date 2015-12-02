@@ -124,5 +124,4 @@ class RegisterCollection(Interface):
         local_master.git_remote_add(name, url)
         local_master.git_fetch(name)
 
-        return Collection(CollectionRepoBackend(local_master,
-                                                name + "/master"))
+        return CollectionRepoBackend(local_master, name + "/master")

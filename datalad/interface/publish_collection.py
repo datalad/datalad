@@ -266,7 +266,7 @@ class PublishCollection(Interface):
         replacements = []
         from datalad.support.collection import Collection
         from datalad.support.collection_backends import CollectionRepoBackend
-        col_meta = Collection(CollectionRepoBackend(local_collection_repo))
+        col_meta = CollectionRepoBackend(local_collection_repo)
         for o in graphs[REPO_STD_META_FILE[0:-4]].objects(subject=new_uri,
                                                           predicate=DCTERMS.hasPart):
             from os.path import basename
@@ -365,5 +365,5 @@ class PublishCollection(Interface):
         local_collection_repo._git_custom_command('', 'git branch -D %s'
                                                   % p_branch)
 
-        return Collection(CollectionRepoBackend(local_collection_repo,
-                                                remote_name + "/master"))
+        return CollectionRepoBackend(local_collection_repo,
+                                     remote_name + "/master")

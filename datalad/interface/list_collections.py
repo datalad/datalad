@@ -38,6 +38,5 @@ class ListCollection(Interface):
         for collection in local_master.git_get_remotes():
             print(collection)
 
-        return [Collection(CollectionRepoBackend(local_master,
-                                                 branch=remote + "/master"))
+        return [CollectionRepoBackend(local_master, branch=remote + "/master")
                 for remote in local_master.git_get_remotes()]

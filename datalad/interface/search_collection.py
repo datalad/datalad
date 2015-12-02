@@ -92,7 +92,7 @@ class SearchCollection(Interface):
             for c, l in zip(collections, locations):
                 print("%s\t%s" % (c.ljust(width), l))
 
-            return [Collection(CollectionRepoBackend(local_master, col + "/master"))
+            return [CollectionRepoBackend(local_master, col + "/master")
                     for col in collections]
         else:
             return []

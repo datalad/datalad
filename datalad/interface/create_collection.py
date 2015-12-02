@@ -70,4 +70,4 @@ class CreateCollection(Interface):
         local_master.git_remote_add(new_collection.name, new_collection.path)
         local_master.git_fetch(new_collection.name)
 
-        return Collection(CollectionRepoBackend(new_collection))
+        return CollectionRepoBackend(new_collection)

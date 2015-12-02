@@ -137,6 +137,6 @@ class ImportMetadata(Interface):
         # locally available collection than just the master?
 
         if isinstance(repo, CollectionRepo):
-            return Collection(CollectionRepoBackend(repo))
+            return CollectionRepoBackend(repo)
         elif isinstance(repo, HandleRepo):
             return HandleRepoBackend(repo)
