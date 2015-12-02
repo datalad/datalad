@@ -74,7 +74,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # TODO: access denied detection
 
 
-# @use_cassette('fixtures/vcr_cassettes/crcns-alm-1-auth.yaml')
+@use_cassette('fixtures/vcr_cassettes/crcns-alm-1-auth.yaml')
 @with_tempfile(mkdir=True)
 def test_authenticate_crcns(d):
     providers = Providers.from_config_files()
@@ -97,7 +97,7 @@ test_authenticate_crcns.tags = ['external-portal']
 
 
 
-import httpretty, requests, sure
+import httpretty, requests#, sure
 
 # TODO
 # def test_HTMLFormAuthenticator_constructor():
@@ -115,20 +115,79 @@ html = '''<html><body>
 </body></html>''',
 header_vals = dict(username='myusername', password='mypassword', submit='Login')
 
+
+# NOTE this is the general idea here
+# @httpretty.activate
+# def test_HTMLFormAuthenticator_authenticate_crcns(url=url, fields=header_vals):
+    # httpretty.register_uri(httpretty.POST, url,
+                           # body=html,
+                           # status=200)
+
+    # response = requests.post(url, data=header_vals)
+    # sure.expect(response.status_code).to.equal(200)
+
+
+
+fname = 'README.txt'
+url = 'https://portal.nersc.gov/project/crcns/download/alm-1/{}'.format(fname)
+# body = '''<html>
+# <head>
+# <title>CRCNS.org data download</title>
+# </head>
+# <body>
+# <h2>CRCNS.org data download</h2>
+# <form action="/project/crcns/download/index.php" method="post">
+   # <input type="hidden" name="fn" value="alm-1/README.txt" />
+   # <table>
+   # <tr><td>username:</td><td><input type="text" name="username" /></td></tr>
+   # <tr><td>password:</td><td><input type="password" name="password" /></td></tr>
+   # </table>
+   # <input type="submit" name="submit" value="Login" /></form>
+
+# </body>
+# </html>'''
+readme = '''See file
+docs/crcns_alm-1_data_description.pdf
+for details about the data set and file formats.
+
+The following information is included in the above file, but given again here for
+convenience.
+
+Contents of directories are:
+
+- "docs" contains documentation
+
+- "datafiles" contains processed data files (for all 99 sessions).
+
+- matlab_scripts has two subdirectories:
+    "demos" - contains a couple of simple demo scripts that performs some basic analyses
+    "analyses_scripts" - has scripts that reproduces the figures in "Li, Chen, Guo, Gerfen, Svoboda (2015)".
+  See end of document "crcns_alm-1_data_description" for instructions for running these scripts.
+
+- "old" contains original data files (3 sessions).  Information about these are in old/README.txt.
+
+
+'''
+
+
 @httpretty.activate
-def test_HTMLFormAuthenticator_authenticate_crcns(url=url, fields=header_vals):
-
-    httpretty.register_uri(httpretty.POST, url,
-                           body=html,
+@with_tempfile(mkdir=True)
+def test_HTMLFormAuthenticator_authenticate_crcns(d):
+    # httpretty.register_uri(httpretty.POST, url,
+    httpretty.register_uri(httpretty.GET, url,
+                           body=readme,
                            status=200)
 
-    response = requests.post(url, data=header_vals)
-    sure.expect(response.status_code).to.equal(200)
+    # stuff like from test_authenticate_crcns above
+    providers = Providers.from_config_files()
+    fpath = opj(d, fname)
+    crcns = providers.get_provider(url)
+    if not crcns.credential.is_known:
+        raise SkipTest("This test requires known credentials for CRCNS")
+    downloader = crcns.get_downloader(url)
+    downloader.download(url, path=d)
+    with open(fpath) as f:
+        content = f.read()
+        assert_false("<form action=" in content)
+        assert_in("docs/crcns_alm-1_data_description.pdf", content)
 
-
-def test_HTMLFormAuthenticator_authenticate_crcns2(url=url, fields=header_vals):
-
-    httpretty.register_uri(httpretty.POST, url,
-                           body=html,
-                           status=200)
-    # TODO fill out this stuff where the datalad commands would go (like the stuff in test_authenticate_crcns above)
