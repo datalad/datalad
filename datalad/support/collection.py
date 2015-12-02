@@ -69,7 +69,17 @@ class Collection(dict):
             raise CollectionBrokenError()  # TODO: Proper exceptions
         key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
         if key_uri is None or key_uri == DLNS.this:
-            raise ValueError("Handle '%s' has invalid URI: %s." % (key, key_uri))
+            if self[key].url is not None:
+                # replace URI in graph:
+                # Note: This assumes handle.meta is modifiable, meaning repo
+                #       backends currently need to override it.
+                from rdflib import URIRef
+                self[key].meta.remove((key_uri, RDF.type, DLNS.Handle))
+                key_uri = URIRef(self[key].url)
+                self[key].meta.add((key_uri, RDF.type, DLNS.Handle))
+            else:
+                super(Collection, self).__delitem__(key)
+                raise ValueError("Handle '%s' has neither a valid URI (%s) nor an URL." % (key, key_uri))
         self.meta.add((self_uri, DCTERMS.hasPart, key_uri))
         self.store.add_graph(self[key].meta)
 

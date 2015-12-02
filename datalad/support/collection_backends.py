@@ -34,7 +34,8 @@ class CollectionRepoBackend(Collection):
         if isinstance(repo, CollectionRepo):
             self.repo = repo
         elif isinstance(repo, string_types):
-            self.repo = CollectionRepo(repo)
+            # TODO: create=??? let it be an option?
+            self.repo = CollectionRepo(repo, create=False)
         else:
             msg = "Invalid repo type: %s" % type(repo)
             lgr.error(msg)
@@ -64,6 +65,21 @@ class CollectionRepoBackend(Collection):
         for key in self.repo.get_handle_list(self._branch):
             self[key] = CollectionRepoHandleBackend(self.repo, key,
                                                     self._branch)
+
+        # Note: Possible solution to setitem vs. laziness:
+        #       Don't assign in constructor but use dict.update() or
+        #       dict.setitem directly! Then check in setitem whether it's
+        #       add or replace.
+
+    @property
+    def branch(self):
+        # Read only
+        return self._branch
+
+    @property
+    def remote(self):
+        # Read only
+        return self._remote
 
     def __eq__(self, other):
         raise NotImplementedError("TODO")
@@ -100,15 +116,14 @@ class CollectionRepoBackend(Collection):
 
         :return:
         """
-        self._graph = Graph(identifier=Literal(self.repo.name))
+        self._graph = Graph(identifier=Literal(self.repo.name),
+                            store=self.store)
         for key in self.sub_graphs:
             self._graph += self.sub_graphs[key]
 
         return self._graph
 
     meta = property(get_metadata, set_metadata)
-
-    # TODO: name from repo? => not, if CollectionRepo melted in!
 
     @property
     def url(self):
@@ -122,8 +137,6 @@ class CollectionRepoBackend(Collection):
             return self.repo.git_get_remote_url(self._remote)
         else:
             return get_local_file_url(self.repo.path)
-
-    # TODO: set_name? See Handle.
 
     def update_metadata(self):
         """
@@ -152,6 +165,11 @@ class CollectionRepoBackend(Collection):
         # commit not just collection metadata, but any changes to the
         # collection (handle list, handles' meta, ...)
         raise NotImplementedError("TODO")
+
+
+    # TODO: name from repo? => not, if CollectionRepo melted in!
+    # TODO: set_name? See Handle.
+    # TODO: setitem (+ delitem?)
 
 ############################# from old backend:
 #
@@ -203,11 +221,12 @@ class CollectionRepoBackend(Collection):
 #             # switch back to repo's active branch on disk
 #             self.repo.git_checkout(current_branch)
 
-class RunTimeCollection(Collection):
+
+class RuntimeCollection(Collection):
 
     def __init__(self, name):
-        super(RunTimeCollection, self).__init__()
-        self._graph = Graph(identifier=Literal(name))
+        super(RuntimeCollection, self).__init__()
+        self._graph = Graph(identifier=Literal(name), store=self.store)
         self._graph.add((DLNS.this, RDF.type, DLNS.Collection))
         self._graph.add((DLNS.this, RDFS.label, Literal(name)))
 
@@ -215,6 +234,7 @@ class RunTimeCollection(Collection):
         return self.keys() == other.keys() and self.name == other.name  \
                and all([self[k] == other[k] for k in self.keys()])
 
+    @property
     def url(self):
         return None
 
@@ -223,3 +243,6 @@ class RunTimeCollection(Collection):
 
     def commit(self, msg="Collection updated."):
         raise ReadOnlyBackendError("Can't commit RuntimeHandle.")
+
+    # TODO: set_name? See Handle.
+    # TODO: setitem (+ delitem?)

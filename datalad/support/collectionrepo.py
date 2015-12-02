@@ -526,8 +526,9 @@ class CollectionRepo(GitRepo):
             files = [file_
                      for file_ in self.git_get_files(branch=branch)
                      if file_.startswith(self._key2filename(key)) and
-                     file_.endswith(".ttl") and
-                     basename(file_) != REPO_CONFIG_FILE]
+                     file_.endswith(".ttl")]
+                     # exclude config?
+                     # and basename(file_) != REPO_CONFIG_FILE]
 
         graphs = dict()
         for file_ in files:
@@ -539,6 +540,7 @@ class CollectionRepo(GitRepo):
 
     def store_handle_graphs(self, graphs, handle, branch=None,
                             msg="Handle metadata updated."):
+        # TODO: Default message to include handle's name
 
         if not isinstance(graphs, dict):
             raise TypeError("Unexpected type of parameter 'graphs' (%s). "

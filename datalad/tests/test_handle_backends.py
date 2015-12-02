@@ -6,28 +6,49 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of classes HandleRepoBackend and
+"""Test implementation of classes RuntimeHandle, HandleRepoBackend and
 CollectionRepoHandleBackend.
 """
-from genericpath import exists
-from os.path import join as opj
+
+from os.path import join as opj, exists
 
 from nose.tools import eq_, assert_raises, assert_in, ok_, assert_not_in, \
-    assert_false, assert_equal
+    assert_false, assert_equal, assert_is_instance
 from rdflib import Graph, Literal, URIRef, RDF
+from six import iterkeys
 
 from datalad.consts import REPO_STD_META_FILE, HANDLE_META_DIR
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.exceptions import ReadOnlyBackendError
 from datalad.support.gitrepo import GitRepo
+from ..support.handle import Handle
 from datalad.support.handle_backends import HandleRepoBackend, \
-    CollectionRepoHandleBackend
+    CollectionRepoHandleBackend, RuntimeHandle
 from datalad.support.handlerepo import HandleRepo
 from datalad.support.metadatahandler import DLNS
 from datalad.tests.utils import with_testrepos, ok_startswith, with_tempfile, \
     ok_clean_git
 from datalad.utils import get_local_file_url
+
+
+def test_RuntimeHandle():
+
+    name = "TestHandle"
+    handle = RuntimeHandle(name)
+    assert_is_instance(handle, Handle)
+    eq_(name, handle.name)
+    ok_(handle.url is None)
+    assert_is_instance(handle.meta, Graph)
+    eq_(handle.meta.value(subject=DLNS.this, predicate=RDF.type), DLNS.Handle)
+    g = Graph(identifier="NewName")
+    handle.meta = g
+    eq_("NewName", handle.name)
+    eq_(handle.meta, g)
+    assert_raises(ReadOnlyBackendError, handle.commit_metadata)
+    eq_("<Handle name=NewName "
+        "(<class 'datalad.support.handle_backends.RuntimeHandle'>)>",
+        handle.__repr__())
 
 
 @with_testrepos('.*handle.*', flavors=['local'])
@@ -212,7 +233,7 @@ def test_CollectionRepoHandleBackend_meta(url, path):
 
     backend = CollectionRepoHandleBackend(repo, "BasicHandle")
 
-    eq_(backend.sub_graphs.keys(), repo_graphs.keys())
+    eq_(set(iterkeys(backend.sub_graphs)), set(iterkeys(repo_graphs)))
     for key in backend.sub_graphs.keys():
         eq_(set(iter(backend.sub_graphs[key])),
             set(iter(repo_graphs[key])))

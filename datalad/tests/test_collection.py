@@ -6,22 +6,23 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test implementation of classes Collection and MetaCollection
+"""Test implementation of classes RuntimeCollection and MetaCollection
 """
 
 import os
 from os.path import join as opj
 
 from nose import SkipTest
-from nose.tools import assert_raises, assert_equal, assert_false, assert_in
-from rdflib import Graph, Literal, URIRef
+from nose.tools import assert_raises, assert_equal, assert_false, assert_in, eq_, assert_is_instance
+from rdflib import Graph, Literal, URIRef, RDFS
 from six import iterkeys
 
 from ..support.handlerepo import HandleRepo
-from datalad.support.handle_backends import HandleRepoBackend
+from datalad.support.handle_backends import HandleRepoBackend, RuntimeHandle
 from ..support.handle import Handle
 from ..support.collectionrepo import CollectionRepo
-from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.exceptions import ReadOnlyBackendError
+from datalad.support.collection_backends import CollectionRepoBackend, RuntimeCollection
 from ..support.collection import Collection, MetaCollection, DLNS, RDF, DCTERMS
 from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
     on_windows, ok_clean_git_annex_proxy, swallow_logs, swallow_outputs, in_, \
@@ -29,55 +30,118 @@ from ..tests.utils import with_tempfile, with_testrepos, assert_cwd_unchanged, \
 from ..support.exceptions import CollectionBrokenError
 from ..utils import get_local_file_url
 
+
 # For now (at least) we would need to clone from the network
 # since there are troubles with submodules on Windows.
 # See: https://github.com/datalad/datalad/issues/44
 local_flavors = ['network-clone' if on_windows else 'local']
 
 
-@with_tempfile
-@with_tempfile
-def test_Collection_constructor(path, h_path):
-    repo = CollectionRepo(path)
-    handle = HandleRepo(h_path)
-    repo.add_handle(handle, "handle1")
+def test_RuntimeCollection_constructor():
 
-    collection = Collection(CollectionRepoBackend(repo))
-    assert_equal(collection.name, repo.name)
-    assert_equal(collection.meta.identifier, Literal(repo.name))
-    assert_equal(set(iterkeys(collection)), {"handle1"})
-    assert_equal(len(list(collection.store.contexts())), 2)
+    name = "MyCollection"
+    collection = RuntimeCollection(name)
+
+    assert_is_instance(collection, Collection)
+    # TODO: if laziness works:
+    # assert_equal(len(list(collection.store.contexts())), 0)
+    assert_is_instance(collection.meta, Graph)
     assert_in((DLNS.this, RDF.type, DLNS.Collection), collection.meta)
-    assert_in((URIRef(get_local_file_url(h_path)), RDF.type, DLNS.Handle),
-              collection["handle1"].meta)
-
-    copy_collection = Collection(collection)
-    assert_equal(copy_collection.name, collection.name)
-    assert_equal(copy_collection.meta.identifier, Literal(repo.name))
-    assert_equal(set(iterkeys(copy_collection)), {"handle1"})
-    assert_equal(len(list(copy_collection.store.contexts())), 2)
-    assert_in((DLNS.this, RDF.type, DLNS.Collection), copy_collection.meta)
-    assert_in((URIRef(get_local_file_url(h_path)), RDF.type, DLNS.Handle),
-              copy_collection["handle1"].meta)
-
-    empty_collection = Collection(name="empty")
-    assert_equal(empty_collection.name, "empty")
-    assert_equal(empty_collection.meta.identifier, Literal("empty"))
-    assert_equal(set(iterkeys(empty_collection)), set([]))
-    assert_equal(len(list(empty_collection.store.contexts())), 1)
-    assert_in((DLNS.this, RDF.type, DLNS.Collection), empty_collection.meta)
-    # test _reload() separately?
+    assert_in((DLNS.this, RDFS.label, Literal(name)), collection.meta)
+    assert_equal(len(list(collection.store.contexts())), 1)
+    eq_(collection.meta.identifier, Literal(name))
+    eq_(collection.name, name)
+    eq_(collection.url, None)
+    eq_("<Collection name=%s (%s), handles=%s>" %
+        (name, type(collection), []), collection.__repr__())
+    assert_equal(set(iterkeys(collection)), set([]))
 
 
-@with_tempfile
-def test_Collection_setitem(path):
-    collection = Collection(name="new_collection")
-    handle1 = HandleRepoBackend(HandleRepo(path, name="handle1"))
+@with_testrepos('.*handle.*', flavors=['local'])
+def test_RuntimeCollection_modify(path):
 
-    collection["handle1"] = handle1
-    assert_equal(set(iterkeys(collection)), {"handle1"})
-    assert_equal(collection["handle1"], handle1)
-    assert_equal(len(collection.meta), 2)
+    col_name = "MyCollection"
+    collection = RuntimeCollection(col_name)
+
+    # Add a RuntimeHandle:
+    hdl_name = "MyHandle"
+    handle1 = RuntimeHandle(hdl_name)
+    # Currently a RuntimeHandle has URI DLNS.this and therefore can't be added
+    # to a collection (it's not a valid identifier in this context). Since it
+    # also has no URL, an URI can't be derived.
+    with assert_raises(ValueError) as cm:
+        collection[hdl_name] = handle1
+    eq_("Handle '%s' has neither a valid URI (%s) nor an URL." % (hdl_name,
+                                                                  DLNS.this),
+        str(cm.exception))
+
+    # Add an existing handle:
+    handle2 = HandleRepoBackend(HandleRepo(path, create=False))
+    collection[handle2.name] = handle2
+
+    eq_(set(iterkeys(collection)), {handle2.name})
+    assert_in((DLNS.this, DCTERMS.hasPart, URIRef(get_local_file_url(path))),
+              collection.meta)
+
+    # TODO: if laziness works:
+    # assert_equal(len(list(collection.store.contexts())), 1)
+    # collection.update_graph_store()
+    assert_equal(len(list(collection.store.contexts())), 2)
+
+    with assert_raises(ReadOnlyBackendError) as cm:
+        collection.commit()
+    eq_("Can't commit RuntimeHandle.", str(cm.exception))
+
+# TODO: more on setitem, delitem, commit, commit_metadata, update_graph_store, ...
+
+
+
+
+
+
+# @with_tempfile
+# @with_tempfile
+# def test_Collection_constructor(path, h_path):
+#     repo = CollectionRepo(path)
+#     handle = HandleRepo(h_path)
+#     repo.add_handle(handle, "handle1")
+#
+#     collection = Collection(CollectionRepoBackend(repo))
+#     assert_equal(collection.name, repo.name)
+#     assert_equal(collection.meta.identifier, Literal(repo.name))
+#     assert_equal(set(iterkeys(collection)), {"handle1"})
+#     assert_equal(len(list(collection.store.contexts())), 2)
+#     assert_in((DLNS.this, RDF.type, DLNS.Collection), collection.meta)
+#     assert_in((URIRef(get_local_file_url(h_path)), RDF.type, DLNS.Handle),
+#               collection["handle1"].meta)
+#
+#     copy_collection = Collection(collection)
+#     assert_equal(copy_collection.name, collection.name)
+#     assert_equal(copy_collection.meta.identifier, Literal(repo.name))
+#     assert_equal(set(iterkeys(copy_collection)), {"handle1"})
+#     assert_equal(len(list(copy_collection.store.contexts())), 2)
+#     assert_in((DLNS.this, RDF.type, DLNS.Collection), copy_collection.meta)
+#     assert_in((URIRef(get_local_file_url(h_path)), RDF.type, DLNS.Handle),
+#               copy_collection["handle1"].meta)
+#
+#     empty_collection = Collection(name="empty")
+#     assert_equal(empty_collection.name, "empty")
+#     assert_equal(empty_collection.meta.identifier, Literal("empty"))
+#     assert_equal(set(iterkeys(empty_collection)), set([]))
+#     assert_equal(len(list(empty_collection.store.contexts())), 1)
+#     assert_in((DLNS.this, RDF.type, DLNS.Collection), empty_collection.meta)
+#     # test _reload() separately?
+
+
+# @with_tempfile
+# def test_Collection_setitem(path):
+#     collection = Collection(name="new_collection")
+#     handle1 = HandleRepoBackend(HandleRepo(path, name="handle1"))
+#
+#     collection["handle1"] = handle1
+#     assert_equal(set(iterkeys(collection)), {"handle1"})
+#     assert_equal(collection["handle1"], handle1)
+#     assert_equal(len(collection.meta), 2)
 
 
 
@@ -89,8 +153,7 @@ def test_Collection_setitem(path):
 
     # assert_in((URIRef(get_local_file_url(path)), RDF.type, DLNS.Handle),
     #           collection["handle1"].meta)
-    # assert_in((DLNS.this, DCTERMS.hasPart, URIRef(get_local_file_url(path))),
-    #           collection.meta)
+    #
 
 
 
@@ -101,21 +164,21 @@ def test_Collection_setitem(path):
 
     #    collection.meta
 
-
-@with_tempfile
-def test_Collection_delitem(path):
-    collection = Collection(name="new_collection")
-    handle1 = HandleRepoBackend(HandleRepo(path, name="handle1"))
-    collection["handle1"] = handle1
-    del collection["handle1"]
-
-    assert_equal(set(iterkeys(collection)), set([]))
-    assert_equal(len(list(collection.meta.objects(subject=DLNS.this,
-                                                  predicate=DCTERMS.hasPart))),
-                 0)
-
-    # TODO: pop doesn't call __delitem__. So we need to override this one, too.
-    # collection.pop("handle1")
+#
+# @with_tempfile
+# def test_Collection_delitem(path):
+#     collection = Collection(name="new_collection")
+#     handle1 = HandleRepoBackend(HandleRepo(path, name="handle1"))
+#     collection["handle1"] = handle1
+#     del collection["handle1"]
+#
+#     assert_equal(set(iterkeys(collection)), set([]))
+#     assert_equal(len(list(collection.meta.objects(subject=DLNS.this,
+#                                                   predicate=DCTERMS.hasPart))),
+#                  0)
+#
+#     # TODO: pop doesn't call __delitem__. So we need to override this one, too.
+#     # collection.pop("handle1")
 
 
 @with_tempfile
@@ -136,12 +199,12 @@ def test_MetaCollection_constructor(path1, path2, path3):
     handle = HandleRepo(path3)
     repo1.add_handle(handle, "somehandle")
 
-    clt1 = Collection(CollectionRepoBackend(repo1))
-    clt2 = Collection(CollectionRepoBackend(repo2))
+    clt1 = CollectionRepoBackend(repo1)
+    clt2 = CollectionRepoBackend(repo2)
 
     # MetaCollection from list; items are either Collections
     # or CollectionBackends:
-    m_clt = MetaCollection([Collection(CollectionRepoBackend(repo1)),
+    m_clt = MetaCollection([CollectionRepoBackend(repo1),
                             CollectionRepoBackend(repo2)])
 
     assert_equal(set(iterkeys(m_clt)), {repo1.name, repo2.name})
@@ -188,7 +251,7 @@ def test_MetaCollection_setitem(path1, path2):
     cr = CollectionRepo(path1)
     hr = HandleRepo(path2)
     cr.add_handle(hr, "somehandle")
-    clt = Collection(CollectionRepoBackend(cr))
+    clt = CollectionRepoBackend(cr)
     m_clt = MetaCollection()
     m_clt[clt.name] = clt
 
@@ -204,7 +267,7 @@ def test_MetaCollection_delitem(path1, path2):
     cr = CollectionRepo(path1)
     hr = HandleRepo(path2)
     cr.add_handle(hr, "somehandle")
-    clt = Collection(CollectionRepoBackend(cr))
+    clt = CollectionRepoBackend(cr)
     m_clt = MetaCollection()
     m_clt[clt.name] = clt
 

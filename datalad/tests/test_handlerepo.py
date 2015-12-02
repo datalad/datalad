@@ -105,7 +105,7 @@ def test_HandleRepo_get_metadata(path):
 
     # default
     graphs = repo.get_metadata()
-    eq_(len(graphs), 2)  # just datalad.ttl
+    eq_(len(graphs), 2)  # just datalad.ttl and config.ttl
     assert_in(REPO_CONFIG_FILE[:-4], graphs)
     assert_in(REPO_STD_META_FILE[:-4], graphs)
     assert_in((DLNS.this, RDF.type, DLNS.Handle),
