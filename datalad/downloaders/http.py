@@ -345,19 +345,35 @@ class HTTPDownloader(BaseDownloader):
                     "Temporary file %s from the previous download was found. "
                     "It will be overriden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
+
+            target_size = int(headers.get('Content-Length', '0').strip()) or None
             with open(temp_filepath, 'wb') as f:
+                # TODO: url might be a bit too long for the beast.
+                # Consider to improve to make it animated as well, or shorten here
+                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+                total = 0
                 for chunk in response.iter_content(chunk_size=1024):
                     if chunk:  # filter out keep-alive new chunks
-                        # TODO: report back to ui
+                        total += len(chunk)
                         f.write(chunk)
-
+                        pbar.update(total)
+                        # TEMP
+                        # see https://github.com/niltonvolpato/python-progressbar/pull/44
+                        ui.out.flush()
+                pbar.finish()
             downloaded_size = os.stat(temp_filepath).st_size
+
             if (headers.get('Content-type', "") or headers.get('Content-Type', "")).startswith('text/html') \
                     and downloaded_size < 10000 \
                     and self.authenticator:  # and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
                 with open(temp_filepath) as f:
                     self.authenticator.check_for_auth_failure(
                         f.read(), "Download of file %s has failed: " % filepath)
+
+            if target_size and target_size != downloaded_size:
+                lgr.error("Downloaded file size %d differs from originally announced %d",
+                          downloaded_size, target_size)
+
             # place successfully downloaded over the filepath
             os.rename(temp_filepath, filepath)
         except AccessDeniedError as e:

@@ -47,6 +47,31 @@ for i in xrange(10):
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
 
+from progressbar import Bar, ETA, FileTransferSpeed, \
+    Percentage, ProgressBar, RotatingMarker
+
+# TODO: might better delegate to an arbitrary bar?
+class BarWithFillText(Bar):
+    """A progress bar widget which fills the bar with the target text"""
+
+    def __init__(self, fill_text, **kwargs):
+        super(BarWithFillText, self).__init__(**kwargs)
+        self.fill_text = fill_text
+
+    def update(self, pbar, width):
+        orig = super(BarWithFillText, self).update(pbar, width)
+        # replace beginning with the title
+        if len(self.fill_text) > width:
+            # TODO:  make it fancier! That we also at the same time scroll it from
+            # the left so it does end up at the end with the tail but starts with
+            # the beginning
+            fill_text = '...' + self.fill_text[-(width-4):]
+        else:
+            fill_text = self.fill_text
+        fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
+        return fill_text + " " + orig[len(fill_text)+1:]
+
+
 @auto_repr
 class ConsoleLog(object):
 
@@ -60,6 +85,23 @@ class ConsoleLog(object):
 
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
+
+    def get_progressbar(self, label='', fill_text=None, currval=None, maxval=None):
+        """'Inspired' by progressbar module interface
+
+        Should return an object with .update(), and .finish()
+        methods, and maxval, currval attributes
+        """
+        bar = dict(marker=RotatingMarker())
+        # TODO: RF entire messaging to be able to support multiple progressbars at once
+        widgets = ['%s: ' % label,
+                   BarWithFillText(fill_text=fill_text, marker=RotatingMarker()), ' ',
+                   Percentage(), ' ',
+                   ETA(), ' ',
+                   FileTransferSpeed()]
+        if currval is not None:
+            raise NotImplementedError("Not yet supported to set currval in the beginning")
+        return ProgressBar(widgets=widgets, maxval=maxval, fd=self.out).start()
 
 
 @auto_repr

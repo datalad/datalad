@@ -72,7 +72,7 @@ class DownloadURL(Interface):
         """
         urls = assure_list_from_str(urls)
 
-        if len(urls):
+        if len(urls) > 1:
             if path:
                 if not(isdir(path)):
                     raise ValueError(
@@ -89,12 +89,10 @@ class DownloadURL(Interface):
             # somewhat "ugly"
             # providers.get_provider(url).get_downloader(url).download(url, path=path)
             # for now -- via sugaring
-            # TODO: should be done within progress bar inside
-            ui.message(url + " -> ", cr=False)
             try:
                 downloaded_path = providers.download(url, path=path, overwrite=overwrite)
                 downloaded_paths.append(downloaded_path)
-                ui.message(downloaded_path)
+                # ui.message("%s -> %s" % (url, downloaded_path))
             except Exception as e:
                 failed_urls.append(url)
                 ui.error(e)

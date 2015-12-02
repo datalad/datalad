@@ -18,6 +18,9 @@ from mock import patch
 from ...tests.utils import eq_
 from ...tests.utils import assert_raises
 from ...tests.utils import assert_re_in
+from ...tests.utils import assert_in
+from ...tests.utils import ok_startswith
+from ...tests.utils import ok_endswith
 from ..dialog import DialogUI
 
 def patch_input(**kwargs):
@@ -54,3 +57,26 @@ def test_question_choices():
     with patch_input(return_value='incorrect'):
         assert_raises(RuntimeError, ui.question, "prompt", choices=['a', 'b'])
     assert_re_in(".*prompt.*ERROR: .incorrect. is not among choices.*", out.getvalue())
+
+
+def _test_progress_bar(len):
+    out = StringIO()
+    fill_str = ('123456890' * (len//10))[:len]
+    pb = DialogUI(out).get_progressbar('label', fill_str, maxval=10)
+    pb.start()
+    for x in xrange(11):
+        pb.update(x)
+        out.flush()  # needed atm
+        pstr = out.getvalue()
+        ok_startswith(pstr, 'label:')
+        assert_in(' %d%% ' % (10*x), pstr)
+        assert_in('ETA', pstr)
+    pb.finish()
+    ok_endswith(out.getvalue(), '\n')
+
+def test_progress_bar():
+    # More of smoke testing given various lengths of fill_text
+    yield _test_progress_bar, 0
+    yield _test_progress_bar, 4
+    yield _test_progress_bar, 10
+    yield _test_progress_bar, 1000

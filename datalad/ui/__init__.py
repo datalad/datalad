@@ -18,6 +18,9 @@ from ..utils import is_interactive
 
 # TODO: implement logic on selection of the ui based on the cfg and environment
 # e.g. we cannot use DialogUI if session is not interactive
+# TODO:  GitAnnexUI where interactive queries (such as question) should get to the
+# user by proxying some other appropriate (cmdline or GUI) UI, while others, such
+# as reporting on progress etc -- should get back to the annex
 if not is_interactive():
     ui = ConsoleLog()
 else:

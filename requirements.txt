@@ -14,3 +14,4 @@ vcrpy
 keyring
 boto
 requests
+progressbar
