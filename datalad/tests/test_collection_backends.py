@@ -100,6 +100,8 @@ def test_CollectionRepoBackend_constructor(path1, path2):
         collection.url = "http://example.org"
 
 
+# TODO: test reload()!
+
 @with_testrepos('.*collection.*', flavors=['clone'])
 @with_tempfile
 def test_CollectionRepoBackend_meta(url, path):

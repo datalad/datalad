@@ -365,6 +365,9 @@ def test_query_collection(c_path, h_path, md_hdl):
 def test_query_metacollection(m_path, c_path1, c_path2, h_path1, h_path2,
                               md1, md2):
 
+    # Doesn't work that way anymore
+    raise SkipTest
+
     # create the master collection; register two collections, each containing
     # one handle and metadata:
     m_path = opj(m_path, 'localcollection')

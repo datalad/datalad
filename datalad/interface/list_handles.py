@@ -53,8 +53,8 @@ class ListHandles(Interface):
             for remote_branch in local_master.git_get_remote_branches():
                 if not remote_branch.endswith('/master'): # for now only those
                     continue
-                for h in CollectionRepoBackend(
-                        local_master, branch=remote_branch).get_handles():
+                for h in CollectionRepoBackend(local_master,
+                                               branch=remote_branch):
                     handle_list.append(
                         CollectionRepoHandleBackend(local_master, key=h,
                                                     branch=remote_branch))

@@ -48,7 +48,7 @@ class Whereis(Interface):
         local_master = get_datalad_master()
 
         if key in local_master.git_get_remotes():
-            location = CollectionRepoBackend(local_master, key).url
+            location = CollectionRepoBackend(local_master, key + "/master").url
         elif key in local_master.get_handle_list():
             location = CollectionRepoHandleBackend(local_master, key).url
         else:

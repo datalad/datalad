@@ -152,6 +152,8 @@ class Collection(dict):
 
         # TODO: Currently we update from backend here. Maybe just make sure
         # every graph is added and make update from backend an option?
+        # Additionally, what about changes in backend?
+        # => handle may not be in self yet!
         for handle in self:
             self[handle].update_metadata()
             self.store.add_graph(self[handle].meta)

@@ -70,6 +70,7 @@ class CollectionRepoBackend(Collection):
         #       Don't assign in constructor but use dict.update() or
         #       dict.setitem directly! Then check in setitem whether it's
         #       add or replace.
+        #       See also: reload()!
 
     @property
     def branch(self):
@@ -116,7 +117,9 @@ class CollectionRepoBackend(Collection):
 
         :return:
         """
-        self._graph = Graph(identifier=Literal(self.repo.name),
+        # TODO: Reconsider naming (also for Handles)
+        name = self.remote or self.repo.name
+        self._graph = Graph(identifier=Literal(name),
                             store=self.store)
         for key in self.sub_graphs:
             self._graph += self.sub_graphs[key]
@@ -166,6 +169,15 @@ class CollectionRepoBackend(Collection):
         # collection (handle list, handles' meta, ...)
         raise NotImplementedError("TODO")
 
+    def reload(self):
+        # TODO: This needs to be reviewed. Integrate all the different updates!
+        to_delete = self.keys()
+        for handle in to_delete:
+            del self[handle]
+
+        for key in self.repo.get_handle_list(self._branch):
+            self[key] = CollectionRepoHandleBackend(self.repo, key,
+                                                    self._branch)
 
     # TODO: name from repo? => not, if CollectionRepo melted in!
     # TODO: set_name? See Handle.

@@ -52,7 +52,7 @@ def test_add_handle_by_paths(hurl, hpath, cpath, lcpath):
         return_value = add_handle(hpath, cpath)
 
         # now handle is listed by collection:
-        collection._reload()
+        collection.reload()
         assert_in(handle.name, collection)
 
         # test collection repo:
@@ -91,7 +91,7 @@ def test_add_handle_by_names(hurl, hpath, cpath, lcpath):
         return_value = add_handle(handle.name, collection.name)
 
         # now handle is listed by collection:
-        collection._reload()
+        collection.reload()
         assert_in(handle.name, collection)
 
         # test collection repo:
