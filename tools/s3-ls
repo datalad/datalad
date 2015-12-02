@@ -33,7 +33,18 @@ conn = boto.connect_s3(access_key, secret_key)
 bucket_name, prefix = bucket_prefix.split('/', 1)
 print("Connecting to bucket: %s" % bucket_name)
 
-bucket = conn.get_bucket(bucket_name)
+try:
+    bucket = conn.get_bucket(bucket_name)
+except S3ResponseError as e:
+    print("E: Cannot access bucket %s by name" % bucket_name)
+    all_buckets = conn.get_all_buckets()
+    all_bucket_names = [b.name for b in all_buckets]
+    print("I: Found following buckets %s" % ', '.join(all_bucket_names))
+    if bucket_name in all_bucket_names:
+        bucket = all_buckets[all_bucket_names.index(bucket_name)]
+    else:
+        raise RuntimeError("E: no bucket named %s thus exiting" % bucket_name)
+
 
 info = []
 for iname, imeth in [
@@ -43,8 +54,8 @@ for iname, imeth in [
 ]:
     try:
         ival = imeth()
-    except:
-        ival = "N/A"
+    except Exception as e:
+        ival = str(e).split('\n')[0]
     info.append(" {iname}: {ival}".format(**locals()))
 print("Bucket info:\n %s" % '\n '.join(info))
 
@@ -60,11 +71,24 @@ for e in prefix_all_versions:
             urlok = "OK"
         except HTTPError as err:
             urlok = "E: %s" % err.code
+
         try:
             acl = e.get_acl()
         except S3ResponseError as err:
             acl = err.message
-        print("ver:%-32s  acl:%s  %s [%s]" % (e.version_id, acl, url, urlok))
+
+        content = ""
+        # IO intensive, make an option finally!
+        # try:
+        #     # _ = e.next()[:5]  # if we are able to fetch the content
+        #     content = e.get_contents_as_string(version_id=e.version_id)[:5]
+        #     #content = "[S3: OK]"
+        # except S3ResponseError as err:
+        #     content = err.message
+        # finally:
+        #     content = " " + content
+
+        print("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
     else:
         print("del")
 

@@ -21,7 +21,7 @@ from ..utils import auto_repr
 from ..utils import assure_list_from_str
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
-from .http import HTMLFormAuthenticator
+from .http import HTMLFormAuthenticator, HTTPAuthAuthenticator
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')
@@ -71,6 +71,11 @@ class Credential(object):
     @property
     def uid(self):
         return "datalad-%s" % (self.name)
+
+    @property
+    def is_known(self):
+        uid = self.uid
+        return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
 
     # should implement corresponding handling (get/set) via keyring module
     def __call__(self):
@@ -178,6 +183,7 @@ class Providers(object):
     # parameters will be fetched from config file itself
     AUTHENTICATION_TYPES = {
         'html_form': HTMLFormAuthenticator,
+        'http_auth': HTTPAuthAuthenticator,
         'aws-s3': NotImplementedAuthenticator,  # TODO: check if having '-' is kosher
         'xnat': NotImplementedAuthenticator,
         'none': NoneAuthenticator,
@@ -252,7 +258,7 @@ class Providers(object):
                                      % (provider.credential, ", ".join(credentials.keys())))
                 provider.credential = credentials[provider.credential]
 
-        return Providers(providers.values())
+        return Providers(list(providers.values()))
 
 
     @classmethod
@@ -270,7 +276,7 @@ class Providers(object):
             authenticator = cls.AUTHENTICATION_TYPES[auth_type](
                 # Extract all the fields as keyword arguments
                 **{k[len(auth_type)+1:]: items.pop(k)
-                   for k in items.keys()
+                   for k in list(items.keys())
                    if k.startswith(auth_type+"_")}
             )
         else:

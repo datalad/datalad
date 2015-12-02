@@ -253,6 +253,11 @@ def ok_startswith(s, prefix):
         msg="String %r doesn't start with %r" % (s, prefix))
 
 
+def ok_endswith(s, suffix):
+    ok_(s.endswith(suffix),
+        msg="String %r doesn't end with %r" % (s, suffix))
+
+
 def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))

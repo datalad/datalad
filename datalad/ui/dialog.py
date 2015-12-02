@@ -13,9 +13,11 @@
 __docformat__ = 'restructuredtext'
 
 import sys
+from six import PY2
 from getpass import getpass
 
 from ..utils import auto_repr
+from .base import InteractiveUI
 
 # Example APIs which might be useful to look for "inspiration"
 #  man debconf-devel
@@ -45,11 +47,65 @@ for i in xrange(10):
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
 
+from progressbar import Bar, ETA, FileTransferSpeed, \
+    Percentage, ProgressBar, RotatingMarker
+
+# TODO: might better delegate to an arbitrary bar?
+class BarWithFillText(Bar):
+    """A progress bar widget which fills the bar with the target text"""
+
+    def __init__(self, fill_text, **kwargs):
+        super(BarWithFillText, self).__init__(**kwargs)
+        self.fill_text = fill_text
+
+    def update(self, pbar, width):
+        orig = super(BarWithFillText, self).update(pbar, width)
+        # replace beginning with the title
+        if len(self.fill_text) > width:
+            # TODO:  make it fancier! That we also at the same time scroll it from
+            # the left so it does end up at the end with the tail but starts with
+            # the beginning
+            fill_text = '...' + self.fill_text[-(width-4):]
+        else:
+            fill_text = self.fill_text
+        fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
+        return fill_text + " " + orig[len(fill_text)+1:]
+
+
 @auto_repr
-class DialogUI(object):
+class ConsoleLog(object):
 
     def __init__(self, out=sys.stdout):
         self.out = out
+
+    def message(self, msg, cr=True):
+        self.out.write(msg)
+        if cr:
+            self.out.write('\n')
+
+    def error(self, error):
+        self.out.write("ERROR: %s\n" % error)
+
+    def get_progressbar(self, label='', fill_text=None, currval=None, maxval=None):
+        """'Inspired' by progressbar module interface
+
+        Should return an object with .update(), and .finish()
+        methods, and maxval, currval attributes
+        """
+        bar = dict(marker=RotatingMarker())
+        # TODO: RF entire messaging to be able to support multiple progressbars at once
+        widgets = ['%s: ' % label,
+                   BarWithFillText(fill_text=fill_text, marker=RotatingMarker()), ' ',
+                   Percentage(), ' ',
+                   ETA(), ' ',
+                   FileTransferSpeed()]
+        if currval is not None:
+            raise NotImplementedError("Not yet supported to set currval in the beginning")
+        return ProgressBar(widgets=widgets, maxval=maxval, fd=self.out).start()
+
+
+@auto_repr
+class DialogUI(ConsoleLog, InteractiveUI):
 
     def question(self, text,
                  title=None, choices=None,
@@ -85,7 +141,7 @@ class DialogUI(object):
             # (e.g. if coming from annex).  So we might need to do the
             # same trick as get_pass() does while directly dealing with /dev/pty
             # and provide per-OS handling with stdin being override
-            response = raw_input() if not hidden else getpass('')
+            response = (raw_input if PY2 else input)() if not hidden else getpass('')
 
             if not response and default:
                 response = default
@@ -97,20 +153,3 @@ class DialogUI(object):
                 continue
             break
         return response
-
-    def yesno(self, *args, **kwargs):
-        response = self.question(*args, choices=['yes', 'no'], **kwargs).rstrip('\n')
-        if response == 'yes':
-            return True
-        elif response == 'no':
-            return False
-        else:
-            raise RuntimeError("must not happen but did")
-
-    def message(self, msg, cr=True):
-        self.out.write(msg)
-        if cr:
-            self.out.write('\n')
-
-    def error(self, error):
-        self.out.write("ERROR: %s\n" % error)

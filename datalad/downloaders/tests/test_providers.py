@@ -17,7 +17,7 @@ from ...tests.utils import assert_equal
 
 def test_Providers_OnStockConfiguration():
     providers = Providers.from_config_files()
-    eq_(sorted([p.name for p in providers]), ['crcns', 'crcns-nersc', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'])
+    eq_(sorted([p.name for p in providers]), ['crcns', 'crcns-nersc', 'hcp-http', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'])
 
     # every provider must have url_res
     for provider in providers:

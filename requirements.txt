@@ -14,3 +14,8 @@ vcrpy
 keyring
 boto
 requests
+# progressbar > 2.3 for python3 support
+# but upstream seems to be dead and fixes are not merged
+# https://github.com/niltonvolpato/python-progressbar/archive/master.zip
+https://github.com/datalad/python-progressbar/archive/master.zip
+httpretty
