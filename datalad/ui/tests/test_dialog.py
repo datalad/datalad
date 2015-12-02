@@ -64,7 +64,7 @@ def _test_progress_bar(len):
     fill_str = ('123456890' * (len//10))[:len]
     pb = DialogUI(out).get_progressbar('label', fill_str, maxval=10)
     pb.start()
-    for x in xrange(11):
+    for x in range(11):
         pb.update(x)
         out.flush()  # needed atm
         pstr = out.getvalue()
