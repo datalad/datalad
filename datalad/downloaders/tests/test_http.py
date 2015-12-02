@@ -74,22 +74,35 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # TODO: access denied detection
 
 
-@use_cassette('fixtures/vcr_cassettes/crcns-alm-1-auth.yaml')
-@with_tempfile(mkdir=True)
-def test_authenticate_crcns(d):
+
+@use_cassette('fixtures/vcr_cassettes/test_authenticate_external_portals.yaml', record_mode='once')
+def test_authenticate_external_portals():
+
     providers = Providers.from_config_files()
-    url = 'https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5'
-    fpath = opj(d, 'checksums.md5')
-    crcns = providers.get_provider(url)
-    if not crcns.credential.is_known:
-        raise SkipTest("This test requires known credentials for CRCNS")
-    downloader = crcns.get_downloader(url)
-    downloader.download(url, path=d)
-    with open(fpath) as f:
-        content = f.read()
-        assert_false("<form action=" in content)
-        assert_in("datafiles/meta_data_files.tar.gz", content)
-test_authenticate_crcns.tags = ['external-portal']
+
+    @with_tempfile(mkdir=True)
+    def check_authenticate_external_portals(url, failed_str, success_str, d):
+        fpath = opj(d, url.split('/')[-1])
+        provider = providers.get_provider(url)
+        if not provider.credential.is_known:
+            raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
+        downloader = provider.get_downloader(url)
+        downloader.download(url, path=d)
+        with open(fpath) as f:
+            content = f.read()
+            assert_false(failed_str in content)
+            assert_in(success_str, content)
+
+    yield check_authenticate_external_portals, \
+          "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
+          "<form action=", \
+          "datafiles/meta_data_files.tar.gz"
+    yield check_authenticate_external_portals, \
+          'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
+          "failed", \
+          "2000 1005 2000 3000"
+test_authenticate_external_portals.tags = ['external-portal']
+
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
