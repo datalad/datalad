@@ -21,7 +21,7 @@ from ..utils import auto_repr
 from ..utils import assure_list_from_str
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
-from .http import HTMLFormAuthenticator
+from .http import HTMLFormAuthenticator, HTTPAuthAuthenticator
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')
@@ -183,6 +183,7 @@ class Providers(object):
     # parameters will be fetched from config file itself
     AUTHENTICATION_TYPES = {
         'html_form': HTMLFormAuthenticator,
+        'http_auth': HTTPAuthAuthenticator,
         'aws-s3': NotImplementedAuthenticator,  # TODO: check if having '-' is kosher
         'xnat': NotImplementedAuthenticator,
         'none': NoneAuthenticator,
