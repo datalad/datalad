@@ -13,9 +13,11 @@ import six.moves.builtins as __builtin__
 
 from ..http import HTTPDownloader
 from ..http import DownloadError
-from ..providers import Providers  # to test against crcns
+from ..http import HTMLFormAuthenticator
+from ..providers import Providers, Credential  # to test against crcns
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
+import httpretty
 from mock import patch
 from ...tests.utils import assert_in
 from ...tests.utils import assert_equal
@@ -94,100 +96,72 @@ test_authenticate_crcns.tags = ['external-portal']
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
 
-
-
-
-import httpretty, requests#, sure
-
-# TODO
-# def test_HTMLFormAuthenticator_constructor():
-    # pass
-
-url = 'https://portal.nersc.gov/project/crcns/download/pvc-1'
-html = '''<html><body>
-  <form action="/project/crcns/download/index.php" method="post">
-   <input type="hidden" name="fn" value="pvc-1" />
-   <table>
-   <tr><td>username:</td><td><input type="text" name="username" /></td></tr>
-   <tr><td>password:</td><td><input type="password" name="password" /></td></tr>
-   </table>
-   <input type="submit" name="submit" value="Login" /></form>
-</body></html>''',
-header_vals = dict(username='myusername', password='mypassword', submit='Login')
-
-
-# NOTE this is the general idea here
-# @httpretty.activate
-# def test_HTMLFormAuthenticator_authenticate_crcns(url=url, fields=header_vals):
-    # httpretty.register_uri(httpretty.POST, url,
-                           # body=html,
-                           # status=200)
-
-    # response = requests.post(url, data=header_vals)
-    # sure.expect(response.status_code).to.equal(200)
-
-
-
-fname = 'README.txt'
-url = 'https://portal.nersc.gov/project/crcns/download/alm-1/{}'.format(fname)
-# body = '''<html>
-# <head>
-# <title>CRCNS.org data download</title>
-# </head>
-# <body>
-# <h2>CRCNS.org data download</h2>
-# <form action="/project/crcns/download/index.php" method="post">
-   # <input type="hidden" name="fn" value="alm-1/README.txt" />
-   # <table>
-   # <tr><td>username:</td><td><input type="text" name="username" /></td></tr>
-   # <tr><td>password:</td><td><input type="password" name="password" /></td></tr>
-   # </table>
-   # <input type="submit" name="submit" value="Login" /></form>
-
-# </body>
-# </html>'''
-readme = '''See file
-docs/crcns_alm-1_data_description.pdf
-for details about the data set and file formats.
-
-The following information is included in the above file, but given again here for
-convenience.
-
-Contents of directories are:
-
-- "docs" contains documentation
-
-- "datafiles" contains processed data files (for all 99 sessions).
-
-- matlab_scripts has two subdirectories:
-    "demos" - contains a couple of simple demo scripts that performs some basic analyses
-    "analyses_scripts" - has scripts that reproduces the figures in "Li, Chen, Guo, Gerfen, Svoboda (2015)".
-  See end of document "crcns_alm-1_data_description" for instructions for running these scripts.
-
-- "old" contains original data files (3 sessions).  Information about these are in old/README.txt.
-
-
-'''
-
+class FakeCredential1(Credential):
+    """Credential to test scenarios."""
+    _fixed_credentials = [
+        {'user': 'testlogin', 'password': 'testpassword'},
+        {'user': 'testlogin2', 'password': 'testpassword2'},
+        {'user': 'testlogin2', 'password': 'testpassword3'}]
+    def is_known(self):
+        return True
+    def __call__(self):
+        return self._fixed_credentials[0]
+    def enter_new(self):
+        # pop last used credential, so we would use "new" ones
+        del self._fixed_credentials[0]
 
 @httpretty.activate
 @with_tempfile(mkdir=True)
-def test_HTMLFormAuthenticator_authenticate_crcns(d):
-    # httpretty.register_uri(httpretty.POST, url,
+def test_HTMLFormAuthenticator_httpretty(d):
+    url = "http://example.com/crap.txt"
+    fpath = opj(d, 'crap.txt')
+
+    # SCENARIO 1
+    # TODO: callaback which would verify that correct credentials provided
+    # and return the cookie, which will be tested again while 'GET'ing
+    httpretty.register_uri(httpretty.POST, url,
+                           body="whatever",  # TODO: return some cookie for the session
+                           status=200)
+    # in GET verify that correct cookie was provided, and verify that no
+    # credentials sneaked in
     httpretty.register_uri(httpretty.GET, url,
-                           body=readme,
+                           body="correct body",
                            status=200)
 
-    # stuff like from test_authenticate_crcns above
-    providers = Providers.from_config_files()
-    fpath = opj(d, fname)
-    crcns = providers.get_provider(url)
-    if not crcns.credential.is_known:
-        raise SkipTest("This test requires known credentials for CRCNS")
-    downloader = crcns.get_downloader(url)
+    # SCENARIO 2
+    # outdated cookie provided to GET -- you must return 403 (access denied)
+    # then our code should POST credentials again and get a new cookies
+    # which is then provided to GET
+
+    # SCENARIO 3
+    # outdated cookie
+    # outdated credentials
+    # it should ask for new credentials (FakeCredential1 already mocks for that)
+    # and then SCENARIO1 must work again
+
+    # SCENARIO 4
+    # cookie and credentials expired, user provided new bad credential
+
+    # TODO: somehow mock or whatever access to cookies, because we don't want to modify
+    # user's cookies during the test.
+    # Also we want to test how would it work if cookie is available (may be)
+    # TODO: check with correct and incorrect credential
+    credential = FakeCredential1(name='test', type='user_password', url=None)
+    authenticator = HTMLFormAuthenticator(dict(username="{user}",
+                                               password="{password}",
+                                               submit="CustomLogin"))
+    # TODO: with success_re etc
+
+    # This is a "success test" which should be tested in various above scenarios
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
     downloader.download(url, path=d)
     with open(fpath) as f:
         content = f.read()
-        assert_false("<form action=" in content)
-        assert_in("docs/crcns_alm-1_data_description.pdf", content)
+        assert_equal(content, "correct body")
 
+    # Unsuccesfull scenarios to test:
+    # Provided URL is at the end 404s, or another failure (e.g. interrupted download)
+
+def test_HTTPAuthAuthenticator_httpretty():
+    raise SkipTest("Not implemented. TODO")
+    # TODO: Single scenario -- test that correct credentials were provided to the HTTPPretty
