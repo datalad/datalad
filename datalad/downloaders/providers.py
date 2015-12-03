@@ -107,6 +107,7 @@ class Provider(object):
     # specific downloaders while importing needed Python modules "on demand"
     DOWNLOADERS = {'http': HTTPDownloader,
                    'https': HTTPDownloader,
+                   #'s3': S3Downloader,
                     # ... TODO
                   }
 
