@@ -43,6 +43,42 @@ except:  # pragma: no cover
 # Little helpers
 #
 
+def shortened_repr(value, l=30):
+    try:
+        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
+            value_repr = repr(value)
+            if not value_repr.startswith('<') and len(value_repr) > l:
+                value_repr = "<<%s...>>" % (value_repr[:l-8])
+            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
+                raise ValueError("I hate those useless long reprs")
+        else:
+            raise ValueError("gimme class")
+    except Exception as e:
+        value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
+    return value_repr
+
+
+def __auto_repr__(obj):
+    items = []
+    for prop in sorted(obj.__dict__):
+        if prop.startswith('_'):
+            continue
+        value = obj.__dict__[prop]
+        items.append("%s=%s" % (prop, shortened_repr(value)))
+
+    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
+
+def auto_repr(cls):
+    """Decorator for a class to assign it an automagic quick and dirty __repr__
+
+    It uses public class attributes to prepare repr of a class
+
+    Original idea: http://stackoverflow.com/a/27799004/1265472
+    """
+
+    cls.__repr__ = __auto_repr__
+    return cls
+
 def is_interactive():
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
@@ -163,6 +199,50 @@ def rmtemp(f, *args, **kwargs):
                 break
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def assure_list_from_str(s):
+    """Given a multiline string convert it to a list of return None if empty
+
+    Parameters
+    ----------
+    s: str or list
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, list):
+        return s
+    return s.split('\n')
+
+
+def assure_dict_from_str(s):
+    """Given a multiline string with key=value items convert it to a dictionary
+
+    Parameters
+    ----------
+    s: str or dict
+
+    Returns None if input s is empty
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, dict):
+        return s
+
+    out = {}
+    for value_str in assure_list_from_str(s):
+        if '=' not in value_str:
+            raise ValueError("{} is not in key=value format".format(repr(value_str)))
+        k, v = value_str.split('=', 1)
+        if k in out:
+            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            raise ValueError(err)
+        out[k] = v
+    return out
 
 
 #
@@ -460,3 +540,4 @@ class chpwd(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         chpwd(self._prev_pwd)
+

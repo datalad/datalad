@@ -12,6 +12,10 @@
 
 __docformat__ = 'restructuredtext'
 
+import sys
+
+from ..ui import ui
+
 def get_interface_groups():
     from .. import interface as _interfaces
 
@@ -143,4 +147,8 @@ class Interface(object):
         from inspect import getargspec
         argnames = getargspec(self.__call__)[0]
         kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
-        return self(**kwargs)
+        try:
+            return self(**kwargs)
+        except KeyboardInterrupt:
+            ui.error("\nInterrupted by user while doing magic")
+            sys.exit(1)

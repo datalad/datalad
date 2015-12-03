@@ -37,17 +37,19 @@ def test_get_response_stamp():
     eq_(r['mtime'], 1367377320)
     eq_(r['url'], "http://www.example.com/1.dat")
 
-
-def test_download_url():
+# TODO: reincarnate support for file://
+@with_tempfile(mkdir=True)
+@serve_path_via_http()
+def test_download_url(toppath, topurl):
     # let's simulate the whole scenario
-    fd, fname = tempfile.mkstemp()
-    dout = fname + '-d'
+    f = 'test.txt'
+    fname = opj(toppath, f)
+    dout = opj(toppath, 'down')
     # TODO move tempfile/tempdir setup/cleanup into fixture(s)
     os.mkdir(dout)
-    os.write(fd, "How do I know what to say?\n".encode())
-    os.close(fd)
-
-    furl = get_local_file_url(fname)
+    with open(fname, 'wb') as fd:
+        fd.write("How do I know what to say?\n".encode())
+    furl = "%s/%s" % (topurl, f)
 
     # Let's assume absent subdirectory
     #repo_filename, downloaded, updated, downloaded_size

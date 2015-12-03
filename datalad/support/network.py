@@ -20,7 +20,9 @@ from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse
 from six.moves.urllib.error import URLError
-from six.moves import StringIO
+
+# TODO not sure what needs to use `six` here yet
+import requests
 
 from bs4 import BeautifulSoup
 
@@ -30,7 +32,8 @@ lgr = logging.getLogger('datalad.network')
 from joblib import Memory
 memory = Memory(cachedir="/tmp/datalad", verbose=1)
 
-def get_response_deposition_filename(response_info):
+
+def get_response_disposition_filename(response_info):
     if 'Content-Disposition' in response_info:
         # If the response has Content-Disposition, try to get filename from it
         cd = dict(map(
@@ -41,13 +44,26 @@ def get_response_deposition_filename(response_info):
             return filename
     return None
 
-def get_url_deposition_filename(url):
-    request = Request(url)
-    r = retry_urlopen(request)
+
+def get_url_disposition_filename(url, headers=None):
+    """Get filename as possibly provided by the server in Content-Disposition
+    """
+    if headers is None:
+        request = Request(url)
+        r = retry_urlopen(request)
+        # things are different in requests
+        if 'requests.' in str(r.__class__):
+            headers = r.headers
+        else:
+            headers = r.info()
+    else:
+        r = None
     try:
-        return get_response_deposition_filename(r.info())
+        return get_response_disposition_filename(headers)
     finally:
-        r.close()
+        if r:
+            r.close()
+
 
 def get_url_straight_filename(url, strip=[], allowdir=False):
     """Get file/dir name of the last path component of the URL
@@ -79,6 +95,14 @@ def get_url_straight_filename(url, strip=[], allowdir=False):
     else:
         return None
 
+def get_url_filename(url, headers=None, strip=[]):
+    """Get filename from the url, first consulting server about Content-Disposition
+    """
+    filename = get_url_disposition_filename(url, headers)
+    if filename:
+        return filename
+    return get_url_straight_filename(url, strip=[])
+
 def get_url_response_stamp(url, response_info):
     size, mtime = None, None
     if 'Content-length' in response_info:
@@ -88,42 +112,29 @@ def get_url_response_stamp(url, response_info):
             response_info['Last-modified']))
     return dict(size=size, mtime=mtime, url=url)
 
-def __download_file(url, filename):
-    # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
-    request = Request(url)
-    #request.add_header('Accept-encoding', 'gzip,deflate')
-    r = urlopen(request)
-    try:
-        with open(filename, 'wb') as f:
-            if False: # r.info().get('Content-Encoding') == 'gzip':
-                buf = StringIO(r.read())
-                src = gzip.GzipFile(fileobj=buf)
-            else:
-                src = r
-            shutil.copyfileobj(src, f)
-    finally:
-        r.close()
-    return filename
 
-from ..cmd import get_runner
+def get_tld(url):
+    # maybe use this instead to be safe:  https://pypi.python.org/pypi/tld
+    if not url.startswith('http'):  # urlparse needs to have urls start with this
+        url = 'http://' + url
+    website = urlparse(url)[1]
+    # domain = '.'.join(website.split('.')[1:])
+    # print domain
+    return website
 
-def _download_file(url, filename):
-    """TEMP: use wget to download url into a file"""
 
-    # comment -- it sucks with reporting -- too much or too little.
-    # our magical wrapping experiences problems here
-    get_runner().run(["wget", "-O", filename, url],
-                     log_online=True,  # so we see what is going on
-                     #log_stderr=True, # doesn't work as necessary
-                     expect_stderr=True,
-                     log_stdout=False  # wget produces no stdout and then our beast would halt waiting for it
-                     )
-    return filename
+def __urlopen_requests(url, header_vals=None):
+    # XXX Workaround for now for ... broken code
+    if isinstance(url, Request):
+        url = url.get_full_url()
+    return requests.Session().get(url)
+
+
 
 def retry_urlopen(url, retries=3):
     for t in range(retries):
         try:
-            return urlopen(url)
+            return __urlopen_requests(url)
         except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
             if t == retries - 1:
@@ -135,10 +146,10 @@ def retry_urlopen(url, retries=3):
 # thus implementing simple decorators
 def _fetch_page(url, retries=3):
     lgr.debug("Fetching %s" % url)
-    openurl = retry_urlopen(url, retries=retries)
+    response = retry_urlopen(url, retries=retries)
     for t in range(retries):
         try:
-            page = openurl.read()
+            page = response.content   # for using requests
             break
         except URLError as e:
             lgr.warn("Received exception while reading %s: %s" % (url, e))
@@ -148,11 +159,13 @@ def _fetch_page(url, retries=3):
     lgr.info("Fetched %d bytes page from %s" % (len(page), url))
     return page
 
+
 def fetch_page(url, retries=3, cache=False):
     if cache:
         return memory.eval(_fetch_page, url, retries=retries)
     else:
         return _fetch_page(url, retries=retries)
+
 
 def is_url_quoted(url):
     """Return either URL looks being already quoted
@@ -181,6 +194,7 @@ def _parse_urls(page):
         urls.append((href, link.text, link))
     return urls
 
+
 def parse_urls(page, cache=False):
     if False:  # cache:
         # disabled until bs4 addresses Pickling issue
@@ -188,6 +202,7 @@ def parse_urls(page, cache=False):
         return memory.eval(_parse_urls, page)
     else:
         return _parse_urls(page)
+
 
 def same_website(url_rec, u_rec):
     """Decide either a link leads to external site
@@ -209,6 +224,7 @@ def same_website(url_rec, u_rec):
     # could go to the parent and that is ok.  Figure out when it was
     # desired not to go to the parent -- we might need explicit option
     # and u_rec.path.startswith(url_rec.path)):
+
 
 def dlurljoin(u_path, url):
     url_rec = urlparse(url)  # probably duplicating parsing :-/ TODO
@@ -338,12 +354,20 @@ def filter_urls(urls,
                    ((exclude_href and re.search(exclude_href, url))
                      or (exclude_href_a and re.search(exclude_href_a, a)))]
 
+
+# TEMP: abomination to support use of providers in code using _download_file
+_old_fashion_download_providers = None
 # TODO: RF move db_incoming and modes logic outside?
 def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run=False,
                  add_mode='download',
                  use_content_name=False,
                  use_redirected_name=True,
                  force_download=False):
+    global _old_fashion_download_providers
+    from ..downloaders.providers import Providers
+    if _old_fashion_download_providers is None:
+        _old_fashion_download_providers = Providers() # so only default handlers
+
     downloaded, updated, downloaded_size = False, False, 0
     # so we could check and remove it to keep it clean
     temp_full_filename = None
@@ -385,7 +409,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 raise RuntimeError("Should not get here")
 
         # TODO: add mode alike to 'relaxed' where we would not
-        # care about content-deposition filename
+        # care about content-disposition filename
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
         request = Request(url)
 
@@ -397,7 +421,8 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
         # what git-annex does for us already... not really
         r = retry_urlopen(request)
         try:
-            r_info = r.info()
+            # r_info = r.info()
+            r_info = r.headers  # not sure this is the same as .info on urllib2 or what was going on here.
 
             r_stamp = get_url_response_stamp(url, r_info)
             if use_redirected_name and url != r.url:
@@ -407,7 +432,7 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 url_filename = get_url_straight_filename(r.url)
 
             if use_content_name:
-                filename = get_response_deposition_filename(r_info) or url_filename
+                filename = get_response_disposition_filename(r_info) or url_filename
             else:
                 filename = url_filename
 
@@ -511,15 +536,18 @@ def download_url_to_incoming(url, incoming, subdir='', db_incoming=None, dry_run
                 #  request, and would need to deal with aborted transfers etc
                 #  Also then we wouldn't need to drag that 'r' around which was
                 #  originally used only to get target filename and related "stamp"
-                with open(temp_full_filename, 'wb') as f:
-                    # No magical decompression for now
-                    if False: #r.info().get('Content-Encoding') == 'gzip':
-                        buf = StringIO( r.read())
-                        src = gzip.GzipFile(fileobj=buf)
-                    else:
-                        src = r
-                    shutil.copyfileobj(src, f)
-                    downloaded = True
+                # with open(temp_full_filename, 'wb') as f:
+                #     # No magical decompression for now
+                #     if False: #r.info().get('Content-Encoding') == 'gzip':
+                #         buf = StringIO( r.read())
+                #         src = gzip.GzipFile(fileobj=buf)
+                #     else:
+                #         src = r
+                #     shutil.copyfileobj(src, f)
+                # XXX temporary workaround with 'requests' in mind to get bloody url
+
+                _ = _old_fashion_download_providers.download(r.url, path=temp_full_filename, allow_old_session=False)
+                downloaded = True
                 downloaded_size = os.stat(temp_full_filename).st_size
 
             except Exception as e:
@@ -584,7 +612,7 @@ class SimpleURLStamper(object):
     def __call__(self, url):
         # Extracted from above madness
         # TODO: add mode alike to 'relaxed' where we would not
-        # care about content-deposition filename
+        # care about content-disposition filename
         # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
         request = Request(url)
 

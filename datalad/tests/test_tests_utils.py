@@ -398,7 +398,7 @@ def test_assert_re_in():
     assert_re_in("ab", ("", "abc", "laskdjf"))
     assert_raises(AssertionError, assert_re_in, "ab$", ("ddd", ""))
 
-    # shouldn't "match" the emty list
+    # shouldn't "match" the empty list
     assert_raises(AssertionError, assert_re_in, "", [])
 
 

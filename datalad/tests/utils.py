@@ -61,7 +61,18 @@ try:
         def returnnothing(*args, **kwargs):
             return()
         _vcrp.CassettePatcherBuilder._requests = returnnothing
-    from vcr import use_cassette
+
+    from vcr import use_cassette as _use_cassette, VCR as _VCR
+
+    def use_cassette(path, return_body=None, **kwargs):
+        """Adapter so we could create/use custom use_cassette with custom parameters
+        """
+        if return_body is not None:
+            my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
+            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
+        else:
+            return _use_cassette(path, **kwargs)  # just a straight one
+
 except ImportError:
     # If there is no vcr.py -- provide a do nothing decorator for use_cassette
     def use_cassette(*args, **kwargs):
@@ -242,6 +253,11 @@ def ok_startswith(s, prefix):
         msg="String %r doesn't start with %r" % (s, prefix))
 
 
+def ok_endswith(s, suffix):
+    ok_(s.endswith(suffix),
+        msg="String %r doesn't end with %r" % (s, suffix))
+
+
 def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
@@ -294,6 +310,12 @@ def ok_archives_caches(repopath, n=1, persistent=None):
     dirs = glob.glob(glob_ptn)
     assert_equal(len(dirs), n,
                  msg="Found following dirs when needed %d of them: %s" % (n, dirs))
+
+def ok_file_has_content(path, content):
+    """Verify that file exists and has expected content"""
+    assert(exists(path))
+    with open(path, 'r') as f:
+        assert_equal(f.read(), content)
 
 #
 # Decorators

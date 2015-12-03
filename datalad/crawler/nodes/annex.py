@@ -15,14 +15,12 @@ from os import unlink, makedirs
 from ...consts import CRAWLER_META_DIR
 from ...utils import rmtree, updated
 
+from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo
 from ...support.annexrepo import AnnexRepo
 from ...support.handlerepo import HandleRepo
-from ...support.network import get_url_straight_filename, get_url_deposition_filename
-# temporarily until
-# http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
-from ...support.network import _download_file
+from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
 from ...cmd import get_runner
@@ -180,6 +178,8 @@ class Annexificator(object):
         self.mode = mode
         self.options = options or []
         self._states = []
+        # TODO: may be should be a lazy centralized instance?
+        self._providers = Providers.from_config_files()
 
         if (not allow_dirty) and self.repo.dirty:
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
@@ -204,17 +204,17 @@ class Annexificator(object):
         filename = get_url_straight_filename(url)
         # if still no filename
         if not filename:
-            filename = get_url_deposition_filename(url)
+            filename = get_url_disposition_filename(url)
         if not filename:
             raise ValueError("No filename was figured out for %s. "
                              "Please adjust pipeline to provide one" % url)
         return filename
 
-    def __call__(self, data):  # filename=None, get_deposition_filename=False):
+    def __call__(self, data):  # filename=None, get_disposition_filename=False):
         url = data.get('url')
 
 
-        # figure out the filename. If deposition one was needed, pipeline should
+        # figure out the filename. If disposition one was needed, pipeline should
         # have had it explicitly
         filename = data['filename'] if 'filename' in data else self._get_filename_from_url(url)
 
@@ -240,9 +240,12 @@ class Annexificator(object):
             _call(self.repo.git_add, filename)
         elif self.mode == 'full':
             lgr.debug("Downloading %s into %s and adding to annex" % (url, filepath))
+            # XXX temporarily??? until
+            # http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
             def _download_and_git_annex_add(url, fpath):
                 # Just to feed into _call for dry-run
-                _download_file(url, filepath)
+                filepath_downloaded = self._providers.download(url, filepath)
+                assert(filepath_downloaded == filepath)
                 self.repo.annex_add(fpath, options=self.options)
                 # and if the file ended up under annex, and not directly under git -- addurl
                 # TODO:  better function which explicitly checks if file is under annex or either under git

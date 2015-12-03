@@ -41,6 +41,7 @@ from .search_collection import SearchCollection
 from .publish_collection import PublishCollection
 from .import_metadata import ImportMetadata
 from .add_archive_content import AddArchiveContent
+from .download_url import DownloadURL
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -83,4 +84,5 @@ _group_misc = (
         Push,
         ImportMetadata,
         AddArchiveContent,
+        DownloadURL,
     ])
