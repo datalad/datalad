@@ -11,7 +11,7 @@ Implements collection backends
 """
 
 import logging
-from six import string_types
+from six import string_types, iterkeys
 
 from rdflib import Graph, Literal, RDF, RDFS
 
@@ -171,7 +171,7 @@ class CollectionRepoBackend(Collection):
 
     def reload(self):
         # TODO: This needs to be reviewed. Integrate all the different updates!
-        to_delete = self.keys()
+        to_delete = list(iterkeys(self))
         for handle in to_delete:
             del self[handle]
 

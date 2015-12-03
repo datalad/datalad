@@ -15,6 +15,7 @@ from abc import ABCMeta, abstractmethod, abstractproperty
 
 from rdflib import ConjunctiveGraph
 from rdflib.plugins.memory import IOMemory
+from six import iterkeys
 
 from datalad.support.exceptions import CollectionBrokenError
 from datalad.support.metadatahandler import DLNS, RDF, DCTERMS
@@ -35,7 +36,7 @@ class Collection(dict):
     def __repr__(self):
         return "<Collection name=%s (%s), handles=%s>" % (self.name,
                                                           type(self),
-                                                          self.keys())
+                                                          list(iterkeys(self)))
 
     # TODO: Not sure yet, whether this should be abstract or provide a
     #       default implementation

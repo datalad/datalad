@@ -285,7 +285,7 @@ class CollectionRepo(GitRepo):
         # TODO: check whether cfg-file even exists, otherwise create
         # a basic one.
         cfg_graph = Graph().parse(opj(target_path, REPO_CONFIG_FILE),
-                                      format="turtle")
+                                  format="turtle")
 
         # check for existing metadata sources to determine the name for the
         # new one:
@@ -297,7 +297,6 @@ class CollectionRepo(GitRepo):
         from six import PY3
         if PY3:
             src_name_prefix = "".join(filter(str.isalnum, str(about_uri)))
-            lgr.error("DEBUG: type: %s\nvalue: %s" % (type(src_name_prefix), src_name_prefix))
         else:
             src_name_prefix = filter(str.isalnum, str(about_uri))
         from random import choice

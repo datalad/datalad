@@ -529,12 +529,18 @@ class GitRepo(object):
           content of file_ as a list of lines.
         """
 
-        return self.repo.commit(branch).tree[file_].data_stream.read().splitlines()
-        # TODO: keep splitlines?
+        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
 
-        #out, err = self._git_custom_command(
-        #    '', 'git cat-file blob %s:%s' % (branch, file_))
-        #return out.rstrip(linesep).splitlines()
+        # in python3 a byte string is returned. Need to convert it:
+        from six import PY3
+        if PY3:
+            conv_str = u''
+            for b in bytes(content_str):
+                conv_str += chr(b)
+            return conv_str.splitlines()
+        else:
+            return content_str.splitlines()
+        # TODO: keep splitlines?
 
     def git_merge(self, name):
         self._git_custom_command('', 'git merge %s' % name)
