@@ -166,6 +166,9 @@ class CollectionRepo(GitRepo):
                          for f in self.git_get_files(branch)
                          if f != basename(f) and not f.startswith('.')]))
 
+    # TODO: come up with a better name for a 'key' in below
+    # it could be a handle_name or collection/handle_name
+    # so smth like fullhandle_name
     def _filename2key(self, fname):
         """Placeholder
 
@@ -183,6 +186,11 @@ class CollectionRepo(GitRepo):
         """
         if '\\' in key:
             raise ValueError("Invalid name: '%s'. No '\\' allowed.")
+
+        # TODO: replace with a check for a present directory instead of
+        #   traversal+transformation+__contains__
+        # if self._is_handle_present_in_current_branch(key):
+        #
         if key in self.get_handle_list():
             return key.replace('/', '--')
 
