@@ -175,6 +175,10 @@ class CollectionRepoBackend(Collection):
         for handle in to_delete:
             del self[handle]
 
+        # TODO: - dict.clear() instead
+        #       - clean meta (subgraphs)
+        #       - may be use this function in constructor?
+
         for key in self.repo.get_handle_list(self._branch):
             self[key] = CollectionRepoHandleBackend(self.repo, key,
                                                     self._branch)

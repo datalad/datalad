@@ -171,6 +171,11 @@ class Collection(dict):
         self.update_graph_store()
         return ConjunctiveGraph(store=self.store).query(query)
 
+    # TODO:
+    # override pop()!
+    # what about clear()?
+    # copy()?
+
 
 class MetaCollection(dict):
     """A collection of collections.
