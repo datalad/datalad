@@ -10,8 +10,8 @@
 
 """
 
+import boto  # TODO should be moved into the class for lazy load
 import re
-import requests
 import os
 from os.path import exists, join as opj, isdir
 
@@ -31,50 +31,14 @@ lgr = getLogger('datalad.http')
 
 __docformat__ = 'restructuredtext'
 
-def check_response_status(response, err_prefix=""):
-    """Check if response's status_code signals problem with authentication etc
-
-    ATM succeeds only if response code was 200
-    """
-    if not err_prefix:
-        err_prefix = "Access to %s has failed: " % response.url
-    if response.status_code in {404}:
-        # It could have been that form_url is wrong, so let's just say that
-        # TODO: actually may be that is where we could use tagid and actually determine the form submission url
-        raise DownloadError(err_prefix + "not found")
-    elif 400 <= response.status_code < 500:
-        raise AccessDeniedError(err_prefix + "status code %d" % response.status_code)
-    elif response.status_code in {200}:
-        pass
-    else:
-        raise AccessDeniedError(err_prefix + "status code %d" % response.status_code)
-
-
 @auto_repr
-class HTTPBaseAuthenticator(Authenticator):
-    """Base class for html_form and http_auth authenticators
+class S3Authenticator(Authenticator):
+    """Authenticator for S3 AWS
     """
-    def __init__(self, url=None, failure_re=None, success_re=None, **kwargs):
-        """
-        Parameters
-        ----------
-        url : str, optional
-          URL where to find the form/login to authenticate.  If not provided, an original query url
-          which will be provided to the __call__ of the authenticator will be used
-        failure_re : str or list of str, optional
-        success_re : str or list of str, optional
-          Regular expressions to determine either login has failed or succeeded.
-          TODO: we might condition when it gets ran
-        """
-        super(HTTPBaseAuthenticator, self).__init__(**kwargs)
-        self.url = url
-        self.failure_re = assure_list_from_str(failure_re)
-        self.success_re = assure_list_from_str(success_re)
 
-
-    def authenticate(self, url, credential, session, update=False):
-        # we should use specified URL for this authentication first
-        lgr.debug("http session: Authenticating into session for %s" % url)
+    #def authenticate(self, url, credential, session, update=False):
+    def authenticate(self, bucket_name, credential):
+        lgr.debug("S3 session: Authenticating into session for %s" % url)
         post_url = self.url if self.url else url
         credentials = credential()
 
@@ -95,14 +59,6 @@ class HTTPBaseAuthenticator(Authenticator):
                         err_prefix + " returned output did not match 'success' regular expression %s" % success_re
                     )
 
-        if response.cookies:
-            cookies_dict = requests.utils.dict_from_cookiejar(response.cookies)
-            if (url in cookies_db) and update:
-                cookies_db[url].update(cookies_dict)
-            else:
-                cookies_db[url] = cookies_dict
-            # assign cookies for this session
-            session.cookies = response.cookies
         return response
 
     def _post_credential(self, credentials, post_url, session):
@@ -116,56 +72,6 @@ class HTTPBaseAuthenticator(Authenticator):
                     raise AccessDeniedError(
                         err_prefix + "returned output which matches regular expression %s" % failure_re
                     )
-
-
-@auto_repr
-class HTMLFormAuthenticator(HTTPBaseAuthenticator):
-    """Authenticate by opening a session via POSTing to HTML form
-    """
-
-    def __init__(self, fields, tagid=None, **kwargs):
-        """
-
-        Example specification in the .ini config file
-        [provider:crcns]
-        ...
-        credential = crcns ; is not given to authenticator as is
-        authentication_type = html_form
-        # TODO: may be rename into post_url
-        html_form_url = https://crcns.org/login_form
-        # probably not needed actually since form_url
-        # html_form_tagid = login_form
-        html_form_fields = __ac_name={user}
-                   __ac_password={password}
-                   submit=Log in
-                   form.submitted=1
-                   js_enabled=0
-                   cookies_enabled=
-        html_form_failure_re = (Login failed|Please log in)
-        html_form_success_re = You are now logged in
-
-        Parameters
-        ----------
-        fields : str or dict
-          String or a dictionary, which will be used (along with credential) information
-          to feed into the form
-        tagid : str, optional
-          id of the HTML <form> in the document to use. If None, and page contains a single form,
-          that one will be used.  If multiple forms -- error will be raise
-        **kwargs : dict, optional
-          Passed to super class HTTPBaseAuthenticator
-        """
-        super(HTMLFormAuthenticator, self).__init__(**kwargs)
-        self.fields = assure_dict_from_str(fields)
-        self.tagid = tagid
-
-    def _post_credential(self, credentials, post_url, session):
-        post_fields = {
-            k: v.format(**credentials)
-            for k, v in self.fields.items()
-            }
-        response = session.post(post_url, data=post_fields)
-        return response
 
 
 @auto_repr
@@ -323,7 +229,6 @@ class HTTPDownloader(BaseDownloader):
             if (headers.get('Content-type', "") or headers.get('Content-Type', "")).startswith('text/html') \
                     and downloaded_size < 10000 \
                     and self.authenticator:  # and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
-                # TODO: Common logic for any downloader whenever no proper failure code is thrown etc
                 with open(temp_filepath) as f:
                     self.authenticator.check_for_auth_failure(
                         f.read(), "Download of file %s has failed: " % filepath)
@@ -355,4 +260,3 @@ class HTTPDownloader(BaseDownloader):
 
     def _check(self, url):
         raise NotImplementedError("check is not yet implemented")
-
