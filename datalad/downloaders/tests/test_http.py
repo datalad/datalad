@@ -15,11 +15,13 @@ from ..http import HTTPDownloader
 from ..http import DownloadError
 from ..http import HTMLFormAuthenticator
 from ..providers import Providers, Credential  # to test against crcns
+from ...support.cookies import CookiesDB
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 import httpretty
 from mock import patch
 from ...tests.utils import assert_in
+from ...tests.utils import assert_not_in
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
 from ...tests.utils import assert_raises
@@ -109,6 +111,7 @@ test_authenticate_external_portals.tags = ['external-portal']
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
 
+
 class FakeCredential1(Credential):
     """Credential to test scenarios."""
     _fixed_credentials = [
@@ -129,17 +132,40 @@ def test_HTMLFormAuthenticator_httpretty(d):
     url = "http://example.com/crap.txt"
     fpath = opj(d, 'crap.txt')
 
+
+    def request_post_callback(request, uri, headers):
+        print '\n***********************************'
+        print 'headers -- ', headers
+        print 'request -- ', request
+        print 'request.headers -- ', request.headers
+        print 'uri -- ', uri
+        print '***********************************'
+        assert_not_in('Cookie', request.headers)
+        return (200, headers, "Got cookie {} from response via {}".format(headers['set-cookie'], uri))
+
+    def request_get_callback(request, uri, headers):
+        print '--------------------------'
+        print request.headers
+        print '--------------------------'
+        print headers
+        print '--------------------------'
+        assert_in('Cookie', request.headers)
+        assert_equal(request.headers.get('Cookie'), 'somewebsite=testcookie')
+        return (200, headers, "correct body")
+
     # SCENARIO 1
-    # TODO: callaback which would verify that correct credentials provided
+    # callback to verify that correct credentials provided
     # and return the cookie, which will be tested again while 'GET'ing
     httpretty.register_uri(httpretty.POST, url,
-                           body="whatever",  # TODO: return some cookie for the session
-                           status=200)
+                           body=request_post_callback,
+                           set_cookie='somewebsite=testcookie',
+                           adding_headers=dict(username='myusername', password='mypassword')
+                          )
     # in GET verify that correct cookie was provided, and verify that no
     # credentials sneaked in
     httpretty.register_uri(httpretty.GET, url,
-                           body="correct body",
-                           status=200)
+                           body=request_get_callback
+                          )
 
     # SCENARIO 2
     # outdated cookie provided to GET -- you must return 403 (access denied)
@@ -166,8 +192,14 @@ def test_HTMLFormAuthenticator_httpretty(d):
     # TODO: with success_re etc
 
     # This is a "success test" which should be tested in various above scenarios
-    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
-    downloader.download(url, path=d)
+    def fake_load(self):
+        self._cookies_db = {}
+
+    with patch.object(CookiesDB, '_load', fake_load):
+        downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+        downloader.download(url, path=d)
+
+
     with open(fpath) as f:
         content = f.read()
         assert_equal(content, "correct body")
