@@ -126,49 +126,46 @@ class FakeCredential1(Credential):
         # pop last used credential, so we would use "new" ones
         del self._fixed_credentials[0]
 
+
 @httpretty.activate
 @with_tempfile(mkdir=True)
 def test_HTMLFormAuthenticator_httpretty(d):
     url = "http://example.com/crap.txt"
+    test_cookie = 'somewebsite=testcookie'
     fpath = opj(d, 'crap.txt')
+
+    credential = FakeCredential1(name='test', type='user_password', url=None)
+    credentials = credential()
 
 
     def request_post_callback(request, uri, headers):
-        print '\n***********************************'
-        print 'headers -- ', headers
-        print 'request -- ', request
-        print 'request.headers -- ', request.headers
-        print 'uri -- ', uri
-        print '***********************************'
+        post_params = request.parsed_body
+        assert_equal(credentials['password'], post_params['password'][0])
+        assert_equal(credentials['user'], post_params['username'][0])
         assert_not_in('Cookie', request.headers)
-        return (200, headers, "Got cookie {} from response via {}".format(headers['set-cookie'], uri))
+        return (200, headers, "Got {} response from {}".format(request.method, uri))
 
     def request_get_callback(request, uri, headers):
-        print '--------------------------'
-        print request.headers
-        print '--------------------------'
-        print headers
-        print '--------------------------'
+        assert_equal(request.body, '')
         assert_in('Cookie', request.headers)
-        assert_equal(request.headers.get('Cookie'), 'somewebsite=testcookie')
+        assert_equal(request.headers['Cookie'], test_cookie)
         return (200, headers, "correct body")
 
     # SCENARIO 1
-    # callback to verify that correct credentials provided
-    # and return the cookie, which will be tested again while 'GET'ing
+    # callback to verify that correct credentials are provided
+    # and then returns the cookie to test again for 'GET'ing
     httpretty.register_uri(httpretty.POST, url,
                            body=request_post_callback,
-                           set_cookie='somewebsite=testcookie',
-                           adding_headers=dict(username='myusername', password='mypassword')
+                           set_cookie=test_cookie,
                           )
-    # in GET verify that correct cookie was provided, and verify that no
-    # credentials sneaked in
+    # then in GET verify that correct cookie was provided and
+    # that no credentials are there
     httpretty.register_uri(httpretty.GET, url,
                            body=request_get_callback
                           )
 
     # SCENARIO 2
-    # outdated cookie provided to GET -- you must return 403 (access denied)
+    # outdated cookie provided to GET -- must return 403 (access denied)
     # then our code should POST credentials again and get a new cookies
     # which is then provided to GET
 
@@ -181,16 +178,12 @@ def test_HTMLFormAuthenticator_httpretty(d):
     # SCENARIO 4
     # cookie and credentials expired, user provided new bad credential
 
-    # TODO: somehow mock or whatever access to cookies, because we don't want to modify
-    # user's cookies during the test.
     # Also we want to test how would it work if cookie is available (may be)
     # TODO: check with correct and incorrect credential
-    credential = FakeCredential1(name='test', type='user_password', url=None)
     authenticator = HTMLFormAuthenticator(dict(username="{user}",
                                                password="{password}",
                                                submit="CustomLogin"))
     # TODO: with success_re etc
-
     # This is a "success test" which should be tested in various above scenarios
     def fake_load(self):
         self._cookies_db = {}
@@ -199,13 +192,13 @@ def test_HTMLFormAuthenticator_httpretty(d):
         downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
         downloader.download(url, path=d)
 
-
     with open(fpath) as f:
         content = f.read()
         assert_equal(content, "correct body")
 
     # Unsuccesfull scenarios to test:
-    # Provided URL is at the end 404s, or another failure (e.g. interrupted download)
+    # the provided URL at the end 404s, or another failure (e.g. interrupted download)
+
 
 def test_HTTPAuthAuthenticator_httpretty():
     raise SkipTest("Not implemented. TODO")
