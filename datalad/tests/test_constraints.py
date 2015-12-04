@@ -81,6 +81,16 @@ def test_str():
     assert_raises(ValueError, lambda: c(7.0))
     assert_equal(c.short_description(), 'str')
 
+def test_str_min_len():
+    c = ct.EnsureStr(min_len=1)
+    assert_equal(c('hello'), 'hello')
+    assert_equal(c('h'), 'h')
+    assert_raises(ValueError, c, '')
+
+    c = ct.EnsureStr(min_len=2)
+    assert_equal(c('hello'), 'hello')
+    assert_raises(ValueError, c, 'h')
+
 
 def test_none():
     c = ct.EnsureNone()

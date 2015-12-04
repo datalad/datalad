@@ -43,6 +43,42 @@ except:  # pragma: no cover
 # Little helpers
 #
 
+def shortened_repr(value, l=30):
+    try:
+        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
+            value_repr = repr(value)
+            if not value_repr.startswith('<') and len(value_repr) > l:
+                value_repr = "<<%s...>>" % (value_repr[:l-8])
+            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
+                raise ValueError("I hate those useless long reprs")
+        else:
+            raise ValueError("gimme class")
+    except Exception as e:
+        value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
+    return value_repr
+
+
+def __auto_repr__(obj):
+    items = []
+    for prop in sorted(obj.__dict__):
+        if prop.startswith('_'):
+            continue
+        value = obj.__dict__[prop]
+        items.append("%s=%s" % (prop, shortened_repr(value)))
+
+    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
+
+def auto_repr(cls):
+    """Decorator for a class to assign it an automagic quick and dirty __repr__
+
+    It uses public class attributes to prepare repr of a class
+
+    Original idea: http://stackoverflow.com/a/27799004/1265472
+    """
+
+    cls.__repr__ = __auto_repr__
+    return cls
+
 def is_interactive():
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
@@ -101,7 +137,7 @@ def rotree(path, ro=True, chmod_files=True):
     else:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode | stat.S_IWRITE | stat.S_IREAD)
 
-    for root, dirs, files in os.walk(path):
+    for root, dirs, files in os.walk(path, followlinks=False):
         if chmod_files:
             for f in files:
                 fullf = opj(root, f)
@@ -127,8 +163,13 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-    rotree(path, ro=False, chmod_files=chmod_files)
-    shutil.rmtree(path, *args, **kwargs)
+
+    if not os.path.islink(path):
+        rotree(path, ro=False, chmod_files=chmod_files)
+        shutil.rmtree(path, *args, **kwargs)
+    else:
+        # just remove the symlink
+        os.unlink(path)
 
 
 def rmtemp(f, *args, **kwargs):
@@ -158,6 +199,50 @@ def rmtemp(f, *args, **kwargs):
                 break
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def assure_list_from_str(s):
+    """Given a multiline string convert it to a list of return None if empty
+
+    Parameters
+    ----------
+    s: str or list
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, list):
+        return s
+    return s.split('\n')
+
+
+def assure_dict_from_str(s):
+    """Given a multiline string with key=value items convert it to a dictionary
+
+    Parameters
+    ----------
+    s: str or dict
+
+    Returns None if input s is empty
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, dict):
+        return s
+
+    out = {}
+    for value_str in assure_list_from_str(s):
+        if '=' not in value_str:
+            raise ValueError("{} is not in key=value format".format(repr(value_str)))
+        k, v = value_str.split('=', 1)
+        if k in out:
+            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            raise ValueError(err)
+        out[k] = v
+    return out
 
 
 #
@@ -194,7 +279,7 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
     # operate on a copy of tkwargs to avoid any side-effects
@@ -408,17 +493,14 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
-def chpwd(path):
-    """Wrapper around os.chdir which also adjusts environ['PWD']
+def updated(d, update):
+    """Return a copy of the input with the 'update'
 
-    The reason is that otherwise PWD is simply inherited from the shell
-    and we have no ability to assess directory path without dereferencing
-    symlinks
+    Primarily for updating dictionaries
     """
-    if not isabs(path):
-        path = normpath(opj(getpwd(), path))
-    os.chdir(path)  # for grep people -- ok, to chdir here!
-    os.environ['PWD'] = path
+    d = d.copy()
+    d.update(update)
+    return d
 
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
@@ -429,3 +511,33 @@ def getpwd():
         return os.environ['PWD']
     except KeyError:
         return os.getcwd()
+
+class chpwd(object):
+    """Wrapper around os.chdir which also adjusts environ['PWD']
+
+    The reason is that otherwise PWD is simply inherited from the shell
+    and we have no ability to assess directory path without dereferencing
+    symlinks.
+
+    If used as a context manager it allows to temporarily change directory
+    to the given path
+    """
+    def __init__(self, path, mkdir=False):
+        if not isabs(path):
+            path = normpath(opj(getpwd(), path))
+        if not os.path.exists(path) and mkdir:
+            self._mkdir = True
+            os.mkdir(path)
+        else:
+            self._mkdir = False
+        self._prev_pwd = getpwd()
+        os.chdir(path)  # for grep people -- ok, to chdir here!
+        os.environ['PWD'] = path
+
+    def __enter__(self):
+        # nothing more to do really, chdir was in the constructor
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        chpwd(self._prev_pwd)
+

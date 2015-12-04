@@ -216,7 +216,7 @@ class HandleRepo(AnnexRepo):
         """
 
         if self.is_direct_mode():
-            self.annex_proxy('git commit -m "%s"' % msg)
+            self.annex_proxy('git commit -m "%s"' % msg, expect_stderr=True)
         else:
             self.git_commit(msg)
 

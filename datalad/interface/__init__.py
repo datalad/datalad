@@ -28,6 +28,7 @@ from .test import Test
 from .get import Get
 from .drop import Drop
 from .crawl import Crawl
+from .oldcrawl import OldCrawl
 from .update import Update
 from .whereis import Whereis
 from .describe import Describe
@@ -39,6 +40,8 @@ from .publish_handle import PublishHandle
 from .search_collection import SearchCollection
 from .publish_collection import PublishCollection
 from .import_metadata import ImportMetadata
+from .add_archive_content import AddArchiveContent
+from .download_url import DownloadURL
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -70,6 +73,7 @@ _group_misc = (
     [
         Test,
         Crawl,
+        OldCrawl,
         SPARQLQuery,
         SearchHandle,
         SearchCollection,
@@ -79,4 +83,6 @@ _group_misc = (
         Pull,
         Push,
         ImportMetadata,
+        AddArchiveContent,
+        DownloadURL,
     ])

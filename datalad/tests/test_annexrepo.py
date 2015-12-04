@@ -456,4 +456,25 @@ def test_AnnexRepo_on_uninited_annex(path):
 #def annex_initremote(self, name, options):
 #def annex_enableremote(self, name):
 
+@with_testrepos('basic_annex$', flavors=['clone'])
+def test_AnnexRepo_get_contentlocation(path):
+    annex = AnnexRepo(path, create=False, init=False)
+    fname = 'test-annex.dat'
+    key = annex.get_file_key(fname)
+    # TODO: see if we can avoid this or specify custom exception
+    assert_raises(CommandError, annex.get_contentlocation, key)
+
+    with swallow_outputs() as cmo:
+        annex.annex_get(fname)
+    key_location = annex.get_contentlocation(key)
+    # they both should point to the same location eventually
+    eq_(os.path.realpath(opj(annex.path, fname)),
+        os.path.realpath(opj(annex.path, key_location)))
+
+    # TODO: test how it would look if done under a subdir
+    with chpwd('subdir', mkdir=True):
+        key_location = annex.get_contentlocation(key)
+        # they both should point to the same location eventually
+        eq_(os.path.realpath(opj(annex.path, fname)),
+            os.path.realpath(opj(annex.path, key_location)))
 

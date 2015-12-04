@@ -7,19 +7,23 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import os, tempfile, time, platform
+import tempfile
+import time
+
+import os
 from os.path import join, exists, lexists, isdir
+from nose.exc import SkipTest
 
 from .utils import eq_, ok_, assert_greater, \
      with_tree, serve_path_via_http, sorted_files, create_tree_archive, \
      md5sum, ok_clean_git, ok_file_under_git, get_most_obscure_supported_name, \
      on_windows, on_osx
 from ..utils import rmtemp
-from nose.exc import SkipTest
 
-from ..config import EnhancedConfigParser
+from ..crawler.oldconfig import EnhancedConfigParser
 from ..crawler.main import DoubleAnnexRepo
 from ..db import load_db
+
 
 # Too many things at a time. For now skip crawler tests on windows:
 if on_windows:

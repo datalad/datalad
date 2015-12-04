@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 from glob import glob
 from os.path import exists, join as opj, basename
 
-from six import PY2
+from six import PY2, PY3
 from six import text_type
 from six.moves.urllib.request import urlopen
 
@@ -34,10 +34,12 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
+from .utils import ok_generator
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import run_under_dir
+from .utils import use_cassette
 
 #
 # Test with_tempfile, especially nested invocations
@@ -227,6 +229,20 @@ def test_nok_startswith():
     assert_raises(AssertionError, nok_startswith, 'abc', 'a')
     assert_raises(AssertionError, nok_startswith, 'abc', 'abc')
 
+def test_ok_generator():
+    def func(a, b=1):
+        return a+b
+    def gen(a, b=1):
+        yield a+b
+    # not sure how to determine if xrange is a generator
+    if PY2:
+        assert_raises(AssertionError, ok_generator, xrange(2))
+    assert_raises(AssertionError, ok_generator, range(2))
+    assert_raises(AssertionError, ok_generator, gen)
+    ok_generator(gen(1))
+    assert_raises(AssertionError, ok_generator, func)
+    assert_raises(AssertionError, ok_generator, func(1))
+
 
 def _test_assert_Xwd_unchanged(func):
     orig_cwd = os.getcwd()
@@ -382,7 +398,7 @@ def test_assert_re_in():
     assert_re_in("ab", ("", "abc", "laskdjf"))
     assert_raises(AssertionError, assert_re_in, "ab$", ("ddd", ""))
 
-    # shouldn't "match" the emty list
+    # shouldn't "match" the empty list
     assert_raises(AssertionError, assert_re_in, "", [])
 
 
@@ -420,3 +436,18 @@ def test_run_under_dir(d):
     assert_raises(AssertionError, f, 1, 3)
     eq_(getpwd(), orig_pwd)
     eq_(os.getcwd(), orig_cwd)
+
+
+def test_use_cassette_if_no_vcr():
+    # just test that our do nothing decorator does the right thing if vcr is not present
+    try:
+        import vcr
+        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
+    except ImportError:
+        pass
+
+    @use_cassette("some_path")
+    def checker(x):
+        return x + 1
+
+    eq_(checker(1), 2)

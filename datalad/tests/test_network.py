@@ -9,7 +9,7 @@
 
 from .utils import eq_, ok_
 
-from ..support.network import same_website, dgurljoin
+from ..support.network import same_website, dlurljoin
 from ..support.network import get_url_straight_filename
 
 
@@ -19,17 +19,19 @@ def test_same_website():
     ok_(same_website("https://a.b/page/2/", "http://a.b/2014/01/xxx/"))
     ok_(same_website("http://a.b/page/2/", "https://a.b/2014/01/xxx/"))
 
-def test_dgurljoin():
-    eq_(dgurljoin('http://a.b/', 'f'), 'http://a.b/f')
-    eq_(dgurljoin('http://a.b/page', 'f'), 'http://a.b/f')
-    eq_(dgurljoin('http://a.b/dir/', 'f'), 'http://a.b/dir/f')
-    eq_(dgurljoin('http://a.b/dir/', 'http://url'), 'http://url')
+def test_dlurljoin():
+    eq_(dlurljoin('http://a.b/', 'f'), 'http://a.b/f')
+    eq_(dlurljoin('http://a.b/page', 'f'), 'http://a.b/f')
+    eq_(dlurljoin('http://a.b/dir/', 'f'), 'http://a.b/dir/f')
+    eq_(dlurljoin('http://a.b/dir/', 'http://url'), 'http://url')
+    eq_(dlurljoin('http://a.b/dir/', '/'), 'http://a.b/')
+    eq_(dlurljoin('http://a.b/dir/', '/x/y'), 'http://a.b/x/y')
 
 def _test_get_url_straight_filename(suf):
     eq_(get_url_straight_filename('http://a.b/' + suf), '')
     eq_(get_url_straight_filename('http://a.b/p1' + suf), 'p1')
     eq_(get_url_straight_filename('http://a.b/p1/' + suf), '')
-    #eq_(get_url_straight_filename('http://a.b/p1/' + suf, allowdir=True), 'p1')
+    eq_(get_url_straight_filename('http://a.b/p1/' + suf, allowdir=True), 'p1')
     eq_(get_url_straight_filename('http://a.b/p1/p2' + suf), 'p2')
     eq_(get_url_straight_filename('http://a.b/p1/p2/' + suf), '')
     eq_(get_url_straight_filename('http://a.b/p1/p2/' + suf, allowdir=True), 'p2')

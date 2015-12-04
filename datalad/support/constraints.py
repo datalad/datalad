@@ -37,6 +37,8 @@ class Constraint(object):
     documentation on an appropriate parameter value.
     """
 
+    # TODO: __str__ and/or __repr__ for every one of them
+
     def __and__(self, other):
         return Constraints(self, other)
 
@@ -178,13 +180,27 @@ class EnsureStr(Constraint):
 
     No automatic conversion is attempted.
     """
+    def __init__(self, min_len=0):
+        """
+        Parameters
+        ----------
+        min_len: int, optional
+           Minimal length for a string.
+        """
+        assert(min_len >= 0)
+        self._min_len = min_len
+        super(EnsureStr, self).__init__()
+
     def __call__(self, value):
         from six import binary_type, text_type
         if not isinstance(value, (binary_type, text_type)):
             # do not perform a blind conversion ala str(), as almost
             # anything can be converted and the result is most likely
             # unintended
-            raise ValueError("value is not a string")
+            raise ValueError("%s is not a string" % repr(value))
+        if len(value) < self._min_len:
+            raise ValueError("%r is shorter than of minimal length %d"
+                             % (value, self._min_len))
         return value
 
     def long_description(self):
@@ -303,7 +319,8 @@ class AltConstraints(Constraint):
                 return c(value)
             except Exception as e:
                 e_list.append(e)
-        raise ValueError("all alternative constraints violated")
+        raise ValueError("all alternative constraints (%s) violated while testing value %r"
+                         % (self.constraints, value))
 
     def long_description(self):
         cs = [c.long_description() for c in self.constraints if hasattr(c, 'long_description')]
