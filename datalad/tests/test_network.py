@@ -7,9 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from .utils import eq_, ok_
+from .utils import eq_, ok_, assert_raises
 
 from ..support.network import same_website, dlurljoin
+from ..support.network import get_tld
 from ..support.network import get_url_straight_filename
 
 
@@ -18,6 +19,17 @@ def test_same_website():
     ok_(same_website("http://a.b/page/2/", "http://a.b/2014/01/xxx/"))
     ok_(same_website("https://a.b/page/2/", "http://a.b/2014/01/xxx/"))
     ok_(same_website("http://a.b/page/2/", "https://a.b/2014/01/xxx/"))
+
+
+def test_get_tld():
+    eq_(get_tld('http://example.com'), 'example.com')
+    eq_(get_tld('http://example.com/1'), 'example.com')
+    eq_(get_tld('http://example.com/1/2'), 'example.com')
+    eq_(get_tld('example.com/1/2'), 'example.com')
+    eq_(get_tld('s3://example.com/1/2'), 'example.com')
+    assert_raises(ValueError, get_tld, "")
+    assert_raises(ValueError, get_tld, "s3://")
+    assert_raises(ValueError, get_tld, "http://")
 
 def test_dlurljoin():
     eq_(dlurljoin('http://a.b/', 'f'), 'http://a.b/f')

@@ -114,13 +114,23 @@ def get_url_response_stamp(url, response_info):
 
 
 def get_tld(url):
+    """Return top level domain from a url
+
+    Parameters
+    ----------
+    url : str
+    """
     # maybe use this instead to be safe:  https://pypi.python.org/pypi/tld
-    if not url.startswith('http'):  # urlparse needs to have urls start with this
-        url = 'http://' + url
-    website = urlparse(url)[1]
-    # domain = '.'.join(website.split('.')[1:])
-    # print domain
-    return website
+    if not url.strip():
+        raise ValueError("Empty URL has no TLD")
+    rec = urlsplit(url)
+    if not rec.netloc:
+        if not rec.scheme:
+            # There were no scheme provided thus netloc was empty -- must have been a simple 'path like'
+            return url.split('/', 1)[0]
+        else:
+            raise ValueError("It seems that only the scheme was provided without the net location/TLD")
+    return rec.netloc
 
 
 def __urlopen_requests(url, header_vals=None):
