@@ -22,6 +22,7 @@ from ..utils import assure_list_from_str
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
 from .http import HTMLFormAuthenticator, HTTPAuthAuthenticator
+from .aws import S3Authenticator, S3Downloader
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')
@@ -107,7 +108,7 @@ class Provider(object):
     # specific downloaders while importing needed Python modules "on demand"
     DOWNLOADERS = {'http': HTTPDownloader,
                    'https': HTTPDownloader,
-                   #'s3': S3Downloader,
+                   's3': S3Downloader,
                     # ... TODO
                   }
 
@@ -185,7 +186,7 @@ class Providers(object):
     AUTHENTICATION_TYPES = {
         'html_form': HTMLFormAuthenticator,
         'http_auth': HTTPAuthAuthenticator,
-        'aws-s3': NotImplementedAuthenticator,  # TODO: check if having '-' is kosher
+        'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
         'xnat': NotImplementedAuthenticator,
         'none': NoneAuthenticator,
     }

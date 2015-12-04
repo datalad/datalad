@@ -10,7 +10,11 @@
 
 """
 
-import boto  # TODO should be moved into the class for lazy load
+try:
+    import boto
+except ImportError:
+    boto = None
+
 import re
 import os
 from os.path import exists, join as opj, isdir
@@ -73,38 +77,9 @@ class S3Authenticator(Authenticator):
                         err_prefix + "returned output which matches regular expression %s" % failure_re
                     )
 
-
 @auto_repr
-class HTTPAuthAuthenticator(HTTPBaseAuthenticator):
-    """Authenticate by opening a session via POSTing authentication data via HTTP
-    """
-
-    def __init__(self, **kwargs):
-        """
-
-        Example specification in the .ini config file
-        [provider:hcp-db]
-        ...
-        credential = hcp-db ; is not given to authenticator as is
-        authentication_type = http_auth
-        http_auth_url = .... TODO
-
-        Parameters
-        ----------
-        **kwargs : dict, optional
-          Passed to super class HTTPBaseAuthenticator
-        """
-        # so we have __init__ solely for a custom docstring
-        super(HTTPAuthAuthenticator, self).__init__(**kwargs)
-
-    def _post_credential(self, credentials, post_url, session):
-        response = session.post(post_url, data={}, auth=(credentials['user'], credentials['password']))
-        return response
-
-
-@auto_repr
-class HTTPDownloader(BaseDownloader):
-    """A stateful downloader to maintain a session to the website
+class S3Downloader(BaseDownloader):
+    """Downloader from AWS S3 buckets
     """
 
     def __init__(self, credential=None, authenticator=None):
