@@ -127,7 +127,12 @@ class DialogUI(ConsoleLog, InteractiveUI):
             msg = "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
         else:
             msg = text
+        """
+        Anaconda format:
 
+Question? [choice1|choice2]
+[default] >>> yes
+        """
         attempt = 0
         while True:
             attempt += 1

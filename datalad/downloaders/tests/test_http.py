@@ -29,6 +29,7 @@ from ...tests.utils import swallow_logs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import SkipTest
+from ...tests.utils import skip_httpretty_on_problematic_pythons
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
@@ -123,6 +124,7 @@ class FakeCredential1(Credential):
         # pop last used credential, so we would use "new" ones
         del self._fixed_credentials[0]
 
+@skip_httpretty_on_problematic_pythons
 @httpretty.activate
 @with_tempfile(mkdir=True)
 def test_HTMLFormAuthenticator_httpretty(d):

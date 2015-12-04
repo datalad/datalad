@@ -757,6 +757,24 @@ def ignore_nose_capturing_stdout(func):
                 raise
     return newfunc
 
+def skip_httpretty_on_problematic_pythons(func):
+    """As discovered some httpretty bug causes a side-effect
+    on other tests on some Pythons.  So we skip the test if such
+    problematic combination detected
+
+    References
+    https://travis-ci.org/datalad/datalad/jobs/94464988
+    http://stackoverflow.com/a/29603206/1265472
+    """
+
+    @make_decorator(func)
+    def newfunc(*args, **kwargs):
+        if sys.version_info[:3] == (3, 4, 2):
+            raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
+        return func(*args, **kwargs)
+    return newfunc
+
+
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_FILENAMES = (
