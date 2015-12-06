@@ -58,14 +58,18 @@ class Credential(object):
         self.type = type
         self.url = url
 
+    def _ask_field_value(self, f):
+        return ui.question(f,
+                           title="You need to authenticate with %r credentials." % self.name
+                                 + " %s provides information on how to gain access"
+                                   % self.url if self.url else '',
+                           hidden=True)
     # TODO: I guess it, or subclasses depending on the type
     def enter_new(self):
         # Use ui., request credential fields corresponding to the type
         # TODO: this is duplication with __call__
         for f in self.TYPES[self.type]:
-            v = ui.question("Please enter the %s field" % f,
-                            title="Authentication necessary for %s" % self.name,
-                            hidden=True)
+            v = self._ask_field_value(f)
             keyring.set_password(self.uid, f, v)
         pass
 
@@ -86,9 +90,7 @@ class Credential(object):
         for f in self.TYPES[self.type]:
             v = keyring.get_password(uid, f)
             while v is None:  # was not known
-                v = ui.question("Please enter the %s field" % f,
-                                title="Authentication necessary for %s" % self.name,
-                                hidden=True)
+                v = self._ask_field_value(f)
             keyring.set_password(uid, f, v)
             credentials[f] = v
 

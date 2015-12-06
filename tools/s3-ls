@@ -79,14 +79,14 @@ for e in prefix_all_versions:
 
         content = ""
         # IO intensive, make an option finally!
-        # try:
-        #     # _ = e.next()[:5]  # if we are able to fetch the content
-        #     content = e.get_contents_as_string(version_id=e.version_id)[:5]
-        #     #content = "[S3: OK]"
-        # except S3ResponseError as err:
-        #     content = err.message
-        # finally:
-        #     content = " " + content
+        try:
+            # _ = e.next()[:5]  if we are able to fetch the content
+            content = repr(e.get_contents_as_string(version_id=e.version_id))
+            #content = "[S3: OK]"
+        except S3ResponseError as err:
+            content = err.message
+        finally:
+            content = " " + content
 
         print("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
     else:

@@ -11,10 +11,12 @@
 from os.path import join as opj
 import six.moves.builtins as __builtin__
 
+from ..base import DownloadError
 from ..http import HTTPDownloader
-from ..http import DownloadError
 from ..http import HTMLFormAuthenticator
 from ..providers import Providers, Credential  # to test against crcns
+
+from ...support.network import get_url_straight_filename
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 import httpretty
@@ -26,6 +28,7 @@ from ...tests.utils import assert_raises
 from ...tests.utils import ok_file_has_content
 from ...tests.utils import serve_path_via_http, with_tree
 from ...tests.utils import swallow_logs
+from ...tests.utils import swallow_outputs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import SkipTest
@@ -77,34 +80,40 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # TODO: access denied detection
 
 
+_test_providers = None
+
+@with_tempfile(mkdir=True)
+def check_download_external_url(url, failed_str, success_str, d):
+    global _test_providers
+    fpath = opj(d, get_url_straight_filename(url))
+    if not _test_providers:
+        _test_providers = Providers.from_config_files()
+    provider = _test_providers.get_provider(url)
+    if not provider.credential.is_known:
+        raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
+    downloader = provider.get_downloader(url)
+    with swallow_outputs() as cmo:
+        downloaded_path = downloader.download(url, path=d)
+    assert_equal(fpath, downloaded_path)
+    with open(fpath) as f:
+        content = f.read()
+        if success_str is not None:
+            assert_in(success_str, content)
+        if failed_str is not None:
+            assert_false(failed_str in content)
+
 
 @use_cassette('fixtures/vcr_cassettes/test_authenticate_external_portals.yaml', record_mode='once')
 def test_authenticate_external_portals():
-
-    providers = Providers.from_config_files()
-
-    @with_tempfile(mkdir=True)
-    def check_authenticate_external_portals(url, failed_str, success_str, d):
-        fpath = opj(d, url.split('/')[-1])
-        provider = providers.get_provider(url)
-        if not provider.credential.is_known:
-            raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
-        downloader = provider.get_downloader(url)
-        downloader.download(url, path=d)
-        with open(fpath) as f:
-            content = f.read()
-            assert_false(failed_str in content)
-            assert_in(success_str, content)
-
-    yield check_authenticate_external_portals, \
+    yield check_download_external_url, \
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
           "<form action=", \
           "datafiles/meta_data_files.tar.gz"
-    yield check_authenticate_external_portals, \
+    yield check_download_external_url, \
           'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
           "failed", \
           "2000 1005 2000 3000"
-test_authenticate_external_portals.tags = ['external-portal']
+test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url

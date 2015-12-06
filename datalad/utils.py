@@ -201,7 +201,7 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s" % f)
 
 
-def assure_list_from_str(s):
+def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
     Parameters
@@ -214,10 +214,10 @@ def assure_list_from_str(s):
 
     if isinstance(s, list):
         return s
-    return s.split('\n')
+    return s.split(sep)
 
 
-def assure_dict_from_str(s):
+def assure_dict_from_str(s, **kwargs):
     """Given a multiline string with key=value items convert it to a dictionary
 
     Parameters
@@ -234,7 +234,7 @@ def assure_dict_from_str(s):
         return s
 
     out = {}
-    for value_str in assure_list_from_str(s):
+    for value_str in assure_list_from_str(s, **kwargs):
         if '=' not in value_str:
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)

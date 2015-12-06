@@ -170,6 +170,8 @@ class Authenticator(object):
     # TODO: figure out interface
 
     def authenticate(self, *args, **kwargs):
+        """Derived classes will provide specific implementation
+        """
         if self.requires_authentication:
             raise NotImplementedError("Authentication for %s not yet implemented" % self.__class__)
 

@@ -74,7 +74,7 @@ class HTTPBaseAuthenticator(Authenticator):
 
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
-        lgr.debug("http session: Authenticating into session for %s" % url)
+        lgr.info("http session: Authenticating into session for %s", url)
         post_url = self.url if self.url else url
         credentials = credential()
 

@@ -12,19 +12,21 @@
 
 try:
     import boto
+    from boto.s3.key import Key
+    from boto.exception import S3ResponseError
 except ImportError:
     boto = None
 
 import re
 import os
 from os.path import exists, join as opj, isdir
-
-from ..utils import assure_list_from_str, assure_dict_from_str
+from six.moves.urllib.parse import urljoin, urlsplit
 
 from ..ui import ui
 from ..utils import auto_repr
-from ..support.network import get_url_filename
-from ..support.cookies import cookies_db
+from ..utils import assure_dict_from_str
+from ..support.network import get_url_straight_filename
+from ..support.network import get_tld
 
 from .base import Authenticator
 from .base import BaseDownloader
@@ -42,40 +44,24 @@ class S3Authenticator(Authenticator):
 
     #def authenticate(self, url, credential, session, update=False):
     def authenticate(self, bucket_name, credential):
-        lgr.debug("S3 session: Authenticating into session for %s" % url)
-        post_url = self.url if self.url else url
+        lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
         credentials = credential()
+        conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
 
-        response = self._post_credential(credentials, post_url, session)
+        try:
+            bucket = conn.get_bucket(bucket_name)
+        except S3ResponseError as e:
+            lgr.debug("Cannot access bucket %s by name", bucket_name)
+            all_buckets = conn.get_all_buckets()
+            all_bucket_names = [b.name for b in all_buckets]
+            lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
+            if bucket_name in all_bucket_names:
+                bucket = all_buckets[all_bucket_names.index(bucket_name)]
+            else:
+                raise DownloadError("No S3 bucket named %s found" % bucket_name)
 
-        err_prefix = "Authentication to %s failed: " % post_url
-        check_response_status(response, err_prefix)
+        return bucket
 
-        response_text = response.text
-        self.check_for_auth_failure(response_text, err_prefix)
-
-        if self.success_re:
-            # the one which must be used to verify success
-            # verify that we actually logged in
-            for success_re in self.success_re:
-                if not re.search(success_re, response_text):
-                    raise AccessDeniedError(
-                        err_prefix + " returned output did not match 'success' regular expression %s" % success_re
-                    )
-
-        return response
-
-    def _post_credential(self, credentials, post_url, session):
-        raise NotImplementedError("Must be implemented in subclass")
-
-    def check_for_auth_failure(self, content, err_prefix=""):
-        if self.failure_re:
-            # verify that we actually logged in
-            for failure_re in self.failure_re:
-                if re.search(failure_re, content):
-                    raise AccessDeniedError(
-                        err_prefix + "returned output which matches regular expression %s" % failure_re
-                    )
 
 @auto_repr
 class S3Downloader(BaseDownloader):
@@ -89,16 +75,32 @@ class S3Downloader(BaseDownloader):
         ----------
         TODO
         """
-        self.credential = credential
-        self.authenticator = authenticator
 
-        if self.authenticator:
+        self.credential = credential
+        if authenticator:
             if not self.credential:
                 raise ValueError(
                     "Both authenticator and credentials must be provided."
                     " Got only authenticator %s" % repr(authenticator))
 
-        self._session = None
+        if not authenticator:
+            authenticator = S3Authenticator()
+        else:
+            assert(isinstance(authenticator, S3Authenticator))
+        self.authenticator = authenticator
+
+        self._bucket = None
+
+    @classmethod
+    def _parse_url(cls, url):
+        """Parses s3:// url and returns bucket name, prefix, additional query elements
+         as a dict (such as VersionId)"""
+        rec = urlsplit(url)
+        assert(rec.scheme == 's3')
+        # TODO: needs replacement to assure_ since it doesn't
+        # deal with non key=value
+        return rec.netloc, rec.path.lstrip('/'), assure_dict_from_str(rec.query, sep='&') or {}
+
 
     def _establish_session(self, url, allow_old=True):
         """
@@ -114,23 +116,16 @@ class S3Downloader(BaseDownloader):
         bool
           To state if old instance of a session/authentication was used
         """
-        if allow_old:
-            if self._session:
-                lgr.debug("http session: Reusing previous")
+        bucket_name = self._parse_url(url)[0]
+        if allow_old and self._bucket:
+            if self._bucket.name == bucket_name:
+                lgr.debug("S3 session: Reusing previous bucket")
                 return True  # we used old
-            elif url in cookies_db:
-                lgr.debug("http session: Creating new with old cookies")
-                self._session = requests.Session()
-                # not sure what happens if cookie is expired (need check to that or exception will prolly get thrown)
-                cookie_dict = cookies_db[url]
-                self._session.cookies = requests.utils.cookiejar_from_dict(cookie_dict)
-                return True
+            else:
+                lgr.warning("No support yet for multiple buckets per S3Downloader")
 
-        lgr.debug("http session: Creating brand new session")
-        self._session = requests.Session()
-        if self.authenticator:
-            self.authenticator.authenticate(url, self.credential, self._session)
-
+        lgr.debug("S3 session: Reconnecting to the bucket")
+        self._bucket = self.authenticator.authenticate(bucket_name, self.credential)
         return False
 
 
@@ -150,32 +145,48 @@ class S3Downloader(BaseDownloader):
         None or bytes
 
         """
+        bucket_name, url_filepath, params = self._parse_url(url)
+        if params:
+            newkeys = set(params.keys()) - {'versionId'}
+            if newkeys:
+                raise NotImplementedError("Did not implement support for %s" % newkeys)
+        assert(self._bucket.name == bucket_name)  # must be the same
 
-        response = self._session.get(url, stream=True)
-        check_response_status(response)
-
-        headers = response.headers
+        try:
+            key = self._bucket.get_key(url_filepath, version_id=params.get('versionId', None))
+        except S3ResponseError as e:
+            raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
+                                % (url_filepath, url, e))
 
         #### Specific to download
+        # TODO: Somewhat duplication with http logic, but we need this custom get_url_filename
+        # handling which might have its own parameters.
+        # Also we do not anyhow use original hierarchy from url
+
         # Consult about filename
         if path:
             if isdir(path):
                 # provided path is a directory under which to save
-                filename = get_url_filename(url, headers=headers)
+                filename = get_url_straight_filename(url)
                 filepath = opj(path, filename)
             else:
                 filepath = path
         else:
-            filepath = get_url_filename(url, headers=headers)
+            filepath = get_url_straight_filename(url)
 
         if exists(filepath) and not overwrite:
             raise DownloadError("File %s already exists" % filepath)
 
-        # FETCH CONTENT
-        # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
-        # TODO: logic to fetch into a nearby temp file, move into target
-        #     reason: detect aborted downloads etc
+        # TODO:  again very common logic with http download on dealing with download to temp
+        # file.  REFACTOR
+        target_size = key.size  # S3 specific
+
         try:
+            # TODO All below might be implemented as a context manager which is given
+            # target filepath, size, callback for actual download into open fp,
+            # callback for checking downloaded content may be even??? or just delegate it
+            # always to the authenticator
+
             temp_filepath = self._get_temp_download_filename(filepath)
             if exists(temp_filepath):
                 # eventually we might want to continue the download
@@ -184,43 +195,41 @@ class S3Downloader(BaseDownloader):
                     "It will be overriden" % temp_filepath)
                 # TODO.  also logic below would clean it up atm
 
-            target_size = int(headers.get('Content-Length', '0').strip()) or None
+
+
             with open(temp_filepath, 'wb') as f:
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
                 pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-                total = 0
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:  # filter out keep-alive new chunks
-                        total += len(chunk)
-                        f.write(chunk)
-                        pbar.update(total)
-                        # TEMP
-                        # see https://github.com/niltonvolpato/python-progressbar/pull/44
-                        ui.out.flush()
+
+                # S3 specific (the rest is common with e.g. http)
+                def pbar_callback(downloaded, totalsize):
+                    assert(totalsize == key.size)
+                    pbar.update(downloaded)
+
+                key.get_contents_to_file(f, cb=pbar_callback, num_cb=None)
+
                 pbar.finish()
             downloaded_size = os.stat(temp_filepath).st_size
 
-            if (headers.get('Content-type', "") or headers.get('Content-Type', "")).startswith('text/html') \
-                    and downloaded_size < 10000 \
-                    and self.authenticator:  # and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
-                with open(temp_filepath) as f:
-                    self.authenticator.check_for_auth_failure(
-                        f.read(), "Download of file %s has failed: " % filepath)
-
+            # TODO: RF Again common check
             if target_size and target_size != downloaded_size:
                 lgr.error("Downloaded file size %d differs from originally announced %d",
                           downloaded_size, target_size)
 
             # place successfully downloaded over the filepath
             os.rename(temp_filepath, filepath)
+
+        # TODO: adjust ctime/mtime according to headers
+        # TODO: not hardcoded size, and probably we should check header
+
         except AccessDeniedError as e:
             raise
         except Exception as e:
             lgr.error("Failed to download {url} into {filepath}: {e}".format(
                 **locals()
             ))
-            raise DownloadError  # for now
+            raise DownloadError(str(e))  # for now
         finally:
             if exists(temp_filepath):
                 # clean up
@@ -228,8 +237,7 @@ class S3Downloader(BaseDownloader):
                 os.unlink(temp_filepath)
 
 
-        # TODO: adjust ctime/mtime according to headers
-        # TODO: not hardcoded size, and probably we should check header
+
 
         return filepath
 
