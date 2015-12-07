@@ -10,8 +10,10 @@
 """
 
 from ..dochelpers import single_or_plural, borrowdoc, borrowkwargs
+from ..dochelpers import exc_str
 
 from .utils import assert_equal, assert_true
+from .utils import assert_re_in
 
 def test_basic():
     assert_equal(single_or_plural('a', 'b', 1), 'a')
@@ -126,3 +128,23 @@ def test_borrow_kwargs():
     assert_true('B.met_nodockwargs' in B.met_nodockwargs.__doc__)
     assert_true('boguse' in B.met_excludes.__doc__)
 
+def test_exc_str():
+    try:
+        raise Exception("my bad")
+    except Exception as e:
+        estr = exc_str(e)
+    assert_re_in("my bad \[test_dochelpers.py:test_exc_str:...\]", estr)
+
+    def f():
+        def f2():
+            raise Exception("my bad again")
+        f2()
+    try:
+        f()
+    except Exception as e:
+        estr_ = exc_str()
+        estr2 = exc_str(e, 2)
+        estr1 = exc_str(e)
+    assert_re_in("my bad again \[test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr2)
+    assert_re_in("my bad again \[test_dochelpers.py:f2:...\]", estr1)
+    assert_equal(estr_, estr1)
