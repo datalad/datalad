@@ -91,10 +91,10 @@ class HandleRepoBackend(Handle):
             self.is_read_only = False
 
         self._files = files
-        self._sub_graphs = dict()
+        self._sub_graphs = {}
 
     def get_subgraphs(self):
-        if self._sub_graphs == dict():
+        if not self._sub_graphs:
             self.update_metadata()
         return self._sub_graphs
 

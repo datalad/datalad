@@ -77,7 +77,7 @@ def test_RuntimeCollection_modify(path):
 
     # Add an existing handle:
     handle2 = HandleRepoBackend(HandleRepo(path, create=False))
-    collection[handle2.name] = handle2
+    collection.register_handle(handle2)
 
     eq_(set(iterkeys(collection)), {handle2.name})
     assert_in((DLNS.this, DCTERMS.hasPart, URIRef(get_local_file_url(path))),
@@ -208,22 +208,32 @@ def test_MetaCollection_constructor(path1, path2, path3):
                             CollectionRepoBackend(repo2)])
 
     assert_equal(set(iterkeys(m_clt)), {repo1.name, repo2.name})
+    # Meta collection asks the metas of the collections
+    # TODO: may be make it even more lazy? ;)
+    assert_equal(len(list(m_clt.store.contexts())), 2)
     assert_equal(clt1.meta, m_clt[repo1.name].meta)
     assert_equal(clt2.meta, m_clt[repo2.name].meta)
-    assert_equal(len(list(m_clt.store.contexts())), 3)
+    # we are lazy in adding handle meta, so only 2 for collections
+    assert_equal(len(list(m_clt.store.contexts())), 2)
+    # Neither of below actions cause any effect on MetaCollection
+    # TODO: figure out what we need to TODO about that
+    #   _ = handle.meta
+    #   clt1.update_graph_store()
+    # assert_equal(len(list(m_clt.store.contexts())), 3)
     [assert_in(g.identifier, [Literal(repo1.name), Literal(repo2.name),
                               Literal("somehandle")])
      for g in m_clt.store.contexts()]
 
     # put something else in that list:
-    assert_raises(TypeError, MetaCollection, [clt1, "invalid"])
+    with swallow_logs():
+        assert_raises(TypeError, MetaCollection, [clt1, "invalid"])
 
     # copy constructor:
     m_clt_2 = MetaCollection(m_clt)
     assert_equal(set(iterkeys(m_clt_2)), {repo1.name, repo2.name})
     assert_equal(m_clt[repo1.name].meta, m_clt_2[repo1.name].meta)
     assert_equal(m_clt[repo2.name].meta, m_clt_2[repo2.name].meta)
-    assert_equal(len(list(m_clt_2.store.contexts())), 3)
+    assert_equal(len(list(m_clt_2.store.contexts())), 2)
     [assert_in(g.identifier, [Literal(repo1.name), Literal(repo2.name),
                               Literal("somehandle")])
      for g in m_clt_2.store.contexts()]
@@ -234,7 +244,7 @@ def test_MetaCollection_constructor(path1, path2, path3):
     assert_equal(set(iterkeys(m_clt_3)), {repo1.name, repo2.name})
     assert_equal(m_clt[repo1.name].meta, m_clt_3[repo1.name].meta)
     assert_equal(m_clt[repo2.name].meta, m_clt_3[repo2.name].meta)
-    assert_equal(len(list(m_clt_3.store.contexts())), 3)
+    assert_equal(len(list(m_clt_3.store.contexts())), 2)
     [assert_in(g.identifier, [Literal(repo1.name), Literal(repo2.name),
                               Literal("somehandle")])
      for g in m_clt_3.store.contexts()]
@@ -257,7 +267,8 @@ def test_MetaCollection_setitem(path1, path2):
 
     assert_equal(set(iterkeys(m_clt)), {clt.name})
     assert_equal(m_clt[clt.name].meta, clt.meta)
-    assert_equal(len(list(m_clt.store.contexts())), 2)
+    # hr is lazy now, so no meta in the m_clt.store
+    assert_equal(len(list(m_clt.store.contexts())), 1)
     assert_equal(m_clt[clt.name].meta.identifier, Literal(clt.name))
 
 

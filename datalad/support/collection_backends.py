@@ -61,10 +61,7 @@ class CollectionRepoBackend(Collection):
         self._files = files
         self._sub_graphs = dict()
 
-        # load handle list:
-        for key in self.repo.get_handle_list(self._branch):
-            self[key] = CollectionRepoHandleBackend(self.repo, key,
-                                                    self._branch)
+        self.reload()
 
         # Note: Possible solution to setitem vs. laziness:
         #       Don't assign in constructor but use dict.update() or
@@ -170,18 +167,15 @@ class CollectionRepoBackend(Collection):
         raise NotImplementedError("TODO")
 
     def reload(self):
-        # TODO: This needs to be reviewed. Integrate all the different updates!
-        to_delete = list(iterkeys(self))
-        for handle in to_delete:
-            del self[handle]
+        self.update_metadata()
+        self.clear()
+        # TODO: clean store?
 
-        # TODO: - dict.clear() instead
-        #       - clean meta (subgraphs)
-        #       - may be use this function in constructor?
-
-        for key in self.repo.get_handle_list(self._branch):
-            self[key] = CollectionRepoHandleBackend(self.repo, key,
-                                                    self._branch)
+        # load handle list:
+        for handle_name in self.repo.get_handle_list(self._branch):
+            self.register_handle(CollectionRepoHandleBackend(self.repo, handle_name,
+                                                             self._branch),
+                                 add_handle_uri=False)
 
     # TODO: name from repo? => not, if CollectionRepo melted in!
     # TODO: set_name? See Handle.

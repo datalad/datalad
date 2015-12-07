@@ -63,26 +63,64 @@ class Collection(dict):
         self.store.remove_graph(self[key].name)
         super(Collection, self).__delitem__(key)
 
-    def __setitem__(self, key, value):
-        super(Collection, self).__setitem__(key, value)
+    def __setitem__(self, handle_name, handle):
+        """Sugaring to be used to assign a brand new handle, not known to the collection
+        """
+        self.register_handle(handle, handle_name=handle_name, add_handle_uri=True)
+
+
+    def register_handle(self, handle, handle_name=None, add_handle_uri=None):
+        """Register a given handle
+
+        Parameters
+        ----------
+        handle_name: str
+        handle: Handle
+        add_handle_uri: bool or None, optional
+          Add handle uri to the collection meta-data.  If None, and no name was
+          provided (thus it could have not being known) -- assume True
+        """
+        # if no handle_name was provided -- take it from the handle
+        if handle_name is None:
+            handle_name = handle.name
+            if add_handle_uri is None:
+                add_handle_uri = True
+
+        super(Collection, self).__setitem__(handle_name, handle)
+
         self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
         if self_uri is None:
             raise CollectionBrokenError()  # TODO: Proper exceptions
-        key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
-        if key_uri is None or key_uri == DLNS.this:
-            if self[key].url is not None:
-                # replace URI in graph:
-                # Note: This assumes handle.meta is modifiable, meaning repo
-                #       backends currently need to override it.
-                from rdflib import URIRef
-                self[key].meta.remove((key_uri, RDF.type, DLNS.Handle))
-                key_uri = URIRef(self[key].url)
-                self[key].meta.add((key_uri, RDF.type, DLNS.Handle))
-            else:
-                super(Collection, self).__delitem__(key)
-                raise ValueError("Handle '%s' has neither a valid URI (%s) nor an URL." % (key, key_uri))
-        self.meta.add((self_uri, DCTERMS.hasPart, key_uri))
-        self.store.add_graph(self[key].meta)
+
+        if add_handle_uri is None:
+            add_handle_uri = False
+
+        if add_handle_uri:
+            # Load it from the handle itself
+            key_uri = self[handle_name].meta.value(predicate=RDF.type, object=DLNS.Handle)
+            if key_uri is None or key_uri == DLNS.this:
+                if self[handle_name].url is not None:
+                    # replace URI in graph:
+                    # Note: This assumes handle.meta is modifiable, meaning repo
+                    #       backends currently need to override it.
+                    from rdflib import URIRef
+                    self[handle_name].meta.remove((key_uri, RDF.type, DLNS.Handle))
+                    key_uri = URIRef(self[handle_name].url)
+                    self[handle_name].meta.add((key_uri, RDF.type, DLNS.Handle))
+                else:
+                    super(Collection, self).__delitem__(handle_name)
+                    raise ValueError("Handle '%s' has neither a valid URI (%s) nor an URL." % (handle_name, key_uri))
+            self.meta.add((self_uri, DCTERMS.hasPart, key_uri))
+            self.store.add_graph(self[handle_name].meta)
+
+    def fsck(self):
+        """Verify that the collection is in legit state. If not - FIX IT!
+        """
+        # TODO: verify that all the registered handles URIs are valid:
+        #  1. that local path key_uris point to existing handles paths
+        #  2. Go through local handles and run their .fsck
+        # Subclasses should extend the checks (e.g. checking git fsck, git annex fsck, etc)
+        raise NotImplementedError()
 
     @property
     def name(self):
@@ -262,3 +300,5 @@ class MetaCollection(dict):
         what is to be queried here.
         """
         pass
+
+    # TODO: to be a *Collection it must fulfill the same API?
