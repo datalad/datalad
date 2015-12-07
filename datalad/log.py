@@ -14,6 +14,68 @@ from .utils import is_interactive
 
 __all__ = ['ColorFormatter', 'log']
 
+# Snippets from traceback borrowed from duecredit which was borrowed from
+# PyMVPA upstream/2.4.0-39-g69ad545  MIT license (the same copyright as DataLad)
+
+import traceback
+import re
+from os.path import basename, dirname
+
+def mbasename(s):
+    """Custom function to include directory name if filename is too common
+
+    Also strip .py at the end
+    """
+    base = basename(s)
+    if base.endswith('.py'):
+        base = base[:-3]
+    if base in set(['base', '__init__']):
+        base = basename(dirname(s)) + '.' + base
+    return base
+
+class TraceBack(object):
+    """Customized traceback to be included in debug messages
+    """
+
+    def __init__(self, collide=False):
+        """Initialize TrackBack metric
+
+        Parameters
+        ----------
+        collide : bool
+          if True then prefix common with previous invocation gets
+          replaced with ...
+        """
+        self.__prev = ""
+        self.__collide = collide
+
+    def __call__(self):
+        ftb = traceback.extract_stack(limit=100)[:-2]
+        entries = [[mbasename(x[0]), str(x[1])] for x in ftb if mbasename(x[0]) != 'logging.__init__']
+        entries = [ e for e in entries if e[0] != 'unittest' ]
+
+        # lets make it more consize
+        entries_out = [entries[0]]
+        for entry in entries[1:]:
+            if entry[0] == entries_out[-1][0]:
+                entries_out[-1][1] += ',%s' % entry[1]
+            else:
+                entries_out.append(entry)
+        sftb = '>'.join(['%s:%s' % (mbasename(x[0]),
+                                    x[1]) for x in entries_out])
+        if self.__collide:
+            # lets remove part which is common with previous invocation
+            prev_next = sftb
+            common_prefix = os.path.commonprefix((self.__prev, sftb))
+            common_prefix2 = re.sub('>[^>]*$', '', common_prefix)
+
+            if common_prefix2 != "":
+                sftb = '...' + sftb[len(common_prefix2):]
+            self.__prev = prev_next
+
+        return sftb
+
+
 # Recipe from http://stackoverflow.com/questions/384076/how-can-i-color-python-logging-output
 # by Brandon Thomson
 # Adjusted for automagic determination either coloring is needed and
@@ -40,6 +102,8 @@ class ColorFormatter(logging.Formatter):
             use_color = is_interactive()
         self.use_color = use_color and platform.system() != 'Windows'  # don't use color on windows
         msg = self.formatter_msg(self._get_format(log_name), self.use_color)
+        self._tb = TraceBack(collide=os.environ.get('DATALAD_LOGTRACEBACK', '') == 'collide') \
+            if os.environ.get('DATALAD_LOGTRACEBACK', False) else None
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False):
@@ -68,6 +132,8 @@ class ColorFormatter(logging.Formatter):
             levelname_color = self.COLOR_SEQ % fore_color + "%-7s" % levelname + self.RESET_SEQ
             record.levelname = levelname_color
         record.msg = record.msg.replace("\n", "\n| ")
+        if self._tb:
+            record.msg = self._tb() + "  " + record.msg
 
         return logging.Formatter.format(self, record)
 
