@@ -293,3 +293,33 @@ def borrowkwargs(cls, methodname=None, exclude=None):
         method.__doc__ = docstring
         return method
     return _borrowkwargs
+
+import os
+import sys
+import traceback
+def exc_str(exc=None, limit=1):
+    """Enhanced str for exceptions.  Should include original location
+
+    Parameters
+    ----------
+    Exception to
+    """
+    out = str(exc)
+
+    try:
+        exctype, value, tb = sys.exc_info()
+        if not exc:
+            exc = value
+            out = str(exc)
+        # verify that it seems to be the exception we were passed
+        #assert(isinstance(exc, exctype))
+        if exc:
+            assert(exc is value)
+        entries = traceback.extract_tb(tb)
+        if entries:
+            out += " [%s]" % (','.join(['%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1]) for x in entries[-limit:]]))
+    finally:
+        # As the bible teaches us:
+        # https://docs.python.org/2/library/sys.html#sys.exc_info
+        del tb
+    return out
