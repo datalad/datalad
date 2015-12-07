@@ -34,6 +34,10 @@ from ...tests.utils import use_cassette
 from ...tests.utils import SkipTest
 from ...tests.utils import skip_httpretty_on_problematic_pythons
 
+def test_docstring():
+    doc = HTTPDownloader.__init__.__doc__
+    assert_in("\ncredential: Credential", doc)
+
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
 def fake_open(write_=None):

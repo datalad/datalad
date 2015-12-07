@@ -25,6 +25,7 @@ from six.moves.urllib.parse import urljoin, urlsplit
 from ..ui import ui
 from ..utils import auto_repr
 from ..utils import assure_dict_from_str
+from ..dochelpers import borrowkwargs
 from ..support.network import get_url_straight_filename
 from ..support.network import get_tld
 
@@ -44,6 +45,12 @@ class S3Authenticator(Authenticator):
 
     #def authenticate(self, url, credential, session, update=False):
     def authenticate(self, bucket_name, credential):
+        """Authenticates to the specified bucket using provided credentials
+
+        Returns
+        -------
+        bucket
+        """
         lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
         credentials = credential()
         conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
@@ -70,6 +77,7 @@ class S3Downloader(BaseDownloader):
 
     _DEFAULT_AUTHENTICATOR = S3Authenticator
 
+    @borrowkwargs(BaseDownloader)
     def __init__(self, **kwargs):
         super(S3Downloader, self).__init__(**kwargs)
         self._bucket = None

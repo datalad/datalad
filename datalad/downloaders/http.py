@@ -14,6 +14,7 @@ import re
 import requests
 
 from ..utils import assure_list_from_str, assure_dict_from_str
+from ..dochelpers import borrowkwargs
 
 from ..ui import ui
 from ..utils import auto_repr
@@ -199,6 +200,7 @@ class HTTPDownloader(BaseDownloader):
     """A stateful downloader to maintain a session to the website
     """
 
+    @borrowkwargs(BaseDownloader)
     def __init__(self, **kwargs):
         super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
