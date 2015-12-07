@@ -12,12 +12,18 @@ from ..providers import Provider
 from ..providers import Providers
 from ...tests.utils import eq_
 from ...tests.utils import assert_in
+from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
 
 
 def test_Providers_OnStockConfiguration():
     providers = Providers.from_config_files()
-    eq_(sorted([p.name for p in providers]), ['crcns', 'crcns-nersc', 'hcp-http', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'])
+    provider_names = {p.name for p in providers}
+    assert_in('datalad-test-s3', provider_names)
+    assert_in('crcns', provider_names)
+    assert_greater(len(provider_names), 5)
+    # too rigid
+    #eq_(provider_names, {'crcns', 'crcns-nersc', 'hcp-http', 'hcp-s3', 'hcp-web', 'hcp-xnat', 'openfmri'})
 
     # every provider must have url_res
     for provider in providers:
