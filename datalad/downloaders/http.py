@@ -9,11 +9,9 @@
 """Provide access to stuff (html, data files) via HTTP and HTTPS
 
 """
-
+import functools
 import re
 import requests
-import os
-from os.path import exists, join as opj, isdir
 
 from ..utils import assure_list_from_str, assure_dict_from_str
 
@@ -201,22 +199,8 @@ class HTTPDownloader(BaseDownloader):
     """A stateful downloader to maintain a session to the website
     """
 
-    def __init__(self, credential=None, authenticator=None):
-        """
-
-        Parameters
-        ----------
-        TODO
-        """
-        self.credential = credential
-        self.authenticator = authenticator
-
-        if self.authenticator:
-            if not self.credential:
-                raise ValueError(
-                    "Both authenticator and credentials must be provided."
-                    " Got only authenticator %s" % repr(authenticator))
-
+    def __init__(self, **kwargs):
+        super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
 
     def _establish_session(self, url, allow_old=True):
@@ -252,106 +236,27 @@ class HTTPDownloader(BaseDownloader):
 
         return False
 
-
-    def _download(self, url, path=None, overwrite=False):
-        """
-
-        Parameters
-        ----------
-        url: str
-          URL to download
-        path: str, optional
-          Path to file where to store the downloaded content.  If None, downloaded
-          content provided back in the return value (not decoded???)
-
-        Returns
-        -------
-        None or bytes
-
-        """
-
+    def _get_download_details(self, url):
         response = self._session.get(url, stream=True)
         check_response_status(response)
-
         headers = response.headers
+        target_size = int(headers.get('Content-Length', '0').strip()) or None
+        # Consult about filename.  Since we already have headers,
+        # should not result in an additional request
+        url_filename = get_url_filename(url, headers=headers)
 
-        #### Specific to download
-        # Consult about filename
-        if path:
-            if isdir(path):
-                # provided path is a directory under which to save
-                filename = get_url_filename(url, headers=headers)
-                filepath = opj(path, filename)
-            else:
-                filepath = path
-        else:
-            filepath = get_url_filename(url, headers=headers)
+        def download_into_fp(f, pbar):
+            total = 0
+            for chunk in response.iter_content(chunk_size=1024):
+                if chunk:  # filter out keep-alive new chunks
+                    total += len(chunk)
+                    f.write(chunk)
+                    pbar.update(total)
+                    # TEMP
+                    # see https://github.com/niltonvolpato/python-progressbar/pull/44
+                    ui.out.flush()
 
-        if exists(filepath) and not overwrite:
-            raise DownloadError("File %s already exists" % filepath)
-
-        # FETCH CONTENT
-        # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
-        # TODO: logic to fetch into a nearby temp file, move into target
-        #     reason: detect aborted downloads etc
-        try:
-            temp_filepath = self._get_temp_download_filename(filepath)
-            if exists(temp_filepath):
-                # eventually we might want to continue the download
-                lgr.warning(
-                    "Temporary file %s from the previous download was found. "
-                    "It will be overriden" % temp_filepath)
-                # TODO.  also logic below would clean it up atm
-
-            target_size = int(headers.get('Content-Length', '0').strip()) or None
-            with open(temp_filepath, 'wb') as f:
-                # TODO: url might be a bit too long for the beast.
-                # Consider to improve to make it animated as well, or shorten here
-                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-                total = 0
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:  # filter out keep-alive new chunks
-                        total += len(chunk)
-                        f.write(chunk)
-                        pbar.update(total)
-                        # TEMP
-                        # see https://github.com/niltonvolpato/python-progressbar/pull/44
-                        ui.out.flush()
-                pbar.finish()
-            downloaded_size = os.stat(temp_filepath).st_size
-
-            if (headers.get('Content-type', "") or headers.get('Content-Type', "")).startswith('text/html') \
-                    and downloaded_size < 10000 \
-                    and self.authenticator:  # and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
-                # TODO: Common logic for any downloader whenever no proper failure code is thrown etc
-                with open(temp_filepath) as f:
-                    self.authenticator.check_for_auth_failure(
-                        f.read(), "Download of file %s has failed: " % filepath)
-
-            if target_size and target_size != downloaded_size:
-                lgr.error("Downloaded file size %d differs from originally announced %d",
-                          downloaded_size, target_size)
-
-            # place successfully downloaded over the filepath
-            os.rename(temp_filepath, filepath)
-        except AccessDeniedError as e:
-            raise
-        except Exception as e:
-            lgr.error("Failed to download {url} into {filepath}: {e}".format(
-                **locals()
-            ))
-            raise DownloadError  # for now
-        finally:
-            if exists(temp_filepath):
-                # clean up
-                lgr.debug("Removing a temporary download %s", temp_filepath)
-                os.unlink(temp_filepath)
-
-
-        # TODO: adjust ctime/mtime according to headers
-        # TODO: not hardcoded size, and probably we should check header
-
-        return filepath
+        return download_into_fp, target_size, url_filename
 
     def _check(self, url):
         raise NotImplementedError("check is not yet implemented")

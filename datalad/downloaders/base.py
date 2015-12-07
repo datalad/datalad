@@ -12,6 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
+from os.path import exists, join as opj, isdir
+
 from ..ui import ui
 from ..utils import auto_repr
 
@@ -21,6 +24,31 @@ lgr = getLogger('datalad.downloaders')
 @auto_repr
 class BaseDownloader(object):
     """Base class for the downloaders"""
+
+    _DEFAULT_AUTHENTICATOR = None
+
+    def __init__(self, credential=None, authenticator=None):
+        """
+
+        Parameters
+        ----------
+        credential: Credential, optional
+          Provides necessary credential fields to be used by authenticator
+        authenticator: Authenticator, optional
+          Authenticator to use for authentication.
+        """
+        self.credential = credential
+        if not authenticator and self._DEFAULT_AUTHENTICATOR:
+            authenticator = self._DEFAULT_AUTHENTICATOR()
+
+        if authenticator:
+            if not credential:
+                raise ValueError(
+                    "Both authenticator and credentials must be provided."
+                    " Got only authenticator %s" % repr(authenticator))
+
+        self.authenticator = authenticator
+
 
     def _access(self, method, url, allow_old_session=True, **kwargs):
         """Fetch content as pointed by the URL optionally into a file
@@ -115,6 +143,116 @@ class BaseDownloader(object):
         """
         # TODO: might better reside somewhere under .datalad/tmp or .git/datalad/tmp
         return filepath + ".datalad-download-temp"
+
+
+    def _get_download_details(self, url):
+        """
+
+        Parameters
+        ----------
+        url : str
+
+        Returns
+        -------
+        downloader_into_fp: callable
+           Which takes two parameters: file, pbar
+        target_size: int or None (if uknown)
+        url_filename: str or None
+           Filename as decided from the url
+        """
+        raise NotImplementedError("Must be implemented in the subclass")
+
+    def _download(self, url, path=None, overwrite=False):
+        """
+
+        Parameters
+        ----------
+        url: str
+          URL to download
+        path: str, optional
+          Path to file where to store the downloaded content.  If None, downloaded
+          content provided back in the return value (not decoded???)
+
+        Returns
+        -------
+        None or bytes
+
+        """
+
+        downloader, target_size, url_filename = self._get_download_details(url)
+
+        #### Specific to download
+        if path:
+            if isdir(path):
+                # provided path is a directory under which to save
+                filename = url_filename
+                filepath = opj(path, filename)
+            else:
+                filepath = path
+        else:
+            filepath = url_filename
+
+        if exists(filepath) and not overwrite:
+            raise DownloadError("File %s already exists" % filepath)
+
+        # FETCH CONTENT
+        # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
+        # TODO: logic to fetch into a nearby temp file, move into target
+        #     reason: detect aborted downloads etc
+        try:
+            temp_filepath = self._get_temp_download_filename(filepath)
+            if exists(temp_filepath):
+                # eventually we might want to continue the download
+                lgr.warning(
+                    "Temporary file %s from the previous download was found. "
+                    "It will be overriden" % temp_filepath)
+                # TODO.  also logic below would clean it up atm
+
+            with open(temp_filepath, 'wb') as fp:
+                # TODO: url might be a bit too long for the beast.
+                # Consider to improve to make it animated as well, or shorten here
+                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+                downloader(fp, pbar)
+                pbar.finish()
+            downloaded_size = os.stat(temp_filepath).st_size
+
+            # (headers.get('Content-type', "") and headers.get('Content-Type')).startswith('text/html')
+            #  and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
+            if self.authenticator and downloaded_size < 10000 \
+                    and (hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re):
+                # TODO: Common logic for any downloader whenever no proper failure code is thrown etc
+                with open(temp_filepath) as fp:
+                    assert hasattr(self.authenticator, 'check_for_auth_failure'), \
+                        "%s has failure_re defined but no check_for_auth_failure" \
+                        % self.authenticator
+                    self.authenticator.check_for_auth_failure(
+                        fp.read(), "Download of file %s has failed: " % filepath)
+
+            if target_size and target_size != downloaded_size:
+                lgr.error("Downloaded file size %d differs from originally announced %d",
+                          downloaded_size, target_size)
+                raise DownloadError("Downloaded size %d differs from original %d" % (downloaded_size, target_size))
+
+            # place successfully downloaded over the filepath
+            os.rename(temp_filepath, filepath)
+
+            # TODO: adjust ctime/mtime according to headers
+            # TODO: not hardcoded size, and probably we should check header
+
+        except AccessDeniedError as e:
+            raise
+        except Exception as e:
+            lgr.error("Failed to download {url} into {filepath}: {e}".format(
+                **locals()
+            ))
+            raise DownloadError  # for now
+        finally:
+            if exists(temp_filepath):
+                # clean up
+                lgr.debug("Removing a temporary download %s", temp_filepath)
+                os.unlink(temp_filepath)
+
+        return filepath
 
     def download(self, url, path=None, **kwargs):
         """Fetch content as pointed by the URL optionally into a file

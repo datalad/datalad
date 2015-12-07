@@ -68,27 +68,10 @@ class S3Downloader(BaseDownloader):
     """Downloader from AWS S3 buckets
     """
 
-    def __init__(self, credential=None, authenticator=None):
-        """
+    _DEFAULT_AUTHENTICATOR = S3Authenticator
 
-        Parameters
-        ----------
-        TODO
-        """
-
-        self.credential = credential
-        if authenticator:
-            if not self.credential:
-                raise ValueError(
-                    "Both authenticator and credentials must be provided."
-                    " Got only authenticator %s" % repr(authenticator))
-
-        if not authenticator:
-            authenticator = S3Authenticator()
-        else:
-            assert(isinstance(authenticator, S3Authenticator))
-        self.authenticator = authenticator
-
+    def __init__(self, **kwargs):
+        super(S3Downloader, self).__init__(**kwargs)
         self._bucket = None
 
     @classmethod
@@ -128,23 +111,7 @@ class S3Downloader(BaseDownloader):
         self._bucket = self.authenticator.authenticate(bucket_name, self.credential)
         return False
 
-
-    def _download(self, url, path=None, overwrite=False):
-        """
-
-        Parameters
-        ----------
-        url: str
-          URL to download
-        path: str, optional
-          Path to file where to store the downloaded content.  If None, downloaded
-          content provided back in the return value (not decoded???)
-
-        Returns
-        -------
-        None or bytes
-
-        """
+    def _get_download_details(self, url):
         bucket_name, url_filepath, params = self._parse_url(url)
         if params:
             newkeys = set(params.keys()) - {'versionId'}
@@ -157,89 +124,20 @@ class S3Downloader(BaseDownloader):
         except S3ResponseError as e:
             raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
-
-        #### Specific to download
-        # TODO: Somewhat duplication with http logic, but we need this custom get_url_filename
-        # handling which might have its own parameters.
-        # Also we do not anyhow use original hierarchy from url
-
-        # Consult about filename
-        if path:
-            if isdir(path):
-                # provided path is a directory under which to save
-                filename = get_url_straight_filename(url)
-                filepath = opj(path, filename)
-            else:
-                filepath = path
-        else:
-            filepath = get_url_straight_filename(url)
-
-        if exists(filepath) and not overwrite:
-            raise DownloadError("File %s already exists" % filepath)
-
-        # TODO:  again very common logic with http download on dealing with download to temp
-        # file.  REFACTOR
         target_size = key.size  # S3 specific
+        # Consult about filename
+        url_filename = get_url_straight_filename(url)
 
-        try:
-            # TODO All below might be implemented as a context manager which is given
-            # target filepath, size, callback for actual download into open fp,
-            # callback for checking downloaded content may be even??? or just delegate it
-            # always to the authenticator
+        def download_into_fp(f, pbar):
+            # S3 specific (the rest is common with e.g. http)
+            def pbar_callback(downloaded, totalsize):
+                assert(totalsize == key.size)
+                pbar.update(downloaded)
 
-            temp_filepath = self._get_temp_download_filename(filepath)
-            if exists(temp_filepath):
-                # eventually we might want to continue the download
-                lgr.warning(
-                    "Temporary file %s from the previous download was found. "
-                    "It will be overriden" % temp_filepath)
-                # TODO.  also logic below would clean it up atm
+            key.get_contents_to_file(f, cb=pbar_callback, num_cb=None)
 
+        return download_into_fp, target_size, url_filename
 
-
-            with open(temp_filepath, 'wb') as f:
-                # TODO: url might be a bit too long for the beast.
-                # Consider to improve to make it animated as well, or shorten here
-                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-
-                # S3 specific (the rest is common with e.g. http)
-                def pbar_callback(downloaded, totalsize):
-                    assert(totalsize == key.size)
-                    pbar.update(downloaded)
-
-                key.get_contents_to_file(f, cb=pbar_callback, num_cb=None)
-
-                pbar.finish()
-            downloaded_size = os.stat(temp_filepath).st_size
-
-            # TODO: RF Again common check
-            if target_size and target_size != downloaded_size:
-                lgr.error("Downloaded file size %d differs from originally announced %d",
-                          downloaded_size, target_size)
-
-            # place successfully downloaded over the filepath
-            os.rename(temp_filepath, filepath)
-
-        # TODO: adjust ctime/mtime according to headers
-        # TODO: not hardcoded size, and probably we should check header
-
-        except AccessDeniedError as e:
-            raise
-        except Exception as e:
-            lgr.error("Failed to download {url} into {filepath}: {e}".format(
-                **locals()
-            ))
-            raise DownloadError(str(e))  # for now
-        finally:
-            if exists(temp_filepath):
-                # clean up
-                lgr.debug("Removing a temporary download %s", temp_filepath)
-                os.unlink(temp_filepath)
-
-
-
-
-        return filepath
 
     def _check(self, url):
         raise NotImplementedError("check is not yet implemented")
