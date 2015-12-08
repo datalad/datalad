@@ -17,6 +17,7 @@ from os.path import exists, join as opj, isdir
 
 from ..ui import ui
 from ..utils import auto_repr
+from ..dochelpers import exc_str
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -91,7 +92,7 @@ class BaseDownloader(object):
                 # assume success if no puke etc
                 break
             except AccessDeniedError as e:
-                lgr.debug("Access was denied: %s", e)
+                lgr.debug("Access was denied: %s", exc_str(e))
                 access_denied = True
             except DownloadError:
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
@@ -242,7 +243,8 @@ class BaseDownloader(object):
         except AccessDeniedError as e:
             raise
         except Exception as e:
-            lgr.error("Failed to download {url} into {filepath}: {e}".format(
+            e_str = exc_str(e)
+            lgr.error("Failed to download {url} into {filepath}: {e_str}".format(
                 **locals()
             ))
             raise DownloadError  # for now

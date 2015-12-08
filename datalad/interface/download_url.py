@@ -21,6 +21,7 @@ from os.path import isdir, curdir
 from .base import Interface
 from ..ui import ui
 from ..utils import assure_list_from_str
+from ..dochelpers import exc_str
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 from ..downloaders import Providers
@@ -95,7 +96,7 @@ class DownloadURL(Interface):
                 # ui.message("%s -> %s" % (url, downloaded_path))
             except Exception as e:
                 failed_urls.append(url)
-                ui.error(e)
+                ui.error(exc_str(e))
                 if stop_on_failure:
                     break
         if failed_urls:
