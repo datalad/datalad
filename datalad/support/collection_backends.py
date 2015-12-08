@@ -114,9 +114,7 @@ class CollectionRepoBackend(Collection):
 
         :return:
         """
-        # TODO: Reconsider naming (also for Handles)
-        name = self.remote or self.repo.name
-        self._graph = Graph(identifier=Literal(name),
+        self._graph = Graph(identifier=Literal(self.name),
                             store=self.store)
         for key in self.sub_graphs:
             self._graph += self.sub_graphs[key]
@@ -124,6 +122,11 @@ class CollectionRepoBackend(Collection):
         return self._graph
 
     meta = property(get_metadata, set_metadata)
+
+    @property
+    def name(self):
+        # TODO: Reconsider naming (also for Handles)
+        return self.remote or self.repo.name
 
     @property
     def url(self):
@@ -145,6 +148,10 @@ class CollectionRepoBackend(Collection):
         """
         self.sub_graphs = self.repo.get_collection_graphs(branch=self._branch,
                                                           files=self._files)
+        # creation of self.meta needs to be triggered in order to be up to date
+        # in the collections graph store. Furthermore, returning the updated
+        # graph might be reasonable anyway.
+        return self.meta
 
     def commit_metadata(self, msg="Collection metadata updated."):
         """
@@ -167,13 +174,16 @@ class CollectionRepoBackend(Collection):
         raise NotImplementedError("TODO")
 
     def reload(self):
-        self.update_metadata()
+        #self.update_metadata()
+        # TODO: update_metadata? lazy! instead reset sub_graphs?
+        self._sub_graphs = dict()
         self.clear()
         # TODO: clean store?
 
         # load handle list:
         for handle_name in self.repo.get_handle_list(self._branch):
-            self.register_handle(CollectionRepoHandleBackend(self.repo, handle_name,
+            self.register_handle(CollectionRepoHandleBackend(self.repo,
+                                                             handle_name,
                                                              self._branch),
                                  add_handle_uri=False)
 
