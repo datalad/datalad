@@ -58,6 +58,8 @@ class SearchHandle(Interface):
              for remote in local_master.git_get_remotes()] +
             [local_master.get_backend_from_branch()])
 
+        metacollection.update_graph_store()
+        
         # TODO: Bindings should be done in collection class:
         metacollection.conjunctive_graph.bind('dlns', DLNS)
 
