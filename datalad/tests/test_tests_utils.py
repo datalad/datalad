@@ -40,6 +40,7 @@ from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import run_under_dir
 from .utils import use_cassette
+from .utils import skip_if
 
 #
 # Test with_tempfile, especially nested invocations
@@ -414,6 +415,18 @@ def test_skip_if_no_network():
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
+
+def test_skip_if():
+
+    with assert_raises(SkipTest):
+        @skip_if(True)
+        def f():
+            raise AssertionError("must have not been ran")
+
+    @skip_if(False)
+    def f():
+        return "magical"
+    eq_(f(), 'magical')
 
 
 @assert_cwd_unchanged
