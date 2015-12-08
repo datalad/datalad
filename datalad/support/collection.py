@@ -64,10 +64,10 @@ class Collection(dict):
         super(Collection, self).__delitem__(key)
 
     def __setitem__(self, handle_name, handle):
-        """Sugaring to be used to assign a brand new handle, not known to the collection
+        """Sugaring to be used to assign a brand new handle, not known to the
+        collection.
         """
         self.register_handle(handle, handle_name=handle_name, add_handle_uri=True)
-
 
     def register_handle(self, handle, handle_name=None, add_handle_uri=None):
         """Register a given handle
@@ -80,6 +80,7 @@ class Collection(dict):
           Add handle uri to the collection meta-data.  If None, and no name was
           provided (thus it could have not being known) -- assume True
         """
+
         # if no handle_name was provided -- take it from the handle
         if handle_name is None:
             handle_name = handle.name
@@ -88,14 +89,14 @@ class Collection(dict):
 
         super(Collection, self).__setitem__(handle_name, handle)
 
-        self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
-        if self_uri is None:
-            raise CollectionBrokenError()  # TODO: Proper exceptions
-
         if add_handle_uri is None:
             add_handle_uri = False
 
         if add_handle_uri:
+            self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
+            if self_uri is None:
+                raise CollectionBrokenError()  # TODO: Proper exceptions
+
             # Load it from the handle itself
             key_uri = self[handle_name].meta.value(predicate=RDF.type, object=DLNS.Handle)
             if key_uri is None or key_uri == DLNS.this:
@@ -232,73 +233,108 @@ class MetaCollection(dict):
     """
 
     def __init__(self, src=None, name=None):
+        """
+
+        Parameters
+        ----------
+        src
+        name
+
+        Returns
+        -------
+
+        """
         super(MetaCollection, self).__init__()
 
         self.name = name
+
+        # TODO: Not sure whether 'store' and 'conjunctive_graph' should be
+        #       public. (requires the user to know exactly when to update)
         self.store = IOMemory()
 
-        if isinstance(src, MetaCollection):
-            self.update(src)
-            self.name = src.name
-            # TODO: See Collection: How to treat names in case of a copy?
+        if src is not None:
+            # retrieve key, value pairs for the dictionary:
+            if isinstance(src, dict):
+                self.update(src)
+            else:
+                # assume iterable of Collection items:
+                for item in src:
+                    self[item.name] = item
 
-        elif isinstance(src, list):
-            for item in src:
-                if isinstance(item, Collection):
-                    self[str(item.name)] = item
-                else:
-                    e_msg = "Can't retrieve collection from %s." % type(item)
-                    lgr.error(e_msg)
-                    raise TypeError(e_msg)
+            # collect the graphs in the store:
+            # Note: Only acquires graphs, that are currently loaded by the
+            #       collections!
 
-        elif isinstance(src, dict):
-            for key in src:
-                if isinstance(src[key], Collection):
-                    self[key] = src[key]
-                else:
-                    e_msg = "Can't retrieve collection from %s." % \
-                            type(src[key])
-                    lgr.error(e_msg)
-                    raise TypeError(e_msg)
-
-        elif src is None:
-            pass
-        else:
-            e_msg = "Invalid source type for MetaCollection: %s" % type(src)
-            lgr.error(e_msg)
-            raise TypeError(e_msg)
-
-        # join the stores:
-        for collection in self:
-            for graph in self[collection].store.contexts():
-                self.store.add_graph(graph)
-                # TODO: Note: Removed all the copying of the graphs and correcting
-                # their references, since we now always use
-                # 'collection/branch/handle' as key. But: Implementation of
-                # this changed behaviour is not well tested yet.
+            # TODO: Move to isinstance(dict)-block. Due to assignement this is
+            # done already in case of a non-dict!
+            for collection in self:
+                for graph in self[collection].store.contexts():
+                    self.store.add_graph(graph)
+                    # TODO:
+                    # Note: Removed all the copying of the graphs and
+                    #       correcting their references, since we now always
+                    #       use 'collection/handle' as key.
+                    # But:  Implementation of this changed behaviour is not
+                    #       well tested yet.
 
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
-    def __setitem__(self, key, value):
-        if not isinstance(value, Collection):
-            raise TypeError("Can't add non-Collection type to MetaCollection.")
-
-        super(MetaCollection, self).__setitem__(key, value)
-        for graph in value.store.contexts():
+    def __setitem__(self, collection_name, collection):
+        super(MetaCollection, self).__setitem__(collection_name, collection)
+        # add the graphs of the collection and its handles to the graph store:
+        for graph in collection.store.contexts():
             self.store.add_graph(graph)
 
-    def __delitem__(self, key):
-        # delete the graphs of the collection and its handles:
-        for graph in self[key].store.contexts():
+    # TODO: if handle names always use collection_name/handle_name in the
+    # context of collections, __delitem__ and pop should use this pattern to
+    # remove graphs instead of looking at the CURRENT store of the collection!
+
+    def __delitem__(self, collection_name):
+        # remove the graphs of the collection and its handles from the graph
+        # store:
+        for graph in self[collection_name].store.contexts():
             self.store.remove_graph(graph)
         # delete the entry itself:
-        super(MetaCollection, self).__delitem__(key)
+        super(MetaCollection, self).__delitem__(collection_name)
 
-    def query(self):
-        """ Perform query on the meta collection.
-        Note: It's self.conjunctive_graph or self.store respectively,
-        what is to be queried here.
+    def pop(self, collection_name, default=None):
+        # remove the graphs of the collection and its handles from the graph
+        # store:
+        for graph in self[collection_name].store.contexts():
+            self.store.remove_graph(graph)
+        return super(MetaCollection, self).pop(collection_name,
+                                               default=default)
+
+    def update_graph_store(self):
         """
-        pass
+        """
+
+        del self.store
+        self.store = IOMemory()
+
+        for collection in self:
+            self[collection].update_graph_store()
+            for graph in self[collection].store.contexts():
+                self.store.add_graph(graph)
+
+        self.conjunctive_graph = ConjunctiveGraph(store=self.store)
+
+    def query(self, query, update=True):
+        """Perform query on the meta collection.
+
+        Parameters
+        ----------
+        query
+        update
+
+        Returns
+        -------
+
+        """
+
+        if update:
+            self.update_graph_store()
+        return self.conjunctive_graph.query(query)
+
 
     # TODO: to be a *Collection it must fulfill the same API?
