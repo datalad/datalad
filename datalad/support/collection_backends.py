@@ -63,12 +63,6 @@ class CollectionRepoBackend(Collection):
 
         self.reload()
 
-        # Note: Possible solution to setitem vs. laziness:
-        #       Don't assign in constructor but use dict.update() or
-        #       dict.setitem directly! Then check in setitem whether it's
-        #       add or replace.
-        #       See also: reload()!
-
     @property
     def branch(self):
         # Read only

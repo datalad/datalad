@@ -156,9 +156,10 @@ class HandleRepo(AnnexRepo):
             branch = self.git_get_active_branch()
 
         if files is None:
-            files = [file_ for file_ in self.git_get_files(branch)
-                     if file_.startswith(HANDLE_META_DIR) and
-                     file_.endswith(".ttl")]
+            # TODO: See CollectionRepo.get_handle_graphs
+            files = [blob.path for blob in
+                     (self.repo.tree(branch) / HANDLE_META_DIR).blobs
+                     if blob.path.endswith(".ttl")]
                     # Note: Think of additionally exclude config.ttl:
                     # and basename(file_) != REPO_CONFIG_FILE
 

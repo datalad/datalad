@@ -12,7 +12,6 @@
 
 __docformat__ = 'restructuredtext'
 
-
 from os import curdir
 from os.path import join as opj, abspath
 from .base import Interface

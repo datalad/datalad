@@ -93,6 +93,10 @@ class HandleRepoBackend(Handle):
         self._files = files
         self._sub_graphs = {}
 
+    @property
+    def name(self):
+        return self.repo.name
+
     def get_subgraphs(self):
         if not self._sub_graphs:
             self.update_metadata()
@@ -125,7 +129,7 @@ class HandleRepoBackend(Handle):
 
         :return:
         """
-        self._graph = Graph(identifier=Literal(self.repo.name))
+        self._graph = Graph(identifier=Literal(self.name))
         for key in self.sub_graphs:
             self._graph += self.sub_graphs[key]
 
@@ -218,6 +222,10 @@ class CollectionRepoHandleBackend(Handle):
 
         self._files = files
         self._sub_graphs = dict()
+
+    @property
+    def name(self):
+        return self._key
 
     def get_subgraphs(self):
         if self._sub_graphs == dict():

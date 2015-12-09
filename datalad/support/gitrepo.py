@@ -23,6 +23,7 @@ from functools import wraps
 
 from git import Repo
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
+from git.objects.blob import Blob
 
 from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
@@ -391,7 +392,6 @@ class GitRepo(object):
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
 
-
     def git_get_active_branch(self):
 
         return self.repo.active_branch.name
@@ -495,7 +495,7 @@ class GitRepo(object):
         self._git_custom_command('', 'git checkout %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_get_files(self, branch="HEAD"):
+    def git_get_files(self, branch=None):
         """Get a list of files in git.
 
         Lists the files in the (remote) branch.
@@ -503,22 +503,20 @@ class GitRepo(object):
         Parameters
         ----------
         branch: str
-          Name of the branch to query.
+          Name of the branch to query. Default: active branch.
 
         Returns
         -------
         [str]
           list of files.
         """
-        cmd_str = 'git ls-tree -r ' + branch
-        out, err = self._git_custom_command('', cmd_str)
-        return [line.split('\t')[1] for line in out.rstrip(linesep).splitlines()]
 
-
-        # Only local branches: How to get from remote branches in a similar way?
-        #head = self.repo.head if branch == "HEAD" else self.repo.heads[branch]
-        # return [item.path for item in list(head.commit.tree.traverse())]
-        # #if isinstance(item, git.objects.blob.Blob)
+        if branch is None:
+            # active branch can be queried way faster:
+            return self.get_indexed_files()
+        else:
+            return [item.path for item in self.repo.tree(branch).traverse()
+                    if isinstance(item, Blob)]
 
     def git_get_file_content(self, file_, branch='HEAD'):
         """

@@ -63,6 +63,8 @@ class Collection(dict):
         self.store.remove_graph(self[key].name)
         super(Collection, self).__delitem__(key)
 
+    # TODO: Check for replace in setitem, register_handle!
+
     def __setitem__(self, handle_name, handle):
         """Sugaring to be used to assign a brand new handle, not known to the
         collection.

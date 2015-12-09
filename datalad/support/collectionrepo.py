@@ -162,9 +162,10 @@ class CollectionRepo(GitRepo):
         if branch is None:
             branch = self.git_get_active_branch()
 
-        return list(set([self._filename2key(f.split(os.sep)[0])
-                         for f in self.git_get_files(branch)
-                         if f != basename(f) and not f.startswith('.')]))
+        # TODO: replace query for subdirectories by a method of GitRepo:
+        # TODO: It may be even faster to filter the index in case of active branch. Yet to be measured.
+        return [self._filename2key(item.path)
+                for item in self.repo.tree(branch).trees]
 
     # TODO: come up with a better name for a 'key' in below
     # it could be a handle_name or collection/handle_name
@@ -524,18 +525,17 @@ class CollectionRepo(GitRepo):
         :param files:
         :return:
         """
-
         if branch is None:
             branch = self.git_get_active_branch()
 
         # by default read all ttl-files except handle's REPO_CONFIG_FILE
         if files is None:
-            files = [file_
-                     for file_ in self.git_get_files(branch=branch)
-                     if file_.startswith(self._key2filename(key)) and
-                     file_.endswith(".ttl")]
-                     # exclude config?
-                     # and basename(file_) != REPO_CONFIG_FILE]
+            # TODO: Figure out how to generalize this gitpython query and make
+            #       it a method of GitRepo.
+            #       May be like get_files(branch="HEAD", directory="repo_base", recursive=True)
+            files = [blob.path for blob in
+                     (self.repo.tree(branch) / self._key2filename(key)).blobs
+                     if blob.path.endswith(".ttl")]
 
         graphs = dict()
         for file_ in files:
@@ -543,6 +543,7 @@ class CollectionRepo(GitRepo):
             file_str = '\n'.join(self.git_get_file_content(file_, branch))
             graphs[basename(file_).rstrip(".ttl")] = \
                 Graph().parse(data=file_str, format="turtle")
+
         return graphs
 
     def store_handle_graphs(self, graphs, handle, branch=None,
@@ -585,12 +586,9 @@ class CollectionRepo(GitRepo):
 
         # by default read all ttl-files in base dir:
         if files is None:
-            files = [file_
-                     for file_ in self.git_get_files(branch=branch)
-                     if os.sep not in file_ and
-                     file_.endswith(".ttl")]
-                    # Note: Think of additionally exclude config.ttl:
-                    # and file_ != REPO_CONFIG_FILE
+            # TODO: See get_handle_graphs!
+            files = [blob.path for blob in self.repo.tree(branch).blobs
+                     if blob.path.endswith(".ttl")]
 
         graphs = dict()
         for file_ in files:

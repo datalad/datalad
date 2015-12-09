@@ -14,7 +14,7 @@ import os
 from os.path import join as opj, exists, realpath
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_in, assert_false, assert_not_equal
+    eq_, assert_in, assert_false, assert_not_equal
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
 from ..support.gitrepo import GitRepo, normalize_paths, _normalize_path
@@ -90,7 +90,7 @@ def test_GitRepo_equals(path1, path2):
     repo1 = GitRepo(path1)
     repo2 = GitRepo(path1)
     ok_(repo1 == repo2)
-    assert_equal(repo1, repo2)
+    eq_(repo1, repo2)
     repo2 = GitRepo(path2)
     assert_not_equal(repo1, repo2)
     ok_(repo1 != repo2)
@@ -161,36 +161,36 @@ def test_normalize_path(git_path):
     assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, getpwd())
 
     result = _normalize_path(gr.path, "testfile")
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+    eq_(result, "testfile", "_normalize_path() returned %s" % result)
 
     # result = _normalize_path(gr.path, opj('.', 'testfile'))
-    # assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+    # eq_(result, "testfile", "_normalize_path() returned %s" % result)
     #
     # result = _normalize_path(gr.path, opj('testdir', '..', 'testfile'))
-    # assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+    # eq_(result, "testfile", "_normalize_path() returned %s" % result)
     # Note: By now, normpath within normalize_paths() is disabled, therefore
     # disable these tests.
 
     result = _normalize_path(gr.path, opj('testdir', 'testfile'))
-    assert_equal(result, opj("testdir", "testfile"), "_normalize_path() returned %s" % result)
+    eq_(result, opj("testdir", "testfile"), "_normalize_path() returned %s" % result)
 
     result = _normalize_path(gr.path, opj(git_path, "testfile"))
-    assert_equal(result, "testfile", "_normalize_path() returned %s" % result)
+    eq_(result, "testfile", "_normalize_path() returned %s" % result)
 
     # now we are inside, so relative paths are relative to cwd and have
     # to be converted to be relative to annex_path:
     chpwd(opj(git_path, 'd1', 'd2'))
 
     result = _normalize_path(gr.path, "testfile")
-    assert_equal(result, opj('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
+    eq_(result, opj('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
 
     result = _normalize_path(gr.path, opj('..', 'testfile'))
-    assert_equal(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
+    eq_(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
     assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, opj(git_path, '..', 'outside'))
 
     result = _normalize_path(gr.path, opj(git_path, 'd1', 'testfile'))
-    assert_equal(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
+    eq_(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
     chpwd(pwd)
 
@@ -214,20 +214,20 @@ def test_GitRepo_files_decorator():
     # When a single file passed -- single path returned
     obscure_filename = get_most_obscure_supported_name()
     file_to_test = opj(test_instance.path, 'deep', obscure_filename)
-    assert_equal(test_instance.decorated_many(file_to_test),
+    eq_(test_instance.decorated_many(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
-    assert_equal(test_instance.decorated_one(file_to_test),
+    eq_(test_instance.decorated_one(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
     file_to_test = obscure_filename
-    assert_equal(test_instance.decorated_many(file_to_test),
+    eq_(test_instance.decorated_many(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
-    assert_equal(test_instance.decorated_one(file_to_test),
+    eq_(test_instance.decorated_one(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
 
     file_to_test = opj(obscure_filename, 'beyond', 'obscure')
-    assert_equal(test_instance.decorated_many(file_to_test),
+    eq_(test_instance.decorated_many(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
 
     file_to_test = opj(getpwd(), 'somewhere', 'else', obscure_filename)
@@ -239,9 +239,9 @@ def test_GitRepo_files_decorator():
     expect = []
     for item in files_to_test:
         expect.append(_normalize_path(test_instance.path, item))
-    assert_equal(test_instance.decorated_many(files_to_test), expect)
+    eq_(test_instance.decorated_many(files_to_test), expect)
 
-    assert_equal(test_instance.decorated_many(''), '')
+    eq_(test_instance.decorated_many(''), '')
 
     assert_raises(ValueError, test_instance.decorated_many, 1)
     assert_raises(ValueError, test_instance.decorated_one, 1)
@@ -255,12 +255,12 @@ def test_GitRepo_remote_add(orig_path, path):
     gr = GitRepo(path, orig_path)
     out = gr.git_remote_show()
     assert_in('origin', out)
-    assert_equal(len(out), 1)
+    eq_(len(out), 1)
     gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
     out = gr.git_remote_show()
     assert_in('origin', out)
     assert_in('github', out)
-    assert_equal(len(out), 2)
+    eq_(len(out), 2)
     out = gr.git_remote_show('github')
     assert_in('  Fetch URL: git://github.com/datalad/testrepo--basic--r1', out)
 
@@ -273,7 +273,7 @@ def test_GitRepo_remote_remove(orig_path, path):
     gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
     gr.git_remote_remove('github')
     out = gr.git_remote_show()
-    assert_equal(len(out), 1)
+    eq_(len(out), 1)
     assert_in('origin', out)
 
 
@@ -284,7 +284,7 @@ def test_GitRepo_remote_show(orig_path, path):
     gr = GitRepo(path, orig_path)
     gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
     out = gr.git_remote_show(verbose=True)
-    assert_equal(len(out), 4)
+    eq_(len(out), 4)
     assert_in('origin\t%s (fetch)' % orig_path, out)
     assert_in('origin\t%s (push)' % orig_path, out)
     # Some fellas might have some fancy rewrite rules for pushes, so we can't
@@ -301,8 +301,8 @@ def test_GitRepo_get_remote_url(orig_path, path):
 
     gr = GitRepo(path, orig_path)
     gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
-    assert_equal(gr.git_get_remote_url('origin'), orig_path)
-    assert_equal(gr.git_get_remote_url('github'),
+    eq_(gr.git_get_remote_url('origin'), orig_path)
+    eq_(gr.git_get_remote_url('github'),
                  'git://github.com/datalad/testrepo--basic--r1')
 
 
@@ -383,47 +383,67 @@ def test_GitRepo_remote_update(path1, path2, path3):
     git1.git_checkout('branch3')
 
     branches1 = git1.git_get_branches()
-    assert_equal({'branch2', 'branch3'}, set(branches1))
+    eq_({'branch2', 'branch3'}, set(branches1))
 
 
-@with_testrepos('basic_git', flavors=local_testrepo_flavors)
+# TODO: Why was it "flavors=local_testrepo_flavors" ? What's the windows issue here?
+@with_testrepos('.*git.*', flavors=['clone'])
 @with_tempfile
-@with_tempfile
-def test_GitRepo_get_files(src, path, path2clone):
+def test_GitRepo_get_files(url, path):
 
-    # TODO: THIS DOES NOT WORK AS EXPECTED! SEE gitrepo.py!
+    gr = GitRepo(path, url)
 
-    gr = GitRepo(path, src)
-    assert_in('INFO.txt', gr.git_get_files())
-    assert_in('test.dat', gr.git_get_files())
-    #gr.git_checkout('new_branch', '-b')
-    ##filename = get_most_obscure_supported_name()
-    #filename = 'another_file.dat'
-    #with open(opj(path, filename), 'w') as f:
-    #    f.write("something")
-    #gr.git_add(filename)
-    #gr.git_commit("Added.")
-    #assert_equal({'INFO.txt', 'test-annex.dat', 'test.dat', filename},
-    #             set(gr.git_get_files()))
-    #assert_equal({'INFO.txt', 'test-annex.dat', 'test.dat'},
-    #             set(gr.git_get_files('master')),
-    #             "return value: %s" % gr.git_get_files('master'))
-    #gr2 = GitRepo(path2clone, src)
-    #gr2.git_remote_add('remoterepo', path)
-    #gr2.git_fetch('remoterepo')
+    # get the expected files via os for comparison:
+    os_files = set()
+    for (dirpath, dirnames, filenames) in os.walk(path):
+        rel_dir = os.path.relpath(dirpath, start=path)
+        if rel_dir.startswith(".git"):
+            continue
+        for file_ in filenames:
+            os_files.add(opj(rel_dir, file_).lstrip("./"))
+
+    # get the files via GitRepo:
+    local_files = set(gr.git_get_files())
+    remote_files = set(gr.git_get_files(branch="origin/master"))
+
+    eq_(local_files, set(gr.get_indexed_files()))
+    eq_(local_files, remote_files)
+    eq_(local_files, os_files)
+
+    # create a different branch:
+    gr.git_checkout('new_branch', '-b')
+    filename = 'another_file.dat'
+    with open(opj(path, filename), 'w') as f:
+        f.write("something")
+    gr.git_add(filename)
+    gr.git_commit("Added.")
+
+    # now get the files again:
+    local_files = set(gr.git_get_files())
+    eq_(local_files, os_files.union({filename}))
+    # retrieve remote branch again, which should not have changed:
+    remote_files = set(gr.git_get_files(branch="origin/master"))
+    eq_(remote_files, os_files)
+    eq_(set([filename]), local_files.difference(remote_files))
+
+    # switch back and query non-active branch:
+    gr.git_checkout('master')
+    local_files = set(gr.git_get_files())
+    branch_files = set(gr.git_get_files(branch="new_branch"))
+    eq_(set([filename]), branch_files.difference(local_files))
 
 
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile(mkdir=True)
 def test_GitRepo_get_toppath(repo, tempdir):
     reporeal = realpath(repo)
-    assert_equal(GitRepo.get_toppath(repo), reporeal)
+    eq_(GitRepo.get_toppath(repo), reporeal)
     # Generate some nested directory
     nested = opj(repo, "d1", "d2")
     os.makedirs(nested)
-    assert_equal(GitRepo.get_toppath(nested), reporeal)
+    eq_(GitRepo.get_toppath(nested), reporeal)
     # and if not under git, should return None
-    assert_equal(GitRepo.get_toppath(tempdir), None)
+    eq_(GitRepo.get_toppath(tempdir), None)
 
 
 # TODO:
