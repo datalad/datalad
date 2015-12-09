@@ -10,6 +10,7 @@
 
 from os.path import join as opj
 import six.moves.builtins as __builtin__
+import time
 
 from ..http import HTTPDownloader
 from ..http import DownloadError
@@ -18,7 +19,11 @@ from ..providers import Providers, Credential  # to test against crcns
 from ...support.cookies import CookiesDB
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
-import httpretty
+try:
+    import httpretty
+except ImportError:
+    httpretty = None
+
 from mock import patch
 from ...tests.utils import assert_in
 from ...tests.utils import assert_not_in
@@ -31,6 +36,9 @@ from ...tests.utils import swallow_logs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import SkipTest
+from ...tests.utils import skip_if
+# from nose.tools import assert_greater
+
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
@@ -127,6 +135,7 @@ class FakeCredential1(Credential):
         del self._fixed_credentials[0]
 
 
+@skip_if(not httpretty)
 @httpretty.activate
 @with_tempfile(mkdir=True)
 def test_HTMLFormAuthenticator_httpretty(d):
@@ -198,6 +207,62 @@ def test_HTMLFormAuthenticator_httpretty(d):
 
     # Unsuccesfull scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
+
+
+import requests
+
+url = "http://example.com/crap.txt"
+test_cookie = 'somewebsite=testcookie'
+credential = FakeCredential1(name='test', type='user_password', url=None)
+credentials = credential()
+
+@skip_if(not httpretty)
+@httpretty.activate
+@with_tempfile(mkdir=True)
+def test_HTMLFormAuthenticator_httpretty_2(d):
+    fpath = opj(d, 'crap.txt')
+
+
+    def request_get_callback(request, uri, headers):
+        assert_in('Cookie', request.headers)
+        print '#################################'
+        morsels = request.headers['Cookie'].split('; ')
+        print morsels
+        for c in morsels:
+            if c.startswith('expires'):
+                expiration_date = c.split('=')[1]
+                # assert_greater(time.time() > expiration_date)
+                assert time.time() > float(expiration_date)
+
+        print '#################################'
+        return (403, headers, "cookie was expired")
+
+    # SCENARIO 2
+    # outdated cookie provided to GET -- must return 403 (access denied)
+    # then our code should POST credentials again and get a new cookies
+    # which is then provided to GET
+    httpretty.register_uri(httpretty.GET, url,
+                           body=request_get_callback
+                          )
+
+    authenticator = HTMLFormAuthenticator(dict(username="{user}",
+                                               password="{password}",
+                                               submit="CustomLogin"))
+    # TODO: with success_re etc
+    # This is a "success test" which should be tested in various above scenarios
+    def fake_load(self):
+        # self._cookies_db = {'example.com': dict(some_site_id='idsomething', expires='Tue, 15-Jan-2013 21:47:38 GMT')}
+        self._cookies_db = {'example.com': dict(some_site_id='idsomething', expires='1449623300')}
+
+    with patch.object(CookiesDB, '_load', fake_load):
+        downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+        downloader.download(url, path=d)
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "cookie was expired")
+
+
 
 
 def test_HTTPAuthAuthenticator_httpretty():
