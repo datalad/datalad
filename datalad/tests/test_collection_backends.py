@@ -19,7 +19,7 @@ from datalad.support.collection_backends import CollectionRepoBackend
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.collection import Collection
 from datalad.support.handlerepo import HandleRepo
-from datalad.support.metadatahandler import DLNS
+from datalad.support.metadatahandler import DLNS, Graph
 from datalad.tests.utils import with_tempfile, with_testrepos
 from datalad.utils import get_local_file_url
 
@@ -110,6 +110,89 @@ def test_CollectionRepoBackend_meta(url, path):
 
 def test_CollectionRepoBackend_commit():
     raise SkipTest
+
+
+@with_testrepos('.*collection.*', flavors=['local'])
+def test_CollectionRepoBackend_handle_update_listener(path):
+
+    repo = CollectionRepo(path, create=False)
+
+    # skip testrepos with no handles:
+    # Note: Can't be done with raise SkipTest, since then the following
+    # collections will be ignored, too.
+    if not repo.get_handle_list():
+        return
+
+    collection = CollectionRepoBackend(repo)
+    # empty store at the beginning:
+    ok_(not set(collection.store.contexts()))
+
+    # now trigger update on a handle within the collection:
+    collection[repo.get_handle_list()[0]].update_metadata()
+    eq_(len(list(collection.store.contexts())), 1)
+    eq_(repo.get_handle_list()[0],
+        str(list(collection.store.contexts())[0].identifier))
+    assert_in(collection[repo.get_handle_list()[0]].meta,
+              collection.store.contexts())
+
+
+@with_testrepos('.*collection.*', flavors=['local'])
+def test_CollectionRepoBackend_update_listener(path):
+
+    class TestListener:
+
+        def __init__(self):
+            self.received = list()
+
+        def listener_callable(self, collection, graph):
+            assert_is_instance(collection, CollectionRepoBackend)
+            assert_is_instance(graph, Graph)
+            self.received.append(graph)
+
+        def reset(self):
+            self.received = list()
+
+    listener = TestListener()
+    repo = CollectionRepo(path, create=False)
+    collection = CollectionRepoBackend(repo)
+    collection.register_update_listener(listener.listener_callable)
+
+    # Due to collection's laziness, the first access to 'meta' should
+    # trigger an update:
+    g = collection.meta
+    eq_(len(listener.received), 1)
+    assert_in(collection.meta, listener.received)
+    listener.reset()
+
+    # explicit update of collection level metadata:
+    collection.update_metadata()
+    eq_(len(listener.received), 1)
+    assert_in(collection.meta, listener.received)
+    listener.reset()
+
+    # modifying the collection level metadata directly:
+    collection.meta = {'some_subgraph': Graph()}
+    eq_(len(listener.received), 1)
+    assert_in(collection.meta, listener.received)
+    listener.reset()
+
+    # explicit update of the graph store:
+    collection.update_graph_store()
+    eq_(len(listener.received), len(collection) + 1)
+    assert_in(collection.meta, listener.received)
+    for handle in collection:
+        assert_in(collection[handle].meta, listener.received)
+    listener.reset()
+
+    # update a handle, that is contained in the collection;
+    # skip testrepos with no handles:
+    if len(repo.get_handle_list()) > 0:
+        collection[repo.get_handle_list()[0]].update_metadata()
+        eq_(len(listener.received), 1)
+        assert_in(collection[repo.get_handle_list()[0]].meta, listener.received)
+        listener.reset()
+
+
 
 
 # @with_tempfile

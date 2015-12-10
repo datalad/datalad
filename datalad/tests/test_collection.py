@@ -193,7 +193,7 @@ def test_Collection_commit(path):
 def test_MetaCollection_constructor(path1, path2):
 
     # MetaCollection (empty):
-    metacollection_empty = MetaCollection()
+    metacollection_empty = MetaCollection(name="metacollection_empty")
     eq_(set(iterkeys(metacollection_empty)), set([]))
     eq_(len(list(metacollection_empty.store.contexts())), 0)
 
@@ -206,40 +206,47 @@ def test_MetaCollection_constructor(path1, path2):
 
     # create the very same meta collection three different ways:
     # 1. MetaCollection from list of collections:
-    metacollection = MetaCollection([clt1, clt2])
+    metacollection = MetaCollection([clt1, clt2], name="metacollection")
     # put something invalid in that list:
     with swallow_logs():
         assert_raises(AttributeError, MetaCollection, [clt1, "invalid"])
     # 2. MetaCollection from dict:
     d = {repo1.name: clt1, repo2.name: clt2}
-    metacollection_dict = MetaCollection(d)
+    metacollection_dict = MetaCollection(d, name="metacollection_dict")
     # 3. copy constructor:
-    metacollection_copy = MetaCollection(metacollection)
+    metacollection_copy = MetaCollection(metacollection, name="metacollection_copy")
 
     # test these three instances:
     for m_col in [metacollection, metacollection_copy, metacollection_dict]:
         eq_(set(iterkeys(m_col)), {repo1.name, repo2.name})
         # lazy loading of metadata, so the store should be empty at this point:
         eq_(len(list(m_col.store.contexts())), 0)
-        eq_(clt1.meta, m_col[repo1.name].meta)
-        eq_(clt2.meta, m_col[repo2.name].meta)
-        # loading of collection level metadata was triggered now:
-        # TODO: But MetaCollection wasn't notified yet!
-        # eq_(len(list(metacollection.store.contexts())), 2)
 
-        # Neither of below actions cause any effect on MetaCollection
-        # TODO: figure out what we need to TODO about that
-        #   _ = handle.meta
-        #   clt1.update_graph_store()
-        # eq_(len(list(metacollection.store.contexts())), 3)
-        # [assert_in(g.identifier, [Literal(repo1.name), Literal(repo2.name),
-        #                           Literal("somehandle")])
-        #  for g in metacollection.store.contexts()]
+    # trigger update of a handle:
+    clt1["BasicHandle"].update_metadata()
+    # now all metacollections linked to that handle should be updated:
+    for m_col in [metacollection, metacollection_copy, metacollection_dict]:
+        eq_(len(list(m_col.store.contexts())), 1)
+        assert_in(clt1["BasicHandle"].meta, m_col.store.contexts())
 
-        # for now just trigger an update of the entire store to test loading:
-        m_col.update_graph_store()
-        # two collection graphs plus two handle graphs:
+    # trigger update of a collection's graph:
+    clt2.update_metadata()
+    # now all metacollections linked to that collection should have that graph
+    # in their stores, too:
+    for m_col in [metacollection, metacollection_copy, metacollection_dict]:
+        eq_(len(list(m_col.store.contexts())), 2)
+        assert_in(clt2.meta, m_col.store.contexts())
+
+    # full update:
+    metacollection.update_graph_store()
+    # recursively triggers all the updates, so that the other metacollections
+    # are affected, too:
+    for m_col in [metacollection, metacollection_copy, metacollection_dict]:
         eq_(len(list(m_col.store.contexts())), 4)
+        assert_in(clt1["BasicHandle"].meta, m_col.store.contexts())
+        assert_in(clt1["MetadataHandle"].meta, m_col.store.contexts())
+        assert_in(clt1.meta, m_col.store.contexts())
+        assert_in(clt2.meta, m_col.store.contexts())
 
 
 @with_testrepos('.*collection.*', flavors=['local'])

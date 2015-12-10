@@ -113,6 +113,7 @@ class HandleRepoBackend(Handle):
                                 "Expected: rdflib.Graph." %
                                 (subgraph, type(graphs[subgraph])))
             self._sub_graphs[subgraph] = graphs[subgraph]
+        self.notify_update_listeners()
 
     sub_graphs = property(get_subgraphs, set_subgraphs)
 
@@ -243,6 +244,7 @@ class CollectionRepoHandleBackend(Handle):
                                 "Expected: rdflib.Graph." %
                                 (subgraph, type(graphs[subgraph])))
             self._sub_graphs[subgraph] = graphs[subgraph]
+        self.notify_update_listeners()
 
     sub_graphs = property(get_subgraphs, set_subgraphs)
 

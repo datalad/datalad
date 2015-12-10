@@ -92,6 +92,7 @@ class CollectionRepoBackend(Collection):
                                 "Expected: rdflib.Graph." %
                                 (subgraph, type(graphs[subgraph])))
             self._sub_graphs[subgraph] = graphs[subgraph]
+        self.notify_update_listeners(self.meta)
 
     sub_graphs = property(get_subgraphs, set_subgraphs)
 
@@ -142,6 +143,7 @@ class CollectionRepoBackend(Collection):
         """
         self.sub_graphs = self.repo.get_collection_graphs(branch=self._branch,
                                                           files=self._files)
+
         # creation of self.meta needs to be triggered in order to be up to date
         # in the collections graph store. Furthermore, returning the updated
         # graph might be reasonable anyway.

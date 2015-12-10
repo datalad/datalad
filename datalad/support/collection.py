@@ -32,6 +32,7 @@ class Collection(dict):
 
         self.store = IOMemory()
         self._graph = None
+        self._update_listeners = list()
 
     def __repr__(self):
         return "<Collection name=%s (%s), handles=%s>" % (self.name,
@@ -90,6 +91,7 @@ class Collection(dict):
                 add_handle_uri = True
 
         super(Collection, self).__setitem__(handle_name, handle)
+        handle.register_update_listener(self.handle_update_listener)
 
         if add_handle_uri is None:
             add_handle_uri = False
@@ -115,6 +117,13 @@ class Collection(dict):
                     raise ValueError("Handle '%s' has neither a valid URI (%s) nor an URL." % (handle_name, key_uri))
             self.meta.add((self_uri, DCTERMS.hasPart, key_uri))
             self.store.add_graph(self[handle_name].meta)
+            self.notify_update_listeners(self[handle_name].meta)
+
+    def handle_update_listener(self, handle):
+        # TODO: For now just updates the handle graph. No checks for
+        # consistency like in register_handle yet.
+        self.store.add_graph(handle.meta)
+        self.notify_update_listeners(handle.meta)
 
     def fsck(self):
         """Verify that the collection is in legit state. If not - FIX IT!
@@ -171,6 +180,8 @@ class Collection(dict):
 
         Called to update 'self._graph' from the collection's backend.
         Creates a named graph, whose identifier is the name of the collection.
+
+        Note: Should call self.notify_update_listeners()
         """
         pass
         # TODO: what about runtime changes? discard? Meh ...
@@ -190,15 +201,13 @@ class Collection(dict):
         to the fact, that graphs are loaded on demand.
         """
 
-        self.update_metadata()
-
         # TODO: Currently we update from backend here. Maybe just make sure
         # every graph is added and make update from backend an option?
         # Additionally, what about changes in backend?
         # => handle may not be in self yet!
         for handle in self:
             self[handle].update_metadata()
-            self.store.add_graph(self[handle].meta)
+        self.update_metadata()
 
     # overriding dict.update():
     # def update(self, other=None, **kwargs):
@@ -216,6 +225,19 @@ class Collection(dict):
     # override pop()!
     # what about clear()?
     # copy()?
+
+    def register_update_listener(self, listener):
+        """
+
+        Parameters
+        ----------
+        listener callable
+        """
+        self._update_listeners.append(listener)
+
+    def notify_update_listeners(self, graph):
+        for listener in self._update_listeners:
+            listener(self, graph)
 
 
 class MetaCollection(dict):
@@ -258,6 +280,8 @@ class MetaCollection(dict):
             # retrieve key, value pairs for the dictionary:
             if isinstance(src, dict):
                 self.update(src)
+                for collection in self:
+                    self[collection].register_update_listener(self.collection_update_listener)
             else:
                 # assume iterable of Collection items:
                 for item in src:
@@ -286,6 +310,7 @@ class MetaCollection(dict):
         # add the graphs of the collection and its handles to the graph store:
         for graph in collection.store.contexts():
             self.store.add_graph(graph)
+        collection.register_update_listener(self.collection_update_listener)
 
     # TODO: if handle names always use collection_name/handle_name in the
     # context of collections, __delitem__ and pop should use this pattern to
@@ -307,6 +332,10 @@ class MetaCollection(dict):
         return super(MetaCollection, self).pop(collection_name,
                                                default=default)
 
+    def collection_update_listener(self, collection, graph):
+        self.store.add_graph(graph)
+        # TODO: For now no sanity checks.
+
     def update_graph_store(self):
         """
         """
@@ -316,8 +345,6 @@ class MetaCollection(dict):
 
         for collection in self:
             self[collection].update_graph_store()
-            for graph in self[collection].store.contexts():
-                self.store.add_graph(graph)
 
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
@@ -337,6 +364,5 @@ class MetaCollection(dict):
         if update:
             self.update_graph_store()
         return self.conjunctive_graph.query(query)
-
 
     # TODO: to be a *Collection it must fulfill the same API?

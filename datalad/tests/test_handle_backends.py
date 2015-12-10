@@ -31,6 +31,10 @@ from datalad.tests.utils import with_testrepos, ok_startswith, with_tempfile, \
     ok_clean_git
 from datalad.utils import get_local_file_url
 
+# ###
+# testing class RuntimeHandle:
+# ###
+
 
 def test_RuntimeHandle():
 
@@ -49,6 +53,10 @@ def test_RuntimeHandle():
     eq_("<Handle name=NewName "
         "(<class 'datalad.support.handle_backends.RuntimeHandle'>)>",
         handle.__repr__())
+
+# ###
+# testing class HandleRepoBackend:
+# ###
 
 
 @with_testrepos('.*handle.*', flavors=['local'])
@@ -157,6 +165,49 @@ def test_HandleRepoBackend_remote(url, path):
     assert_not_in(triple_1, backend_remote.meta)
     backend_remote.update_metadata()
     assert_not_in(triple_1, backend_remote.meta)
+
+
+@with_testrepos('.*handle.*', flavors=['local'])
+def test_HandleRepoBackend_update_listener(path):
+
+    class TestListener:
+
+        def __init__(self):
+            self.received = list()
+
+        def listener_callable(self, handle):
+            assert_is_instance(handle, HandleRepoBackend)
+            self.received.append(handle)
+
+        def reset(self):
+            self.received = list()
+
+    listener = TestListener()
+    handle = HandleRepoBackend(HandleRepo(path, create=False))
+    handle.register_update_listener(listener.listener_callable)
+
+    # Due to handle's laziness, the first access to 'meta' should trigger
+    # an update:
+    g = handle.meta
+    eq_(len(listener.received), 1)
+    assert_in(handle, listener.received)
+    listener.reset()
+
+    # explicit update:
+    handle.update_metadata()
+    eq_(len(listener.received), 1)
+    assert_in(handle, listener.received)
+    listener.reset()
+
+    # modifying the metadata directly:
+    handle.meta = {'some_subgraph': Graph()}
+    eq_(len(listener.received), 1)
+    assert_in(handle, listener.received)
+    listener.reset()
+
+# ###
+# testing class CollectionRepoHandleBackend:
+# ###
 
 
 @with_tempfile
@@ -291,3 +342,30 @@ def test_CollectionRepoHandleBackend_remote(url, path):
     assert_not_in(triple_1, backend_remote.meta)
     backend_remote.update_metadata()
     assert_not_in(triple_1, backend_remote.meta)
+
+
+@with_testrepos('collection', flavors=['local'])
+def test_CollectionRepoHandleBackend_update_listener(path):
+
+    def listener_callable(handle):
+        assert_is_instance(handle, CollectionRepoHandleBackend)
+        raise RuntimeError("Notified.")
+
+    handle = CollectionRepoHandleBackend(CollectionRepo(path, create=False),
+                                         "BasicHandle")
+    handle.register_update_listener(listener_callable)
+    with assert_raises(RuntimeError) as cm:
+        # Due to handle's laziness, the first access to 'meta' should trigger
+        # an update:
+        g = handle.meta
+    eq_(str(cm.exception), "Notified.")
+
+    # explicit update:
+    with assert_raises(RuntimeError) as cm:
+        handle.update_metadata()
+    eq_(str(cm.exception), "Notified.")
+
+    # modifying the metadata directly:
+    with assert_raises(RuntimeError) as cm:
+        handle.meta = {'some_subgraph': Graph()}
+    eq_(str(cm.exception), "Notified.")

@@ -38,6 +38,7 @@ class Handle(object):
 
     def __init__(self):
         self._graph = None
+        self._update_listeners = list()
 
     def __repr__(self):
         return "<Handle name=%s (%s)>" % (self.name, type(self))
@@ -45,6 +46,19 @@ class Handle(object):
     def __eq__(self, other):
         # abstract?
         raise NotImplementedError("TODO")
+
+    def register_update_listener(self, listener):
+        """
+
+        Parameters
+        ----------
+        listener callable
+        """
+        self._update_listeners.append(listener)
+
+    def notify_update_listeners(self):
+        for listener in self._update_listeners:
+            listener(self)
 
     @abstractproperty
     def url(self):
