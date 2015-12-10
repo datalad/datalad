@@ -28,8 +28,10 @@ from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
 
 
-_MODES = ('names', 'locations', 'full')
-
+_OUTPUTS = ('names', 'locations', 'full')
+# TODO:
+# may be in Python mode we would like to extend it with
+#  rdf-result, collections
 class SearchCollection(Interface):
     """Search for a collection.
 
@@ -43,9 +45,9 @@ class SearchCollection(Interface):
 
     _params_ = dict(
         output=Parameter(
-            choices=_MODES,
+            choices=_OUTPUTS,
             doc="""What to output as a result of search. TODO -- elaborate""",
-            constraints=EnsureChoice(*_MODES)
+            constraints=EnsureChoice(*_OUTPUTS)
         ),
         search=Parameter(
             args=('search',),
@@ -100,21 +102,23 @@ class SearchCollection(Interface):
 
         printed_collections = set()
         if collections:
-            width = max(len(c) for c in collections)
-            for c, l in zip(collections, locations):
-                if output in {'names', 'locations'} and c in printed_collections:
-                    continue
-                printed_collections.add(c)
-                if output == 'names':
-                    out = c
-                elif output == 'locations':
-                    out = l
-                elif output == 'full':
-                    raise NotImplementedError()
-                #print("%s\t%s" % (c.ljust(width), l))
-                print(out)
+            if not self.cmdline:
+                return [CollectionRepoBackend(local_master, col + "/master")
+                        for col in collections]
+            else:
+                #width = max(len(c) for c in collections)
+                for c, l in zip(collections, locations):
+                    if output in {'names', 'locations'} and c in printed_collections:
+                        continue
+                    printed_collections.add(c)
+                    if output == 'names':
+                        out = c
+                    elif output == 'locations':
+                        out = l
+                    elif output == 'full':
+                        raise NotImplementedError()
+                    #print("%s\t%s" % (c.ljust(width), l))
+                    print(out)
 
-            return [CollectionRepoBackend(local_master, col + "/master")
-                    for col in collections]
         else:
             return []
