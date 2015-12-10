@@ -26,19 +26,10 @@ except ImportError:
     httpretty = None
 
 from mock import patch
-from ...tests.utils import assert_in
-from ...tests.utils import assert_not_in
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_false
-from ...tests.utils import assert_raises
-from ...tests.utils import ok_file_has_content
-from ...tests.utils import serve_path_via_http, with_tree
-from ...tests.utils import swallow_logs
-from ...tests.utils import with_tempfile
-from ...tests.utils import use_cassette
-from ...tests.utils import SkipTest
-from ...tests.utils import skip_if
-from nose.tools import assert_greater
+from ...tests.utils import assert_in, assert_not_in, assert_equal, assert_false, \
+                assert_raises, ok_file_has_content, serve_path_via_http, \
+                with_tree, swallow_logs, with_tempfile, use_cassette, \
+                SkipTest, skip_if, assert_greater
 
 
 # XXX doesn't quite work as it should since doesn't provide context handling
