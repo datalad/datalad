@@ -27,6 +27,9 @@ from ..log import lgr
 from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
 
+# PROFILE
+#import line_profiler
+#prof = line_profiler.LineProfiler()
 
 _OUTPUTS = ('names', 'locations', 'full')
 # TODO:
@@ -43,6 +46,8 @@ class SearchCollection(Interface):
     """
     # TODO: A lot of doc ;)
 
+    # TODO: option to either query only the collections meta-data or the entirety
+    # with handles meta-data
     _params_ = dict(
         output=Parameter(
             choices=_OUTPUTS,
@@ -68,8 +73,14 @@ class SearchCollection(Interface):
         # TODO: since search-handle and search-collection only slightly differ,
         # build a search call, that's more general and both can use
         # This one should allow for searching for other entities as well
+        # PROFILE
+        # prof.add_function(self.__call__)
+        # prof.enable_by_count()
         local_master = get_datalad_master()
 
+        # TODO: check on possibility of efficient persistence of MetaCollection on a drive
+        # so we could update it once with current state of collections and handles, save
+        # to drive, and load it HERE for a query
         metacollection = MetaCollection(
             [local_master.get_backend_from_branch(remote + "/master")
              for remote in local_master.git_get_remotes()]
@@ -77,7 +88,13 @@ class SearchCollection(Interface):
             # + [local_master.get_backend_from_branch()]
         )
 
+        # XXX was attempt to update only meta of the collections itself, without handles meta
+        # resulted in no output
+        #for collection in metacollection:
+        #    metacollection[collection].update_metadata()
+
         metacollection.update_graph_store()
+
         # TODO: Bindings should be done in collection class:
         metacollection.conjunctive_graph.bind('dlns', DLNS)
 
@@ -122,3 +139,7 @@ class SearchCollection(Interface):
 
         else:
             return []
+
+        # PROFILE
+        #prof.disable_by_count()
+        #prof.print_stats()
