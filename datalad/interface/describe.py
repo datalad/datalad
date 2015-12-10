@@ -108,8 +108,8 @@ class Describe(Interface):
                 files = opj(repo.path, repo._key2filename(subject))
             else:
                 # TODO: look for internal entities as subject
-                lgr.error("Subject '%s' unknwon." % subject)
-                raise RuntimeError("Subject '%s' unknwon." % subject)
+                lgr.error("Subject '%s' unknown." % subject)
+                raise RuntimeError("Subject '%s' unknown." % subject)
         elif isinstance(repo, HandleRepo):
             target_class = 'Handle'
             if subject in [repo.name, None]:
@@ -118,8 +118,8 @@ class Describe(Interface):
                 files = opj(repo.path, HANDLE_META_DIR)
             else:
                 # TODO: look for internal entities as subject
-                lgr.error("Subject '%s' unknwon." % subject)
-                raise RuntimeError("Subject '%s' unknwon." % subject)
+                lgr.error("Subject '%s' unknown." % subject)
+                raise RuntimeError("Subject '%s' unknown." % subject)
         else:
             lgr.error("Don't know how to handle object of class %s" %
                       repo.__class__)

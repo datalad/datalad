@@ -88,6 +88,15 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
 class Interface(object):
     """Base class for interface implementations"""
 
+    def __init__(self, cmdline=False):
+        """
+        Parameters
+        ----------
+        cmdline: bool, optional
+          Either this interface instance is working within command line invocation
+        """
+        self.cmdline = cmdline
+
     def setup_parser(self, parser):
         # XXX needs safety check for name collisions
         # XXX allow for parser kwargs customization

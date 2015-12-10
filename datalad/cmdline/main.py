@@ -23,7 +23,7 @@ from datalad.log import lgr
 from datalad.cmdline import helpers
 from ..interface.base import dedent_docstring, get_interface_groups
 from ..utils import setup_exceptionhook, chpwd
-
+from ..dochelpers import exc_str
 
 def _license_info():
     return """\
@@ -108,7 +108,7 @@ def setup_parser():
         cmd_short_descriptions = []
 
         for _intfcls in _interfaces:
-            _intf = _intfcls()
+            _intf = _intfcls(cmdline=True)
 
             cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
             # deal with optional parser args
@@ -170,13 +170,14 @@ def setup_parser():
     return parser
 
 
-def generate_api_call(cmdlineargs=None):
-    parser = setup_parser()
-    # parse cmd args
-    cmdlineargs = parser.parse_args(cmdlineargs)
-    # convert cmdline args into API call spec
-    functor, args, kwargs = cmdlineargs.func(cmdlineargs)
-    return cmdlineargs, functor, args, kwargs
+# yoh: arn't used
+# def generate_api_call(cmdlineargs=None):
+#     parser = setup_parser()
+#     # parse cmd args
+#     cmdlineargs = parser.parse_args(cmdlineargs)
+#     # convert cmdline args into API call spec
+#     functor, args, kwargs = cmdlineargs.func(cmdlineargs)
+#     return cmdlineargs, functor, args, kwargs
 
 
 def main(cmdlineargs=None):
@@ -203,5 +204,5 @@ def main(cmdlineargs=None):
         try:
             cmdlineargs.func(cmdlineargs)
         except Exception as exc:
-            lgr.error('%s (%s)' % (str(exc), exc.__class__.__name__))
+            lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
             sys.exit(1)
