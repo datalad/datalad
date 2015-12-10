@@ -168,7 +168,7 @@ def test_HandleRepoBackend_remote(url, path):
 
 
 @with_testrepos('.*handle.*', flavors=['local'])
-def test_HandleRepoBackend_update_listener(path):
+def test_HandleRepoBackend_update_signal(path):
 
     class TestListener:
 
@@ -204,6 +204,12 @@ def test_HandleRepoBackend_update_listener(path):
     eq_(len(listener.received), 1)
     assert_in(handle, listener.received)
     listener.reset()
+
+    # remove the listener:
+    handle.remove_update_listener(listener.listener_callable)
+    eq_(handle._update_listeners, [])
+    handle.update_metadata()
+    eq_(len(listener.received), 0)
 
 # ###
 # testing class CollectionRepoHandleBackend:

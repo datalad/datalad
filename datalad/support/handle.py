@@ -52,9 +52,23 @@ class Handle(object):
 
         Parameters
         ----------
-        listener callable
+        listener: callable
         """
+
+        for l in self._update_listeners:
+            if l is listener:
+                return
         self._update_listeners.append(listener)
+
+    def remove_update_listener(self, listener):
+        """
+
+        Parameters
+        ----------
+        listener: callable
+        """
+
+        self._update_listeners.remove(listener)
 
     def notify_update_listeners(self):
         for listener in self._update_listeners:

@@ -10,7 +10,7 @@
 """
 
 from unittest import SkipTest
-from nose.tools import eq_, assert_in, ok_, assert_is_instance, assert_raises
+from nose.tools import eq_, assert_in, ok_, assert_is_instance, assert_raises, assert_is
 from rdflib import URIRef, RDF, Literal
 from rdflib.namespace import DCTERMS
 from six import iterkeys
@@ -137,7 +137,7 @@ def test_CollectionRepoBackend_handle_update_listener(path):
 
 
 @with_testrepos('.*collection.*', flavors=['local'])
-def test_CollectionRepoBackend_update_listener(path):
+def test_CollectionRepoBackend_update_signal(path):
 
     class TestListener:
 
@@ -192,8 +192,11 @@ def test_CollectionRepoBackend_update_listener(path):
         assert_in(collection[repo.get_handle_list()[0]].meta, listener.received)
         listener.reset()
 
-
-
+    # remove the listener:
+    collection.remove_update_listener(listener.listener_callable)
+    eq_(collection._update_listeners, [])
+    collection.update_graph_store()
+    eq_(len(listener.received), 0)
 
 # @with_tempfile
 # @with_tempfile

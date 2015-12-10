@@ -62,6 +62,7 @@ class Collection(dict):
             raise ValueError("Handle '%s' has invalid URI: %s." % (key, key_uri))
         self.meta.remove((self_uri, DCTERMS.hasPart, key_uri))
         self.store.remove_graph(self[key].name)
+        self[key].remove_update_listener(self.handle_update_listener)
         super(Collection, self).__delitem__(key)
 
     # TODO: Check for replace in setitem, register_handle!
@@ -231,9 +232,23 @@ class Collection(dict):
 
         Parameters
         ----------
-        listener callable
+        listener: callable
         """
+        # TODO: Why does "if listener not in self._update..." not work?
+        for l in self._update_listeners:
+            if l is listener:
+                return
         self._update_listeners.append(listener)
+
+    def remove_update_listener(self, listener):
+        """
+
+        Parameters
+        ----------
+        listener: callable
+        """
+
+        self._update_listeners.remove(listener)
 
     def notify_update_listeners(self, graph):
         for listener in self._update_listeners:
@@ -321,6 +336,7 @@ class MetaCollection(dict):
         # store:
         for graph in self[collection_name].store.contexts():
             self.store.remove_graph(graph)
+        self[collection_name].remove_update_listener(self.collection_update_listener)
         # delete the entry itself:
         super(MetaCollection, self).__delitem__(collection_name)
 
@@ -329,6 +345,7 @@ class MetaCollection(dict):
         # store:
         for graph in self[collection_name].store.contexts():
             self.store.remove_graph(graph)
+        self[collection_name].remove_update_listener(self.collection_update_listener)
         return super(MetaCollection, self).pop(collection_name,
                                                default=default)
 
