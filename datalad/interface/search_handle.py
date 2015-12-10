@@ -28,6 +28,7 @@ from ..log import lgr
 from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
 
+# TODO:  --output option as in search_collection.py
 
 class SearchHandle(Interface):
     """Search for a handle.
@@ -82,11 +83,15 @@ class SearchHandle(Interface):
                 locations.append(str(row['r']))
 
         if handles:
-            width = max(len(h) for h in handles)
-            for h, l in zip(handles, locations):
-                print("%s\t%s" % (h.ljust(width), l))
-
-            return [CollectionRepoHandleBackend(local_master, handle)
-                    for handle in handles]
+            # TODO:
+            #   - needs to have remote collection name/ prefix
+            #   - Python API shouldn't bomb -- we should have a test
+            if self.cmdline:
+                width = max(len(h) for h in handles)
+                for h, l in zip(handles, locations):
+                    print("%s\t%s" % (h.ljust(width), l))
+            else:
+                return [CollectionRepoHandleBackend(local_master, handle)
+                        for handle in handles]
         else:
             return []
