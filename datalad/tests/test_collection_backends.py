@@ -198,6 +198,10 @@ def test_CollectionRepoBackend_update_signal(path):
     collection.update_graph_store()
     eq_(len(listener.received), 0)
 
+
+# TODO: test reload()
+
+
 # @with_tempfile
 # @with_tempfile
 # @with_tempfile

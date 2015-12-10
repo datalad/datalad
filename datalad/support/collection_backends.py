@@ -170,7 +170,7 @@ class CollectionRepoBackend(Collection):
         raise NotImplementedError("TODO")
 
     def reload(self):
-        #self.update_metadata()
+        # self.update_metadata()
         # TODO: update_metadata? lazy! instead reset sub_graphs?
         self._sub_graphs = dict()
         self.clear()
@@ -182,6 +182,10 @@ class CollectionRepoBackend(Collection):
                                                              handle_name,
                                                              self._branch),
                                  add_handle_uri=False)
+
+        # TODO: new update signal, that allows for reading the empty graphs
+        # without triggering loading and read possibly new handle list?
+
 
     # TODO: name from repo? => not, if CollectionRepo melted in!
     # TODO: set_name? See Handle.
