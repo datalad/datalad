@@ -47,7 +47,7 @@ elif __rst_conventions == 'numpy':
         """Provide section heading"""
         return "%s\n%s" % (section_name, '-'*len(section_name))
 else:
-    raise ValueError, "Unknown convention %s for RST" % __rst_conventions
+    raise ValueError("Unknown convention %s for RST" % __rst_conventions)
 
 
 def _rst(s, snotrst=''):
@@ -319,6 +319,8 @@ def exc_str(exc=None, limit=1):
         entries = traceback.extract_tb(tb)
         if entries:
             out += " [%s]" % (','.join(['%s:%s:%d' % (os.path.basename(x[0]), x[2], x[1]) for x in entries[-limit:]]))
+    except:
+        return out  # To the best of our abilities
     finally:
         # As the bible teaches us:
         # https://docs.python.org/2/library/sys.html#sys.exc_info
