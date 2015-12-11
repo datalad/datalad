@@ -290,39 +290,27 @@ class MetaCollection(dict):
         # TODO: Not sure whether 'store' and 'conjunctive_graph' should be
         #       public. (requires the user to know exactly when to update)
         self.store = IOMemory()
+        self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
         if src is not None:
             # retrieve key, value pairs for the dictionary:
             if isinstance(src, dict):
                 self.update(src)
                 for collection in self:
-                    self[collection].register_update_listener(self.collection_update_listener)
+                    for graph in self[collection].store.contexts():
+                        self.store.add_graph(graph)
+                    self[collection].register_update_listener(
+                        self.collection_update_listener)
             else:
                 # assume iterable of Collection items:
                 for item in src:
                     self[item.name] = item
 
-            # collect the graphs in the store:
-            # Note: Only acquires graphs, that are currently loaded by the
-            #       collections!
-
-            # TODO: Move to isinstance(dict)-block. Due to assignement this is
-            # done already in case of a non-dict!
-            for collection in self:
-                for graph in self[collection].store.contexts():
-                    self.store.add_graph(graph)
-                    # TODO:
-                    # Note: Removed all the copying of the graphs and
-                    #       correcting their references, since we now always
-                    #       use 'collection/handle' as key.
-                    # But:  Implementation of this changed behaviour is not
-                    #       well tested yet.
-
-        self.conjunctive_graph = ConjunctiveGraph(store=self.store)
-
     def __setitem__(self, collection_name, collection):
         super(MetaCollection, self).__setitem__(collection_name, collection)
         # add the graphs of the collection and its handles to the graph store:
+        # Note: Only acquires graphs, that are currently loaded by the
+        #       collections!
         for graph in collection.store.contexts():
             self.store.add_graph(graph)
         collection.register_update_listener(self.collection_update_listener)
@@ -357,25 +345,25 @@ class MetaCollection(dict):
         """
         """
 
-        del self.store
-        self.store = IOMemory()
+        #self.store.gc()
+        #self.store = IOMemory()
 
         for collection in self:
             self[collection].update_graph_store()
 
-        self.conjunctive_graph = ConjunctiveGraph(store=self.store)
+        #self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
     def query(self, query, update=True):
         """Perform query on the meta collection.
 
         Parameters
         ----------
-        query
-        update
+        query: str
+        update: bool
 
         Returns
         -------
-
+        rdflib.plugins.sparql.processor.SPARQLResult
         """
 
         if update:
