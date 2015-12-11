@@ -201,7 +201,7 @@ class AnnexRepo(GitRepo):
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
 
-        git_options = git_options[:] if git_options else []
+        git_options = (git_options[:] if git_options else []) + self._GIT_COMMON_OPTIONS
         annex_options = annex_options[:] if annex_options else []
 
         if not self.always_commit:
