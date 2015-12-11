@@ -18,6 +18,7 @@ from ..dochelpers import borrowkwargs
 
 from ..ui import ui
 from ..utils import auto_repr
+from ..dochelpers import exc_str
 from ..support.network import get_url_filename
 from ..support.cookies import cookies_db
 
@@ -238,7 +239,8 @@ class HTTPDownloader(BaseDownloader):
 
         return False
 
-    def _get_download_details(self, url):
+    def _get_download_details(self, url, chunk_size=1024**2):
+        # TODO: possibly make chunk size adaptive
         response = self._session.get(url, stream=True)
         check_response_status(response)
         headers = response.headers
@@ -249,11 +251,16 @@ class HTTPDownloader(BaseDownloader):
 
         def download_into_fp(f, pbar):
             total = 0
-            for chunk in response.iter_content(chunk_size=1024):
+            # must use .raw to be able avoiding decoding/decompression
+            for chunk in response.raw.stream(chunk_size, decode_content=False):
                 if chunk:  # filter out keep-alive new chunks
                     total += len(chunk)
                     f.write(chunk)
-                    pbar.update(total)
+                    try:
+                        # TODO: pbar is not robust ATM against > 100% performance ;)
+                        pbar.update(total)
+                    except Exception as e:
+                        lgr.warning("Failed to update progressbar: %s" % exc_str(e))
                     # TEMP
                     # see https://github.com/niltonvolpato/python-progressbar/pull/44
                     ui.out.flush()
