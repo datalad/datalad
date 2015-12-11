@@ -13,6 +13,7 @@ from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import func_to_node
+from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
 from ...utils import updated
@@ -34,8 +35,9 @@ def pipeline(dataset):
 
     dataset_url = 'https://openfmri.org/dataset/%s' % dataset
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
-    annex = Annexificator(create=False,  # must be already initialized etc
-                          options=["-c", "annex.largefiles=exclude=*.txt"])
+    annex = Annexificator(
+        create=False,  # must be already initialized etc
+        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
 
     return [
         annex.switch_branch('incoming'),
@@ -56,42 +58,53 @@ def pipeline(dataset):
            annex,
         ],
         [  # and collect all URLs under "AWS Link"
-            css_match('.field-name-field-aws-link a',
-                      xpaths={'url': '@href',
-                              'url_text': 'text()'}),
+            # no longer valid
+            #css_match('.field-name-field-aws-link a',
+            #          xpaths={'url': '@href',
+            #                  'url_text': 'text()'},
+            #          min_count=1),
+            # and don't know how to select all the a after h4
+            # xpath('//h4[contains(text(), "Data:")]')
+            # so let's just select all the ones going to /tarballs/
+            a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
 
             # TODO: we need to "version" those urls which we can version, e.g.,
             # if coming from versioned S3 buckets
             # version_url,
             # TODO TEMP -- too heavy, use some bogie for now
-            assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie.tgz'}),
+            #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie.tgz'}),
+            #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_2.tgz'}),
+            assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_4.tgz'}),
+            assign({'filename': 'ds005_raw_boogie.tgz'}),
 
             annex,
         ],
-        [  # and license information
-           css_match('.field-name-field-license a',
-                     xpaths={'url': '@href',
-                             'url_text': 'text()'}),
-           # TODO: HTML dump of that page for the license wouldn't be as useful I guess,
-           # so let's provide our collection of most common referenced artifacts
-           # in few formats
-           assign({'filename': 'license.txt'}),
-           annex,
-        ],
+        # Some of them ship their own license.txt, so let's just use that one
+        # TODO: add a check and only if not present -- populate
+        # [  # and license information
+        #    css_match('.field-name-field-license a',
+        #              xpaths={'url': '@href',
+        #                      'url_text': 'text()'}),
+        #    # TODO: HTML dump of that page for the license wouldn't be as useful I guess,
+        #    # so let's provide our collection of most common referenced artifacts
+        #    # in few formats
+        #    assign({'filename': 'license.txt'}),
+        #    annex,
+        # ],
         # TODO: describe_handle
         annex.switch_branch('master'),
         annex.merge_branch('incoming', strategy='theirs', commit=False),
-        # [ # Pipeline to augment content of the incoming TODO
-        #     ExtractArchives(
-        #         # will do the merge of 'replace' strategy
-        #         source_branch="incoming",
-        #         regex="\.(tgz|tar\..*)$",
-        #         renames=[
-        #             ("^[^/]*/(.*)", "\1") # e.g. to strip leading dir, or could prepend etc
-        #         ],
-        #         #exclude="license.*",  # regexp
-        #     ),
-        #     annex,
-        # ],
+        [   # Pipeline to augment content of the incoming and commit it to master
+            find_files("\.(tgz|tar\..*)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+            annex.add_archive_content(
+                rename=[
+                    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
+                ],
+                # overwrite=True,
+                # TODO: we might need a safeguard for cases if multiple subdirectories within a single tarball
+                #rename=
+            ),
+            # annex, # not needed since above add_archive_content adds to annex
+        ],
         annex.finalize,
     ]

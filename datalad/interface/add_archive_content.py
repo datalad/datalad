@@ -82,6 +82,11 @@ class AddArchiveContent(Interface):
             doc="""Additional options to pass to git-annex""",
             constraints=EnsureStr() | EnsureNone()
         ),
+        # TODO: Python only???
+        annex=Parameter(
+            doc="""Annex instance to use""" #,
+            #constraints=EnsureStr() | EnsureNone()
+        ),
         key=Parameter(
             args=("--key",),
             action="store_true",
@@ -90,11 +95,16 @@ class AddArchiveContent(Interface):
             args=("--copy",),
             action="store_true",
             doc="""Flag to copy the content of the archive instead of moving."""),
+        allow_dirty=Parameter(
+            args=("--allow-dirty",),
+            action="store_true",
+            doc="""Flag that operating on a dirty repository (uncommitted or untracked content) is Ok."""),
         commit=Parameter(
             args=("--no-commit",),
             action="store_false",
             dest="commit",
             doc="""Flag to not commit upon completion."""),
+
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
             doc="archive file or a key (if --key option specified)",
@@ -112,8 +122,9 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, delete=False, key=False, exclude=None, rename=None, overwrite=False,
-                 annex_options=None, copy=False, commit=True):
+    def __call__(self, archive, annex=None,
+                 delete=False, key=False, exclude=None, rename=None, overwrite=False,
+                 annex_options=None, copy=False, commit=True, allow_dirty=False):
         """
         Returns
         -------
@@ -122,10 +133,11 @@ class AddArchiveContent(Interface):
 
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex
-        annex = get_repo_instance(class_=AnnexRepo)
+        if annex is None:
+            annex = get_repo_instance(class_=AnnexRepo)
 
         # TODO: somewhat too cruel -- may be an option or smth...
-        if annex.dirty:
+        if not allow_dirty and annex.dirty:
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
@@ -159,6 +171,7 @@ class AddArchiveContent(Interface):
 
         #key_path = opj(reltop, key_path)
         # now we simply need to go through every file in that archive and
+        lgr.info("Adding content of the archive %s into annex %s", archive, annex)
 
         from datalad.customremotes.archive import AnnexArchiveCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
@@ -182,7 +195,11 @@ class AddArchiveContent(Interface):
             old_always_commit = annex.always_commit
             annex.always_commit = False
 
-            stats = dict(n=0, add_git=0, add_annex=0, skip=0, overwritten=0, renamed=0)
+            if annex_options:
+                if isinstance(annex_options, string_types):
+                    annex_options = shlex.split(annex_options)
+
+            stats = dict(n=0, add_git=0, add_annex=0, skipped=0, overwritten=0, renamed=0)
             #import pdb; pdb.set_trace()
             for extracted_file in earchive.get_extracted_files():
                 stats['n'] += 1
@@ -202,14 +219,14 @@ class AddArchiveContent(Interface):
                         for regexp in exclude:
                             if re.search(regexp, target_file):
                                 lgr.debug("Skipping {target_file} since contains {regexp} pattern".format(**locals()))
-                                stats['skip'] += 1
+                                stats['skipped'] += 1
                                 raise StopIteration
                     except StopIteration:
                         continue
 
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
 
-                lgr.info("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
+                lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
                 target_path = opj(getpwd(), target_file)
                 if lexists(target_file):
                     if not overwrite:
@@ -225,10 +242,8 @@ class AddArchiveContent(Interface):
                 else:
                     os.renames(extracted_path, target_path)
 
-                lgr.debug("Adding {target_path} to annex pointing to {url}".format(**locals()))
-                if annex_options:
-                    if isinstance(annex_options, string_types):
-                        annex_options = shlex.split(annex_options)
+                lgr.debug("Adding %s to annex pointing to %s and with options %r",
+                    target_path, url, annex_options)
                 annex.annex_add(target_path, options=annex_options)
 
                 # above action might add to git or to annex
@@ -244,20 +259,23 @@ class AddArchiveContent(Interface):
 
             if delete and archive:
                 lgr.debug("Removing the original archive {}".format(archive))
-                annex.git_remove(archive)
+                # force=True since some times might still be staged and fail
+                annex.git_remove(archive, force=True)
 
             if commit:
                 annex.git_commit(
                     "Added content extracted from " + origin + """
 
 Processed: {n}
-Skipped: {skip}
+Skipped: {skipped}
 Renamed: {renamed}
 Added
  to git: {add_git}
  to annex: {add_annex}
 Overwritten: {overwritten}
 """.format(**stats))
+            lgr.info("Finished adding {archive}: {n} added (git/annex: {add_git}/{add_annex}), "
+                     "{skipped} skipped, {renamed} renamed, {overwritten} overwritten".format(archive=archive, **stats))
         finally:
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure

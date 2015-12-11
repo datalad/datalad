@@ -251,7 +251,7 @@ class ArchivesCache(object):
             try:
                 self._made_path = True
                 os.makedirs(path)
-                lgr.info("Cache initialized")
+                lgr.debug("Cache initialized")
             except:
                 lgr.error("Failed to initialize cached under %s" % path)
                 raise

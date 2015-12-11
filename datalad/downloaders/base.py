@@ -243,7 +243,7 @@ class BaseDownloader(object):
         except AccessDeniedError as e:
             raise
         except Exception as e:
-            e_str = exc_str(e)
+            e_str = exc_str(e, limit=5)
             lgr.error("Failed to download {url} into {filepath}: {e_str}".format(
                 **locals()
             ))

@@ -8,7 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+import re
 import six.moves.builtins as __builtin__
+
+from os.path import curdir
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
 import logging
@@ -96,6 +99,39 @@ def sorted_files(dout):
     return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
                        for r,d,files in os.walk(dout)
                        if not '.git' in r], []))
+
+from os.path import sep as dirsep
+_VCS_REGEX = '%s\.(git|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+    """Generator to find files matching regex
+
+    Parameters
+    ----------
+    regex: basestring
+    exclude: basestring, optional
+      Matches to exclude
+    exclude_vcs:
+      If True, excludes commonly known VCS subdirectories.  If string, used
+      as regex to exclude those files (regex: %r)
+    topdir: basestring, optional
+      Directory where to search
+    dirs: bool, optional
+      Either to match directories as well as files
+    """ % _VCS_REGEX
+
+    for dirpath, dirnames, filenames in os.walk(topdir):
+        names = (dirnames + filenames) if dirs else filenames
+        # TODO: might want to uniformize on windows to use '/'
+        paths = (opj(dirpath, name) for name in names)
+        for path in filter(re.compile(regex).search, paths):
+            path = path.rstrip(dirsep)
+            if exclude and re.search(exclude, path):
+                continue
+            if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            yield path
+
 
 #### windows workaround ###
 # TODO: There should be a better way

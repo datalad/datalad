@@ -10,11 +10,20 @@
 """
 
 import inspect
+import os
+import re
+
+from os.path import curdir, join as opj
 from six import iteritems, string_types
 
 from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
 from datalad.utils import updated
 from ..pipeline import FinishPipeline
+from ...utils import auto_repr
+from ...utils import find_files as _find_files
+
+from logging import getLogger
+lgr = getLogger('datalad.crawler.nodes')
 
 class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
@@ -151,7 +160,7 @@ def _string_as_list(x):
         return [x]
     return x
 
-def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=()):
+def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **orig_kwargs):
     """Generate a node out of an arbitrary function
 
     If provided function returns a generator, each item returned separately
@@ -170,6 +179,7 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=()):
 
     def func_node(data):
         kwargs_ = kwargs.copy()
+        kwargs_.update(orig_kwargs)
         args_ = []
         for k in _string_as_list(data_args):
             args_.append(data[k])
@@ -215,3 +225,37 @@ keys in the output.%s
     )
 
     return func_node
+
+# TODO: come up with a generic function_to_node adapter
+#   actually there is already func_to_node but it is not clear how it works on
+#   generators... in this commit also added **orig_kwargs to it
+@auto_repr
+class find_files(object):
+    """Find files matching a regular expression in a pre-specified directory
+
+    By default in current directory
+    """
+    def __init__(self, regex, fail_if_none=False, dirs=False, topdir=curdir):
+        """
+
+        Parameters
+        ----------
+        regex: basestring
+        topdir: basestring, optional
+          Directory where to search
+        dirs: bool, optional
+          Either to match directories
+        """
+        self.regex = regex
+        self.topdir = topdir
+        self.dirs = dirs
+        self.fail_if_none=fail_if_none
+
+    def __call__(self, data):
+        count = 0
+        for path in _find_files(self.regex, dirs=self.dirs, topdir=self.topdir):
+            lgr.log(5, "Found file %s" % path)
+            count += 1
+            yield updated(data, {'path': path})
+        if not count:
+            raise RuntimeError("We did not match any file using regex %r" % self.regex)
