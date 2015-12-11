@@ -9,26 +9,29 @@
 """Tests for http downloader"""
 
 from os.path import join as opj
+import time
+from calendar import timegm
 import six.moves.builtins as __builtin__
+from six import PY3
 
 from ..http import HTTPDownloader
 from ..http import DownloadError
 from ..http import HTMLFormAuthenticator
 from ..providers import Providers, Credential  # to test against crcns
+from ...support.cookies import CookiesDB
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
-import httpretty
+if PY3:
+    httpretty = None
+else:
+    import httpretty
+
 from mock import patch
-from ...tests.utils import assert_in
-from ...tests.utils import assert_equal
-from ...tests.utils import assert_false
-from ...tests.utils import assert_raises
-from ...tests.utils import ok_file_has_content
-from ...tests.utils import serve_path_via_http, with_tree
-from ...tests.utils import swallow_logs
-from ...tests.utils import with_tempfile
-from ...tests.utils import use_cassette
-from ...tests.utils import SkipTest
+from ...tests.utils import assert_in, assert_not_in, assert_equal, assert_false, \
+                assert_raises, ok_file_has_content, serve_path_via_http, \
+                with_tree, swallow_logs, with_tempfile, use_cassette, \
+                SkipTest, skip_if, assert_greater
+
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
@@ -109,6 +112,7 @@ test_authenticate_external_portals.tags = ['external-portal']
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
 
+
 class FakeCredential1(Credential):
     """Credential to test scenarios."""
     _fixed_credentials = [
@@ -123,26 +127,45 @@ class FakeCredential1(Credential):
         # pop last used credential, so we would use "new" ones
         del self._fixed_credentials[0]
 
+
+url = "http://example.com/crap.txt"
+test_cookie = 'somewebsite=testcookie'
+
 @httpretty.activate
+@skip_if(not httpretty)
 @with_tempfile(mkdir=True)
 def test_HTMLFormAuthenticator_httpretty(d):
-    url = "http://example.com/crap.txt"
     fpath = opj(d, 'crap.txt')
 
+    credential = FakeCredential1(name='test', type='user_password', url=None)
+    credentials = credential()
+
+    def request_post_callback(request, uri, headers):
+        post_params = request.parsed_body
+        assert_equal(credentials['password'], post_params['password'][0])
+        assert_equal(credentials['user'], post_params['username'][0])
+        assert_not_in('Cookie', request.headers)
+        return (200, headers, "Got {} response from {}".format(request.method, uri))
+
+    def request_get_callback(request, uri, headers):
+        assert_equal(request.body, '')
+        assert_in('Cookie', request.headers)
+        assert_equal(request.headers['Cookie'], test_cookie)
+        return (200, headers, "correct body")
+
     # SCENARIO 1
-    # TODO: callaback which would verify that correct credentials provided
-    # and return the cookie, which will be tested again while 'GET'ing
+    # callback to verify that correct credentials are provided
+    # and then returns the cookie to test again for 'GET'ing
     httpretty.register_uri(httpretty.POST, url,
-                           body="whatever",  # TODO: return some cookie for the session
-                           status=200)
-    # in GET verify that correct cookie was provided, and verify that no
-    # credentials sneaked in
+                           body=request_post_callback,
+                           set_cookie=test_cookie)
+    # then in GET verify that correct cookie was provided and
+    # that no credentials are there
     httpretty.register_uri(httpretty.GET, url,
-                           body="correct body",
-                           status=200)
+                           body=request_get_callback)
 
     # SCENARIO 2
-    # outdated cookie provided to GET -- you must return 403 (access denied)
+    # outdated cookie provided to GET -- must return 403 (access denied)
     # then our code should POST credentials again and get a new cookies
     # which is then provided to GET
 
@@ -155,25 +178,106 @@ def test_HTMLFormAuthenticator_httpretty(d):
     # SCENARIO 4
     # cookie and credentials expired, user provided new bad credential
 
-    # TODO: somehow mock or whatever access to cookies, because we don't want to modify
-    # user's cookies during the test.
     # Also we want to test how would it work if cookie is available (may be)
     # TODO: check with correct and incorrect credential
-    credential = FakeCredential1(name='test', type='user_password', url=None)
     authenticator = HTMLFormAuthenticator(dict(username="{user}",
                                                password="{password}",
                                                submit="CustomLogin"))
     # TODO: with success_re etc
-
     # This is a "success test" which should be tested in various above scenarios
-    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
-    downloader.download(url, path=d)
+    def fake_load(self):
+        self._cookies_db = {}
+
+    with patch.object(CookiesDB, '_load', fake_load):
+        downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+        downloader.download(url, path=d)
+
     with open(fpath) as f:
         content = f.read()
         assert_equal(content, "correct body")
 
     # Unsuccesfull scenarios to test:
-    # Provided URL is at the end 404s, or another failure (e.g. interrupted download)
+    # the provided URL at the end 404s, or another failure (e.g. interrupted download)
+
+
+
+class FakeCredential2(Credential):
+    """Credential to test scenarios."""
+    _fixed_credentials = {'user': 'testlogin', 'password': 'testpassword'}
+    def is_known(self):
+        return True
+    def __call__(self):
+        return self._fixed_credentials
+    def enter_new(self):
+        return self._fixed_credentials
+
+
+@httpretty.activate
+@skip_if(not httpretty)
+@with_tempfile(mkdir=True)
+def test_HTMLFormAuthenticator_httpretty_2(d):
+    fpath = opj(d, 'crap.txt')
+
+    credential = FakeCredential2(name='test', type='user_password', url=None)
+    credentials = credential()
+    authenticator = HTMLFormAuthenticator(dict(username="{user}",
+                                               password="{password}",
+                                               submit="CustomLogin"))
+
+    def request_get_with_expired_cookie_callback(request, uri, headers):
+        assert_in('Cookie', request.headers)
+        cookie_vals = request.headers['Cookie'].split('; ')
+        for v in cookie_vals:
+            if v.startswith('expires'):
+                expiration_date = v.split('=')[1]
+                expiration_epoch_time = timegm(time.strptime(expiration_date, "%a, %d %b %Y %H:%M:%S GMT"))
+                assert_greater(time.time(), expiration_epoch_time)
+        return (403, headers, "cookie was expired")
+
+    def request_post_callback(request, uri, headers):
+        post_params = request.parsed_body
+        assert_equal(credentials['password'], post_params['password'][0])
+        assert_equal(credentials['user'], post_params['username'][0])
+        assert_not_in('Cookie', request.headers)
+        return (200, headers, "Got {} response from {}".format(request.method, uri))
+
+    def request_get_callback(request, uri, headers):
+        assert_equal(request.body, '')
+        assert_in('Cookie', request.headers)
+        assert_equal(request.headers['Cookie'], test_cookie)
+        return (200, headers, "correct body")
+
+    # SCENARIO 2
+    # outdated cookie provided to GET, return 403 (access denied)
+    # then like SCENARIO 1 again:
+    # POST credentials and get a new cookie
+    # which is then provided to a GET request
+    httpretty.register_uri(httpretty.GET, url,
+                           responses=[httpretty.Response(body=request_get_with_expired_cookie_callback),
+                                      httpretty.Response(body=request_get_callback),
+                                     ])
+
+    # callback to verify that correct credentials are provided
+    # and then returns the cookie to test again for 'GET'ing
+    httpretty.register_uri(httpretty.POST, url,
+                           body=request_post_callback,
+                           set_cookie=test_cookie)
+    # then in another GET is performed to verify that correct cookie was provided and
+    # that no credentials are there
+
+    def fake_load_expired_cookie(self):
+        self._cookies_db = {'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')}
+
+    with patch.object(CookiesDB, '_load', fake_load_expired_cookie):
+        downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+        downloader.download(url, path=d)
+
+    with open(fpath) as f:
+        content = f.read()
+        assert_equal(content, "correct body")
+
+
+
 
 def test_HTTPAuthAuthenticator_httpretty():
     raise SkipTest("Not implemented. TODO")

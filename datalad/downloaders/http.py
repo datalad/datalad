@@ -243,7 +243,12 @@ class HTTPDownloader(BaseDownloader):
                 self._session = requests.Session()
                 # not sure what happens if cookie is expired (need check to that or exception will prolly get thrown)
                 cookie_dict = cookies_db[url]
+
+                # TODO dict_to_cookiejar doesn't preserve all fields when reversed
                 self._session.cookies = requests.utils.cookiejar_from_dict(cookie_dict)
+                # TODO cookie could be expired w/ something like (but docs say it should be expired automatically):
+                # http://docs.python-requests.org/en/latest/api/#requests.cookies.RequestsCookieJar.clear_expired_cookies
+                # self._session.cookies.clear_expired_cookies()
                 return True
 
         lgr.debug("http session: Creating brand new session")
