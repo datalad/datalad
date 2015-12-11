@@ -28,13 +28,15 @@ from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
 
 # PROFILE
-#import line_profiler
-#prof = line_profiler.LineProfiler()
+# import line_profiler
+# prof = line_profiler.LineProfiler()
 
 _OUTPUTS = ('names', 'locations', 'full')
 # TODO:
 # may be in Python mode we would like to extend it with
 #  rdf-result, collections
+
+
 class SearchCollection(Interface):
     """Search for a collection.
 
@@ -78,22 +80,17 @@ class SearchCollection(Interface):
         # prof.enable_by_count()
         local_master = get_datalad_master()
 
-        # TODO: check on possibility of efficient persistence of MetaCollection on a drive
-        # so we could update it once with current state of collections and handles, save
-        # to drive, and load it HERE for a query
+        # TODO: check on possibility of efficient persistence of MetaCollection
+        # on a drive, so we could update it once with current state of
+        # collections and handles, save to drive, and load it HERE for a query
+
         metacollection = MetaCollection(
-            [local_master.get_backend_from_branch(remote + "/master")
-             for remote in local_master.git_get_remotes()]
-            # Returns local collection, which we don't want to "search for", so commented out
-            # + [local_master.get_backend_from_branch()]
-        )
+           [CollectionRepoBackend(local_master, remote + "/master")
+            for remote in local_master.git_get_remotes()])
 
-        # XXX was attempt to update only meta of the collections itself, without handles meta
-        # resulted in no output
-        #for collection in metacollection:
-        #    metacollection[collection].update_metadata()
-
-        metacollection.update_graph_store()
+        # load just the collection level metadata:
+        for collection in metacollection:
+            metacollection[collection].update_metadata()
 
         # TODO: Bindings should be done in collection class:
         metacollection.conjunctive_graph.bind('dlns', DLNS)
@@ -103,8 +100,7 @@ class SearchCollection(Interface):
                                              ?s ?p ?o .
                                              FILTER regex(?o, "%s")}}""" % \
                        search
-
-        results = metacollection.conjunctive_graph.query(query_string)
+        results = metacollection.query(query_string, update=False)
 
         rows = [row.asdict() for row in results]
         collections = list()
@@ -141,5 +137,5 @@ class SearchCollection(Interface):
             return []
 
         # PROFILE
-        #prof.disable_by_count()
-        #prof.print_stats()
+        # prof.disable_by_count()
+        # prof.print_stats()
