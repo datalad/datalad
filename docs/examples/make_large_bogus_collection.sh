@@ -11,16 +11,21 @@ rword() {
 }
 
 c=bogus-${n}_collection
-datalad create-collection $c
+if ! ( datalad list-collections | grep -q "^$c\$" ); then
+    echo "I: creating new collection $c"
+    datalad create-collection $c
+fi
 
 for i in `seq 1 $n`; do
 	h=bogus$i-$n
-	datalad create-handle $h
+	[ ! -d $h ] || { echo "I: $h exists, skipping"; continue; }
+    echo "I: creating $h"
+	/usr/bin/time datalad --dbg create-handle $h
 	( cd $h;
 	  git annex addurl "http://www.onerussian.com/tmp/banner.png" --file "Banner for $h"
 	  git commit -m "Our banner for $h"
-
-	  datalad describe \
+      echo "I: describing"
+	  /usr/bin/time datalad describe \
 			  --author "`rword` `rword`" \
 			  --license "`rword`" \
 			  --description "`rword` `rword`
@@ -28,7 +33,7 @@ for i in `seq 1 $n`; do
 `rword` `rword` `rword`
 "
 	  cd ..
-	  # add
-	  datalad add-handle $h $c
+	  echo "I: adding a handle"
+	  /usr/bin/time datalad --dbg add-handle $h $c
 	)
 done
