@@ -202,6 +202,8 @@ class GitRepo(object):
     """
     __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
+    _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=false']
+
     def __init__(self, path, url=None, runner=None, create=True):
         """Creates representation of git repository at `path`.
 
@@ -427,6 +429,8 @@ class GitRepo(object):
         
         cmd = shlex.split(cmd_str + " " + " ".join(files),
                           posix=not on_windows)
+        assert(cmd[0] == 'git')
+        cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
