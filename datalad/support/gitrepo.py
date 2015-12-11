@@ -386,8 +386,15 @@ class GitRepo(object):
         """
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
-        return [branch.strip() for branch in
-                self.repo.git.branch(r=True).splitlines()]
+
+        # For some reason, this is three times faster than the version below:
+        remote_branches = list()
+        for remote in self.repo.remotes:
+            for ref in remote.refs:
+                remote_branches.append(ref.name)
+        return remote_branches
+        # return [branch.strip() for branch in
+        #         self.repo.git.branch(r=True).splitlines()]
 
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
