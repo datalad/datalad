@@ -12,6 +12,7 @@ from os.path import join as opj
 import time
 from calendar import timegm
 import six.moves.builtins as __builtin__
+from six import PY3
 
 from ..http import HTTPDownloader
 from ..http import DownloadError
@@ -20,10 +21,10 @@ from ..providers import Providers, Credential  # to test against crcns
 from ...support.cookies import CookiesDB
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
-try:
-    import httpretty
-except ImportError:
+if PY3:
     httpretty = None
+else:
+    import httpretty
 
 from mock import patch
 from ...tests.utils import assert_in, assert_not_in, assert_equal, assert_false, \
