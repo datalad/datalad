@@ -131,9 +131,9 @@ class FakeCredential1(Credential):
 url = "http://example.com/crap.txt"
 test_cookie = 'somewebsite=testcookie'
 
-@skip_if(not httpretty)
 @httpretty.activate
 @with_tempfile(mkdir=True)
+@skip_if(not httpretty)
 def test_HTMLFormAuthenticator_httpretty(d):
     fpath = opj(d, 'crap.txt')
 
@@ -212,9 +212,9 @@ class FakeCredential2(Credential):
         return self._fixed_credentials
 
 
-@skip_if(not httpretty)
 @httpretty.activate
 @with_tempfile(mkdir=True)
+@skip_if(not httpretty)
 def test_HTMLFormAuthenticator_httpretty_2(d):
     fpath = opj(d, 'crap.txt')
 
