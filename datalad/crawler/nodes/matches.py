@@ -74,12 +74,15 @@ class ExtractorMatch(object):
                         continue
                     if len(key_extracted) > 1:
                         if self._allow_multiple:
-                            raise NotImplementedError("Don't know what to do yet with this one")
+                            data_[key] = key_extracted
+                            # raise NotImplementedError("Don't know what to do yet with this one")
                         else:
                             lgr.warn(
                                 "Got multiple selections for xpath query %s. "
                                 "Keeping only the first one: %s" % (repr(selector_), key_extracted[0]))
-                    data_[key] = key_extracted[0]
+                            data_[key] = key_extracted[0]
+                    else:
+                        data_[key] = key_extracted[0]
             count += 1
             yield data_
 

@@ -15,7 +15,9 @@ from ..pipeline import run_pipeline, FinishPipeline
 
 from ..nodes.misc import Sink, assign, range_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
+from ..pipeline import load_pipeline_from_script
 
+from ...tests.utils import with_tree
 from ...tests.utils import eq_, ok_, assert_raises
 from ...tests.utils import assert_in
 from ...tests.utils import skip_if_no_module
@@ -135,6 +137,17 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     ]
 
     run_pipeline(pipeline)
+
+
+@with_tree(tree={
+    'pipeline.py': 'pipeline = lambda: [1]',
+    'pipeline2.py': 'pipeline = lambda x: [2*x]',
+})
+def test_load_pipeline_from_script(d):
+    eq_(load_pipeline_from_script(opj(d, 'pipeline.py')), [1])
+    eq_(load_pipeline_from_script(opj(d, 'pipeline2.py'), x=2), [4])
+    assert_raises(RuntimeError, load_pipeline_from_script, opj(d, 'unlikelytobethere.py'))
+
 
 def test_pipeline_linear_simple():
     sink = Sink()

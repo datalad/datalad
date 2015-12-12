@@ -16,11 +16,14 @@ implemented as a callable (i.e. define __call__) class, which could obtain param
 in its constructor.
 """
 
-from os.path import dirname, join as opj, isabs, exists, curdir
+import sys
+from glob import glob
+from os.path import dirname, join as opj, isabs, exists, curdir, basename
 
 from .newmain import lgr
-from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR
+from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..utils import updated
+from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
@@ -153,27 +156,75 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
         data_in_to_loop = node(data)
 
     data_out = None
-    for data_ in data_in_to_loop:
-        if pipeline_tail:
-            # TODO: for heavy debugging we might want to track/report what node has changed in data
-            lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
-            lgr.log(4, " passed keys: %s", data_.keys())
-            for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
+    if data_in_to_loop:
+        for data_ in data_in_to_loop:
+            if pipeline_tail:
+                # TODO: for heavy debugging we might want to track/report what node has changed in data
+                lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
+                lgr.log(4, " passed keys: %s", data_.keys())
+                for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
+                    if 'outputs' in output:
+                        yield data_out
+            else:
+                data_out = data_
                 if 'outputs' in output:
                     yield data_out
-        else:
-            data_out = data_
-            if 'outputs' in output:
-                yield data_out
+    elif pipeline_tail:
+        lgr.warning("%s returned None, although there is still a tail in the pipeline" % node)
 
     if output == 'last-output' and data_out:
         yield data_out
 
-def load_template_pipeline(name, **opts):
 
-    mod = __import__('datalad.crawler.pipelines.%s' % name, fromlist=['datalad.crawler.pipelines'])
-    return mod.pipeline(**opts)
+def load_pipeline_from_script(filename, **opts):
+    # mod = __import__('datalad.crawler.pipelines.%s' % filename, fromlist=['datalad.crawler.pipelines'])
+    dirname_ = dirname(filename)
+    assert(filename.endswith('.py'))
+    try:
+        sys.path.insert(0, dirname_)
+        modname = basename(filename)[:-3]
+        # To allow for relative imports within "stock" pipelines
+        if dirname_ == opj(dirname(__file__), 'pipelines'):
+            mod = __import__('datalad.crawler.pipelines.%s' % modname,
+                             fromlist=['datalad.crawler.pipelines'])
+        else:
+            mod = __import__(modname, level=0)
+        return mod.pipeline(**opts)
+    except Exception as e:
+        raise RuntimeError("Failed to import pipeline from %s: %s" % (filename, exc_str(e)))
+    finally:
+        if dirname_ in sys.path:
+            path = sys.path.pop(0)
+            if path != dirname_:
+                lgr.warning("Popped %s when expected %s. Restoring!!!" % (path, dirname_))
+                sys.path.insert(0, path)
 
+
+
+def _find_pipeline(name):
+    """Given a name for a pipeline, looks for it under common locations
+    """
+    def candidates(name):
+        if not name.endswith('.py'):
+            name = name + '.py'
+
+        # first -- current directory
+        repo_path = GitRepo.get_toppath(curdir)
+        if repo_path:
+            yield opj(repo_path, CRAWLER_META_DIR, 'pipelines', name)
+
+        # TODO: look under other .datalad locations as well
+
+        # last -- within datalad code
+        yield opj(dirname(__file__), 'pipelines', name)  # datalad's module shipped within it
+
+    for candidate in candidates(name):
+        if exists(candidate):
+            lgr.debug("Found pipeline %s under %s", name, candidate)
+            return candidate
+        lgr.log(5, "No pipeline %s under %s", name, candidate)
+
+    return None
 
 def load_pipeline_from_template(name, opts={}):
     """Given a name, loads that pipeline from datalad.crawler.pipelines
@@ -192,12 +243,17 @@ def load_pipeline_from_template(name, opts={}):
         raise NotImplementedError("Don't know how to import straight path %s yet" % name)
 
     # explicit isabs since might not exist
-    filename = name if (isabs(name) or exists(name)) else opj(dirname(__file__), 'pipelines', "%s.py" % name)
+    filename = name \
+        if (isabs(name) or exists(name)) \
+        else _find_pipeline(name)
 
-    if not exists(filename):
-        raise IOError("Pipeline file %s was not found" % filename)
+    if filename:
+        if not exists(filename):
+            raise IOError("Pipeline file %s is N/A" % filename)
+    else:
+        raise ValueError("could not find pipeline for %s" % name)
 
-    return load_template_pipeline(name, **opts)
+    return load_pipeline_from_script(filename, **opts)
 
 
 def load_pipeline_from_config(path):
@@ -221,11 +277,26 @@ def load_pipeline_from_config(path):
         raise IOError("Did not find section %r within %s" % (CRAWLER_PIPELINE_SECTION, path))
     return pipeline
 
-def get_pipeline_config_path(repo_path=curdir):
+
+def get_repo_pipeline_config_path(repo_path=curdir):
     """Given a path within a repo, return path to the crawl.cfg"""
     if not exists(opj(repo_path, HANDLE_META_DIR)):
         # we need to figure out top path for the repo
         repo_path = GitRepo.get_toppath(repo_path)
         if not repo_path:
             return None
-    return opj(repo_path, CRAWLER_META_DIR, 'crawl.cfg')
+    return opj(repo_path, CRAWLER_META_CONFIG_PATH)
+
+def get_repo_pipeline_script_path(repo_path=curdir):
+    """If there is a single pipeline present among pipelines/ return path to it"""
+    # TODO: somewhat adhoc etc -- may be improve with some dedicated name being
+    # tracked or smth like that
+    if not exists(opj(repo_path, HANDLE_META_DIR)):
+        # we need to figure out top path for the repo
+        repo_path = GitRepo.get_toppath(repo_path)
+        if not repo_path:
+            return None
+    pipelines = glob(opj(repo_path, CRAWLER_META_DIR, 'pipelines', '*.py'))
+    if len(pipelines) > 1 or not pipelines:
+        return None
+    return pipelines[0]

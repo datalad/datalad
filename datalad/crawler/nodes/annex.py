@@ -13,7 +13,7 @@ from os.path import expanduser, join as opj, exists
 from os import unlink, makedirs
 
 from ...api import add_archive_content
-from ...consts import CRAWLER_META_DIR
+from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 
 from ...downloaders.providers import Providers
@@ -88,7 +88,7 @@ class initiate_handle(object):
             lgr.log(1, "Creating %s", crawl_config_dir)
             makedirs(crawl_config_dir)
 
-        crawl_config = opj(crawl_config_dir, 'crawl.cfg')
+        crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
         cfg = SafeConfigParserWithIncludes()
         cfg.add_section(CRAWLER_PIPELINE_SECTION)
         def secset(k, v):

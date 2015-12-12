@@ -62,6 +62,7 @@ class Sink(object):
         self.data = []
 
 
+@auto_repr
 class rename(object):
     """Rename some items (i.e. change keys) in data for subsequent nodes
     """
@@ -80,7 +81,27 @@ class rename(object):
                 data[to_] = data.pop(from_)
         yield data
 
+# TODO: test
+@auto_repr
+class sub(object):
+    """Apply re.sub regular expression substitutions to specified items"""
+    def __init__(self, subs):
+        """
 
+        Parameters
+        ----------
+        subs: dict of key -> dict of pattern -> replacement
+        """
+        self.subs = subs
+
+    def __call__(self, data):
+        data = data.copy()
+        for key, subs in self.subs.items():
+            for from_, to_ in subs.items():
+                data[key] = re.sub(from_, to_, data[key])
+        yield data
+
+@auto_repr
 class assign(object):
     """Class node to provide assignment of items in data
 

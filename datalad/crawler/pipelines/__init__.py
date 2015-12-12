@@ -6,4 +6,5 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Module containing pre-crafted pipeline generators for crawling"""
+"""Module containing pre-crafted pipeline generators for crawling
+"""
