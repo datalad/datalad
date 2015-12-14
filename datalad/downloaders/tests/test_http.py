@@ -66,6 +66,9 @@ def test_HTTPDownloader_basic(toppath, topurl):
     download(furl, tfpath)
     ok_file_has_content(tfpath, 'abc')
 
+    # see if fetch works correctly
+    assert_equal(downloader.fetch(furl), 'abc')
+
     # By default should not overwrite the file
     assert_raises(DownloadError, download, furl, tfpath)
     # but be able to redownload whenever overwrite==True
@@ -96,6 +99,8 @@ def check_download_external_url(url, failed_str, success_str, d):
     if not provider.credential.is_known:
         raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
     downloader = provider.get_downloader(url)
+
+    # Download way
     with swallow_outputs() as cmo:
         downloaded_path = downloader.download(url, path=d)
     assert_equal(fpath, downloaded_path)
@@ -105,6 +110,13 @@ def check_download_external_url(url, failed_str, success_str, d):
             assert_in(success_str, content)
         if failed_str is not None:
             assert_false(failed_str in content)
+
+    # Fetch way
+    content = downloader.fetch(url)
+    if success_str is not None:
+        assert_in(success_str, content)
+    if failed_str is not None:
+        assert_false(failed_str in content)
 
 
 @use_cassette('fixtures/vcr_cassettes/test_authenticate_external_portals.yaml', record_mode='once')

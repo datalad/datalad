@@ -69,7 +69,7 @@ class DownloadURL(Interface):
         Returns
         -------
         list of str
-          downloaded succesfully files
+          downloaded successfully files
         """
         urls = assure_list_from_str(urls)
 

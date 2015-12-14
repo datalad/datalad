@@ -198,6 +198,8 @@ class Providers(object):
         'aws-s3'
     }
 
+    _DEFAULT_PROVIDERS = None
+
     def __init__(self, providers=None):
         """
         """
@@ -219,7 +221,7 @@ class Providers(object):
         return self._providers.__iter__()
 
     @classmethod
-    def from_config_files(cls, files=None):
+    def from_config_files(cls, files=None, reload=False):
         """Would load information about related/possible websites requiring authentication from
 
         - codebase (for now) datalad/downloaders/configs/providers.cfg
@@ -228,7 +230,14 @@ class Providers(object):
         - system-wide datalad installation/config /etc/datalad/providers/
 
         For sample configs look into datalad/downloaders/configs/providers.cfg
+
+        If files is None, loading is "lazy".  Specify reload=True to force
+        reload
         """
+        # lazy part
+        if files is None and cls._DEFAULT_PROVIDERS and not reload:
+            return cls._DEFAULT_PROVIDERS
+
         config = SafeConfigParserWithIncludes()
         # TODO: support all those other paths
         if files is None:
@@ -262,7 +271,15 @@ class Providers(object):
                                      % (provider.credential, ", ".join(credentials.keys())))
                 provider.credential = credentials[provider.credential]
 
-        return Providers(list(providers.values()))
+        providers = Providers(list(providers.values()))
+
+        if files is None:
+            # Store providers for lazy access
+            cls._DEFAULT_PROVIDERS = providers
+
+        return providers
+
+
 
 
     @classmethod
@@ -334,9 +351,14 @@ class Providers(object):
         lgr.debug("No dedicated provider, returning default one for %s" % scheme)
         return self._default_providers[scheme]
 
+    # TODO: avoid duplication somehow ;)
     # Sugarings to get easier access to downloaders
     def download(self, url, *args, **kwargs):
         return self.get_provider(url).get_downloader(url).download(url, *args, **kwargs)
+
+    def fetch(self, url, *args, **kwargs):
+        return self.get_provider(url).get_downloader(url).fetch(url, *args, **kwargs)
+
 
     def needs_authentication(self, url):
         provider = self.get_provider(url, only_nondefault=True)

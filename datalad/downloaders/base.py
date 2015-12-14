@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import exists, join as opj, isdir
+from six import string_types
+from six.moves import StringIO
 
 from ..ui import ui
 from ..utils import auto_repr
@@ -163,20 +165,45 @@ class BaseDownloader(object):
         """
         raise NotImplementedError("Must be implemented in the subclass")
 
+    def _verify_download(self, url, downloaded_size, target_size, file_=None, content=None):
+        """Verify that download finished correctly"""
+        if (self.authenticator and
+            downloaded_size < 10000 and
+            (hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re)):
+            assert hasattr(self.authenticator, 'check_for_auth_failure'), \
+                "%s has failure_re defined but no check_for_auth_failure" \
+                % self.authenticator
+
+            if file_:
+                with open(file_) as fp:
+                    content = fp.read()
+            else:
+                assert(content is not None)
+
+            self.authenticator.check_for_auth_failure(
+                content, "Download of the url %s has failed: " % url)
+
+        if target_size and target_size != downloaded_size:
+            lgr.error("Downloaded file size %d differs from originally announced %d",
+                      downloaded_size, target_size)
+            raise DownloadError("Downloaded size %d differs from original %d" % (downloaded_size, target_size))
+
+
     def _download(self, url, path=None, overwrite=False):
-        """
+        """Download content into a file
 
         Parameters
         ----------
         url: str
           URL to download
         path: str, optional
-          Path to file where to store the downloaded content.  If None, downloaded
-          content provided back in the return value (not decoded???)
+          Path to file where to store the downloaded content.  If None,
+          filename deduced from the url and saved in curdir
 
         Returns
         -------
-        None or bytes
+        None or string
+          Returns downloaded filename
 
         """
 
@@ -198,8 +225,6 @@ class BaseDownloader(object):
 
         # FETCH CONTENT
         # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
-        # TODO: logic to fetch into a nearby temp file, move into target
-        #     reason: detect aborted downloads etc
         try:
             temp_filepath = self._get_temp_download_filename(filepath)
             if exists(temp_filepath):
@@ -219,20 +244,7 @@ class BaseDownloader(object):
 
             # (headers.get('Content-type', "") and headers.get('Content-Type')).startswith('text/html')
             #  and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
-            if self.authenticator and downloaded_size < 10000 \
-                    and (hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re):
-                # TODO: Common logic for any downloader whenever no proper failure code is thrown etc
-                with open(temp_filepath) as fp:
-                    assert hasattr(self.authenticator, 'check_for_auth_failure'), \
-                        "%s has failure_re defined but no check_for_auth_failure" \
-                        % self.authenticator
-                    self.authenticator.check_for_auth_failure(
-                        fp.read(), "Download of file %s has failed: " % filepath)
-
-            if target_size and target_size != downloaded_size:
-                lgr.error("Downloaded file size %d differs from originally announced %d",
-                          downloaded_size, target_size)
-                raise DownloadError("Downloaded size %d differs from original %d" % (downloaded_size, target_size))
+            self._verify_download(url, downloaded_size, target_size, temp_filepath)
 
             # place successfully downloaded over the filepath
             os.rename(temp_filepath, filepath)
@@ -247,7 +259,7 @@ class BaseDownloader(object):
             lgr.error("Failed to download {url} into {filepath}: {e_str}".format(
                 **locals()
             ))
-            raise DownloadError  # for now
+            raise DownloadError(exc_str(e))  # for now
         finally:
             if exists(temp_filepath):
                 # clean up
@@ -263,20 +275,77 @@ class BaseDownloader(object):
         ----------
         url : string
           URL to access
-        path : str, optional
-          Either full path to the file, or if exists and a directory
-          -- the directory to save under. If just a filename -- store
-          under curdir. If None -- fetch and return the fetched content.
+        path : string, optional
+          Filename or existing directory to store downloaded content under.
+          If not provided -- deduced from the url
 
         Returns
         -------
-        None or bytes
+        string
+          file path
         """
         # TODO: may be move all the path dealing logic here
         # but then it might require sending request anyways for Content-Disposition
         # so probably nah
         lgr.info("Downloading %r into %r", url, path)
         return self._access(self._download, url, path=path, **kwargs)
+
+    def _fetch(self, url):
+        """Fetch content from a url into a file.
+
+        Very similar to _download but lacks any "file" management
+
+        Parameters
+        ----------
+        url: str
+          URL to download
+
+        Returns
+        -------
+        bytes
+        """
+
+        downloader, target_size, url_filename = self._get_download_details(url)
+
+        # FETCH CONTENT
+        try:
+            fp = StringIO()
+            # Consider to improve to make it animated as well, or shorten here
+            #pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+            downloader(fp)
+            content = fp.getvalue()
+            #pbar.finish()
+            downloaded_size = len(content)
+            # downloaded_size = os.stat(temp_filepath).st_size
+
+            self._verify_download(url, downloaded_size, target_size, None, content=content)
+
+        except AccessDeniedError as e:
+            raise
+        except Exception as e:
+            e_str = exc_str(e, limit=5)
+            lgr.error("Failed to fetch {url}: {e_str}".format(**locals()))
+            raise DownloadError(exc_str(e))  # for now
+
+        return content
+
+
+    def fetch(self, url, **kwargs):
+        """Fetch and return content (not decoded) as pointed by the URL
+
+        Parameters
+        ----------
+        url : string
+          URL to access
+
+        Returns
+        -------
+        bytes
+          content
+        """
+        lgr.info("Fetching %r", url)
+        return self._access(self._fetch, url, **kwargs)
+
 
     def check(self, url, **kwargs):
         """

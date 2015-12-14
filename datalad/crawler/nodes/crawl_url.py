@@ -11,6 +11,7 @@
 
 from ...support.network import fetch_page
 from ...utils import updated
+from ...downloaders.providers import Providers
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.crawl_url')
@@ -37,6 +38,7 @@ class crawl_url(object):
         self._input = input
         self._output = output
         self._seen = set()
+        self._providers = Providers.from_config_files()
 
     def reset(self):
         """Reset cache of seen urls"""
@@ -48,7 +50,7 @@ class crawl_url(object):
         self._seen.add(url)
         # this is just a cruel first attempt
         lgr.debug("Visiting %s" % url)
-        page = fetch_page(url)
+        page = self._providers.fetch(url)
         data_ = updated(data, zip(self._output, (page, url)))
         yield data_
         # now recurse if matchers were provided

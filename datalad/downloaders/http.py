@@ -249,7 +249,7 @@ class HTTPDownloader(BaseDownloader):
         # should not result in an additional request
         url_filename = get_url_filename(url, headers=headers)
 
-        def download_into_fp(f, pbar):
+        def download_into_fp(f, pbar=None):
             total = 0
             # must use .raw to be able avoiding decoding/decompression
             for chunk in response.raw.stream(chunk_size, decode_content=False):
@@ -258,7 +258,8 @@ class HTTPDownloader(BaseDownloader):
                     f.write(chunk)
                     try:
                         # TODO: pbar is not robust ATM against > 100% performance ;)
-                        pbar.update(total)
+                        if pbar:
+                            pbar.update(total)
                     except Exception as e:
                         lgr.warning("Failed to update progressbar: %s" % exc_str(e))
                     # TEMP
