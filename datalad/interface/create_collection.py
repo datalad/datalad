@@ -70,4 +70,5 @@ class CreateCollection(Interface):
         local_master.git_remote_add(new_collection.name, new_collection.path)
         local_master.git_fetch(new_collection.name)
 
-        return CollectionRepoBackend(new_collection)
+        if not self.cmdline:
+            return CollectionRepoBackend(new_collection)

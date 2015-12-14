@@ -209,4 +209,5 @@ class InstallHandle(Interface):
                                                    key=local_name,
                                                    data=metadata)
 
-        return HandleRepoBackend(installed_handle)
+        if not self.cmdline:
+            return HandleRepoBackend(installed_handle)

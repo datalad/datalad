@@ -86,4 +86,5 @@ class SPARQLQuery(Interface):
             out.lstrip('\t')
             print(out)
 
-        return results
+        if not self.cmdline:
+            return results

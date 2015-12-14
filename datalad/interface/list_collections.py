@@ -37,5 +37,6 @@ class ListCollection(Interface):
         for collection in local_master.git_get_remotes():
             print(collection)
 
-        return [CollectionRepoBackend(local_master, branch=remote + "/master")
-                for remote in local_master.git_get_remotes()]
+        if not self.cmdline:
+            return [CollectionRepoBackend(local_master, branch=remote + "/master")
+                    for remote in local_master.git_get_remotes()]

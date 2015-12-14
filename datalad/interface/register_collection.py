@@ -124,4 +124,5 @@ class RegisterCollection(Interface):
         local_master.git_remote_add(name, url)
         local_master.git_fetch(name)
 
-        return CollectionRepoBackend(local_master, name + "/master")
+        if not self.cmdline:
+            return CollectionRepoBackend(local_master, name + "/master")

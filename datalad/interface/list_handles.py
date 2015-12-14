@@ -66,5 +66,6 @@ class ListHandles(Interface):
                     CollectionRepoHandleBackend(local_master, handle))
                 print(handle)
 
-        return handle_list
+        if not self.cmdline:
+            return handle_list
 

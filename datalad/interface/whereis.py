@@ -56,4 +56,5 @@ class Whereis(Interface):
 
         result = urlparse(location).path
         print(result)
-        return result
+        if not self.cmdline:
+            return result

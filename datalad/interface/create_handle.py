@@ -65,4 +65,5 @@ class CreateHandle(Interface):
         # TODO: get metadata, in case there is some already.
         # This implicates the option to use create-handle on an existing annex.
 
-        return HandleRepoBackend(new_handle)
+        if not self.cmdline:
+            return HandleRepoBackend(new_handle)

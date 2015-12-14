@@ -88,4 +88,5 @@ class UpgradeHandle(Interface):
             # upgrade content:
             repo.get(files_to_upgrade)
 
-        return HandleRepoBackend(repo)
+        if not self.cmdline:
+            return HandleRepoBackend(repo)

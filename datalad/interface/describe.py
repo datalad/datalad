@@ -239,8 +239,9 @@ class Describe(Interface):
         # prof.disable_by_count()
         # prof.print_stats()
 
-        if isinstance(repo, CollectionRepo):
-            return CollectionRepoBackend(repo)
-        elif isinstance(repo, HandleRepo):
-            return HandleRepoBackend(repo)
+        if not self.cmdline:
+            if isinstance(repo, CollectionRepo):
+                return CollectionRepoBackend(repo)
+            elif isinstance(repo, HandleRepo):
+                return HandleRepoBackend(repo)
 

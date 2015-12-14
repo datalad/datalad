@@ -365,5 +365,6 @@ class PublishCollection(Interface):
         local_collection_repo._git_custom_command('', 'git branch -D %s'
                                                   % p_branch)
 
-        return CollectionRepoBackend(local_collection_repo,
-                                     remote_name + "/master")
+        if not self.cmdline:
+            return CollectionRepoBackend(local_collection_repo,
+                                         remote_name + "/master")
