@@ -17,6 +17,7 @@ from os.path import exists, join as opj, isdir
 from six import string_types
 from six.moves import StringIO
 
+from ..config import cfg
 from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
@@ -51,6 +52,7 @@ class BaseDownloader(object):
                     " Got only authenticator %s" % repr(authenticator))
 
         self.authenticator = authenticator
+        self._cache = None  # for fetches, not downloads
 
 
     def _access(self, method, url, allow_old_session=True, **kwargs):
@@ -290,7 +292,14 @@ class BaseDownloader(object):
         lgr.info("Downloading %r into %r", url, path)
         return self._access(self._download, url, path=path, **kwargs)
 
-    def _fetch(self, url):
+    def get_cache(self):
+        if self._cache is None:
+            # Initiate cache
+            opj(cfg.dirs.user_cache_dir)
+            pass
+        return self._cache
+
+    def _fetch(self, url, cache=None):
         """Fetch content from a url into a file.
 
         Very similar to _download but lacks any "file" management
@@ -299,13 +308,24 @@ class BaseDownloader(object):
         ----------
         url: str
           URL to download
+        cache: bool, optional
+          If None, config is consulted either results should be cached.
+          Cache is operating based on url, so no verification of any kind
+          is carried out
 
         Returns
         -------
         bytes
         """
 
+        if cache is None:
+            cache = cfg.getboolean('crawl', 'cache', False)
+
+        if cache:
+            cache_key = url
+
         downloader, target_size, url_filename = self._get_download_details(url)
+
 
         # FETCH CONTENT
         try:
