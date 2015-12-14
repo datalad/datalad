@@ -30,6 +30,7 @@ from six.moves.urllib.parse import urlparse
 
 # TODO:  --output option as in search_collection.py
 
+
 class SearchHandle(Interface):
     """Search for a handle.
 

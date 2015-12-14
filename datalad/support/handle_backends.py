@@ -193,6 +193,7 @@ class CollectionRepoHandleBackend(Handle):
         :param files:
         :return:
         """
+
         super(CollectionRepoHandleBackend, self).__init__()
 
         if not isinstance(repo, CollectionRepo):

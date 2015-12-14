@@ -33,6 +33,9 @@ from datalad.cmdline.helpers import get_datalad_master
 
 from six.moves.urllib.parse import urlparse
 
+# PROFILE
+# import line_profiler
+# prof = line_profiler.LineProfiler()
 
 class Describe(Interface):
     """Add metadata to the repository in cwd.
@@ -93,6 +96,11 @@ class Describe(Interface):
         -------
         Handle or Collection
         """
+        # PROFILE
+        # prof.add_function(self.__call__)
+        # prof.add_module(CollectionRepo)
+        # prof.enable_by_count()
+
         repo = get_repo_instance()
 
         if isinstance(repo, CollectionRepo):
@@ -204,19 +212,35 @@ class Describe(Interface):
                     local_master.git_fetch(c)
         elif isinstance(repo, HandleRepo):
             # update master if it is an installed handle:
+
+            # TODO: This takes way too long. Now, that we have new collection
+            # classes, use it instead of the repo and access the handle's url
+            # directly, instead of searching for it in the repo!
+            # Note: Probably, we need to add an explicit connection between a
+            # handle's URI and it's name in the collection level metadata.
+            # The issue here is to figure out a handle's name in local master
+            # from it's repository's path. This currently leads to reading the
+            # metadata of all known handles to compare their paths with the one
+            # we are looking for.
             for h in local_master.get_handle_list():
-                if repo.path == urlparse(
-                        CollectionRepoHandleBackend(local_master, h).url).path:
+                handle = CollectionRepoHandleBackend(local_master, h)
+                url = handle.url
+                if repo.path == urlparse(url).path:
                     local_master.import_metadata_to_handle(CustomImporter,
                                                            key=h,
                                                            files=opj(
-                                                               repo.path,
-                                                               HANDLE_META_DIR))
+                                                              repo.path,
+                                                              HANDLE_META_DIR))
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
+
+        # PROFILE
+        # prof.disable_by_count()
+        # prof.print_stats()
 
         if isinstance(repo, CollectionRepo):
             return CollectionRepoBackend(repo)
         elif isinstance(repo, HandleRepo):
             return HandleRepoBackend(repo)
+
