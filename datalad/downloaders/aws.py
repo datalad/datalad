@@ -136,14 +136,16 @@ class S3Downloader(BaseDownloader):
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
-        def download_into_fp(f, pbar=None):
+        def download_into_fp(f=None, pbar=None):
             # S3 specific (the rest is common with e.g. http)
             def pbar_callback(downloaded, totalsize):
                 assert(totalsize == key.size)
                 if pbar:
                     pbar.update(downloaded)
-
-            key.get_contents_to_file(f, cb=pbar_callback, num_cb=None)
+            if f:
+                key.get_contents_to_file(f, cb=pbar_callback, num_cb=None)
+            else:
+                return key.get_contents_as_string(cb=pbar_callback, encoding='utf-8')
 
         return download_into_fp, target_size, url_filename
 

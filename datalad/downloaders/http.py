@@ -13,6 +13,8 @@ import functools
 import re
 import requests
 
+from six.moves import StringIO
+
 from ..utils import assure_list_from_str, assure_dict_from_str
 from ..dochelpers import borrowkwargs
 
@@ -249,10 +251,15 @@ class HTTPDownloader(BaseDownloader):
         # should not result in an additional request
         url_filename = get_url_filename(url, headers=headers)
 
-        def download_into_fp(f, pbar=None):
+        def download_into_fp(f=None, pbar=None):
             total = 0
-            # must use .raw to be able avoiding decoding/decompression
-            for chunk in response.raw.stream(chunk_size, decode_content=False):
+            return_content = f is None
+            if f is None:
+                # no file to download to
+                f = StringIO()
+            # must use .raw to be able avoiding decoding/decompression while downloading
+            # to a file
+            for chunk in response.raw.stream(chunk_size, decode_content=return_content):
                 if chunk:  # filter out keep-alive new chunks
                     total += len(chunk)
                     f.write(chunk)
@@ -265,6 +272,8 @@ class HTTPDownloader(BaseDownloader):
                     # TEMP
                     # see https://github.com/niltonvolpato/python-progressbar/pull/44
                     ui.out.flush()
+            if return_content:
+                return f.getvalue()
 
         return download_into_fp, target_size, url_filename
 

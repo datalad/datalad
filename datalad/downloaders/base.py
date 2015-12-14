@@ -12,10 +12,11 @@
 
 __docformat__ = 'restructuredtext'
 
+import msgpack
 import os
 from os.path import exists, join as opj, isdir
 from six import string_types, PY2
-from six.moves import StringIO
+
 
 from .. import cfg
 from ..ui import ui
@@ -296,6 +297,7 @@ class BaseDownloader(object):
     @property
     def cache(self):
         if self._cache is None:
+            # TODO: move this all logic outside into a dedicated caching beast
             lgr.info("Initializing cache for fetches")
             if PY2:
                 import anydbm as dbm
@@ -316,7 +318,8 @@ class BaseDownloader(object):
     def _fetch(self, url, cache=None):
         """Fetch content from a url into a file.
 
-        Very similar to _download but lacks any "file" management
+        Very similar to _download but lacks any "file" management and decodes
+        content
 
         Parameters
         ----------
@@ -336,21 +339,23 @@ class BaseDownloader(object):
             cache = cfg.getboolean('crawl', 'cache', False)
 
         if cache:
-            cache_key = url
+            cache_key = msgpack.dumps(url)
             res = self.cache.get(cache_key)
             if res is not None:
-                return res
+                try:
+                    return msgpack.loads(res, encoding='utf-8')
+                except Exception as exc:
+                    lgr.warning("Failed to unpack loaded from cache for %s: %s",
+                                url, exc_str(exc))
 
         downloader, target_size, url_filename = self._get_download_details(url)
 
 
         # FETCH CONTENT
         try:
-            fp = StringIO()
             # Consider to improve to make it animated as well, or shorten here
             #pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-            downloader(fp)
-            content = fp.getvalue()
+            content = downloader()
             #pbar.finish()
             downloaded_size = len(content)
             # downloaded_size = os.stat(temp_filepath).st_size
@@ -362,10 +367,10 @@ class BaseDownloader(object):
         except Exception as e:
             e_str = exc_str(e, limit=5)
             lgr.error("Failed to fetch {url}: {e_str}".format(**locals()))
-            raise DownloadError(exc_str(e))  # for now
+            raise DownloadError(exc_str(e, limit=8))  # for now
 
         if cache:
-            self.cache[cache_key] = content
+            self.cache[cache_key] = msgpack.dumps(content)
 
         return content
 

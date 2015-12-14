@@ -19,3 +19,4 @@ requests
 # https://github.com/niltonvolpato/python-progressbar/archive/master.zip
 https://github.com/datalad/python-progressbar/archive/master.zip
 httpretty
+msgpack-python
