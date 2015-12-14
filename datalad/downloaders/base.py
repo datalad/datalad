@@ -14,10 +14,10 @@ __docformat__ = 'restructuredtext'
 
 import os
 from os.path import exists, join as opj, isdir
-from six import string_types
+from six import string_types, PY2
 from six.moves import StringIO
 
-from ..config import cfg
+from .. import cfg
 from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
@@ -292,12 +292,26 @@ class BaseDownloader(object):
         lgr.info("Downloading %r into %r", url, path)
         return self._access(self._download, url, path=path, **kwargs)
 
-    def get_cache(self):
+
+    @property
+    def cache(self):
         if self._cache is None:
-            # Initiate cache
-            opj(cfg.dirs.user_cache_dir)
-            pass
+            lgr.info("Initializing cache for fetches")
+            if PY2:
+                import anydbm as dbm
+            else:
+                import dbm
+            # Initiate cache.
+            # Very rudimentary caching for now, might fail many ways
+            cache_dir = opj(cfg.dirs.user_cache_dir)
+            if not exists(cache_dir):
+                os.makedirs(cache_dir)
+            cache_path = opj(cache_dir, 'crawl_cache.dbm')
+            self._cache = dbm.open(cache_path, 'c')
+            import atexit
+            atexit.register(self._cache.close)
         return self._cache
+
 
     def _fetch(self, url, cache=None):
         """Fetch content from a url into a file.
@@ -323,6 +337,9 @@ class BaseDownloader(object):
 
         if cache:
             cache_key = url
+            res = self.cache.get(cache_key)
+            if res is not None:
+                return res
 
         downloader, target_size, url_filename = self._get_download_details(url)
 
@@ -346,6 +363,9 @@ class BaseDownloader(object):
             e_str = exc_str(e, limit=5)
             lgr.error("Failed to fetch {url}: {e_str}".format(**locals()))
             raise DownloadError(exc_str(e))  # for now
+
+        if cache:
+            self.cache[cache_key] = content
 
         return content
 
