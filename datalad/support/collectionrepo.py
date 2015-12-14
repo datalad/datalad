@@ -525,6 +525,7 @@ class CollectionRepo(GitRepo):
         :param files:
         :return:
         """
+
         if branch is None:
             branch = self.git_get_active_branch()
 
@@ -532,10 +533,18 @@ class CollectionRepo(GitRepo):
         if files is None:
             # TODO: Figure out how to generalize this gitpython query and make
             #       it a method of GitRepo.
-            #       May be like get_files(branch="HEAD", directory="repo_base", recursive=True)
-            files = [blob.path for blob in
-                     (self.repo.tree(branch) / self._key2filename(key)).blobs
-                     if blob.path.endswith(".ttl")]
+            #       May be like get_files(branch="HEAD", directory="repo_base",
+            #                             recursive=True)
+            if branch == self.git_get_active_branch():
+                files = [blob.path for blob in
+                         (self.repo.active_branch.commit.tree /
+                          self._key2filename(key)).blobs
+                         if blob.path.endswith(".ttl")]
+            else:
+                files = [blob.path for blob in
+                         (self.repo.tree(branch) /
+                          self._key2filename(key)).blobs
+                         if blob.path.endswith(".ttl")]
 
         graphs = dict()
         for file_ in files:
@@ -586,9 +595,13 @@ class CollectionRepo(GitRepo):
 
         # by default read all ttl-files in base dir:
         if files is None:
-            # TODO: See get_handle_graphs!
-            files = [blob.path for blob in self.repo.tree(branch).blobs
-                     if blob.path.endswith(".ttl")]
+            if branch == self.git_get_active_branch():
+                files = [blob.path for blob in
+                         self.repo.active_branch.commit.tree.blobs
+                         if blob.path.endswith(".ttl")]
+            else:
+                files = [blob.path for blob in self.repo.tree(branch).blobs
+                         if blob.path.endswith(".ttl")]
 
         graphs = dict()
         for file_ in files:
