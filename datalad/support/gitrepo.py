@@ -426,9 +426,9 @@ class GitRepo(object):
         -------
         stdout, stderr
         """
-        
-        cmd = shlex.split(cmd_str + " " + " ".join(files),
-                          posix=not on_windows)
+        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
+            if isinstance(cmd_str, string_types) \
+            else cmd_str + files
         assert(cmd[0] == 'git')
         cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
@@ -494,7 +494,6 @@ class GitRepo(object):
     def git_push(self, name='', options=''):
         """
         """
-
         self._git_custom_command('', 'git push %s %s' % (options, name),
                                  expect_stderr=True)
 

@@ -18,13 +18,13 @@ shift 2
 
 
 cd "$ROOT_PATH"
-git -C "$COL_REPO_NAME" checkout master
+git -C "$COL_REPO_NAME" checkout -q master
 printf "DATALAD_COLLECTION_REPO_%s: checkout_master DATALAD_END\n" "$COL_REPO_NAME"
 
 for name in "$@"; do
     curdir=$PWD
     cd "$name"
-    git checkout master
+    git checkout -q master
     printf "DATALAD_HANDLE_REPO_%s: checkout_master DATALAD_END\n" "$name"
     # call init to do things like enabling special remotes
     git annex init
