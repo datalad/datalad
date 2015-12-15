@@ -482,6 +482,7 @@ class CollectionRepo(GitRepo):
         md_collection.import_data(self.path)
         graphs = md_collection.get_graphs()
         graphs[REPO_STD_META_FILE[0:-4]].add((DLNS.this, DCTERMS.hasPart, uri))
+        graphs[REPO_STD_META_FILE[0:-4]].add((uri, RDFS.label, Literal(name)))
         # TODO: anything else? any config needed?
         md_collection.set_graphs(graphs)
         md_collection.store_data(self.path)
@@ -501,6 +502,7 @@ class CollectionRepo(GitRepo):
         col_graph = Graph().parse(opj(self.path, REPO_STD_META_FILE),
                                   format="turtle")
         col_graph.remove((DLNS.this, DCTERMS.hasPart, uri))
+        col_graph.remove((uri, RDFS.label, Literal(key)))
         col_graph.serialize(opj(self.path, REPO_STD_META_FILE), format="turtle")
 
         # remove handle's directory:
@@ -589,6 +591,17 @@ class CollectionRepo(GitRepo):
             self.git_checkout(active_branch)
 
     def get_collection_graphs(self, branch=None, files=None):
+        """
+
+        Parameters
+        ----------
+        branch: str
+        files: list of str
+
+        Returns
+        -------
+        dict of Graph
+        """
 
         if branch is None:
             branch = self.git_get_active_branch()

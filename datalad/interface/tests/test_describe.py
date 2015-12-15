@@ -26,7 +26,10 @@ from ...support.metadatahandler import DLNS, PAV, DCTERMS, URIRef, RDF, FOAF, \
     PROV, Literal, Graph
 from ...support.handle import Handle
 from ...support.collection import Collection
+from ...support.collection_backends import CollectionRepoBackend
 from ...consts import REPO_STD_META_FILE, HANDLE_META_DIR
+from datalad.cmdline.helpers import get_datalad_master
+from datalad.utils import get_local_file_url
 
 
 @assert_cwd_unchanged
@@ -112,6 +115,32 @@ def test_describe_handle_simple(path, lcpath):
         assert_in((DLNS.this, DCTERMS.description,
                    Literal("This a description.")),
                   stored_graph)
+
+        # now, test updated master collection:
+        master = CollectionRepoBackend(get_datalad_master())
+        master_handle_uri = master["TestDescribeHandle"].meta.value(
+            predicate=RDF.type,
+            object=DLNS.Handle)
+        eq_(master_handle_uri, URIRef(get_local_file_url(path)))
+        assert_in((master_handle_uri, DCTERMS.license, Literal("A license text.")),
+                  master["TestDescribeHandle"].meta)
+        assert_in((master_handle_uri, DCTERMS.description, Literal("This a description.")),
+                  master["TestDescribeHandle"].meta)
+        master_author_node = master["TestDescribeHandle"].meta.value(
+            subject=DLNS.this,
+            predicate=PAV.createdBy)
+        assert_in((master_author_node, RDF.type, PROV.Person),
+                  master["TestDescribeHandle"].meta)
+        assert_in((master_author_node, RDF.type, FOAF.Person),
+                  master["TestDescribeHandle"].meta)
+        assert_in((master_author_node, FOAF.mbox,
+                   URIRef("mailto:some.author@example.com")),
+                  master["TestDescribeHandle"].meta)
+        assert_in((master_author_node, FOAF.homepage,
+                   URIRef("http://example.com/someauthor")),
+                  master["TestDescribeHandle"].meta)
+        assert_in((master_author_node, FOAF.name, Literal("Some author")),
+                  master["TestDescribeHandle"].meta)
 
 
 @assert_cwd_unchanged

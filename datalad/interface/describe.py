@@ -25,17 +25,15 @@ from ..support.handlerepo import HandleRepo
 from datalad.support.handle_backends import HandleRepoBackend, \
     CollectionRepoHandleBackend
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
-    EMP, RDF, PAV, PROV, FOAF, DCTERMS
+    EMP, RDF, PAV, PROV, FOAF, DCTERMS, RDFS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
 from datalad.cmdline.helpers import get_datalad_master
+from datalad.utils import get_local_file_url
 
 from six.moves.urllib.parse import urlparse
 
-# PROFILE
-# import line_profiler
-# prof = line_profiler.LineProfiler()
 
 class Describe(Interface):
     """Add metadata to the repository in cwd.
@@ -96,10 +94,6 @@ class Describe(Interface):
         -------
         Handle or Collection
         """
-        # PROFILE
-        # prof.add_function(self.__call__)
-        # prof.add_module(CollectionRepo)
-        # prof.enable_by_count()
 
         repo = get_repo_instance()
 
@@ -213,31 +207,22 @@ class Describe(Interface):
         elif isinstance(repo, HandleRepo):
             # update master if it is an installed handle:
 
-            # TODO: This takes way too long. Now, that we have new collection
-            # classes, use it instead of the repo and access the handle's url
-            # directly, instead of searching for it in the repo!
-            # Note: Probably, we need to add an explicit connection between a
-            # handle's URI and it's name in the collection level metadata.
-            # The issue here is to figure out a handle's name in local master
-            # from it's repository's path. This currently leads to reading the
-            # metadata of all known handles to compare their paths with the one
-            # we are looking for.
-            for h in local_master.get_handle_list():
-                handle = CollectionRepoHandleBackend(local_master, h)
-                url = handle.url
-                if repo.path == urlparse(url).path:
-                    local_master.import_metadata_to_handle(CustomImporter,
-                                                           key=h,
-                                                           files=opj(
-                                                              repo.path,
-                                                              HANDLE_META_DIR))
+            # TODO: Create method to get a handle's name by it's url from a
+            # collection and move the code below there.
+            meta_graph = local_master.get_collection_graphs(
+                files=[REPO_STD_META_FILE])[REPO_STD_META_FILE[:-4]]
+            handle_name = meta_graph.value(
+                subject=URIRef(get_local_file_url(repo.path)),
+                predicate=RDFS.label)
+            if handle_name is not None:
+                local_master.import_metadata_to_handle(CustomImporter,
+                                                       key=handle_name,
+                                                       files=opj(
+                                                           repo.path,
+                                                           HANDLE_META_DIR))
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
-
-        # PROFILE
-        # prof.disable_by_count()
-        # prof.print_stats()
 
         if not self.cmdline:
             if isinstance(repo, CollectionRepo):

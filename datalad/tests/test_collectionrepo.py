@@ -156,8 +156,7 @@ def test_CollectionRepo_add_handle(annex_path, clone_path, clt_path):
 
     handle_uri = g_datalad.value(subject=DLNS.this, predicate=DCTERMS.hasPart)
     eq_(handle_uri, URIRef(get_local_file_url(handle.path)))
-    # TODO: one says "file:///..." and the other just "/..."
-    # Note: Use datalad/utils.py:60:def get_local_file_url(fname)
+    assert_in((handle_uri, RDFS.label, Literal("first_handle")), g_datalad)
 
     # 2. handle's metadata:
     g_config = Graph().parse(opj(clt.path, 'first_handle', REPO_CONFIG_FILE),
@@ -190,8 +189,12 @@ def test_CollectionRepo_remove_handle(annex_path, handle_path, clt_path):
                               format="turtle")
 
     eq_(len(list(g_datalad.objects(subject=DLNS.this,
-                                            predicate=DCTERMS.hasPart))),
-                 0, "Collection's graph still contains handle(s).")
+                                   predicate=DCTERMS.hasPart))),
+        0, "Collection's graph still lists handle(s).")
+    eq_(len(list(g_datalad.subjects(predicate=DCTERMS.hasPart,
+                                    object=Literal("MyHandle")))),
+        0, "Collection's graph still lists name(s) of handle(s).")
+
 
 @with_tempfile
 @with_tempfile
