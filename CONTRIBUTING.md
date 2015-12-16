@@ -99,6 +99,20 @@ we outline the workflow used by the developers:
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
 
+Additional Hints
+----------------
+
+1. For merge commits to have more informative description, add to your
+   `.git/config` or `~/.gitconfig` following section:
+   
+        [merge]
+        summary = true
+        log = true
+   
+   and if conflicts occur, provide short summary on how they were resolved
+   in "Conflicts" listing within the merge commit
+   (see [example](https://github.com/datalad/datalad/commit/eb062a8009d160ae51929998771964738636dcc2)).
+
 
 Quality Assurance
 -----------------
