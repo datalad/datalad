@@ -11,6 +11,7 @@
 For further information on git-annex see https://git-annex.branchable.com/.
 
 """
+import os
 
 from os import linesep
 from os.path import join as opj, exists
@@ -27,6 +28,8 @@ from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 from ..utils import on_windows
 
+
+from ..utils import has_content
 
 lgr = logging.getLogger('datalad.annex')
 

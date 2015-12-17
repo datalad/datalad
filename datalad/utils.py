@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+
 import six.moves.builtins as __builtin__
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
@@ -21,8 +22,9 @@ import platform
 import gc
 
 from functools import wraps
-from os.path import exists, join as opj, isabs, normpath
+from os.path import exists, join as opj, isabs, normpath, realpath
 from time import sleep
+from six import next
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -158,6 +160,206 @@ def rmtemp(f, *args, **kwargs):
                 break
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def is_symlink(file_, good=None):
+    """Check if file_ is a symlink
+
+    Parameters
+    ----------
+    good: None or bool, optional
+        Test not only that it is a symlink, but either it is a good symlink
+        (good=True) or broken (good=False) symlink.  So if good=False,
+        it would return True only if it is a symlink and it is broken.
+    """
+    try:
+        link = os.readlink(file_)
+    except OSError:
+        link = None
+
+    # TODO: copied from ok_symlink so may be we also want to check the path etc?
+    # path_ = realpath(file_)
+    # ok_(path_ != link)
+    # TODO anything else?
+
+    if good is None:
+        # nothing to do more:
+        return bool(link)
+    else:
+        return is_good_symlink(file_)
+
+
+def is_good_symlink(file_):
+    """Return if a file_ is a good symlink (assuming it is a symlink)
+    """
+    return exists(realpath(file_))
+
+def ls_tree(path, files_only=False, relative=True):
+    """Recurse into the directory and return all found files (and dirs if dirs)
+    """
+    out = []
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            out.append(opj(root, f))
+        if not files_only:
+            for d in dirs:
+                out.append(opj(root, d))
+    out = sorted(out)
+    if relative:
+        beg = len(path) + len(os.pathsep)
+        return [o[beg:] for o in out]
+    else:
+        return out
+
+def has_content(file_):
+    """Returns True if a file is not a broken symlink, and if it has content
+    """
+    if not on_windows:
+        if not is_symlink(file_, good=True):
+            return False
+    # verify it has content
+    return os.stat(realpath(file_)).st_size > 0
+
+
+def rm_misses(p, misses_files=None, misses_dirs=None):
+    """Callback for traverse_and_do to be used for do_some, do_none
+
+    To prune "misses", e.g. empty content
+    """
+    for d in misses_dirs:
+        rmtree(opj(p, d))
+    for f in misses_files:
+        os.unlink(opj(p, f))
+
+
+def traverse_and_do(path,
+                    do_none=None,
+                    do_some=None,
+                    do_all=None,
+                    matcher=has_content,
+                    pass_all_files=False,
+                    exclude=(),
+                    pass_hits=False,
+                    pass_misses=False,
+                    return_="any"
+                    ):
+    """Traverse and perform actions depending on either tree files pass the matcher
+
+    Note
+    ----
+
+    "some" is used instead of "any" to accent that it is the case when only some,
+    not all files are matched
+
+    Parameters
+    ----------
+    do_none, do_some, do_all: callable, optional
+        Callback to use for each traversed directory in case it has None, any,
+        or all files (in that directory, or under) hit by `matcher`.
+        Those callbacks should have following arguments
+           path: string
+             path to the directory
+           hits_files, hits_dirs: list, optional
+             list of files and list of directories which pass the matcher.
+             Passed only if pass_hits=True
+           misses_files, misses_dirs: list, optional
+             list of files and list of directories which pass the matcher.
+             Passed only if pass_misses=True
+    matcher: callable, optional
+        Given the path (to a file) should return the bool result
+    pass_all_files: bool, optional
+        Either matcher could process all files at once, and output a list
+        of result per each file
+    exclude: iterable or regexp, optional
+        Files/directories to exclude from consideration. If an iterable (e.g.
+        list or string) -- checked for presence in that iterable, otherwise --
+        assuming it is a compiled regular expression to .match against
+    pass_hits: bool, optional
+        Either to pass hits_files, hits_dirs into do_* callables
+    pass_misses: bool, optional
+        Either to pass misses_files, misses_dirs into do_* callables
+    return_: {'all', 'any'}, optional
+        Instructs either function should return True when 'all' or 'any' of
+        its children passed the matcher
+
+    Returns
+    -------
+    bool
+    """
+    # Naive recursive implementation, still using os.walk though
+
+    # Get all elements of current directory
+    root, dirs, files = next(os.walk(path))
+    assert(root == path)
+
+    if exclude:
+        if hasattr(exclude, '__iter__'):
+            excluder = lambda x: x not in exclude
+        else:
+            excluder = lambda x: not exclude.match(x)
+
+        dirs = filter(excluder, dirs)
+        files = filter(excluder, files)
+
+    # TODO: I feel like in some cases we might want to stop descent earlier
+    # and not even bother with kids, but I could be wrong
+    status_dirs = [
+        traverse_and_do(os.path.join(root, d),
+                        do_none=do_none,
+                        do_some=do_some,
+                        do_all=do_all,
+                        matcher=matcher,
+                        pass_hits=pass_hits,
+                        pass_misses=pass_misses,
+                        return_=return_)
+        for d in dirs
+    ]
+
+    # TODO: Theoretically we could sophisticate it. E.g. if only do_some
+    # or do_none defined and already we have some of status_dirs, no need
+    # to verify files. Also if some are not defined in dirs and we have
+    # only do_all -- no need to matcher files.  For now -- KISS
+
+    # Now verify all the files
+    if pass_all_files:
+        status_files = matcher([os.path.join(root, f) for f in files])
+    else:
+        status_files = [
+            matcher(os.path.join(root, f))
+            for f in files
+        ]
+
+    status_all = status_dirs + status_files
+
+    # TODO: may be there is a point to pass those files into do_
+    # callbacks -- add option  pass_hits?
+    all_match = all(status_all)
+    some_match = any(status_all)
+
+    kw = {}
+    if pass_hits:
+        kw.update(
+            {'hits_dirs':  [d for d, c in zip(dirs, status_dirs) if c],
+             'hits_files': [f for f, c in zip(files, status_files) if c]})
+
+    if pass_misses:
+        kw.update(
+            {'misses_dirs':  [d for d, c in zip(dirs, status_dirs) if not c],
+             'misses_files': [f for f, c in zip(files, status_files) if not c]})
+
+    if all_match:
+        if do_all:
+            do_all(root, **kw)
+    elif some_match:
+        if do_some:
+            do_some(root, **kw)
+    else:
+        if do_none:
+            do_none(root, **kw)
+
+    return {'all': all_match,
+            'any': some_match,
+            }[return_]
 
 
 #

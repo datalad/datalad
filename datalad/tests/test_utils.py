@@ -19,6 +19,7 @@ from six import PY3
 
 from os.path import join as opj, isabs, abspath
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
+from ..utils import traverse_and_do, rm_misses, ls_tree
 from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
 from ..support.annexrepo import AnnexRepo
@@ -26,6 +27,8 @@ from ..support.annexrepo import AnnexRepo
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
+from .utils import ok_startswith
+from .utils import on_windows
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 
 @with_tempfile(mkdir=True)
@@ -54,6 +57,169 @@ def test_rotree(d):
     os.unlink(f)
     shutil.rmtree(d)
 
+
+@with_tree([
+    ('loaded.txt', 'abracadabra'),
+    ('empty.txt', ''),
+    ('d1', (
+        ('loaded2.txt', '1 f load'),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d3', (
+        ('empty', ''),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d4', (
+        ('loaded3', 'load'),
+        )),
+    ])
+def test_traverse_and_do(d):
+    # shouldn't blow if just ran without any callables and say that there is some load
+    ok_(traverse_and_do(d))
+    # but should report empty for
+    eq_(traverse_and_do(opj(d, 'd1', 'd2')), False)
+    eq_(traverse_and_do(opj(d, 'd3')), False)
+    # but not upstairs for d1 since of loaded2.txt
+    ok_(traverse_and_do(opj(d, 'd1')))
+    ok_(traverse_and_do(opj(d, 'd4')))
+
+    #
+    # Verify that it seems to be calling callbacks appropriately
+    #
+    def cb_dummy_noargs(d_):
+        ok_(d_ is not None)
+
+    def cb_dummy_kwargs(d_, misses_files=None, misses_dirs=None):
+        ok_(d_ is not None)
+        ok_(isinstance(misses_files, list))
+        ok_(isinstance(misses_dirs, list))
+        for f in misses_files:
+            ok_startswith(f, 'empty')
+
+    ok_(traverse_and_do(d,
+                        do_all=cb_dummy_noargs,
+                        do_none=cb_dummy_noargs,
+                        do_some=cb_dummy_noargs))
+
+    ok_(traverse_and_do(d,
+                        do_all=cb_dummy_kwargs,
+                        do_none=cb_dummy_kwargs,
+                        do_some=cb_dummy_kwargs,
+                        pass_misses=True))
+
+    # more thorough tests
+    def cb_any(d_, misses_files=None, misses_dirs=None):
+        ok_(d_ is not None)
+        if d_ == d:
+            eq_(misses_files, ['empty.txt'])
+            eq_(misses_dirs, ['d3'])
+        elif d_ == opj(d, 'd1'):
+            # indeed we have empty d2 but loaded.txt
+            eq_(misses_files, [])
+            eq_(misses_dirs, ['d2'])
+        else:
+            raise ValueError("Must not be called for %d" % d_)
+
+    def cb_all(d_, misses_files=None, misses_dirs=None):
+        ok_(d_ is not None)
+        if d_ == opj(d, 'd4'):
+            eq_(misses_files, [])
+            eq_(misses_dirs, [])
+        else:
+            raise ValueError("Must not be called for %s" % d_)
+
+    def cb_none(d_, misses_files=None, misses_dirs=None):
+        ok_(d_ is not None)
+        if d_ in (opj(d, 'd1', 'd2'), opj(d, 'd3', 'd2')):
+            eq_(misses_files, ['empty'])
+            eq_(misses_dirs, [])
+        elif d_ == opj(d, 'd3'):
+            eq_(misses_files, ['empty'])
+            eq_(misses_dirs, ['d2'])
+        else:
+            raise ValueError("Must not be called for %s" % d_)
+
+    ok_(traverse_and_do(d,
+                        do_all=cb_all,
+                        do_none=cb_none,
+                        do_some=cb_any,
+                        pass_misses=True))
+
+
+    # And now let's do some desired action -- clean it up!
+    ok_(traverse_and_do(d,
+                        do_none=rm_misses,
+                        do_some=rm_misses,
+                        pass_misses=True))
+    # And check what is left
+    eq_(ls_tree(d),
+        ['d1', opj('d1', 'loaded2.txt'), 'd4', opj('d4', 'loaded3'), 'loaded.txt'])
+
+
+@with_tree([
+    ('empty.txt', ''),
+    ('d1', (
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d3', (
+        ('empty', ''),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d4', (
+        ('empty', ''),
+        )),
+    ])
+def test_traverse_and_do_fully_empty(d):
+    # And now let's do some desired action -- clean it up!
+    ok_(not traverse_and_do(d,
+                            do_none=rm_misses,
+                            do_some=rm_misses,
+                            pass_misses=True))
+    # And check that nothing is left behind
+    eq_(ls_tree(d), [])
+
+
+@with_tree([
+    ('loaded.txt', 'abracadabra'),
+    ('empty.txt', ''),
+    ('d1', (
+        ('loaded2.txt', '1 f load'),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d3', (
+        ('empty', ''),
+        ('d2',
+            (('empty', ''),
+             )),
+        )),
+    ('d4', (
+        ('loaded3', 'load'),
+        )),
+    ])
+def test_traverse_and_do_annex_repo(d):
+    from ..support.annexrepo import AnnexRepo
+    ar = AnnexRepo(d)
+    kw = {'matcher': ar.file_has_content,
+          'pass_all_files': True}
+    # since none of the files was added to annex yet -- should be all "empty"
+    # for the beast
+    ok_(not traverse_and_do(d, **kw))
+    # but should report empty for
+    eq_(traverse_and_do(opj(d, 'd1', 'd2')), False)
+    eq_(traverse_and_do(opj(d, 'd3')), False)
+    # but not upstairs for d1 since of loaded2.txt
+    ok_(traverse_and_do(opj(d, 'd1')))
+    ok_(traverse_and_do(opj(d, 'd4')))
 
 def test_swallow_outputs():
     with swallow_outputs() as cm:
