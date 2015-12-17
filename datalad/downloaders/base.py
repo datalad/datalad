@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import msgpack
 import os
+
+from abc import ABCMeta, abstractmethod, abstractproperty
 from os.path import exists, join as opj, isdir
 from six import string_types, PY2
 
@@ -22,6 +24,7 @@ from .. import cfg
 from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
+from ..dochelpers import borrowkwargs
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -31,6 +34,9 @@ class BaseDownloader(object):
     """Base class for the downloaders"""
 
     _DEFAULT_AUTHENTICATOR = None
+    _DOWNLOAD_SIZE_TO_VERIFY_AUTH = 10000
+
+    __metaclass__ = ABCMeta
 
     def __init__(self, credential=None, authenticator=None):
         """
@@ -150,7 +156,7 @@ class BaseDownloader(object):
         # TODO: might better reside somewhere under .datalad/tmp or .git/datalad/tmp
         return filepath + ".datalad-download-temp"
 
-
+    @abstractmethod
     def _get_download_details(self, url):
         """
 
@@ -165,14 +171,15 @@ class BaseDownloader(object):
         target_size: int or None (if uknown)
         url_filename: str or None
            Filename as decided from the url
+        headers : dict or None
         """
         raise NotImplementedError("Must be implemented in the subclass")
 
     def _verify_download(self, url, downloaded_size, target_size, file_=None, content=None):
         """Verify that download finished correctly"""
-        if (self.authenticator and
-            downloaded_size < 10000 and
-            (hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re)):
+
+        if (self.authenticator and downloaded_size < self._DOWNLOAD_SIZE_TO_VERIFY_AUTH) and \
+            hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re:
             assert hasattr(self.authenticator, 'check_for_auth_failure'), \
                 "%s has failure_re defined but no check_for_auth_failure" \
                 % self.authenticator
@@ -192,7 +199,7 @@ class BaseDownloader(object):
             raise DownloadError("Downloaded size %d differs from original %d" % (downloaded_size, target_size))
 
 
-    def _download(self, url, path=None, overwrite=False):
+    def _download(self, url, path=None, overwrite=False, size=None):
         """Download content into a file
 
         Parameters
@@ -202,6 +209,8 @@ class BaseDownloader(object):
         path: str, optional
           Path to file where to store the downloaded content.  If None,
           filename deduced from the url and saved in curdir
+        size: int, optional
+          Limit in size to be downloaded
 
         Returns
         -------
@@ -210,7 +219,10 @@ class BaseDownloader(object):
 
         """
 
-        downloader, target_size, url_filename = self._get_download_details(url)
+        downloader, target_size, url_filename, headers = self._get_download_details(url)
+
+        if size is not None:
+            target_size = min(target_size, size)
 
         #### Specific to download
         if path:
@@ -241,7 +253,7 @@ class BaseDownloader(object):
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
                 pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-                downloader(fp, pbar)
+                downloader(fp, pbar, size=size)
                 pbar.finish()
             downloaded_size = os.stat(temp_filepath).st_size
 
@@ -315,7 +327,7 @@ class BaseDownloader(object):
         return self._cache
 
 
-    def _fetch(self, url, cache=None):
+    def _fetch(self, url, cache=None, size=None):
         """Fetch content from a url into a file.
 
         Very similar to _download but lacks any "file" management and decodes
@@ -332,7 +344,8 @@ class BaseDownloader(object):
 
         Returns
         -------
-        bytes
+        bytes, dict
+          content, headers
         """
 
         if cache is None:
@@ -348,14 +361,19 @@ class BaseDownloader(object):
                     lgr.warning("Failed to unpack loaded from cache for %s: %s",
                                 url, exc_str(exc))
 
-        downloader, target_size, url_filename = self._get_download_details(url)
+        downloader, target_size, url_filename, headers = self._get_download_details(url)
 
+        if size is not None:
+            if size == 0:
+                # no download of the content was requested -- just return headers and be done
+                return None, headers
+            target_size = min(size, target_size)
 
         # FETCH CONTENT
         try:
             # Consider to improve to make it animated as well, or shorten here
             #pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-            content = downloader()
+            content = downloader(size=size)
             #pbar.finish()
             downloaded_size = len(content)
             # downloaded_size = os.stat(temp_filepath).st_size
@@ -370,9 +388,9 @@ class BaseDownloader(object):
             raise DownloadError(exc_str(e, limit=8))  # for now
 
         if cache:
-            self.cache[cache_key] = msgpack.dumps(content)
+            self.cache[cache_key] = msgpack.dumps((content, headers))
 
-        return content
+        return content, headers
 
 
     def fetch(self, url, **kwargs):
@@ -389,18 +407,59 @@ class BaseDownloader(object):
           content
         """
         lgr.info("Fetching %r", url)
-        return self._access(self._fetch, url, **kwargs)
+        # Do not return headers, just content
+        return self._access(self._fetch, url, **kwargs)[0]
 
 
-    def check(self, url, **kwargs):
-        """
+    def get_status(self, url, old_status=None, **kwargs):
+        """Return status of the url as a dict, None if N/A
+
         Parameters
         ----------
         url : string
           URL to access
-        """
-        return self._access(self._check, url, **kwargs)
+        old_status : dict, optional
+          Previous status record.  If provided, might serve as a shortcut
+          to assess if status has changed, and if not -- return the same
+          record
 
+        Returns
+        -------
+        dict
+          dict-like beast depicting the status of the URL if accessible.
+          Returned value should be sufficient to tell if the URL content
+          has changed by comparing to previously obtained value.
+          If URL is not reachable, None would be returned
+        """
+        return self._access(self._get_status, url, old_status=old_status, **kwargs)
+
+
+    # TODO: borrow from itself... ?
+    # @borrowkwargs(BaseDownloader, 'get_status')
+    def _get_status(self, url, old_status=None):
+
+        # the tricky part is only to make sure that we are getting the target URL
+        # and not some page saying to login, that is why we need to fetch some content
+        # in those cases, and not just check the headers
+        download_size = self._DOWNLOAD_SIZE_TO_VERIFY_AUTH \
+            if self.authenticator and \
+                hasattr(self.authenticator, 'failure_re') and self.authenticator.failure_re \
+            else 0
+
+        _, headers = self._fetch(url, cache=False, size=download_size)
+
+        # extract from headers information to depict the status of the url
+        status = self.get_status_from_headers(headers)
+
+        if old_status is not None:
+            raise NotImplementedError("Do not know yet how to deal with old_status. TODO")
+
+        return status
+
+    @classmethod
+    @abstractmethod
+    def get_status_from_headers(cls, headers):
+        raise NotImplementedError("Implement in the subclass: %s" % cls)
 
 # Exceptions.  might migrate elsewhere
 

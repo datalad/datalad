@@ -57,3 +57,7 @@ def test_get_url_straight_filename():
     yield _test_get_url_straight_filename, '#tag/obscure'
     yield _test_get_url_straight_filename, '?param=1'
     yield _test_get_url_straight_filename, '?param=1&another=/'
+
+from ..support.network import rfc2822_to_epoch
+def test_rfc2822_to_epoch():
+    eq_(rfc2822_to_epoch("Thu, 16 Oct 2014 01:16:17 EDT"), 1413436577)

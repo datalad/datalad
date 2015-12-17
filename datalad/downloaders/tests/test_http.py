@@ -111,12 +111,36 @@ def check_download_external_url(url, failed_str, success_str, d):
         if failed_str is not None:
             assert_false(failed_str in content)
 
+    # And if we specify size
+    for s in [1, 2]:
+        #with swallow_outputs() as cmo:
+        downloaded_path_ = downloader.download(url, path=d, size=s, overwrite=True)
+        # should not be affected
+        assert_equal(downloaded_path, downloaded_path_)
+        with open(fpath) as f:
+            content_ = f.read()
+        assert_equal(len(content_), s)
+        assert_equal(content_, content[:s])
+
     # Fetch way
     content = downloader.fetch(url)
     if success_str is not None:
         assert_in(success_str, content)
     if failed_str is not None:
         assert_false(failed_str in content)
+
+    # And if we specify size
+    for s in [1, 2]:
+        with swallow_outputs() as cmo:
+            content_ = downloader.fetch(url, size=s)
+        assert_equal(len(content_), s)
+        assert_equal(content_, content[:s])
+
+    # Verify status
+    status = downloader.get_status(url)
+    assert_in('Last-Modified', status)
+    assert_in('Content-Length', status)
+    # TODO -- more and more specific
 
 
 @use_cassette('fixtures/vcr_cassettes/test_authenticate_external_portals.yaml', record_mode='once')
@@ -131,6 +155,20 @@ def test_authenticate_external_portals():
           "2000 1005 2000 3000"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
+
+def test_get_status_from_headers():
+    # function doesn't do any value transformation ATM
+    headers = {
+        'Content-Length': '123',
+        # some other file record - we don't test content here yet
+        'Content-Disposition': "bogus.txt",
+        'Last-Modified': 'Sat, 07 Nov 2015 05:23:36 GMT'
+    }
+    headers['bogus1'] = '123'
+    assert_equal(
+            HTTPDownloader.get_status_from_headers(headers),
+            {'Content-Length': 123, 'Content-Disposition': "bogus.txt", 'Last-Modified': 1446873816})
+    assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}), {'Content-Length': 123})
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!

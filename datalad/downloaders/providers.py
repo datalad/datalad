@@ -10,6 +10,7 @@
 """
 
 import re
+from glob import glob
 from six import iteritems
 from six.moves.urllib.parse import urlparse
 
@@ -21,7 +22,7 @@ from ..utils import auto_repr
 from ..utils import assure_list_from_str
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
-from .http import HTMLFormAuthenticator, HTTPAuthAuthenticator
+from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
 from .aws import S3Authenticator, S3Downloader
 
 from logging import getLogger
@@ -187,7 +188,9 @@ class Providers(object):
     # parameters will be fetched from config file itself
     AUTHENTICATION_TYPES = {
         'html_form': HTMLFormAuthenticator,
-        'http_auth': HTTPAuthAuthenticator,
+        'http_auth': HTTPBasicAuthAuthenticator,
+        'http_basic_auth': HTTPBasicAuthAuthenticator,
+        'http_digest_auth': HTTPDigestAuthAuthenticator,
         'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
         'xnat': NotImplementedAuthenticator,
         'none': NoneAuthenticator,
@@ -241,7 +244,7 @@ class Providers(object):
         config = SafeConfigParserWithIncludes()
         # TODO: support all those other paths
         if files is None:
-            files = [pathjoin(dirname(abspath(__file__)), 'configs', 'providers.cfg')]
+            files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
         config.read(files)
 
         # We need first to load Providers and credentials

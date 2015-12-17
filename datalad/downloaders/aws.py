@@ -27,7 +27,7 @@ from ..utils import auto_repr
 from ..utils import assure_dict_from_str
 from ..dochelpers import borrowkwargs
 from ..support.network import get_url_straight_filename
-from ..support.network import get_tld
+from ..support.network import rfc2822_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader
@@ -133,22 +133,39 @@ class S3Downloader(BaseDownloader):
             raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
         target_size = key.size  # S3 specific
+        headers = {
+            'Content-Length': key.size,
+            'Content-Disposition': key.name,
+            'Last-Modified': rfc2822_to_epoch(key.last_modified),
+        }
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
-        def download_into_fp(f=None, pbar=None):
+        def download_into_fp(f=None, pbar=None, size=None):
             # S3 specific (the rest is common with e.g. http)
             def pbar_callback(downloaded, totalsize):
                 assert(totalsize == key.size)
                 if pbar:
-                    pbar.update(downloaded)
+                    try:
+                        pbar.update(downloaded)
+                    except:
+                        pass  # do not let pbar spoil our fun
+            headers = {}
+            kwargs = dict(headers=headers, cb=pbar_callback)
+            if size:
+                headers['Range'] = 'bytes=0-%d' % (size-1)
             if f:
-                key.get_contents_to_file(f, cb=pbar_callback, num_cb=None)
+                # TODO: May be we could use If-Modified-Since
+                # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
+                key.get_contents_to_file(f, num_cb=None, **kwargs)
             else:
-                return key.get_contents_as_string(cb=pbar_callback, encoding='utf-8')
+                return key.get_contents_as_string(encoding='utf-8', **kwargs)
 
-        return download_into_fp, target_size, url_filename
+        # TODO: possibly return a "header"
+        return download_into_fp, target_size, url_filename, headers
 
 
-    def _check(self, url):
-        raise NotImplementedError("check is not yet implemented")
+    @classmethod
+    def get_status_from_headers(cls, headers):
+        # ATM 1-to-1
+        return headers

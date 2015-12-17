@@ -141,9 +141,19 @@ class ColorFormatter(logging.Formatter):
 class LoggerHelper(object):
     """Helper to establish and control a Logger"""
 
-    def __init__(self, name='datalad'):
+    def __init__(self, name='datalad', logtarget=None):
+        """
+
+        Parameters
+        ----------
+        name :
+        logtarget : string, optional
+          If we want to use our logger for other log targets, while having
+          a uniform control over them
+        """
         self.name = name
-        self.lgr = logging.getLogger(name)
+        self.logtarget = logtarget
+        self.lgr = logging.getLogger(logtarget if logtarget is not None else name)
 
     def _get_environ(self, var, default=None):
         return os.environ.get(self.name.upper() + '_%s' % var.upper(), default)

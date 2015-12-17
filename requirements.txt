@@ -18,5 +18,7 @@ requests
 # but upstream seems to be dead and fixes are not merged
 # https://github.com/niltonvolpato/python-progressbar/archive/master.zip
 https://github.com/datalad/python-progressbar/archive/master.zip
-httpretty
+#
+#httpretty >= 0.8.13 may be even more since python 3.4,5 is not supported
+https://github.com/gabrielfalcao/HTTPretty/archive/master.zip
 msgpack-python

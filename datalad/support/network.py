@@ -132,6 +132,11 @@ def get_tld(url):
             raise ValueError("It seems that only the scheme was provided without the net location/TLD")
     return rec.netloc
 
+from email.utils import parsedate_tz, mktime_tz
+def rfc2822_to_epoch(datestr):
+    """Given rfc2822 date/time format, return seconds since epoch"""
+    return mktime_tz(parsedate_tz(datestr))
+
 
 def __urlopen_requests(url, header_vals=None):
     # XXX Workaround for now for ... broken code
