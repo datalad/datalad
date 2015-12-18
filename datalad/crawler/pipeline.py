@@ -44,6 +44,7 @@ provide informative logging.
 
 import sys
 from glob import glob
+from six import iteritems
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
 
 from .newmain import lgr
@@ -129,12 +130,18 @@ def xrun_pipeline(pipeline, data=None):
     if output not in ('input',  'last-output', 'outputs', 'input+outputs'):
         raise ValueError("Unknown output=%r" % output)
 
+    log_level = lgr.getEffectiveLevel()
     data_out = None
     while data_to_process:
         _log("processing data. %d left to go", len(data_to_process))
         data_in = data_to_process.pop(0)
         try:
             for idata_out, data_out in enumerate(xrun_pipeline_steps(pipeline, data_in, output=output)):
+                if log_level <= 3:
+                        # provide details of what keys got changed
+                        # TODO: unify with 2nd place where it was invoked
+                        lgr.log(3, "O3: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data_in, data_out))
+
                 _log("got new %dth output", idata_out)
                 if opts['loop']:
                     _log("extending list of data to process due to loop option")
@@ -195,14 +202,21 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
         lgr.debug("Node: %s" % node)
         data_in_to_loop = node(data)
 
+    log_level = lgr.getEffectiveLevel()
     data_out = None
     if data_in_to_loop:
         for data_ in data_in_to_loop:
+            if log_level <= 4:
+                # provide details of what keys got changed
+                lgr.log(4, "O1: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_))
             if pipeline_tail:
                 # TODO: for heavy debugging we might want to track/report what node has changed in data
                 lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
-                lgr.log(4, " passed keys: %s", data_.keys())
+                lgr.log(5, " passed keys: %s", data_.keys())
                 for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
+                    if log_level <= 3:
+                        # provide details of what keys got changed
+                        lgr.log(3, "O2: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_out))
                     if 'outputs' in output:
                         yield data_out
             else:
@@ -214,6 +228,28 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
 
     if output == 'last-output' and data_out:
         yield data_out
+
+
+def _compare_dicts(d1, d2):
+    """Given two dictionary, return what keys were added, removed, changed or may be changed
+    """
+    added, removed, changed, maybe_changed = [], [], [], []
+    all_keys = set(d1).union(set(d2))
+    for k in all_keys:
+        if k not in d1:
+            added.append(k)
+        elif k not in d2:
+            removed.append(k)
+        else:
+            if (d1[k] is d2[k]):
+                continue
+            else:
+                try:
+                    if d1[k] != d2[k]:
+                        changed.append(k)
+                except:
+                    maybe_changed.append(k)
+    return added, changed, removed, maybe_changed
 
 
 def load_pipeline_from_script(filename, **opts):
