@@ -59,6 +59,9 @@ def check_response_status(response, err_prefix=""):
     """
     if not err_prefix:
         err_prefix = "Access to %s has failed: " % response.url
+    # 401 would be for digest authentication mechanism, or if we first ask which mechanisms are
+    # supported.... must be linked into the logic if we decide to automagically detect which
+    # mechanism or to give more sensible error message
     if response.status_code in {404}:
         # It could have been that form_url is wrong, so let's just say that
         # TODO: actually may be that is where we could use tagid and actually determine the form submission url
