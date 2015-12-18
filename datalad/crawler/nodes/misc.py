@@ -25,6 +25,7 @@ from ...utils import find_files as _find_files
 from logging import getLogger
 lgr = getLogger('datalad.crawler.nodes')
 
+@auto_repr
 class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
     """
@@ -163,6 +164,7 @@ class interrupt_if(object):
                 return
         raise FinishPipeline
 
+@auto_repr
 class range_node(object):
     """A node yielding incrementing integers in a data item (output by default)
 

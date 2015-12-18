@@ -157,7 +157,7 @@ def test_pipeline_linear_simple():
         sink
     ]
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, None)  # by default no output produced
+    eq_(pipeline_output, [{}])  # by default 'input' is output and input is made empty dict if not provided
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
                     {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}])
 
@@ -165,7 +165,7 @@ def test_pipeline_linear_simple():
     # stop at that matching point, but otherwise there should be no crash etc
     sink.clean()
     pipeline_output = run_pipeline(pipeline + [interrupt_if({'out1': 0, 'out2': 1})])
-    eq_(pipeline_output, None)  # by default no output produced
+    eq_(pipeline_output, [{}])
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}])
 
 def test_pipeline_unknown_opts():
@@ -207,7 +207,7 @@ def test_pipeline_linear_nested():
     all_pairs = [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
                  {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}]
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, None)  # by default no output produced
+    eq_(pipeline_output, [{}])
     eq_(sink.data, all_pairs)
     # and output is not seen outside of the nested pipeline
     eq_(sink2.data, [{'out1': 0}, {'out1': 1}])
@@ -218,7 +218,7 @@ def test_pipeline_linear_nested():
     pipeline[1].insert(0, {'output': 'outputs'})
 
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, None)  # by default no output produced
+    eq_(pipeline_output, [{}])  # by default no output produced
     eq_(sink.data, all_pairs)
     # and output was passed outside from the nested pipeline
     eq_(sink2.data, all_pairs)
@@ -227,7 +227,7 @@ def test_pipeline_linear_nested():
     sink2.clean()
     pipeline[1][0] = {'output': 'last-output'}
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, None)  # by default no output produced
+    eq_(pipeline_output, [{}])  # by default no output produced
     # only the last output from the nested pipeline appeared outside
     eq_(sink2.data, [{'out1': 0, 'out2': 2}, {'out1': 1, 'out2': 2}])
 
@@ -254,4 +254,16 @@ def test_pipeline_recursive():
     pipeline_output = run_pipeline(pipeline, dict(x=0))
     eq_(pipeline_output, [{'x': 1}, {'x': 2}, {'x': 3}])
 
-#def test_pipeline_recursive
+
+def test_pipeline_linear_top_isnested_pipeline():
+    # check if no generated data to reach the end node, it still gets executed
+    was_called = []
+    pipeline = [
+        # range_node(1),
+        [
+            range_node(1, "out2"),
+        ],
+        lambda d: was_called.append('yes')
+    ]
+    pipeline_output = run_pipeline(pipeline)
+    eq_(was_called, ['yes'])

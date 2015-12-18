@@ -8,12 +8,38 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Pipeline functionality.
 
-Pipeline is depicted by a simple list or tuple of nodes or other nested pipelines.
+Pipeline is represented by a simple list or tuple of nodes or other nested pipelines.
 Each pipeline node is a callable which receives a dictionary (commonly named `data`),
-does some processing and yields (once or multiple times) derived dictionary (commonly
+does some processing and yields (once or multiple times) a derived dictionary (commonly
 a shallow copy of original dict).  For a node to be parametrized it should be
 implemented as a callable (i.e. define __call__) class, which could obtain parameters
 in its constructor.
+
+TODO:  describe   PIPELINE_OPTS  and how to specify them for a give (sub-)pipeline.
+
+`data` dictionary is used primarily to carry the scraped/produced data, but besides that
+it will carry few items which some nodes might use.  All those item names will start with
+`datalad_` prefix, and will be intended for 'inplace' modifications or querying.
+Following items are planned to be provided by the pipeline runner:
+
+`datalad_settings`
+   PipelineSettings object which would could be used to provide configuration for current
+   run of the pipeline. E.g.
+
+   - dry:  either nodes are intended not to perform any changes which would reflect on disk
+   - skip_existing:
+
+`datalad_stats`
+   PipelineStats/dict object to accumulate statistics on what has been done by the nodes
+   so far
+
+To some degree, we could make an analogy of a `blood` to `data` and `venous system` to
+`pipeline`.  Blood delivers various elements, which are picked up by various parts of
+our body, whenever they know what to do with corresponding elements.  To the same degree
+nodes can consume, augment, or produce new items to the `data` and send it down the stream.
+Since there is no strict typing or specification on what nodes could consume or produce (yet)
+no verification is done and things can go utterly wrong.  So nodes must be robust and
+provide informative logging.
 """
 
 import sys
@@ -50,9 +76,26 @@ PIPELINE_OPTS = dict(
 
 
 def run_pipeline(*args, **kwargs):
-    """Run pipeline and assemble results into a list"""
+    """Run pipeline and assemble results into a list
+
+    Byt default pipeline returns only its input (see PIPELINE_OPTS),
+    so if no options for the pipeline were given to return additional
+    items, a `[{}]` will be provided as output
+    """
     output = list(xrun_pipeline(*args, **kwargs))
     return output if output else None
+
+
+def _get_pipeline_opts(pipeline):
+    """Return options and pipeline steps to be ran given the pipeline "definition"
+
+    Definition might have options as the first element
+    """
+    opts = PIPELINE_OPTS.copy()
+    if isinstance(pipeline[0], dict):
+        newopts, pipeline = (pipeline[0], pipeline[1:])
+        opts = updated(opts, newopts)
+    return opts, pipeline
 
 
 def xrun_pipeline(pipeline, data=None):
@@ -70,14 +113,11 @@ def xrun_pipeline(pipeline, data=None):
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
     data = data or {}
-    opts = PIPELINE_OPTS.copy()
     if not len(pipeline):
         return
 
     # options for this pipeline
-    if isinstance(pipeline[0], dict):
-        newopts, pipeline = (pipeline[0], pipeline[1:])
-        opts = updated(opts, newopts)
+    opts, pipeline = _get_pipeline_opts(pipeline)
 
     # verify that we know about all specified options
     unknown_opts = set(opts).difference(set(PIPELINE_OPTS))
@@ -91,7 +131,7 @@ def xrun_pipeline(pipeline, data=None):
 
     data_out = None
     while data_to_process:
-        _log("processing data. %d left to go", len(data_to_process)-1)
+        _log("processing data. %d left to go", len(data_to_process))
         data_in = data_to_process.pop(0)
         try:
             for idata_out, data_out in enumerate(xrun_pipeline_steps(pipeline, data_in, output=output)):
@@ -117,11 +157,10 @@ def xrun_pipeline(pipeline, data=None):
 
     # Input should be yielded last since otherwise it might ruin the flow for typical
     # pipelines which do not expect anything beyond going step by step
-    if ('input' in output) and data:
+    # We should yeild input data even if it was empty
+    if ('input' in output):
         _log("finally yielding input data as instructed")
         yield data
-
-
 
 
 def xrun_pipeline_steps(pipeline, data, output='input'):
@@ -147,7 +186,8 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
             data_in_to_loop = pipeline_gen
         else:
             # pipeline can return None, and in such a case
-            # just do not process its output (which is None)
+            # just do not process further, since if it completed
+            # normally, its input would have been provided back
             lgr.log(7, "Pipeline generator %s returned None", node)
             data_in_to_loop = []
     else:  # it is a "node" which should generate (or return) us an iterable to feed
@@ -200,7 +240,6 @@ def load_pipeline_from_script(filename, **opts):
                 sys.path.insert(0, path)
 
 
-
 def _find_pipeline(name):
     """Given a name for a pipeline, looks for it under common locations
     """
@@ -225,6 +264,7 @@ def _find_pipeline(name):
         lgr.log(5, "No pipeline %s under %s", name, candidate)
 
     return None
+
 
 def load_pipeline_from_template(name, opts={}):
     """Given a name, loads that pipeline from datalad.crawler.pipelines
@@ -286,6 +326,7 @@ def get_repo_pipeline_config_path(repo_path=curdir):
         if not repo_path:
             return None
     return opj(repo_path, CRAWLER_META_CONFIG_PATH)
+
 
 def get_repo_pipeline_script_path(repo_path=curdir):
     """If there is a single pipeline present among pipelines/ return path to it"""
