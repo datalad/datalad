@@ -388,7 +388,10 @@ class BaseDownloader(object):
             raise DownloadError(exc_str(e, limit=8))  # for now
 
         if cache:
-            self.cache[cache_key] = msgpack.dumps((content, headers))
+            # apparently requests' CaseInsensitiveDict is not serialazable
+            # TODO:  may be we should reuse that type everywhere, to avoid
+            # out own handling for case-handling
+            self.cache[cache_key] = msgpack.dumps((content, dict(headers)))
 
         return content, headers
 
