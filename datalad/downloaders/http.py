@@ -14,7 +14,7 @@ import re
 import requests
 import requests.auth
 
-from six.moves import StringIO
+from six import BytesIO
 
 from ..utils import assure_list_from_str, assure_dict_from_str
 from ..dochelpers import borrowkwargs
@@ -310,7 +310,8 @@ class HTTPDownloader(BaseDownloader):
             return_content = f is None
             if f is None:
                 # no file to download to
-                f = StringIO()
+                # TODO: actually strange since it should have been decoded then...
+                f = BytesIO()
 
             # must use .raw to be able avoiding decoding/decompression while downloading
             # to a file
