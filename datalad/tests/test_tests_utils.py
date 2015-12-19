@@ -422,6 +422,7 @@ def test_skip_if():
         @skip_if(True)
         def f():
             raise AssertionError("must have not been ran")
+        f()
 
     @skip_if(False)
     def f():
