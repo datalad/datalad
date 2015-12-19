@@ -17,7 +17,7 @@ from ....tests.utils import with_tree, serve_path_via_http
 from ....tests.utils import ok_file_under_git
 from ....tests.utils import ok_file_has_content
 from ...pipeline import load_pipeline_from_config
-from ....consts import CRAWLER_META_DIR
+from ....consts import CRAWLER_META_CONFIG_PATH
 
 @with_tempfile(mkdir=True)
 def test_initialize_handle(path):
@@ -26,7 +26,7 @@ def test_initialize_handle(path):
     assert_equal(len(datas), 1)
     data = datas[0]
     eq_(data['handle_path'], handle_path)
-    crawl_cfg = opj(handle_path, CRAWLER_META_DIR, 'crawl.cfg')
+    crawl_cfg = opj(handle_path, CRAWLER_META_CONFIG_PATH)
     ok_(exists, crawl_cfg)
     pipeline = load_pipeline_from_config(crawl_cfg)
     raise SkipTest("TODO much more")

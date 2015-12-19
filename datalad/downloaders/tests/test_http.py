@@ -11,10 +11,12 @@
 from os.path import join as opj
 import six.moves.builtins as __builtin__
 
+from ..base import DownloadError
 from ..http import HTTPDownloader
-from ..http import DownloadError
 from ..http import HTMLFormAuthenticator
 from ..providers import Providers, Credential  # to test against crcns
+
+from ...support.network import get_url_straight_filename
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 import httpretty
@@ -26,9 +28,15 @@ from ...tests.utils import assert_raises
 from ...tests.utils import ok_file_has_content
 from ...tests.utils import serve_path_via_http, with_tree
 from ...tests.utils import swallow_logs
+from ...tests.utils import swallow_outputs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import SkipTest
+from ...tests.utils import skip_httpretty_on_problematic_pythons
+
+def test_docstring():
+    doc = HTTPDownloader.__init__.__doc__
+    assert_in("\ncredential: Credential", doc)
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
@@ -58,6 +66,9 @@ def test_HTTPDownloader_basic(toppath, topurl):
     download(furl, tfpath)
     ok_file_has_content(tfpath, 'abc')
 
+    # see if fetch works correctly
+    assert_equal(downloader.fetch(furl), 'abc')
+
     # By default should not overwrite the file
     assert_raises(DownloadError, download, furl, tfpath)
     # but be able to redownload whenever overwrite==True
@@ -76,35 +87,88 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # TODO: access denied detection
 
 
+_test_providers = None
+
+@with_tempfile(mkdir=True)
+def check_download_external_url(url, failed_str, success_str, d):
+    global _test_providers
+    fpath = opj(d, get_url_straight_filename(url))
+    if not _test_providers:
+        _test_providers = Providers.from_config_files()
+    provider = _test_providers.get_provider(url)
+    if not provider.credential.is_known:
+        raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
+    downloader = provider.get_downloader(url)
+
+    # Download way
+    with swallow_outputs() as cmo:
+        downloaded_path = downloader.download(url, path=d)
+    assert_equal(fpath, downloaded_path)
+    with open(fpath) as f:
+        content = f.read()
+        if success_str is not None:
+            assert_in(success_str, content)
+        if failed_str is not None:
+            assert_false(failed_str in content)
+
+    # And if we specify size
+    for s in [1, 2]:
+        #with swallow_outputs() as cmo:
+        downloaded_path_ = downloader.download(url, path=d, size=s, overwrite=True)
+        # should not be affected
+        assert_equal(downloaded_path, downloaded_path_)
+        with open(fpath) as f:
+            content_ = f.read()
+        assert_equal(len(content_), s)
+        assert_equal(content_, content[:s])
+
+    # Fetch way
+    content = downloader.fetch(url)
+    if success_str is not None:
+        assert_in(success_str, content)
+    if failed_str is not None:
+        assert_false(failed_str in content)
+
+    # And if we specify size
+    for s in [1, 2]:
+        with swallow_outputs() as cmo:
+            content_ = downloader.fetch(url, size=s)
+        assert_equal(len(content_), s)
+        assert_equal(content_, content[:s])
+
+    # Verify status
+    status = downloader.get_status(url)
+    assert_in('Last-Modified', status)
+    assert_in('Content-Length', status)
+    # TODO -- more and more specific
+
 
 @use_cassette('fixtures/vcr_cassettes/test_authenticate_external_portals.yaml', record_mode='once')
 def test_authenticate_external_portals():
-
-    providers = Providers.from_config_files()
-
-    @with_tempfile(mkdir=True)
-    def check_authenticate_external_portals(url, failed_str, success_str, d):
-        fpath = opj(d, url.split('/')[-1])
-        provider = providers.get_provider(url)
-        if not provider.credential.is_known:
-            raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
-        downloader = provider.get_downloader(url)
-        downloader.download(url, path=d)
-        with open(fpath) as f:
-            content = f.read()
-            assert_false(failed_str in content)
-            assert_in(success_str, content)
-
-    yield check_authenticate_external_portals, \
+    yield check_download_external_url, \
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
           "<form action=", \
           "datafiles/meta_data_files.tar.gz"
-    yield check_authenticate_external_portals, \
+    yield check_download_external_url, \
           'https://db.humanconnectome.org/data/archive/projects/HCP_500/subjects/100307/experiments/100307_CREST/resources/100307_CREST/files/unprocessed/3T/Diffusion/100307_3T_DWI_dir97_LR.bval', \
           "failed", \
           "2000 1005 2000 3000"
-test_authenticate_external_portals.tags = ['external-portal']
+test_authenticate_external_portals.tags = ['external-portal', 'network']
 
+
+def test_get_status_from_headers():
+    # function doesn't do any value transformation ATM
+    headers = {
+        'Content-Length': '123',
+        # some other file record - we don't test content here yet
+        'Content-Disposition': "bogus.txt",
+        'Last-Modified': 'Sat, 07 Nov 2015 05:23:36 GMT'
+    }
+    headers['bogus1'] = '123'
+    assert_equal(
+            HTTPDownloader.get_status_from_headers(headers),
+            {'Content-Length': 123, 'Content-Disposition': "bogus.txt", 'Last-Modified': 1446873816})
+    assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}), {'Content-Length': 123})
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
@@ -123,6 +187,7 @@ class FakeCredential1(Credential):
         # pop last used credential, so we would use "new" ones
         del self._fixed_credentials[0]
 
+@skip_httpretty_on_problematic_pythons
 @httpretty.activate
 @with_tempfile(mkdir=True)
 def test_HTMLFormAuthenticator_httpretty(d):

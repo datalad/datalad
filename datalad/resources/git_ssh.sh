@@ -1,4 +1,9 @@
 #!/bin/sh
+
+set -e
+set -u
+
+echo Running "$@"
 if test "$1" = "-p"
 then
 	PORT=:$2

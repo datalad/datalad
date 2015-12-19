@@ -9,17 +9,21 @@
 """Provide access to stuff (html, data files) via HTTP and HTTPS
 
 """
-
+import functools
 import re
 import requests
-import os
-from os.path import exists, join as opj, isdir
+import requests.auth
+
+from six.moves import StringIO
 
 from ..utils import assure_list_from_str, assure_dict_from_str
+from ..dochelpers import borrowkwargs
 
 from ..ui import ui
 from ..utils import auto_repr
+from ..dochelpers import exc_str
 from ..support.network import get_url_filename
+from ..support.network import rfc2822_to_epoch
 from ..support.cookies import cookies_db
 
 from .base import Authenticator
@@ -27,9 +31,26 @@ from .base import BaseDownloader
 from .base import DownloadError, AccessDeniedError
 
 from logging import getLogger
+from ..log import LoggerHelper
 lgr = getLogger('datalad.http')
 
+if lgr.getEffectiveLevel() < 10:
+    # Let's also enable requests etc debugging
+
+    # These two lines enable debugging at httplib level (requests->urllib3->http.client)
+    # You will see the REQUEST, including HEADERS and DATA, and RESPONSE with HEADERS but without DATA.
+    # The only thing missing will be the response.body which is not logged.
+    from six.moves import http_client
+    # TODO: nohow wrapped with logging, plain prints (heh heh), so formatting will not be consistent
+    http_client.HTTPConnection.debuglevel = 1
+
+    # for requests we can define logging properly
+    requests_log = LoggerHelper(logtarget="requests.packages.urllib3").get_initialized_logger()
+    requests_log.setLevel(lgr.getEffectiveLevel())
+    requests_log.propagate = True
+
 __docformat__ = 'restructuredtext'
+
 
 def check_response_status(response, err_prefix=""):
     """Check if response's status_code signals problem with authentication etc
@@ -38,6 +59,9 @@ def check_response_status(response, err_prefix=""):
     """
     if not err_prefix:
         err_prefix = "Access to %s has failed: " % response.url
+    # 401 would be for digest authentication mechanism, or if we first ask which mechanisms are
+    # supported.... must be linked into the logic if we decide to automagically detect which
+    # mechanism or to give more sensible error message
     if response.status_code in {404}:
         # It could have been that form_url is wrong, so let's just say that
         # TODO: actually may be that is where we could use tagid and actually determine the form submission url
@@ -74,10 +98,16 @@ class HTTPBaseAuthenticator(Authenticator):
 
     def authenticate(self, url, credential, session, update=False):
         # we should use specified URL for this authentication first
-        lgr.debug("http session: Authenticating into session for %s" % url)
+        lgr.info("http session: Authenticating into session for %s", url)
         post_url = self.url if self.url else url
         credentials = credential()
 
+        # TODO: With digestauth there is no POST strictly necessary.
+        # The whole thing relies on server first spitting out 401
+        # and client GETing again with 'Authentication:' header
+        # So we need custom handling for those, while keeping track not
+        # of cookies per se, but of 'Authentication:' header which is
+        # to be used in subsequent GETs
         response = self._post_credential(credentials, post_url, session)
 
         err_prefix = "Authentication to %s failed: " % post_url
@@ -169,31 +199,52 @@ class HTMLFormAuthenticator(HTTPBaseAuthenticator):
 
 
 @auto_repr
-class HTTPAuthAuthenticator(HTTPBaseAuthenticator):
-    """Authenticate by opening a session via POSTing authentication data via HTTP
+class HTTPRequestsAuthenticator(HTTPBaseAuthenticator):
+    """Base class for various authenticators using requests pre-crafted ones
     """
 
+    REQUESTS_AUTHENTICATOR = None
+
     def __init__(self, **kwargs):
-        """
-
-        Example specification in the .ini config file
-        [provider:hcp-db]
-        ...
-        credential = hcp-db ; is not given to authenticator as is
-        authentication_type = http_auth
-        http_auth_url = .... TODO
-
-        Parameters
-        ----------
-        **kwargs : dict, optional
-          Passed to super class HTTPBaseAuthenticator
-        """
         # so we have __init__ solely for a custom docstring
-        super(HTTPAuthAuthenticator, self).__init__(**kwargs)
+        super(HTTPRequestsAuthenticator, self).__init__(**kwargs)
 
     def _post_credential(self, credentials, post_url, session):
-        response = session.post(post_url, data={}, auth=(credentials['user'], credentials['password']))
+        response = session.post(post_url, data={},
+                                auth=self.REQUESTS_AUTHENTICATOR(credentials['user'], credentials['password']))
         return response
+
+
+@auto_repr
+class HTTPBasicAuthAuthenticator(HTTPRequestsAuthenticator):
+    """Authenticate via basic HTTP authentication
+
+    Example specification in the .ini config file
+    [provider:hcp-db]
+    ...
+    credential = hcp-db
+    authentication_type = http_auth
+    http_auth_url = .... TODO
+
+    Parameters
+    ----------
+    **kwargs : dict, optional
+      Passed to super class HTTPBaseAuthenticator
+    """
+
+    REQUESTS_AUTHENTICATOR = requests.auth.HTTPBasicAuth
+
+
+@auto_repr
+class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
+    """Authenticate via HTTP digest authentication
+    """
+
+    REQUESTS_AUTHENTICATOR = requests.auth.HTTPDigestAuth
+
+    def _post_credential(self, *args, **kwargs):
+        raise NotImplementedError("not yet functioning, see https://github.com/kennethreitz/requests/issues/2934")
+
 
 
 @auto_repr
@@ -201,22 +252,9 @@ class HTTPDownloader(BaseDownloader):
     """A stateful downloader to maintain a session to the website
     """
 
-    def __init__(self, credential=None, authenticator=None):
-        """
-
-        Parameters
-        ----------
-        TODO
-        """
-        self.credential = credential
-        self.authenticator = authenticator
-
-        if self.authenticator:
-            if not self.credential:
-                raise ValueError(
-                    "Both authenticator and credentials must be provided."
-                    " Got only authenticator %s" % repr(authenticator))
-
+    @borrowkwargs(BaseDownloader)
+    def __init__(self, **kwargs):
+        super(HTTPDownloader, self).__init__(**kwargs)
         self._session = None
 
     def _establish_session(self, url, allow_old=True):
@@ -252,107 +290,73 @@ class HTTPDownloader(BaseDownloader):
 
         return False
 
-
-    def _download(self, url, path=None, overwrite=False):
-        """
-
-        Parameters
-        ----------
-        url: str
-          URL to download
-        path: str, optional
-          Path to file where to store the downloaded content.  If None, downloaded
-          content provided back in the return value (not decoded???)
-
-        Returns
-        -------
-        None or bytes
-
-        """
-
+    def _get_download_details(self, url, chunk_size=1024**2):
+        # TODO: possibly make chunk size adaptive
         response = self._session.get(url, stream=True)
         check_response_status(response)
-
         headers = response.headers
+        target_size = int(headers.get('Content-Length', '0').strip()) or None
+        # Consult about filename.  Since we already have headers,
+        # should not result in an additional request
+        url_filename = get_url_filename(url, headers=headers)
 
-        #### Specific to download
-        # Consult about filename
-        if path:
-            if isdir(path):
-                # provided path is a directory under which to save
-                filename = get_url_filename(url, headers=headers)
-                filepath = opj(path, filename)
-            else:
-                filepath = path
-        else:
-            filepath = get_url_filename(url, headers=headers)
+        def _downloader(f=None, pbar=None, size=None):
+            total = 0
+            return_content = f is None
+            if f is None:
+                # no file to download to
+                f = StringIO()
 
-        if exists(filepath) and not overwrite:
-            raise DownloadError("File %s already exists" % filepath)
+            # must use .raw to be able avoiding decoding/decompression while downloading
+            # to a file
+            chunk_size_ = min(chunk_size, size) if size is not None else chunk_size
+            for chunk in response.raw.stream(chunk_size_, decode_content=return_content):
+                if chunk:  # filter out keep-alive new chunks
+                    chunk_len = len(chunk)
+                    if size is not None and total + chunk_len > size:
+                        # trim the download to match target size
+                        chunk = chunk[:size - total]
+                        chunk_len = len(chunk)
+                    total += chunk_len
+                    f.write(chunk)
+                    try:
+                        # TODO: pbar is not robust ATM against > 100% performance ;)
+                        if pbar:
+                            pbar.update(total)
+                    except Exception as e:
+                        lgr.warning("Failed to update progressbar: %s" % exc_str(e))
+                    # TEMP
+                    # see https://github.com/niltonvolpato/python-progressbar/pull/44
+                    ui.out.flush()
+                    if size is not None and total >= size:
+                        break  # we have done as much as we were asked
+            if return_content:
+                return f.getvalue()
 
-        # FETCH CONTENT
-        # TODO: pbar = ui.get_progressbar(size=response.headers['size'])
-        # TODO: logic to fetch into a nearby temp file, move into target
-        #     reason: detect aborted downloads etc
-        try:
-            temp_filepath = self._get_temp_download_filename(filepath)
-            if exists(temp_filepath):
-                # eventually we might want to continue the download
-                lgr.warning(
-                    "Temporary file %s from the previous download was found. "
-                    "It will be overriden" % temp_filepath)
-                # TODO.  also logic below would clean it up atm
-
-            target_size = int(headers.get('Content-Length', '0').strip()) or None
-            with open(temp_filepath, 'wb') as f:
-                # TODO: url might be a bit too long for the beast.
-                # Consider to improve to make it animated as well, or shorten here
-                pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-                total = 0
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:  # filter out keep-alive new chunks
-                        total += len(chunk)
-                        f.write(chunk)
-                        pbar.update(total)
-                        # TEMP
-                        # see https://github.com/niltonvolpato/python-progressbar/pull/44
-                        ui.out.flush()
-                pbar.finish()
-            downloaded_size = os.stat(temp_filepath).st_size
-
-            if (headers.get('Content-type', "") or headers.get('Content-Type', "")).startswith('text/html') \
-                    and downloaded_size < 10000 \
-                    and self.authenticator:  # and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
-                # TODO: Common logic for any downloader whenever no proper failure code is thrown etc
-                with open(temp_filepath) as f:
-                    self.authenticator.check_for_auth_failure(
-                        f.read(), "Download of file %s has failed: " % filepath)
-
-            if target_size and target_size != downloaded_size:
-                lgr.error("Downloaded file size %d differs from originally announced %d",
-                          downloaded_size, target_size)
-
-            # place successfully downloaded over the filepath
-            os.rename(temp_filepath, filepath)
-        except AccessDeniedError as e:
-            raise
-        except Exception as e:
-            lgr.error("Failed to download {url} into {filepath}: {e}".format(
-                **locals()
-            ))
-            raise DownloadError  # for now
-        finally:
-            if exists(temp_filepath):
-                # clean up
-                lgr.debug("Removing a temporary download %s", temp_filepath)
-                os.unlink(temp_filepath)
+        return _downloader, target_size, url_filename, headers
 
 
-        # TODO: adjust ctime/mtime according to headers
-        # TODO: not hardcoded size, and probably we should check header
-
-        return filepath
-
-    def _check(self, url):
-        raise NotImplementedError("check is not yet implemented")
+    @classmethod
+    def get_status_from_headers(cls, headers):
+        """Given HTTP headers, return 'status' record to assess later if link content was changed
+        """
+        # used for quick checks for HTTP or S3?
+        # TODO:  So we will base all statuses on this set? e.g. for Last-Modified if to be
+        # mapping from field to its type converter
+        HTTP_HEADERS_TO_STATUS = {
+            'Content-Length': int,
+            'Content-Disposition': str,
+            'Last-Modified': rfc2822_to_epoch
+        }
+        # Allow for webserver to return them in other casing
+        HTTP_HEADERS_TO_STATUS_lower = {s.lower(): (s, t) for s, t in HTTP_HEADERS_TO_STATUS.items()}
+        status = {}
+        if headers:
+            for header_key in headers:
+                try:
+                    k, t = HTTP_HEADERS_TO_STATUS_lower[header_key.lower()]
+                except KeyError:
+                    continue
+                status[k] = t(headers[header_key])
+        return status
 

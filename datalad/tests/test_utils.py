@@ -17,6 +17,7 @@ import logging
 from mock import patch
 from six import PY3
 
+from os.path import dirname, normpath, pardir, basename
 from collections import OrderedDict
 
 from ..utils import updated
@@ -26,6 +27,7 @@ from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, 
 from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
+from ..utils import find_files
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
@@ -33,6 +35,10 @@ from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
+from .utils import ok_generator
+from .utils import assert_not_in
+from .utils import ok_startswith
+
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -251,3 +257,50 @@ def test_assure_dict_from_str():
     assert_equal(assure_dict_from_str(
         dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+
+
+def test_find_files():
+    tests_dir = dirname(__file__)
+    proj_dir = normpath(opj(dirname(__file__), pardir))
+
+    ff = find_files('.*', proj_dir)
+    ok_generator(ff)
+    files = list(ff)
+    assert(len(files) > 10)  # we have more than 10 test files here
+    assert_in(opj(tests_dir, 'test_utils.py'), files)
+    # and no directories should be mentioned
+    assert_not_in(tests_dir, files)
+
+    ff2 = find_files('.*', proj_dir, dirs=True)
+    files2 = list(ff2)
+    assert_in(opj(tests_dir, 'test_utils.py'), files2)
+    assert_in(tests_dir, files2)
+
+    # now actually matching the path
+    ff3 = find_files('.*/test_.*\.py$', proj_dir, dirs=True)
+    files3 = list(ff3)
+    assert_in(opj(tests_dir, 'test_utils.py'), files3)
+    assert_not_in(tests_dir, files3)
+    for f in files3:
+        ok_startswith(basename(f), 'test_')
+
+from .utils import with_tree
+@with_tree(tree={
+    '.git': {
+        '1': '2'
+    },
+    'd1': {
+        '.git': 'possibly a link from submodule'
+    },
+    'git': 'just a file'
+})
+def test_find_files_exclude_vcs(repo):
+    ff = find_files('.*', repo, dirs=True)
+    files = list(ff)
+    assert_equal({basename(f) for f in files}, {'d1', 'git'})
+    assert_not_in(opj(repo, '.git'), files)
+
+    ff = find_files('.*', repo, dirs=True, exclude_vcs=False)
+    files = list(ff)
+    assert_equal({basename(f) for f in files}, {'d1', 'git', '.git', '1'})
+    assert_in(opj(repo, '.git'), files)

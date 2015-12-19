@@ -10,7 +10,7 @@
 import inspect
 from nose import SkipTest
 from ..matches import *
-from datalad.tests.utils import ok_, eq_
+from datalad.tests.utils import ok_, eq_, assert_raises
 
 try:
     import scrapy
@@ -35,9 +35,11 @@ class sample1:
 
 
 def _test_match_basic(matcher, query):
-    m = matcher(query,
-                xpaths={'text': 'text()'},
-                csss={'favorite': '.class1::text'})
+    extracts = dict(
+        xpaths={'text': 'text()'},
+        csss={'favorite': '.class1::text'}
+    )
+    m = matcher(query, **extracts)
 
     mg = m(dict(response="<div></div>"))
     ok_(inspect.isgenerator(mg))
@@ -53,6 +55,17 @@ def _test_match_basic(matcher, query):
         eq_(hit['match'], a_html)
         eq_(hit['text'], a_text)
         eq_(hit.get('favorite', None), class1_text)
+
+    m = matcher(query, min_count=4, **extracts)
+    mg = m(dict(response=sample1.response))
+    ok_(inspect.isgenerator(mg))
+    assert_raises(ValueError, list, mg)
+
+    m = matcher(query, max_count=2, **extracts)
+    mg = m(dict(response=sample1.response))
+    ok_(inspect.isgenerator(mg))
+    assert_raises(ValueError, list, mg)
+
 
 def test_match_basic():
     yield _test_match_basic, xpath_match, '//a'

@@ -10,6 +10,7 @@
 """
 
 import re
+from glob import glob
 from six import iteritems
 from six.moves.urllib.parse import urlparse
 
@@ -21,7 +22,8 @@ from ..utils import auto_repr
 from ..utils import assure_list_from_str
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
-from .http import HTMLFormAuthenticator, HTTPAuthAuthenticator
+from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
+from .aws import S3Authenticator, S3Downloader
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')
@@ -57,14 +59,18 @@ class Credential(object):
         self.type = type
         self.url = url
 
+    def _ask_field_value(self, f):
+        return ui.question(f,
+                           title="You need to authenticate with %r credentials." % self.name
+                                 + " %s provides information on how to gain access"
+                                   % self.url if self.url else '',
+                           hidden=True)
     # TODO: I guess it, or subclasses depending on the type
     def enter_new(self):
         # Use ui., request credential fields corresponding to the type
         # TODO: this is duplication with __call__
         for f in self.TYPES[self.type]:
-            v = ui.question("Please enter the %s field" % f,
-                            title="Authentication necessary for %s" % self.name,
-                            hidden=True)
+            v = self._ask_field_value(f)
             keyring.set_password(self.uid, f, v)
         pass
 
@@ -85,9 +91,7 @@ class Credential(object):
         for f in self.TYPES[self.type]:
             v = keyring.get_password(uid, f)
             while v is None:  # was not known
-                v = ui.question("Please enter the %s field" % f,
-                                title="Authentication necessary for %s" % self.name,
-                                hidden=True)
+                v = self._ask_field_value(f)
             keyring.set_password(uid, f, v)
             credentials[f] = v
 
@@ -107,6 +111,7 @@ class Provider(object):
     # specific downloaders while importing needed Python modules "on demand"
     DOWNLOADERS = {'http': HTTPDownloader,
                    'https': HTTPDownloader,
+                   's3': S3Downloader,
                     # ... TODO
                   }
 
@@ -183,8 +188,10 @@ class Providers(object):
     # parameters will be fetched from config file itself
     AUTHENTICATION_TYPES = {
         'html_form': HTMLFormAuthenticator,
-        'http_auth': HTTPAuthAuthenticator,
-        'aws-s3': NotImplementedAuthenticator,  # TODO: check if having '-' is kosher
+        'http_auth': HTTPBasicAuthAuthenticator,
+        'http_basic_auth': HTTPBasicAuthAuthenticator,
+        'http_digest_auth': HTTPDigestAuthAuthenticator,
+        'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
         'xnat': NotImplementedAuthenticator,
         'none': NoneAuthenticator,
     }
@@ -193,6 +200,8 @@ class Providers(object):
         'user_password',
         'aws-s3'
     }
+
+    _DEFAULT_PROVIDERS = None
 
     def __init__(self, providers=None):
         """
@@ -215,7 +224,7 @@ class Providers(object):
         return self._providers.__iter__()
 
     @classmethod
-    def from_config_files(cls, files=None):
+    def from_config_files(cls, files=None, reload=False):
         """Would load information about related/possible websites requiring authentication from
 
         - codebase (for now) datalad/downloaders/configs/providers.cfg
@@ -224,11 +233,18 @@ class Providers(object):
         - system-wide datalad installation/config /etc/datalad/providers/
 
         For sample configs look into datalad/downloaders/configs/providers.cfg
+
+        If files is None, loading is "lazy".  Specify reload=True to force
+        reload
         """
+        # lazy part
+        if files is None and cls._DEFAULT_PROVIDERS and not reload:
+            return cls._DEFAULT_PROVIDERS
+
         config = SafeConfigParserWithIncludes()
         # TODO: support all those other paths
         if files is None:
-            files = [pathjoin(dirname(abspath(__file__)), 'configs', 'providers.cfg')]
+            files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
         config.read(files)
 
         # We need first to load Providers and credentials
@@ -258,7 +274,15 @@ class Providers(object):
                                      % (provider.credential, ", ".join(credentials.keys())))
                 provider.credential = credentials[provider.credential]
 
-        return Providers(list(providers.values()))
+        providers = Providers(list(providers.values()))
+
+        if files is None:
+            # Store providers for lazy access
+            cls._DEFAULT_PROVIDERS = providers
+
+        return providers
+
+
 
 
     @classmethod
@@ -330,9 +354,14 @@ class Providers(object):
         lgr.debug("No dedicated provider, returning default one for %s" % scheme)
         return self._default_providers[scheme]
 
+    # TODO: avoid duplication somehow ;)
     # Sugarings to get easier access to downloaders
     def download(self, url, *args, **kwargs):
         return self.get_provider(url).get_downloader(url).download(url, *args, **kwargs)
+
+    def fetch(self, url, *args, **kwargs):
+        return self.get_provider(url).get_downloader(url).fetch(url, *args, **kwargs)
+
 
     def needs_authentication(self, url):
         provider = self.get_provider(url, only_nondefault=True)

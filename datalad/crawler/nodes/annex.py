@@ -12,7 +12,8 @@
 from os.path import expanduser, join as opj, exists
 from os import unlink, makedirs
 
-from ...consts import CRAWLER_META_DIR
+from ...api import add_archive_content
+from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 
 from ...downloaders.providers import Providers
@@ -87,7 +88,7 @@ class initiate_handle(object):
             lgr.log(1, "Creating %s", crawl_config_dir)
             makedirs(crawl_config_dir)
 
-        crawl_config = opj(crawl_config_dir, 'crawl.cfg')
+        crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
         cfg = SafeConfigParserWithIncludes()
         cfg.add_section(CRAWLER_PIPELINE_SECTION)
         def secset(k, v):
@@ -336,6 +337,33 @@ class Annexificator(object):
         if msg is not None:
             options += " -m %r" % msg
         self.repo.cmd_call_wrapper.run("git commit %s" % options)
+
+
+    #TODO: @borrow_kwargs from api_add_...
+    def add_archive_content(self, **aac_kwargs):
+        """
+
+        Parameters
+        ----------
+        aac_kwargs: dict, optional
+           Options to pass into api.add_archive_content
+        """
+        def _add_archive_content(data):
+            archive = data['path']
+            # TODO: may be adjust annex_options
+            annex = add_archive_content(
+                archive, annex=self.repo,
+                delete=True, key=False, commit=False, allow_dirty=True,
+                annex_options=self.options,
+                **aac_kwargs
+            )
+            assert(annex is self.repo)   # must be the same annex, and no new created
+            # TODO: how to propagate statistics from this call into commit msg
+            #       since we commit=False here
+            # Probably we should carry though 'data' somehow so it gets accumulated
+            # until commit...?
+            yield data
+        return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
     def finalize(self, data):

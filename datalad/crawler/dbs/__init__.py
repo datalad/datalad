@@ -6,5 +6,9 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Module containing pre-crafted pipeline generators for crawling
+"""DB support for the crawler
+
 """
+
+__docformat__ = 'restructuredtext'
+

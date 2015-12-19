@@ -8,7 +8,10 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+import re
 import six.moves.builtins as __builtin__
+
+from os.path import curdir
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
 import logging
@@ -96,6 +99,39 @@ def sorted_files(dout):
     return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
                        for r,d,files in os.walk(dout)
                        if not '.git' in r], []))
+
+from os.path import sep as dirsep
+_VCS_REGEX = '%s\.(git|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+    """Generator to find files matching regex
+
+    Parameters
+    ----------
+    regex: basestring
+    exclude: basestring, optional
+      Matches to exclude
+    exclude_vcs:
+      If True, excludes commonly known VCS subdirectories.  If string, used
+      as regex to exclude those files (regex: %r)
+    topdir: basestring, optional
+      Directory where to search
+    dirs: bool, optional
+      Either to match directories as well as files
+    """ % _VCS_REGEX
+
+    for dirpath, dirnames, filenames in os.walk(topdir):
+        names = (dirnames + filenames) if dirs else filenames
+        # TODO: might want to uniformize on windows to use '/'
+        paths = (opj(dirpath, name) for name in names)
+        for path in filter(re.compile(regex).search, paths):
+            path = path.rstrip(dirsep)
+            if exclude and re.search(exclude, path):
+                continue
+            if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            yield path
+
 
 #### windows workaround ###
 # TODO: There should be a better way
@@ -201,7 +237,7 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s" % f)
 
 
-def assure_list_from_str(s):
+def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
     Parameters
@@ -214,10 +250,10 @@ def assure_list_from_str(s):
 
     if isinstance(s, list):
         return s
-    return s.split('\n')
+    return s.split(sep)
 
 
-def assure_dict_from_str(s):
+def assure_dict_from_str(s, **kwargs):
     """Given a multiline string with key=value items convert it to a dictionary
 
     Parameters
@@ -234,7 +270,7 @@ def assure_dict_from_str(s):
         return s
 
     out = {}
-    for value_str in assure_list_from_str(s):
+    for value_str in assure_list_from_str(s, **kwargs):
         if '=' not in value_str:
             raise ValueError("{} is not in key=value format".format(repr(value_str)))
         k, v = value_str.split('=', 1)

@@ -33,7 +33,7 @@ from os.path import exists, realpath, join as opj, pardir, split as pathsplit, c
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
-    assert_in, assert_in as in_, \
+    assert_in, assert_not_in, assert_in as in_, \
     raises, ok_, eq_, make_decorator
 
 from nose import SkipTest
@@ -112,9 +112,12 @@ def create_tree(path, tree):
     if not exists(path):
         os.makedirs(path)
 
+    if isinstance(tree, dict):
+        tree = tree.items()
+
     for name, load in tree:
         full_name = opj(path, name)
-        if isinstance(load, tuple):
+        if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz'):
                 create_tree_archive(path, name, load)
             else:
@@ -579,7 +582,7 @@ def _get_testrepos_uris(regex, flavors):
 
 
 @optional_args
-def with_testrepos(t, regex='.*', flavors='auto', skip=False):
+def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     """Decorator to provide a local/remote test repository
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
@@ -599,6 +602,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
       first clone from the network location. 'auto' would include the list of
       appropriate ones (e.g., no 'network*' flavors if network tests are
       "forbidden").
+    count: int, optional
+      If specified, only up to that number of repositories to test with
 
     Examples
     --------
@@ -623,7 +628,11 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
+        ntested = 0
         for uri in testrepos_uris:
+            if count and ntested >= count:
+                break
+            ntested += 1
             if __debug__:
                 lgr.debug('Running %s on %s' % (t.__name__, uri))
             try:
@@ -656,6 +665,14 @@ def skip_if_on_windows(func):
             raise SkipTest("Skipping on Windows")
         return func(*args, **kwargs)
     return newfunc
+
+@optional_args
+def skip_if(func, cond=True, msg=None):
+    """Skip test completely under Windows
+    """
+    if cond:
+        raise SkipTest(msg if msg else "condition was True")
+    return func
 
 
 @optional_args
@@ -756,6 +773,24 @@ def ignore_nose_capturing_stdout(func):
             else:
                 raise
     return newfunc
+
+def skip_httpretty_on_problematic_pythons(func):
+    """As discovered some httpretty bug causes a side-effect
+    on other tests on some Pythons.  So we skip the test if such
+    problematic combination detected
+
+    References
+    https://travis-ci.org/datalad/datalad/jobs/94464988
+    http://stackoverflow.com/a/29603206/1265472
+    """
+
+    @make_decorator(func)
+    def newfunc(*args, **kwargs):
+        if sys.version_info[:3] == (3, 4, 2):
+            raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
+        return func(*args, **kwargs)
+    return newfunc
+
 
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure

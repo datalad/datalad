@@ -6,5 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Module containing pre-crafted pipeline generators for crawling
-"""
+"""Tests for downloaders base"""
+
+def test_docstring():
+    pass
