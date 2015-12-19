@@ -19,7 +19,8 @@ from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.collectionrepo import CollectionRepo
-from datalad.support.handlerepo import HandleRepo, HandleRepoBackend
+from datalad.support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend
 from datalad.support.handle import Handle
 from datalad.cmdline.helpers import get_datalad_master
 
@@ -64,4 +65,5 @@ class CreateHandle(Interface):
         # TODO: get metadata, in case there is some already.
         # This implicates the option to use create-handle on an existing annex.
 
-        return Handle(HandleRepoBackend(new_handle))
+        if not self.cmdline:
+            return HandleRepoBackend(new_handle)

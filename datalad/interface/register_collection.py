@@ -20,8 +20,8 @@ import re
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from datalad.support.collection import Collection
 from datalad.cmd import CommandError
 from datalad.log import lgr
@@ -124,5 +124,5 @@ class RegisterCollection(Interface):
         local_master.git_remote_add(name, url)
         local_master.git_fetch(name)
 
-        return Collection(CollectionRepoBackend(local_master,
-                                                name + "/master"))
+        if not self.cmdline:
+            return CollectionRepoBackend(local_master, name + "/master")

@@ -228,8 +228,14 @@ from datalad.consts import DATALAD_COLLECTION_NAME
 
 dirs = AppDirs("datalad", "datalad.org")
 def get_datalad_master():
-    return CollectionRepo(opj(dirs.user_data_dir, DATALAD_COLLECTION_NAME),
-                          create=True)
+    """Return "master" collection on which all collection operations will be done
+    """
+    # Allow to have "master" collection be specified by environment variable
+    env_path = os.environ.get('DATALAD_COLLECTION_PATH', None)
+    return CollectionRepo(
+        env_path or opj(dirs.user_data_dir, DATALAD_COLLECTION_NAME),
+        create=True
+    )
 
 
 # Notes:

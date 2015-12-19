@@ -108,7 +108,7 @@ def setup_parser():
         cmd_short_descriptions = []
 
         for _intfcls in _interfaces:
-            _intf = _intfcls()
+            _intf = _intfcls(cmdline=True)
 
             cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
             # deal with optional parser args
@@ -170,13 +170,14 @@ def setup_parser():
     return parser
 
 
-def generate_api_call(cmdlineargs=None):
-    parser = setup_parser()
-    # parse cmd args
-    cmdlineargs = parser.parse_args(cmdlineargs)
-    # convert cmdline args into API call spec
-    functor, args, kwargs = cmdlineargs.func(cmdlineargs)
-    return cmdlineargs, functor, args, kwargs
+# yoh: arn't used
+# def generate_api_call(cmdlineargs=None):
+#     parser = setup_parser()
+#     # parse cmd args
+#     cmdlineargs = parser.parse_args(cmdlineargs)
+#     # convert cmdline args into API call spec
+#     functor, args, kwargs = cmdlineargs.func(cmdlineargs)
+#     return cmdlineargs, functor, args, kwargs
 
 
 def main(cmdlineargs=None):

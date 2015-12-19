@@ -24,7 +24,9 @@ from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
 from ...cmdline.helpers import get_repo_instance, get_datalad_master
 from ...support.handle import Handle
 from ...support.handlerepo import HandleRepo
-from ...support.collectionrepo import CollectionRepo, Collection, CollectionRepoBackend
+from ...support.collectionrepo import CollectionRepo
+from datalad.support.collection import Collection
+from datalad.support.collection_backends import CollectionRepoBackend
 from ...consts import REPO_CONFIG_FILE, REPO_STD_META_FILE
 
 
@@ -50,7 +52,7 @@ def test_add_handle_by_paths(hurl, hpath, cpath, lcpath):
         return_value = add_handle(hpath, cpath)
 
         # now handle is listed by collection:
-        collection._reload()
+        collection.reload()
         assert_in(handle.name, collection)
 
         # test collection repo:
@@ -89,7 +91,7 @@ def test_add_handle_by_names(hurl, hpath, cpath, lcpath):
         return_value = add_handle(handle.name, collection.name)
 
         # now handle is listed by collection:
-        collection._reload()
+        collection.reload()
         assert_in(handle.name, collection)
 
         # test collection repo:

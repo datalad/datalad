@@ -17,9 +17,11 @@ from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend, \
     CollectionRepoHandleBackend
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
 from ..support.handle import Handle
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -86,4 +88,5 @@ class UpgradeHandle(Interface):
             # upgrade content:
             repo.get(files_to_upgrade)
 
-        return Handle(HandleRepoBackend(repo))
+        if not self.cmdline:
+            return HandleRepoBackend(repo)

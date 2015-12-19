@@ -11,267 +11,21 @@
 
 import logging
 import os
-from os.path import join as opj, basename, split as ops, exists, isdir
-from six import string_types
+from os.path import join as opj, basename, exists
+from six import string_types, itervalues
 
 from rdflib import Graph, URIRef
 
-from .gitrepo import GitRepo, _remove_empty_items
-from .handlerepo import HandleRepo
-from .handle import Handle, HandleBackend
 from .exceptions import CollectionBrokenError
-from .collection import Collection, CollectionBackend
+from .gitrepo import GitRepo
+from .handle import Handle
+from .handlerepo import HandleRepo
 from .metadatahandler import CustomImporter, DLNS, RDFS, Literal, \
     MetadataImporter, DCTERMS, RDF
-from ..utils import assure_dir, get_local_file_url
 from ..consts import REPO_STD_META_FILE, REPO_CONFIG_FILE
+from ..utils import get_local_file_url
 
 lgr = logging.getLogger('datalad.collectionrepo')
-
-
-class CollectionRepoHandleBackend(HandleBackend):
-    """HandleBackend for collection repositories.
-
-    Implements a HandleBackend retrieving its data from a branch of a
-    collection repository. This is a read-only backend for Handle, since a
-    collection only contains a cache of the metadata of handles.
-    """
-    # TODO: raise proper Exceptions on write access
-    # TODO: Better name of these classes
-    # TODO: Update docs!
-
-    def __init__(self, repo, key, branch=None):
-        self.repo = repo
-        self.branch = branch if branch is not None \
-            else self.repo.git_get_active_branch()
-        self.key = key
-        self._path = self.repo._key2filename(self.key)
-        self._cfg_file = opj(self._path, REPO_CONFIG_FILE)
-        self._std_file = opj(self._path, REPO_STD_META_FILE)
-
-        # remote branch? => read-only
-        branch_parts = self.branch.split('/')
-        if branch_parts[0] in self.repo.git_get_remotes():
-            self.is_read_only = True
-            if len(branch_parts) == 1:
-                # remote name without branch
-                self.branch += "/master"
-        else:
-            self.is_read_only = False
-
-        if self._std_file not in self.repo.git_get_files(self.branch):
-            raise RuntimeError("Handle '%s' not available." % self.key)
-
-    def get_metadata(self, files=None):
-        """
-        Gets metadata graph for the handle (all files in collection or just
-        `files`)
-        Parameters
-        ----------
-        files: list of str
-
-        Returns
-        -------
-        rdflib.Graph
-        """
-        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                           self.branch))
-        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-
-        h_node = cfg_graph.value(predicate=RDF.type, object=DLNS.Handle)
-        h_name = cfg_graph.value(subject=h_node, predicate=RDFS.label)
-
-        # additional files in handle's dir:
-        if files is None:
-            files = [file_
-                     for file_ in self.repo.git_get_files(branch=self.branch)
-                     if file_.startswith(self.repo._key2filename(self.key))
-                     and basename(file_) != REPO_CONFIG_FILE]
-
-        out = Graph(identifier=h_name)
-        for file_ in files:
-            file_str = '\n'.join(self.repo.git_get_file_content(file_,
-                                                                self.branch))
-            out.parse(data=file_str, format="turtle")
-
-        # Note: See note in CollectionRepoBackend.get_collection
-        return out
-
-    def set_metadata(self, meta, msg="Handle metadata updated."):
-
-        if self.is_read_only:
-            raise RuntimeWarning("Can't write to read-only handle.")
-
-        # save current branch ...
-        current_branch = self.repo.git_get_active_branch()
-
-        if self.branch != current_branch:
-            # ... and switch to the one to be changed:
-            self.repo.git_checkout(self.branch)
-
-        assure_dir(opj(self.repo.path, self._path))
-        meta.serialize(self._std_file, format="turtle")
-        self.repo.git_add(self._std_file)
-        self.repo.git_commit(msg=msg)
-
-        if self.branch != current_branch:
-            self.repo.git_checkout(current_branch)
-
-    @property
-    def url(self):
-        cfg_str = '\n'.join(self.repo.git_get_file_content(self._cfg_file,
-                                                           self.branch))
-        cfg_graph = Graph().parse(data=cfg_str, format="turtle")
-        return str(cfg_graph.value(predicate=RDF.type, object=DLNS.Handle))
-
-
-class CollectionRepoBackend(CollectionBackend):
-    """CollectionBackend for collection repositories.
-
-    Implements a CollectionBackend that is connected to a branch of a
-    collection repository.
-    """
-    # TODO: Better name
-
-    # Note (reminder): If it's a remote branch: Should writing data imply a
-    # push or sth.?
-    # Probably not, but it should be well documented, since 'saving' a
-    # collection with a remote url and then it's just locally done, could be
-    # confusing to users not familiar with git.
-    # To be worked out when implementing such commands.
-    #
-    # Better to not allow to commit to remote branches and force the user to
-    # clone it first.
-
-    def __init__(self, repo, branch=None):
-        """
-        Parameters
-        ----------
-        repo: CollectionRepo or str
-          in case of a string it's interpreted as being the path to the
-          repository in question.
-        branch: str
-        """
-        if isinstance(repo, CollectionRepo):
-            self.repo = repo
-        elif isinstance(repo, string_types):
-            self.repo = CollectionRepo(repo)
-        else:
-            msg = "Invalid repo type: %s" % type(repo)
-            lgr.error(msg)
-            raise TypeError(msg)
-
-        self.branch = branch if branch is not None \
-            else self.repo.git_get_active_branch()
-
-        # remote branch? => read-only
-        if self.branch.split('/')[0] in self.repo.git_get_remotes():
-            self.is_read_only = True
-        else:
-            self.is_read_only = False
-
-    def get_handles(self):
-        """Get the metadata of all handles in `branch`.
-
-        Returns
-        -------
-        dictionary of Handle
-
-        """
-        out = dict()
-
-        # load handles from branch
-        for key in self.repo.get_handle_list(self.branch):
-            out[key] = Handle(src=CollectionRepoHandleBackend(
-                self.repo, key, self.branch))
-        return out
-
-    def get_collection(self):
-        """Get collection level metadata of a branch
-        """
-        # read standard files:
-        cfg_str = '\n'.join(self.repo.git_get_file_content(REPO_CONFIG_FILE,
-                                                           self.branch))
-        std = Graph().parse(data=cfg_str, format="turtle")
-
-        col_node = std.value(predicate=RDF.type, object=DLNS.Collection)
-        col_name = std.value(subject=col_node, predicate=RDFS.label)
-
-        # additional turtle files in collection's basedir:
-        files = [file_ for file_ in self.repo.git_get_files(branch=self.branch)
-                 if file_ == basename(file_) and file_ != REPO_CONFIG_FILE and
-                 file_.endswith(".ttl")]
-
-        out = Graph(identifier=col_name)  # avoid type 'URIRef' or sth.
-
-        for file_ in files:
-            file_str = '\n'.join(self.repo.git_get_file_content(file_,
-                                                                self.branch))
-            out.parse(data=file_str, format="turtle")
-
-        # Note: By now we parse config.ttl and datalad.ttl two times here.
-        # The issue is to determine the identifier of hte graph, which can't be
-        # changed after creation. We probably also want to read certain files
-        # only into the returned graph later on.
-
-        return out
-
-    def commit_collection(self, collection, msg):
-
-        if self.is_read_only:
-            raise RuntimeWarning("Can't commit remote collection.")
-
-        if not isinstance(collection, Collection):
-            raise TypeError("Can't save non-collection type: %s" %
-                            type(collection))
-
-        # save current branch ...
-        current_branch = self.repo.git_get_active_branch()
-
-        if self.branch != current_branch:
-            # ... and switch to the one to be changed:
-            self.repo.git_checkout(self.branch)
-
-        # handle files we no longer have:
-        files_to_remove = [f for f in self.repo.get_indexed_files()
-                           if self.repo._filename2key(ops(f)[0]) not in
-                           collection.keys()]
-
-        self.repo.git_remove(files_to_remove)
-
-        # update everything else to be safe
-        files_to_add = []
-
-        # collection level:
-        collection.meta.serialize(opj(self.repo.path, REPO_STD_META_FILE),
-                                  format="turtle")
-        files_to_add.append(REPO_STD_META_FILE)
-
-        # handles:
-        for k, v in collection.iteritems():
-
-            v.commit()
-            # files_to_add.append(self.repo._key2filename(k))
-            # Actually, this shouldn't be necessary, since it was
-            # committed above. On the other hand, that's a lot of commits.
-            # May be don't commit the handles but just write_to_file and commit
-            # herein.
-
-        self.repo.git_add(files_to_add)
-        self.repo.git_commit(msg)
-
-        if self.branch != current_branch:
-            # switch back to repo's active branch on disk
-            self.repo.git_checkout(current_branch)
-
-    @property
-    def url(self):
-        if self.is_read_only:
-            # remote repo:
-            return self.repo.git_get_remote_url(self.branch.split('/')[0])
-        else:
-            # available repo:
-            return self.repo.path
 
 
 class CollectionRepo(GitRepo):
@@ -316,8 +70,8 @@ class CollectionRepo(GitRepo):
           if true, creates a collection repository at path, in case there is
           none. Otherwise an exception is raised.
 
-        Raises:
-        -------
+        Raises
+        ------
         CollectionBrokenError
         """
 
@@ -365,6 +119,9 @@ class CollectionRepo(GitRepo):
                     self.repo.index.diff(self.repo.head.commit):
                 self.git_commit("Initialized collection metadata.")
 
+    def __repr__(self):
+        return "<CollectionRepo path=%s (%s)>" % (self.path, type(self))
+
     def _get_cfg(self):
         config_handler = CustomImporter('Collection', 'Collection', DLNS.this)
         config_handler.import_data(opj(self.path, REPO_CONFIG_FILE))
@@ -405,10 +162,14 @@ class CollectionRepo(GitRepo):
         if branch is None:
             branch = self.git_get_active_branch()
 
-        return list(set([self._filename2key(f.split(os.sep)[0])
-                         for f in self.git_get_files(branch)
-                         if f != basename(f) and not f.startswith('.')]))
+        # TODO: replace query for subdirectories by a method of GitRepo:
+        # TODO: It may be even faster to filter the index in case of active branch. Yet to be measured.
+        return [self._filename2key(item.path)
+                for item in self.repo.tree(branch).trees]
 
+    # TODO: come up with a better name for a 'key' in below
+    # it could be a handle_name or collection/handle_name
+    # so smth like fullhandle_name
     def _filename2key(self, fname):
         """Placeholder
 
@@ -426,6 +187,11 @@ class CollectionRepo(GitRepo):
         """
         if '\\' in key:
             raise ValueError("Invalid name: '%s'. No '\\' allowed.")
+
+        # TODO: replace with a check for a present directory instead of
+        #   traversal+transformation+__contains__
+        # if self._is_handle_present_in_current_branch(key):
+        #
         if key in self.get_handle_list():
             return key.replace('/', '--')
 
@@ -437,7 +203,6 @@ class CollectionRepo(GitRepo):
         else:
             return key.replace('/', '--')
 
-
     # ### repo methods:
 
     def get_handles(self, branch=None):
@@ -446,9 +211,9 @@ class CollectionRepo(GitRepo):
         This is different to get_handle_list(), which provides a list of handle
         names.
         """
-
-        return [Handle(CollectionRepoHandleBackend(self, key=key,
-                                                   branch=branch))
+        from datalad.support.handle_backends import CollectionRepoHandleBackend
+        return [CollectionRepoHandleBackend(self, key=key,
+                                            branch=branch)
                 for key in self.get_handle_list(branch=branch)]
 
     def get_handle_repos(self, branch=None):
@@ -490,6 +255,7 @@ class CollectionRepo(GitRepo):
         """
         if branch is None:
             branch = self.git_get_active_branch()
+        from datalad.support.collection_backends import CollectionRepoBackend
         return CollectionRepoBackend(self, branch)
 
     def _import_metadata(self, target_path, importer, about_uri,
@@ -528,7 +294,7 @@ class CollectionRepo(GitRepo):
         # TODO: check whether cfg-file even exists, otherwise create
         # a basic one.
         cfg_graph = Graph().parse(opj(target_path, REPO_CONFIG_FILE),
-                                      format="turtle")
+                                  format="turtle")
 
         # check for existing metadata sources to determine the name for the
         # new one:
@@ -540,7 +306,6 @@ class CollectionRepo(GitRepo):
         from six import PY3
         if PY3:
             src_name_prefix = "".join(filter(str.isalnum, str(about_uri)))
-            lgr.error("DEBUG: type: %s\nvalue: %s" % (type(src_name_prefix), src_name_prefix))
         else:
             src_name_prefix = filter(str.isalnum, str(about_uri))
         from random import choice
@@ -659,17 +424,17 @@ class CollectionRepo(GitRepo):
 
         Parameters
         ----------
-        handle: str or HandleRepo or HandleBackend
-          URL of the handle or an instance of either HandleRepo or HandleBackend.
+        handle: str or HandleRepo or Handle
+          URL of the handle or an instance of either HandleRepo or Handle.
         name: str
           name of the handle within the collection. This name is required to be
           unique with respect to the collection. If a HandleRepo or
-          HandleBackend is passed, the name stored therein is the default.
+          Handle is passed, the name stored therein is the default.
           If `handle` is just an URL, a name is required.
         """
-        if isinstance(handle, HandleBackend):
+        if isinstance(handle, Handle):
             uri = URIRef(handle.url)
-            name = name or handle.get_metadata().identifier
+            name = name or handle.name
 
         if isinstance(handle, HandleRepo):
             uri = URIRef(get_local_file_url(handle.path))
@@ -717,6 +482,7 @@ class CollectionRepo(GitRepo):
         md_collection.import_data(self.path)
         graphs = md_collection.get_graphs()
         graphs[REPO_STD_META_FILE[0:-4]].add((DLNS.this, DCTERMS.hasPart, uri))
+        graphs[REPO_STD_META_FILE[0:-4]].add((uri, RDFS.label, Literal(name)))
         # TODO: anything else? any config needed?
         md_collection.set_graphs(graphs)
         md_collection.store_data(self.path)
@@ -736,6 +502,7 @@ class CollectionRepo(GitRepo):
         col_graph = Graph().parse(opj(self.path, REPO_STD_META_FILE),
                                   format="turtle")
         col_graph.remove((DLNS.this, DCTERMS.hasPart, uri))
+        col_graph.remove((uri, RDFS.label, Literal(key)))
         col_graph.serialize(opj(self.path, REPO_STD_META_FILE), format="turtle")
 
         # remove handle's directory:
@@ -751,3 +518,140 @@ class CollectionRepo(GitRepo):
 
         self.git_add(REPO_STD_META_FILE)
         self.git_commit("Removed handle %s." % key)
+
+    def get_handle_graphs(self, key, branch=None, files=None):
+        """
+
+        :param key:
+        :param branch:
+        :param files:
+        :return:
+        """
+
+        if branch is None:
+            branch = self.git_get_active_branch()
+
+        # by default read all ttl-files except handle's REPO_CONFIG_FILE
+        if files is None:
+            # TODO: Figure out how to generalize this gitpython query and make
+            #       it a method of GitRepo.
+            #       May be like get_files(branch="HEAD", directory="repo_base",
+            #                             recursive=True)
+            if branch == self.git_get_active_branch():
+                files = [blob.path for blob in
+                         (self.repo.active_branch.commit.tree /
+                          self._key2filename(key)).blobs
+                         if blob.path.endswith(".ttl")]
+            else:
+                files = [blob.path for blob in
+                         (self.repo.tree(branch) /
+                          self._key2filename(key)).blobs
+                         if blob.path.endswith(".ttl")]
+
+        graphs = dict()
+        for file_ in files:
+            # TODO: opj(_key2filname(key), file_)?
+            file_str = '\n'.join(self.git_get_file_content(file_, branch))
+            graphs[basename(file_).rstrip(".ttl")] = \
+                Graph().parse(data=file_str, format="turtle")
+
+        return graphs
+
+    def store_handle_graphs(self, graphs, handle, branch=None,
+                            msg="Handle metadata updated."):
+        # TODO: Default message to include handle's name
+
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of parameter 'graphs' (%s). "
+                            "Expected: dict." % type(graphs))
+
+        files = dict()
+        for key in graphs:
+            if not isinstance(graphs[key], Graph):
+                raise TypeError("Wrong type of graphs['%s'] (%s). "
+                                "Expected: Graph." % (key, type(graphs[key])))
+
+            files[key] = opj(self.path, self._key2filename(handle), key + ".ttl")
+
+        active_branch = self.git_get_active_branch()
+        if branch is None:
+            branch = active_branch
+        elif branch not in self.git_get_branches():
+            raise ValueError("Unknown branch '%s'." % branch)
+        else:
+            self.git_checkout(branch)
+
+        for key in graphs:
+            graphs[key].serialize(files[key], format="turtle")
+
+        self.git_add(list(itervalues(files)))
+        self.git_commit(msg)
+
+        if branch != active_branch:
+            self.git_checkout(active_branch)
+
+    def get_collection_graphs(self, branch=None, files=None):
+        """
+
+        Parameters
+        ----------
+        branch: str
+        files: list of str
+
+        Returns
+        -------
+        dict of Graph
+        """
+
+        if branch is None:
+            branch = self.git_get_active_branch()
+
+        # by default read all ttl-files in base dir:
+        if files is None:
+            if branch == self.git_get_active_branch():
+                files = [blob.path for blob in
+                         self.repo.active_branch.commit.tree.blobs
+                         if blob.path.endswith(".ttl")]
+            else:
+                files = [blob.path for blob in self.repo.tree(branch).blobs
+                         if blob.path.endswith(".ttl")]
+
+        graphs = dict()
+        for file_ in files:
+            file_str = '\n'.join(self.git_get_file_content(file_, branch))
+            graphs[file_.rstrip(".ttl")] = \
+                Graph().parse(data=file_str, format="turtle")
+        return graphs
+
+    def set_collection_graphs(self, graphs, branch=None,
+                              msg="Collection metadata updated."):
+
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of parameter 'graphs' (%s). "
+                            "Expected: dict." % type(graphs))
+
+        files = dict()
+        for key in graphs:
+            if not isinstance(graphs[key], Graph):
+                raise TypeError("Wrong type of graphs['%s'] (%s). "
+                                "Expected: Graph." % (key, type(graphs[key])))
+
+            files[key] = opj(self.path, key + ".ttl")
+
+        active_branch = self.git_get_active_branch()
+        if branch is None:
+            branch = active_branch
+        elif branch not in self.git_get_branches():
+            raise ValueError("Unknown branch '%s'." % branch)
+        else:
+            self.git_checkout(branch)
+
+        for key in graphs:
+            graphs[key].serialize(files[key], format="turtle")
+
+        self.git_add(list(itervalues(files)))
+        self.git_commit(msg)
+
+        if branch != active_branch:
+            self.git_checkout(active_branch)
+

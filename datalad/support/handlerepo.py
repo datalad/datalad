@@ -13,69 +13,19 @@ This layer makes the difference between an arbitrary annex and a
 datalad-managed dataset.
 """
 
-
-import os
-from os.path import join as opj, exists, basename
 import logging
+from os.path import join as opj, basename
+from six import string_types, itervalues
 
-from rdflib import URIRef, RDF
-from six import string_types
+from rdflib import URIRef
 
 from .annexrepo import AnnexRepo
-from .metadatahandler import MetadataImporter, CustomImporter, Graph, Literal, \
-    DLNS, RDFS
-from .handle import HandleBackend, Handle
-from ..utils import assure_dir
+from .metadatahandler import MetadataImporter, CustomImporter, Graph, \
+    Literal, DLNS, RDFS
 from ..consts import HANDLE_META_DIR, REPO_CONFIG_FILE, REPO_STD_META_FILE
+from ..utils import assure_dir
 
 lgr = logging.getLogger('datalad.handlerepo')
-
-
-class HandleRepoBackend(HandleBackend):
-    # TODO: Name. See corresponding naming for CollectionBackend and find
-    # a solution for both of them
-    """HandleBackend for handle repositories.
-
-    Implements a HandleBackend pointing to a handle repository branch.
-    """
-
-    # TODO: Currently the branch is always the active branch of the handle.
-    # So, the branch-option of the constructor has no effect and is just a
-    # placeholder, serving as a reminder. Implementing it may be involves some
-    # changes in the HandleRepo-class, so it's returning infos from the
-    # branch's config file.
-
-    def __init__(self, repo, branch=None):
-
-        if not isinstance(repo, HandleRepo):
-            e_msg = "Can't deal with type '%s' to access a handle repository." \
-                    % type(repo)
-            lgr.error(e_msg)
-            raise TypeError(e_msg)
-        else:
-            self._repo = repo
-
-        self._branch = branch or self._repo.git_get_active_branch()
-
-    @property
-    def url(self):
-        return self._repo.path
-
-    def get_name(self):
-        return self._repo.name
-
-    def set_name(self, name):
-        self._repo.name = name
-
-    name = property(get_name, set_name)
-
-    def get_metadata(self, files=None):
-        return self._repo.get_metadata(files)
-
-    def set_metadata(self, meta, msg=None):
-        self._repo.set_metadata(meta, msg)
-
-    metadata = property(get_metadata, set_metadata)
 
 
 class HandleRepo(AnnexRepo):
@@ -93,7 +43,7 @@ class HandleRepo(AnnexRepo):
     """
 
     def __init__(self, path, url=None, direct=False, runner=None, backend=None,
-                 name=None, create=True):
+                 name=None, create=True, init=False):
         """Creates a dataset representation from path.
 
         If `path` is empty, it creates an new repository.
@@ -118,7 +68,7 @@ class HandleRepo(AnnexRepo):
 
         super(HandleRepo, self).__init__(path, url, direct=direct,
                                          runner=runner, backend=backend,
-                                         create=create)
+                                         create=create, init=init)
 
         self.datalad_path = HANDLE_META_DIR
         self._cfg_file = opj(HANDLE_META_DIR, REPO_CONFIG_FILE)
@@ -148,6 +98,9 @@ class HandleRepo(AnnexRepo):
             self.add_to_git([self._cfg_file, self._md_file],
                             "Initialized handle metadata.")
 
+    def __repr__(self):
+        return "<HandleRepo path=%s (%s)>" % (self.path, type(self))
+
     def _get_cfg(self):
         config_handler = CustomImporter('Handle', 'Handle', DLNS.this)
         config_handler.import_data(opj(self.path, self._cfg_file))
@@ -160,18 +113,6 @@ class HandleRepo(AnnexRepo):
         config_handler.set_graphs(graph_dict)
         config_handler.store_data(opj(self.path, HANDLE_META_DIR))
         self.add_to_git(self._cfg_file, commit_msg)
-
-    def __eq__(self, obj):
-        """Decides whether or not two instances of this class are equal.
-
-        This is done by comparing the base repository path.
-        Note: There is a second meaning of 'equal' handles, meaning that
-        they have the same datalad id. However, at the level of instances of
-        this class, 'equal' means, that the both of them are representing the
-        very same repository.
-        """
-        # TODO: Move this to GitRepo, since it is true for all the repositories
-        return self.path == obj.path
 
     # TODO: Consider using preferred label for the name
     def get_name(self):
@@ -187,78 +128,13 @@ class HandleRepo(AnnexRepo):
 
     name = property(get_name, set_name)
 
-    @property
-    def datalad_id(self):
-        """Get the datalad identifier of the handle.
-
-        This is a read-only property.
-
-        Returns
-        -------
-        str
-        """
-        raise NotImplementedError("datalad id not used anymore")
-
-    def get(self, files):
-        """get the actual content of files
-
-        This command gets the actual content of the files in `list`.
-        """
-        self.annex_get(files)
-
-    def _commit(self, msg):
-        """Commit changes to repository
-
-        Parameters
-        ----------
-        msg: str
-            commit-message
-        """
-
-        if self.is_direct_mode():
-            self.annex_proxy('git commit -m "%s"' % msg)
-        else:
-            self.git_commit(msg)
-
-    def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
-        """Add file(s) to the annex.
-
-        Adds files to the annex and commits.
-
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to the annex; Can also be a str, in case of a
-            single path.
-        """
-
-        self.annex_add(files)
-        self._commit(commit_msg)
-
-    def add_to_git(self, files, commit_msg="Added file(s) to git."):
-        """Add file(s) directly to git
-
-        Adds files directly to git and commits.
-
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to git; Can also be a str, in case of a single
-            path.
-        """
-        self.annex_add_to_git(files)
-        self._commit(commit_msg)
-
     def get_handle(self, branch=None):
         """Convenience method to create a `Handle` instance.
         """
-        return Handle(HandleRepoBackend(self, branch))
+        from datalad.support.handle_backends import HandleRepoBackend
+        return HandleRepoBackend(self, branch)
 
-    def get_metadata(self, files=None):
+    def get_metadata(self, files=None, branch=None):
         """Get a Graph containing the handle's metadata
 
         Parameters
@@ -267,6 +143,7 @@ class HandleRepo(AnnexRepo):
             metadata files within the datalad directory of the handle to
             be read. Default: All files are read.
         """
+        # TODO: Doc. returns dict
         # Parameter? May be by default get graph of all files, just some of
         # them otherwise. But how to save then?
         # Just don't save at all (Exception)?
@@ -275,22 +152,67 @@ class HandleRepo(AnnexRepo):
         # Is there some "in namespace" check in rdflib? => what to save to
         # datalad.ttl ==> str.startswith(ns) or URIRef.startswith(ns)
 
+        if branch is None:
+            branch = self.git_get_active_branch()
+
         if files is None:
-            files = opj(self.path, HANDLE_META_DIR)
-        else:
-            files = [opj(self.path, HANDLE_META_DIR, f) for f in files]
+            if branch == self.git_get_active_branch():
+                files = [blob.path for blob in
+                         (self.repo.active_branch.commit.tree /
+                          HANDLE_META_DIR).blobs
+                         if blob.path.endswith(".ttl")]
+            else:
+                files = [blob.path for blob in
+                         (self.repo.tree(branch) / HANDLE_META_DIR).blobs
+                         if blob.path.endswith(".ttl")]
+            # Note: Think of additionally exclude config.ttl:
+            # and basename(file_) != REPO_CONFIG_FILE
 
-        handler = CustomImporter('Handle', 'Handle', DLNS.this)
+        graphs = dict()
+        for file_ in files:
+            # TODO: opj(HANDLE_META_DIR, file_)?
+            file_str = '\n'.join(self.git_get_file_content(file_, branch))
+            graphs[basename(file_).rstrip(".ttl")] = \
+                Graph().parse(data=file_str, format="turtle")
 
-        handler.import_data(files)
-        graphs = handler.get_graphs()
-        joined_graph = Graph(identifier=self.name)
+        return graphs
+
+    def set_metadata(self, graphs, msg="Metadata saved.", branch=None):
+        """
+
+        :param graphs:
+        :param msg:
+        :param branch:
+        :return:
+        """
+
+        if not isinstance(graphs, dict):
+            raise TypeError("Unexpected type of parameter 'graphs' (%s). "
+                            "Expected: dict." % type(graphs))
+
+        files = dict()
         for key in graphs:
-            joined_graph += graphs[key]
-        return joined_graph
+            if not isinstance(graphs[key], Graph):
+                raise TypeError("Wrong type of graphs['%s'] (%s). "
+                                "Expected: Graph." % (key, type(graphs[key])))
 
-    def set_metadata(self, graph, msg="Metadata saved."):
-        raise NotImplementedError
+            files[key] = opj(self.path, HANDLE_META_DIR, key + ".ttl")
+
+        active_branch = self.git_get_active_branch()
+        if branch is None:
+            branch = active_branch
+        elif branch not in self.git_get_branches():
+            raise ValueError("Unknown branch '%s'." % branch)
+        else:
+            self.git_checkout(branch)
+
+        for key in graphs:
+            graphs[key].serialize(files[key], format="turtle")
+
+        self.add_to_git(list(itervalues(files)), msg)
+
+        if branch != active_branch:
+            self.git_checkout(active_branch)
 
     def import_metadata(self, importer, files=None, data=None,
                         about_uri=DLNS.this):
@@ -320,8 +242,8 @@ class HandleRepo(AnnexRepo):
 
         # TODO: check whether cfg-file even exists, otherwise create a basic one.
         cfg_graph = Graph().parse(opj(self.path, HANDLE_META_DIR,
-                                          REPO_CONFIG_FILE),
-                                      format="turtle")
+                                      REPO_CONFIG_FILE),
+                                  format="turtle")
 
         # check for existing metadata sources to determine the name for the
         # new one:
@@ -333,17 +255,17 @@ class HandleRepo(AnnexRepo):
                                     + 1)
 
         # graph containing just new config statements:
-        cfg_graph = Graph()
+        cfg_graph_new = Graph()
 
         if files is not None and data is None:
             # treat it as a metadata source, that can be used again later on.
             src_node = URIRef(src_name)
             # add config-entries for that source:
-            cfg_graph.add((about_uri, DLNS.usesSrc, src_node))
+            cfg_graph_new.add((about_uri, DLNS.usesSrc, src_node))
             if isinstance(files, string_types):
-                cfg_graph.add((src_node, DLNS.usesFile, URIRef(files)))
+                cfg_graph_new.add((src_node, DLNS.usesFile, URIRef(files)))
             elif isinstance(files, list):
-                [cfg_graph.add((src_node, DLNS.usesFile, URIRef(f)))
+                [cfg_graph_new.add((src_node, DLNS.usesFile, URIRef(f)))
                  for f in files]
 
         elif files is None and data is not None:
@@ -357,13 +279,13 @@ class HandleRepo(AnnexRepo):
         im.import_data(files=files, data=data)
 
         # add new config statements:
-        im.get_graphs()[REPO_CONFIG_FILE[:-4]] += cfg_graph
-
+        im.get_graphs()[REPO_CONFIG_FILE[:-4]] += cfg_graph + cfg_graph_new
         # create import branch:
         active_branch = self.git_get_active_branch()
         self.git_checkout(name=src_name, options='-b')
 
         im.store_data(opj(self.path, HANDLE_META_DIR))
+
         self.add_to_git(opj(self.path, HANDLE_META_DIR))
 
         # switching back and merge:

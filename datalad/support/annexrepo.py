@@ -20,6 +20,7 @@ import shlex
 
 from functools import wraps
 
+from six import string_types
 from six.moves.configparser import NoOptionError
 
 from .gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
@@ -161,6 +162,9 @@ class AnnexRepo(GitRepo):
             writer.set_value("annex", "backends", backend)
             writer.release()
 
+    def __repr__(self):
+        return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
+
     def _run_annex_command(self, annex_cmd, git_options=None, annex_options=None,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, expect_fail=False,
@@ -198,7 +202,7 @@ class AnnexRepo(GitRepo):
         debug = ['--debug'] if lgr.getEffectiveLevel() <= logging.DEBUG else []
         backend = ['--backend=%s' % backend] if backend else []
 
-        git_options = git_options[:] if git_options else []
+        git_options = (git_options[:] if git_options else []) + self._GIT_COMMON_OPTIONS
         annex_options = annex_options[:] if annex_options else []
 
         if not self.always_commit:
@@ -240,7 +244,6 @@ class AnnexRepo(GitRepo):
             # If .git/config lacks an entry "direct",
             # it's actually indirect mode.
             return False
-
 
     def is_crippled_fs(self):
         """Indicates whether or not git-annex considers current filesystem 'crippled'.
@@ -315,6 +318,15 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('get', annex_options=options + files,
                                 log_stdout=True, log_stderr=False,
                                 log_online=True, expect_stderr=True)
+
+    # TODO: Moved from HandleRepo. Just a temporary alias.
+    # When renaming is done, melt with annex_get
+    def get(self, files):
+        """get the actual content of files
+
+        This command gets the actual content of the files in `list`.
+        """
+        self.annex_get(files)
 
     @normalize_paths
     def annex_add(self, files, backend=None, options=None):
@@ -464,6 +476,43 @@ class AnnexRepo(GitRepo):
         else:
             self.git_add(files)
 
+    # TODO: Just moved from HandleRepo. Melt with annex_add_to_git and rename.
+    @normalize_paths
+    def add_to_git(self, files, commit_msg="Added file(s) to git."):
+        """Add file(s) directly to git
+
+        Adds files directly to git and commits.
+
+        Parameters
+        ----------
+        commit_msg: str
+            commit message
+        files: list
+            list of paths to add to git; Can also be a str, in case of a single
+            path.
+        """
+        self.annex_add_to_git(files)
+        self.commit(commit_msg)
+
+    @normalize_paths
+    def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
+        """Add file(s) to the annex.
+
+        Adds files to the annex and commits.
+
+        Parameters
+        ----------
+        commit_msg: str
+            commit message
+        files: list
+            list of paths to add to the annex; Can also be a str, in case of a
+            single path.
+        """
+
+        self.annex_add(files)
+        self.commit(commit_msg)
+
+
     def annex_initremote(self, name, options):
         """Creates a new special remote
 
@@ -608,6 +657,17 @@ class AnnexRepo(GitRepo):
         out, err = self._run_annex_command('find')
         return out.splitlines()
 
+    def commit(self, msg):
+        """
+
+        Parameters
+        ----------
+        msg: str
+        """
+        if self.is_direct_mode():
+            self.annex_proxy('git commit -m "%s"' % msg)
+        else:
+            self.git_commit(msg)
 
 # TODO: ---------------------------------------------------------------------
     @normalize_paths(match_return_type=False)
@@ -630,7 +690,9 @@ class AnnexRepo(GitRepo):
         -------
         stdout, stderr
         """
-        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows)
+        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
+            if isinstance(cmd_str, string_types) \
+            else cmd_str + files
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,

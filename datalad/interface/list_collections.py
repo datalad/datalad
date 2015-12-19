@@ -12,14 +12,13 @@
 
 __docformat__ = 'restructuredtext'
 
-
 from os import curdir
 from os.path import join as opj, abspath
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from datalad.support.collection import Collection
 from datalad.cmdline.helpers import get_datalad_master
 
@@ -38,6 +37,6 @@ class ListCollection(Interface):
         for collection in local_master.git_get_remotes():
             print(collection)
 
-        return [Collection(CollectionRepoBackend(local_master,
-                                                 branch=remote + "/master"))
-                for remote in local_master.git_get_remotes()]
+        if not self.cmdline:
+            return [CollectionRepoBackend(local_master, branch=remote + "/master")
+                    for remote in local_master.git_get_remotes()]

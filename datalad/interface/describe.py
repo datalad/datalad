@@ -17,17 +17,20 @@ from os.path import exists, join as opj, isfile
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from datalad.support.collection import Collection
 from datalad.support.handle import Handle
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend, \
+    CollectionRepoHandleBackend
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
-    EMP, RDF, PAV, PROV, FOAF, DCTERMS
+    EMP, RDF, PAV, PROV, FOAF, DCTERMS, RDFS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
 from datalad.cmdline.helpers import get_datalad_master
+from datalad.utils import get_local_file_url
 
 from six.moves.urllib.parse import urlparse
 
@@ -91,6 +94,7 @@ class Describe(Interface):
         -------
         Handle or Collection
         """
+
         repo = get_repo_instance()
 
         if isinstance(repo, CollectionRepo):
@@ -106,8 +110,8 @@ class Describe(Interface):
                 files = opj(repo.path, repo._key2filename(subject))
             else:
                 # TODO: look for internal entities as subject
-                lgr.error("Subject '%s' unknwon." % subject)
-                raise RuntimeError("Subject '%s' unknwon." % subject)
+                lgr.error("Subject '%s' unknown." % subject)
+                raise RuntimeError("Subject '%s' unknown." % subject)
         elif isinstance(repo, HandleRepo):
             target_class = 'Handle'
             if subject in [repo.name, None]:
@@ -116,8 +120,8 @@ class Describe(Interface):
                 files = opj(repo.path, HANDLE_META_DIR)
             else:
                 # TODO: look for internal entities as subject
-                lgr.error("Subject '%s' unknwon." % subject)
-                raise RuntimeError("Subject '%s' unknwon." % subject)
+                lgr.error("Subject '%s' unknown." % subject)
+                raise RuntimeError("Subject '%s' unknown." % subject)
         else:
             lgr.error("Don't know how to handle object of class %s" %
                       repo.__class__)
@@ -202,19 +206,27 @@ class Describe(Interface):
                     local_master.git_fetch(c)
         elif isinstance(repo, HandleRepo):
             # update master if it is an installed handle:
-            for h in local_master.get_handle_list():
-                if repo.path == urlparse(
-                        CollectionRepoHandleBackend(local_master, h).url).path:
-                    local_master.import_metadata_to_handle(CustomImporter,
-                                                           key=h,
-                                                           files=opj(
-                                                               repo.path,
-                                                               HANDLE_META_DIR))
+
+            # TODO: Create method to get a handle's name by it's url from a
+            # collection and move the code below there.
+            meta_graph = local_master.get_collection_graphs(
+                files=[REPO_STD_META_FILE])[REPO_STD_META_FILE[:-4]]
+            handle_name = meta_graph.value(
+                subject=URIRef(get_local_file_url(repo.path)),
+                predicate=RDFS.label)
+            if handle_name is not None:
+                local_master.import_metadata_to_handle(CustomImporter,
+                                                       key=handle_name,
+                                                       files=opj(
+                                                           repo.path,
+                                                           HANDLE_META_DIR))
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
 
-        if isinstance(repo, CollectionRepo):
-            return Collection(CollectionRepoBackend(repo))
-        elif isinstance(repo, HandleRepo):
-            return Handle(HandleRepoBackend(repo))
+        if not self.cmdline:
+            if isinstance(repo, CollectionRepo):
+                return CollectionRepoBackend(repo)
+            elif isinstance(repo, HandleRepo):
+                return HandleRepoBackend(repo)
+

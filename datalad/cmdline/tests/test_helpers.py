@@ -27,6 +27,15 @@ from ...consts import DATALAD_COLLECTION_NAME
 from ...utils import chpwd, getpwd
 
 
+def assert_master_collection(lcpath, untracked=[]):
+    master = get_datalad_master()
+    eq_(master.path, lcpath)
+    ok_(exists(lcpath))
+    ok_clean_git(lcpath, annex=False, untracked=untracked)
+    # raises exception in case of invalid collection repo:
+    get_repo_instance(lcpath, CollectionRepo)
+
+
 @assert_cwd_unchanged
 @with_tempfile(mkdir=True)
 def test_get_datalad_master(path):
@@ -37,12 +46,25 @@ def test_get_datalad_master(path):
         user_data_dir = path
 
     with patch('datalad.cmdline.helpers.dirs', mocked_dirs) as cm:
-        master = get_datalad_master()
-        eq_(master.path, lcpath)
-        ok_(exists(lcpath))
-        ok_clean_git(lcpath, annex=False)
-        # raises exception in case of invalid collection repo:
-        get_repo_instance(lcpath, CollectionRepo)
+        assert_master_collection(lcpath)
+
+
+@assert_cwd_unchanged
+@with_tempfile(mkdir=True)
+def test_get_datalad_master_localdir_via_environ(lcpath):
+    with patch.dict('os.environ', {'DATALAD_COLLECTION_PATH': lcpath}):
+        assert_master_collection(lcpath)
+
+    # So now we have a directory with initialized collection in it
+    # But if we create another subdirectory -- that one would be allowed to be
+    # a collection as well
+    lcpath2 = opj(lcpath, 'subcollection')
+    with patch.dict('os.environ', {'DATALAD_COLLECTION_PATH': lcpath2}):
+        assert_master_collection(lcpath2)
+
+    # and we still can access collection above
+    with patch.dict('os.environ', {'DATALAD_COLLECTION_PATH': lcpath}):
+        assert_master_collection(lcpath, untracked=['subcollection/'])
 
 
 @assert_cwd_unchanged

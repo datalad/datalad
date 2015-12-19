@@ -17,8 +17,9 @@ from os.path import join as opj, abspath
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoHandleBackend, CollectionRepoBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from datalad.support.handle import Handle
 from datalad.cmdline.helpers import get_datalad_master
 
@@ -52,18 +53,19 @@ class ListHandles(Interface):
             for remote_branch in local_master.git_get_remote_branches():
                 if not remote_branch.endswith('/master'): # for now only those
                     continue
-                for h in CollectionRepoBackend(
-                        local_master, branch=remote_branch).get_handles():
-                    handle_list.append(Handle(
+                for h in CollectionRepoBackend(local_master,
+                                               branch=remote_branch):
+                    handle_list.append(
                         CollectionRepoHandleBackend(local_master, key=h,
-                                                    branch=remote_branch)))
+                                                    branch=remote_branch))
                     remote_name = '/'.join(remote_branch.split('/')[:-1])
                     print("%s/%s" % (remote_name, h))
         else:
             for handle in local_master.get_handle_list():
-                handle_list.append(Handle(
-                    CollectionRepoHandleBackend(local_master, handle)))
+                handle_list.append(
+                    CollectionRepoHandleBackend(local_master, handle))
                 print(handle)
 
-        return handle_list
+        if not self.cmdline:
+            return handle_list
 

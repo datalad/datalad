@@ -18,14 +18,14 @@ from os.path import join as opj, abspath, expanduser, expandvars, isdir, \
     exists, basename
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoHandleBackend
 from datalad.support.handle import Handle
 from datalad.support.metadatahandler import CustomImporter
 from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
 from datalad.cmdline.helpers import get_datalad_master
 
-from ..support.handlerepo import HandleRepo, HandleRepoBackend
+from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend, \
+    CollectionRepoHandleBackend
 from ..support.network import get_url_straight_filename
 from ..utils import getpwd, get_url_path
 from .base import Interface
@@ -209,5 +209,5 @@ class InstallHandle(Interface):
                                                    key=local_name,
                                                    data=metadata)
 
-        return Handle(HandleRepoBackend(installed_handle))
-    
+        if not self.cmdline:
+            return HandleRepoBackend(installed_handle)

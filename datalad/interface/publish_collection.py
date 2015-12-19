@@ -13,12 +13,13 @@ __docformat__ = 'restructuredtext'
 
 
 from os import curdir, environ, geteuid, urandom
-from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
+from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir, basename
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, GitRepo, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo, GitRepo
+from ..dochelpers import exc_str
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..support.handlerepo import HandleRepo
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -97,7 +98,6 @@ class PublishCollection(Interface):
         """
 
         # TODO: Note: Yarik's git mtheirs for publishing branches!
-
         local_master = get_datalad_master()
 
         if isdir(abspath(expandvars(expanduser(collection)))):
@@ -119,6 +119,7 @@ class PublishCollection(Interface):
                                  local_collection_repo, key).url).path)]
 
         parsed_target = urlparse(target)  # => scheme, path
+        host_name = parsed_target.netloc
 
         from pkg_resources import resource_filename
         prepare_script_path = \
@@ -130,8 +131,12 @@ class PublishCollection(Interface):
 
         from ..cmd import Runner
         runner = Runner()
+
+        lgr.info("Preparing target repositories on %s", host_name)
+
+
         if parsed_target.scheme == 'ssh':
-            if parsed_target.netloc == '':
+            if host_name == '':
                 raise RuntimeError("Invalid ssh address: %s" % target)
 
             if baseurl is None:
@@ -143,38 +148,31 @@ class PublishCollection(Interface):
             from datalad.utils import assure_dir
             var_run_user_datalad = "/var/run/user/%s/datalad" % geteuid()
             assure_dir(var_run_user_datalad)
-            control_path = "%s/%s" % (var_run_user_datalad, parsed_target.netloc)
+            control_path = "%s/%s" % (var_run_user_datalad, host_name)
             control_path += ":%s" % parsed_target.port if parsed_target.port else ""
 
             # start controlmaster:
 
-            cmd_str = "ssh -o \"ControlMaster=yes\" -o \"ControlPath=%s\" " \
-                      "-o \"ControlPersist=yes\" %s exit" % \
-                      (control_path, parsed_target.netloc)
-            lgr.error("DEBUG: %s" % cmd_str)
+            cmd = "ssh -o ControlMaster=yes -o \"ControlPath=%s\" " \
+                      "-o ControlPersist=yes %s exit" % \
+                      (control_path, host_name)
+            lgr.error("DEBUG: %s" % cmd)
             import subprocess
-            proc = subprocess.Popen(cmd_str, shell=True)
+            proc = subprocess.Popen(cmd, shell=True)
             proc.communicate(input="\n")  # why the f.. this is necessary?
 
             # prepare target repositories:
 
-            script_options = "%s %s.datalad-collection" % (parsed_target.path,
-                                                    local_collection_repo.name)
+            script_options = [parsed_target.path, "%s.datalad-collection" % local_collection_repo.name]
             for key in available_handles:
                 # prepare repos for locally available handles only
-                script_options += " %s" % key
+                script_options += [key]
 
-            cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
-                      (control_path, parsed_target.netloc, script_options)
-            cmd_str += " < %s" % prepare_script_path
-            try:
-                out, err = runner.run(cmd_str)
-            except CommandError as e:
-                lgr.error("Preparation script failed: %s" % str(e))
-                out = e.stdout
-                err = e.stderr
+            ssh_cmd = ["ssh", "-S", control_path, host_name]
+            err, out = self.run_script_on_remote_host(prepare_script_path, host_name, script_options, control_path, runner, ssh_cmd)# set GIT-SSH:
 
-            # set GIT-SSH:
+            # yoh: THIS COSTED ME 2 HOURS TO ARRIVE HERE TO DEBUG WTF is going on
+            # Please do not change global environ.  Provide custom one to commands!!!!!
             environ['GIT_SSH'] = resource_filename('datalad',
                                                    'resources/git_ssh.sh')
 
@@ -217,6 +215,8 @@ class PublishCollection(Interface):
         if script_failed:
             raise RuntimeError("Server setup failed.")
 
+        lgr.info("Preparing %d handles for publishing" % len(available_handles))
+
         # Now, all the handles:
         from .publish_handle import PublishHandle
         handle_publisher = PublishHandle()
@@ -235,6 +235,7 @@ class PublishCollection(Interface):
 
             annex_ssh = "-S %s" % control_path \
                 if parsed_target.scheme == 'ssh' else None
+            lgr.info("Publishing handle %s" % handle_loc)
             handle_publisher(None, handle=handle_loc,
                              url=baseurl + '/' + handle_name,
                              ssh_options=annex_ssh)
@@ -245,8 +246,7 @@ class PublishCollection(Interface):
         # check for existing publish branches:
         from random import choice
         from string import ascii_letters
-        from six.moves import xrange
-        p_branch = "publish_" + ''.join(choice(ascii_letters) for i in xrange(6))
+        p_branch = "publish_" + ''.join(choice(ascii_letters) for i in range(6))
         local_collection_repo.git_checkout(p_branch, '-b')
 
         importer = CustomImporter('Collection', 'Collection', DLNS.this)
@@ -265,11 +265,10 @@ class PublishCollection(Interface):
         # correct handle uris in hasPart statements:
         replacements = []
         from datalad.support.collection import Collection
-        from datalad.support.collectionrepo import CollectionRepoBackend
-        col_meta = Collection(CollectionRepoBackend(local_collection_repo))
+        from datalad.support.collection_backends import CollectionRepoBackend
+        col_meta = CollectionRepoBackend(local_collection_repo)
         for o in graphs[REPO_STD_META_FILE[0:-4]].objects(subject=new_uri,
                                                           predicate=DCTERMS.hasPart):
-            from os.path import basename
             path = urlparse(o).path
             if exists(path):
                 # local handle
@@ -323,6 +322,7 @@ class PublishCollection(Interface):
             remote_name = p_branch
         local_collection_repo.git_remote_add(remote_name, collection_url)
 
+        lgr.info("Pushing branch %r as %s", p_branch, remote_name)
         # push local branch "publish" to remote branch "master"
         # we want to push to master, so a different branch has to be checked
         # out in target; in general we can't explicitly allow for the local
@@ -333,22 +333,22 @@ class PublishCollection(Interface):
         local_collection_repo.git_checkout("master")
 
         # checkout master in published collection:
+
         if parsed_target.scheme == 'ssh':
-            cmd_str = "ssh -S %s %s \'cat | sh /dev/stdin\' %s" % \
-                      (control_path, parsed_target.netloc, script_options)
-            cmd_str += " < %s" % cleanup_script_path
+            ssh_cmd = ["ssh", "-S", control_path, host_name]
             try:
-                out, err = runner.run(cmd_str)
+                err, out = self.run_script_on_remote_host(
+                    cleanup_script_path, host_name, script_options, control_path, runner, ssh_cmd)
             except CommandError as e:
-                lgr.error("Clean-up script failed: %s" % str(e))
+                lgr.error("Clean-up script failed: %s" % exc_str(e))
 
             # stop controlmaster:
-            cmd_str = "ssh -O stop -S %s %s" % (control_path,
-                                                parsed_target.netloc)
+            cmd = "ssh -O stop -S %s %s" % (control_path,
+                                            host_name)
             try:
-                out, err = runner.run(cmd_str)
+                out, err = runner.run(cmd, expect_stderr=True)
             except CommandError as e:
-                lgr.error("Stopping ssh control master failed: %s" % str(e))
+                lgr.error("Stopping ssh control master failed: %s" % exc_str(e))
 
         else:
             try:
@@ -360,10 +360,42 @@ class PublishCollection(Interface):
             except CommandError as e:
                 lgr.error("Clean-up script failed: %s" % str(e))
 
+        lgr.info("Performing final checks")
         # TODO: final check, whether everything is fine
         # Delete publish branch:
         local_collection_repo._git_custom_command('', 'git branch -D %s'
                                                   % p_branch)
 
-        return Collection(CollectionRepoBackend(local_collection_repo,
-                                                remote_name + "/master"))
+        if not self.cmdline:
+            return CollectionRepoBackend(local_collection_repo,
+                                         remote_name + "/master")
+
+    def run_script_on_remote_host(self, script_path, remote_host, script_options,
+                                  control_path, runner, ssh_cmd):
+        """Run specified script on the remote_host.
+
+        Script first gets scp'ed to the remote host
+        """
+        # TODO: ideally should request remote mktemp -u
+        import random
+        remote_script_path = '/tmp/%s-%d' % (basename(script_path), random.randint(0, 10000))
+        lgr.debug("Deploying %s on a remote host as %s", script_path, remote_script_path)
+        runner.run(['scp', '-o', 'ControlPath=%s' % control_path,
+                    script_path, '%s:%s' % (remote_host, remote_script_path)],
+                    expect_stderr=True  # Might complaint about existing socket
+                   )
+        try:
+            lgr.debug("Running %s on a remote host %s", remote_script_path, remote_host)
+            out, err = runner.run(ssh_cmd + ['sh', remote_script_path] + script_options)
+        except CommandError as e:
+            # Don't drag -- just fail!
+            raise
+            lgr.error("Preparation script failed: %s" % exc_str(e))
+            out = e.stdout
+            err = e.stderr
+        finally:
+            lgr.debug("Removing %s from the remote host", remote_script_path)
+            runner.run(ssh_cmd + ['rm', '-f', remote_script_path])
+
+        return err, out
+

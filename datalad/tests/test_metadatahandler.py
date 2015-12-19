@@ -21,8 +21,9 @@ from six import iterkeys
 
 from ..support.gitrepo import GitRepo
 from ..support.handlerepo import HandleRepo
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..support.metadatahandler import DLNS, RDF, RDFS, DCTERMS, PAV, \
     PlainTextImporter, CustomImporter
 from ..tests.utils import with_tempfile, with_testrepos, \

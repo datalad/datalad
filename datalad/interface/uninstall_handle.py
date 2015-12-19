@@ -21,8 +21,8 @@ from six.moves.urllib.parse import urlparse
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoHandleBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..utils import rmtree
 from datalad.cmdline.helpers import get_datalad_master
 

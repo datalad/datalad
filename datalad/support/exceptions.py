@@ -10,7 +10,6 @@
 """
 
 
-#
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
@@ -61,5 +60,12 @@ class FileNotInRepositoryError(FileNotInAnnexError):
 
 class CollectionBrokenError(Exception):
     """Thrown if a collection repository is somehow invalid
+    """
+    pass
+
+
+class ReadOnlyBackendError(Exception):
+    """Thrown if a Collection or Handle is trying to write to a read-only
+    backend.
     """
     pass

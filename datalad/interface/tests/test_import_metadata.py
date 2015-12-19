@@ -27,7 +27,9 @@ from ...support.handle import Handle
 from ...support.metadatahandler import DLNS, PAV, DCTERMS, URIRef, RDF, FOAF, \
     PROV, Literal, Graph
 from ...support.handlerepo import HandleRepo
-from ...support.collectionrepo import CollectionRepo, Collection, CollectionRepoBackend
+from ...support.collectionrepo import CollectionRepo
+from datalad.support.collection import Collection
+from datalad.support.collection_backends import CollectionRepoBackend
 from ...consts import REPO_CONFIG_FILE, REPO_STD_META_FILE, HANDLE_META_DIR
 
 
@@ -54,8 +56,21 @@ def test_import_meta_handle(hurl, hpath, lcpath):
 
         # test the metadata in returned Handle instance as well as the
         # metadata, that is actually stored in the repository:
-        stored_graph = Graph().parse(
-            opj(hpath, HANDLE_META_DIR, REPO_STD_META_FILE), format="turtle")
+
+        # TODO: Care for empty prefix, which causes several issues.
+        # Note: Previously parsed stored graph the following way:
+        # stored_graph = Graph().parse(
+        #     opj(hpath, HANDLE_META_DIR, REPO_STD_META_FILE), format="turtle")
+        # This fails, due to the 'empty' prefix in graphs, which is converted
+        # by rdflib to the file's path in case we parse a file and to cwd in
+        # case we parse a string (as we do when getting the file's content
+        # from git instead of getting it from the file directly). Need to find
+        # a better solution to replace that prefix anyway. Therefore: delay.
+        #
+        # For now, get the stored graph the same way for comparison:
+        repo = HandleRepo(hpath, create=False)
+        stored_graph = Graph().parse(data='\n'.join(repo.git_get_file_content(
+            opj(HANDLE_META_DIR, REPO_STD_META_FILE))), format="turtle")
 
         # test license:
         assert_in((DLNS.this, DCTERMS.license,
@@ -78,12 +93,17 @@ def test_import_meta_handle(hurl, hpath, lcpath):
                   stored_graph)
 
         # authors:
-        author_list = {URIRef("mailto:benjaminpoldrack@gmail.com"),
-                       URIRef("mailto:justanemail@address.tl"),
-                       URIRef("https://www.myfancypage.com/digital"),
-                       URIRef("file://" + opj(hpath, HANDLE_META_DIR,
-                                              REPO_STD_META_FILE)
-                              + "#author1")}
+        author_ben = URIRef("mailto:benjaminpoldrack@gmail.com")
+        author_just = URIRef("mailto:justanemail@address.tl")
+        author_digital = URIRef("https://www.myfancypage.com/digital")
+        author_1 = URIRef("file://" + getpwd() + "/#author1")
+        # Note: author_1 was:
+        # URIRef("file://" + opj(hpath, HANDLE_META_DIR, REPO_STD_META_FILE)
+        #        + "#author1")
+        # TODO: To be reconsidered when parsing issue regarding empty
+        # prefix is solved.
+        author_list = {author_ben, author_just, author_digital, author_1}
+
         eq_(author_list, set(handle.meta.objects(subject=DLNS.this,
                                                  predicate=PAV.createdBy)))
         eq_(author_list, set(stored_graph.objects(subject=DLNS.this,
@@ -92,27 +112,23 @@ def test_import_meta_handle(hurl, hpath, lcpath):
             assert_in((author, RDF.type, PROV.Person), handle.meta)
             assert_in((author, RDF.type, PROV.Person), stored_graph)
 
-        assert_in((URIRef("mailto:benjaminpoldrack@gmail.com"),
+        assert_in((author_ben,
                    FOAF.name,
                    Literal("Benjamin Poldrack")), handle.meta)
-        assert_in((URIRef("mailto:benjaminpoldrack@gmail.com"),
+        assert_in((author_ben,
                    FOAF.name,
                    Literal("Benjamin Poldrack")), stored_graph)
-        assert_in((URIRef("file://" + opj(hpath, HANDLE_META_DIR,
-                                          REPO_STD_META_FILE)
-                          + "#author1"),
+        assert_in((author_1,
                    FOAF.name,
                    Literal("someone else")), handle.meta)
-        assert_in((URIRef("file://" + opj(hpath, HANDLE_META_DIR,
-                                          REPO_STD_META_FILE)
-                          + "#author1"),
+        assert_in((author_1,
                    FOAF.name,
                    Literal("someone else")), stored_graph)
-        assert_in((URIRef("https://www.myfancypage.com/digital"),
+        assert_in((author_digital,
                    FOAF.name,
                    Literal("digital native")),
                   handle.meta)
-        assert_in((URIRef("https://www.myfancypage.com/digital"),
+        assert_in((author_digital,
                    FOAF.name,
                    Literal("digital native")),
                   stored_graph)
@@ -186,6 +202,8 @@ def test_import_meta_collection_handle(hurl, hpath, cpath, lcpath):
         #                                      REPO_STD_META_FILE)
         #                      + "/#author1")}
         # TODO: check!
+        # Note: See test_import_meta_handle!
+        #
         # Currently the prefix (EMP) expands differently in both graphs.
         # Why is this?
         # eq_(author_list, set(handle_graph.objects(subject=handle_uri,

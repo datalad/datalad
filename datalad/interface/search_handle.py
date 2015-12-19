@@ -17,8 +17,8 @@ from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..support.handle import Handle
 from ..support.collection import MetaCollection
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
@@ -27,6 +27,8 @@ from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
+
+# TODO:  --output option as in search_collection.py
 
 
 class SearchHandle(Interface):
@@ -58,6 +60,8 @@ class SearchHandle(Interface):
              for remote in local_master.git_get_remotes()] +
             [local_master.get_backend_from_branch()])
 
+        metacollection.update_graph_store()
+
         # TODO: Bindings should be done in collection class:
         metacollection.conjunctive_graph.bind('dlns', DLNS)
 
@@ -80,11 +84,15 @@ class SearchHandle(Interface):
                 locations.append(str(row['r']))
 
         if handles:
-            width = max(len(h) for h in handles)
-            for h, l in zip(handles, locations):
-                print("%s\t%s" % (h.ljust(width), l))
-
-            return [Handle(CollectionRepoHandleBackend(local_master, handle))
-                    for handle in handles]
+            # TODO:
+            #   - needs to have remote collection name/ prefix
+            #   - Python API shouldn't bomb -- we should have a test
+            if self.cmdline:
+                width = max(len(h) for h in handles)
+                for h, l in zip(handles, locations):
+                    print("%s\t%s" % (h.ljust(width), l))
+            else:
+                return [CollectionRepoHandleBackend(local_master, handle)
+                        for handle in handles]
         else:
             return []

@@ -37,12 +37,13 @@ def test_uninstall_handle(handle_url, path, lcpath):
     with patch('datalad.cmdline.helpers.dirs', mocked_dirs), \
             swallow_logs() as cml:
         handle = install_handle(handle_url, path)
-        assert_in(handle.name, get_datalad_master().get_handle_list())
+        name = handle.name
+        assert_in(name, get_datalad_master().get_handle_list())
 
-        uninstall_handle(handle.name)
+        uninstall_handle(name)
 
         # unknown to datalad
-        assert_not_in(handle.name, get_datalad_master().get_handle_list())
+        assert_not_in(name, get_datalad_master().get_handle_list())
 
         # repo was removed:
         ok_(not exists(path))

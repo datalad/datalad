@@ -16,8 +16,9 @@ from os import curdir
 from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
-from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend
+from ..support.constraints import EnsureStr, EnsureChoice
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from ..support.collection import MetaCollection, Collection
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
@@ -25,6 +26,15 @@ from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
+
+# PROFILE
+# import line_profiler
+# prof = line_profiler.LineProfiler()
+
+_OUTPUTS = ('names', 'locations', 'full')
+# TODO:
+# may be in Python mode we would like to extend it with
+#  rdf-result, collections
 
 
 class SearchCollection(Interface):
@@ -38,13 +48,21 @@ class SearchCollection(Interface):
     """
     # TODO: A lot of doc ;)
 
+    # TODO: option to either query only the collections meta-data or the entirety
+    # with handles meta-data
     _params_ = dict(
+        output=Parameter(
+            choices=_OUTPUTS,
+            doc="""What to output as a result of search. TODO -- elaborate""",
+            constraints=EnsureChoice(*_OUTPUTS)
+        ),
         search=Parameter(
             args=('search',),
             doc="a string to search for",
-            constraints=EnsureStr()))
+            constraints=EnsureStr())
+    )
 
-    def __call__(self, search):
+    def __call__(self, search, output='names'):
         """
         Returns
         -------
@@ -57,23 +75,32 @@ class SearchCollection(Interface):
         # TODO: since search-handle and search-collection only slightly differ,
         # build a search call, that's more general and both can use
         # This one should allow for searching for other entities as well
-
+        # PROFILE
+        # prof.add_function(self.__call__)
+        # prof.enable_by_count()
         local_master = get_datalad_master()
 
+        # TODO: check on possibility of efficient persistence of MetaCollection
+        # on a drive, so we could update it once with current state of
+        # collections and handles, save to drive, and load it HERE for a query
+
         metacollection = MetaCollection(
-            [local_master.get_backend_from_branch(remote + "/master")
-             for remote in local_master.git_get_remotes()] +
-            [local_master.get_backend_from_branch()])
+           [CollectionRepoBackend(local_master, remote + "/master")
+            for remote in local_master.git_get_remotes()])
+
+        # load just the collection level metadata:
+        for collection in metacollection:
+            metacollection[collection].update_metadata()
 
         # TODO: Bindings should be done in collection class:
         metacollection.conjunctive_graph.bind('dlns', DLNS)
 
+        # TODO: adjust query for 'full' and then implement output
         query_string = """SELECT ?g ?r {GRAPH ?g {?r rdf:type dlns:Collection .
                                              ?s ?p ?o .
                                              FILTER regex(?o, "%s")}}""" % \
                        search
-
-        results = metacollection.conjunctive_graph.query(query_string)
+        results = metacollection.query(query_string, update=False)
 
         rows = [row.asdict() for row in results]
         collections = list()
@@ -86,12 +113,29 @@ class SearchCollection(Interface):
             else:
                 locations.append(str(row['r']))
 
+        printed_collections = set()
         if collections:
-            width = max(len(c) for c in collections)
-            for c, l in zip(collections, locations):
-                print("%s\t%s" % (c.ljust(width), l))
+            if not self.cmdline:
+                return [CollectionRepoBackend(local_master, col + "/master")
+                        for col in collections]
+            else:
+                #width = max(len(c) for c in collections)
+                for c, l in zip(collections, locations):
+                    if output in {'names', 'locations'} and c in printed_collections:
+                        continue
+                    printed_collections.add(c)
+                    if output == 'names':
+                        out = c
+                    elif output == 'locations':
+                        out = l
+                    elif output == 'full':
+                        raise NotImplementedError()
+                    #print("%s\t%s" % (c.ljust(width), l))
+                    print(out)
 
-            return [Collection(CollectionRepoBackend(local_master, col + "/master"))
-                    for col in collections]
         else:
             return []
+
+        # PROFILE
+        # prof.disable_by_count()
+        # prof.print_stats()

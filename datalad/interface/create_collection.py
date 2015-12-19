@@ -18,8 +18,8 @@ from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from datalad.support.collection import Collection
 from datalad.cmdline.helpers import get_datalad_master
 
@@ -70,4 +70,5 @@ class CreateCollection(Interface):
         local_master.git_remote_add(new_collection.name, new_collection.path)
         local_master.git_fetch(new_collection.name)
 
-        return Collection(CollectionRepoBackend(new_collection))
+        if not self.cmdline:
+            return CollectionRepoBackend(new_collection)

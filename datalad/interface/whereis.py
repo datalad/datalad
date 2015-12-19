@@ -16,8 +16,9 @@ from os.path import join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from datalad.cmdline.helpers import get_datalad_master
 from ..log import lgr
 
@@ -47,7 +48,7 @@ class Whereis(Interface):
         local_master = get_datalad_master()
 
         if key in local_master.git_get_remotes():
-            location = CollectionRepoBackend(local_master, key).url
+            location = CollectionRepoBackend(local_master, key + "/master").url
         elif key in local_master.get_handle_list():
             location = CollectionRepoHandleBackend(local_master, key).url
         else:
@@ -55,4 +56,5 @@ class Whereis(Interface):
 
         result = urlparse(location).path
         print(result)
-        return result
+        if not self.cmdline:
+            return result

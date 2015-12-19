@@ -23,6 +23,7 @@ from functools import wraps
 
 from git import Repo
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
+from git.objects.blob import Blob
 
 from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
@@ -201,6 +202,8 @@ class GitRepo(object):
     """
     __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
+    _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=false']
+
     def __init__(self, path, url=None, runner=None, create=True):
         """Creates representation of git repository at `path`.
 
@@ -259,6 +262,17 @@ class GitRepo(object):
                     InvalidGitRepositoryError) as e:
                 lgr.error(str(e))
                 raise
+
+    def __repr__(self):
+        return "<GitRepo path=%s (%s)>" % (self.path, type(self))
+
+    def __eq__(self, obj):
+        """Decides whether or not two instances of this class are equal.
+
+        This is done by comparing the base repository path.
+        """
+        return self.path == obj.path
+
 
     @classmethod
     def get_toppath(cls, path):
@@ -374,12 +388,18 @@ class GitRepo(object):
         """
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
-        return [branch.strip() for branch in
-                self.repo.git.branch(r=True).splitlines()]
+
+        # For some reason, this is three times faster than the version below:
+        remote_branches = list()
+        for remote in self.repo.remotes:
+            for ref in remote.refs:
+                remote_branches.append(ref.name)
+        return remote_branches
+        # return [branch.strip() for branch in
+        #         self.repo.git.branch(r=True).splitlines()]
 
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
-
 
     def git_get_active_branch(self):
 
@@ -406,9 +426,11 @@ class GitRepo(object):
         -------
         stdout, stderr
         """
-        
-        cmd = shlex.split(cmd_str + " " + " ".join(files),
-                          posix=not on_windows)
+        cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
+            if isinstance(cmd_str, string_types) \
+            else cmd_str + files
+        assert(cmd[0] == 'git')
+        cmd = cmd[:1] + self._GIT_COMMON_OPTIONS + cmd[1:]
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
@@ -472,7 +494,6 @@ class GitRepo(object):
     def git_push(self, name='', options=''):
         """
         """
-
         self._git_custom_command('', 'git push %s %s' % (options, name),
                                  expect_stderr=True)
 
@@ -484,7 +505,7 @@ class GitRepo(object):
         self._git_custom_command('', 'git checkout %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_get_files(self, branch="HEAD"):
+    def git_get_files(self, branch=None):
         """Get a list of files in git.
 
         Lists the files in the (remote) branch.
@@ -492,22 +513,20 @@ class GitRepo(object):
         Parameters
         ----------
         branch: str
-          Name of the branch to query.
+          Name of the branch to query. Default: active branch.
 
         Returns
         -------
         [str]
           list of files.
         """
-        cmd_str = 'git ls-tree -r ' + branch
-        out, err = self._git_custom_command('', cmd_str)
-        return [line.split('\t')[1] for line in out.rstrip(linesep).splitlines()]
 
-
-        # Only local branches: How to get from remote branches in a similar way?
-        #head = self.repo.head if branch == "HEAD" else self.repo.heads[branch]
-        # return [item.path for item in list(head.commit.tree.traverse())]
-        # #if isinstance(item, git.objects.blob.Blob)
+        if branch is None:
+            # active branch can be queried way faster:
+            return self.get_indexed_files()
+        else:
+            return [item.path for item in self.repo.tree(branch).traverse()
+                    if isinstance(item, Blob)]
 
     def git_get_file_content(self, file_, branch='HEAD'):
         """
@@ -518,9 +537,18 @@ class GitRepo(object):
           content of file_ as a list of lines.
         """
 
-        out, err = self._git_custom_command(
-            '', 'git cat-file blob %s:%s' % (branch, file_))
-        return out.rstrip(linesep).splitlines()
+        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
+
+        # in python3 a byte string is returned. Need to convert it:
+        from six import PY3
+        if PY3:
+            conv_str = u''
+            for b in bytes(content_str):
+                conv_str += chr(b)
+            return conv_str.splitlines()
+        else:
+            return content_str.splitlines()
+        # TODO: keep splitlines?
 
     def git_merge(self, name):
         self._git_custom_command('', 'git merge %s' % name)
