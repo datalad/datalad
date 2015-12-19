@@ -24,7 +24,10 @@ from ...support.network import get_url_straight_filename
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 if PY3:
-    httpretty = None
+    class NoHTTPPretty(object):
+       __bool__ = __nonzero__ = lambda s: False
+       activate = lambda s, t: t
+    httpretty = NoHTTPPretty()
 else:
     import httpretty
 
@@ -204,8 +207,8 @@ url = "http://example.com/crap.txt"
 test_cookie = 'somewebsite=testcookie'
 
 #@skip_httpretty_on_problematic_pythons
+@skip_if(not httpretty, "no httpretty")
 @httpretty.activate
-@skip_if(not httpretty)
 @with_tempfile(mkdir=True)
 def test_HTMLFormAuthenticator_httpretty(d):
     fpath = opj(d, 'crap.txt')
@@ -285,8 +288,8 @@ class FakeCredential2(Credential):
         return self._fixed_credentials
 
 
+@skip_if(not httpretty, "no httpretty")
 @httpretty.activate
-@skip_if(not httpretty)
 @with_tempfile(mkdir=True)
 def test_HTMLFormAuthenticator_httpretty_2(d):
     fpath = opj(d, 'crap.txt')
