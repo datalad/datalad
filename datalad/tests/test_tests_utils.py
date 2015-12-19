@@ -459,6 +459,10 @@ def test_use_cassette_if_no_vcr():
         raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
     except ImportError:
         pass
+    except:
+        # if anything else goes wrong with importing vcr, we still should be able to
+        # run use_cassette
+        pass
 
     @use_cassette("some_path")
     def checker(x):
