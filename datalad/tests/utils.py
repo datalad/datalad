@@ -666,22 +666,17 @@ def skip_if_on_windows(func):
         return func(*args, **kwargs)
     return newfunc
 
-@optional_args
-def skip_if(func, cond=True, msg=None):
-    """Skip test completely under Windows
-    """
-    if cond:
-        raise SkipTest(msg if msg else "condition was True")
-    return func
-
 
 @optional_args
 def skip_if(func, cond=True, msg=None):
     """Skip test for specific condition
     """
-    if cond:
-        raise SkipTest(msg if msg else "condition was True")
-    return func
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if cond:
+            raise SkipTest(msg if msg else "condition was True")
+        return func(*args, **kwargs)
+    return newfunc
 
 
 @optional_args
