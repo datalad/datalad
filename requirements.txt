@@ -9,7 +9,10 @@ keyring
 mock
 
 # ---- Downloaders
-boto
+
+# boto
+# started to cause chaos somehow on travis, so let's try develop branch
+https://github.com/boto/boto/archive/develop.zip
 requests
 # progressbar > 2.3 for python3 support
 # but upstream seems to be dead and fixes are not merged
