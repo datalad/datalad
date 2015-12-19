@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import inspect
 import shutil
 import stat
 import os
@@ -28,11 +29,11 @@ from six.moves.BaseHTTPServer import HTTPServer
 from six import reraise
 
 from functools import wraps
-from os.path import exists, realpath, join as opj, pardir
+from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
 
 from nose.tools import \
     assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
-    assert_in, assert_in as in_, \
+    assert_in, assert_not_in, assert_in as in_, \
     raises, ok_, eq_, make_decorator
 
 from nose import SkipTest
@@ -42,11 +43,52 @@ from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
-
+from ..cmdline.helpers import get_repo_instance
+from ..consts import ARCHIVES_TEMP_DIR
 from . import _TEMP_PATHS_GENERATED
 
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
+
+try:
+    # TEMP: Just to overcome problem with testing on jessie with older requests
+    # https://github.com/kevin1024/vcrpy/issues/215
+    import vcr.patch as _vcrp
+    import requests as _
+    try:
+        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
+    except ImportError:
+        def returnnothing(*args, **kwargs):
+            return()
+        _vcrp.CassettePatcherBuilder._requests = returnnothing
+
+    from vcr import use_cassette as _use_cassette, VCR as _VCR
+
+    def use_cassette(path, return_body=None, **kwargs):
+        """Adapter so we could create/use custom use_cassette with custom parameters
+        """
+        if return_body is not None:
+            my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
+            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
+        else:
+            return _use_cassette(path, **kwargs)  # just a straight one
+
+except ImportError:
+    # If there is no vcr.py -- provide a do nothing decorator for use_cassette
+    def use_cassette(*args, **kwargs):
+        def do_nothing_decorator(t):
+            @wraps(t)
+            def wrapper(*args, **kwargs):
+                return t(*args, **kwargs)
+            return wrapper
+        return do_nothing_decorator
+
+def skip_if_no_module(module):
+    try:
+        imp = __import__(module)
+    except ImportError:
+        raise SkipTest("No %s module" % module)
+
 
 def create_tree_archive(path, name, load, overwrite=False):
     """Given an archive `name`, create under `path` with specified `load` tree
@@ -70,9 +112,12 @@ def create_tree(path, tree):
     if not exists(path):
         os.makedirs(path)
 
+    if isinstance(tree, dict):
+        tree = tree.items()
+
     for name, load in tree:
         full_name = opj(path, name)
-        if isinstance(load, tuple):
+        if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz'):
                 create_tree_archive(path, name, load)
             else:
@@ -93,6 +138,7 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 from ..utils import chpwd, getpwd
 
@@ -140,14 +186,42 @@ def ok_clean_git(path, annex=True, untracked=[]):
         eq_(head_diffs, [])
 
 
-def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepo(path)
-    assert(filename in repo.get_indexed_files())  # file is known to Git
+def ok_file_under_git(path, filename=None, annexed=False):
+    """Test if file is present and under git/annex control
+
+    If relative path provided, then test from current directory
+    """
+    if filename is None:
+        # path provides the path and the name
+        path, filename = pathsplit(path)
+
     try:
-        repo.get_file_key(filename)
-        in_annex = True
-    except FileNotInAnnexError as e:
+        # if succeeds when must not (not `annexed`) -- fail
+        repo = get_repo_instance(path, class_=AnnexRepo)
+        annex = True
+    except RuntimeError as e:
+        # TODO: make a dedicated Exception
+        if "No annex repository found in" in str(e):
+            repo = get_repo_instance(path, class_=GitRepo)
+            annex = False
+        else:
+            raise
+
+    # path to the file within the repository
+    file_repo_dir = os.path.relpath(path, repo.path)
+    file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
+    assert(file_repo_path in repo.get_indexed_files())  # file is known to Git
+
+    if annex:
+        try:
+            # operates on relative to curdir path
+            repo.get_file_key(opj(path, filename))
+            in_annex = True
+        except FileNotInAnnexError as e:
+            in_annex = False
+    else:
         in_annex = False
+
     assert(annexed == in_annex)
 
 #
@@ -182,6 +256,11 @@ def ok_startswith(s, prefix):
         msg="String %r doesn't start with %r" % (s, prefix))
 
 
+def ok_endswith(s, suffix):
+    ok_(s.endswith(suffix),
+        msg="String %r doesn't end with %r" % (s, suffix))
+
+
 def nok_startswith(s, prefix):
     assert_false(s.startswith(prefix),
         msg="String %r starts with %r" % (s, prefix))
@@ -212,6 +291,34 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+def ok_generator(gen):
+    assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
+
+def ok_archives_caches(repopath, n=1, persistent=None):
+    """Given a path to repository verify number of archives
+
+    Parameters
+    ----------
+    repopath : str
+      Path to the repository
+    n : int, optional
+      Number of archives directories to expect
+    persistent: bool or None, optional
+      If None -- both persistent and not count.
+    """
+    # looking into subdirectories
+    glob_ptn = opj(repopath,
+                   ARCHIVES_TEMP_DIR + {None: '*', True: '', False: '-*'}[persistent],
+                   '*')
+    dirs = glob.glob(glob_ptn)
+    assert_equal(len(dirs), n,
+                 msg="Found following dirs when needed %d of them: %s" % (n, dirs))
+
+def ok_file_has_content(path, content):
+    """Verify that file exists and has expected content"""
+    assert(exists(path))
+    with open(path, 'r') as f:
+        assert_equal(f.read(), content)
 
 #
 # Decorators
@@ -259,7 +366,7 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
 def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
     """
-    
+
     @wraps(tfunc)
     def newfunc(*args, **kwargs):
 
@@ -475,7 +582,7 @@ def _get_testrepos_uris(regex, flavors):
 
 
 @optional_args
-def with_testrepos(t, regex='.*', flavors='auto', skip=False):
+def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     """Decorator to provide a local/remote test repository
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
@@ -495,6 +602,8 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
       first clone from the network location. 'auto' would include the list of
       appropriate ones (e.g., no 'network*' flavors if network tests are
       "forbidden").
+    count: int, optional
+      If specified, only up to that number of repositories to test with
 
     Examples
     --------
@@ -519,7 +628,11 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
+        ntested = 0
         for uri in testrepos_uris:
+            if count and ntested >= count:
+                break
+            ntested += 1
             if __debug__:
                 lgr.debug('Running %s on %s' % (t.__name__, uri))
             try:
@@ -552,6 +665,14 @@ def skip_if_on_windows(func):
             raise SkipTest("Skipping on Windows")
         return func(*args, **kwargs)
     return newfunc
+
+@optional_args
+def skip_if(func, cond=True, msg=None):
+    """Skip test completely under Windows
+    """
+    if cond:
+        raise SkipTest(msg if msg else "condition was True")
+    return func
 
 
 @optional_args
@@ -652,6 +773,24 @@ def ignore_nose_capturing_stdout(func):
             else:
                 raise
     return newfunc
+
+def skip_httpretty_on_problematic_pythons(func):
+    """As discovered some httpretty bug causes a side-effect
+    on other tests on some Pythons.  So we skip the test if such
+    problematic combination detected
+
+    References
+    https://travis-ci.org/datalad/datalad/jobs/94464988
+    http://stackoverflow.com/a/29603206/1265472
+    """
+
+    @make_decorator(func)
+    def newfunc(*args, **kwargs):
+        if sys.version_info[:3] == (3, 4, 2):
+            raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
+        return func(*args, **kwargs)
+    return newfunc
+
 
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure

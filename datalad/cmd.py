@@ -23,8 +23,9 @@ from six import PY3
 from six import string_types, binary_type
 
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol
+from .support.protocol import NullProtocol, DryRunProtocol
 from .utils import on_windows
+from . import cfg
 
 lgr = logging.getLogger('datalad.cmd')
 
@@ -126,7 +127,8 @@ class Runner(object):
                 line = proc.stderr.readline()
                 if line:
                     stderr += line
-                    self._log_err(line.decode(), expect_stderr or expect_fail)
+                    self._log_err(line.decode() if PY3 else line,
+                                  expect_stderr or expect_fail)
                     # TODO: what's the proper log level here?
                     # Changes on that should be properly adapted in
                     # test.cmd.test_runner_log_stderr()
@@ -352,3 +354,10 @@ def link_file_load(src, dst, dry_run=False):
         shutil.copystat(src_realpath, dst)
     else:
         lgr.log(1, "Hardlinking finished")
+
+def get_runner(*args, **kwargs):
+    # TODO:  this is all crawl specific -- should be moved away
+    if cfg.getboolean('crawl', 'dryrun', default=False):
+        kwargs = kwargs.copy()
+        kwargs['protocol'] = DryRunProtocol()
+    return Runner(*args, **kwargs)

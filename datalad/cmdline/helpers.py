@@ -127,6 +127,7 @@ class RegexpType(object):
             return None
 
 
+# TODO: useful also outside of cmdline, move to support/
 from os import curdir
 def get_repo_instance(path=curdir, class_=None):
     """Returns an instance of appropriate datalad repository for path.

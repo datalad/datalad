@@ -9,12 +9,20 @@
 """constants for datalad
 """
 
+from os.path import join
+
 # file names for metadata of collections and handles:
 REPO_STD_META_FILE = 'datalad.ttl'
 REPO_CONFIG_FILE = 'config.ttl'
 
 # directory containing prepared metadata of a handle repository:
 HANDLE_META_DIR = ".datalad"
+CRAWLER_META_DIR = join(HANDLE_META_DIR, 'crawl')
+CRAWLER_META_CONFIG_FILENAME = 'crawl.cfg'
+CRAWLER_META_CONFIG_PATH = join(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
 
 # name of local master collection:
 DATALAD_COLLECTION_NAME = "datalad-local"
+
+ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
+ARCHIVES_TEMP_DIR = join('.git', 'datalad', 'tmp', 'archives')

@@ -30,6 +30,7 @@ from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import assert_re_in
 from .utils import ok_
+from .utils_testrepos import BasicHandleTestRepo
 
 
 @assert_cwd_unchanged
@@ -444,6 +445,43 @@ def test_GitRepo_get_toppath(repo, tempdir):
     eq_(GitRepo.get_toppath(nested), reporeal)
     # and if not under git, should return None
     eq_(GitRepo.get_toppath(tempdir), None)
+
+def test_GitRepo_dirty():
+    trepo = BasicHandleTestRepo()
+    repo = trepo.repo
+    # empty at this point -- should not be dirty as well. TODO
+    assert_false(repo.dirty)
+    trepo.create()
+    assert_false(repo.dirty)
+
+    # new file added to index
+    trepo.create_file('newfiletest.dat', '123\n', annex=False)
+    assert_true(repo.dirty)
+    repo.git_commit("just a commit")
+    assert_false(repo.dirty)
+
+    # file modified to be the same
+    trepo.create_file('newfiletest.dat', '123\n', annex=False)
+    assert_false(repo.dirty)
+
+    # file modified
+    trepo.create_file('newfiletest.dat', '12\n', annex=False)
+    assert_true(repo.dirty)
+    repo.git_commit("just a commit")
+    assert_false(repo.dirty)
+
+    # new file not added to index
+    trepo.create_file('newfiletest2.dat', '123\n', add=False, annex=False)
+    assert_true(repo.dirty)
+    os.unlink(opj(repo.path, 'newfiletest2.dat'))
+    assert_false(repo.dirty)
+
+    # new annexed file
+    trepo.create_file('newfiletest2.dat', '123\n', annex=True)
+    assert_true(repo.dirty)
+    repo.git_commit("just a commit")
+    assert_false(repo.dirty)
+
 
 
 # TODO:

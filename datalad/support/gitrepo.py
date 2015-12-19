@@ -350,6 +350,10 @@ class GitRepo(object):
             to be implemented. See options_decorator in annexrepo.
         """
 
+        # TODO: for some commits we explicitly do not want a message since
+        # it would be coming from e.g. staged merge. But it is not clear
+        # what gitpython would do about it. doc says that it would
+        # convert to string anyways.... bleh
         if not msg:
             msg = "What would be a good default message?"
 
@@ -408,7 +412,7 @@ class GitRepo(object):
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
-                           expect_stderr=False, cwd=None, env=None,
+                           expect_stderr=True, cwd=None, env=None,
                            shell=None):
         """Allows for calling arbitrary commands.
 
@@ -550,8 +554,8 @@ class GitRepo(object):
             return content_str.splitlines()
         # TODO: keep splitlines?
 
-    def git_merge(self, name):
-        self._git_custom_command('', 'git merge %s' % name)
+    def git_merge(self, name, options='', **kwargs):
+        self._git_custom_command('', 'git merge %s %s' % (options, name), **kwargs)
 
     def git_remove_branch(self, branch):
         self._git_custom_command('', 'git branch -D %s' % branch)
@@ -561,3 +565,8 @@ class GitRepo(object):
                                  (options if options is not None else '',
                                   remote))
         # TODO: Return values?
+    
+    @property
+    def dirty(self):
+        """Returns true if there is uncommitted changes or files not known to index"""
+        return self.repo.is_dirty(untracked_files=True)
