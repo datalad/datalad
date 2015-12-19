@@ -10,12 +10,6 @@
 
 """
 
-try:
-    import boto
-    from boto.s3.key import Key
-    from boto.exception import S3ResponseError
-except ImportError:
-    boto = None
 
 import re
 import os
@@ -25,13 +19,14 @@ from six.moves.urllib.parse import urljoin, urlsplit
 from ..ui import ui
 from ..utils import auto_repr
 from ..utils import assure_dict_from_str
-from ..dochelpers import borrowkwargs
+from ..dochelpers import borrowkwargs, exc_str
 from ..support.network import get_url_straight_filename
 from ..support.network import rfc2822_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader
 from .base import DownloadError, AccessDeniedError
+from ..support.s3 import boto, S3ResponseError
 
 from logging import getLogger
 lgr = getLogger('datalad.http')
@@ -53,6 +48,8 @@ class S3Authenticator(Authenticator):
         """
         lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
         credentials = credential()
+        if not boto:
+            raise RuntimeError("%s requires boto module which is N/A" % self)
         conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
 
         try:

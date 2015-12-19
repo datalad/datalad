@@ -24,7 +24,6 @@ from ..utils import assure_list_from_str
 from ..dochelpers import exc_str
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
-from ..downloaders import Providers
 
 from logging import getLogger
 lgr = getLogger('datalad.api.download-url')
@@ -71,6 +70,9 @@ class DownloadURL(Interface):
         list of str
           downloaded successfully files
         """
+
+        from ..downloaders import Providers
+
         urls = assure_list_from_str(urls)
 
         if len(urls) > 1:

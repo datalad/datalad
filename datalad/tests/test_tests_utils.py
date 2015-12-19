@@ -422,6 +422,7 @@ def test_skip_if():
         @skip_if(True)
         def f():
             raise AssertionError("must have not been ran")
+        f()
 
     @skip_if(False)
     def f():
@@ -457,6 +458,10 @@ def test_use_cassette_if_no_vcr():
         import vcr
         raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
     except ImportError:
+        pass
+    except:
+        # if anything else goes wrong with importing vcr, we still should be able to
+        # run use_cassette
         pass
 
     @use_cassette("some_path")

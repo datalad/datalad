@@ -10,11 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
-import boto
 import mimetypes
-
-from boto.s3.key import Key
-from boto.exception import S3ResponseError
 
 from os.path import splitext
 
@@ -22,6 +18,19 @@ import keyring
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
+
+from ..dochelpers import exc_str
+
+try:
+    import boto
+    from boto.s3.key import Key
+    from boto.exception import S3ResponseError
+except ImportError:
+    boto = Key = S3ResponseError = None
+except Exception as e:
+    lgr.warning("boto module failed to import although available: %s" % exc_str(e))
+    boto = Key = S3ResponseError = None
+
 
 # TODO: should become a config option and managed along with the rest
 S3_ADMIN_CREDENTIAL = "datalad-s3-admin"

@@ -8,9 +8,6 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for S3 downloader"""
 
-from os.path import join as opj
-
-from ..base import DownloadError, AccessDeniedError
 from ..aws import S3Downloader
 
 from ..providers import Providers, Credential  # to test against crcns
@@ -20,6 +17,12 @@ from ...tests.utils import with_tempfile
 from ...tests.utils import assert_false
 from ...tests.utils import assert_in
 from ...tests.utils import use_cassette
+from ...dochelpers import exc_str
+
+try:
+    import boto
+except Exception as e:
+    raise SkipTest("boto module is not available: %s" % exc_str(e))
 
 from .test_http import check_download_external_url
 

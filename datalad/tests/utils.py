@@ -43,6 +43,7 @@ from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
+from ..dochelpers import exc_str
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
 from . import _TEMP_PATHS_GENERATED
@@ -73,7 +74,10 @@ try:
         else:
             return _use_cassette(path, **kwargs)  # just a straight one
 
-except ImportError:
+except Exception as exc:
+    if not isinstance(exc, ImportError):
+        # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
+        lgr.warning("Failed to import vcr, no cassettes will be available: %s", exc_str(exc, limit=10))
     # If there is no vcr.py -- provide a do nothing decorator for use_cassette
     def use_cassette(*args, **kwargs):
         def do_nothing_decorator(t):
