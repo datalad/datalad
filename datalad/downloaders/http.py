@@ -14,6 +14,7 @@ import re
 import requests
 import requests.auth
 
+from six import PY3
 from six import BytesIO
 
 from ..utils import assure_list_from_str, assure_dict_from_str
@@ -337,7 +338,10 @@ class HTTPDownloader(BaseDownloader):
                     if size is not None and total >= size:
                         break  # we have done as much as we were asked
             if return_content:
-                return f.getvalue()
+                out = f.getvalue()
+                if PY3 and isinstance(out, bytes):
+                    out = out.decode()
+                return out
 
         return _downloader, target_size, url_filename, headers
 
