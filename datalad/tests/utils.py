@@ -645,6 +645,23 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     return newfunc
 with_testrepos.__test__ = False
 
+@optional_args
+def with_fake_cookies_db(func, cookies={}):
+    """mock original cookies db with a fake one for the duration of the test
+    """
+    from ..support.cookies import cookies_db
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        try:
+            orig_cookies_db = cookies_db._cookies_db
+            cookies_db._cookies_db = cookies.copy()
+            return func(*args, **kwargs)
+        finally:
+            cookies_db._cookies_db = orig_cookies_db
+    return newfunc
+
+
 def skip_if_no_network(func):
     """Skip test completely in NONETWORK settings
     """

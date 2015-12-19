@@ -21,6 +21,7 @@ from ..providers import Providers, Credential  # to test against crcns
 from ...support.cookies import CookiesDB
 
 from ...support.network import get_url_straight_filename
+from ...tests.utils import with_fake_cookies_db
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 if PY3:
@@ -210,6 +211,7 @@ test_cookie = 'somewebsite=testcookie'
 @skip_if(not httpretty, "no httpretty")
 @httpretty.activate
 @with_tempfile(mkdir=True)
+@with_fake_cookies_db
 def test_HTMLFormAuthenticator_httpretty(d):
     fpath = opj(d, 'crap.txt')
 
@@ -261,12 +263,8 @@ def test_HTMLFormAuthenticator_httpretty(d):
                                                submit="CustomLogin"))
     # TODO: with success_re etc
     # This is a "success test" which should be tested in various above scenarios
-    def fake_load(self):
-        self._cookies_db = {}
-
-    with patch.object(CookiesDB, '_load', fake_load):
-        downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
-        downloader.download(url, path=d)
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
 
     with open(fpath) as f:
         content = f.read()
@@ -291,6 +289,7 @@ class FakeCredential2(Credential):
 @skip_if(not httpretty, "no httpretty")
 @httpretty.activate
 @with_tempfile(mkdir=True)
+@with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})
 def test_HTMLFormAuthenticator_httpretty_2(d):
     fpath = opj(d, 'crap.txt')
 
@@ -341,12 +340,8 @@ def test_HTMLFormAuthenticator_httpretty_2(d):
     # then in another GET is performed to verify that correct cookie was provided and
     # that no credentials are there
 
-    def fake_load_expired_cookie(self):
-        self._cookies_db = {'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')}
-
-    with patch.object(CookiesDB, '_load', fake_load_expired_cookie):
-        downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
-        downloader.download(url, path=d)
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    downloader.download(url, path=d)
 
     with open(fpath) as f:
         content = f.read()
