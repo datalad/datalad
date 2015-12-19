@@ -231,7 +231,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
 def ok_symlink(path):
     """Checks whether path is either a working or broken symlink"""
     link_path = os.path.islink(path)
-    if not link_path: 
+    if not link_path:
         raise AssertionError("Path {} seems not to be a symlink".format(path))
 
 
@@ -373,7 +373,7 @@ def serve_path_via_http(tfunc, *targs):
         if targs:
             # if a path is passed into serve_path_via_http, then it's in targs
             assert len(targs) == 1
-            path = targs[0] 
+            path = targs[0]
 
         elif len(args) > 1:
             args, path = args[:-1], args[-1]
@@ -390,7 +390,7 @@ def serve_path_via_http(tfunc, *targs):
         hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http,
                                                 args=(hostname, path, queue))
         multi_proc.start()
         port = queue.get(timeout=300)
@@ -669,6 +669,15 @@ def skip_if_on_windows(func):
 @optional_args
 def skip_if(func, cond=True, msg=None):
     """Skip test completely under Windows
+    """
+    if cond:
+        raise SkipTest(msg if msg else "condition was True")
+    return func
+
+
+@optional_args
+def skip_if(func, cond=True, msg=None):
+    """Skip test for specific condition
     """
     if cond:
         raise SkipTest(msg if msg else "condition was True")
