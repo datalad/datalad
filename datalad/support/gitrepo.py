@@ -148,7 +148,8 @@ def normalize_paths(func, match_return_type=True):
     def newfunc(self, files, *args, **kwargs):
         if isinstance(files, string_types) or not files:
             files_new = [_normalize_path(self.path, files)]
-            single_file = not(isdir(opj(self.path, files_new[0])))
+            file_path = opj(self.path, files_new[0])
+            single_file = exists(file_path) and not(isdir(file_path))
         elif isinstance(files, list):
             files_new = [_normalize_path(self.path, path) for path in files]
             single_file = False

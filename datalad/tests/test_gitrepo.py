@@ -115,7 +115,11 @@ def test_GitRepo_add(src, path):
 @with_tree(tree={
     'd': {'f1': 'content1',
           'f2': 'content2'},
-    'file': 'content3'
+    'file': 'content3',
+    'd2': {'f1': 'content1',
+          'f2': 'content2'},
+    'file2': 'content3'
+
     })
 def test_GitRepo_remove(path):
 
@@ -126,6 +130,7 @@ def test_GitRepo_remove(path):
     eq_(gr.git_remove('file'), 'file')
     eq_(set(gr.git_remove('d', r=True, f=True)), {'d/f1', 'd/f2'})
 
+    eq_(set(gr.git_remove('*', r=True, f=True)), {'file2', 'd2/f1', 'd2/f2'})
 
 @assert_cwd_unchanged
 @with_tempfile
