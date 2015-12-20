@@ -13,7 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os import linesep
-from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
+from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir
 from os.path import dirname, basename
 import logging
 import shlex
@@ -148,7 +148,7 @@ def normalize_paths(func, match_return_type=True):
     def newfunc(self, files, *args, **kwargs):
         if isinstance(files, string_types) or not files:
             files_new = [_normalize_path(self.path, files)]
-            single_file = True
+            single_file = not(isdir(opj(self.path, files_new[0])))
         elif isinstance(files, list):
             files_new = [_normalize_path(self.path, path) for path in files]
             single_file = False

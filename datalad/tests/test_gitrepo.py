@@ -112,6 +112,22 @@ def test_GitRepo_add(src, path):
 
 
 @assert_cwd_unchanged
+@with_tree(tree={
+    'd': {'f1': 'content1',
+          'f2': 'content2'},
+    'file': 'content3'
+    })
+def test_GitRepo_remove(path):
+
+    gr = GitRepo(path, create=True)
+    gr.git_add('*')
+    gr.git_commit("committing all the files")
+
+    eq_(gr.git_remove('file'), 'file')
+    eq_(set(gr.git_remove('d', r=True, f=True)), {'d/f1', 'd/f2'})
+
+
+@assert_cwd_unchanged
 @with_tempfile
 def test_GitRepo_commit(path):
 
