@@ -148,8 +148,7 @@ def normalize_paths(func, match_return_type=True):
     def newfunc(self, files, *args, **kwargs):
         if isinstance(files, string_types) or not files:
             files_new = [_normalize_path(self.path, files)]
-            file_path = opj(self.path, files_new[0])
-            single_file = exists(file_path) and not(isdir(file_path))
+            single_file = True
         elif isinstance(files, list):
             files_new = [_normalize_path(self.path, path) for path in files]
             single_file = False
@@ -320,7 +319,7 @@ class GitRepo(object):
         else:
             lgr.warning("git_add was called with empty file list.")
 
-    @normalize_paths
+    @normalize_paths(match_return_type=False)
     def git_remove(self, files, **kwargs):
         """Remove files.
 

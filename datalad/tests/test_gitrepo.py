@@ -127,7 +127,7 @@ def test_GitRepo_remove(path):
     gr.git_add('*')
     gr.git_commit("committing all the files")
 
-    eq_(gr.git_remove('file'), 'file')
+    eq_(gr.git_remove('file'), ['file'])
     eq_(set(gr.git_remove('d', r=True, f=True)), {'d/f1', 'd/f2'})
 
     eq_(set(gr.git_remove('*', r=True, f=True)), {'file2', 'd2/f1', 'd2/f2'})
@@ -223,6 +223,8 @@ def test_GitRepo_files_decorator():
         def __init__(self):
             self.path = opj('some', 'where')
 
+        # TODO
+        # yoh:  logic is alien to me below why to have two since both look identical!
         @normalize_paths
         def decorated_many(self, files):
             return files
@@ -236,7 +238,8 @@ def test_GitRepo_files_decorator():
     # When a single file passed -- single path returned
     obscure_filename = get_most_obscure_supported_name()
     file_to_test = opj(test_instance.path, 'deep', obscure_filename)
-    eq_(test_instance.decorated_many(file_to_test),
+    # file doesn't exist
+    eq_(test_instance.decorated_one(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
     eq_(test_instance.decorated_one(file_to_test),
                  _normalize_path(test_instance.path, file_to_test))
