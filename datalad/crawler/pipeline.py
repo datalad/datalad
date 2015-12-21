@@ -331,6 +331,8 @@ def load_pipeline_from_template(name, opts={}):
 
     return load_pipeline_from_script(filename, **opts)
 
+# TODO: we might need to find present .datalad/crawl in another branch if not
+# present currently
 
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
