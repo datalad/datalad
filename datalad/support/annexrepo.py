@@ -624,7 +624,7 @@ class AnnexRepo(GitRepo):
                 if len(note_split) != 2:
                     lgr.debug("Skipping note record %r for file %s", note_record, j['file'])
                     continue
-                remote, url = map(str.strip, note_split)
+                remote, url = map(lambda x: x.strip(), note_split)
                 if remote not in remotes:
                     lgr.warning("Remote %r not found among remotes %s. Skipping", remote, remotes.keys())
                 assert remote == 'web', "ATM can understand only notes for web remote"
@@ -632,9 +632,8 @@ class AnnexRepo(GitRepo):
         return remotes
 
 
-    # Magic of matching will be done inside
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
-    @normalize_paths(match_return_type=False)
+    @normalize_paths
     def annex_whereis(self, files, output='remotes'):
         """Lists repositories that have actual content of file(s).
 
@@ -684,22 +683,16 @@ class AnnexRepo(GitRepo):
                         for line in out.splitlines() if line.startswith('{'))
 
         if output == 'remotes':
-            out = [
+            return [
                 [remote.get('description') for remote in j.get('whereis')]
                 if j.get('success') else []
                 for j in json_objects]
-            return out[0] if len(files) == 1 and len(out) == 1 else out
+            return out
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
-            out = {j['file']: self._whereis_json_to_dict(j)
-                   for j in json_objects}
-
-            # do just a little magic?
-            if len(files) == 1 and len(out) == 1 and tuple(out)[0] == files[0]:
-                return tuple(out.values())[0]
-            else:
-                return out
+            return {j['file']: self._whereis_json_to_dict(j)
+                    for j in json_objects}
         else:
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
 

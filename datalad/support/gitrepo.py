@@ -163,8 +163,17 @@ def normalize_paths(func, match_return_type=True):
             # was requested or it was not a single file
             return result
         elif single_file:
-            assert(len(result) == 1)
-            return result[0]
+            if len(result) != 1:
+                # Magic doesn't apply
+                return result
+            elif isinstance(result, (list, tuple)):
+                return result[0]
+            elif isinstance(result, dict) and tuple(result)[0] == files_new[0]:
+                # assume that returned dictionary has files as keys.
+                return tuple(result.values())[0]
+            else:
+                # no magic can apply
+                return result
         else:
             return RuntimeError("should have not got here... check logic")
 
