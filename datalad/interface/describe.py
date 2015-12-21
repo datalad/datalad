@@ -95,7 +95,12 @@ class Describe(Interface):
         Handle or Collection
         """
 
-        repo = get_repo_instance()
+        if subject is not None and not exists(subject):
+            # we must be referring to something known to the master collection
+            repo = get_datalad_master()
+        else:
+            # use current location
+            repo = get_repo_instance()
 
         if isinstance(repo, CollectionRepo):
             target_class = 'Collection'
