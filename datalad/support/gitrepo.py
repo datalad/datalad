@@ -13,7 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os import linesep
-from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath
+from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir
 from os.path import dirname, basename
 import logging
 import shlex
@@ -319,7 +319,7 @@ class GitRepo(object):
         else:
             lgr.warning("git_add was called with empty file list.")
 
-    @normalize_paths
+    @normalize_paths(match_return_type=False)
     def git_remove(self, files, **kwargs):
         """Remove files.
 
