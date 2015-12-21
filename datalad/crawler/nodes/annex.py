@@ -40,7 +40,7 @@ class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
     def __init__(self, template, handle_name=None, collection_name=None,
-                 path=None,
+                 path=None, branch=None,
                  data_fields=[], add_fields={}, existing='raise'):
         """
         Parameters
@@ -54,6 +54,8 @@ class initiate_handle(object):
         path : str, optional
           Path were to initiate the handle.  If not specified, would use
           default path for all new handles (DATALAD_CRAWL_COLLECTIONSPATH)
+        branch : str, optional
+          Which branch to initialize
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
           the handle crawling options -- would be passed into the corresponding
@@ -73,8 +75,17 @@ class initiate_handle(object):
         self.add_fields = add_fields
         self.existing = existing
         self.path = path
+        self.branch = branch
 
     def _initiate_handle(self, path, name):
+        if self.branch is not None:
+            # Because all the 'create' magic is stuffed into the constructor ATM
+            # we need first initiate a git repository
+            git_repo = GitRepo(path, create=True)
+            # since we are initiatializing, that branch shouldn't exist yet, thus --orphan
+            git_repo.git_checkout(self.branch, options="--orphan")
+            # TODO: RF whenevever create becomes a dedicated factory/method
+            # and/or branch becomes an option for the "creater"
         return HandleRepo(
                        path,
                        direct=cfg.getboolean('crawl', 'init direct', default=False),
