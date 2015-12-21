@@ -154,7 +154,7 @@ class S3Downloader(BaseDownloader):
             if f:
                 # TODO: May be we could use If-Modified-Since
                 # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-                key.get_contents_to_file(f, num_cb=None, **kwargs)
+                key.get_contents_to_file(f, num_cb=0, **kwargs)
             else:
                 return key.get_contents_as_string(encoding='utf-8', **kwargs)
 

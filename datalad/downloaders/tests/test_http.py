@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for http downloader"""
 
+import os
 from os.path import join as opj
 import time
 from calendar import timegm
@@ -104,12 +105,17 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
 _test_providers = None
 
-@with_tempfile(mkdir=True)
-def check_download_external_url(url, failed_str, success_str, d):
+def _get_test_providers():
+    """Return reusable instance of our global providers"""
     global _test_providers
-    fpath = opj(d, get_url_straight_filename(url))
     if not _test_providers:
         _test_providers = Providers.from_config_files()
+    return _test_providers
+
+@with_tempfile(mkdir=True)
+def check_download_external_url(url, failed_str, success_str, d):
+    fpath = opj(d, get_url_straight_filename(url))
+    _test_providers = _get_test_providers()
     provider = _test_providers.get_provider(url)
     if not provider.credential.is_known:
         raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
@@ -170,6 +176,20 @@ def test_authenticate_external_portals():
           "2000 1005 2000 3000"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
+# TODO: redo smart way with mocking, to avoid unnecessary CPU waste
+@with_tree(tree={'file.dat': '1'})
+@serve_path_via_http
+@with_tempfile
+def test_mtime(path, url, tempfile):
+    # let's set custom mtime
+    file_to_download = opj(path, 'file.dat')
+    os.utime(file_to_download, (time.time(), 1000))
+    assert_equal(os.stat(file_to_download).st_mtime, 1000)
+
+    file_url = "%s/%s" % (url, 'file.dat')
+    with swallow_outputs():
+        _get_test_providers().download(file_url, path=tempfile)
+    assert_equal(os.stat(tempfile).st_mtime, 1000)
 
 def test_get_status_from_headers():
     # function doesn't do any value transformation ATM
