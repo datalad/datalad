@@ -410,18 +410,21 @@ def swallow_outputs():
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
 
+    from .ui import ui
     # preserve -- they could have been mocked already
     oldprint = getattr(__builtin__, 'print')
     oldout, olderr = sys.stdout, sys.stderr
+    olduiout = ui.out
     adapter = StringIOAdapter()
 
     try:
         sys.stdout, sys.stderr = adapter.handles
+        ui.out = adapter.handles[0]
         setattr(__builtin__, 'print', fake_print)
 
         yield adapter
     finally:
-        sys.stdout, sys.stderr = oldout, olderr
+        sys.stdout, sys.stderr, ui.out = oldout, olderr, olduiout
         setattr(__builtin__, 'print',  oldprint)
         adapter.cleanup()
 
