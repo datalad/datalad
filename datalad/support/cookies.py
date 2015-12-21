@@ -47,7 +47,7 @@ class CookiesDB(object):
     def _get_provider(self, url):
         if self._cookies_db is None:
             self._load()
-        return get_tld(url)
+        return get_tld(url).encode()
 
     def __getitem__(self, url):
         return self._cookies_db[self._get_provider(url)]
