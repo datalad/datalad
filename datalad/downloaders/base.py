@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import msgpack
 import os
+import time
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from os.path import exists, join as opj, isdir
@@ -220,6 +221,7 @@ class BaseDownloader(object):
         """
 
         downloader, target_size, url_filename, headers = self._get_download_details(url)
+        status = self.get_status_from_headers(headers)
 
         if size is not None:
             target_size = min(target_size, size)
@@ -261,11 +263,13 @@ class BaseDownloader(object):
             #  and self.authenticator.html_form_failure_re: # TODO: use information in authenticator
             self._verify_download(url, downloaded_size, target_size, temp_filepath)
 
+            # adjust atime/mtime according to headers/status
+            if 'Last-Modified' in status:
+                lgr.log(5, "Setting mtime for %s to be %s", temp_filepath, status['Last-Modified'])
+                os.utime(temp_filepath, (time.time(), status['Last-Modified']))
+
             # place successfully downloaded over the filepath
             os.rename(temp_filepath, filepath)
-
-            # TODO: adjust ctime/mtime according to headers
-            # TODO: not hardcoded size, and probably we should check header
 
         except AccessDeniedError as e:
             raise
