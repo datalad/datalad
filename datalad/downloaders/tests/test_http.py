@@ -105,20 +105,24 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
 _test_providers = None
 
-def _get_test_providers():
+def _get_test_providers(url=None):
     """Return reusable instance of our global providers"""
     global _test_providers
     if not _test_providers:
         _test_providers = Providers.from_config_files()
+    if url is not None:
+        # check if we have credentials for the url
+        provider = _test_providers.get_provider(url)
+        if not provider.credential.is_known:
+            raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
     return _test_providers
+
 
 @with_tempfile(mkdir=True)
 def check_download_external_url(url, failed_str, success_str, d):
     fpath = opj(d, get_url_straight_filename(url))
-    _test_providers = _get_test_providers()
-    provider = _test_providers.get_provider(url)
-    if not provider.credential.is_known:
-        raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
+    providers = _get_test_providers(url)  # url for check of credentials
+    provider = providers.get_provider(url)
     downloader = provider.get_downloader(url)
 
     # Download way
@@ -134,8 +138,8 @@ def check_download_external_url(url, failed_str, success_str, d):
 
     # And if we specify size
     for s in [1, 2]:
-        #with swallow_outputs() as cmo:
-        downloaded_path_ = downloader.download(url, path=d, size=s, overwrite=True)
+        with swallow_outputs() as cmo:
+            downloaded_path_ = downloader.download(url, path=d, size=s, overwrite=True)
         # should not be affected
         assert_equal(downloaded_path, downloaded_path_)
         with open(fpath) as f:
