@@ -11,7 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from os.path import exists
+from os.path import exists, isdir
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
@@ -38,48 +38,55 @@ class Crawl(Interface):
             args=("--is-pipeline",),
             action="store_true",
             doc="""Flag if provided file is a Python script which defines pipeline()"""),
+        chdir=Parameter(
+            args=("-C", "--chdir"),
+            constraints=EnsureStr() | EnsureNone(),
+            doc="""Directory to chrdir to for crawling"""),
         path=Parameter(
             args=('path',),
             metavar='file',
             nargs='?',
             constraints=EnsureStr() | EnsureNone(),
-            doc="""Configuration (or pipeline if --is-pipeline) file defining crawling"""),
+            doc="""Configuration (or pipeline if --is-pipeline) file defining crawling, or a directory
+                of a handle on which to perform crawling using its standard crawling specification"""),
     )
 
-    def __call__(self, path=None, dry_run=False, is_pipeline=False):
+    def __call__(self, path=None, dry_run=False, is_pipeline=False, chdir=None):
         from datalad.crawler.pipeline import (
             load_pipeline_from_config, load_pipeline_from_script,
             get_repo_pipeline_config_path, get_repo_pipeline_script_path
         )
         from datalad.crawler.pipeline import run_pipeline
+        from datalad.utils import chpwd  # import late so we could mock during tests
+        with chpwd(chdir):
+            # TODO: centralize via _params_ handling
+            if dry_run:
+                if not 'crawl' in cfg.sections():
+                    cfg.add_section('crawl')
+                cfg.set('crawl', 'dryrun', "True")
 
-        # TODO: centralize via _params_ handling
-        if dry_run:
-            if not 'crawl' in cfg.sections():
-                cfg.add_section('crawl')
-            cfg.set('crawl', 'dryrun', "True")
+            if path is None:
 
-        if path is None:
-            # get config from the current repository/handle
+                # get config from the current repository/handle
+                if is_pipeline:
+                    raise ValueError("You must specify the file if --pipeline")
+                # Let's see if there is a config or pipeline in this repo
+                path = get_repo_pipeline_config_path()
+                if not path or not exists(path):
+                    # Check if there may be the pipeline provided
+                    path = get_repo_pipeline_script_path()
+                    if path and exists(path):
+                        is_pipeline = True
+
+            if not path:
+                raise RuntimeError("Cannot locate crawler config or pipeline file")
+
             if is_pipeline:
-                raise ValueError("You must specify the file if --pipeline")
-            # Let's see if there is a config or pipeline in this repo
-            path = get_repo_pipeline_config_path()
-            if not path or not exists(path):
-                # Check if there may be the pipeline provided
-                path = get_repo_pipeline_script_path()
-                if path and exists(path):
-                    is_pipeline = True
+                lgr.info("Loading pipeline definition from %s" % path)
+                pipeline = load_pipeline_from_script(path)
+            else:
+                lgr.info("Loading pipeline specification from %s" % path)
+                pipeline = load_pipeline_from_config(path)
 
-        if not path:
-            raise RuntimeError("Cannot locate crawler config or pipeline file")
-
-        if is_pipeline:
-            lgr.info("Loading pipeline definition from %s" % path)
-            pipeline = load_pipeline_from_script(path)
-        else:
-            lgr.info("Loading pipeline specification from %s" % path)
-            pipeline = load_pipeline_from_config(path)
-
-        lgr.info("Running pipeline %s" % str(pipeline))
-        run_pipeline(pipeline)
+            lgr.info("Running pipeline %s" % str(pipeline))
+            run_pipeline(pipeline)

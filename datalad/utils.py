@@ -559,14 +559,22 @@ class chpwd(object):
     to the given path
     """
     def __init__(self, path, mkdir=False):
+
+        if path:
+            pwd = getpwd()
+            self._prev_pwd = pwd
+        else:
+            self._prev_pwd = None
+            return
+
         if not isabs(path):
-            path = normpath(opj(getpwd(), path))
+            path = normpath(opj(pwd, path))
         if not os.path.exists(path) and mkdir:
             self._mkdir = True
             os.mkdir(path)
         else:
             self._mkdir = False
-        self._prev_pwd = getpwd()
+
         os.chdir(path)  # for grep people -- ok, to chdir here!
         os.environ['PWD'] = path
 
@@ -575,5 +583,6 @@ class chpwd(object):
         pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        chpwd(self._prev_pwd)
+        if self._prev_pwd:
+            chpwd(self._prev_pwd)
 

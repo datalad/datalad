@@ -42,10 +42,6 @@ def pipeline(dataset):
     return [
         annex.switch_branch('incoming'),
         crawl_url(dataset_url),
-        # TODO: needs fixing of the openfmri bucket
-        # email sent out
-        #func_to_node(get_versioned_url, kwargs={'guarantee_versioned': True,
-        #                                        'verify': True})
         [  # changelog
            a_href_match(".*release_history.txt"),  # , limit=1
            assign({'filename': 'changelog.txt'}),
@@ -67,6 +63,13 @@ def pipeline(dataset):
             # xpath('//h4[contains(text(), "Data:")]')
             # so let's just select all the ones going to /tarballs/
             a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
+            # TODO: needs fixing of the openfmri bucket
+            # email sent out
+            func_to_node(get_versioned_url,
+                         data_args=['url'],
+                         outputs=['url'],
+                         kwargs={'guarantee_versioned': True,
+                                 'verify': True}),
 
             # TODO: we need to "version" those urls which we can version, e.g.,
             # if coming from versioned S3 buckets
@@ -74,8 +77,8 @@ def pipeline(dataset):
             # TODO TEMP -- too heavy, use some bogie for now
             #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie.tgz'}),
             #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_2.tgz'}),
-            assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_4.tgz'}),
-            assign({'filename': 'ds005_raw_boogie.tgz'}),
+            #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_4.tgz'}),
+            #assign({'filename': 'ds005_raw_boogie.tgz'}),
 
             annex,
         ],

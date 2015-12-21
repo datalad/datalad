@@ -181,6 +181,12 @@ def test_getpwd_basic():
     ok_(isabs(pwd))
     eq_(os.getcwd(), abspath(pwd))
 
+    # that we do not chdir anywhere if None provided
+    with patch('os.chdir') as oschdir:
+        with chpwd(None):
+            eq_(getpwd(), pwd)
+        assert_false(oschdir.called)
+
 
 @skip_if_on_windows
 @with_tempfile(mkdir=True)

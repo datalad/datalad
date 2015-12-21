@@ -33,8 +33,8 @@ except Exception as e:
 
 
 # TODO: should become a config option and managed along with the rest
-S3_ADMIN_CREDENTIAL = "datalad-s3-admin"
-S3_TEST_CREDENTIAL = "datalad-s3-test"
+S3_ADMIN_CREDENTIAL = "datalad-datalad-admin-s3"
+S3_TEST_CREDENTIAL = "datalad-datalad-test-s3"
 
 
 def get_bucket_connection(credential):
@@ -210,8 +210,16 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     was_versioned = False
     all_versions = []
     if s3_bucket:
-        s3conn = s3conn or get_bucket_connection(S3_TEST_CREDENTIAL)
-        bucket = s3conn.get_bucket(s3_bucket)    # TODO cache
+        # TODO: cache
+        if s3conn is None:
+            # we need to reuse our providers
+            from ..downloaders.providers import Providers
+            providers = Providers.from_config_files()
+            s3url = "s3://%s/" % s3_bucket
+            s3provider = providers.get_provider(s3url)
+            bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or get_bucket_connection(S3_TEST_CREDENTIAL)
+        else:
+            bucket = s3conn.get_bucket(s3_bucket)
         supports_versioning = True  # assume that it does
         try:
             supports_versioning = bucket.get_versioning_status()  # TODO cache
