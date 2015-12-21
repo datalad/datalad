@@ -12,6 +12,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
+import re
 from os import linesep
 from os.path import join as opj, exists, relpath
 import logging
@@ -602,25 +603,69 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('drop', annex_options=options + files)
 
-    @normalize_paths
-    def annex_whereis(self, files):
+
+    # TODO: a dedicated unit-test
+    def _whereis_json_to_dict(self, j):
+        """Convert json record returned by annex whereis --json to our dict representation for it
+        """
+        assert (j.get('success', True) is True)
+        # process 'whereis' containing list of remotes
+        remotes = {remote['description']: {'here': remote['here'], 'uuid': remote['uuid']}
+                   for remote in j.get('whereis')}
+        if 'web' in remotes:
+            # will be replaced with a list of urls
+            remotes['web']['urls'] = []
+        # process 'note' which would contain urls for 'web' remote
+        note = j.get('note', '')
+        if note:
+            for note_record in filter(bool, note.split('\n')):
+                # format remote: url ?
+                note_split = note_record.split(':', 1)
+                if len(note_split) != 2:
+                    lgr.debug("Skipping note record %r for file %s", note_record, j['file'])
+                    continue
+                remote, url = map(str.strip, note_split)
+                if remote not in remotes:
+                    lgr.warning("Remote %r not found among remotes %s. Skipping", remote, remotes.keys())
+                assert remote == 'web', "ATM can understand only notes for web remote"
+                remotes['web']['urls'].append(url)
+        return remotes
+
+
+    # Magic of matching will be done inside
+    # TODO: reconsider having any magic at all and maybe just return a list/dict always
+    @normalize_paths(match_return_type=False)
+    def annex_whereis(self, files, output='remotes'):
         """Lists repositories that have actual content of file(s).
 
         Parameters
         ----------
         files: list of str
             files to look for
+        output: {'remotes', 'full'}, optional
+            If 'remotes', a list of remotes returned per each file. If full,
+            per each file a dictionary returned with "web" also containing
+            'urls' list with all the urls for that file
 
         Returns
         -------
-        list of list of unicode
-            Contains a list of descriptions per each input file,
-            describing the remote for each remote, which was found by
-            git-annex whereis, like:
+        list of list of unicode  or dict
+            if output == 'remotes', contains a list of descriptions per
+            each input file, describing the remote for each remote, which
+            was found by git-annex whereis, like:
 
             u'me@mycomputer:~/where/my/repo/is [origin]' or
             u'web' or
             u'me@mycomputer:~/some/other/clone'
+
+            if output == 'full', returns a dictionary with filenames as keys
+            and values a detailed record, e.g.
+
+                {'web': {
+                  'uuid': '00000000-0000-0000-0000-000000000001',
+                  'here': False,
+                  'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
+                }}
         """
 
         try:
@@ -635,13 +680,28 @@ class AnnexRepo(GitRepo):
             else:
                 raise e
 
-        json_objects = [json.loads(line)
-                        for line in out.splitlines() if line.startswith('{')]
+        json_objects = (json.loads(line)
+                        for line in out.splitlines() if line.startswith('{'))
 
-        return [
-            [remote.get('description') for remote in item.get('whereis')]
-            if item.get('success') else []
-            for item in json_objects]
+        if output == 'remotes':
+            out = [
+                [remote.get('description') for remote in j.get('whereis')]
+                if j.get('success') else []
+                for j in json_objects]
+            return out[0] if len(files) == 1 and len(out) == 1 else out
+        elif output == 'full':
+            # TODO: we might want to optimize storage since many remotes entries will be the
+            # same so we could just reuse them instead of brewing copies
+            out = {j['file']: self._whereis_json_to_dict(j)
+                   for j in json_objects}
+
+            # do just a little magic?
+            if len(files) == 1 and len(out) == 1 and tuple(out)[0] == files[0]:
+                return tuple(out.values())[0]
+            else:
+                return out
+        else:
+            raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
 
     def get_annexed_files(self):
         """Get a list of files in annex

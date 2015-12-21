@@ -241,15 +241,17 @@ def test_AnnexRepo_annex_add_to_git(src, dst):
     assert_in(filename, ar.get_indexed_files())
 
 
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-@with_tree(tree=(('about.txt', 'Lots of abouts'),))
+@with_tree(tree=(('about.txt', 'Lots of abouts'),
+                 ('about2.txt', 'more abouts')))
 @serve_path_via_http()
 @with_tempfile
-def test_AnnexRepo_web_remote(src, sitepath, siteurl, dst):
+def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 
-    ar = AnnexRepo(dst, src)
+    ar = AnnexRepo(dst, create=True)
     testurl = urljoin(siteurl, 'about.txt')
+    testurl2 = urljoin(siteurl, 'about2.txt')
     testfile = '%s_about.txt' % urlsplit(testurl).netloc.split(':')[0]
+    testfile2 = '%s_about2.txt' % urlsplit(testurl).netloc.split(':')[0]
 
     # get the file from remote
     with swallow_outputs() as cmo:
@@ -258,6 +260,14 @@ def test_AnnexRepo_web_remote(src, sitepath, siteurl, dst):
     assert_in('web', l)
     assert_equal(len(l), 2)
     assert_true(ar.file_has_content(testfile))
+
+    # output='full'
+    lfull = ar.annex_whereis(testfile, output='full')
+    assert_equal(set(lfull), set(l))  # the same entries
+    non_web_remote = l[1-l.index('web')]
+    assert_not_in('urls', lfull[non_web_remote])
+    assert_equal(lfull['web']['uuid'], '00000000-0000-0000-0000-000000000001')
+    assert_equal(lfull['web']['urls'], [testurl])
 
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
@@ -292,6 +302,33 @@ def test_AnnexRepo_web_remote(src, sitepath, siteurl, dst):
     assert_in('web', l)
     assert_equal(len(l), 1)
     assert_false(ar.file_has_content(testfile))
+    lfull = ar.annex_whereis(testfile, output='full')
+    assert_not_in(non_web_remote, lfull) # not present -- so not even listed
+
+    # multiple files/urls
+    # get the file from remote
+    with swallow_outputs() as cmo:
+        ar.annex_addurls([testurl2])
+
+    # TODO: if we ask for whereis on all files, we should get for all files
+    lall = ar.annex_whereis('.')
+    assert_equal(len(lall), 2)
+    for e in lall:
+        assert(isinstance(e, list))
+    # but we don't know which one for which file. need a 'full' one for that
+    lall_full = ar.annex_whereis('.', output='full')
+    assert_true(ar.file_has_content(testfile2))
+    assert_true(lall_full[testfile2][non_web_remote]['here'])
+    assert_equal(set(lall_full), {testfile, testfile2})
+
+    # add a bogus 2nd url to testfile
+
+    someurl = "http://example.com/someurl"
+    ar.annex_addurl_to_file(testfile, someurl, options=['--relaxed'])
+    lfull = ar.annex_whereis(testfile, output='full')
+    assert_equal(set(lfull['web']['urls']), {testurl, someurl})
+
+
 
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
