@@ -12,6 +12,7 @@ import atexit
 import shelve
 import appdirs
 import os.path
+from six import PY2
 from .network import get_tld
 
 # FIXME should make into a decorator so that it closes the cookie_db upon exiting whatever func uses it
@@ -47,7 +48,10 @@ class CookiesDB(object):
     def _get_provider(self, url):
         if self._cookies_db is None:
             self._load()
-        return get_tld(url).encode()
+        tld = get_tld(url)
+        if PY2:
+            return tld.encode()
+        return tld
 
     def __getitem__(self, url):
         return self._cookies_db[self._get_provider(url)]
