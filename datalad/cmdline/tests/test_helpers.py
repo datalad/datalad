@@ -16,6 +16,7 @@ from nose.tools import assert_is_instance
 from os import mkdir
 from os.path import join as opj, exists, realpath
 from ..helpers import get_datalad_master, get_repo_instance
+from ..helpers import strip_arg_from_argv
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, ok_clean_git, \
     with_tempfile, SkipTest, with_testrepos
@@ -181,3 +182,11 @@ def test_get_repo_instance_collection(path):
     eq_(realpath(repo.path), realpath(path))
 
     chpwd(old_pwd)
+
+
+def test_strip_arg_from_argv():
+    eq_(strip_arg_from_argv(['-s', 'value'], 'value', ('-s',)), [])
+    eq_(strip_arg_from_argv(['-s', 'value'], 'value', ('-s', '--long-s')), [])
+    eq_(strip_arg_from_argv(
+            ['cmd', '-s', 'value', '--more'], 'value', ('-s', '--long-s')),
+            ['cmd',                '--more'])

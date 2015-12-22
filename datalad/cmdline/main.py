@@ -65,6 +65,7 @@ def setup_parser():
     # common options
     helpers.parser_add_common_opt(parser, 'help')
     helpers.parser_add_common_opt(parser, 'log_level')
+    helpers.parser_add_common_opt(parser, 'pbs_runner')
     helpers.parser_add_common_opt(
         parser,
         'version',
@@ -128,6 +129,7 @@ def setup_parser():
             # our own custom help for all commands
             helpers.parser_add_common_opt(subparser, 'help')
             helpers.parser_add_common_opt(subparser, 'log_level')
+            helpers.parser_add_common_opt(subparser, 'pbs_runner')
             # let module configure the parser
             _intf.setup_parser(subparser)
             # logger for command
@@ -180,7 +182,7 @@ def setup_parser():
 #     return cmdlineargs, functor, args, kwargs
 
 
-def main(cmdlineargs=None):
+def main(args=None):
     # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser()
     try:
@@ -188,13 +190,21 @@ def main(cmdlineargs=None):
         argcomplete.autocomplete(parser)
     except ImportError:
         pass
+
     # parse cmd args
-    cmdlineargs = parser.parse_args(cmdlineargs)
+    cmdlineargs = parser.parse_args(args)
     if not cmdlineargs.change_path is None:
         for path in cmdlineargs.change_path:
             chpwd(path)
-    # run the function associated with the selected command
-    if cmdlineargs.common_debug:
+
+    if cmdlineargs.pbs_runner:
+        from .helpers import run_via_pbs
+        from .helpers import strip_arg_from_argv
+        from .common_args import pbs_runner as pbs_runner_opt
+        args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
+        # run the function associated with the selected command
+        run_via_pbs(args_, cmdlineargs.pbs_runner)
+    elif cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure
         setup_exceptionhook()
         cmdlineargs.func(cmdlineargs)
@@ -206,3 +216,5 @@ def main(cmdlineargs=None):
         except Exception as exc:
             lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
             sys.exit(1)
+
+
