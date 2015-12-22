@@ -30,6 +30,7 @@ from ..tests.utils import with_tempfile, with_testrepos, \
     on_windows, get_most_obscure_supported_name, ok_clean_git, ok_, eq_, \
     ok_startswith
 from ..utils import get_local_file_url
+from ..utils import swallow_logs
 
 # For now (at least) we would need to clone from the network
 # since there are troubles with submodules on Windows.
@@ -79,10 +80,11 @@ def test_CollectionRepo_constructor(clean_path, clean_path2, clean_path3):
               "Missing RDFS.label.")
 
     # now, test Exceptions:
-    assert_raises(NoSuchPathError, CollectionRepo, clean_path3, create=False)
-    os.mkdir(clean_path3)
-    assert_raises(InvalidGitRepositoryError, CollectionRepo, clean_path3,
-                  create=False)
+    with swallow_logs():
+        assert_raises(NoSuchPathError, CollectionRepo, clean_path3, create=False)
+        os.mkdir(clean_path3)
+        assert_raises(InvalidGitRepositoryError, CollectionRepo, clean_path3,
+                      create=False)
     gr = GitRepo(clean_path3)
     ok_(os.path.exists(opj(clean_path3, '.git')))
     assert_raises(CollectionBrokenError, CollectionRepo, clean_path3,
