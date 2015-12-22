@@ -9,7 +9,8 @@
 """Nodes to interact with annex -- add files etc
 """
 
-from os.path import expanduser, join as opj, exists
+import os
+from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
 from os import unlink, makedirs
 
 from ...api import add_archive_content
@@ -160,9 +161,12 @@ class Annexificator(object):
 
     If 'filename' field was not found in the data, filename from the url
     gets taken.
+
+    'path' field of data (if present) is used to define path within the subdirectory.
+    Should be relative. If absolute found -- ValueError is raised
     """
     def __init__(self, path=None, mode='full', options=None,
-                 allow_dirty=False, **kwargs):
+                 allow_dirty=False, yield_non_updated=False, **kwargs):
         """
 
         Note that always_commit=False for the used AnnexRepo to minimize number
@@ -174,6 +178,8 @@ class Annexificator(object):
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
           annex modes where no actual download is performed and files' keys are their urls
+        yield_non_updated : bool, optional
+          Either to yield original data (with filepath) if load was not updated in annex
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -192,6 +198,7 @@ class Annexificator(object):
         self._states = []
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
+        self.yield_non_updated = yield_non_updated
 
         if (not allow_dirty) and self.repo.dirty:
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
@@ -222,6 +229,34 @@ class Annexificator(object):
                              "Please adjust pipeline to provide one" % url)
         return filename
 
+
+    def get_file_status(self, fpath):
+        """Given a file (under annex) relative path, return its status record
+
+        annex information about size etc might be used if load is not available
+        """
+        filepath = opj(self.repo.path, fpath)
+        assert(lexists, filepath)  # of check and return None?
+        # I wish I could just test using filesystem stats but that would not
+        # be reliable, and also file might not even be here.
+        # if self.repo.file_has_content(filepath)
+        # TODO: that is where doing it once for all files under annex might be of benefit
+        info = self.repo.get_info(fpath)
+        # deduce mtime from the file or a content which it points to. Take the oldest (I wonder
+        # if it would bite ;) XXX)
+        mtime = os.stat(filepath).st_mtime
+        if islink(fpath):
+            filepath_ = realpath(filepath)  # symlinked to
+            if exists(filepath_):
+                mtime_ = os.stat(filepath_).st_mtime
+                mtime = min(mtime_, mtime)
+
+        return {
+            'Content-Length': info['size'],
+            'Last-Modified': mtime,
+        }
+
+
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
         url = data.get('url')
 
@@ -230,8 +265,13 @@ class Annexificator(object):
         # have had it explicitly
         filename = data['filename'] if 'filename' in data else self._get_filename_from_url(url)
 
-        # TODO:  some kind of 'path' should be in play here as well
         fpath = filename
+        path_ = data.get('path', None)
+        if path_:
+            # TODO: test all this handling of provided paths
+            if isabs(path_):
+                raise ValueError("Absolute path %s was provided" % path_)
+            fpath = opj(path_, fpath)
 
         lgr.debug("Request to annex %(url)s to %(fpath)s", locals())
         # Filename still can be None
@@ -239,9 +279,23 @@ class Annexificator(object):
         # Since addurl ignores annex.largefiles we need first to download that file and then
         # annex add it
         filepath = opj(self.repo.path, fpath)
-        if url and exists(filepath):
-            lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
-            unlink(filepath)
+        updated_data = updated(data, {'filename': filename,
+                                      #TODO? 'filepath': filepath
+                                      })
+
+        if url:
+            downloader = self._providers.get_provider(url).get_downloader(url)
+            if lexists(filepath):
+                # Check if URL provides us updated content.  If not -- we should do nothing
+                # TODO: RF all this status dict into a helper class
+                local_status = self.get_file_status(fpath)
+                remote_status = downloader.get_status(url, old_status=local_status)
+                if False: # WIP TODO not is_status_different(local_status, remote_status):
+                    lgr.debug("URL %s doesn't provide new content for %s. Doing nothing",
+                              url, filepath)
+                    if self.yield_non_updated:
+                        yield updated_data  # There might be more to it!
+                    return
 
         assert(self.mode is not None)
         if not url:
@@ -256,7 +310,7 @@ class Annexificator(object):
             # http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
             def _download_and_git_annex_add(url, fpath):
                 # Just to feed into _call for dry-run
-                filepath_downloaded = self._providers.download(url, filepath)
+                filepath_downloaded = downloader.download(url, filepath, overwrite=True)
                 assert(filepath_downloaded == filepath)
                 self.repo.annex_add(fpath, options=self.options)
                 # and if the file ended up under annex, and not directly under git -- addurl
@@ -267,6 +321,9 @@ class Annexificator(object):
         else:
             annex_options = self.options + ["--%s" % self.mode]
             lgr.debug("Downloading %s into %s and adding to annex in %s mode" % (url, filepath, self.mode))
+            if lexists(filepath):
+                lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
+                _call(unlink, filepath)
             _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options)
 
         state = "adding files to git/annex"
@@ -286,7 +343,7 @@ class Annexificator(object):
         # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
         # with subsequent "drop" leaves no record that it ever was here
 
-        yield updated(data, {'filename': filename})  # There might be more to it!
+        yield updated_data  # There might be more to it!
 
     def switch_branch(self, branch, parent=None):
         """Node generator to switch branch, returns actual node
