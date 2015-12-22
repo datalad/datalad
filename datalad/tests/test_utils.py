@@ -28,6 +28,7 @@ from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import not_supported_on_windows
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
@@ -37,6 +38,7 @@ from .utils import assert_cwd_unchanged, skip_if_on_windows
 from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import ok_generator
 from .utils import assert_not_in
+from .utils import assert_raises
 from .utils import ok_startswith
 
 
@@ -310,3 +312,13 @@ def test_find_files_exclude_vcs(repo):
     files = list(ff)
     assert_equal({basename(f) for f in files}, {'d1', 'git', '.git', '1'})
     assert_in(opj(repo, '.git'), files)
+
+
+def test_not_supported_on_windows():
+    with patch('datalad.utils.on_windows', True):
+        assert_raises(NotImplementedError, not_supported_on_windows)
+        assert_raises(NotImplementedError, not_supported_on_windows, "msg")
+
+    with patch('datalad.utils.on_windows', False):
+        assert_equal(not_supported_on_windows(), None)
+        assert_equal(not_supported_on_windows("msg"), None)

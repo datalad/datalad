@@ -46,6 +46,15 @@ except:  # pragma: no cover
 # Little helpers
 #
 
+def not_supported_on_windows(msg=None):
+    """A little helper to be invoked to consistently fail whenever functionality is
+    not supported (yet) on Windows
+    """
+    if on_windows:
+        raise NotImplementedError("This functionality is not yet implemented for Windows OS"
+                                  + (": %s" % msg if msg else ""))
+
+
 def shortened_repr(value, l=30):
     try:
         if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
