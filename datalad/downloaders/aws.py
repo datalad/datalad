@@ -27,6 +27,7 @@ from .base import Authenticator
 from .base import BaseDownloader
 from .base import DownloadError, AccessDeniedError
 from ..support.s3 import boto, S3ResponseError
+from ..support.status import FileStatus
 
 from logging import getLogger
 lgr = getLogger('datalad.http')
@@ -164,5 +165,11 @@ class S3Downloader(BaseDownloader):
 
     @classmethod
     def get_status_from_headers(cls, headers):
-        # ATM 1-to-1
-        return headers
+        # TODO: duplicated with http functionality
+        # convert to FileStatus
+        return FileStatus(
+            size=headers.get('Content-Length'),
+            mtime=headers.get('Last-Modified'),
+            filename=headers.get('Content-Disposition')
+        )
+

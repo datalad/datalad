@@ -28,6 +28,7 @@ from ... import cfg
 from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
+from ..dbs.files import AnnexFileAttributesDB
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.annex')
@@ -166,7 +167,9 @@ class Annexificator(object):
     Should be relative. If absolute found -- ValueError is raised
     """
     def __init__(self, path=None, mode='full', options=None,
-                 allow_dirty=False, yield_non_updated=False, **kwargs):
+                 allow_dirty=False, yield_non_updated=False,
+                 statusdb=None,
+                 **kwargs):
         """
 
         Note that always_commit=False for the used AnnexRepo to minimize number
@@ -180,6 +183,10 @@ class Annexificator(object):
           annex modes where no actual download is performed and files' keys are their urls
         yield_non_updated : bool, optional
           Either to yield original data (with filepath) if load was not updated in annex
+        statusdb : , optional
+          DB of file statuses which will be used to figure out if remote load has changed.
+          If None, instance of AnnexFileAttributesDB will be used which will decide based on
+          information in annex and file(s) mtime on the disk
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -203,9 +210,14 @@ class Annexificator(object):
         if (not allow_dirty) and self.repo.dirty:
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
 
+        if statusdb is None:
+            statusdb = AnnexFileAttributesDB(annex=self.repo)
+        self.statusdb = statusdb
+
+
     def add(self, filename, url=None):
         # TODO: modes
-        self.repo.annex_addurl_to_file(filename, url#, TODO  backend
+        self.repo.annex_addurl_to_file(filename, url #, TODO  backend
                                        )
         raise NotImplementedError()
 
@@ -228,33 +240,6 @@ class Annexificator(object):
             raise ValueError("No filename was figured out for %s. "
                              "Please adjust pipeline to provide one" % url)
         return filename
-
-
-    def get_file_status(self, fpath):
-        """Given a file (under annex) relative path, return its status record
-
-        annex information about size etc might be used if load is not available
-        """
-        filepath = opj(self.repo.path, fpath)
-        assert(lexists, filepath)  # of check and return None?
-        # I wish I could just test using filesystem stats but that would not
-        # be reliable, and also file might not even be here.
-        # if self.repo.file_has_content(filepath)
-        # TODO: that is where doing it once for all files under annex might be of benefit
-        info = self.repo.get_info(fpath)
-        # deduce mtime from the file or a content which it points to. Take the oldest (I wonder
-        # if it would bite ;) XXX)
-        mtime = os.stat(filepath).st_mtime
-        if islink(fpath):
-            filepath_ = realpath(filepath)  # symlinked to
-            if exists(filepath_):
-                mtime_ = os.stat(filepath_).st_mtime
-                mtime = min(mtime_, mtime)
-
-        return {
-            'Content-Length': info['size'],
-            'Last-Modified': mtime,
-        }
 
 
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
@@ -287,12 +272,14 @@ class Annexificator(object):
             downloader = self._providers.get_provider(url).get_downloader(url)
             if lexists(filepath):
                 # Check if URL provides us updated content.  If not -- we should do nothing
-                # TODO: RF all this status dict into a helper class
-                local_status = self.get_file_status(fpath)
+                local_status = self.statusdb.get(fpath)
                 remote_status = downloader.get_status(url, old_status=local_status)
-                if False: # WIP TODO not is_status_different(local_status, remote_status):
-                    lgr.debug("URL %s doesn't provide new content for %s. Doing nothing",
-                              url, filepath)
+                if remote_status == local_status:  # WIP TODO not is_status_different(local_status, remote_status):
+                    # TODO:  check if remote_status < local_status, i.e. mtime jumped back
+                    # and if so -- warning or may be according to some config setting -- skip
+                    # e.g. config.get('crawl', 'new_older_files') == 'skip'
+                    lgr.debug("Skipping download. URL %s doesn't provide new content for %s.  New status: %s",
+                              url, filepath, remote_status)
                     if self.yield_non_updated:
                         yield updated_data  # There might be more to it!
                     return

@@ -264,9 +264,9 @@ class BaseDownloader(object):
             self._verify_download(url, downloaded_size, target_size, temp_filepath)
 
             # adjust atime/mtime according to headers/status
-            if 'Last-Modified' in status:
-                lgr.log(5, "Setting mtime for %s to be %s", temp_filepath, status['Last-Modified'])
-                os.utime(temp_filepath, (time.time(), status['Last-Modified']))
+            if status.mtime:
+                lgr.log(5, "Setting mtime for %s to be %s", temp_filepath, status.mtime)
+                os.utime(temp_filepath, (time.time(), status.mtime))
 
             # place successfully downloaded over the filepath
             os.rename(temp_filepath, filepath)
@@ -425,7 +425,7 @@ class BaseDownloader(object):
         ----------
         url : string
           URL to access
-        old_status : dict, optional
+        old_status : FileStatus, optional
           Previous status record.  If provided, might serve as a shortcut
           to assess if status has changed, and if not -- return the same
           record

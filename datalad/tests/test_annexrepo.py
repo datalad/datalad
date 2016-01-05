@@ -273,6 +273,14 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_equal(lfull['web']['uuid'], '00000000-0000-0000-0000-000000000001')
     assert_equal(lfull['web']['urls'], [testurl])
 
+    # info
+    info = ar.annex_info(testfile)
+    assert_equal(info['size'], 14)
+    assert(info['key'])  # that it is there
+    # and if we ask for both files
+    info2 = ar.annex_info([testfile, testfile3])
+    assert_equal(set(info2), {testfile, testfile3})
+
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
     l = ar.annex_whereis(testfile)
