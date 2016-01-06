@@ -277,9 +277,6 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     info = ar.annex_info(testfile)
     assert_equal(info['size'], 14)
     assert(info['key'])  # that it is there
-    # and if we ask for both files
-    info2 = ar.annex_info([testfile, testfile3])
-    assert_equal(set(info2), {testfile, testfile3})
 
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
@@ -348,11 +345,20 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_equal(set(ar.annex_whereis(testfile3)), {'web', non_web_remote})
     assert_equal(set(ar.annex_whereis(testfile3, output='full').keys()), {'web', non_web_remote})
 
+    # and if we ask for both files
+    info2 = ar.annex_info([testfile, testfile3])
+    assert_equal(set(info2), {testfile, testfile3})
+    assert_equal(info2[testfile3]['size'], 216)
+
     # which would work even if we cd to that subdir
     with chpwd(subdir):
         assert_equal(set(ar.annex_whereis('sub.txt')), {'web', non_web_remote})
         assert_equal(set(ar.annex_whereis('sub.txt', output='full').keys()), {'web', non_web_remote})
-
+        testfiles = ['sub.txt', opj(pardir, testfile)]
+        info2_ = ar.annex_info(testfiles)
+        # Should maintain original relative file names
+        assert_equal(set(info2_), set(testfiles))
+        assert_equal(info2_['sub.txt']['size'], 216)
 
 
 

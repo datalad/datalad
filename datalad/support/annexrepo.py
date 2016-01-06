@@ -701,7 +701,15 @@ class AnnexRepo(GitRepo):
         else:
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
 
-    @normalize_paths
+    # TODO:
+    #  I think we should make interface cleaner and less ambigious for those annex
+    #  commands which could operate on globs, files, and entire repositories, separating
+    #  those out, e.g. annex_info_repo, annex_info_files at least.
+    #  If we make our calling wrappers work without relying on invoking from repo topdir,
+    #  then returned filenames would not need to be mapped, so we could easily work on dirs
+    #  and globs.
+    # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
+    @normalize_paths(map_filenames_back=True)
     def annex_info(self, files):
         """Provide annex info for file(s).
 

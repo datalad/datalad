@@ -120,7 +120,7 @@ def normalize_path(func):
 
 
 @optional_args
-def normalize_paths(func, match_return_type=True):
+def normalize_paths(func, match_return_type=True, map_filenames_back=False):
     """Decorator to provide unified path conversions.
 
     Note
@@ -142,6 +142,10 @@ def normalize_paths(func, match_return_type=True):
       If True, and a single string was passed in, it would return the first
       element of the output (after verifying that it is a list of length 1).
       It makes easier to work with single files input.
+    map_filenames_back : bool, optional
+      If True and returned value is a dictionary, it assumes to carry entries
+      one per file, and then filenames are mapped back to as provided from the
+      normalized (from the root of the repo) paths
     """
 
     @wraps(func)
@@ -156,16 +160,31 @@ def normalize_paths(func, match_return_type=True):
             raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
                              type(files))
 
+        if map_filenames_back:
+            def remap_filenames(out):
+                """Helper to map files back to non-normalized paths"""
+                if isinstance(out, dict):
+                    assert(len(out) == len(files_new))
+                    files_ = [files] if single_file else files
+                    mapped = out.__class__()
+                    for fin, fout in zip(files_, files_new):
+                        mapped[fin] = out[fout]
+                    return mapped
+                else:
+                    return out
+        else:
+            remap_filenames = lambda x: x
+
         result = func(self, files_new, *args, **kwargs)
 
         if (result is None) or not match_return_type or not single_file:
             # If function doesn't return anything or no denormalization
             # was requested or it was not a single file
-            return result
+            return remap_filenames(result)
         elif single_file:
             if len(result) != 1:
                 # Magic doesn't apply
-                return result
+                return remap_filenames(result)
             elif isinstance(result, (list, tuple)):
                 return result[0]
             elif isinstance(result, dict) and tuple(result)[0] == files_new[0]:
@@ -173,7 +192,7 @@ def normalize_paths(func, match_return_type=True):
                 return tuple(result.values())[0]
             else:
                 # no magic can apply
-                return result
+                return remap_filenames(result)
         else:
             return RuntimeError("should have not got here... check logic")
 
