@@ -90,8 +90,8 @@ except Exception as exc:
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
-    except ImportError:
-        raise SkipTest("No %s module" % module)
+    except Exception as exc:
+        raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
 
 
 def create_tree_archive(path, name, load, overwrite=False):

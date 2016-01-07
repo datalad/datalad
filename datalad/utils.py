@@ -336,6 +336,21 @@ def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
 
     return tkwargs_
 
+@optional_args
+def line_profile(func):
+    """Q&D helper to line profile the function and spit out stats
+    """
+    import line_profiler
+    prof = line_profiler.LineProfiler()
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        try:
+            pfunc = prof(func)
+            return pfunc(*args, **kwargs)
+        finally:
+            prof.print_stats()
+    return newfunc
 
 #
 # Context Managers

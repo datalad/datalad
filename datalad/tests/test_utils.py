@@ -20,6 +20,7 @@ from six import PY3
 from os.path import dirname, normpath, pardir, basename
 from collections import OrderedDict
 
+from ..dochelpers import exc_str
 from ..utils import updated
 from ..utils import get_local_file_url
 from os.path import join as opj, isabs, abspath, exists
@@ -28,6 +29,7 @@ from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import line_profile
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
@@ -38,6 +40,7 @@ from .utils import assure_dict_from_str, assure_list_from_str
 from .utils import ok_generator
 from .utils import assert_not_in
 from .utils import ok_startswith
+from .utils import skip_if_no_module
 
 
 @with_tempfile(mkdir=True)
@@ -310,3 +313,18 @@ def test_find_files_exclude_vcs(repo):
     files = list(ff)
     assert_equal({basename(f) for f in files}, {'d1', 'git', '.git', '1'})
     assert_in(opj(repo, '.git'), files)
+
+
+def test_line_profile():
+    skip_if_no_module('line_profiler')
+
+    @line_profile
+    def f(j):
+        i = j + 1  # xyz
+        return i
+
+    with swallow_outputs() as cmo:
+        assert_equal(f(3), 4)
+        assert_equal(cmo.err, '')
+        assert_in('i = j + 1  # xyz', cmo.out)
+
