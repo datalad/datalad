@@ -12,7 +12,9 @@
 
 __docformat__ = 'restructuredtext'
 
+from ..utils import auto_repr
 
+@auto_repr
 class FileStatus(object):
     """Description of the file status to e.g. check if newer version is available
 

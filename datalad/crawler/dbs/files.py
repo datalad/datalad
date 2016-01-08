@@ -10,13 +10,20 @@
 
 """
 
+import os
+from os.path import join as opj, exists, lexists, islink, realpath
+
+from ...dochelpers import exc_str
+from ...support.status import FileStatus
+from ...support.exceptions import CommandError
+from ...utils import auto_repr
+from ...utils import swallow_logs
+
+import logging
+lgr = logging.getLogger('datalad.crawler.dbs')
+
 __docformat__ = 'restructuredtext'
 
-import os
-from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
-
-from ...support.status import FileStatus
-from ...utils import auto_repr
 
 @auto_repr
 class AnnexFileAttributesDB(object):
@@ -47,19 +54,34 @@ class AnnexFileAttributesDB(object):
         """Given a file (under annex) relative path, return its status record
 
         annex information about size etc might be used if load is not available
+
+        Parameters
+        ----------
+        fpath: str
+          Path (relative to the top of the repo) of the file to get stats of
         """
         filepath = opj(self.annex.path, fpath)
         if self._track_queried:
             self._queried_filepaths.add(filepath)
-        assert(lexists, filepath)  # of check and return None?
+
+        assert(lexists(filepath))  # of check and return None?
+
         # I wish I could just test using filesystem stats but that would not
         # be reliable, and also file might not even be here.
-        # if self.repo.file_has_content(filepath)
-        # TODO: that is where doing it once for all files under annex might be of benefit
-        info = self.annex.annex_info(fpath)
+        # File might be under git, not annex so then we would need to assess size
+        filestat = os.stat(filepath)
+        try:
+            with swallow_logs():
+                info = self.annex.annex_info(fpath)
+            size = info['size']
+        except CommandError as exc:
+            # must be under git or a plain file
+            lgr.debug("File %s must be not under annex, since info failed: %s" % (filepath, exc_str(exc)))
+            size = filestat.st_size
+
         # deduce mtime from the file or a content which it points to. Take the oldest (I wonder
         # if it would bite ;) XXX)
-        mtime = os.stat(filepath).st_mtime
+        mtime = filestat.st_mtime
 
         if islink(fpath):
             filepath_ = realpath(filepath)  # symlinked to
@@ -68,12 +90,12 @@ class AnnexFileAttributesDB(object):
                 mtime = min(mtime_, mtime)
 
         return FileStatus(
-            size=info['size'],
+            size=size,
             mtime=mtime
         )
 
     def is_different(self, fpath, status):
-        """Return True if file pointed by fpath newer according to the status
+        """Return True if file pointed by fpath newer in status
         """
         old_status = self.get(fpath)
         return old_status != status
