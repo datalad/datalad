@@ -150,15 +150,19 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
-        if isinstance(files, string_types) or not files:
-            files_new = [_normalize_path(self.path, files)]
-            single_file = True
-        elif isinstance(files, list):
-            files_new = [_normalize_path(self.path, path) for path in files]
-            single_file = False
+        if files:
+            if isinstance(files, string_types) or not files:
+                files_new = [_normalize_path(self.path, files)]
+                single_file = True
+            elif isinstance(files, list):
+                files_new = [_normalize_path(self.path, path) for path in files]
+                single_file = False
+            else:
+                raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
+                                 type(files))
         else:
-            raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
-                             type(files))
+            single_file = None
+            files_new = []
 
         if map_filenames_back:
             def remap_filenames(out):
@@ -177,7 +181,10 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
 
         result = func(self, files_new, *args, **kwargs)
 
-        if (result is None) or not match_return_type or not single_file:
+        if single_file is None:
+            # no files were provided, nothing we can do really
+            return result
+        elif (result is None) or not match_return_type or not single_file:
             # If function doesn't return anything or no denormalization
             # was requested or it was not a single file
             return remap_filenames(result)
@@ -582,8 +589,10 @@ class GitRepo(object):
             return content_str.splitlines()
         # TODO: keep splitlines?
 
-    def git_merge(self, name, options='', **kwargs):
-        self._git_custom_command('', 'git merge %s %s' % (options, name), **kwargs)
+    def git_merge(self, name, options=[], msg=None, **kwargs):
+        if msg:
+            options = options + ["-m", msg]
+        self._git_custom_command('', ['git', 'merge'] + options + [name], **kwargs)
 
     def git_remove_branch(self, branch):
         self._git_custom_command('', 'git branch -D %s' % branch)

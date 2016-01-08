@@ -266,7 +266,7 @@ def test_GitRepo_files_decorator():
         expect.append(_normalize_path(test_instance.path, item))
     eq_(test_instance.decorated_many(files_to_test), expect)
 
-    eq_(test_instance.decorated_many(''), '')
+    eq_(test_instance.decorated_many(''), [])
 
     assert_raises(ValueError, test_instance.decorated_many, 1)
     assert_raises(ValueError, test_instance.decorated_one, 1)
