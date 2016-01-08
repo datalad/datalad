@@ -56,7 +56,7 @@ class AnnexFileAttributesDB(object):
         # be reliable, and also file might not even be here.
         # if self.repo.file_has_content(filepath)
         # TODO: that is where doing it once for all files under annex might be of benefit
-        info = self.annex.get_info(fpath)
+        info = self.annex.annex_info(fpath)
         # deduce mtime from the file or a content which it points to. Take the oldest (I wonder
         # if it would bite ;) XXX)
         mtime = os.stat(filepath).st_mtime
@@ -71,3 +71,9 @@ class AnnexFileAttributesDB(object):
             size=info['size'],
             mtime=mtime
         )
+
+    def is_different(self, fpath, status):
+        """Return True if file pointed by fpath newer according to the status
+        """
+        old_status = self.get(fpath)
+        return old_status != status

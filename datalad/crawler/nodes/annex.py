@@ -22,6 +22,7 @@ from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo
 from ...support.annexrepo import AnnexRepo
 from ...support.handlerepo import HandleRepo
+from ...support.stats import ActivityStats
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -232,6 +233,8 @@ class Annexificator(object):
 
     @staticmethod
     def _get_filename_from_url(url):
+        if url is None:
+            return None
         filename = get_url_straight_filename(url)
         # if still no filename
         if not filename:
@@ -243,27 +246,39 @@ class Annexificator(object):
 
 
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
-        url = data.get('url')
+        # Some checks
+        assert(self.mode is not None)
 
+        stats = data.get('datalad_stats', ActivityStats())
+
+        url = data.get('url')
+        if url:
+            stats.urls += 1
 
         # figure out the filename. If disposition one was needed, pipeline should
         # have had it explicitly
-        filename = data['filename'] if 'filename' in data else self._get_filename_from_url(url)
+        fpath = filename = \
+            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
 
-        fpath = filename
+        stats.files += 1
+        if filename is None:
+            stats.skipped += 1
+            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
+        elif isabs(filename):
+            stats.skipped += 1
+            raise ValueError("Got absolute filename %r" % filename)
+
         path_ = data.get('path', None)
         if path_:
             # TODO: test all this handling of provided paths
             if isabs(path_):
+                stats.skipped += 1
                 raise ValueError("Absolute path %s was provided" % path_)
             fpath = opj(path_, fpath)
+        filepath = opj(self.repo.path, fpath)
 
         lgr.debug("Request to annex %(url)s to %(fpath)s", locals())
-        # Filename still can be None
 
-        # Since addurl ignores annex.largefiles we need first to download that file and then
-        # annex add it
-        filepath = opj(self.repo.path, fpath)
         updated_data = updated(data, {'filename': filename,
                                       #TODO? 'filepath': filepath
                                       })
@@ -272,38 +287,49 @@ class Annexificator(object):
             downloader = self._providers.get_provider(url).get_downloader(url)
             if lexists(filepath):
                 # Check if URL provides us updated content.  If not -- we should do nothing
-                local_status = self.statusdb.get(fpath)
-                remote_status = downloader.get_status(url, old_status=local_status)
-                if remote_status == local_status:  # WIP TODO not is_status_different(local_status, remote_status):
+                # APP1:  in this one it would depend on local_status being asked first BUT
+                #        may be for S3 support where statusdb would only record most recent
+                #        modification time
+                # local_status = self.statusdb.get(fpath)
+                # remote_status = downloader.get_status(url, old_status=local_status)
+                # if remote_status == local_status:  # WIP TODO not is_status_different(local_status, remote_status):
+                # APP2:  no explicit local_status
+                remote_status = downloader.get_status(url)
+                if not self.statusdb.is_different(fpath, remote_status):
                     # TODO:  check if remote_status < local_status, i.e. mtime jumped back
                     # and if so -- warning or may be according to some config setting -- skip
                     # e.g. config.get('crawl', 'new_older_files') == 'skip'
                     lgr.debug("Skipping download. URL %s doesn't provide new content for %s.  New status: %s",
                               url, filepath, remote_status)
+                    stats.skipped += 1
                     if self.yield_non_updated:
                         yield updated_data  # There might be more to it!
                     return
 
-        assert(self.mode is not None)
         if not url:
             lgr.debug("Adding %s directly into git since no url was provided" % (filepath))
             # So we have only filename
             assert(filename)
             # Thus add directly into git
             _call(self.repo.git_add, filename)
+            _call(stats.increment, 'add_git')
         elif self.mode == 'full':
+            # Since addurl ignores annex.largefiles we need first to download that file and then
+            # annex add it
+            # see http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
             lgr.debug("Downloading %s into %s and adding to annex" % (url, filepath))
-            # XXX temporarily??? until
-            # http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
             def _download_and_git_annex_add(url, fpath):
                 # Just to feed into _call for dry-run
-                filepath_downloaded = downloader.download(url, filepath, overwrite=True)
+                filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
                 assert(filepath_downloaded == filepath)
                 self.repo.annex_add(fpath, options=self.options)
                 # and if the file ended up under annex, and not directly under git -- addurl
-                # TODO:  better function which explicitly checks if file is under annex or either under git
+                # TODO: better function which explicitly checks if file is under annex or either under git
                 if self.repo.file_has_content(fpath):
+                    stats.add_annex += 1
                     self.repo.annex_addurl_to_file(fpath, url)
+                else:
+                    stats.add_git += 1
             _call(_download_and_git_annex_add, url, fpath)
         else:
             annex_options = self.options + ["--%s" % self.mode]
@@ -312,6 +338,7 @@ class Annexificator(object):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
                 _call(unlink, filepath)
             _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options)
+            _call(stats.increment, 'annex_add')
 
         state = "adding files to git/annex"
         if state not in self._states:
@@ -369,19 +396,23 @@ class Annexificator(object):
     def merge_branch(self, branch, strategy=None, commit=True):
         # TODO: support merge of multiple branches at once
         assert(strategy in (None, 'theirs'))
+
         def merge_branch(data):
             lgr.info("Initiating merge of %(branch)s using strategy %(strategy)s", locals())
-            options = '--no-commit' if not commit else ''
-            if not commit:
-                self._states += ["merge of %s" % branch]
+            options = ['--no-commit'] if not commit else []
             if strategy is None:
                 self.repo.git_merge(branch, options=options)
             elif strategy == 'theirs':
-                self.repo.git_merge(branch, options="-s ours --no-commit", expect_stderr=True)
+                self.repo.git_merge(branch, options=["-s", "ours", "--no-commit"], expect_stderr=True)
                 self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % branch)
                 self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
                 if commit:
                     self._commit("Merged %s using strategy %s" % (branch, strategy), options="-a")
+                else:
+                    # Record into our activity stats
+                    stats = data.get('datalad_stats', None)
+                    if stats:
+                        stats.merges.append([branch, self.repo.git_get_active_branch()])
             yield data
         return merge_branch
 
@@ -410,6 +441,7 @@ class Annexificator(object):
                 archive, annex=self.repo,
                 delete=True, key=False, commit=False, allow_dirty=True,
                 annex_options=self.options,
+                stats=data.get('datalad_stats', None),
                 **aac_kwargs
             )
             assert(annex is self.repo)   # must be the same annex, and no new created
@@ -428,7 +460,9 @@ class Annexificator(object):
             lgr.info("Repository found dirty -- adding and committing")
             #    # TODO: introduce activities tracker
             _call(self.repo.annex_add, '.', options=self.options) # so everything is committed
-            _call(self._commit, "Finalizing %s" % ','.join(self._states), options="-a") # TODO: use activities tracker
+            stats = data.get('datalad_stats', None)
+            stats_str = stats.as_str(mode='line') if stats else ''
+            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options="-a")
         else:
             lgr.info("Found branch non-dirty - doing nothing")
         self._states = []

@@ -62,12 +62,18 @@ def shortened_repr(value, l=30):
 
 
 def __auto_repr__(obj):
+    attr_names = tuple()
+    if hasattr(obj, '__dict__'):
+        attr_names += tuple(obj.__dict__.keys())
+    if hasattr(obj, '__slots__'):
+        attr_names += tuple(obj.__slots__)
+
     items = []
-    for prop in sorted(obj.__dict__):
-        if prop.startswith('_'):
+    for attr in sorted(set(attr_names)):
+        if attr.startswith('_'):
             continue
-        value = obj.__dict__[prop]
-        items.append("%s=%s" % (prop, shortened_repr(value)))
+        value = getattr(obj, attr)
+        items.append("%s=%s" % (attr, shortened_repr(value)))
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
 

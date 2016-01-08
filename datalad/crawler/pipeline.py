@@ -30,7 +30,7 @@ Following items are planned to be provided by the pipeline runner:
    - skip_existing:
 
 `datalad_stats`
-   PipelineStats/dict object to accumulate statistics on what has been done by the nodes
+   ActivityStats/dict object to accumulate statistics on what has been done by the nodes
    so far
 
 To some degree, we could make an analogy of a `blood` to `data` and `venous system` to
@@ -52,6 +52,7 @@ from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..utils import updated
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
+from ..support.stats import ActivityStats
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 # Name of the section in the config file which would define pipeline parameters
@@ -99,7 +100,7 @@ def _get_pipeline_opts(pipeline):
     return opts, pipeline
 
 
-def xrun_pipeline(pipeline, data=None):
+def xrun_pipeline(pipeline, data=None, stats=None):
     """Yield results from the pipeline.
 
     """
@@ -114,6 +115,8 @@ def xrun_pipeline(pipeline, data=None):
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
     data = data or {}
+    data['datalad_stats'] = stats or ActivityStats()
+
     if not len(pipeline):
         return
 

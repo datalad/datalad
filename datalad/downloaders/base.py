@@ -200,7 +200,7 @@ class BaseDownloader(object):
             raise DownloadError("Downloaded size %d differs from original %d" % (downloaded_size, target_size))
 
 
-    def _download(self, url, path=None, overwrite=False, size=None):
+    def _download(self, url, path=None, overwrite=False, size=None, stats=None):
         """Download content into a file
 
         Parameters
@@ -237,7 +237,8 @@ class BaseDownloader(object):
         else:
             filepath = url_filename
 
-        if exists(filepath) and not overwrite:
+        existed = exists(filepath)
+        if existed and not overwrite:
             raise DownloadError("File %s already exists" % filepath)
 
         # FETCH CONTENT
@@ -255,7 +256,9 @@ class BaseDownloader(object):
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
                 pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+                t0 = time.time()
                 downloader(fp, pbar, size=size)
+                downloaded_time = time.time() - t0
                 pbar.finish()
             downloaded_size = os.stat(temp_filepath).st_size
 
@@ -271,6 +274,11 @@ class BaseDownloader(object):
             # place successfully downloaded over the filepath
             os.rename(temp_filepath, filepath)
 
+            if stats:
+                stats.downloaded += 1
+                stats.overwritten += int(existed)
+                stats.downloaded_size += downloaded_size
+                stats.downloaded_time += downloaded_time
         except AccessDeniedError as e:
             raise
         except Exception as e:

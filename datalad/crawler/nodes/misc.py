@@ -31,7 +31,7 @@ class Sink(object):
     """
 
     # TODO: add argument for selection of fields of data to keep
-    def __init__(self, keys=None, output=None):
+    def __init__(self, keys=None, output=None, ignore_prefixes=['datalad_']):
         """
         Parameters
         ----------
@@ -40,10 +40,13 @@ class Sink(object):
         output : str, optional
           If specified, it will be the key in the yielded data to contain all sunk
           data
+        ignore_prefixes : list, optional
+          Keys with which prefixes to ignore.  By default all 'datalad_' ignored
         """
         self.data = []
         self.keys = keys
         self.output = output
+        self.ignore_prefixes = ignore_prefixes or []
 
     def get_values(self, *keys):
         return [[d[k] for k in keys] for d in self.data]
@@ -53,7 +56,10 @@ class Sink(object):
         if self.keys:
             raise NotImplementedError("Jason will do it")
         else:
-            self.data.append(data)
+            data_ = {k: v
+                     for k, v in data.items()
+                     if not any(k.startswith(p) for p in self.ignore_prefixes)}
+            self.data.append(data_)
         if self.output:
             data = updated(data, {self.output: self.data})
         yield data

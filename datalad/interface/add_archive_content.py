@@ -26,12 +26,12 @@ from ..support.constraints import EnsureStr, EnsureNone, EnsureListOf
 
 from ..support.annexrepo import AnnexRepo
 from ..support.strings import apply_replacement_rules
+from ..support.stats import ActivityStats
 from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree
 
 from six import string_types
 from six.moves.urllib.parse import urlparse
-
 
 from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
@@ -87,6 +87,10 @@ class AddArchiveContent(Interface):
             doc="""Annex instance to use""" #,
             #constraints=EnsureStr() | EnsureNone()
         ),
+        # TODO: Python only!
+        stats=Parameter(
+            doc="""ActivityStats instance for global tracking""",
+        ),
         key=Parameter(
             args=("--key",),
             action="store_true",
@@ -124,7 +128,8 @@ class AddArchiveContent(Interface):
 
     def __call__(self, archive, annex=None,
                  delete=False, key=False, exclude=None, rename=None, overwrite=False,
-                 annex_options=None, copy=False, commit=True, allow_dirty=False):
+                 annex_options=None, copy=False, commit=True, allow_dirty=False,
+                 stats=None):
         """
         Returns
         -------
@@ -199,10 +204,10 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
-            stats = dict(n=0, add_git=0, add_annex=0, skipped=0, overwritten=0, renamed=0)
+            stats = stats or ActivityStats()
             #import pdb; pdb.set_trace()
             for extracted_file in earchive.get_extracted_files():
-                stats['n'] += 1
+                stats.files += 1
                 extracted_path = opj(earchive.path, extracted_file)
                 # preliminary target name which might get modified by renames
                 target_file = extracted_file
@@ -211,7 +216,7 @@ class AddArchiveContent(Interface):
                     target_file_ = target_file
                     target_file_ = apply_replacement_rules(rename, target_file_)
                     if target_file_ != target_file:
-                        stats['renamed'] += 1
+                        stats.renamed += 1
                         target_file = target_file_
 
                 if exclude:
@@ -219,7 +224,7 @@ class AddArchiveContent(Interface):
                         for regexp in exclude:
                             if re.search(regexp, target_file):
                                 lgr.debug("Skipping {target_file} since contains {regexp} pattern".format(**locals()))
-                                stats['skipped'] += 1
+                                stats.skipped += 1
                                 raise StopIteration
                     except StopIteration:
                         continue
@@ -233,7 +238,7 @@ class AddArchiveContent(Interface):
                         raise RuntimeError(
                             "File {} already exists, but new (?) file {} was instructed "
                             "to be placed there while overwrite=False".format(target_file, extracted_file))
-                    stats['overwritten'] += 1
+                    stats.overwritten += 1
                     # to make sure it doesn't conflict -- might have been a tree
                     rmtree(target_file)
 
@@ -250,10 +255,12 @@ class AddArchiveContent(Interface):
                 if annex.file_has_content(target_path):
                     # if not --  it was added to git, if in annex, it is present and output is True
                     annex.annex_addurl_to_file(target_file, url, options=['--relaxed'])
-                    stats['add_annex'] += 1
+                    stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))
-                    stats['add_git'] += 1
+                    stats.add_git += 1
+                # TODO: actually check if it is anyhow different from a previous version. If not
+                # then it wasn't really added
 
                 del target_file  # Done with target_file -- just to have clear end of the loop
 
@@ -264,18 +271,9 @@ class AddArchiveContent(Interface):
 
             if commit:
                 annex.git_commit(
-                    "Added content extracted from " + origin + """
-
-Processed: {n}
-Skipped: {skipped}
-Renamed: {renamed}
-Added
- to git: {add_git}
- to annex: {add_annex}
-Overwritten: {overwritten}
-""".format(**stats))
-            lgr.info("Finished adding {archive}: {n} added (git/annex: {add_git}/{add_annex}), "
-                     "{skipped} skipped, {renamed} renamed, {overwritten} overwritten".format(archive=archive, **stats))
+                    "Added content extracted from %s\n\n%s" % (origin, stats.as_str(mode='full'))
+                )
+            lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
         finally:
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure

@@ -17,6 +17,8 @@ from ..nodes.misc import Sink, assign, range_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
 from ..pipeline import load_pipeline_from_script
 
+from ...support.stats import ActivityStats
+
 from ...tests.utils import with_tree
 from ...tests.utils import eq_, ok_, assert_raises
 from ...tests.utils import assert_in
@@ -149,6 +151,19 @@ def test_load_pipeline_from_script(d):
     assert_raises(RuntimeError, load_pipeline_from_script, opj(d, 'unlikelytobethere.py'))
 
 
+DEFAULT_OUTPUT = [{'datalad_stats': ActivityStats()}]
+def _out(ld):
+    """Adjust output entry to include default outputs as well
+    """
+    outl = []
+    for d in ld:
+        out = d.copy()
+        outl.append(out)
+        for k, v in DEFAULT_OUTPUT[0].items():
+            if k not in out:
+                out[k] = v
+    return outl
+
 def test_pipeline_linear_simple():
     sink = Sink()
     pipeline = [
@@ -157,7 +172,7 @@ def test_pipeline_linear_simple():
         sink
     ]
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])  # by default 'input' is output and input is made empty dict if not provided
+    eq_(pipeline_output, DEFAULT_OUTPUT)  # by default 'input' is output and input is made empty dict if not provided
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
                     {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}])
 
@@ -165,7 +180,7 @@ def test_pipeline_linear_simple():
     # stop at that matching point, but otherwise there should be no crash etc
     sink.clean()
     pipeline_output = run_pipeline(pipeline + [interrupt_if({'out1': 0, 'out2': 1})])
-    eq_(pipeline_output, [{}])
+    eq_(pipeline_output, DEFAULT_OUTPUT)
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}])
 
 def test_pipeline_unknown_opts():
@@ -207,7 +222,7 @@ def test_pipeline_linear_nested():
     all_pairs = [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
                  {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}]
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])
+    eq_(pipeline_output, DEFAULT_OUTPUT)
     eq_(sink.data, all_pairs)
     # and output is not seen outside of the nested pipeline
     eq_(sink2.data, [{'out1': 0}, {'out1': 1}])
@@ -218,7 +233,7 @@ def test_pipeline_linear_nested():
     pipeline[1].insert(0, {'output': 'outputs'})
 
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])  # by default no output produced
+    eq_(pipeline_output, DEFAULT_OUTPUT)  # by default no output produced
     eq_(sink.data, all_pairs)
     # and output was passed outside from the nested pipeline
     eq_(sink2.data, all_pairs)
@@ -227,19 +242,20 @@ def test_pipeline_linear_nested():
     sink2.clean()
     pipeline[1][0] = {'output': 'last-output'}
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])  # by default no output produced
+    eq_(pipeline_output, DEFAULT_OUTPUT)  # by default no output produced
     # only the last output from the nested pipeline appeared outside
     eq_(sink2.data, [{'out1': 0, 'out2': 2}, {'out1': 1, 'out2': 2}])
 
     # Let's now add output to the top-most pipeline
     pipeline.insert(0, {'output': 'outputs'})
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{'out1': 0, 'out2': 2}, {'out1': 1, 'out2': 2}])
+    eq_(pipeline_output, _out([{'out1': 0, 'out2': 2},
+                               {'out1': 1, 'out2': 2}]))
 
     # and if we ask only for the last one
     pipeline[0] = {'output': 'last-output'}
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{'out1': 1, 'out2': 2}])
+    eq_(pipeline_output, _out([{'out1': 1, 'out2': 2}]))
 
 def test_pipeline_recursive():
     def less3(data):
@@ -252,7 +268,7 @@ def test_pipeline_recursive():
         less3,
     ]
     pipeline_output = run_pipeline(pipeline, dict(x=0))
-    eq_(pipeline_output, [{'x': 1}, {'x': 2}, {'x': 3}])
+    eq_(pipeline_output, _out([{'x': 1}, {'x': 2}, {'x': 3}]))
 
 
 def test_pipeline_linear_top_isnested_pipeline():

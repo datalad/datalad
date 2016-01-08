@@ -7,6 +7,7 @@ appdirs
 keyring
 # mock is also used for auto.py, not only for testing
 mock
+humanize
 
 # ---- Downloaders
 boto
