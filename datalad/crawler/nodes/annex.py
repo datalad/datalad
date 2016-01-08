@@ -393,11 +393,38 @@ class Annexificator(object):
             yield updated(data, {"git_branch": branch})
         return switch_branch
 
-    def merge_branch(self, branch, strategy=None, commit=True):
+    def merge_branch(self, branch, strategy=None, commit=True, skip_no_changes=None):
+        """Merge a branch into a current branch
+
+        Parameters
+        ----------
+        branch: str
+          Branch to be merged
+        strategy: None or 'theirs', optional
+          With 'theirs' strategy remote branch content is used 100% as is.
+          'theirs' with commit=False can be used to prepare data from that branch for
+          processing by further steps in the pipeline
+        commit: bool, optional
+          Either to commit when merge is complete
+        skip_no_changes: None or bool, optional
+          Either to not perform any action if there is no changes from previous merge
+          point. If None, config TODO will be consulted with default of being True (i.e. skip
+          if no changes)
+        """
         # TODO: support merge of multiple branches at once
         assert(strategy in (None, 'theirs'))
 
         def merge_branch(data):
+            last_merged_checksum = self.repo.git_get_merge_base([self.repo.git_get_active_branch(), branch])
+            if last_merged_checksum == self.repo.git_get_hexsha(branch):
+                lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
+                if skip_no_changes is None:
+                    # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                    skip_no_changes = True
+                if skip_no_changes:
+                    lgr.debug("Skipping the merge")
+                    return
+
             lgr.info("Initiating merge of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
             if strategy is None:
