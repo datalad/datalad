@@ -85,6 +85,12 @@ def run_pipeline(*args, **kwargs):
     items, a `[{}]` will be provided as output
     """
     output = list(xrun_pipeline(*args, **kwargs))
+    if output:
+        stats_str = output[-1]['datalad_stats'].get_total().as_str(mode='line') \
+                if 'datalad_stats' in output[-1] else 'no stats collected'
+    else:
+        stats_str = "no output"
+    lgr.info("Finished running pipeline: %s" % stats_str)
     return output if output else None
 
 
@@ -213,7 +219,6 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
                 # provide details of what keys got changed
                 lgr.log(4, "O1: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_))
             if pipeline_tail:
-                # TODO: for heavy debugging we might want to track/report what node has changed in data
                 lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
                 lgr.log(5, " passed keys: %s", data_.keys())
                 for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
