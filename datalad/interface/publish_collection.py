@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 
-from os import curdir, environ, geteuid, urandom
+from os import curdir, environ, urandom
 from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir, basename
 from .base import Interface
 from ..support.param import Parameter
@@ -29,6 +29,8 @@ from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from datalad.cmdline.helpers import get_datalad_master
 from six.moves.urllib.parse import urlparse
+
+from ..utils import not_supported_on_windows
 
 
 def parse_script_output(out, err):
@@ -146,6 +148,8 @@ class PublishCollection(Interface):
 
             # build control master:
             from datalad.utils import assure_dir
+            not_supported_on_windows("TODO")
+            from os import geteuid  # Linux specific import
             var_run_user_datalad = "/var/run/user/%s/datalad" % geteuid()
             assure_dir(var_run_user_datalad)
             control_path = "%s/%s" % (var_run_user_datalad, host_name)

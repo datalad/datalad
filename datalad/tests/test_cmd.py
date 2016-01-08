@@ -245,15 +245,17 @@ def test_link_file_load(tempfile):
     os.unlink(tempfile2)  # TODO: next two with_tempfile
 
 
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+@with_tempfile(mkdir=True)
 def test_runner_failure(dir_):
-
+    from ..support.annexrepo import AnnexRepo
+    repo = AnnexRepo(dir_, create=True)
     runner = Runner()
     failing_cmd = ['git-annex', 'add', 'notexistent.dat']
-    assert_raises(CommandError, runner.run, failing_cmd, cwd=dir_)
 
     try:
-        runner.run(failing_cmd, cwd=dir_)
+        with swallow_logs():
+            runner.run(failing_cmd, cwd=dir_)
+        raise AssertionError("must not reach here -- should have thrown an exception")
     except CommandError as e:
         assert_equal(1, e.code)
         assert_in('notexistent.dat not found', e.stderr)
