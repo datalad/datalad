@@ -406,6 +406,49 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
+    def git_get_hexsha(self, branch=None):
+        """Return a hexsha for a given branch name. If None - of current branch
+
+        Parameters
+        ----------
+        branch: str, optional
+        """
+        # TODO: support not only a branch but any treeish
+        if branch is None:
+            return self.repo.active_branch.object.hexsha
+        for b in self.repo.branches:
+            if b.name == branch:
+                return b.object.hexsha
+        raise ValueError("Unknown branch %s" % branch)
+
+    def git_get_merge_base(self, treeishes):
+        """Get a merge base hexsha
+
+        Parameters
+        ----------
+        treeishes: str or list of str
+          List of treeishes (branches, hexshas, etc) to determine the merge base of.
+          If a single value provided, returns merge_base with the current branch.
+
+        Returns
+        -------
+        str or None
+          If no merge-base for given commits, None returned
+        """
+        if isinstance(treeishes, string_types):
+            treeishes = [treeishes]
+        if not treeishes:
+            raise ValueError("Provide at least a single value")
+        elif len(treeishes) == 1:
+            treeishes = treeishes + [self.git_get_active_branch()]
+
+        bases = self.repo.merge_base(*treeishes)
+
+        if not bases:
+            return None
+        assert(len(bases) == 1)  # we do not do 'all' yet
+        return bases[0].hexsha
+
     def git_get_active_branch(self):
 
         return self.repo.active_branch.name

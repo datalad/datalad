@@ -507,6 +507,30 @@ def test_GitRepo_dirty():
     assert_false(repo.dirty)
 
 
+@with_testrepos(flavors=['clone'], count=1)
+def test_GitRepo_get_merge_base(src):
+    repo = GitRepo(src)
+    assert_raises(ValueError, repo.git_get_merge_base, [])
+    branch1 = repo.git_get_active_branch()
+    branch1_hexsha = repo.git_get_hexsha()
+    eq_(len(branch1_hexsha), 40)
+    eq_(repo.git_get_merge_base(branch1), branch1_hexsha)
+
+    # Let's create a detached branch
+    branch2 = "_detach_"
+    repo.git_checkout(branch2, options="--orphan")
+    # it will have all the files
+    # Must not do:  https://github.com/gitpython-developers/GitPython/issues/375
+    # repo.git_add('.')
+    repo.git_add('*')
+    repo.git_commit("committing")
+    assert(repo.get_indexed_files())  # we did commit
+    assert(repo.git_get_merge_base(branch1) is None)
+    assert(repo.git_get_merge_base([branch2, branch1]) is None)
+
+    # Let's merge them up -- then merge base should match the master
+    repo.git_merge(branch1)
+    eq_(repo.git_get_merge_base(branch1), branch1_hexsha)
 
 # TODO:
 #   def git_fetch(self, name, options=''):
