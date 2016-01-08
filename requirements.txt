@@ -36,3 +36,6 @@ vcrpy
 # until https://github.com/gabrielfalcao/HTTPretty/pull/279 gets a resolution
 https://github.com/yarikoptic/HTTPretty/archive/bf-3.x.zip
 msgpack-python
+
+# -- Optional for Testing
+nose-timer
