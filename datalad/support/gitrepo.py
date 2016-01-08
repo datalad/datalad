@@ -406,6 +406,10 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
+    def git_get_active_branch(self):
+
+        return self.repo.active_branch.name
+
     def git_get_branches(self):
         """Get all branches of the repo.
 
@@ -440,9 +444,50 @@ class GitRepo(object):
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
 
-    def git_get_active_branch(self):
+    def git_get_files(self, branch=None):
+        """Get a list of files in git.
 
-        return self.repo.active_branch.name
+        Lists the files in the (remote) branch.
+
+        Parameters
+        ----------
+        branch: str
+          Name of the branch to query. Default: active branch.
+
+        Returns
+        -------
+        [str]
+          list of files.
+        """
+
+        if branch is None:
+            # active branch can be queried way faster:
+            return self.get_indexed_files()
+        else:
+            return [item.path for item in self.repo.tree(branch).traverse()
+                    if isinstance(item, Blob)]
+
+    def git_get_file_content(self, file_, branch='HEAD'):
+        """
+
+        Returns
+        -------
+        [str]
+          content of file_ as a list of lines.
+        """
+
+        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
+
+        # in python3 a byte string is returned. Need to convert it:
+        from six import PY3
+        if PY3:
+            conv_str = u''
+            for b in bytes(content_str):
+                conv_str += chr(b)
+            return conv_str.splitlines()
+        else:
+            return content_str.splitlines()
+        # TODO: keep splitlines?
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
@@ -543,51 +588,6 @@ class GitRepo(object):
 
         self._git_custom_command('', 'git checkout %s %s' % (options, name),
                                  expect_stderr=True)
-
-    def git_get_files(self, branch=None):
-        """Get a list of files in git.
-
-        Lists the files in the (remote) branch.
-
-        Parameters
-        ----------
-        branch: str
-          Name of the branch to query. Default: active branch.
-
-        Returns
-        -------
-        [str]
-          list of files.
-        """
-
-        if branch is None:
-            # active branch can be queried way faster:
-            return self.get_indexed_files()
-        else:
-            return [item.path for item in self.repo.tree(branch).traverse()
-                    if isinstance(item, Blob)]
-
-    def git_get_file_content(self, file_, branch='HEAD'):
-        """
-
-        Returns
-        -------
-        [str]
-          content of file_ as a list of lines.
-        """
-
-        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
-
-        # in python3 a byte string is returned. Need to convert it:
-        from six import PY3
-        if PY3:
-            conv_str = u''
-            for b in bytes(content_str):
-                conv_str += chr(b)
-            return conv_str.splitlines()
-        else:
-            return content_str.splitlines()
-        # TODO: keep splitlines?
 
     def git_merge(self, name, options=[], msg=None, **kwargs):
         if msg:
