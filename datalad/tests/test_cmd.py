@@ -252,10 +252,8 @@ def test_runner_failure(dir_):
     runner = Runner()
     failing_cmd = ['git-annex', 'add', 'notexistent.dat']
 
-    try:
-        with swallow_logs():
-            runner.run(failing_cmd, cwd=dir_)
-        raise AssertionError("must not reach here -- should have thrown an exception")
-    except CommandError as e:
-        assert_equal(1, e.code)
-        assert_in('notexistent.dat not found', e.stderr)
+    with assert_raises(CommandError) as cme, \
+         swallow_logs() as cml:
+        runner.run(failing_cmd, cwd=dir_)
+        assert_in('notexistent.dat not found', cml.out)
+    assert_equal(1, cme.exception.code)
