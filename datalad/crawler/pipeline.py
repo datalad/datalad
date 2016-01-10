@@ -121,7 +121,12 @@ def xrun_pipeline(pipeline, data=None, stats=None):
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
     data = data or {}
-    data['datalad_stats'] = stats or ActivityStats()
+
+    if 'datalad_stats' in data:
+        if stats is not None:
+            raise ValueError("We were provided stats to use, but data has already datalad_stats")
+    else:
+        data['datalad_stats'] = stats or ActivityStats()
 
     if not len(pipeline):
         return
