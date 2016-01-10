@@ -416,10 +416,11 @@ class Annexificator(object):
             last_merged_checksum = self.repo.git_get_merge_base([self.repo.git_get_active_branch(), branch])
             if last_merged_checksum == self.repo.git_get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
+                skip_no_changes_ = skip_no_changes
                 if skip_no_changes is None:
                     # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
-                    skip_no_changes = True
-                if skip_no_changes:
+                    skip_no_changes_ = True
+                if skip_no_changes_:
                     lgr.debug("Skipping the merge")
                     return
 
@@ -488,6 +489,6 @@ class Annexificator(object):
             stats_str = stats.as_str(mode='line') if stats else ''
             _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options="-a")
         else:
-            lgr.info("Found branch non-dirty - doing nothing")
+            lgr.info("Found branch non-dirty - nothing is committed")
         self._states = []
         yield data
