@@ -507,9 +507,14 @@ def test_GitRepo_dirty():
     assert_false(repo.dirty)
 
 
-@with_testrepos(flavors=['clone'], count=1)
+@with_tempfile(mkdir=True)
 def test_GitRepo_get_merge_base(src):
-    repo = GitRepo(src)
+    repo = GitRepo(src, create=True)
+    with open(opj(src, 'file.txt'), 'w') as f:
+        f.write('load')
+    repo.git_add('*')
+    repo.git_commit('committing')
+
     assert_raises(ValueError, repo.git_get_merge_base, [])
     branch1 = repo.git_get_active_branch()
     branch1_hexsha = repo.git_get_hexsha()
@@ -523,7 +528,9 @@ def test_GitRepo_get_merge_base(src):
     # Must not do:  https://github.com/gitpython-developers/GitPython/issues/375
     # repo.git_add('.')
     repo.git_add('*')
-    repo.git_commit("committing")
+    # NOTE: fun part is that we should have at least a different commit message
+    # so it results in a different checksum ;)
+    repo.git_commit("committing again")
     assert(repo.get_indexed_files())  # we did commit
     assert(repo.git_get_merge_base(branch1) is None)
     assert(repo.git_get_merge_base([branch2, branch1]) is None)
@@ -531,6 +538,10 @@ def test_GitRepo_get_merge_base(src):
     # Let's merge them up -- then merge base should match the master
     repo.git_merge(branch1)
     eq_(repo.git_get_merge_base(branch1), branch1_hexsha)
+
+    # if points to some empty/non-existing branch - should also be None
+    assert(repo.git_get_merge_base(['nonexistent', branch2]) is None)
+
 
 # TODO:
 #   def git_fetch(self, name, options=''):
