@@ -30,7 +30,7 @@ def extract_readme(data):
     lgr.info("Generated README.txt")
     yield {'filename': "README.txt"}
 
-def pipeline(dataset):
+def pipeline(dataset, versioned_urls=True):
     """Pipeline to crawl/annex an openfmri dataset"""
 
     dataset_url = 'https://openfmri.org/dataset/%s' % dataset
@@ -64,13 +64,15 @@ def pipeline(dataset):
                 # and don't know how to select all the a after h4
                 # xpath('//h4[contains(text(), "Data:")]')
                 # so let's just select all the ones going to /tarballs/
-                a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
+				# some are not on S3 yet, so no /tarballs/ prefix e.g. ds 158
+                #a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
+                a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
                 # TODO: needs fixing of the openfmri bucket
                 # email sent out
                 func_to_node(get_versioned_url,
                              data_args=['url'],
                              outputs=['url'],
-                             kwargs={'guarantee_versioned': True,
+                             kwargs={'guarantee_versioned': versioned_urls,
                                      'verify': True}),
 
                 # TODO: we need to "version" those urls which we can version, e.g.,
