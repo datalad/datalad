@@ -110,11 +110,18 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     # we need to pre-initiate handle
     list(initiate_handle('openfmri', dataset_index, path=handle_path)())
 
-    annex = Annexificator(handle_path, create=False,  # must be already initialized etc
-                          options=["-c", "annex.largefiles='exclude=*.txt'"])
+    annex = Annexificator(
+        handle_path,
+        create=False,  # must be already initialized etc
+        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
 
     pipeline = [
         crawl_url(dataset_url),
+        [  # changelog
+               a_href_match(".*release_history.txt"),  # , limit=1
+               assign({'filename': 'changelog.txt'}),
+               annex,
+        ],
         [  # and collect all URLs under "AWS Link"
             css_match('.field-name-field-aws-link a',
                       xpaths={'url': '@href',

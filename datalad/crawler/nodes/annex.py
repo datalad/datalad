@@ -248,7 +248,6 @@ class Annexificator(object):
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
         # Some checks
         assert(self.mode is not None)
-
         stats = data.get('datalad_stats', ActivityStats())
 
         url = data.get('url')
@@ -356,7 +355,6 @@ class Annexificator(object):
         # #if self.mode in ('relaxed', 'fast'):
         # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
         # with subsequent "drop" leaves no record that it ever was here
-
         yield updated_data  # There might be more to it!
 
     def switch_branch(self, branch, parent=None):
@@ -482,7 +480,6 @@ class Annexificator(object):
     # TODO: either separate out commit or allow to pass a custom commit msg?
     def finalize(self, data):
         """Finalize operations -- commit uncommited, prune abandoned? etc"""
-
         if self.repo.dirty:  # or self.tracker.dirty # for dry run
             lgr.info("Repository found dirty -- adding and committing")
             #    # TODO: introduce activities tracker
