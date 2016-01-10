@@ -433,7 +433,8 @@ class GitRepo(object):
         Returns
         -------
         str or None
-          If no merge-base for given commits, None returned
+          If no merge-base for given commits, or specified treeish doesn't exist,
+          None returned
         """
         if isinstance(treeishes, string_types):
             treeishes = [treeishes]
@@ -442,7 +443,12 @@ class GitRepo(object):
         elif len(treeishes) == 1:
             treeishes = treeishes + [self.git_get_active_branch()]
 
-        bases = self.repo.merge_base(*treeishes)
+        try:
+            bases = self.repo.merge_base(*treeishes)
+        except GitCommandError as exc:
+            if "fatal: Not a valid object name" in str(exc):
+                return None
+            raise
 
         if not bases:
             return None
