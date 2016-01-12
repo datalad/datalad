@@ -19,7 +19,7 @@ import os
 import shutil
 import shlex
 
-from six import PY3
+from six import PY3, PY2
 from six import string_types, binary_type
 
 from .support.exceptions import CommandError
@@ -31,6 +31,11 @@ lgr = logging.getLogger('datalad.cmd')
 
 _TEMP_std = sys.stdout, sys.stderr
 
+if PY2:
+    # TODO apparently there is a recommended substitution for Python2
+    # which is a backported implementation of python3 subprocess
+    # https://pypi.python.org/pypi/subprocess32/
+    pass
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.

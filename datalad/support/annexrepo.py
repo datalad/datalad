@@ -12,23 +12,26 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
-import re
 from os import linesep
 from os.path import join as opj, exists, relpath
 import logging
 import json
+import re
 import shlex
+from subprocess import Popen, PIPE
+#import pexpect
 
 from functools import wraps
 
-from six import string_types
+from six import string_types, PY3
 from six.moves.configparser import NoOptionError
+from six.moves.urllib.parse import quote as urlquote
 
+from ..utils import auto_repr
 from .gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
 from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 from ..utils import on_windows, getpwd
-
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -70,7 +73,7 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit']
+    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched']
 
     # TODO: pass description
     def __init__(self, path, url=None, runner=None,
@@ -162,6 +165,8 @@ class AnnexRepo(GitRepo):
             writer = self.repo.config_writer()
             writer.set_value("annex", "backends", backend)
             writer.release()
+
+        self._batched = BatchedAnnexes()
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -529,7 +534,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('enableremote', annex_options=[name])
 
     @normalize_path
-    def annex_addurl_to_file(self, file_, url, options=None, backend=None):
+    def annex_addurl_to_file(self, file_, url, options=None, backend=None, batch=False):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -546,13 +551,32 @@ class AnnexRepo(GitRepo):
             options to the annex command
         """
         options = options[:] if options else []
+        #if file_ == 'about.txt':
+        #    import pdb; pdb.set_trace()
+        kwargs = dict(backend=backend)
+        if not batch:
+            self._run_annex_command('addurl',
+                                    annex_options=options + ['--file=%s' % file_] + [url],
+                                    log_online=True, log_stderr=False,
+                                    **kwargs)
+            # Don't capture stderr, since download progress provided by wget uses
+            # stderr.
+        else:
+            if backend:
+                options += ['--backend=%s' % backend]
+            # Initializes (if necessary) and obtains the batch process
+            out = self._batched.get(
+                # Since backend will be critical for non-existing files
+                'addurl_to_file_backend:%s' % backend,
+                annex_cmd='addurl',
+                annex_options=['--with-files'] + options,  # --raw ?
+                path=self.path,
+                output_proc=readlines_until_ok_or_failed
+            )((url, file_))
+            if not out.endswith('ok'):
+                raise ValueError("Error, output from annex was %s, whenever we expected it to end with ' ok'"
+                                 % out)
 
-        annex_options = ['--file=%s' % file_] + options + [url]
-        self._run_annex_command('addurl', annex_options=annex_options,
-                                backend=backend, log_online=True,
-                                log_stderr=False)
-        # Don't capture stderr, since download progress provided by wget uses
-        # stderr.
 
     def annex_addurls(self, urls, options=None, backend=None, cwd=None):
         """Downloads each url to its own file, which is added to the annex.
@@ -636,6 +660,7 @@ class AnnexRepo(GitRepo):
         """Run an annex command with --json and load output results into a tuple of dicts
         """
         try:
+            # TODO: refactor to account for possible --batch ones
             out, err = self._run_annex_command(
                     command,
                     annex_options=['--json'] + args)
@@ -749,6 +774,8 @@ class AnnexRepo(GitRepo):
         out, err = self._run_annex_command('find')
         return out.splitlines()
 
+    # TODO: oh -- API for this better gets RFed sooner than later!
+    #       by overloading commit in GitRepo
     def commit(self, msg):
         """
 
@@ -869,3 +896,125 @@ class AnnexRepo(GitRepo):
 
     def annex_fsck(self):
         self._run_annex_command('fsck')
+
+
+#@auto_repr
+class BatchedAnnexes(dict):
+    """Class to contain the registry of active batch'ed instances of annex for a repository
+    """
+#    def __init__(self):
+#        self.processes = {}  # codename -> process
+
+    def get(self, codename, annex_cmd=None, **kwargs):
+        if annex_cmd is None:
+            annex_cmd = codename
+
+        if codename not in self:
+            # Create a new git-annex process we will keep around
+            self[codename] = BatchedAnnex(annex_cmd, **kwargs)
+        return self[codename]
+
+
+def readline_rstripped(stdout):
+    return stdout.readline().rstrip()
+
+
+def readlines_until_ok_or_failed(stdout):
+    """Read stdout until line ends with ok or failed"""
+    out = ''
+    lgr.log(3, "Trying to receive from %s" % stdout)
+    while not stdout.closed:
+        lgr.log(1, "Expecting a line")
+        line = stdout.readline()
+        lgr.log(1, "Received line %r" % line)
+        out += line
+        if re.match(r'^.*\b(failed|ok)$', line.rstrip()):
+            break
+    return out.rstrip()
+
+
+@auto_repr
+class BatchedAnnex(object):
+    """Container for an annex process which would allow for persistent communication
+    """
+
+    def __init__(self, annex_cmd, annex_options=[], path=None,
+                 output_proc=readline_rstripped):
+        self.annex_cmd = annex_cmd
+        self.annex_options = annex_options
+        self.path = path
+        self.output_proc = output_proc
+        self._process = None
+
+    def _initialize(self):
+        lgr.debug("Initiating a new process for %s" % repr(self))
+        cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + \
+              ['annex', self.annex_cmd] + self.annex_options + ['--batch'] # , '--debug']
+        lgr.log(5, "Command: %s" % cmd)
+        # TODO: look into _run_annex_command  to support default options such as --debug
+        #
+        # according to the internet wisdom there is no easy way with subprocess
+        # while avoid deadlocks etc.  We would need to start a thread/subprocess
+        # to timeout etc
+        # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
+        self._process = Popen(cmd, stdin=PIPE, stdout=PIPE
+                              # , stderr=PIPE
+                              , cwd=self.path
+                              , bufsize=1, universal_newlines=True #**kwargs
+                              )
+
+    def __call__(self, input_):
+        """
+
+        Parameters
+        ----------
+        input_ : str or tuple or list of (str or tuple)
+        output_proc : callable
+          To provide handling
+
+        Returns
+        -------
+        str or list
+          Output received from annex.  list in case if input_ was a list
+        """
+        # TODO: add checks -- may be process died off and needs to be reinitiated
+        if not self._process:
+            self._initialize()
+
+        input_multiple = isinstance(input_, list)
+        if not input_multiple:
+            input_ = [input_]
+
+        output = []
+        process = self._process
+        for entry in input_:
+            if not isinstance(entry, string_types):
+                entry = ' '.join(entry)
+            entry = entry + '\n'
+            lgr.log(5, "Sending %r to batched annex %s" % (entry, self))
+            # apparently communicate is just a one time show
+            # stdout, stderr = self._process.communicate(entry)
+            # according to the internet wisdom there is no easy way with subprocess
+            process.stdin.write(entry)#.encode())
+            lgr.log(5, "Done sending.")
+            # TODO: somehow do catch stderr which might be there or not
+            #stderr = str(process.stderr) if process.stderr.closed else None
+            if process.returncode:
+                lgr.warning("Process %s for %s returned %s" % (process, self, process.returncode))
+            # We are expecting a single line output
+            # TODO: timeouts etc
+            stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
+            #if stderr:
+            #    lgr.warning("Received output in stderr: %r" % stderr)
+            lgr.log(5, "Received output: %r" % stdout)
+            output.append(stdout)
+
+        return output if input_multiple else output[0]
+
+    def __del__(self):
+        if self._process:
+            process = self._process
+            lgr.debug("Closing stdin of %s and waiting process to finish" % process)
+            process.stdin.close()
+            process.wait()
+            self._process = None

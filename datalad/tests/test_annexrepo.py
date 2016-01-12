@@ -15,6 +15,7 @@ from os.path import exists, islink
 from git.exc import GitCommandError
 from six import PY3
 from six.moves.urllib.parse import urljoin, urlsplit
+from shutil import copyfile
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
@@ -639,3 +640,82 @@ def test_AnnexRepo_get_contentlocation(path):
         eq_(os.path.realpath(opj(annex.path, fname)),
             os.path.realpath(opj(annex.path, key_location)))
 
+
+@with_tree(tree=(('about.txt', 'Lots of abouts'),
+                 ('about2.txt', 'more abouts'),
+                 ('about2_.txt', 'more abouts_'),
+                 ('d', {'sub.txt': 'more stuff'})))
+@serve_path_via_http()
+@with_tempfile
+def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
+
+    ar = AnnexRepo(dst, create=True)
+    testurl = urljoin(siteurl, 'about.txt')
+    testurl2 = urljoin(siteurl, 'about2.txt')
+    testurl2_ = urljoin(siteurl, 'about2_.txt')
+    testurl3 = urljoin(siteurl, 'd/sub.txt')
+    url_file_prefix = urlsplit(testurl).netloc.split(':')[0]
+    testfile = 'about.txt'
+    testfile2 = 'about2.txt'
+    testfile2_ = 'about2_.txt'
+    testfile3 = opj('d', 'sub.txt')
+
+    # add to an existing but not committed file
+    # TODO: __call__ of the BatchedAnnex must be checked to be called
+    copyfile(opj(sitepath, 'about.txt'), opj(dst, testfile))
+    #with swallow_outputs() as cmo:
+    ar.annex_addurl_to_file(testfile, testurl, batch=True)
+    # TODO: causes it to download the file even if it is present already
+    # http://git-annex.branchable.com/bugs/addurl_--file__causes_file_redownload_even_if_it_already_present/?updated
+    info = ar.annex_info(testfile)
+    assert_equal(info['size'], 14)
+    assert(info['key'])
+    # not committed yet
+    assert_not_in('web', ar.annex_whereis(testfile))
+
+    # TODO: none of the below should re-initiate the batch process
+
+    # add to an existing and staged annex file
+    copyfile(opj(sitepath, 'about2.txt'), opj(dst, testfile2))
+    ar.annex_add(testfile2)
+    ar.annex_addurl_to_file(testfile2, testurl2, batch=True)
+    assert(ar.annex_info(testfile2))
+    # not committed yet
+    # assert_in('web', ar.annex_whereis(testfile2))
+
+    # add to an existing and committed annex file
+    copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
+    ar.annex_add(testfile2_)
+    ar.commit("added about2_.txt and there was about2.txt lingering around")
+    ar.annex_addurl_to_file(testfile2_, testurl2_, batch=True)
+    assert(ar.annex_info(testfile2_))
+    assert_in('web', ar.annex_whereis(testfile2_))
+
+    # add into a new file
+    #filename = 'newfile.dat'
+    filename = get_most_obscure_supported_name()
+    with swallow_outputs():
+        ar.annex_addurl_to_file(filename, testurl, batch=True)
+    # XXX closing pipe to annex would result in it finally adding to index those files
+    #ar._batched.clear()
+    ar.commit("added new file")  # would do nothing ATM, but also doesn't fail
+    assert_not_in(filename, ar.git_get_files())  # but the file is not in git
+    # see http://git-annex.branchable.com/bugs/addurl_--batch__--with-files_doesn__39__t_add_file_into_git_until_pipe_is_closed/
+    assert_not_in('web', ar.annex_whereis(filename))
+
+    # but if we manually add it -- should get there
+    ar.annex_add(filename)
+    ar.annex_add(testfile)  # and that file above
+    ar.commit("actually committing new files")
+    assert_in(filename, ar.git_get_files())
+    assert_in('web', ar.annex_whereis(filename))
+    assert_in('web', ar.annex_whereis(testfile))
+
+    # and closing the pipes now shoudn't anyhow affect things
+    assert(not ar.dirty)
+    ar._batched.clear()
+    assert(not ar.dirty)
+
+    raise SkipTest("TODO: more, e.g. add with a custom backend")
+    # TODO: also with different modes (relaxed, fast)
+    # TODO: verify that file is added with that backend and that we got a new batched process

@@ -391,8 +391,14 @@ class GitRepo(object):
         # convert to string anyways.... bleh
         if not msg:
             msg = "What would be a good default message?"
-
+        lgr.debug("Committing with msg=%r" % msg)
         self.cmd_call_wrapper(self.repo.index.commit, msg)
+        #
+        #  Was blaming of too much state causes side-effects while interlaving with
+        #  git annex cmds so this snippet if to use outside git call
+        #self._git_custom_command([], ['git', 'commit'] + \
+        #                         (["-m", msg] if msg else []) + \
+        #                         (options if options else []))
 
     def get_indexed_files(self):
         """Get a list of files in git's index
