@@ -10,6 +10,7 @@
 """
 
 import os
+import time
 from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
 from os import unlink, makedirs
 
@@ -281,9 +282,10 @@ class Annexificator(object):
         updated_data = updated(data, {'filename': filename,
                                       #TODO? 'filepath': filepath
                                       })
-
+        remote_status = None
         if url:
             downloader = self._providers.get_provider(url).get_downloader(url)
+
             if lexists(filepath):
                 # Check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT
@@ -293,8 +295,12 @@ class Annexificator(object):
                 # remote_status = downloader.get_status(url, old_status=local_status)
                 # if remote_status == local_status:  # WIP TODO not is_status_different(local_status, remote_status):
                 # APP2:  no explicit local_status
+                # if self.mode != 'full' and fpath == '1-copy.dat':
+                #     import pdb; pdb.set_trace()
                 remote_status = downloader.get_status(url)
-                if not self.statusdb.is_different(fpath, remote_status):
+                # TODO: what if the file came from another url bearing the same mtime and size????
+                #       unlikely but possible.  We would need to provide URL for comparison(s)
+                if self.mode == 'relaxed' or not self.statusdb.is_different(fpath, remote_status, url):
                     # TODO:  check if remote_status < local_status, i.e. mtime jumped back
                     # and if so -- warning or may be according to some config setting -- skip
                     # e.g. config.get('crawl', 'new_older_files') == 'skip'
@@ -304,6 +310,9 @@ class Annexificator(object):
                     if self.yield_non_updated:
                         yield updated_data  # There might be more to it!
                     return
+            elif self.mode != 'full':
+                # we would need remote_status to set mtime of the symlink
+                remote_status = downloader.get_status(url)
 
         if not url:
             lgr.debug("Adding %s directly into git since no url was provided" % (filepath))
@@ -331,13 +340,23 @@ class Annexificator(object):
                     stats.add_git += 1
             _call(_download_and_git_annex_add, url, fpath)
         else:
+            # !!!! If file shouldn't get under annex due to largefile setting -- we must download it!!!
+            # TODO: http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option/#comment-b43ef555564cc78c6dee2092f7eb9bac
             annex_options = self.options + ["--%s" % self.mode]
-            lgr.debug("Downloading %s into %s and adding to annex in %s mode" % (url, filepath, self.mode))
+            lgr.debug("Pointing %s to %s within annex in %s mode" % (url, filepath, self.mode))
             if lexists(filepath):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
                 _call(unlink, filepath)
+                _call(stats.increment, 'overwritten')
             _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options)
-            _call(stats.increment, 'annex_add')
+            _call(stats.increment, 'add_annex')
+
+        if remote_status and lexists(filepath): # and islink(filepath):
+            # Set mtime of the symlink or git-added file itself
+            # utime dereferences!
+            # _call(os.utime, filepath, (time.time(), remote_status.mtime))
+            # *nix only!  TODO
+            _run(['touch', '-h', '-d', '@%s' % remote_status.mtime, filepath])
 
         state = "adding files to git/annex"
         if state not in self._states:

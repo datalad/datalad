@@ -69,7 +69,7 @@ class AnnexFileAttributesDB(object):
         # I wish I could just test using filesystem stats but that would not
         # be reliable, and also file might not even be here.
         # File might be under git, not annex so then we would need to assess size
-        filestat = os.stat(filepath)
+        filestat = os.lstat(filepath)
         try:
             with swallow_logs():
                 info = self.annex.annex_info(fpath)
@@ -94,8 +94,10 @@ class AnnexFileAttributesDB(object):
             mtime=mtime
         )
 
-    def is_different(self, fpath, status):
+    def is_different(self, fpath, status, url=None):
         """Return True if file pointed by fpath newer in status
         """
+        # TODO: make use of URL -- we should validate that url is among those associated
+        #  with the file
         old_status = self.get(fpath)
         return old_status != status
