@@ -254,7 +254,7 @@ class AddArchiveContent(Interface):
                 # above action might add to git or to annex
                 if annex.file_has_content(target_path):
                     # if not --  it was added to git, if in annex, it is present and output is True
-                    annex.annex_addurl_to_file(target_file, url, options=['--relaxed'])
+                    annex.annex_addurl_to_file(target_file, url, options=['--relaxed'], batch=True)
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))

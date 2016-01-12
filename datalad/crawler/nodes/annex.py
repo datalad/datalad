@@ -218,7 +218,7 @@ class Annexificator(object):
 
     def add(self, filename, url=None):
         # TODO: modes
-        self.repo.annex_addurl_to_file(filename, url #, TODO  backend
+        self.repo.annex_addurl_to_file(filename, url, batch=True #, TODO  backend
                                        )
         raise NotImplementedError()
 
@@ -326,7 +326,7 @@ class Annexificator(object):
                 # TODO: better function which explicitly checks if file is under annex or either under git
                 if self.repo.file_has_content(fpath):
                     stats.add_annex += 1
-                    self.repo.annex_addurl_to_file(fpath, url)
+                    self.repo.annex_addurl_to_file(fpath, url, batch=True)
                 else:
                     stats.add_git += 1
             _call(_download_and_git_annex_add, url, fpath)
@@ -336,7 +336,7 @@ class Annexificator(object):
             if lexists(filepath):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
                 _call(unlink, filepath)
-            _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options)
+            _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options, batch=True)
             _call(stats.increment, 'annex_add')
 
         state = "adding files to git/annex"
