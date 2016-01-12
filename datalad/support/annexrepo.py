@@ -760,7 +760,7 @@ class AnnexRepo(GitRepo):
             assert(j['file'] == f)
             assert(j.pop('success') == True)
             # convert size to int
-            j['size'] = int(j['size'])
+            j['size'] = int(j['size']) if 'unknown' not in j['size'] else None
             # and pop the "command" field
             j.pop("command")
             out[j.pop("file")] = j
