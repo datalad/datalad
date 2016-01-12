@@ -337,7 +337,7 @@ def with_tree(t, tree=None, **tkwargs):
         d = tempfile.mkdtemp(**tkwargs_)
         create_tree(d, tree)
         try:
-            t(*(arg + (d,)), **kw)
+            return t(*(arg + (d,)), **kw)
         finally:
             rmtemp(d)
     return newfunc
@@ -402,7 +402,7 @@ def serve_path_via_http(tfunc, *targs):
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
-            tfunc(*(args + (path, url)), **kwargs)
+            return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
