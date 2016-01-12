@@ -576,6 +576,11 @@ class AnnexRepo(GitRepo):
             if not out.endswith('ok'):
                 raise ValueError("Error, output from annex was %s, whenever we expected it to end with ' ok'"
                                  % out)
+            # due to annex needing closing its pipe to actually add addurl'ed file
+            # to index, we will do it manually here for now
+            # see
+            # http://git-annex.branchable.com/bugs/addurl_--batch__--with-files_doesn__39__t_add_file_into_git_until_pipe_is_closed/
+            self.git_add(file_)
 
 
     def annex_addurls(self, urls, options=None, backend=None, cwd=None):

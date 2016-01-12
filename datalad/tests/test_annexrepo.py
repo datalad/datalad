@@ -671,7 +671,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     assert_equal(info['size'], 14)
     assert(info['key'])
     # not committed yet
-    assert_not_in('web', ar.annex_whereis(testfile))
+    assert_in('web', ar.annex_whereis(testfile))
 
     # TODO: none of the below should re-initiate the batch process
 
@@ -699,13 +699,13 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # XXX closing pipe to annex would result in it finally adding to index those files
     #ar._batched.clear()
     ar.commit("added new file")  # would do nothing ATM, but also doesn't fail
-    assert_not_in(filename, ar.git_get_files())  # but the file is not in git
+    assert_in(filename, ar.git_get_files())  # but the file is not in git
     # see http://git-annex.branchable.com/bugs/addurl_--batch__--with-files_doesn__39__t_add_file_into_git_until_pipe_is_closed/
-    assert_not_in('web', ar.annex_whereis(filename))
+    assert_in('web', ar.annex_whereis(filename))
 
     # but if we manually add it -- should get there
-    ar.annex_add(filename)
-    ar.annex_add(testfile)  # and that file above
+    #ar.annex_add(filename)
+    #ar.annex_add(testfile)  # and that file above
     ar.commit("actually committing new files")
     assert_in(filename, ar.git_get_files())
     assert_in('web', ar.annex_whereis(filename))
