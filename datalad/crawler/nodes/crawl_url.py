@@ -11,6 +11,8 @@
 
 from ...support.network import fetch_page
 from ...utils import updated
+from ...dochelpers import exc_str
+from ...downloaders.base import DownloadError
 from ...downloaders.providers import Providers
 
 from logging import getLogger
@@ -24,6 +26,7 @@ class crawl_url(object):
     def __init__(self,
                  url=None, matchers=None,
                  input='url',
+                 failed=None,
                  output=('response', 'url')):
         """If url is None, would try to pick it up from data[input]
 
@@ -32,6 +35,8 @@ class crawl_url(object):
 
         matchers: list of matchers
           Expect page content in and should produce url field
+        failed: {skip}, optional
+          What to do about failing urls. If None -- would consult (eventually) the config
         """
         self._url = url
         self._matchers = matchers
@@ -39,6 +44,7 @@ class crawl_url(object):
         self._output = output
         self._seen = set()
         self._providers = Providers.from_config_files()
+        self.failed = failed
 
     def reset(self):
         """Reset cache of seen urls"""
@@ -50,7 +56,15 @@ class crawl_url(object):
         self._seen.add(url)
         # this is just a cruel first attempt
         lgr.debug("Visiting %s" % url)
-        page = self._providers.fetch(url)
+        try:
+            page = self._providers.fetch(url)
+        except DownloadError as exc:
+            lgr.warning("URL %s failed to download: %s" % (url, exc_str(exc)))
+            if self.failed in {None, 'skip'}:
+                # TODO: config  -- failed='skip' should be a config option, for now always skipping
+                return
+            raise  # otherwise -- kaboom
+
         data_ = updated(data, zip(self._output, (page, url)))
         yield data_
         # now recurse if matchers were provided
