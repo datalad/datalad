@@ -957,7 +957,7 @@ class BatchedAnnex(object):
     def _initialize(self):
         lgr.debug("Initiating a new process for %s" % repr(self))
         cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + \
-              ['annex', self.annex_cmd] + self.annex_options + ['--batch'] # , '--debug']
+              ['annex', self.annex_cmd] + self.annex_options + ['--batch', '--debug']
         lgr.log(5, "Command: %s" % cmd)
         # TODO: look into _run_annex_command  to support default options such as --debug
         #
