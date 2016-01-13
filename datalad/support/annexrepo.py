@@ -927,11 +927,15 @@ def readline_rstripped(stdout):
     return stdout.readline().rstrip()
 
 
-def readlines_until_ok_or_failed(stdout):
+def readlines_until_ok_or_failed(stdout, maxlines=100):
     """Read stdout until line ends with ok or failed"""
     out = ''
+    i = 0
     lgr.log(3, "Trying to receive from %s" % stdout)
     while not stdout.closed:
+        i += 1
+        if maxlines > 0 and i > maxlines:
+            raise IOError("Expected no more than %d lines. So far received: %r" % (maxlines, out))
         lgr.log(1, "Expecting a line")
         line = stdout.readline()
         lgr.log(1, "Received line %r" % line)
@@ -1007,6 +1011,8 @@ class BatchedAnnex(object):
             lgr.log(5, "Done sending.")
             # TODO: somehow do catch stderr which might be there or not
             #stderr = str(process.stderr) if process.stderr.closed else None
+            if process.poll():
+                lgr.warning("Process %s was terminated" % process)
             if process.returncode:
                 lgr.warning("Process %s for %s returned %s" % (process, self, process.returncode))
             # We are expecting a single line output
