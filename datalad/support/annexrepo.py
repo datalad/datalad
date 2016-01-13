@@ -580,7 +580,10 @@ class AnnexRepo(GitRepo):
             # to index, we will do it manually here for now
             # see
             # http://git-annex.branchable.com/bugs/addurl_--batch__--with-files_doesn__39__t_add_file_into_git_until_pipe_is_closed/
-            self.git_add(file_)
+
+            # no normalization since we are dealing with normalized paths already
+            # and might reside within repo's subdir
+            self.git_add(file_, normalize_paths=False)
 
 
     def annex_addurls(self, urls, options=None, backend=None, cwd=None):
