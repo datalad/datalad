@@ -251,7 +251,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     ar = AnnexRepo(dst, create=True)
     testurl = urljoin(siteurl, 'about.txt')
     testurl2 = urljoin(siteurl, 'about2.txt')
-    testurl3 = urljoin(siteurl, 'd', 'sub.txt')
+    testurl3 = urljoin(siteurl, 'd/sub.txt')
     url_file_prefix = urlsplit(testurl).netloc.split(':')[0]
     testfile = '%s_about.txt' % url_file_prefix
     testfile2 = '%s_about2.txt' % url_file_prefix
@@ -272,6 +272,11 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_not_in('urls', lfull[non_web_remote])
     assert_equal(lfull['web']['uuid'], '00000000-0000-0000-0000-000000000001')
     assert_equal(lfull['web']['urls'], [testurl])
+
+    # info
+    info = ar.annex_info(testfile)
+    assert_equal(info['size'], 14)
+    assert(info['key'])  # that it is there
 
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
@@ -337,14 +342,24 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     os.mkdir(subdir)
     with swallow_outputs() as cmo:
         ar.annex_addurl_to_file(testfile3, url=testurl3)
+    ok_file_has_content(opj(dst, testfile3), 'more stuff')
     assert_equal(set(ar.annex_whereis(testfile3)), {'web', non_web_remote})
     assert_equal(set(ar.annex_whereis(testfile3, output='full').keys()), {'web', non_web_remote})
+
+    # and if we ask for both files
+    info2 = ar.annex_info([testfile, testfile3])
+    assert_equal(set(info2), {testfile, testfile3})
+    assert_equal(info2[testfile3]['size'], 10)
 
     # which would work even if we cd to that subdir
     with chpwd(subdir):
         assert_equal(set(ar.annex_whereis('sub.txt')), {'web', non_web_remote})
         assert_equal(set(ar.annex_whereis('sub.txt', output='full').keys()), {'web', non_web_remote})
-
+        testfiles = ['sub.txt', opj(pardir, testfile)]
+        info2_ = ar.annex_info(testfiles)
+        # Should maintain original relative file names
+        assert_equal(set(info2_), set(testfiles))
+        assert_equal(info2_['sub.txt']['size'], 10)
 
 
 

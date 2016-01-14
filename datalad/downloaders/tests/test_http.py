@@ -49,6 +49,7 @@ from ...tests.utils import use_cassette
 from ...tests.utils import SkipTest
 from ...tests.utils import skip_httpretty_on_problematic_pythons
 from ...tests.utils import skip_if
+from ...support.status import FileStatus
 
 def test_docstring():
     doc = HTTPDownloader.__init__.__doc__
@@ -163,8 +164,9 @@ def check_download_external_url(url, failed_str, success_str, d):
 
     # Verify status
     status = downloader.get_status(url)
-    assert_in('Last-Modified', status)
-    assert_in('Content-Length', status)
+    assert(isinstance(status, FileStatus))
+    assert(status.mtime)
+    assert(status.size)
     # TODO -- more and more specific
 
 
@@ -195,6 +197,7 @@ def test_mtime(path, url, tempfile):
         _get_test_providers().download(file_url, path=tempfile)
     assert_equal(os.stat(tempfile).st_mtime, 1000)
 
+
 def test_get_status_from_headers():
     # function doesn't do any value transformation ATM
     headers = {
@@ -206,8 +209,9 @@ def test_get_status_from_headers():
     headers['bogus1'] = '123'
     assert_equal(
             HTTPDownloader.get_status_from_headers(headers),
-            {'Content-Length': 123, 'Content-Disposition': "bogus.txt", 'Last-Modified': 1446873816})
-    assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}), {'Content-Length': 123})
+            FileStatus(size=123, filename='bogus.txt', mtime=1446873816))
+    assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}),
+                 FileStatus(size=123))
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!

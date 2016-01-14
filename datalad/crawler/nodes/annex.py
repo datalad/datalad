@@ -9,24 +9,29 @@
 """Nodes to interact with annex -- add files etc
 """
 
-from os.path import expanduser, join as opj, exists
+import os
+import time
+from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
 from os import unlink, makedirs
 
 from ...api import add_archive_content
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
+from ...utils import lmtime
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo
 from ...support.annexrepo import AnnexRepo
 from ...support.handlerepo import HandleRepo
+from ...support.stats import ActivityStats
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
 from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
+from ..dbs.files import AnnexFileAttributesDB
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.annex')
@@ -160,9 +165,14 @@ class Annexificator(object):
 
     If 'filename' field was not found in the data, filename from the url
     gets taken.
+
+    'path' field of data (if present) is used to define path within the subdirectory.
+    Should be relative. If absolute found -- ValueError is raised
     """
     def __init__(self, path=None, mode='full', options=None,
-                 allow_dirty=False, **kwargs):
+                 allow_dirty=False, yield_non_updated=False,
+                 statusdb=None,
+                 **kwargs):
         """
 
         Note that always_commit=False for the used AnnexRepo to minimize number
@@ -174,6 +184,12 @@ class Annexificator(object):
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
           annex modes where no actual download is performed and files' keys are their urls
+        yield_non_updated : bool, optional
+          Either to yield original data (with filepath) if load was not updated in annex
+        statusdb : , optional
+          DB of file statuses which will be used to figure out if remote load has changed.
+          If None, instance of AnnexFileAttributesDB will be used which will decide based on
+          information in annex and file(s) mtime on the disk
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -192,13 +208,19 @@ class Annexificator(object):
         self._states = []
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
+        self.yield_non_updated = yield_non_updated
 
         if (not allow_dirty) and self.repo.dirty:
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
 
+        if statusdb is None:
+            statusdb = AnnexFileAttributesDB(annex=self.repo)
+        self.statusdb = statusdb
+
+
     def add(self, filename, url=None):
         # TODO: modes
-        self.repo.annex_addurl_to_file(filename, url#, TODO  backend
+        self.repo.annex_addurl_to_file(filename, url #, TODO  backend
                                        )
         raise NotImplementedError()
 
@@ -213,6 +235,8 @@ class Annexificator(object):
 
     @staticmethod
     def _get_filename_from_url(url):
+        if url is None:
+            return None
         filename = get_url_straight_filename(url)
         # if still no filename
         if not filename:
@@ -222,52 +246,118 @@ class Annexificator(object):
                              "Please adjust pipeline to provide one" % url)
         return filename
 
-    def __call__(self, data):  # filename=None, get_disposition_filename=False):
-        url = data.get('url')
 
+    def __call__(self, data):  # filename=None, get_disposition_filename=False):
+        # Some checks
+        assert(self.mode is not None)
+        stats = data.get('datalad_stats', ActivityStats())
+
+        url = data.get('url')
+        if url:
+            stats.urls += 1
 
         # figure out the filename. If disposition one was needed, pipeline should
         # have had it explicitly
-        filename = data['filename'] if 'filename' in data else self._get_filename_from_url(url)
+        fpath = filename = \
+            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
 
-        # TODO:  some kind of 'path' should be in play here as well
-        fpath = filename
+        stats.files += 1
+        if filename is None:
+            stats.skipped += 1
+            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
+        elif isabs(filename):
+            stats.skipped += 1
+            raise ValueError("Got absolute filename %r" % filename)
+
+        path_ = data.get('path', None)
+        if path_:
+            # TODO: test all this handling of provided paths
+            if isabs(path_):
+                stats.skipped += 1
+                raise ValueError("Absolute path %s was provided" % path_)
+            fpath = opj(path_, fpath)
+        filepath = opj(self.repo.path, fpath)
 
         lgr.debug("Request to annex %(url)s to %(fpath)s", locals())
-        # Filename still can be None
 
-        # Since addurl ignores annex.largefiles we need first to download that file and then
-        # annex add it
-        filepath = opj(self.repo.path, fpath)
-        if url and exists(filepath):
-            lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
-            unlink(filepath)
+        updated_data = updated(data, {'filename': filename,
+                                      #TODO? 'filepath': filepath
+                                      })
+        remote_status = None
+        if url:
+            downloader = self._providers.get_provider(url).get_downloader(url)
 
-        assert(self.mode is not None)
+            if lexists(filepath):
+                # Check if URL provides us updated content.  If not -- we should do nothing
+                # APP1:  in this one it would depend on local_status being asked first BUT
+                #        may be for S3 support where statusdb would only record most recent
+                #        modification time
+                # local_status = self.statusdb.get(fpath)
+                # remote_status = downloader.get_status(url, old_status=local_status)
+                # if remote_status == local_status:  # WIP TODO not is_status_different(local_status, remote_status):
+                # APP2:  no explicit local_status
+                # if self.mode != 'full' and fpath == '1-copy.dat':
+                #     import pdb; pdb.set_trace()
+                remote_status = downloader.get_status(url)
+                # TODO: what if the file came from another url bearing the same mtime and size????
+                #       unlikely but possible.  We would need to provide URL for comparison(s)
+                if self.mode == 'relaxed' or not self.statusdb.is_different(fpath, remote_status, url):
+                    # TODO:  check if remote_status < local_status, i.e. mtime jumped back
+                    # and if so -- warning or may be according to some config setting -- skip
+                    # e.g. config.get('crawl', 'new_older_files') == 'skip'
+                    lgr.debug("Skipping download. URL %s doesn't provide new content for %s.  New status: %s",
+                              url, filepath, remote_status)
+                    stats.skipped += 1
+                    if self.yield_non_updated:
+                        yield updated_data  # There might be more to it!
+                    return
+            elif self.mode != 'full':
+                # we would need remote_status to set mtime of the symlink
+                remote_status = downloader.get_status(url)
+
         if not url:
             lgr.debug("Adding %s directly into git since no url was provided" % (filepath))
             # So we have only filename
             assert(filename)
             # Thus add directly into git
             _call(self.repo.git_add, filename)
+            _call(stats.increment, 'add_git')
         elif self.mode == 'full':
+            # Since addurl ignores annex.largefiles we need first to download that file and then
+            # annex add it
+            # see http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
             lgr.debug("Downloading %s into %s and adding to annex" % (url, filepath))
-            # XXX temporarily??? until
-            # http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
             def _download_and_git_annex_add(url, fpath):
                 # Just to feed into _call for dry-run
-                filepath_downloaded = self._providers.download(url, filepath)
+                filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
                 assert(filepath_downloaded == filepath)
                 self.repo.annex_add(fpath, options=self.options)
                 # and if the file ended up under annex, and not directly under git -- addurl
-                # TODO:  better function which explicitly checks if file is under annex or either under git
+                # TODO: better function which explicitly checks if file is under annex or either under git
                 if self.repo.file_has_content(fpath):
+                    stats.add_annex += 1
                     self.repo.annex_addurl_to_file(fpath, url)
+                else:
+                    stats.add_git += 1
             _call(_download_and_git_annex_add, url, fpath)
         else:
+            # !!!! If file shouldn't get under annex due to largefile setting -- we must download it!!!
+            # TODO: http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option/#comment-b43ef555564cc78c6dee2092f7eb9bac
             annex_options = self.options + ["--%s" % self.mode]
-            lgr.debug("Downloading %s into %s and adding to annex in %s mode" % (url, filepath, self.mode))
+            lgr.debug("Pointing %s to %s within annex in %s mode" % (url, filepath, self.mode))
+            if lexists(filepath):
+                lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
+                _call(unlink, filepath)
+                _call(stats.increment, 'overwritten')
             _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options)
+            _call(stats.increment, 'add_annex')
+
+        if remote_status and lexists(filepath):  # and islink(filepath):
+            # Set mtime of the symlink or git-added file itself
+            # utime dereferences!
+            # _call(os.utime, filepath, (time.time(), remote_status.mtime))
+            # *nix only!  TODO
+            _call(lmtime, filepath, remote_status.mtime)
 
         state = "adding files to git/annex"
         if state not in self._states:
@@ -285,8 +375,7 @@ class Annexificator(object):
         # #if self.mode in ('relaxed', 'fast'):
         # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
         # with subsequent "drop" leaves no record that it ever was here
-
-        yield updated(data, {'filename': filename})  # There might be more to it!
+        yield updated_data  # There might be more to it!
 
     def switch_branch(self, branch, parent=None):
         """Node generator to switch branch, returns actual node
@@ -322,22 +411,54 @@ class Annexificator(object):
             yield updated(data, {"git_branch": branch})
         return switch_branch
 
-    def merge_branch(self, branch, strategy=None, commit=True):
+    def merge_branch(self, branch, strategy=None, commit=True, skip_no_changes=None):
+        """Merge a branch into a current branch
+
+        Parameters
+        ----------
+        branch: str
+          Branch to be merged
+        strategy: None or 'theirs', optional
+          With 'theirs' strategy remote branch content is used 100% as is.
+          'theirs' with commit=False can be used to prepare data from that branch for
+          processing by further steps in the pipeline
+        commit: bool, optional
+          Either to commit when merge is complete
+        skip_no_changes: None or bool, optional
+          Either to not perform any action if there is no changes from previous merge
+          point. If None, config TODO will be consulted with default of being True (i.e. skip
+          if no changes)
+        """
         # TODO: support merge of multiple branches at once
         assert(strategy in (None, 'theirs'))
+
         def merge_branch(data):
+            last_merged_checksum = self.repo.git_get_merge_base([self.repo.git_get_active_branch(), branch])
+            if last_merged_checksum == self.repo.git_get_hexsha(branch):
+                lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
+                skip_no_changes_ = skip_no_changes
+                if skip_no_changes is None:
+                    # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                    skip_no_changes_ = True
+                if skip_no_changes_:
+                    lgr.debug("Skipping the merge")
+                    return
+
             lgr.info("Initiating merge of %(branch)s using strategy %(strategy)s", locals())
-            options = '--no-commit' if not commit else ''
-            if not commit:
-                self._states += ["merge of %s" % branch]
+            options = ['--no-commit'] if not commit else []
             if strategy is None:
                 self.repo.git_merge(branch, options=options)
             elif strategy == 'theirs':
-                self.repo.git_merge(branch, options="-s ours --no-commit", expect_stderr=True)
+                self.repo.git_merge(branch, options=["-s", "ours", "--no-commit"], expect_stderr=True)
                 self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % branch)
                 self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
                 if commit:
                     self._commit("Merged %s using strategy %s" % (branch, strategy), options="-a")
+                else:
+                    # Record into our activity stats
+                    stats = data.get('datalad_stats', None)
+                    if stats:
+                        stats.merges.append([branch, self.repo.git_get_active_branch()])
             yield data
         return merge_branch
 
@@ -366,6 +487,7 @@ class Annexificator(object):
                 archive, annex=self.repo,
                 delete=True, key=False, commit=False, allow_dirty=True,
                 annex_options=self.options,
+                stats=data.get('datalad_stats', None),
                 **aac_kwargs
             )
             assert(annex is self.repo)   # must be the same annex, and no new created
@@ -379,13 +501,14 @@ class Annexificator(object):
     # TODO: either separate out commit or allow to pass a custom commit msg?
     def finalize(self, data):
         """Finalize operations -- commit uncommited, prune abandoned? etc"""
-
         if self.repo.dirty:  # or self.tracker.dirty # for dry run
             lgr.info("Repository found dirty -- adding and committing")
             #    # TODO: introduce activities tracker
             _call(self.repo.annex_add, '.', options=self.options) # so everything is committed
-            _call(self._commit, "Finalizing %s" % ','.join(self._states), options="-a") # TODO: use activities tracker
+            stats = data.get('datalad_stats', None)
+            stats_str = stats.as_str(mode='line') if stats else ''
+            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options="-a")
         else:
-            lgr.info("Found branch non-dirty - doing nothing")
+            lgr.info("Found branch non-dirty - nothing is committed")
         self._states = []
         yield data

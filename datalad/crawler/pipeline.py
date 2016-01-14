@@ -30,7 +30,7 @@ Following items are planned to be provided by the pipeline runner:
    - skip_existing:
 
 `datalad_stats`
-   PipelineStats/dict object to accumulate statistics on what has been done by the nodes
+   ActivityStats/dict object to accumulate statistics on what has been done by the nodes
    so far
 
 To some degree, we could make an analogy of a `blood` to `data` and `venous system` to
@@ -52,6 +52,7 @@ from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..utils import updated
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
+from ..support.stats import ActivityStats
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 # Name of the section in the config file which would define pipeline parameters
@@ -84,6 +85,12 @@ def run_pipeline(*args, **kwargs):
     items, a `[{}]` will be provided as output
     """
     output = list(xrun_pipeline(*args, **kwargs))
+    if output:
+        stats_str = output[-1]['datalad_stats'].get_total().as_str(mode='line') \
+                if 'datalad_stats' in output[-1] else 'no stats collected'
+    else:
+        stats_str = "no output"
+    lgr.info("Finished running pipeline: %s" % stats_str)
     return output if output else None
 
 
@@ -99,7 +106,7 @@ def _get_pipeline_opts(pipeline):
     return opts, pipeline
 
 
-def xrun_pipeline(pipeline, data=None):
+def xrun_pipeline(pipeline, data=None, stats=None):
     """Yield results from the pipeline.
 
     """
@@ -114,6 +121,13 @@ def xrun_pipeline(pipeline, data=None):
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
     data = data or {}
+
+    if 'datalad_stats' in data:
+        if stats is not None:
+            raise ValueError("We were provided stats to use, but data has already datalad_stats")
+    else:
+        data['datalad_stats'] = stats or ActivityStats()
+
     if not len(pipeline):
         return
 
@@ -210,7 +224,6 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
                 # provide details of what keys got changed
                 lgr.log(4, "O1: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_))
             if pipeline_tail:
-                # TODO: for heavy debugging we might want to track/report what node has changed in data
                 lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
                 lgr.log(5, " passed keys: %s", data_.keys())
                 for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):

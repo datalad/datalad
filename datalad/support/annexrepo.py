@@ -632,6 +632,25 @@ class AnnexRepo(GitRepo):
         return remotes
 
 
+    def _run_annex_command_json(self, command, args=[]):
+        """Run an annex command with --json and load output results into a tuple of dicts
+        """
+        try:
+            out, err = self._run_annex_command(
+                    command,
+                    annex_options=['--json'] + args)
+        except CommandError as e:
+            # if multiple files, whereis may technically fail,
+            # but still returns correct response
+            if command == 'whereis' and e.code == 1 and e.stdout.startswith('{'):
+                out = e.stdout
+            else:
+                raise e
+        json_objects = (json.loads(line)
+                        for line in out.splitlines() if line.startswith('{'))
+        return json_objects
+
+
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
     def annex_whereis(self, files, output='remotes'):
@@ -667,27 +686,13 @@ class AnnexRepo(GitRepo):
                 }}
         """
 
-        try:
-            out, err = self._run_annex_command(
-                'whereis',
-                annex_options=['--json'] + files)
-        except CommandError as e:
-            # if multiple files, whereis may technically fail,
-            # but still returns correct response
-            if e.code == 1 and e.stdout.startswith('{'):
-                out = e.stdout
-            else:
-                raise e
-
-        json_objects = (json.loads(line)
-                        for line in out.splitlines() if line.startswith('{'))
+        json_objects = self._run_annex_command_json('whereis', args=files)
 
         if output == 'remotes':
             return [
                 [remote.get('description') for remote in j.get('whereis')]
                 if j.get('success') else []
                 for j in json_objects]
-            return out
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
@@ -695,6 +700,46 @@ class AnnexRepo(GitRepo):
                     for j in json_objects}
         else:
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
+
+    # TODO:
+    #  I think we should make interface cleaner and less ambigious for those annex
+    #  commands which could operate on globs, files, and entire repositories, separating
+    #  those out, e.g. annex_info_repo, annex_info_files at least.
+    #  If we make our calling wrappers work without relying on invoking from repo topdir,
+    #  then returned filenames would not need to be mapped, so we could easily work on dirs
+    #  and globs.
+    # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
+    @normalize_paths(map_filenames_back=True)
+    def annex_info(self, files):
+        """Provide annex info for file(s).
+
+        Parameters
+        ----------
+        files: list of str
+            files to look for
+
+        Returns
+        -------
+        dict
+          Info per each file
+        """
+
+        json_objects = self._run_annex_command_json('info', args=['--bytes'] + files)
+
+        # Some aggressive checks. ATM info can be requested only per file
+        # json_objects is a generator, let's keep it that way
+        # assert(len(json_objects) == len(files))
+        # and that they all have 'file' equal to the passed one
+        out = {}
+        for j, f in zip(json_objects, files):
+            assert(j['file'] == f)
+            assert(j.pop('success') == True)
+            # convert size to int
+            j['size'] = int(j['size']) if 'unknown' not in j['size'] else None
+            # and pop the "command" field
+            j.pop("command")
+            out[j.pop("file")] = j
+        return out
 
     def get_annexed_files(self):
         """Get a list of files in annex

@@ -120,7 +120,7 @@ def normalize_path(func):
 
 
 @optional_args
-def normalize_paths(func, match_return_type=True):
+def normalize_paths(func, match_return_type=True, map_filenames_back=False):
     """Decorator to provide unified path conversions.
 
     Note
@@ -142,30 +142,56 @@ def normalize_paths(func, match_return_type=True):
       If True, and a single string was passed in, it would return the first
       element of the output (after verifying that it is a list of length 1).
       It makes easier to work with single files input.
+    map_filenames_back : bool, optional
+      If True and returned value is a dictionary, it assumes to carry entries
+      one per file, and then filenames are mapped back to as provided from the
+      normalized (from the root of the repo) paths
     """
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
-        if isinstance(files, string_types) or not files:
-            files_new = [_normalize_path(self.path, files)]
-            single_file = True
-        elif isinstance(files, list):
-            files_new = [_normalize_path(self.path, path) for path in files]
-            single_file = False
+        if files:
+            if isinstance(files, string_types) or not files:
+                files_new = [_normalize_path(self.path, files)]
+                single_file = True
+            elif isinstance(files, list):
+                files_new = [_normalize_path(self.path, path) for path in files]
+                single_file = False
+            else:
+                raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
+                                 type(files))
         else:
-            raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
-                             type(files))
+            single_file = None
+            files_new = []
+
+        if map_filenames_back:
+            def remap_filenames(out):
+                """Helper to map files back to non-normalized paths"""
+                if isinstance(out, dict):
+                    assert(len(out) == len(files_new))
+                    files_ = [files] if single_file else files
+                    mapped = out.__class__()
+                    for fin, fout in zip(files_, files_new):
+                        mapped[fin] = out[fout]
+                    return mapped
+                else:
+                    return out
+        else:
+            remap_filenames = lambda x: x
 
         result = func(self, files_new, *args, **kwargs)
 
-        if (result is None) or not match_return_type or not single_file:
+        if single_file is None:
+            # no files were provided, nothing we can do really
+            return result
+        elif (result is None) or not match_return_type or not single_file:
             # If function doesn't return anything or no denormalization
             # was requested or it was not a single file
-            return result
+            return remap_filenames(result)
         elif single_file:
             if len(result) != 1:
                 # Magic doesn't apply
-                return result
+                return remap_filenames(result)
             elif isinstance(result, (list, tuple)):
                 return result[0]
             elif isinstance(result, dict) and tuple(result)[0] == files_new[0]:
@@ -173,7 +199,7 @@ def normalize_paths(func, match_return_type=True):
                 return tuple(result.values())[0]
             else:
                 # no magic can apply
-                return result
+                return remap_filenames(result)
         else:
             return RuntimeError("should have not got here... check logic")
 
@@ -380,6 +406,59 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
+    def git_get_hexsha(self, branch=None):
+        """Return a hexsha for a given branch name. If None - of current branch
+
+        Parameters
+        ----------
+        branch: str, optional
+        """
+        # TODO: support not only a branch but any treeish
+        if branch is None:
+            return self.repo.active_branch.object.hexsha
+        for b in self.repo.branches:
+            if b.name == branch:
+                return b.object.hexsha
+        raise ValueError("Unknown branch %s" % branch)
+
+    def git_get_merge_base(self, treeishes):
+        """Get a merge base hexsha
+
+        Parameters
+        ----------
+        treeishes: str or list of str
+          List of treeishes (branches, hexshas, etc) to determine the merge base of.
+          If a single value provided, returns merge_base with the current branch.
+
+        Returns
+        -------
+        str or None
+          If no merge-base for given commits, or specified treeish doesn't exist,
+          None returned
+        """
+        if isinstance(treeishes, string_types):
+            treeishes = [treeishes]
+        if not treeishes:
+            raise ValueError("Provide at least a single value")
+        elif len(treeishes) == 1:
+            treeishes = treeishes + [self.git_get_active_branch()]
+
+        try:
+            bases = self.repo.merge_base(*treeishes)
+        except GitCommandError as exc:
+            if "fatal: Not a valid object name" in str(exc):
+                return None
+            raise
+
+        if not bases:
+            return None
+        assert(len(bases) == 1)  # we do not do 'all' yet
+        return bases[0].hexsha
+
+    def git_get_active_branch(self):
+
+        return self.repo.active_branch.name
+
     def git_get_branches(self):
         """Get all branches of the repo.
 
@@ -414,9 +493,50 @@ class GitRepo(object):
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
 
-    def git_get_active_branch(self):
+    def git_get_files(self, branch=None):
+        """Get a list of files in git.
 
-        return self.repo.active_branch.name
+        Lists the files in the (remote) branch.
+
+        Parameters
+        ----------
+        branch: str
+          Name of the branch to query. Default: active branch.
+
+        Returns
+        -------
+        [str]
+          list of files.
+        """
+
+        if branch is None:
+            # active branch can be queried way faster:
+            return self.get_indexed_files()
+        else:
+            return [item.path for item in self.repo.tree(branch).traverse()
+                    if isinstance(item, Blob)]
+
+    def git_get_file_content(self, file_, branch='HEAD'):
+        """
+
+        Returns
+        -------
+        [str]
+          content of file_ as a list of lines.
+        """
+
+        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
+
+        # in python3 a byte string is returned. Need to convert it:
+        from six import PY3
+        if PY3:
+            conv_str = u''
+            for b in bytes(content_str):
+                conv_str += chr(b)
+            return conv_str.splitlines()
+        else:
+            return content_str.splitlines()
+        # TODO: keep splitlines?
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
@@ -518,53 +638,10 @@ class GitRepo(object):
         self._git_custom_command('', 'git checkout %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_get_files(self, branch=None):
-        """Get a list of files in git.
-
-        Lists the files in the (remote) branch.
-
-        Parameters
-        ----------
-        branch: str
-          Name of the branch to query. Default: active branch.
-
-        Returns
-        -------
-        [str]
-          list of files.
-        """
-
-        if branch is None:
-            # active branch can be queried way faster:
-            return self.get_indexed_files()
-        else:
-            return [item.path for item in self.repo.tree(branch).traverse()
-                    if isinstance(item, Blob)]
-
-    def git_get_file_content(self, file_, branch='HEAD'):
-        """
-
-        Returns
-        -------
-        [str]
-          content of file_ as a list of lines.
-        """
-
-        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
-
-        # in python3 a byte string is returned. Need to convert it:
-        from six import PY3
-        if PY3:
-            conv_str = u''
-            for b in bytes(content_str):
-                conv_str += chr(b)
-            return conv_str.splitlines()
-        else:
-            return content_str.splitlines()
-        # TODO: keep splitlines?
-
-    def git_merge(self, name, options='', **kwargs):
-        self._git_custom_command('', 'git merge %s %s' % (options, name), **kwargs)
+    def git_merge(self, name, options=[], msg=None, **kwargs):
+        if msg:
+            options = options + ["-m", msg]
+        self._git_custom_command('', ['git', 'merge'] + options + [name], **kwargs)
 
     def git_remove_branch(self, branch):
         self._git_custom_command('', 'git branch -D %s' % branch)

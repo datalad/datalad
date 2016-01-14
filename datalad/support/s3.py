@@ -194,12 +194,18 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     """
     url_rec = urlparse(url)
 
-    s3_bucket = None # if AWS S3
+    s3_bucket, fpath = None, url_rec.path.lstrip('/')
+
     if url_rec.netloc.endswith('.s3.amazonaws.com'):
         if not url_rec.scheme in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # we know how to slice this cat
         s3_bucket = url_rec.netloc.split('.', 1)[0]
+    elif url_rec.netloc == 's3.amazonaws.com':
+        if not url_rec.scheme in ('http', 'https'):
+            raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
+        # url is s3.amazonaws.com/bucket/PATH
+        s3_bucket, fpath = fpath.split('/', 1)
     elif url_rec.scheme == 's3':
         s3_bucket = url_rec.netloc # must be
         # and for now implement magical conversion to URL
@@ -228,7 +234,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             supports_versioning = 'maybe'
 
         if supports_versioning:
-            fpath = url_rec.path.lstrip('/')
+
             all_keys = bucket.list_versions(fpath)
             # Filter and sort them so the newest one on top
             all_keys = [x for x in sorted(all_keys, key=lambda x: (x.last_modified, x.is_latest))

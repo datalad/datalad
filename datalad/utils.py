@@ -10,6 +10,7 @@
 import collections
 import re
 import six.moves.builtins as __builtin__
+import time
 
 from os.path import curdir
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
@@ -71,12 +72,18 @@ def shortened_repr(value, l=30):
 
 
 def __auto_repr__(obj):
+    attr_names = tuple()
+    if hasattr(obj, '__dict__'):
+        attr_names += tuple(obj.__dict__.keys())
+    if hasattr(obj, '__slots__'):
+        attr_names += tuple(obj.__slots__)
+
     items = []
-    for prop in sorted(obj.__dict__):
-        if prop.startswith('_'):
+    for attr in sorted(set(attr_names)):
+        if attr.startswith('_'):
             continue
-        value = obj.__dict__[prop]
-        items.append("%s=%s" % (prop, shortened_repr(value)))
+        value = getattr(obj, attr)
+        items.append("%s=%s" % (attr, shortened_repr(value)))
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
 
@@ -246,6 +253,26 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s" % f)
 
 
+if on_windows:
+    def lmtime(filepath, mtime):
+        """Set mtime for files.  On Windows a merely adapter to os.utime
+        """
+        os.utime(filepath, (time.time(), mtime))
+else:
+    def lmtime(filepath, mtime):
+        """Set mtime for files, while de-referencing symlinks.
+
+        To overcome absence of os.lutime
+
+        Works only on linux and OSX ATM
+        """
+        from .cmd import Runner
+        # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
+        smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
+        Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        # doesn't work on OSX
+        # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
+
 def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
@@ -345,6 +372,21 @@ def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
 
     return tkwargs_
 
+@optional_args
+def line_profile(func):
+    """Q&D helper to line profile the function and spit out stats
+    """
+    import line_profiler
+    prof = line_profiler.LineProfiler()
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        try:
+            pfunc = prof(func)
+            return pfunc(*args, **kwargs)
+        finally:
+            prof.print_stats()
+    return newfunc
 
 #
 # Context Managers

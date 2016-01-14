@@ -24,11 +24,12 @@ def test_version_url():
     if not keyring.get_password(S3_TEST_CREDENTIAL, 'secret_id'):
         # will skip under tox as well -- some environ variable(s) must be passed
         raise SkipTest("Do not have access to S3 key/secret.  Test skipped")
-    eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz"),
-        "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?versionId=null")
+    for url_pref in ('http://openfmri.s3.amazonaws.com', 'https://s3.amazonaws.com/openfmri'):
+        eq_(get_versioned_url(url_pref + "/tarballs/ds001_raw.tgz"),
+            url_pref + "/tarballs/ds001_raw.tgz?versionId=null")
 
-    eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"),
-        "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1&versionId=null")
+        eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"),
+            "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1&versionId=null")
 
     # something is wrong there
     #print(get_versioned_url("http://openfmri.s3.amazonaws.com/ds001/demographics.txt"))

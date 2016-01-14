@@ -32,7 +32,7 @@ from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
 
 from nose.tools import \
-    assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
+    assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
     assert_in, assert_not_in, assert_in as in_, \
     raises, ok_, eq_, make_decorator
 
@@ -90,8 +90,8 @@ except Exception as exc:
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
-    except ImportError:
-        raise SkipTest("No %s module" % module)
+    except Exception as exc:
+        raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
 
 
 def create_tree_archive(path, name, load, overwrite=False):
@@ -337,7 +337,7 @@ def with_tree(t, tree=None, **tkwargs):
         d = tempfile.mkdtemp(**tkwargs_)
         create_tree(d, tree)
         try:
-            t(*(arg + (d,)), **kw)
+            return t(*(arg + (d,)), **kw)
         finally:
             rmtemp(d)
     return newfunc
@@ -402,7 +402,7 @@ def serve_path_via_http(tfunc, *targs):
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
-            tfunc(*(args + (path, url)), **kwargs)
+            return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()

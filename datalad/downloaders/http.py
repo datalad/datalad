@@ -26,6 +26,7 @@ from ..dochelpers import exc_str
 from ..support.network import get_url_filename
 from ..support.network import rfc2822_to_epoch
 from ..support.cookies import cookies_db
+from ..support.status import FileStatus
 
 from .base import Authenticator
 from .base import BaseDownloader
@@ -368,5 +369,10 @@ class HTTPDownloader(BaseDownloader):
                 except KeyError:
                     continue
                 status[k] = t(headers[header_key])
-        return status
 
+        # convert to FileStatus
+        return FileStatus(
+            size=status.get('Content-Length'),
+            mtime=status.get('Last-Modified'),
+            filename=status.get('Content-Disposition')
+        )
