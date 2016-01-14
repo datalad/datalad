@@ -19,6 +19,7 @@ import os
 import shlex
 
 from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename
+from os.path import sep as opsep
 from .base import Interface
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
@@ -57,6 +58,12 @@ class AddArchiveContent(Interface):
             action="store_true",
             doc="""Flag to delete original archive from the filesystem/git in current tree.
                    Note that it will be of no effect if --key is given."""),
+        strip_leading_dirs=Parameter(
+            args=("--strip-leading-dirs",),
+            action="store_true",
+            doc="""Flag to move all files directories up, from how they were stored in an archive,
+                   if that one contained a number (possibly more than 1 down) single leading
+                   directories."""),
         existing=Parameter(
             args=("--existing"),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
@@ -132,7 +139,7 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, annex=None,
+    def __call__(self, archive, annex=None, strip_leading_dirs=False,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None):
@@ -210,19 +217,20 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
+            leading_dir = earchive.get_leading_directory() if strip_leading_dirs else None
+            leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
             stats = stats or ActivityStats()
+
             for extracted_file in earchive.get_extracted_files():
                 stats.files += 1
                 extracted_path = opj(earchive.path, extracted_file)
                 # preliminary target name which might get modified by renames
-                target_file = extracted_file
+                target_file_orig = target_file = extracted_file
+
+                target_file = target_file[leading_dir_len:]
 
                 if rename:
-                    target_file_ = target_file
-                    target_file_ = apply_replacement_rules(rename, target_file_)
-                    if target_file_ != target_file:
-                        stats.renamed += 1
-                        target_file = target_file_
+                    target_file = apply_replacement_rules(rename, target_file)
 
                 if exclude:
                     try:  # since we need to skip outside loop from inside loop
@@ -248,7 +256,7 @@ class AddArchiveContent(Interface):
                         # to make sure it doesn't conflict -- might have been a tree
                         rmtree(target_file)
                     else:
-                        target_file_orig = target_file
+                        target_file_orig_ = target_file
                         if existing == 'archive-suffix':
                             target_file += '-%s' % file_basename(origin)
                         elif existing == 'numeric-suffix':
@@ -263,9 +271,12 @@ class AddArchiveContent(Interface):
                             suf = '.%d' % i
                         target_file += suf
                         lgr.debug("Original file %s will be saved into %s"
-                                  % (target_file_orig, target_file))
+                                  % (target_file_orig_, target_file))
                         # TODO: should we reserve smth like
                         # stats.clobbed += 1
+
+                if target_file != target_file_orig:
+                    stats.renamed += 1
 
                 target_path = opj(getpwd(), target_file)
                 if copy:

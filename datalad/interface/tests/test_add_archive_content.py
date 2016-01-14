@@ -150,5 +150,29 @@ def test_add_archive_content(path_orig, url, repo_path):
     chpwd(orig_pwd)  # just to avoid warnings ;)
 
 
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**tree1args)
+@serve_path_via_http()
+@with_tempfile(mkdir=True)
+def test_add_archive_content_strip_leading(path_orig, url, repo_path):
+    direct = False  # TODO: test on undirect, but too long ATM
+    orig_pwd = getpwd()
+    chpwd(repo_path)
+
+    repo = AnnexRepo(repo_path, create=True, direct=direct)
+
+    # Let's add first archive to the repo so we could test
+    with swallow_outputs():
+        repo.annex_addurls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+    repo.git_commit("added 1.tar.gz")
+
+    add_archive_content('1.tar.gz', strip_leading_dirs=True)
+    ok_(not exists('1'))
+    ok_file_under_git(repo.path, '1 f.txt', annexed=True)
+    ok_file_under_git('d', '1d', annexed=True)
+    ok_archives_caches(repo.path, 0)
+
+    chpwd(orig_pwd)  # just to avoid warnings ;)
+
 # looking for the future tagging of lengthy tests
 test_add_archive_content.tags = ['integration']
