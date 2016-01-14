@@ -65,7 +65,7 @@ class AddArchiveContent(Interface):
                    if that one contained a number (possibly more than 1 down) single leading
                    directories."""),
         existing=Parameter(
-            args=("--existing"),
+            args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
             default="fail",
             doc="""What operation to perform a file from archive tries to overwrite an existing
