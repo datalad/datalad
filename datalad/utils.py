@@ -10,6 +10,7 @@
 import collections
 import re
 import six.moves.builtins as __builtin__
+import time
 
 from os.path import curdir
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
@@ -251,6 +252,26 @@ def rmtemp(f, *args, **kwargs):
     else:
         lgr.info("Keeping temp file: %s" % f)
 
+
+if on_windows:
+    def lmtime(filepath, mtime):
+        """Set mtime for files.  On Windows a merely adapter to os.utime
+        """
+        os.utime(filepath, (time.time(), mtime))
+else:
+    def lmtime(filepath, mtime):
+        """Set mtime for files, while de-referencing symlinks.
+
+        To overcome absence of os.lutime
+
+        Works only on linux and OSX ATM
+        """
+        from .cmd import Runner
+        # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
+        smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
+        Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        # doesn't work on OSX
+        # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty

@@ -17,6 +17,7 @@ from os import unlink, makedirs
 from ...api import add_archive_content
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
+from ...utils import lmtime
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
@@ -351,12 +352,12 @@ class Annexificator(object):
             _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options)
             _call(stats.increment, 'add_annex')
 
-        if remote_status and lexists(filepath): # and islink(filepath):
+        if remote_status and lexists(filepath):  # and islink(filepath):
             # Set mtime of the symlink or git-added file itself
             # utime dereferences!
             # _call(os.utime, filepath, (time.time(), remote_status.mtime))
             # *nix only!  TODO
-            _run(['touch', '-h', '-d', '@%s' % remote_status.mtime, filepath])
+            _call(lmtime, filepath, remote_status.mtime)
 
         state = "adding files to git/annex"
         if state not in self._states:
