@@ -12,10 +12,12 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import exists, join as opj, pardir
+from os.path import exists, join as opj, pardir, basename
+from glob import glob
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_tempfile, assert_in
+from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
 from ...tests.utils import ok_archives_caches
 
@@ -86,8 +88,16 @@ def test_add_archive_content(path_orig, url, repo_path):
     # -- in caching and overwrite check
     assert_in("already exists", str(cme.exception))
     # but should do fine if overrides are allowed
-    add_archive_content('1.tar.gz', overwrite=True)
+    add_archive_content('1.tar.gz', existing='overwrite')
     d1_basic_checks()
+    add_archive_content('1.tar.gz', existing='archive-suffix')
+    add_archive_content('1.tar.gz', existing='archive-suffix')
+    # rudimentary test
+    assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
+                 ['1 f.txt', '1 f.txt-1', '1 f.txt-1.1'])
+    whereis = repo.annex_whereis(glob(opj(repo_path, '1', '1*')))
+    # they all must be the same
+    assert(all([x==whereis[0] for x in whereis[1:]]))
 
     # and we should be able to reference it while under subdirectory
     subdir = opj(repo_path, 'subdir')
