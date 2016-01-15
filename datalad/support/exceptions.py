@@ -29,6 +29,11 @@ class CommandError(RuntimeError):
         to_str += ".\n%s" % self.msg
         return to_str
 
+class AnnexBatchCommandError(CommandError):
+    """Thrown if a batched command to annex fails
+
+    """
+    pass
 
 class CommandNotAvailableError(CommandError):
     """Thrown if a command is not available due to certain circumstances.

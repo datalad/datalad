@@ -27,10 +27,12 @@ from six import string_types, PY3
 from six.moves.configparser import NoOptionError
 from six.moves.urllib.parse import quote as urlquote
 
+from ..dochelpers import exc_str
 from ..utils import auto_repr
 from .gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
 from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
+from .exceptions import AnnexBatchCommandError
 from ..utils import on_windows, getpwd
 
 lgr = logging.getLogger('datalad.annex')
@@ -549,6 +551,10 @@ class AnnexRepo(GitRepo):
 
         options: list
             options to the annex command
+
+        batch: bool, optional
+            initiate or continue with a batched run of annex addurl, instead of just
+            calling a single git annex addurl command
         """
         options = options[:] if options else []
         #if file_ == 'about.txt':
@@ -565,17 +571,27 @@ class AnnexRepo(GitRepo):
             if backend:
                 options += ['--backend=%s' % backend]
             # Initializes (if necessary) and obtains the batch process
-            out = self._batched.get(
+            bcmd = self._batched.get(
                 # Since backend will be critical for non-existing files
                 'addurl_to_file_backend:%s' % backend,
                 annex_cmd='addurl',
                 annex_options=['--with-files'] + options,  # --raw ?
                 path=self.path,
                 output_proc=readlines_until_ok_or_failed
-            )((url, file_))
+            )
+            try:
+                out = bcmd((url, file_))
+            except Exception as exc:
+                # if isinstance(exc, IOError):
+                #     raise
+                raise AnnexBatchCommandError(
+                        cmd="addurl",
+                        msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
             if not out.endswith('ok'):
-                raise ValueError("Error, output from annex was %s, whenever we expected it to end with ' ok'"
-                                 % out)
+                raise AnnexBatchCommandError(
+                        cmd="addurl",
+                        msg="Error, output from annex was %s, whenever we expected it to end with ' ok'"
+                        % out)
             # due to annex needing closing its pipe to actually add addurl'ed file
             # to index, we will do it manually here for now
             # see
@@ -923,6 +939,21 @@ class BatchedAnnexes(dict):
         return self[codename]
 
 
+    def clear(self):
+        """Override just to make sure we don't rely on __del__ to close all the pipes"""
+        self.close()
+        super(BatchedAnnexes, self).clear()
+
+
+    def close(self):
+        """Close communication to all the batched annexes
+
+        It does not remove them from the dictionary though
+        """
+        for p in self.values():
+            p.close()
+
+
 def readline_rstripped(stdout):
     return stdout.readline().rstrip()
 
@@ -975,6 +1006,18 @@ class BatchedAnnex(object):
                               , bufsize=1, universal_newlines=True #**kwargs
                               )
 
+    def _check_process(self, restart=False):
+        """Check if the process was terminated and restart if restart
+
+        """
+        process = self._process
+        if process and process.poll():
+            lgr.warning("Process %s was terminated with returncode %s" % (process, process.returncode))
+            self.close()
+        if self._process is None and restart:
+            lgr.warning("Restarting the process due to previous failure")
+            self._initialize()
+
     def __call__(self, input_):
         """
 
@@ -998,7 +1041,7 @@ class BatchedAnnex(object):
             input_ = [input_]
 
         output = []
-        process = self._process
+
         for entry in input_:
             if not isinstance(entry, string_types):
                 entry = ' '.join(entry)
@@ -1007,14 +1050,13 @@ class BatchedAnnex(object):
             # apparently communicate is just a one time show
             # stdout, stderr = self._process.communicate(entry)
             # according to the internet wisdom there is no easy way with subprocess
+            self._check_process(restart=True)
+            process = self._process  # _check_process might have restarted it
             process.stdin.write(entry)#.encode())
             lgr.log(5, "Done sending.")
             # TODO: somehow do catch stderr which might be there or not
             #stderr = str(process.stderr) if process.stderr.closed else None
-            if process.poll():
-                lgr.warning("Process %s was terminated" % process)
-            if process.returncode:
-                lgr.warning("Process %s for %s returned %s" % (process, self, process.returncode))
+            self._check_process(restart=False)
             # We are expecting a single line output
             # TODO: timeouts etc
             stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
@@ -1026,6 +1068,10 @@ class BatchedAnnex(object):
         return output if input_multiple else output[0]
 
     def __del__(self):
+        self.close()
+
+    def close(self):
+        """Close communication and wait for process to terminate"""
         if self._process:
             process = self._process
             lgr.debug("Closing stdin of %s and waiting process to finish" % process)

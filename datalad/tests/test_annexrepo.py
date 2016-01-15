@@ -22,7 +22,7 @@ from nose.tools import assert_raises, assert_is_instance, assert_true, \
 
 from ..support.annexrepo import AnnexRepo, kwargs_to_options, GitRepo
 from ..support.exceptions import CommandNotAvailableError, \
-    FileInGitError, FileNotInAnnexError, CommandError
+    FileInGitError, FileNotInAnnexError, CommandError, AnnexBatchCommandError
 from ..cmd import Runner
 from .utils import *
 
@@ -665,9 +665,17 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # TODO: __call__ of the BatchedAnnex must be checked to be called
     copyfile(opj(sitepath, 'about.txt'), opj(dst, testfile))
     #with swallow_outputs() as cmo:
+    # must crash sensibly since file exists, we shouldn't addurl to non-annexed files
+    #    needs a fix in annex: http://git-annex.branchable.com/bugs/addurl_--batch___40__--json_or_not__41___doesn__39__t_report_failure_correctly_if_non-annexed_file_exists/
+    # TODO:  use -c annex.queuesize=1 if we want to flush upon each addurl (make it an option)
+    # TODO:  use --json for addurl --batch
+    with assert_raises(AnnexBatchCommandError):
+        ar.annex_addurl_to_file(testfile, testurl, batch=True)
+
+    # Remove it
+    os.unlink(opj(dst, testfile))
     ar.annex_addurl_to_file(testfile, testurl, batch=True)
-    # TODO: causes it to download the file even if it is present already
-    # http://git-annex.branchable.com/bugs/addurl_--file__causes_file_redownload_even_if_it_already_present/?updated
+
     info = ar.annex_info(testfile)
     assert_equal(info['size'], 14)
     assert(info['key'])
