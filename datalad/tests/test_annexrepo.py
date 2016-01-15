@@ -665,19 +665,18 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # TODO: __call__ of the BatchedAnnex must be checked to be called
     copyfile(opj(sitepath, 'about.txt'), opj(dst, testfile))
     # must crash sensibly since file exists, we shouldn't addurl to non-annexed files
-    # TODO:  use -c annex.queuesize=1 if we want to flush upon each addurl (make it an option)
     with assert_raises(AnnexBatchCommandError):
         ar.annex_addurl_to_file(testfile, testurl, batch=True)
 
-    # Remove it
+    # Remove it and re-add
     os.unlink(opj(dst, testfile))
     ar.annex_addurl_to_file(testfile, testurl, batch=True)
 
     info = ar.annex_info(testfile)
     assert_equal(info['size'], 14)
     assert(info['key'])
-    # not committed yet
-    assert_in('web', ar.annex_whereis(testfile))
+    # not even added to index yet since we didn't specify batch_size=1
+    assert_not_in('web', ar.annex_whereis(testfile))
 
     # TODO: none of the below should re-initiate the batch process
 
@@ -701,26 +700,32 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     #filename = 'newfile.dat'
     filename = get_most_obscure_supported_name()
     with swallow_outputs():
-        ar.annex_addurl_to_file(filename, testurl, batch=True)
-    # XXX closing pipe to annex would result in it finally adding to index those files
-    #ar._batched.clear()
+        assert_equal(len(ar._batched), 1)
+        ar.annex_addurl_to_file(filename, testurl, batch=True, batch_size=1)
+        assert_equal(len(ar._batched), 2)  # we added one more with batch_size=1
     ar.commit("added new file")  # would do nothing ATM, but also doesn't fail
-    assert_in(filename, ar.git_get_files())  # but the file is not in git
-    # see http://git-annex.branchable.com/bugs/addurl_--batch__--with-files_doesn__39__t_add_file_into_git_until_pipe_is_closed/
+    assert_in(filename, ar.git_get_files())
     assert_in('web', ar.annex_whereis(filename))
 
-    # but if we manually add it -- should get there
-    #ar.annex_add(filename)
-    #ar.annex_add(testfile)  # and that file above
     ar.commit("actually committing new files")
     assert_in(filename, ar.git_get_files())
     assert_in('web', ar.annex_whereis(filename))
-    assert_in('web', ar.annex_whereis(testfile))
+    # this poor bugger still wasn't added since we used default batch_size=0 on him
+    assert_not_in('web', ar.annex_whereis(testfile))
 
     # and closing the pipes now shoudn't anyhow affect things
+    assert(ar.dirty)  # testfile still lingering around
+    assert_equal(len(ar._batched), 2)
+    ar._batched.close()
+    assert_equal(len(ar._batched), 2)  # doesn't remove them, just closes
+    assert(ar.dirty)  # testfile must be in index now but not committed yet
+    # and now that the pipes are closed to all of them -- must have been added
+    assert_in('web', ar.annex_whereis(testfile))
+    ar.commit("actually committing testfile")
     assert(not ar.dirty)
+
     ar._batched.clear()
-    assert(not ar.dirty)
+    assert_equal(len(ar._batched), 0)  # .clear also removes
 
     raise SkipTest("TODO: more, e.g. add with a custom backend")
     # TODO: also with different modes (relaxed, fast)

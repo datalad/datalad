@@ -536,7 +536,8 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('enableremote', annex_options=[name])
 
     @normalize_path
-    def annex_addurl_to_file(self, file_, url, options=None, backend=None, batch=False):
+    def annex_addurl_to_file(self, file_, url, options=None, backend=None,
+                             batch=False, batch_size=0):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -552,14 +553,21 @@ class AnnexRepo(GitRepo):
         options: list
             options to the annex command
 
-        batch: bool, optional
+        batch: bool or int, optional
             initiate or continue with a batched run of annex addurl, instead of just
-            calling a single git annex addurl command
+            calling a single git annex addurl command.
+
+        batch_size: int, optional
+            if specified and >0, instructs annex to batch this many addurls commands before
+            annex adds them to index.  If non-0 and batch wasn't set to True, enables
+            batching mode.
         """
         options = options[:] if options else []
+        git_options = []
         #if file_ == 'about.txt':
         #    import pdb; pdb.set_trace()
         kwargs = dict(backend=backend)
+        batch = batch or bool(batch_size)
         if not batch:
             self._run_annex_command('addurl',
                                     annex_options=options + ['--file=%s' % file_] + [url],
@@ -568,20 +576,23 @@ class AnnexRepo(GitRepo):
             # Don't capture stderr, since download progress provided by wget uses
             # stderr.
         else:
+            options += ['--with-files', '--json']
+            if batch_size:
+                git_options += ['-c', 'annex.queuesize=%d' % batch_size]
             if backend:
                 options += ['--backend=%s' % backend]
             # Initializes (if necessary) and obtains the batch process
             bcmd = self._batched.get(
                 # Since backend will be critical for non-existing files
-                'addurl_to_file_backend:%s' % backend,
+                'addurl_to_file_backend:%s_batchsize:%d' % (backend, batch_size),
                 annex_cmd='addurl',
-                annex_options=['--with-files', '--json'] + options,  # --raw ?
+                git_options=git_options,
+                annex_options=options,  # --raw ?
                 path=self.path,
                 output_proc=readline_json
             )
             try:
                 out_json = bcmd((url, file_))
-                print out_json
             except Exception as exc:
                 # if isinstance(exc, IOError):
                 #     raise
@@ -594,14 +605,6 @@ class AnnexRepo(GitRepo):
                         cmd="addurl",
                         msg="Error, annex reported failure for addurl: %s"
                         % str(out_json))
-            # due to annex needing closing its pipe to actually add addurl'ed file
-            # to index, we will do it manually here for now
-            # see
-            # http://git-annex.branchable.com/bugs/addurl_--batch__--with-files_doesn__39__t_add_file_into_git_until_pipe_is_closed/
-
-            # no normalization since we are dealing with normalized paths already
-            # and might reside within repo's subdir
-            self.git_add(file_, normalize_paths=False)
 
 
     def annex_addurls(self, urls, options=None, backend=None, cwd=None):
@@ -985,9 +988,10 @@ class BatchedAnnex(object):
     """Container for an annex process which would allow for persistent communication
     """
 
-    def __init__(self, annex_cmd, annex_options=[], path=None,
+    def __init__(self, annex_cmd, git_options=[], annex_options=[], path=None,
                  output_proc=readline_rstripped):
         self.annex_cmd = annex_cmd
+        self.git_options = git_options
         self.annex_options = annex_options
         self.path = path
         self.output_proc = output_proc
@@ -995,7 +999,7 @@ class BatchedAnnex(object):
 
     def _initialize(self):
         lgr.debug("Initiating a new process for %s" % repr(self))
-        cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + \
+        cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + self.git_options + \
               ['annex', self.annex_cmd] + self.annex_options + ['--batch', '--debug']
         lgr.log(5, "Command: %s" % cmd)
         # TODO: look into _run_annex_command  to support default options such as --debug
