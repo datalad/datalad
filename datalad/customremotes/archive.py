@@ -50,8 +50,21 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         self._cache.clean()
         super(AnnexArchiveCustomRemote, self).stop(*args)
 
-    def get_file_url(self, archive_file=None, archive_key=None, file=None):
+    def get_file_url(self, archive_file=None, archive_key=None, file=None, size=None):
         """Given archive (file or a key) and a file -- compose URL for access
+
+        Examples:
+        ---------
+
+        dl+archive:SHA256E-s176--69...3e.tar.gz/s123/1/d2/2d
+            when size of file within archive was known to be 123
+        dl+archive:SHA256E-s176--69...3e.tar.gz//1/d2/2d
+            when size of file within archive was not provided
+
+        Parameters
+        ----------
+        size: int, optional
+          Size of the file.  If not provided, will simply be empty
         """
         assert(file is not None)
         if archive_file is not None:
@@ -60,7 +73,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             archive_key = self.repo.get_file_key(archive_file)
         assert(archive_key is not None)
         file_quoted = urlquote(file)
-        return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
+        size_str = 's%d' if size else ''
+        return '%s%s/%s/%s' % (self.url_prefix, archive_key, size_str, file_quoted.lstrip('/'))
 
     @property
     def cache(self):
@@ -68,7 +82,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
     def _parse_url(self, url):
         assert(url[:len(self.url_prefix)] == self.url_prefix)
-        key, file_ = url[len(self.url_prefix):].split('/', 1)
+        key, size_file = url[len(self.url_prefix):].split('/', 1)
+        # for compatibility for now. TODO: remove eventually since we do not have AFAIK
+        # annexes in production which use non-sized URLs version
         return key, file_
 
     #

@@ -31,7 +31,7 @@ import logging
 
 lgr = logging.getLogger('datalad.customremotes')
 
-URI_PREFIX = "dl+"
+URI_PREFIX = "dl"
 SUPPORTED_PROTOCOL = 1
 
 DEFAULT_COST = 100
@@ -200,7 +200,12 @@ class AnnexCustomRemote(object):
         assert(self.AVAILABILITY.upper() in ("LOCAL", "GLOBAL"))
 
         # prefix which will be used in all URLs supported by this custom remote
-        self.url_prefix = "%s%s:" % (URI_PREFIX, self.PREFIX)
+        # https://tools.ietf.org/html/rfc2718 dictates "URL Schemes" standard
+        # 2.1.2   suggests that we do use // since all of our URLs will define
+        #         some hierarchical structure.  But actually since we might encode
+        #         additional information (such as size) into the URL, it will not be
+        #         strictly conforming it. Thus we will not use //
+        self.url_prefix = "%s%s:" % (URI_PREFIX, '+' + self.PREFIX if self.PREFIX else '')
 
         # To signal either we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
