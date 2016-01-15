@@ -419,11 +419,12 @@ def test_AnnexRepo_backend_option(path, url):
     assert_equal(ar.get_file_backend('secondfile'), 'MD5')
 
     with swallow_outputs() as cmo:
-        ar.annex_addurl_to_file('remotefile', url + 'remotefile', backend='SHA1')
-    assert_equal(ar.get_file_backend('remotefile'), 'SHA1')
+        # must be added under different name since annex 20160114
+        ar.annex_addurl_to_file('remotefile2', url + 'remotefile', backend='SHA1')
+    assert_equal(ar.get_file_backend('remotefile2'), 'SHA1')
 
     with swallow_outputs() as cmo:
-        ar.annex_addurls([url +'faraway'], backend='SHA1')
+        ar.annex_addurls([url + 'faraway'], backend='SHA1')
     # TODO: what's the annex-generated name of this?
     # For now, workaround:
     assert_true(ar.get_file_backend(f) == 'SHA1'
