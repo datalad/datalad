@@ -664,11 +664,8 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     # add to an existing but not committed file
     # TODO: __call__ of the BatchedAnnex must be checked to be called
     copyfile(opj(sitepath, 'about.txt'), opj(dst, testfile))
-    #with swallow_outputs() as cmo:
     # must crash sensibly since file exists, we shouldn't addurl to non-annexed files
-    #    needs a fix in annex: http://git-annex.branchable.com/bugs/addurl_--batch___40__--json_or_not__41___doesn__39__t_report_failure_correctly_if_non-annexed_file_exists/
     # TODO:  use -c annex.queuesize=1 if we want to flush upon each addurl (make it an option)
-    # TODO:  use --json for addurl --batch
     with assert_raises(AnnexBatchCommandError):
         ar.annex_addurl_to_file(testfile, testurl, batch=True)
 

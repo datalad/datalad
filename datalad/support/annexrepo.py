@@ -575,23 +575,25 @@ class AnnexRepo(GitRepo):
                 # Since backend will be critical for non-existing files
                 'addurl_to_file_backend:%s' % backend,
                 annex_cmd='addurl',
-                annex_options=['--with-files'] + options,  # --raw ?
+                annex_options=['--with-files', '--json'] + options,  # --raw ?
                 path=self.path,
-                output_proc=readlines_until_ok_or_failed
+                output_proc=readline_json
             )
             try:
-                out = bcmd((url, file_))
+                out_json = bcmd((url, file_))
+                print out_json
             except Exception as exc:
                 # if isinstance(exc, IOError):
                 #     raise
                 raise AnnexBatchCommandError(
                         cmd="addurl",
                         msg="Adding url %s to file %s failed due to %s" % (url, file_, exc_str(exc)))
-            if not out.endswith('ok'):
+            assert(out_json['command'] == 'addurl')
+            if not out_json.get('success', False):
                 raise AnnexBatchCommandError(
                         cmd="addurl",
-                        msg="Error, output from annex was %s, whenever we expected it to end with ' ok'"
-                        % out)
+                        msg="Error, annex reported failure for addurl: %s"
+                        % str(out_json))
             # due to annex needing closing its pipe to actually add addurl'ed file
             # to index, we will do it manually here for now
             # see
@@ -975,6 +977,8 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
             break
     return out.rstrip()
 
+def readline_json(stdout):
+    return json.loads(stdout.readline().strip())
 
 @auto_repr
 class BatchedAnnex(object):
