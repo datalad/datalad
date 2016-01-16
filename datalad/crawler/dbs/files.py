@@ -74,7 +74,7 @@ class AnnexFileAttributesDB(object):
             with swallow_logs():
                 info = self.annex.annex_info(fpath)
             size = info['size']
-        except CommandError as exc:
+        except (CommandError, TypeError) as exc:
             # must be under git or a plain file
             lgr.debug("File %s must be not under annex, since info failed: %s" % (filepath, exc_str(exc)))
             size = filestat.st_size

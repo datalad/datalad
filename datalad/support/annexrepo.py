@@ -77,9 +77,13 @@ class AnnexRepo(GitRepo):
 
     __slots__ = GitRepo.__slots__ + ['always_commit', '_batched']
 
+    # Web remote has a hard-coded UUID we might (ab)use
+    WEB_UUID = "00000000-0000-0000-0000-000000000001"
+
     # TODO: pass description
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True, create=True, init=False):
+                 direct=False, backend=None, always_commit=True, create=True, init=False,
+                 batch_size=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -119,6 +123,10 @@ class AnnexRepo(GitRepo):
           annex repository which just was not yet initialized by annex (e.g. a
           fresh git clone). Note that if `create=True`, then initialization
           would happen
+
+        batch_size: int, optional
+          if specified and >0, instructs annex to batch this many commands before
+          annex adds acts on git repository (e.g. adds them them to index for addurl).
         """
         fix_it = False
         try:
@@ -168,7 +176,7 @@ class AnnexRepo(GitRepo):
             writer.set_value("annex", "backends", backend)
             writer.release()
 
-        self._batched = BatchedAnnexes()
+        self._batched = BatchedAnnexes(batch_size=batch_size)
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -537,7 +545,7 @@ class AnnexRepo(GitRepo):
 
     @normalize_path
     def annex_addurl_to_file(self, file_, url, options=None, backend=None,
-                             batch=False, batch_size=0):
+                             batch=False):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -556,18 +564,12 @@ class AnnexRepo(GitRepo):
         batch: bool or int, optional
             initiate or continue with a batched run of annex addurl, instead of just
             calling a single git annex addurl command.
-
-        batch_size: int, optional
-            if specified and >0, instructs annex to batch this many addurls commands before
-            annex adds them to index.  If non-0 and batch wasn't set to True, enables
-            batching mode.
         """
         options = options[:] if options else []
         git_options = []
         #if file_ == 'about.txt':
         #    import pdb; pdb.set_trace()
         kwargs = dict(backend=backend)
-        batch = batch or bool(batch_size)
         if not batch:
             self._run_annex_command('addurl',
                                     annex_options=options + ['--file=%s' % file_] + [url],
@@ -577,14 +579,12 @@ class AnnexRepo(GitRepo):
             # stderr.
         else:
             options += ['--with-files', '--json']
-            if batch_size:
-                git_options += ['-c', 'annex.queuesize=%d' % batch_size]
             if backend:
                 options += ['--backend=%s' % backend]
             # Initializes (if necessary) and obtains the batch process
             bcmd = self._batched.get(
                 # Since backend will be critical for non-existing files
-                'addurl_to_file_backend:%s_batchsize:%d' % (backend, batch_size),
+                'addurl_to_file_backend:%s' % backend,
                 annex_cmd='addurl',
                 git_options=git_options,
                 annex_options=options,  # --raw ?
@@ -663,25 +663,10 @@ class AnnexRepo(GitRepo):
         """
         assert (j.get('success', True) is True)
         # process 'whereis' containing list of remotes
-        remotes = {remote['description']: {'here': remote['here'], 'uuid': remote['uuid']}
+        remotes = {remote['uuid']: {x: remote.get(x, None) for x in ('description', 'here', 'urls')}
                    for remote in j.get('whereis')}
-        if 'web' in remotes:
-            # will be replaced with a list of urls
-            remotes['web']['urls'] = []
-        # process 'note' which would contain urls for 'web' remote
-        note = j.get('note', '')
-        if note:
-            for note_record in filter(bool, note.split('\n')):
-                # format remote: url ?
-                note_split = note_record.split(':', 1)
-                if len(note_split) != 2:
-                    lgr.debug("Skipping note record %r for file %s", note_record, j['file'])
-                    continue
-                remote, url = map(lambda x: x.strip(), note_split)
-                if remote not in remotes:
-                    lgr.warning("Remote %r not found among remotes %s. Skipping", remote, remotes.keys())
-                assert remote == 'web', "ATM can understand only notes for web remote"
-                remotes['web']['urls'].append(url)
+        if self.WEB_UUID in remotes:
+            assert(remotes[self.WEB_UUID]['description'] == 'web')
         return remotes
 
 
@@ -707,34 +692,35 @@ class AnnexRepo(GitRepo):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def annex_whereis(self, files, output='remotes'):
+    def annex_whereis(self, files, output='uuids'):
         """Lists repositories that have actual content of file(s).
 
         Parameters
         ----------
         files: list of str
             files to look for
-        output: {'remotes', 'full'}, optional
-            If 'remotes', a list of remotes returned per each file. If full,
-            per each file a dictionary returned with "web" also containing
-            'urls' list with all the urls for that file
+        output: {'descriptions', 'uuids', 'full'}, optional
+            If 'descriptions', a list of remotes descriptions returned is per
+            each file. If 'full', per each file a dictionary of all fields
+            is returned as returned by annex
 
         Returns
         -------
         list of list of unicode  or dict
-            if output == 'remotes', contains a list of descriptions per
-            each input file, describing the remote for each remote, which
+            if output == 'descriptions', contains a list of descriptions of remotes
+            per each input file, describing the remote for each remote, which
             was found by git-annex whereis, like:
 
             u'me@mycomputer:~/where/my/repo/is [origin]' or
             u'web' or
             u'me@mycomputer:~/some/other/clone'
 
+            if output == 'uuids', returns a list of uuids.
             if output == 'full', returns a dictionary with filenames as keys
             and values a detailed record, e.g.
 
-                {'web': {
-                  'uuid': '00000000-0000-0000-0000-000000000001',
+                {'00000000-0000-0000-0000-000000000001': {
+                  'description': 'web',
                   'here': False,
                   'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
                 }}
@@ -742,9 +728,9 @@ class AnnexRepo(GitRepo):
 
         json_objects = self._run_annex_command_json('whereis', args=files)
 
-        if output == 'remotes':
+        if output in {'descriptions', 'uuids'}:
             return [
-                [remote.get('description') for remote in j.get('whereis')]
+                [remote.get(output[:-1]) for remote in j.get('whereis')]
                 if j.get('success') else []
                 for j in json_objects]
         elif output == 'full':
@@ -786,13 +772,16 @@ class AnnexRepo(GitRepo):
         # and that they all have 'file' equal to the passed one
         out = {}
         for j, f in zip(json_objects, files):
-            assert(j['file'] == f)
-            assert(j.pop('success') == True)
-            # convert size to int
-            j['size'] = int(j['size']) if 'unknown' not in j['size'] else None
-            # and pop the "command" field
-            j.pop("command")
-            out[j.pop("file")] = j
+            assert(j.pop('file') == f)
+            if not j['success']:
+                j = None
+            else:
+                assert(j.pop('success') == True)
+                # convert size to int
+                j['size'] = int(j['size']) if 'unknown' not in j['size'] else None
+                # and pop the "command" field
+                j.pop("command")
+            out[f] = j
         return out
 
     def get_annexed_files(self):
@@ -803,6 +792,12 @@ class AnnexRepo(GitRepo):
         out, err = self._run_annex_command('find')
         return out.splitlines()
 
+    def precommit(self):
+        """Perform pre-commit maintenance tasks, such as closing all batched annexes
+        since they might still need to flush their changes into index
+        """
+        self._batched.close()
+
     # TODO: oh -- API for this better gets RFed sooner than later!
     #       by overloading commit in GitRepo
     def commit(self, msg):
@@ -812,6 +807,7 @@ class AnnexRepo(GitRepo):
         ----------
         msg: str
         """
+        self.precommit()
         if self.is_direct_mode():
             self.annex_proxy('git commit -m "%s"' % msg)
         else:
@@ -931,24 +927,27 @@ class AnnexRepo(GitRepo):
 class BatchedAnnexes(dict):
     """Class to contain the registry of active batch'ed instances of annex for a repository
     """
-#    def __init__(self):
-#        self.processes = {}  # codename -> process
+    def __init__(self, batch_size=0):
+        self.batch_size = batch_size
+        super(BatchedAnnexes, self).__init__()
 
     def get(self, codename, annex_cmd=None, **kwargs):
         if annex_cmd is None:
             annex_cmd = codename
 
+        git_options = kwargs.pop('git_options', [])
+        if self.batch_size:
+            git_options += ['-c', 'annex.queuesize=%d' % self.batch_size]
+
         if codename not in self:
             # Create a new git-annex process we will keep around
-            self[codename] = BatchedAnnex(annex_cmd, **kwargs)
+            self[codename] = BatchedAnnex(annex_cmd, git_options=git_options, **kwargs)
         return self[codename]
-
 
     def clear(self):
         """Override just to make sure we don't rely on __del__ to close all the pipes"""
         self.close()
         super(BatchedAnnexes, self).clear()
-
 
     def close(self):
         """Close communication to all the batched annexes

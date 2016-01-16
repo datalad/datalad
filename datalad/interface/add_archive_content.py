@@ -275,6 +275,8 @@ class AddArchiveContent(Interface):
                 )
             lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
         finally:
+            # since we batched addurl, we should close those batched processes
+            annex.precommit()
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure
             earchive.clean()

@@ -49,15 +49,21 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     expected_output = [input.copy()]   # nothing to be added/changed
     output = list(annex(input))
     assert_equal(output, expected_output)
-    ok_file_under_git(tfile, annexed=True)
     if mode == 'full':
+        ok_file_under_git(tfile, annexed=True)
         ok_file_has_content(tfile, '1.dat load')
     else:
+        # addurl is batched, and we haven't forced annex flushing so there should
+        # be a batched process
+        assert_equal(len(annex.repo._batched), 1)
+        assert_raises(AssertionError, ok_file_under_git, tfile, annexed=True)
+        # if we finalize, it should flush batched annexes and commit
+        list(annex.finalize({}))
         # in fast or relaxed mode there must not be any content
         assert_raises(AssertionError, ok_file_has_content, tfile, '1.dat load')
         assert(lexists(tfile))
     whereis = annex.repo.annex_whereis(tfile)
-    assert_in("web", whereis)  # url must have been added
+    assert_in(annex.repo.WEB_UUID, whereis)  # url must have been added
     assert_equal(len(whereis), 1 + int(mode=='full'))
     # TODO: check the url
 
@@ -95,6 +101,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     else:
         # TODO: unfortunately we can't decide to add .txt without providing
         # our own parser for  annex.largefiles  ATM
+        list(annex.finalize({}))
         assert_raises(AssertionError, ok_file_has_content, tfile, '1.dat load+')
     ok_file_under_git(tfile, annexed=annexed)
     assert_equal(len(output), 1)

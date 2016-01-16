@@ -195,10 +195,10 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
-@with_testrepos('.*annex.*', flavors=['local', 'network'])
+# 1 is enought to test file_has_content
+@with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
 def test_AnnexRepo_file_has_content(src, annex_path):
-
     ar = AnnexRepo(annex_path, src)
     testfiles = ["test-annex.dat", "test.dat"]
     assert_equal(ar.file_has_content(testfiles), [False, False])
@@ -262,17 +262,22 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     with swallow_outputs() as cmo:
         ar.annex_addurls([testurl])
     l = ar.annex_whereis(testfile)
-    assert_in('web', l)
+    assert_in(ar.WEB_UUID, l)
     assert_equal(len(l), 2)
     assert_true(ar.file_has_content(testfile))
 
     # output='full'
     lfull = ar.annex_whereis(testfile, output='full')
     assert_equal(set(lfull), set(l))  # the same entries
-    non_web_remote = l[1-l.index('web')]
-    assert_not_in('urls', lfull[non_web_remote])
-    assert_equal(lfull['web']['uuid'], '00000000-0000-0000-0000-000000000001')
-    assert_equal(lfull['web']['urls'], [testurl])
+    non_web_remote = l[1-l.index(ar.WEB_UUID)]
+    assert_in('urls', lfull[non_web_remote])
+    assert_equal(lfull[non_web_remote]['urls'], [])
+    assert_not_in('uuid', lfull[ar.WEB_UUID])  # no uuid in the records
+    assert_equal(lfull[ar.WEB_UUID]['urls'], [testurl])
+
+    # output='descriptions'
+    ldesc = ar.annex_whereis(testfile, output='descriptions')
+    assert_equal(set(ldesc), set([v['description'] for v in lfull.values()]))
 
     # info
     info = ar.annex_info(testfile)
@@ -282,7 +287,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
     l = ar.annex_whereis(testfile)
-    assert_not_in('web', l)
+    assert_not_in(ar.WEB_UUID, l)
     assert_equal(len(l), 1)
 
     # now only 1 copy; drop should fail
@@ -302,14 +307,14 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     # read the url using different method
     ar.annex_addurl_to_file(testfile, testurl)
     l = ar.annex_whereis(testfile)
-    assert_in('web', l)
+    assert_in(ar.WEB_UUID, l)
     assert_equal(len(l), 2)
     assert_true(ar.file_has_content(testfile))
 
     # 2 known copies now; drop should succeed
     ar.annex_drop(testfile)
     l = ar.annex_whereis(testfile)
-    assert_in('web', l)
+    assert_in(ar.WEB_UUID, l)
     assert_equal(len(l), 1)
     assert_false(ar.file_has_content(testfile))
     lfull = ar.annex_whereis(testfile, output='full')
@@ -336,7 +341,7 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     someurl = "http://example.com/someurl"
     ar.annex_addurl_to_file(testfile, someurl, options=['--relaxed'])
     lfull = ar.annex_whereis(testfile, output='full')
-    assert_equal(set(lfull['web']['urls']), {testurl, someurl})
+    assert_equal(set(lfull[ar.WEB_UUID]['urls']), {testurl, someurl})
 
     # and now test with a file in subdirectory
     subdir = opj(dst, 'd')
@@ -344,8 +349,8 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     with swallow_outputs() as cmo:
         ar.annex_addurl_to_file(testfile3, url=testurl3)
     ok_file_has_content(opj(dst, testfile3), 'more stuff')
-    assert_equal(set(ar.annex_whereis(testfile3)), {'web', non_web_remote})
-    assert_equal(set(ar.annex_whereis(testfile3, output='full').keys()), {'web', non_web_remote})
+    assert_equal(set(ar.annex_whereis(testfile3)), {ar.WEB_UUID, non_web_remote})
+    assert_equal(set(ar.annex_whereis(testfile3, output='full').keys()), {ar.WEB_UUID, non_web_remote})
 
     # and if we ask for both files
     info2 = ar.annex_info([testfile, testfile3])
@@ -354,8 +359,8 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
 
     # which would work even if we cd to that subdir
     with chpwd(subdir):
-        assert_equal(set(ar.annex_whereis('sub.txt')), {'web', non_web_remote})
-        assert_equal(set(ar.annex_whereis('sub.txt', output='full').keys()), {'web', non_web_remote})
+        assert_equal(set(ar.annex_whereis('sub.txt')), {ar.WEB_UUID, non_web_remote})
+        assert_equal(set(ar.annex_whereis('sub.txt', output='full').keys()), {ar.WEB_UUID, non_web_remote})
         testfiles = ['sub.txt', opj(pardir, testfile)]
         info2_ = ar.annex_info(testfiles)
         # Should maintain original relative file names
@@ -675,8 +680,8 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     info = ar.annex_info(testfile)
     assert_equal(info['size'], 14)
     assert(info['key'])
-    # not even added to index yet since we didn't specify batch_size=1
-    assert_not_in('web', ar.annex_whereis(testfile))
+    # not even added to index yet since we this repo is with default batch_size
+    assert_not_in(ar.WEB_UUID, ar.annex_whereis(testfile))
 
     # TODO: none of the below should re-initiate the batch process
 
@@ -686,42 +691,41 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     ar.annex_addurl_to_file(testfile2, testurl2, batch=True)
     assert(ar.annex_info(testfile2))
     # not committed yet
-    # assert_in('web', ar.annex_whereis(testfile2))
+    # assert_in(ar.WEB_UUID, ar.annex_whereis(testfile2))
 
     # add to an existing and committed annex file
     copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
     ar.annex_add(testfile2_)
+    assert_not_in(ar.WEB_UUID, ar.annex_whereis(testfile))
     ar.commit("added about2_.txt and there was about2.txt lingering around")
+    # commit causes closing all batched annexes, so testfile gets committed
+    assert_in(ar.WEB_UUID, ar.annex_whereis(testfile))
+    assert(not ar.dirty)
     ar.annex_addurl_to_file(testfile2_, testurl2_, batch=True)
     assert(ar.annex_info(testfile2_))
-    assert_in('web', ar.annex_whereis(testfile2_))
+    assert_in(ar.WEB_UUID, ar.annex_whereis(testfile2_))
 
     # add into a new file
     #filename = 'newfile.dat'
     filename = get_most_obscure_supported_name()
+    ar2 = AnnexRepo(dst, batch_size=1)
     with swallow_outputs():
-        assert_equal(len(ar._batched), 1)
-        ar.annex_addurl_to_file(filename, testurl, batch=True, batch_size=1)
-        assert_equal(len(ar._batched), 2)  # we added one more with batch_size=1
-    ar.commit("added new file")  # would do nothing ATM, but also doesn't fail
-    assert_in(filename, ar.git_get_files())
-    assert_in('web', ar.annex_whereis(filename))
+        assert_equal(len(ar2._batched), 0)
+        ar2.annex_addurl_to_file(filename, testurl, batch=True)
+        assert_equal(len(ar2._batched), 1)  # we added one more with batch_size=1
+    ar2.commit("added new file")  # would do nothing ATM, but also doesn't fail
+    assert_in(filename, ar2.git_get_files())
+    assert_in(ar.WEB_UUID, ar2.annex_whereis(filename))
 
     ar.commit("actually committing new files")
     assert_in(filename, ar.git_get_files())
-    assert_in('web', ar.annex_whereis(filename))
+    assert_in(ar.WEB_UUID, ar.annex_whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
-    assert_not_in('web', ar.annex_whereis(testfile))
 
     # and closing the pipes now shoudn't anyhow affect things
-    assert(ar.dirty)  # testfile still lingering around
-    assert_equal(len(ar._batched), 2)
+    assert_equal(len(ar._batched), 1)
     ar._batched.close()
-    assert_equal(len(ar._batched), 2)  # doesn't remove them, just closes
-    assert(ar.dirty)  # testfile must be in index now but not committed yet
-    # and now that the pipes are closed to all of them -- must have been added
-    assert_in('web', ar.annex_whereis(testfile))
-    ar.commit("actually committing testfile")
+    assert_equal(len(ar._batched), 1)  # doesn't remove them, just closes
     assert(not ar.dirty)
 
     ar._batched.clear()

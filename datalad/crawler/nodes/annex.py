@@ -218,17 +218,17 @@ class Annexificator(object):
         self.statusdb = statusdb
 
 
-    def add(self, filename, url=None):
-        # TODO: modes
-        self.repo.annex_addurl_to_file(filename, url, batch=True #, TODO  backend
-                                       )
-        raise NotImplementedError()
-
-    def addurl(self, url, filename):
-        raise NotImplementedError()
-        # TODO: register url within "The DB" after it was added
-        self.register_url_in_db(url, filename)
-
+    # def add(self, filename, url=None):
+    #     # TODO: modes
+    #     self.repo.annex_addurl_to_file(filename, url, batch=True #, TODO  backend
+    #                                    )
+    #     raise NotImplementedError()
+    #
+    # def addurl(self, url, filename):
+    #     raise NotImplementedError()
+    #     # TODO: register url within "The DB" after it was added
+    #     self.register_url_in_db(url, filename)
+    #
     def register_url_in_db(self, url, filename):
         # might need to go outside -- since has nothing to do with self
         raise NotImplementedError()
@@ -433,6 +433,8 @@ class Annexificator(object):
         assert(strategy in (None, 'theirs'))
 
         def merge_branch(data):
+            if self.repo.dirty:
+                raise RuntimeError("Requested to merge another branch while current state is dirty")
             last_merged_checksum = self.repo.git_get_merge_base([self.repo.git_get_active_branch(), branch])
             if last_merged_checksum == self.repo.git_get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
@@ -453,7 +455,7 @@ class Annexificator(object):
                 self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % branch)
                 self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
                 if commit:
-                    self._commit("Merged %s using strategy %s" % (branch, strategy), options="-a")
+                    self._commit("Merged %s using strategy %s" % (branch, strategy), options=["-a"])
                 else:
                     # Record into our activity stats
                     stats = data.get('datalad_stats', None)
@@ -462,13 +464,14 @@ class Annexificator(object):
             yield data
         return merge_branch
 
-    def _commit(self, msg=None, options=''):
+    def _commit(self, msg=None, options=[]):
         # We need a custom commit due to "fancy" merges and GitPython
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
         if msg is not None:
-            options += " -m %r" % msg
-        self.repo.cmd_call_wrapper.run("git commit %s" % options)
+            options = options + ["-m", msg]
+        self.repo.precommit()  # so that all batched annexes stop
+        self.repo.cmd_call_wrapper.run(["git", "commit"] + options)
 
 
     #TODO: @borrow_kwargs from api_add_...
@@ -501,13 +504,14 @@ class Annexificator(object):
     # TODO: either separate out commit or allow to pass a custom commit msg?
     def finalize(self, data):
         """Finalize operations -- commit uncommited, prune abandoned? etc"""
+        self.repo.precommit()
         if self.repo.dirty:  # or self.tracker.dirty # for dry run
             lgr.info("Repository found dirty -- adding and committing")
             #    # TODO: introduce activities tracker
-            _call(self.repo.annex_add, '.', options=self.options) # so everything is committed
+            _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
             stats = data.get('datalad_stats', None)
             stats_str = stats.as_str(mode='line') if stats else ''
-            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options="-a")
+            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options=["-a"])
         else:
             lgr.info("Found branch non-dirty - nothing is committed")
         self._states = []
