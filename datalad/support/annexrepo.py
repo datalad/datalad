@@ -561,9 +561,9 @@ class AnnexRepo(GitRepo):
         options: list
             options to the annex command
 
-        batch: bool or int, optional
+        batch: bool, optional
             initiate or continue with a batched run of annex addurl, instead of just
-            calling a single git annex addurl command.
+            calling a single git annex addurl command
         """
         options = options[:] if options else []
         git_options = []
@@ -813,7 +813,7 @@ class AnnexRepo(GitRepo):
         else:
             self.git_commit(msg)
 
-    def get_contentlocation(self, key):
+    def get_contentlocation(self, key, batch=False):
         """Get location of the key content
 
         Normally under .git/annex objects in indirect mode and within file
@@ -828,6 +828,8 @@ class AnnexRepo(GitRepo):
         ----------
         key: str
             key
+        batch: bool, optional
+            initiate or continue with a batched run of annex contentlocation
 
         Returns
         -------
@@ -835,15 +837,15 @@ class AnnexRepo(GitRepo):
             path relative to the top directory of the repository
         """
 
-        # TODO: batchable
-
         cmd_str = 'git annex contentlocation %s' % key  # have a string for messages
 
-        out, err = self._run_annex_command('contentlocation',
-                                           annex_options=[key],
-                                           expect_fail=True)
-        path = out.rstrip(linesep).splitlines()[0]
-        return path
+        if not batch:
+            out, err = self._run_annex_command('contentlocation',
+                                               annex_options=[key],
+                                               expect_fail=True)
+            return out.rstrip(linesep).splitlines()[0]
+        else:
+            return self._batched.get('contentlocation', path=self.path)(key)
 
 
 # TODO: ---------------------------------------------------------------------
@@ -959,6 +961,7 @@ class BatchedAnnexes(dict):
 
 
 def readline_rstripped(stdout):
+    #return iter(stdout.readline, b'').next().rstrip()
     return stdout.readline().rstrip()
 
 
@@ -1010,7 +1013,8 @@ class BatchedAnnex(object):
         self._process = Popen(cmd, stdin=PIPE, stdout=PIPE
                               # , stderr=PIPE
                               , cwd=self.path
-                              , bufsize=1, universal_newlines=True #**kwargs
+                              , bufsize=1
+                              , universal_newlines=True #**kwargs
                               )
 
     def _check_process(self, restart=False):
@@ -1060,12 +1064,14 @@ class BatchedAnnex(object):
             self._check_process(restart=True)
             process = self._process  # _check_process might have restarted it
             process.stdin.write(entry)#.encode())
+            process.stdin.flush()
             lgr.log(5, "Done sending.")
             # TODO: somehow do catch stderr which might be there or not
             #stderr = str(process.stderr) if process.stderr.closed else None
             self._check_process(restart=False)
             # We are expecting a single line output
             # TODO: timeouts etc
+            #import pdb; pdb.set_trace()
             stdout = self.output_proc(process.stdout) if not process.stdout.closed else None
             #if stderr:
             #    lgr.warning("Received output in stderr: %r" % stderr)
