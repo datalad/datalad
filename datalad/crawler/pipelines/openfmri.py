@@ -106,9 +106,11 @@ def pipeline(dataset, versioned_urls=True):
             [   # Pipeline to augment content of the incoming and commit it to master
                 find_files("\.(tgz|tar\..*)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
-                    rename=[
-                        r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
-                    ],
+                    #rename=[
+                    #    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
+                    #],
+					existing='archive-suffix',
+					strip_leading_dirs=True,
                     # overwrite=True,
                     # TODO: we might need a safeguard for cases if multiple subdirectories within a single tarball
                     #rename=
