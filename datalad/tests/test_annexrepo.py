@@ -630,7 +630,7 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
     fname = 'test-annex.dat'
     key = annex.get_file_key(fname)
     # TODO: see if we can avoid this or specify custom exception
-    assert_raises(CommandError, annex.get_contentlocation, key, batch=batch)
+    assert_equal(annex.get_contentlocation(key, batch=batch), '')
 
     with swallow_outputs() as cmo:
         annex.annex_get(fname)
@@ -648,7 +648,7 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
 
 def test_AnnexRepo_get_contentlocation():
     yield _test_AnnexRepo_get_contentlocation, False
-    #yield _test_AnnexRepo_get_contentlocation, True
+    yield _test_AnnexRepo_get_contentlocation, True
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),

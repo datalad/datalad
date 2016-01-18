@@ -14,14 +14,16 @@ import errno
 import os
 import sys
 
-from os.path import exists, join as opj, realpath, dirname
+from os.path import exists, join as opj, realpath, dirname, lexists
 from traceback import format_exc
 
 from six.moves import range
 
 from ..cmd import Runner
+from ..support.exceptions import CommandError
 from ..support.protocol import ProtocolInterface
 from ..support.annexrepo import AnnexRepo
+from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 
 import logging
@@ -99,7 +101,7 @@ send () {
                     entries[i] = '#' + e
             with open(_file, 'w') as f:
                 f.write(''.join(entries))
-            return # nothing else to be done
+            return  # nothing else to be done
 
         lgr.debug("Initiating protocoling."
                       "cd %s; vim %s"
@@ -168,7 +170,7 @@ class AnnexCustomRemote(object):
 
     AVAILABILITY = DEFAULT_AVAILABILITY
 
-    def __init__(self, path=None, cost=DEFAULT_COST): # , availability=DEFAULT_AVAILABILITY):
+    def __init__(self, path=None, cost=DEFAULT_COST):  # , availability=DEFAULT_AVAILABILITY):
         """
         Parameters
         ----------
@@ -206,6 +208,8 @@ class AnnexCustomRemote(object):
                          if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
                          else None
 
+        self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
+
 
     # Just an obscure way to provide "Abstract attribute"
     @property
@@ -215,6 +219,30 @@ class AnnexCustomRemote(object):
         raise ValueError("Each derived class should carry its own PREFIX")
 
 
+    # Helpers functionality
+
+    def get_contentlocation(self, key):
+        """Return absolute path to the file containing the key
+
+        This is a wrapper around AnnexRepo.get_contentlocation which provides caching
+        of the result (we are asking the location for the same archive key often)
+        """
+        if key not in self._contentlocations:
+            fpath = self.repo.get_contentlocation(key, batch=True)
+            if fpath:  # shouldn't store empty ones
+                self._contentlocations[key] = fpath
+        else:
+            fpath = self._contentlocations[key]
+            # but verify that it exists
+            if not lexists(opj(self.path, fpath)):
+                # prune from cache
+                del self._contentlocations[key]
+                fpath = ''
+        return fpath
+
+    #
+    # Communication with git-annex
+    #
     def send(self, *args):
         """Send a message to git-annex
 

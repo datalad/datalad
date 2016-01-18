@@ -834,16 +834,18 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         str
-            path relative to the top directory of the repository
+            path relative to the top directory of the repository. If no content
+            is present, empty string is returned
         """
 
-        cmd_str = 'git annex contentlocation %s' % key  # have a string for messages
-
         if not batch:
-            out, err = self._run_annex_command('contentlocation',
-                                               annex_options=[key],
-                                               expect_fail=True)
-            return out.rstrip(linesep).splitlines()[0]
+            try:
+                out, err = self._run_annex_command('contentlocation',
+                                                   annex_options=[key],
+                                                   expect_fail=True)
+                return out.rstrip(linesep).splitlines()[0]
+            except CommandError:
+                return ''
         else:
             return self._batched.get('contentlocation', path=self.path)(key)
 
