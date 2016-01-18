@@ -12,6 +12,7 @@ from ..misc import get_disposition_filename
 from ..misc import range_node
 from ..misc import interrupt_if
 from ..misc import func_to_node
+from ..misc import sub
 from ...pipeline import FinishPipeline
 
 from datalad.tests.utils import skip_if_no_network
@@ -80,3 +81,20 @@ def test_func_to_node():
     range_node_gen = xrange_node(in_dict)
     ok_generator(range_node_gen)
     assert_equal(list(range_node_gen), [{'in': 1, 'out': 10}])
+
+def test_sub():
+    s = sub({
+        'url': {
+            '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'
+        }
+    })
+    ex1 = {'url': 'http://example.com'}
+    assert_equal(list(s(ex1)), [ex1])
+
+    assert_equal(list(s({'url': "https://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"})),
+                 [{'url': "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"}])
+
+    assert_equal(
+            list(s({'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
+            [{'url': "http://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"}]
+    )
