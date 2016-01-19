@@ -228,6 +228,15 @@ class AddArchiveContent(Interface):
             for extracted_file in earchive.get_extracted_files():
                 stats.files += 1
                 extracted_path = opj(earchive.path, extracted_file)
+
+                if islink(extracted_path):
+                    link_path = realpath(extracted_path)
+                    if not exists(link_path):  # TODO: config  addarchive.symlink-broken='skip'
+                        lgr.warning("Path %s points to non-existing file %s" % (extracted_path, link_path))
+                        stats.skipped += 1
+                        continue
+                    # TODO: check if points outside of the archive -- warning and skip
+
                 # preliminary target name which might get modified by renames
                 target_file_orig = target_file = extracted_file
 
