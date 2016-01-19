@@ -18,7 +18,7 @@ import re
 import os
 import shlex
 
-from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath
+from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, islink
 from .base import Interface
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
@@ -146,6 +146,8 @@ class AddArchiveContent(Interface):
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
+        direct_mode = annex.is_direct_mode()
+
         # are we in a subdirectory?
         # get the path relative to the top
         # TODO: check in direct mode
@@ -170,7 +172,7 @@ class AddArchiveContent(Interface):
 
         # and operate from now on the key or whereever content available "canonically"
         try:
-            key_path = annex.get_contentlocation(key) # , relative_to_top=True)
+            key_path = annex.get_contentlocation(key)  # , relative_to_top=True)
         except:
             raise RuntimeError("Content of %s seems to be N/A.  Fetch it first" % key)
 
@@ -180,10 +182,10 @@ class AddArchiveContent(Interface):
 
         from datalad.customremotes.archive import AnnexArchiveCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
-        # TODO: whenever copy strategy is implemented, we could reuse persistent cache
-        annexarchive = AnnexArchiveCustomRemote(path=annex.path, persistent_cache=False)
+        # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
+        annexarchive = AnnexArchiveCustomRemote(path=annex.path, persistent_cache=True)
         # We will move extracted content so it must not exist prior running
-        annexarchive.cache.allow_existing = False
+        annexarchive.cache.allow_existing = True
         earchive = annexarchive.cache[key_path]
 
         # TODO: check if may be it was already added
@@ -208,7 +210,7 @@ class AddArchiveContent(Interface):
             #import pdb; pdb.set_trace()
             for extracted_file in earchive.get_extracted_files():
                 stats.files += 1
-                extracted_path = opj(earchive.path, extracted_file)
+                # extracted_path = opj(earchive.path, extracted_file)
                 # preliminary target name which might get modified by renames
                 target_file = extracted_file
 
@@ -231,7 +233,7 @@ class AddArchiveContent(Interface):
 
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
 
-                lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
+                # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
                 target_path = opj(getpwd(), target_file)
                 if lexists(target_file):
                     if not overwrite:
@@ -245,22 +247,40 @@ class AddArchiveContent(Interface):
                 if copy:
                     raise NotImplementedError("Not yet copying from 'persistent' cache")
                 else:
-                    os.renames(extracted_path, target_path)
+                    # os.renames(extracted_path, target_path)
+                    # addurl implementation relying on annex'es addurl below would actually copy
+                    pass
 
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
-                    target_path, url, annex_options)
-                annex.annex_add(target_path, options=annex_options)
+                          target_path, url, annex_options)
 
-                # above action might add to git or to annex
-                if annex.file_has_content(target_path):
-                    # if not --  it was added to git, if in annex, it is present and output is True
-                    annex.annex_addurl_to_file(target_file, url, options=['--relaxed'], batch=True)
+                annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
+
+                if direct_mode:
+                    # need to inquire annex
+                    added_to_annex = annex.file_has_content(target_path)
+                else:
+                    # adhoc check -- faster and only for stats anyways
+                    added_to_annex = islink(target_path) and '.git/annex/objects' in realpath(target_path)
+
+                if added_to_annex:
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))
                     stats.add_git += 1
-                # TODO: actually check if it is anyhow different from a previous version. If not
-                # then it wasn't really added
+
+                # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
+                # annex.annex_add(target_path, options=annex_options)
+                # # above action might add to git or to annex
+                # if annex.file_has_content(target_path):
+                #     # if not --  it was added to git, if in annex, it is present and output is True
+                #     annex.annex_addurl_to_file(target_file, url, options=['--relaxed'], batch=True)
+                #     stats.add_annex += 1
+                # else:
+                #     lgr.debug("File {} was added to git, not adding url".format(target_file))
+                #     stats.add_git += 1
+                # # TODO: actually check if it is anyhow different from a previous version. If not
+                # # then it wasn't really added
 
                 del target_file  # Done with target_file -- just to have clear end of the loop
 
@@ -279,6 +299,6 @@ class AddArchiveContent(Interface):
             annex.precommit()
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure
-            earchive.clean()
+            earchive.clean(force=True)
 
         return annex
