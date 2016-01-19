@@ -196,7 +196,7 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 test_add_archive_content.tags = ['integration']
 
 
-@assert_cwd_unchanged()  # we are passing annex, not chpwd
+@assert_cwd_unchanged()
 @with_tree(tree={'1.tar': {'file.txt': 'load',
                            '1.dat': 'load2'}})
 def test_add_archive_content_tar(repo_path):

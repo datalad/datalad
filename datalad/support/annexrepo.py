@@ -13,10 +13,11 @@ For further information on git-annex see https://git-annex.branchable.com/.
 """
 
 from os import linesep
-from os.path import join as opj, exists, relpath, islink, realpath
+from os.path import join as opj, exists, relpath, islink, realpath, lexists
 import logging
 import json
 import re
+import os
 import shlex
 from subprocess import Popen, PIPE
 #import pexpect
@@ -869,6 +870,27 @@ class AnnexRepo(GitRepo):
             self.annex_proxy('git commit -m "%s"' % msg)
         else:
             self.git_commit(msg)
+
+    @normalize_paths(match_return_type=False)
+    def remove(self, files, force=False):
+        """Remove files from git/annex (works in direct mode as well)
+
+        Parameters
+        ----------
+        files
+        force: bool, optional
+        """
+        self.precommit()  # since might interfer
+        if self.is_direct_mode():
+            self.annex_proxy('git rm ' + ('--force ' if force else '') + ' '.join(files))
+            # yoh gives up -- for some reason sometimes it remains, so if we force -- we mean it!
+            if force:
+                for f in files:
+                    filepath = opj(self.path, f)
+                    if lexists(filepath):
+                        os.unlink(filepath)
+        else:
+            self.git_remove(files, force=force, normalize_paths=False)
 
     def get_contentlocation(self, key, batch=False):
         """Get location of the key content

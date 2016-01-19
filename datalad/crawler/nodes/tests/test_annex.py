@@ -14,9 +14,11 @@ from ..annex import initiate_handle
 from ..annex import Annexificator
 from ....tests.utils import assert_equal, assert_in
 from ....tests.utils import assert_raises
+from ....tests.utils import assert_true, assert_false
 from ....tests.utils import with_tree, serve_path_via_http
 from ....tests.utils import ok_file_under_git
 from ....tests.utils import ok_file_has_content
+from ....tests.utils import assert_cwd_unchanged
 from ...pipeline import load_pipeline_from_config
 from ....consts import CRAWLER_META_CONFIG_PATH
 from ....support.stats import ActivityStats
@@ -115,3 +117,39 @@ def test_annex_file():
     for mode in ('full', 'fast', 'relaxed',):
         yield _test_annex_file, mode
 
+
+@assert_cwd_unchanged()  # we are passing annex, not chpwd
+@with_tree(tree={'1.tar': {'file.txt': 'load',
+                           '1.dat': 'load2'}})
+def _test_add_archive_content_tar(direct, repo_path):
+    mode = 'full'
+    annex = Annexificator(path=repo_path,
+                          allow_dirty=True,
+                          mode=mode,
+                          direct=direct,
+                          options=["-c", "annex.largefiles=exclude=*.txt"])
+    output_add = list(annex({'filename': '1.tar'}))  # adding it to annex
+    assert_equal(output_add, [{'filename': '1.tar'}])
+
+    #stats = ActivityStats()
+    #output_add[0]['datalad_stats'] = ActivityStats()
+    output_addarchive = list(
+        annex.add_archive_content(
+            existing='archive-suffix',
+            strip_leading_dirs=True,)(output_add[0]))
+    # http://git-annex.branchable.com/bugs/addurl_--batch_from_url_from_a_custom_special_remote_adds_to_annex_disregarding_largefiles___40__on_first_run__41__/?updated
+    # TODO: largefiles instruction seems to be ignored on the first run, but works in direct mode
+    assert_equal(output_addarchive,
+                 [{'datalad_stats': ActivityStats(add_annex=1 + int(not direct), add_git=int(direct), files=3, renamed=2), 'filename': '1.tar'}])
+    if not direct:  # Notimplemented otherwise
+        assert_true(annex.repo.dirty)
+    annex.repo.commit("added")
+    ok_file_under_git(repo_path, 'file.txt', annexed=True)
+    ok_file_under_git(repo_path, '1.dat', annexed=True)
+    assert_false(lexists(opj(repo_path, '1.tar')))
+    if not direct:  # Notimplemented otherwise
+        assert_false(annex.repo.dirty)
+
+def test_add_archive_content_tar():
+    for direct in (True, False):
+        yield _test_add_archive_content_tar, direct

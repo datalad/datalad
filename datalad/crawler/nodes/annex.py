@@ -12,6 +12,7 @@
 import os
 import time
 from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
+from os.path import split as ops
 from os import unlink, makedirs
 
 from ...api import add_archive_content
@@ -257,31 +258,13 @@ class Annexificator(object):
         if url:
             stats.urls += 1
 
-        # figure out the filename. If disposition one was needed, pipeline should
-        # have had it explicitly
-        fpath = filename = \
-            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
-
-        stats.files += 1
-        if filename is None:
-            stats.skipped += 1
-            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
-        elif isabs(filename):
-            stats.skipped += 1
-            raise ValueError("Got absolute filename %r" % filename)
-
-        path_ = data.get('path', None)
-        if path_:
-            # TODO: test all this handling of provided paths
-            if isabs(path_):
-                stats.skipped += 1
-                raise ValueError("Absolute path %s was provided" % path_)
-            fpath = opj(path_, fpath)
+        fpath = self._get_fpath(data, stats, url)
         filepath = opj(self.repo.path, fpath)
 
         lgr.debug("Request to annex %(url)s to %(fpath)s", locals())
 
-        updated_data = updated(data, {'filename': filename,
+        # since filename could have come from url -- let's update with it
+        updated_data = updated(data, {'filename': ops(fpath)[1],
                                       #TODO? 'filepath': filepath
                                       })
         remote_status = None
@@ -319,9 +302,9 @@ class Annexificator(object):
         if not url:
             lgr.debug("Adding %s directly into git since no url was provided" % (filepath))
             # So we have only filename
-            assert(filename)
-            # Thus add directly into git
-            _call(self.repo.git_add, filename)
+            assert(fpath)
+            # Just add into annex without addurl
+            _call(self.repo.annex_add, fpath)
             _call(stats.increment, 'add_git')
         elif self.mode == 'full':
             # Since addurl ignores annex.largefiles we need first to download that file and then
@@ -377,6 +360,33 @@ class Annexificator(object):
         # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
         # with subsequent "drop" leaves no record that it ever was here
         yield updated_data  # There might be more to it!
+
+    def _get_fpath(self, data, stats, url=None):
+        """Return relative path (fpath) to the file based on information in data or url
+        """
+        # figure out the filename. If disposition one was needed, pipeline should
+        # have had it explicitly
+        fpath = filename = \
+            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
+
+        stats.files += 1
+
+        if filename is None:
+            stats.skipped += 1
+            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
+        elif isabs(filename):
+            stats.skipped += 1
+            raise ValueError("Got absolute filename %r" % filename)
+
+        path_ = data.get('path', None)
+        if path_:
+            # TODO: test all this handling of provided paths
+            if isabs(path_):
+                stats.skipped += 1
+                raise ValueError("Absolute path %s was provided" % path_)
+            fpath = opj(path_, fpath)
+
+        return fpath
 
     def switch_branch(self, branch, parent=None):
         """Node generator to switch branch, returns actual node
@@ -476,7 +486,7 @@ class Annexificator(object):
 
 
     #TODO: @borrow_kwargs from api_add_...
-    def add_archive_content(self, **aac_kwargs):
+    def add_archive_content(self, commit=False, **aac_kwargs):
         """
 
         Parameters
@@ -485,21 +495,22 @@ class Annexificator(object):
            Options to pass into api.add_archive_content
         """
         def _add_archive_content(data):
-            archive = data['path']
+            # if no stats -- they will be brand new each time :-/
+            stats = data.get('datalad_stats', ActivityStats())
+            archive = self._get_fpath(data, stats)
             # TODO: may be adjust annex_options
+            #import pdb; pdb.set_trace()
             annex = add_archive_content(
                 archive, annex=self.repo,
-                delete=True, key=False, commit=False, allow_dirty=True,
+                delete=True, key=False, commit=commit, allow_dirty=True,
                 annex_options=self.options,
-                stats=data.get('datalad_stats', None),
+                stats=stats,
                 **aac_kwargs
             )
             assert(annex is self.repo)   # must be the same annex, and no new created
-            # TODO: how to propagate statistics from this call into commit msg
-            #       since we commit=False here
-            # Probably we should carry though 'data' somehow so it gets accumulated
-            # until commit...?
-            yield data
+            # to propagate statistics from this call into commit msg since we commit=False here
+            # we update data with stats which gets a new instance if wasn't present
+            yield updated(data, {'datalad_stats': stats})
         return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
