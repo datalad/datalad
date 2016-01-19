@@ -24,9 +24,9 @@ def pipeline(**kwargs):
     # TODO: get to 'incoming branch'
     return [
         crawl_url("http://crcns.org/data-sets",
-            matchers=[a_href_match('.*/data-sets/\S+')]),
-#                      a_href_match('.*/data-sets/\S+/\S+'),]),
-        a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/]+)/(?P<dataset>[^/]+))$"),
+            matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
+#                      a_href_match('.*/data-sets/[\S+/\S+'),]),
+        a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
         # https://openfmri.org/dataset/ds000001/
         assign({'handle_name': '%(dataset)s'}, interpolate=True),
         initiate_handle(
