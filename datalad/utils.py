@@ -12,7 +12,7 @@ import re
 import six.moves.builtins as __builtin__
 import time
 
-from os.path import curdir
+from os.path import curdir, basename
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
 import logging
@@ -251,6 +251,14 @@ def rmtemp(f, *args, **kwargs):
                 break
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def file_basename(name):
+    """
+    Strips up to 2 extensions of length up to 4 characters, so we could get
+    rid of .tar.gz etc
+    """
+    return re.sub('(\.\S{0,4}){0,2}$', '', basename(name))
 
 
 if on_windows:

@@ -12,10 +12,12 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import exists, join as opj, pardir
+from os.path import exists, join as opj, pardir, basename
+from glob import glob
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_tempfile, assert_in
+from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
 from ...tests.utils import ok_archives_caches
 
@@ -86,8 +88,16 @@ def test_add_archive_content(path_orig, url, repo_path):
     # -- in caching and overwrite check
     assert_in("already exists", str(cme.exception))
     # but should do fine if overrides are allowed
-    add_archive_content('1.tar.gz', overwrite=True)
+    add_archive_content('1.tar.gz', existing='overwrite')
     d1_basic_checks()
+    add_archive_content('1.tar.gz', existing='archive-suffix')
+    add_archive_content('1.tar.gz', existing='archive-suffix')
+    # rudimentary test
+    assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
+                 ['1 f.txt', '1 f.txt-1', '1 f.txt-1.1'])
+    whereis = repo.annex_whereis(glob(opj(repo_path, '1', '1*')))
+    # they all must be the same
+    assert(all([x==whereis[0] for x in whereis[1:]]))
 
     # and we should be able to reference it while under subdirectory
     subdir = opj(repo_path, 'subdir')
@@ -139,6 +149,30 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     chpwd(orig_pwd)  # just to avoid warnings ;)
 
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**tree1args)
+@serve_path_via_http()
+@with_tempfile(mkdir=True)
+def test_add_archive_content_strip_leading(path_orig, url, repo_path):
+    direct = False  # TODO: test on undirect, but too long ATM
+    orig_pwd = getpwd()
+    chpwd(repo_path)
+
+    repo = AnnexRepo(repo_path, create=True, direct=direct)
+
+    # Let's add first archive to the repo so we could test
+    with swallow_outputs():
+        repo.annex_addurls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+    repo.git_commit("added 1.tar.gz")
+
+    add_archive_content('1.tar.gz', strip_leading_dirs=True)
+    ok_(not exists('1'))
+    ok_file_under_git(repo.path, '1 f.txt', annexed=True)
+    ok_file_under_git('d', '1d', annexed=True)
+    ok_archives_caches(repo.path, 0)
+
+    chpwd(orig_pwd)  # just to avoid warnings ;)
 
 # looking for the future tagging of lengthy tests
 test_add_archive_content.tags = ['integration']
