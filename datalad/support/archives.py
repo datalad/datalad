@@ -206,7 +206,7 @@ import random
 def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):
     """Return a random ID composed from digits and uppercase letters
 
-    upper-case so we are tollerant to unlikely collisions on dummy FSs
+    upper-case so we are tolerant to unlikely collisions on dummy FSs
     """
     return ''.join(random.choice(chars) for _ in range(size))
 
@@ -231,7 +231,7 @@ class ArchivesCache(object):
             path = opj(toppath, ARCHIVES_TEMP_DIR)
             if not persistent:
                 tempsuffix = "-" + _get_random_id()
-                lgr.debug("For non-persistent archives using %s suffix forpath %s",
+                lgr.debug("For non-persistent archives using %s suffix for path %s",
                           tempsuffix, path )
                 path += tempsuffix
         else:
@@ -396,7 +396,7 @@ class ExtractedArchive(object):
         """
         path = self.assure_extracted()
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
-        for root, dirs, files in os.walk(path): # TEMP
+        for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
                 yield opj(root, name)[path_len:]
 
