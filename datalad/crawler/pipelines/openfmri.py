@@ -12,6 +12,7 @@
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
+from ..nodes.misc import sub
 from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
@@ -64,11 +65,17 @@ def pipeline(dataset, versioned_urls=True):
                 # and don't know how to select all the a after h4
                 # xpath('//h4[contains(text(), "Data:")]')
                 # so let's just select all the ones going to /tarballs/
-				# some are not on S3 yet, so no /tarballs/ prefix e.g. ds 158
+                # some are not on S3 yet, so no /tarballs/ prefix e.g. ds 158
                 #a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
                 a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
-                # TODO: needs fixing of the openfmri bucket
-                # email sent out
+                # Since all content of openfmri is anyways available openly, no need atm
+                # to use https which complicates proxying etc. Thus replace for AWS urls
+                # to openfmri S3 from https to http
+                # TODO: might want to become an option for get_versioned_url? 
+                sub({
+                 'url': {
+                   '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'
+                }}),
                 func_to_node(get_versioned_url,
                              data_args=['url'],
                              outputs=['url'],
