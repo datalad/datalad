@@ -12,7 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import exists, join as opj, pardir, basename
+from os.path import exists, join as opj, pardir, basename, lexists
 from glob import glob
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
@@ -194,3 +194,19 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 # looking for the future tagging of lengthy tests
 test_add_archive_content.tags = ['integration']
+
+
+@assert_cwd_unchanged()  # we are passing annex, not chpwd
+@with_tree(tree={'1.tar': {'file.txt': 'load',
+                           '1.dat': 'load2'}})
+def test_add_archive_content_tar(repo_path):
+    # To test that .tar gets removed
+    direct = False  # TODO: test on undirect, but too long ATM
+    annex = AnnexRepo(repo_path, create=True, direct=direct)
+    # Let's add first archive to the annex so we could test
+    annex.annex_add('1.tar')
+    annex.commit(msg="added 1.tar")
+    #print annex.path
+    #import pdb; pdb.set_trace()
+    add_archive_content('1.tar', annex=annex, strip_leading_dirs=True, delete=True)
+    assert_false(lexists(opj(repo_path, '1.tar')))

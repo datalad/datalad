@@ -21,6 +21,7 @@ import shlex
 from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename
 from os.path import sep as opsep
 from os.path import islink
+from os.path import isabs
 from .base import Interface
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
@@ -153,8 +154,13 @@ class AddArchiveContent(Interface):
 
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex
+        archive_path = archive
         if annex is None:
             annex = get_repo_instance(class_=AnnexRepo)
+        elif not isabs(archive):
+            # if we are given an annex, then assume that given path is within annex, not
+            # relative to PWD
+            archive_path = opj(annex.path, archive)
 
         # TODO: somewhat too cruel -- may be an option or smth...
         if not allow_dirty and annex.dirty:
@@ -170,7 +176,7 @@ class AddArchiveContent(Interface):
 
         if not key:
             # we were given a file which must exist
-            if not exists(archive):
+            if not exists(archive_path):
                 raise ValueError("Archive {} does not exist".format(archive))
             # TODO: support adding archives content from outside the annex/repo
             origin = archive
