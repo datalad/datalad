@@ -97,7 +97,7 @@ def skip_if_no_module(module):
 def create_tree_archive(path, name, load, overwrite=False):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
-    dirname = name[:-7]
+    dirname = file_basename(name)
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
     create_tree(full_dirname, load)
@@ -122,7 +122,7 @@ def create_tree(path, tree):
     for name, load in tree:
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
-            if name.endswith('.tar.gz'):
+            if name.endswith('.tar.gz') or name.endswith('.tar'):
                 create_tree_archive(path, name, load)
             else:
                 create_tree(full_name, load)
