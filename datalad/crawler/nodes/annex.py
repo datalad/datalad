@@ -512,6 +512,8 @@ class Annexificator(object):
             stats = data.get('datalad_stats', None)
             stats_str = stats.as_str(mode='line') if stats else ''
             _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options=["-a"])
+            if stats:
+                _call(stats.reset)
         else:
             lgr.info("Found branch non-dirty - nothing is committed")
         self._states = []

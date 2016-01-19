@@ -345,6 +345,7 @@ class AddArchiveContent(Interface):
                     "Added content extracted from %s\n\n%s" % (origin, stats.as_str(mode='full'))
                 )
             lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
+            stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
             annex.precommit()
