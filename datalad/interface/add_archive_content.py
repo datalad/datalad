@@ -270,7 +270,7 @@ class AddArchiveContent(Interface):
                 annex.git_remove(archive, force=True)
 
             if commit:
-                annex.git_commit(
+                annex.commit(
                     "Added content extracted from %s\n\n%s" % (origin, stats.as_str(mode='full'))
                 )
             lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
