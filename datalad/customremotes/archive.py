@@ -237,6 +237,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             # Command could have fail to run if key was not present locally yet
             # Thus retrieve the key using annex
             try:
+                # TODO: we need to report user somehow about this happening and progress on the download
                 self.runner(["git-annex", "get", "--key", akey],
                             cwd=self.path, expect_stderr=True)
             except Exception as e:
