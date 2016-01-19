@@ -18,7 +18,9 @@ import re
 import os
 import shlex
 
-from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, islink
+from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename
+from os.path import sep as opsep
+from os.path import islink
 from .base import Interface
 from ..consts import ARCHIVES_SPECIAL_REMOTE
 from ..support.param import Parameter
@@ -28,7 +30,8 @@ from ..support.annexrepo import AnnexRepo
 from ..support.strings import apply_replacement_rules
 from ..support.stats import ActivityStats
 from ..cmdline.helpers import get_repo_instance
-from ..utils import getpwd, rmtree
+from ..utils import getpwd, rmtree, file_basename
+from ..utils import md5sum
 
 from six import string_types
 from six.moves.urllib.parse import urlparse
@@ -57,10 +60,22 @@ class AddArchiveContent(Interface):
             action="store_true",
             doc="""Flag to delete original archive from the filesystem/git in current tree.
                    Note that it will be of no effect if --key is given."""),
-        overwrite=Parameter(
-            args=("-O", "--overwrite"),
+        strip_leading_dirs=Parameter(
+            args=("--strip-leading-dirs",),
             action="store_true",
-            doc="""Flag to replace an existing file if new file from archive has the same name"""
+            doc="""Flag to move all files directories up, from how they were stored in an archive,
+                   if that one contained a number (possibly more than 1 down) single leading
+                   directories."""),
+        existing=Parameter(
+            args=("--existing",),
+            choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
+            default="fail",
+            doc="""What operation to perform a file from archive tries to overwrite an existing
+             file with the same name. 'fail' (default) leads to RuntimeError exception.
+             'overwrite' silently replaces existing file.  'archive-suffix' instructs to add
+             a suffix (prefixed with a '-') matching archive name from which file gets extracted,
+             and if that one present, 'numeric-suffix' is in effect in addition, when incremental
+             numeric suffix (prefixed with a '.') is added until no name collision is longer detected"""
         ),
         exclude=Parameter(
             args=("-e", "--exclude"),
@@ -126,8 +141,8 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, annex=None,
-                 delete=False, key=False, exclude=None, rename=None, overwrite=False,
+    def __call__(self, archive, annex=None, strip_leading_dirs=False,
+                 delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None):
         """
@@ -206,20 +221,20 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
+            leading_dir = earchive.get_leading_directory() if strip_leading_dirs else None
+            leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
             stats = stats or ActivityStats()
-            #import pdb; pdb.set_trace()
+
             for extracted_file in earchive.get_extracted_files():
                 stats.files += 1
-                # extracted_path = opj(earchive.path, extracted_file)
+                extracted_path = opj(earchive.path, extracted_file)
                 # preliminary target name which might get modified by renames
-                target_file = extracted_file
+                target_file_orig = target_file = extracted_file
+
+                target_file = target_file[leading_dir_len:]
 
                 if rename:
-                    target_file_ = target_file
-                    target_file_ = apply_replacement_rules(rename, target_file_)
-                    if target_file_ != target_file:
-                        stats.renamed += 1
-                        target_file = target_file_
+                    target_file = apply_replacement_rules(rename, target_file)
 
                 if exclude:
                     try:  # since we need to skip outside loop from inside loop
@@ -234,16 +249,43 @@ class AddArchiveContent(Interface):
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
 
                 # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
-                target_path = opj(getpwd(), target_file)
+
                 if lexists(target_file):
-                    if not overwrite:
+                    if md5sum(target_file) == md5sum(extracted_path):
+                        # must be having the same content, we should just add possibly a new extra URL
+                        pass
+                    elif existing == 'fail':
                         raise RuntimeError(
                             "File {} already exists, but new (?) file {} was instructed "
                             "to be placed there while overwrite=False".format(target_file, extracted_file))
-                    stats.overwritten += 1
-                    # to make sure it doesn't conflict -- might have been a tree
-                    rmtree(target_file)
+                    elif existing == 'overwrite':
+                        stats.overwritten += 1
+                        # to make sure it doesn't conflict -- might have been a tree
+                        rmtree(target_file)
+                    else:
+                        target_file_orig_ = target_file
+                        if existing == 'archive-suffix':
+                            target_file += '-%s' % file_basename(origin)
+                        elif existing == 'numeric-suffix':
+                            pass  # archive-suffix will have the same logic
+                        else:
+                            raise ValueError(existing)
+                        # keep incrementing index in the suffix until file doesn't collide
+                        suf, i = '', 0
+                        while lexists(target_file + suf):
+                            lgr.debug("File %s already exists" % (target_file + suf))
+                            i += 1
+                            suf = '.%d' % i
+                        target_file += suf
+                        lgr.debug("Original file %s will be saved into %s"
+                                  % (target_file_orig_, target_file))
+                        # TODO: should we reserve smth like
+                        # stats.clobbed += 1
 
+                if target_file != target_file_orig:
+                    stats.renamed += 1
+
+                target_path = opj(getpwd(), target_file)
                 if copy:
                     raise NotImplementedError("Not yet copying from 'persistent' cache")
                 else:

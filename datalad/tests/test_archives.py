@@ -10,8 +10,10 @@
 import os
 from os.path import join as opj, exists
 
+from mock import patch
 from .utils import assert_true, assert_false, eq_, \
     with_tree, with_tempfile, swallow_outputs, on_windows
+from .utils import assert_equal
 
 from ..support.archives import decompress_file, compress_files, unixify_path
 from ..support.archives import ExtractedArchive, ArchivesCache
@@ -153,3 +155,20 @@ def test_ArchivesCache():
     cache_path = cache.path
     del cache
     assert_false(exists(cache_path))
+
+
+def _test_get_leading_directory(ea, return_value, target_value, depth=None):
+    with patch.object(ExtractedArchive, 'get_extracted_files', return_value=return_value):
+        assert_equal(ea.get_leading_directory(depth=depth), target_value)
+
+
+def test_get_leading_directory():
+    ea = ExtractedArchive('bogus', 'bogus')
+    yield _test_get_leading_directory, ea, [], None
+    yield _test_get_leading_directory, ea, ['file.txt'], None
+    yield _test_get_leading_directory, ea, ['file.txt', opj('d', 'f')], None
+    yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d', 'f2')], 'd'
+    yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d2', 'f2')], None
+    yield _test_get_leading_directory, ea, [opj('d', 'd2', 'f'), opj('d', 'd2', 'f2')], opj('d', 'd2')
+    yield _test_get_leading_directory, ea, [opj('d', 'd2', 'f'), opj('d', 'd2', 'f2')], 'd', 1
+

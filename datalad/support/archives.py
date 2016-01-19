@@ -19,6 +19,7 @@ assert(StrictVersion(patoolib.__version__) >= "1.7")
 import os
 import tempfile
 from os.path import join as opj, exists, abspath, basename, isabs, normpath, relpath, pardir, isdir
+from os.path import split as ops, sep as opsep
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
@@ -399,6 +400,42 @@ class ExtractedArchive(object):
         for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
                 yield opj(root, name)[path_len:]
+
+    def get_leading_directory(self, depth=None):
+        """Return leading directory of the content within archive
+
+        Parameters
+        ----------
+        depth: int or None, optional
+          Maximal depth of leading directories to consider.  If None - no upper
+          limit
+
+        Returns
+        -------
+        str or None:
+          If there is no single leading directory -- None returned
+        """
+        leading = None
+        # returns only files, so no need to check if a dir or not
+        for fpath in self.get_extracted_files():
+            lpath = fpath.split(opsep)
+            dpath = lpath[:-1]  # directory path components
+            if leading is None:
+                leading = dpath if depth is None else dpath[:depth]
+            else:
+                if dpath[:len(leading)] != leading:
+                    # find smallest common path
+                    leading_ = []
+                    # TODO: there might be more efficient pythonic way
+                    for d1, d2 in zip(leading, dpath):
+                        if d1 != d2:
+                            break
+                        leading_.append(d1)
+                    leading = leading_
+            if not len(leading):
+                # no common leading - ready to exit
+                return None
+        return leading if leading is None else opj(*leading)
 
     def get_extracted_file(self, afile):
         lgr.debug("Requested file {afile} from archive {self._archive}".format(**locals()))
