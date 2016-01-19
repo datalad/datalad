@@ -195,7 +195,7 @@ def test_AnnexRepo_get_file_key(src, annex_path):
     assert_raises(IOError, ar.get_file_key, "filenotpresent.wtf")
 
 
-# 1 is enought to test file_has_content
+# 1 is enough to test file_has_content
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
 def test_AnnexRepo_file_has_content(src, annex_path):
@@ -212,6 +212,37 @@ def test_AnnexRepo_file_has_content(src, annex_path):
 
     assert_false(ar.file_has_content("bogus.txt"))
     assert_true(ar.file_has_content("test-annex.dat"))
+
+
+# 1 is enough to test
+@with_testrepos('.*annex.*', flavors=['local'], count=1)
+@with_tempfile
+def _test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
+    ar = AnnexRepo(annex_path, src, direct=direct)
+
+    with open(opj(annex_path, 'not-committed.txt'), 'w') as f:
+        f.write("aaa")
+
+    testfiles = ["test-annex.dat", "not-committed.txt", "INFO.txt"]
+    # wouldn't change
+    target_value = [True, False, False]
+    assert_equal(ar.is_under_annex(testfiles, batch=batch), target_value)
+
+    ok_annex_get(ar, "test-annex.dat")
+    assert_equal(ar.is_under_annex(testfiles, batch=batch), target_value)
+    assert_equal(ar.is_under_annex(testfiles[:1], batch=batch), target_value[:1])
+    assert_equal(ar.is_under_annex(testfiles[1:], batch=batch), target_value[1:])
+
+    assert_equal(ar.is_under_annex(testfiles + ["bogus.txt"], batch=batch),
+                 target_value + [False])
+
+    assert_false(ar.is_under_annex("bogus.txt", batch=batch))
+    assert_true(ar.is_under_annex("test-annex.dat", batch=batch))
+
+def test_AnnexRepo_is_under_annex():
+    for batch in (False, True):
+        for direct in (False, True):
+            yield _test_AnnexRepo_is_under_annex, batch, direct
 
 
 def test_AnnexRepo_options_decorator():
@@ -283,6 +314,11 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     info = ar.annex_info(testfile)
     assert_equal(info['size'], 14)
     assert(info['key'])  # that it is there
+    info_batched = ar.annex_info(testfile, batch=True)
+    assert_equal(info, info_batched)
+    # while at it ;)
+    assert_equal(ar.annex_info('nonexistent', batch=False), None)
+    assert_equal(ar.annex_info('nonexistent', batch=True), None)
 
     # remove the remote
     ar.annex_rmurl(testfile, testurl)

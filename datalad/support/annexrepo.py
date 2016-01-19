@@ -13,7 +13,7 @@ For further information on git-annex see https://git-annex.branchable.com/.
 """
 
 from os import linesep
-from os.path import join as opj, exists, relpath
+from os.path import join as opj, exists, relpath, islink, realpath
 import logging
 import json
 import re
@@ -75,7 +75,7 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched']
+    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
@@ -161,6 +161,7 @@ class AnnexRepo(GitRepo):
                 raise RuntimeError("No annex found at %s." % self.path)
 
         # only force direct mode; don't force indirect mode
+        self._direct_mode = None  # we don't know yet
         if direct and not self.is_direct_mode():
             self.set_direct_mode()
 
@@ -234,8 +235,10 @@ class AnnexRepo(GitRepo):
             else:
                 raise e
 
-    def is_direct_mode(self):
-        """Indicates whether or not annex is in direct mode
+    def _is_direct_mode_from_config(self):
+        """Figure out if in direct mode from the git config.
+
+        Since relies on reading config, expensive to be used often
 
         Returns
         -------
@@ -248,6 +251,18 @@ class AnnexRepo(GitRepo):
             # If .git/config lacks an entry "direct",
             # it's actually indirect mode.
             return False
+
+    def is_direct_mode(self):
+        """Indicates whether or not annex is in direct mode
+
+        Returns
+        -------
+        True if in direct mode, False otherwise.
+        """
+        if self._direct_mode is None:
+            # we need to figure it out
+            self._direct_mode = self._is_direct_mode_from_config()
+        return self._direct_mode
 
     def is_crippled_fs(self):
         """Indicates whether or not git-annex considers current filesystem 'crippled'.
@@ -286,6 +301,9 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('direct' if enable_direct_mode else 'indirect',
                                 expect_stderr=True)
+        # For paranoid we will just re-request
+        self._direct_mode = None
+        assert(self.is_direct_mode() == enable_direct_mode)
 
     def _annex_init(self):
         """Initializes an annex repository.
@@ -428,7 +446,7 @@ class AnnexRepo(GitRepo):
 
     @normalize_paths
     def file_has_content(self, files):
-        """ Check whether files have their content present under annex.
+        """Check whether files have their content present under annex.
 
         Parameters
         ----------
@@ -464,6 +482,41 @@ class AnnexRepo(GitRepo):
                                "we did not expect: %s" % (found_files_new,))
 
         return [file_ in found_files for file_ in files]
+
+    @normalize_paths
+    def is_under_annex(self, files, allow_quick=True, batch=False):
+        """Check whether files are under annex control
+
+        Parameters
+        ----------
+        files: list of str
+            file(s) to check for being under annex
+        allow_quick: bool, optional
+            allow quick check, based on having a symlink into .git/annex/objects.
+            Works only in non-direct mode (TODO: thin mode)
+
+        Returns
+        -------
+        list of bool
+            Per each input file states either file is under annex
+        """
+        # theoretically in direct mode files without content would also be
+        # broken symlinks on the FSs which support it, but that would complicate
+        # the matters
+        if self.is_direct_mode() or not allow_quick:  # TODO: thin mode
+            # no other way but to call whereis and if anything returned for it
+            info = self.annex_info(files, normalize_paths=False, batch=batch)
+            # info is a dict... khe khe -- "thanks" Yarik! ;)
+            return [bool(info[f]) for f in files]
+        else:  # ad-hoc check which should be faster than call into annex
+            out = []
+            for f in files:
+                filepath = opj(self.path, f)
+                # todo checks for being not outside of this repository
+                out.append(
+                    islink(filepath) and '.git/annex/objects' in realpath(filepath)
+                )
+            return out
 
     @normalize_paths
     def annex_add_to_git(self, files):
@@ -578,7 +631,7 @@ class AnnexRepo(GitRepo):
             # Don't capture stderr, since download progress provided by wget uses
             # stderr.
         else:
-            options += ['--with-files', '--json']
+            options += ['--with-files']
             if backend:
                 options += ['--backend=%s' % backend]
             # Initializes (if necessary) and obtains the batch process
@@ -589,7 +642,7 @@ class AnnexRepo(GitRepo):
                 git_options=git_options,
                 annex_options=options,  # --raw ?
                 path=self.path,
-                output_proc=readline_json
+                json=True
             )
             try:
                 out_json = bcmd((url, file_))
@@ -750,7 +803,7 @@ class AnnexRepo(GitRepo):
     #  and globs.
     # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
     @normalize_paths(map_filenames_back=True)
-    def annex_info(self, files):
+    def annex_info(self, files, batch=False):
         """Provide annex info for file(s).
 
         Parameters
@@ -764,7 +817,11 @@ class AnnexRepo(GitRepo):
           Info per each file
         """
 
-        json_objects = self._run_annex_command_json('info', args=['--bytes'] + files)
+        options = ['--bytes']
+        if not batch:
+            json_objects = self._run_annex_command_json('info', args=options + files)
+        else:
+            json_objects = self._batched.get('info', annex_options=options, json=True, path=self.path)(files)
 
         # Some aggressive checks. ATM info can be requested only per file
         # json_objects is a generator, let's keep it that way
@@ -993,11 +1050,14 @@ class BatchedAnnex(object):
     """
 
     def __init__(self, annex_cmd, git_options=[], annex_options=[], path=None,
-                 output_proc=readline_rstripped):
+                 json=False,
+                 output_proc=None):
         self.annex_cmd = annex_cmd
         self.git_options = git_options
-        self.annex_options = annex_options
+        self.annex_options = annex_options + (['--json'] if json else [])
         self.path = path
+        if output_proc is None:
+            output_proc = readline_json if json else readline_rstripped
         self.output_proc = output_proc
         self._process = None
 
