@@ -33,13 +33,14 @@ def pipeline(
     return [
         crawl_url("https://openfmri.org/dataset/"),
         #a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[1-9][0-9a-z]*)))$"),
-        a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9]*)))/*$"),
+        a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9a-z]*)))/*$"),
         # https://openfmri.org/dataset/ds000001/
         assign({'handle_name': '%(dataset)s'}, interpolate=True),
         initiate_handle(
             template="openfmri",
             data_fields=['dataset'],
             branch='incoming',  # there will be archives etc
+            existing='skip'
             # further any additional options
         )
     ]
