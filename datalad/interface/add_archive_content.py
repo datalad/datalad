@@ -30,6 +30,7 @@ from ..support.strings import apply_replacement_rules
 from ..support.stats import ActivityStats
 from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree, file_basename
+from ..utils import md5sum
 
 from six import string_types
 from six.moves.urllib.parse import urlparse
@@ -247,7 +248,10 @@ class AddArchiveContent(Interface):
                 lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
 
                 if lexists(target_file):
-                    if existing == 'fail':
+                    if md5sum(target_file) == md5sum(extracted_path):
+                        # must be having the same content, we should just add possibly a new extra URL
+                        pass
+                    elif existing == 'fail':
                         raise RuntimeError(
                             "File {} already exists, but new (?) file {} was instructed "
                             "to be placed there while overwrite=False".format(target_file, extracted_file))
