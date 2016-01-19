@@ -167,11 +167,8 @@ class AddArchiveContent(Interface):
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
-        direct_mode = annex.is_direct_mode()
-
         # are we in a subdirectory?
         # get the path relative to the top
-        # TODO: check in direct mode
         reltop = relpath(annex.path, getpwd())
 
         if not key:
@@ -229,7 +226,9 @@ class AddArchiveContent(Interface):
 
             leading_dir = earchive.get_leading_directory() if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
-            stats = stats or ActivityStats()
+
+            if stats is None:
+                stats = ActivityStats()
 
             for extracted_file in earchive.get_extracted_files():
                 stats.files += 1
@@ -300,7 +299,7 @@ class AddArchiveContent(Interface):
                 if target_file != target_file_orig:
                     stats.renamed += 1
 
-                target_path = opj(getpwd(), target_file)
+                #target_path = opj(getpwd(), target_file)
                 if copy:
                     raise NotImplementedError("Not yet copying from 'persistent' cache")
                 else:
@@ -309,18 +308,11 @@ class AddArchiveContent(Interface):
                     pass
 
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
-                          target_path, url, annex_options)
+                          target_file, url, annex_options)
 
                 annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
 
-                if direct_mode:
-                    # need to inquire annex
-                    added_to_annex = annex.file_has_content(target_path)
-                else:
-                    # adhoc check -- faster and only for stats anyways
-                    added_to_annex = islink(target_path) and '.git/annex/objects' in realpath(target_path)
-
-                if added_to_annex:
+                if annex.is_under_annex(target_file, batch=True):
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))
@@ -344,14 +336,14 @@ class AddArchiveContent(Interface):
             if delete and archive:
                 lgr.debug("Removing the original archive {}".format(archive))
                 # force=True since some times might still be staged and fail
-                annex.git_remove(archive, force=True)
+                annex.remove(archive, force=True)
 
+            lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
             if commit:
                 annex.commit(
                     "Added content extracted from %s\n\n%s" % (origin, stats.as_str(mode='full'))
                 )
-            lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
-            stats.reset()
+                stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
             annex.precommit()
