@@ -33,6 +33,7 @@ def pipeline(**kwargs):
             template="crcns",
             data_fields=['dataset'],
             branch='incoming',  # there will be archives etc
+            existing='skip',
             # further any additional options
         )
     ]

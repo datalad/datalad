@@ -146,11 +146,12 @@ class initiate_handle(object):
         if exists(handle_path):
             if self.existing == 'skip':
                 yield data
+                return
             elif self.existing == 'raise':
                 raise RuntimeError("%s already exists" % handle_path)
             elif self.existing == 'replace':
                 _call(rmtree, handle_path)
-            else:
+            else: # TODO: 'crawl'  ;)
                 raise ValueError(self.existing)
         _call(self._initiate_handle, handle_path, handle_name)
         _call(self._save_crawl_config, handle_path, handle_name, data)
