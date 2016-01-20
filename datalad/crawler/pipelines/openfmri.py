@@ -38,7 +38,7 @@ def pipeline(dataset, versioned_urls=True):
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
+        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README* and exclude=*.[mc]"])
 
     return [
         annex.switch_branch('incoming'),
@@ -111,7 +111,9 @@ def pipeline(dataset, versioned_urls=True):
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+			    # There might be archives within archives, so we need to loop
+				{'loop': True},
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True), #  we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
                     #rename=[
                     #    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
