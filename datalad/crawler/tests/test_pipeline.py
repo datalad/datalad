@@ -278,7 +278,7 @@ def test_pipeline_recursive():
     eq_(pipeline_output, _out([{'x': 1}, {'x': 2}, {'x': 3}]))
 
 def test_pipeline_looping():
-    count = [0]
+    count = [0, 0]
     def count_threetimes(data):
         """helper to not yield anything if done it 3 times by now"""
         if count[0] >= 3:
@@ -287,12 +287,32 @@ def test_pipeline_looping():
         for i in xrange(count[0]):
             yield updated(data, dict(somevar=(i, count[0])))
 
-    # when we don't specify output it should still loop feeding in the same input
-    assert_raises(ValueError, run_pipeline, [{'loop': True}, count_threetimes], dict(x=0))
+    def add_count(data):
+        count[1] += 1
+        yield updated(data, {'count': count[0]})
 
+    pipeline_output = run_pipeline([{'loop': True}, count_threetimes], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0}]))
+    eq_(count, [3, 0])
+
+    count[0] = 0
+    # Let's rerun with explicit last-output, which would also affect output of this pipeline
     pipeline_output = run_pipeline([{'loop': True, 'output': 'last-output'}, count_threetimes], dict(x=0))
     eq_(pipeline_output, _out([{'x': 0, 'somevar': (2, 3)}]))
-    eq_(count, [3])
+    eq_(count, [3, 0])
+
+    # and if pipeline is composite, i.e. more than a single step, so we could make sure everything is called
+    count[0] = 0
+    pipeline_output = run_pipeline([{'loop': True}, count_threetimes, add_count], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0}]))
+    eq_(count, [3, 6])
+
+    count[0] = count[1] = 0
+    # Let's rerun with explicit last-output, which would also affect output of this pipeline
+    pipeline_output = run_pipeline([{'loop': True, 'output': 'last-output'}, count_threetimes, add_count], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0, 'somevar': (2, 3), 'count': 3}]))
+    eq_(count, [3, 6])
+
 
 
 def test_pipeline_linear_top_isnested_pipeline():

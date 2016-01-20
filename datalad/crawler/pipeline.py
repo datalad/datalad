@@ -145,7 +145,10 @@ def xrun_pipeline(pipeline, data=None, stats=None):
         raise ValueError("Unknown output=%r" % output)
 
     if opts['loop'] and output == 'input':
-        raise ValueError("For looping pipeline must output something besides input")
+        lgr.debug("Assigning output='last-output' for sub-pipeline since we want to loop until pipeline returns anything")
+        output_sub = 'last-output'
+    else:
+        output_sub = output
 
     log_level = lgr.getEffectiveLevel()
     data_out = None
@@ -153,7 +156,7 @@ def xrun_pipeline(pipeline, data=None, stats=None):
         _log("processing data. %d left to go", len(data_to_process))
         data_in = data_to_process.pop(0)
         try:
-            for idata_out, data_out in enumerate(xrun_pipeline_steps(pipeline, data_in, output=output)):
+            for idata_out, data_out in enumerate(xrun_pipeline_steps(pipeline, data_in, output=output_sub)):
                 if log_level <= 3:
                         # provide details of what keys got changed
                         # TODO: unify with 2nd place where it was invoked
