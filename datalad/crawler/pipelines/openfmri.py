@@ -111,7 +111,7 @@ def pipeline(dataset, versioned_urls=True):
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(tgz|tar\..*)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+                find_files("\.(tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
                     #rename=[
                     #    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
