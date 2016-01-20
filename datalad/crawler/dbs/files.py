@@ -11,7 +11,7 @@
 """
 
 import os
-from os.path import join as opj, exists, lexists, islink, realpath
+from os.path import join as opj, exists, lexists, islink, realpath, basename
 
 from ...dochelpers import exc_str
 from ...support.status import FileStatus
@@ -100,4 +100,6 @@ class AnnexFileAttributesDB(object):
         # TODO: make use of URL -- we should validate that url is among those associated
         #  with the file
         old_status = self.get(fpath)
+        if status.filename and not old_status.filename:
+            old_status.filename = basename(fpath)
         return old_status != status

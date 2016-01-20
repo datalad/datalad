@@ -203,7 +203,7 @@ def test_get_status_from_headers():
     headers = {
         'Content-Length': '123',
         # some other file record - we don't test content here yet
-        'Content-Disposition': "bogus.txt",
+        'Content-Disposition': 'attachment; filename="bogus.txt"',
         'Last-Modified': 'Sat, 07 Nov 2015 05:23:36 GMT'
     }
     headers['bogus1'] = '123'

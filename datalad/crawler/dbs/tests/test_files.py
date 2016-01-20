@@ -14,6 +14,7 @@ from ..files import AnnexFileAttributesDB
 from ....tests.utils import with_tree
 from ....tests.utils import assert_equal
 from ....tests.utils import assert_false
+from ....tests.utils import assert_true
 from ....tests.utils import chpwd
 from ....support.annexrepo import AnnexRepo
 
@@ -42,6 +43,13 @@ def test_AnnexFileAttributesDB(path):
     status1_ = db.get('file1.txt')
     assert_equal(status1, status1_)
     assert_false(db.is_different('file1.txt', status1))
+    assert_false(db.is_different('file1.txt', status1_))
+    # even if we add a filename specification
+    status1_.filename = 'file1.txt'
+    assert_false(db.is_different('file1.txt', status1_))
+    status1_.filename = 'different.txt'
+    assert_true(db.is_different('file1.txt', status1_))
+
 
     os.unlink(filepath1)  # under annex- - we don't have unlock yet and thus can't inplace augment
     with open(filepath1, 'a') as f:

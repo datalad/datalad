@@ -33,15 +33,19 @@ from joblib import Memory
 memory = Memory(cachedir="/tmp/datalad", verbose=1)
 
 
-def get_response_disposition_filename(response_info):
-    if 'Content-Disposition' in response_info:
-        # If the response has Content-Disposition, try to get filename from it
-        cd = dict(map(
-            lambda x: x.strip().split('=') if '=' in x else (x.strip(),''),
-            response_info['Content-Disposition'].split(';')))
-        if 'filename' in cd:
-            filename = cd['filename'].strip("\"'")
-            return filename
+def get_response_disposition_filename(s):
+    """Given a string s as from HTTP Content-Disposition field in the response
+    return possibly present filename if any
+    """
+    if not s:
+        return None
+    # If the response has Content-Disposition, try to get filename from it
+    cd = dict(map(
+        lambda x: x.strip().split('=') if '=' in x else (x.strip(),''),
+        s.split(';')))
+    if 'filename' in cd:
+        filename = cd['filename'].strip("\"'")
+        return filename
     return None
 
 
@@ -59,7 +63,7 @@ def get_url_disposition_filename(url, headers=None):
     else:
         r = None
     try:
-        return get_response_disposition_filename(headers)
+        return get_response_disposition_filename(headers.get('Content-Disposition', ''))
     finally:
         if r:
             r.close()

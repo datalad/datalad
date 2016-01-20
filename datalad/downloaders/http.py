@@ -24,6 +24,7 @@ from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
 from ..support.network import get_url_filename
+from ..support.network import get_response_disposition_filename
 from ..support.network import rfc2822_to_epoch
 from ..support.cookies import cookies_db
 from ..support.status import FileStatus
@@ -374,5 +375,5 @@ class HTTPDownloader(BaseDownloader):
         return FileStatus(
             size=status.get('Content-Length'),
             mtime=status.get('Last-Modified'),
-            filename=status.get('Content-Disposition')
+            filename=get_response_disposition_filename(status.get('Content-Disposition'))
         )
