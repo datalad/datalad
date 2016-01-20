@@ -144,6 +144,9 @@ def xrun_pipeline(pipeline, data=None, stats=None):
     if output not in ('input',  'last-output', 'outputs', 'input+outputs'):
         raise ValueError("Unknown output=%r" % output)
 
+    if opts['loop'] and output == 'input':
+        raise ValueError("For looping pipeline must output something besides input")
+
     log_level = lgr.getEffectiveLevel()
     data_out = None
     while data_to_process:

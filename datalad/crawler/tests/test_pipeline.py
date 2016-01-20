@@ -277,6 +277,23 @@ def test_pipeline_recursive():
     pipeline_output = run_pipeline(pipeline, dict(x=0))
     eq_(pipeline_output, _out([{'x': 1}, {'x': 2}, {'x': 3}]))
 
+def test_pipeline_looping():
+    count = [0]
+    def count_threetimes(data):
+        """helper to not yield anything if done it 3 times by now"""
+        if count[0] >= 3:
+            return
+        count[0] += 1
+        for i in xrange(count[0]):
+            yield updated(data, dict(somevar=(i, count[0])))
+
+    # when we don't specify output it should still loop feeding in the same input
+    assert_raises(ValueError, run_pipeline, [{'loop': True}, count_threetimes], dict(x=0))
+
+    pipeline_output = run_pipeline([{'loop': True, 'output': 'last-output'}, count_threetimes], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0, 'somevar': (2, 3)}]))
+    eq_(count, [3])
+
 
 def test_pipeline_linear_top_isnested_pipeline():
     # check if no generated data to reach the end node, it still gets executed
