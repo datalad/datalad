@@ -227,8 +227,9 @@ class AddArchiveContent(Interface):
             leading_dir = earchive.get_leading_directory() if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
-            if stats is None:
-                stats = ActivityStats()
+            # dedicated stats which would be added to passed in (if any)
+            outside_stats = stats
+            stats = ActivityStats()
 
             for extracted_file in earchive.get_extracted_files():
                 stats.files += 1
@@ -339,11 +340,15 @@ class AddArchiveContent(Interface):
                 annex.remove(archive, force=True)
 
             lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
+
+            if outside_stats:
+                outside_stats += stats
             if commit:
+                commit_stats = outside_stats if outside_stats else stats
                 annex.commit(
-                    "Added content extracted from %s\n\n%s" % (origin, stats.as_str(mode='full'))
+                    "Added content extracted from %s\n\n%s" % (origin, commit_stats.as_str(mode='full'))
                 )
-                stats.reset()
+                commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
             annex.precommit()
