@@ -78,10 +78,10 @@ class ConsoleLog(object):
     def __init__(self, out=sys.stdout):
         self.out = out
 
-    def message(self, msg, cr=True):
+    def message(self, msg, cr='\n'):
         self.out.write(msg)
         if cr:
-            self.out.write('\n')
+            self.out.write(cr)
 
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
