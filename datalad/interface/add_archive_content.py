@@ -279,19 +279,27 @@ class AddArchiveContent(Interface):
                         rmtree(target_file)
                     else:
                         target_file_orig_ = target_file
+
+                        # To keep extension intact -- operate on the base of the filename
+                        p, fn = os.path.split(target_file)
+                        fn_base, fn_ext = file_basename(fn, return_ext=True)
+
                         if existing == 'archive-suffix':
-                            target_file += '-%s' % file_basename(origin)
+                            fn_base += '-%s' % file_basename(origin)
                         elif existing == 'numeric-suffix':
                             pass  # archive-suffix will have the same logic
                         else:
                             raise ValueError(existing)
                         # keep incrementing index in the suffix until file doesn't collide
                         suf, i = '', 0
-                        while lexists(target_file + suf):
-                            lgr.debug("File %s already exists" % (target_file + suf))
+                        while True:
+                            target_file_new = opj(p, fn_base + suf + '.' + fn_ext)
+                            if not lexists(target_file_new):
+                                break
+                            lgr.debug("File %s already exists" % target_file_new)
                             i += 1
                             suf = '.%d' % i
-                        target_file += suf
+                        target_file = target_file_new
                         lgr.debug("Original file %s will be saved into %s"
                                   % (target_file_orig_, target_file))
                         # TODO: should we reserve smth like

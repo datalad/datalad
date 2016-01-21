@@ -49,6 +49,10 @@ tree1args = dict(
           '1.tar.gz': {
              '1 f.txt': '1 f load3'
           }}),
+        ('4u', {  # updated file content
+          '1.tar.gz': {
+             '1 f.txt': '1 f load4'
+          }}),
         ('d1', (('1.tar.gz', (
                     ('2 f.txt', '2 f load'),
                     ('d2', (
@@ -78,7 +82,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     # Let's add first archive to the repo so we could test
     with swallow_outputs():
         repo.annex_addurls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
-        for s in range(1, 4):
+        for s in range(1, 5):
             repo.annex_addurls([opj(url, '%du/1.tar.gz' % s)], options=["--pathdepth", "-2"])
     repo.git_commit("added 1.tar.gz")
 
@@ -110,9 +114,10 @@ def test_add_archive_content(path_orig, url, repo_path):
     d1_basic_checks()
     add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix')
     add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix')
+    add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix')
     # rudimentary test
     assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
-                 ['1 f.txt', '1 f.txt-1', '1 f.txt-1.1'])
+                 ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
     whereis = repo.annex_whereis(glob(opj(repo_path, '1', '1*')))
     # they all must be the same
     assert(all([x == whereis[0] for x in whereis[1:]]))
