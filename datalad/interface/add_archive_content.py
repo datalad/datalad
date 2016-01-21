@@ -282,6 +282,7 @@ class AddArchiveContent(Interface):
 
                         # To keep extension intact -- operate on the base of the filename
                         p, fn = os.path.split(target_file)
+                        ends_with_dot = fn.endswith('.')
                         fn_base, fn_ext = file_basename(fn, return_ext=True)
 
                         if existing == 'archive-suffix':
@@ -293,7 +294,7 @@ class AddArchiveContent(Interface):
                         # keep incrementing index in the suffix until file doesn't collide
                         suf, i = '', 0
                         while True:
-                            target_file_new = opj(p, fn_base + suf + '.' + fn_ext)
+                            target_file_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
                             if not lexists(target_file_new):
                                 break
                             lgr.debug("File %s already exists" % target_file_new)
