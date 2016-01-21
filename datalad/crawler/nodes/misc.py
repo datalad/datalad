@@ -274,11 +274,16 @@ class find_files(object):
           Directory where to search
         dirs: bool, optional
           Either to match directories
+        fail_if_none: bool, optional
+          Fail if none file matched throughout the life-time of this object, i.e.
+          counts through multiple runs (if any run had files matched -- it is ok
+          to have no matched files on subsequent run)
         """
         self.regex = regex
         self.topdir = topdir
         self.dirs = dirs
         self.fail_if_none = fail_if_none
+        self._total_count = 0
 
     def __call__(self, data):
         count = 0
@@ -287,5 +292,6 @@ class find_files(object):
             count += 1
             path, filename = ops(fpath)
             yield updated(data, {'path': path, 'filename': filename})
-        if not count:
+        self._total_count += count
+        if not self._total_count and self.fail_if_none:
             raise RuntimeError("We did not match any file using regex %r" % self.regex)

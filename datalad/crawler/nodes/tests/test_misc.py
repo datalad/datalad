@@ -7,13 +7,17 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
+from os.path import join as opj
 from six import next
 from ..misc import get_disposition_filename
 from ..misc import range_node
 from ..misc import interrupt_if
 from ..misc import func_to_node
 from ..misc import sub
+from ..misc import find_files
 from ...pipeline import FinishPipeline
+from ....tests.utils import with_tree
 
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
@@ -98,3 +102,17 @@ def test_sub():
             list(s({'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
             [{'url': "http://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"}]
     )
+
+
+@with_tree(tree={'1': '1', '1.txt': '2'})
+def test_find_files(d):
+    assert_equal(sorted(list(find_files('.*', topdir=d)({}))), [{'path': d, 'filename': '1'}, {'path': d, 'filename': '1.txt'}])
+    assert_equal(list(find_files('.*\.txt', topdir=d)({})), [{'path': d, 'filename': '1.txt'}])
+    assert_equal(list(find_files('notmatchable', topdir=d)({})), [])
+    assert_raises(RuntimeError, list, find_files('notmatchable', topdir=d, fail_if_none=True)({}))
+
+    # and fail_if_none should operate globally i.e. this should be fine
+    ff = find_files('.*\.txt', topdir=d, fail_if_none=True)
+    assert_equal(list(ff({})), [{'path': d, 'filename': '1.txt'}])
+    os.unlink(opj(d, '1.txt'))
+    assert_equal(list(ff({})), [])
