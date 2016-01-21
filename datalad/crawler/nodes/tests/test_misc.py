@@ -106,7 +106,8 @@ def test_sub():
 
 @with_tree(tree={'1': '1', '1.txt': '2'})
 def test_find_files(d):
-    assert_equal(sorted(list(find_files('.*', topdir=d)({}))), [{'path': d, 'filename': '1'}, {'path': d, 'filename': '1.txt'}])
+    assert_equal(sorted(list(sorted(x.items())) for x in find_files('.*', topdir=d)({})),
+                 [[('filename', '1'), ('path', d)], [('filename', '1.txt'), ('path', d)]])
     assert_equal(list(find_files('.*\.txt', topdir=d)({})), [{'path': d, 'filename': '1.txt'}])
     assert_equal(list(find_files('notmatchable', topdir=d)({})), [])
     assert_raises(RuntimeError, list, find_files('notmatchable', topdir=d, fail_if_none=True)({}))
