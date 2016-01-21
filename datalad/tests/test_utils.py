@@ -343,6 +343,15 @@ def test_not_supported_on_windows():
 
 
 def test_file_basename():
+    eq_(file_basename('1'), '1')
+    eq_(file_basename('d1/1'), '1')
+    eq_(file_basename('/d1/1'), '1')
+    eq_(file_basename('1.'), '1.')
     eq_(file_basename('1.tar.gz'), '1')
+    eq_(file_basename('1.Tar.gz'), '1')
+    eq_(file_basename('1._bak.gz'), '1')
+    eq_(file_basename('1.tar.gz', return_ext=True), ('1', 'tar.gz'))
     eq_(file_basename('/tmp/1.tar.gz'), '1')
     eq_(file_basename('/tmp/1.longish.gz'), '1.longish')
+    eq_(file_basename('1_R1.1.1.tar.gz'), '1_R1.1.1')
+    eq_(file_basename('ds202_R1.1.1.tgz'), 'ds202_R1.1.1')

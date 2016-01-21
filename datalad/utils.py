@@ -253,12 +253,17 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s" % f)
 
 
-def file_basename(name):
+def file_basename(name, return_ext=False):
     """
-    Strips up to 2 extensions of length up to 4 characters, so we could get
-    rid of .tar.gz etc
+    Strips up to 2 extensions of length up to 4 characters and starting with alpha
+    not a digit, so we could get rid of .tar.gz etc
     """
-    return re.sub('(\.\S{0,4}){0,2}$', '', basename(name))
+    bname = basename(name)
+    fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
+    if return_ext:
+        return fbname, bname[len(fbname)+1:]
+    else:
+        return fbname
 
 
 if on_windows:
