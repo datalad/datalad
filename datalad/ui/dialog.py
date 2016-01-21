@@ -32,7 +32,7 @@ from time import sleep
 import sys
 
 out = sys.stderr
-for i in xrange(10):
+for i in range(10):
   diff = 2
   if i:
       out.write("%c[%dA" % (27, diff))

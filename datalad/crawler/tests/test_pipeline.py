@@ -284,7 +284,7 @@ def test_pipeline_looping():
         if count[0] >= 3:
             return
         count[0] += 1
-        for i in xrange(count[0]):
+        for i in range(count[0]):
             yield updated(data, dict(somevar=(i, count[0])))
 
     def add_count(data):
