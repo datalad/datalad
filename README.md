@@ -35,7 +35,7 @@ On Debian-based systems we recommend to enable
 backports of recent fixed external modules we depend upon:
 
 ```sh
-apt-get install patool python-bs4 python-git python-joblib python-testtools python-mock python-nose git-annex-standalone
+apt-get install patool python-bs4 python-git python-testtools python-mock python-nose git-annex-standalone
 ```
 
 or otherwise you can use pip to install Python modules

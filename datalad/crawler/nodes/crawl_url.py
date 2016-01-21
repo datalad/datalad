@@ -9,7 +9,6 @@
 """Basic crawler for the web
 """
 
-from ...support.network import fetch_page
 from ...utils import updated
 from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError

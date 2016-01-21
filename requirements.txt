@@ -25,7 +25,8 @@ https://github.com/yarikoptic/scrapy/archive/master.zip
 
 # To be gone whenever refactoring is complete and network.py scraping is gone
 beautifulsoup4
-joblib
+# no longer used ATM
+# joblib
 
 # ---- Testing
 nose>=1.3.4
