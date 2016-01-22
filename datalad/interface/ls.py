@@ -62,7 +62,7 @@ class Ls(Interface):
         from hashlib import md5
         from boto.s3.key import Key
         from boto.exception import S3ResponseError
-        from ConfigParser import SafeConfigParser
+        from ..support.configparserinc import SafeConfigParser  # provides PY2,3 imports
 
         bucket_name, prefix = bucket_prefix.split('/', 1)
 
