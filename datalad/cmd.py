@@ -22,6 +22,7 @@ import shlex
 from six import PY3, PY2
 from six import string_types, binary_type
 
+from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol
 from .utils import on_windows
@@ -236,7 +237,7 @@ class Runner(object):
             except Exception as e:
                 prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
-                          (cmd, " under %r" % cwd if cwd else '', e))
+                          (cmd, " under %r" % cwd if cwd else '', exc_str(e)))
                 raise
 
             finally:

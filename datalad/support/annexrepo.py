@@ -323,7 +323,7 @@ class AnnexRepo(GitRepo):
         # on crippled filesystem for example (think so)?
 
     @normalize_paths
-    def annex_get(self, files, options=None):
+    def annex_get(self, files, log_online=True, options=None):
         """Get the actual content of files
 
         Parameters
@@ -338,9 +338,10 @@ class AnnexRepo(GitRepo):
         options = options[:] if options else []
 
         # don't capture stderr, since it provides progress display
+        # but if no online logging, then log it
         self._run_annex_command('get', annex_options=options + files,
-                                log_stdout=True, log_stderr=False,
-                                log_online=True, expect_stderr=True)
+                                log_stdout=True, log_stderr=not log_online,
+                                log_online=log_online, expect_stderr=True)
 
     # TODO: Moved from HandleRepo. Just a temporary alias.
     # When renaming is done, melt with annex_get
