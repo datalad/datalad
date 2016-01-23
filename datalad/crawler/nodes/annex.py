@@ -41,7 +41,7 @@ _runner = get_runner()
 _call = _runner.call
 _run = _runner.run
 
-
+# TODO: make use of datalad_stats
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
@@ -84,6 +84,7 @@ class initiate_handle(object):
         self.branch = branch
 
     def _initiate_handle(self, path, name):
+        lgr.info("Initiating handle %s" % name)
         if self.branch is not None:
             # Because all the 'create' magic is stuffed into the constructor ATM
             # we need first initiate a git repository
@@ -99,6 +100,7 @@ class initiate_handle(object):
                        create=True)
 
     def _save_crawl_config(self, handle_path, name, data):
+        lgr.info("Creating handle configuration for %s" % name)
         repo = GitRepo(handle_path)
         crawl_config_dir = opj(handle_path, CRAWLER_META_DIR)
         if not exists(crawl_config_dir):
@@ -127,7 +129,10 @@ class initiate_handle(object):
         with open(crawl_config, 'w') as f:
             cfg.write(f)
         repo.git_add(crawl_config)
-        repo.git_commit("Initialized crawling configuration to use template %s" % self.template)
+        if repo.dirty:
+            repo.git_commit("Initialized crawling configuration to use template %s" % self.template)
+        else:
+            lgr.debug("Repository is not dirty -- not committing")
 
 
     def __call__(self, data={}):
@@ -144,17 +149,25 @@ class initiate_handle(object):
 
         lgr.debug("Request to initialize a handle at %s", handle_path)
 
+        init = True
         if exists(handle_path):
+            # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
+            # TODO: config crawl.collection.crawl_new = false|true
             if self.existing == 'skip':
+                lgr.info("Skipping handle %s since already exists" % handle_name)
                 yield data
                 return
             elif self.existing == 'raise':
                 raise RuntimeError("%s already exists" % handle_path)
             elif self.existing == 'replace':
                 _call(rmtree, handle_path)
+            elif self.existing == 'adjust':
+                # E.g. just regenerate configs/meta
+                init = False
             else: # TODO: 'crawl'  ;)
                 raise ValueError(self.existing)
-        _call(self._initiate_handle, handle_path, handle_name)
+        if init:
+            _call(self._initiate_handle, handle_path, handle_name)
         _call(self._save_crawl_config, handle_path, handle_name, data)
 
 
