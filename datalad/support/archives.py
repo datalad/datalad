@@ -19,6 +19,7 @@ assert(StrictVersion(patoolib.__version__) >= "1.7")
 import os
 import tempfile
 from os.path import join as opj, exists, abspath, basename, isabs, normpath, relpath, pardir, isdir
+from os.path import split as ops, sep as opsep
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
@@ -206,7 +207,7 @@ import random
 def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):
     """Return a random ID composed from digits and uppercase letters
 
-    upper-case so we are tollerant to unlikely collisions on dummy FSs
+    upper-case so we are tolerant to unlikely collisions on dummy FSs
     """
     return ''.join(random.choice(chars) for _ in range(size))
 
@@ -231,7 +232,7 @@ class ArchivesCache(object):
             path = opj(toppath, ARCHIVES_TEMP_DIR)
             if not persistent:
                 tempsuffix = "-" + _get_random_id()
-                lgr.debug("For non-persistent archives using %s suffix forpath %s",
+                lgr.debug("For non-persistent archives using %s suffix for path %s",
                           tempsuffix, path )
                 path += tempsuffix
         else:
@@ -396,9 +397,45 @@ class ExtractedArchive(object):
         """
         path = self.assure_extracted()
         path_len = len(path) + (len(os.sep) if not path.endswith(os.sep) else 0)
-        for root, dirs, files in os.walk(path): # TEMP
+        for root, dirs, files in os.walk(path):  # TEMP
             for name in files:
                 yield opj(root, name)[path_len:]
+
+    def get_leading_directory(self, depth=None):
+        """Return leading directory of the content within archive
+
+        Parameters
+        ----------
+        depth: int or None, optional
+          Maximal depth of leading directories to consider.  If None - no upper
+          limit
+
+        Returns
+        -------
+        str or None:
+          If there is no single leading directory -- None returned
+        """
+        leading = None
+        # returns only files, so no need to check if a dir or not
+        for fpath in self.get_extracted_files():
+            lpath = fpath.split(opsep)
+            dpath = lpath[:-1]  # directory path components
+            if leading is None:
+                leading = dpath if depth is None else dpath[:depth]
+            else:
+                if dpath[:len(leading)] != leading:
+                    # find smallest common path
+                    leading_ = []
+                    # TODO: there might be more efficient pythonic way
+                    for d1, d2 in zip(leading, dpath):
+                        if d1 != d2:
+                            break
+                        leading_.append(d1)
+                    leading = leading_
+            if not len(leading):
+                # no common leading - ready to exit
+                return None
+        return leading if leading is None else opj(*leading)
 
     def get_extracted_file(self, afile):
         lgr.debug("Requested file {afile} from archive {self._archive}".format(**locals()))

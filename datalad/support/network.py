@@ -29,19 +29,20 @@ from bs4 import BeautifulSoup
 import logging
 lgr = logging.getLogger('datalad.network')
 
-from joblib import Memory
-memory = Memory(cachedir="/tmp/datalad", verbose=1)
 
-
-def get_response_disposition_filename(response_info):
-    if 'Content-Disposition' in response_info:
-        # If the response has Content-Disposition, try to get filename from it
-        cd = dict(map(
-            lambda x: x.strip().split('=') if '=' in x else (x.strip(),''),
-            response_info['Content-Disposition'].split(';')))
-        if 'filename' in cd:
-            filename = cd['filename'].strip("\"'")
-            return filename
+def get_response_disposition_filename(s):
+    """Given a string s as from HTTP Content-Disposition field in the response
+    return possibly present filename if any
+    """
+    if not s:
+        return None
+    # If the response has Content-Disposition, try to get filename from it
+    cd = dict(map(
+        lambda x: x.strip().split('=') if '=' in x else (x.strip(),''),
+        s.split(';')))
+    if 'filename' in cd:
+        filename = cd['filename'].strip("\"'")
+        return filename
     return None
 
 
@@ -59,7 +60,7 @@ def get_url_disposition_filename(url, headers=None):
     else:
         r = None
     try:
-        return get_response_disposition_filename(headers)
+        return get_response_disposition_filename(headers.get('Content-Disposition', ''))
     finally:
         if r:
             r.close()
@@ -157,31 +158,6 @@ def retry_urlopen(url, retries=3):
                 raise
 
 
-# yoh: I haven't found a quick way to enable/disable memory. caching at runtime,
-# thus implementing simple decorators
-def _fetch_page(url, retries=3):
-    lgr.debug("Fetching %s" % url)
-    response = retry_urlopen(url, retries=retries)
-    for t in range(retries):
-        try:
-            page = response.content   # for using requests
-            break
-        except URLError as e:
-            lgr.warn("Received exception while reading %s: %s" % (url, e))
-            if t == retries - 1:
-                # if we have reached allowed number of retries -- reraise
-                raise
-    lgr.info("Fetched %d bytes page from %s" % (len(page), url))
-    return page
-
-
-def fetch_page(url, retries=3, cache=False):
-    if cache:
-        return memory.eval(_fetch_page, url, retries=retries)
-    else:
-        return _fetch_page(url, retries=retries)
-
-
 def is_url_quoted(url):
     """Return either URL looks being already quoted
     """
@@ -190,33 +166,6 @@ def is_url_quoted(url):
         return url != url_
     except:  # problem with unquoting -- then it must be wasn't quoted (correctly)
         return False
-
-
-def _parse_urls(page):
-    lgr.debug("Parsing out urls")
-    soup = BeautifulSoup(page, "html.parser")
-    urls = []
-    for link in soup.findAll('a'):
-        href = link.get('href')
-        if not href:
-            # skip empties
-            continue
-        # we better bring it to canonical quoted form for consistency
-        rec = urlsplit(href)
-        path_quoted = urlquote(rec.path) if not is_url_quoted(rec.path) else rec.path
-        href = urlunsplit((rec.scheme, rec.netloc, path_quoted,
-                           rec.query, rec.fragment))
-        urls.append((href, link.text, link))
-    return urls
-
-
-def parse_urls(page, cache=False):
-    if False:  # cache:
-        # disabled until bs4 addresses Pickling issue
-        # https://bugs.launchpad.net/beautifulsoup/+bug/1231545
-        return memory.eval(_parse_urls, page)
-    else:
-        return _parse_urls(page)
 
 
 def same_website(url_rec, u_rec):

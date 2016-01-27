@@ -19,9 +19,10 @@ import os
 import shutil
 import shlex
 
-from six import PY3
+from six import PY3, PY2
 from six import string_types, binary_type
 
+from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol
 from .utils import on_windows
@@ -31,6 +32,11 @@ lgr = logging.getLogger('datalad.cmd')
 
 _TEMP_std = sys.stdout, sys.stderr
 
+if PY2:
+    # TODO apparently there is a recommended substitution for Python2
+    # which is a backported implementation of python3 subprocess
+    # https://pypi.python.org/pypi/subprocess32/
+    pass
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
@@ -231,7 +237,7 @@ class Runner(object):
             except Exception as e:
                 prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
-                          (cmd, " under %r" % cwd if cwd else '', e))
+                          (cmd, " under %r" % cwd if cwd else '', exc_str(e)))
                 raise
 
             finally:
@@ -348,12 +354,13 @@ def link_file_load(src, dst, dry_run=False):
 
     try:
         os.link(src_realpath, dst)
-    except  AttributeError as e:
+    except AttributeError as e:
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
     else:
         lgr.log(1, "Hardlinking finished")
+
 
 def get_runner(*args, **kwargs):
     # TODO:  this is all crawl specific -- should be moved away

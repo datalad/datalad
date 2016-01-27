@@ -133,9 +133,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
 
         # But reply that present only if archive is present
         # TODO: this would throw exception if not present, so this statement is kinda bogus
-        try:
-            # throws exception if not present
-            akey_path = opj(self.path, self.repo.get_contentlocation(akey))#, relative_to_top=True))
+        akey_fpath = self.get_contentlocation(akey) #, relative_to_top=True))
+        if akey_fpath:
+            akey_path = opj(self.path, akey_fpath)
 
             # if for testing we want to force getting the archive extracted
             # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
@@ -148,7 +148,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
             self.send("CHECKURL-CONTENTS", size)#, basename(afile))
-        except CommandError:
+        else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
@@ -177,10 +177,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
         akey, afile = self._get_akey_afile(key)
-        try:
-            self.repo.get_contentlocation(akey)
+        if self.get_contentlocation(akey):
             self.send("CHECKPRESENT-SUCCESS", key)
-        except CommandError:
+        else:
             # TODO: proxy the same to annex itself to verify check for archive.
             # If archive is no longer available -- then CHECKPRESENT-FAILURE
             self.send("CHECKPRESENT-UNKNOWN", key)
@@ -230,22 +229,28 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def _transfer(self, cmd, key, path):
 
         akey, afile = self._get_akey_afile(key)
-        try:
-            akey_path = opj(self.path, self.repo.get_contentlocation(akey))
-        except CommandError:
+        akey_fpath = self.get_contentlocation(akey)
+        if akey_fpath:  # present
+            akey_path = opj(self.path, akey_fpath)
+        else:
             # TODO: make it more stringent?
             # Command could have fail to run if key was not present locally yet
             # Thus retrieve the key using annex
             try:
+                # TODO: we need to report user somehow about this happening and progress on the download
                 self.runner(["git-annex", "get", "--key", akey],
                             cwd=self.path, expect_stderr=True)
-                akey_path = self.repo.get_contentlocation(akey)
-                assert exists(opj(self.repo.path, akey_path)), "Key file %s is not present" % akey_path
             except Exception as e:
                 #from celery.contrib import rdb
                 #rdb.set_trace()
                 self.error("Failed to fetch {akey} containing {key}: {e}".format(**locals()))
                 return
+            akey_fpath = self.get_contentlocation(akey)
+            if not akey_fpath:
+                raise RuntimeError("We were reported to fetch it alright but now can't get its location.  Check logic")
+
+        akey_path = opj(self.repo.path, akey_fpath)
+        assert exists(akey_path), "Key file %s is not present" % akey_path
 
         # Extract that bloody file from the bloody archive
         # TODO: implement/use caching, for now a simple one

@@ -31,7 +31,7 @@ _FORMATTERS = {
     'merges': lambda merges: ", ".join('->'.join(merge) for merge in merges)
 }
 
-@auto_repr
+# @auto_repr
 class ActivityStats(object):
     """Helper to collect/pass statistics on carried out actions
 
@@ -47,12 +47,33 @@ class ActivityStats(object):
         self._total = {}
         self.reset(full=True, vals=vals)
 
+    def __repr__(self):
+        # since auto_repr doesn't support "non-0" values atm
+        return "%s(%s)" % (self.__class__.__name__,
+                           ", ".join(["%s=%s" % (k,v) for k, v in self._current.items() if v]))
+
     # Comparisons operate solely on _current
     def __eq__(self, other):
         return (self._current == other._current)# and (self._total == other._total)
 
     def __ne__(self, other):
         return (self._current != other._current)# or (self._total != other._total)
+
+    def __iadd__(self, other):
+        for m in other.__metrics__:
+            # not inplace for increased paranoia for bloody lists, and dummy implementation of *add
+            self._current[m] = self._current[m] + other._current[m]
+            self._total[m] = self._total[m] + other._total[m]
+        return self
+
+    def __add__(self, other):
+        # crashed
+        # out = deepcopy(self)
+        # so doing ugly way
+        out = ActivityStats(**self._current)
+        out._total = self._total.copy()
+        out += other
+        return out
 
     def __setattr__(self, key, value):
         if key in self.__metrics__:

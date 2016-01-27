@@ -12,6 +12,7 @@
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
+from ..nodes.misc import sub
 from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
@@ -64,11 +65,17 @@ def pipeline(dataset, versioned_urls=True):
                 # and don't know how to select all the a after h4
                 # xpath('//h4[contains(text(), "Data:")]')
                 # so let's just select all the ones going to /tarballs/
-				# some are not on S3 yet, so no /tarballs/ prefix e.g. ds 158
+                # some are not on S3 yet, so no /tarballs/ prefix e.g. ds 158
                 #a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
                 a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
-                # TODO: needs fixing of the openfmri bucket
-                # email sent out
+                # Since all content of openfmri is anyways available openly, no need atm
+                # to use https which complicates proxying etc. Thus replace for AWS urls
+                # to openfmri S3 from https to http
+                # TODO: might want to become an option for get_versioned_url? 
+                sub({
+                 'url': {
+                   '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'
+                }}),
                 func_to_node(get_versioned_url,
                              data_args=['url'],
                              outputs=['url'],
@@ -104,11 +111,13 @@ def pipeline(dataset, versioned_urls=True):
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(tgz|tar\..*)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+                find_files("\.(tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
-                    rename=[
-                        r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
-                    ],
+                    #rename=[
+                    #    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
+                    #],
+					existing='archive-suffix',
+					strip_leading_dirs=True,
                     # overwrite=True,
                     # TODO: we might need a safeguard for cases if multiple subdirectories within a single tarball
                     #rename=

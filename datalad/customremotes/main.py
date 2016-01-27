@@ -26,6 +26,8 @@ from ..cmdline.main import _license_info
 
 from ..utils import setup_exceptionhook
 
+backends = ['archive']
+
 def setup_parser():
     # setup cmdline args parser
     # main parser

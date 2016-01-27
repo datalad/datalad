@@ -7,12 +7,17 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
+from os.path import join as opj
 from six import next
 from ..misc import get_disposition_filename
 from ..misc import range_node
 from ..misc import interrupt_if
 from ..misc import func_to_node
+from ..misc import sub
+from ..misc import find_files
 from ...pipeline import FinishPipeline
+from ....tests.utils import with_tree
 
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
@@ -80,3 +85,35 @@ def test_func_to_node():
     range_node_gen = xrange_node(in_dict)
     ok_generator(range_node_gen)
     assert_equal(list(range_node_gen), [{'in': 1, 'out': 10}])
+
+def test_sub():
+    s = sub({
+        'url': {
+            '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'
+        }
+    })
+    ex1 = {'url': 'http://example.com'}
+    assert_equal(list(s(ex1)), [ex1])
+
+    assert_equal(list(s({'url': "https://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"})),
+                 [{'url': "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"}])
+
+    assert_equal(
+            list(s({'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
+            [{'url': "http://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"}]
+    )
+
+
+@with_tree(tree={'1': '1', '1.txt': '2'})
+def test_find_files(d):
+    assert_equal(sorted(list(sorted(x.items())) for x in find_files('.*', topdir=d)({})),
+                 [[('filename', '1'), ('path', d)], [('filename', '1.txt'), ('path', d)]])
+    assert_equal(list(find_files('.*\.txt', topdir=d)({})), [{'path': d, 'filename': '1.txt'}])
+    assert_equal(list(find_files('notmatchable', topdir=d)({})), [])
+    assert_raises(RuntimeError, list, find_files('notmatchable', topdir=d, fail_if_none=True)({}))
+
+    # and fail_if_none should operate globally i.e. this should be fine
+    ff = find_files('.*\.txt', topdir=d, fail_if_none=True)
+    assert_equal(list(ff({})), [{'path': d, 'filename': '1.txt'}])
+    os.unlink(opj(d, '1.txt'))
+    assert_equal(list(ff({})), [])

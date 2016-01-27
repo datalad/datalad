@@ -12,6 +12,7 @@
 import os
 import time
 from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
+from os.path import split as ops
 from os import unlink, makedirs
 
 from ...api import add_archive_content
@@ -146,11 +147,12 @@ class initiate_handle(object):
         if exists(handle_path):
             if self.existing == 'skip':
                 yield data
+                return
             elif self.existing == 'raise':
                 raise RuntimeError("%s already exists" % handle_path)
             elif self.existing == 'replace':
                 _call(rmtree, handle_path)
-            else:
+            else: # TODO: 'crawl'  ;)
                 raise ValueError(self.existing)
         _call(self._initiate_handle, handle_path, handle_name)
         _call(self._save_crawl_config, handle_path, handle_name, data)
@@ -218,17 +220,17 @@ class Annexificator(object):
         self.statusdb = statusdb
 
 
-    def add(self, filename, url=None):
-        # TODO: modes
-        self.repo.annex_addurl_to_file(filename, url #, TODO  backend
-                                       )
-        raise NotImplementedError()
-
-    def addurl(self, url, filename):
-        raise NotImplementedError()
-        # TODO: register url within "The DB" after it was added
-        self.register_url_in_db(url, filename)
-
+    # def add(self, filename, url=None):
+    #     # TODO: modes
+    #     self.repo.annex_addurl_to_file(filename, url, batch=True #, TODO  backend
+    #                                    )
+    #     raise NotImplementedError()
+    #
+    # def addurl(self, url, filename):
+    #     raise NotImplementedError()
+    #     # TODO: register url within "The DB" after it was added
+    #     self.register_url_in_db(url, filename)
+    #
     def register_url_in_db(self, url, filename):
         # might need to go outside -- since has nothing to do with self
         raise NotImplementedError()
@@ -256,31 +258,13 @@ class Annexificator(object):
         if url:
             stats.urls += 1
 
-        # figure out the filename. If disposition one was needed, pipeline should
-        # have had it explicitly
-        fpath = filename = \
-            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
-
-        stats.files += 1
-        if filename is None:
-            stats.skipped += 1
-            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
-        elif isabs(filename):
-            stats.skipped += 1
-            raise ValueError("Got absolute filename %r" % filename)
-
-        path_ = data.get('path', None)
-        if path_:
-            # TODO: test all this handling of provided paths
-            if isabs(path_):
-                stats.skipped += 1
-                raise ValueError("Absolute path %s was provided" % path_)
-            fpath = opj(path_, fpath)
+        fpath = self._get_fpath(data, stats, url)
         filepath = opj(self.repo.path, fpath)
 
         lgr.debug("Request to annex %(url)s to %(fpath)s", locals())
 
-        updated_data = updated(data, {'filename': filename,
+        # since filename could have come from url -- let's update with it
+        updated_data = updated(data, {'filename': ops(fpath)[1],
                                       #TODO? 'filepath': filepath
                                       })
         remote_status = None
@@ -318,9 +302,9 @@ class Annexificator(object):
         if not url:
             lgr.debug("Adding %s directly into git since no url was provided" % (filepath))
             # So we have only filename
-            assert(filename)
-            # Thus add directly into git
-            _call(self.repo.git_add, filename)
+            assert(fpath)
+            # Just add into annex without addurl
+            _call(self.repo.annex_add, fpath)
             _call(stats.increment, 'add_git')
         elif self.mode == 'full':
             # Since addurl ignores annex.largefiles we need first to download that file and then
@@ -336,7 +320,7 @@ class Annexificator(object):
                 # TODO: better function which explicitly checks if file is under annex or either under git
                 if self.repo.file_has_content(fpath):
                     stats.add_annex += 1
-                    self.repo.annex_addurl_to_file(fpath, url)
+                    self.repo.annex_addurl_to_file(fpath, url, batch=True)
                 else:
                     stats.add_git += 1
             _call(_download_and_git_annex_add, url, fpath)
@@ -349,7 +333,7 @@ class Annexificator(object):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
                 _call(unlink, filepath)
                 _call(stats.increment, 'overwritten')
-            _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options)
+            _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options, batch=True)
             _call(stats.increment, 'add_annex')
 
         if remote_status and lexists(filepath):  # and islink(filepath):
@@ -376,6 +360,33 @@ class Annexificator(object):
         # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
         # with subsequent "drop" leaves no record that it ever was here
         yield updated_data  # There might be more to it!
+
+    def _get_fpath(self, data, stats, url=None):
+        """Return relative path (fpath) to the file based on information in data or url
+        """
+        # figure out the filename. If disposition one was needed, pipeline should
+        # have had it explicitly
+        fpath = filename = \
+            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
+
+        stats.files += 1
+
+        if filename is None:
+            stats.skipped += 1
+            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
+        elif isabs(filename):
+            stats.skipped += 1
+            raise ValueError("Got absolute filename %r" % filename)
+
+        path_ = data.get('path', None)
+        if path_:
+            # TODO: test all this handling of provided paths
+            if isabs(path_):
+                stats.skipped += 1
+                raise ValueError("Absolute path %s was provided" % path_)
+            fpath = opj(path_, fpath)
+
+        return fpath
 
     def switch_branch(self, branch, parent=None):
         """Node generator to switch branch, returns actual node
@@ -433,6 +444,8 @@ class Annexificator(object):
         assert(strategy in (None, 'theirs'))
 
         def merge_branch(data):
+            if self.repo.dirty:
+                raise RuntimeError("Requested to merge another branch while current state is dirty")
             last_merged_checksum = self.repo.git_get_merge_base([self.repo.git_get_active_branch(), branch])
             if last_merged_checksum == self.repo.git_get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
@@ -453,7 +466,7 @@ class Annexificator(object):
                 self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % branch)
                 self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
                 if commit:
-                    self._commit("Merged %s using strategy %s" % (branch, strategy), options="-a")
+                    self._commit("Merged %s using strategy %s" % (branch, strategy), options=["-a"])
                 else:
                     # Record into our activity stats
                     stats = data.get('datalad_stats', None)
@@ -462,17 +475,18 @@ class Annexificator(object):
             yield data
         return merge_branch
 
-    def _commit(self, msg=None, options=''):
+    def _commit(self, msg=None, options=[]):
         # We need a custom commit due to "fancy" merges and GitPython
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
         if msg is not None:
-            options += " -m %r" % msg
-        self.repo.cmd_call_wrapper.run("git commit %s" % options)
+            options = options + ["-m", msg]
+        self.repo.precommit()  # so that all batched annexes stop
+        self.repo.cmd_call_wrapper.run(["git", "commit"] + options)
 
 
     #TODO: @borrow_kwargs from api_add_...
-    def add_archive_content(self, **aac_kwargs):
+    def add_archive_content(self, commit=False, **aac_kwargs):
         """
 
         Parameters
@@ -481,33 +495,37 @@ class Annexificator(object):
            Options to pass into api.add_archive_content
         """
         def _add_archive_content(data):
-            archive = data['path']
+            # if no stats -- they will be brand new each time :-/
+            stats = data.get('datalad_stats', ActivityStats())
+            archive = self._get_fpath(data, stats)
             # TODO: may be adjust annex_options
+            #import pdb; pdb.set_trace()
             annex = add_archive_content(
                 archive, annex=self.repo,
-                delete=True, key=False, commit=False, allow_dirty=True,
+                delete=True, key=False, commit=commit, allow_dirty=True,
                 annex_options=self.options,
-                stats=data.get('datalad_stats', None),
+                stats=stats,
                 **aac_kwargs
             )
             assert(annex is self.repo)   # must be the same annex, and no new created
-            # TODO: how to propagate statistics from this call into commit msg
-            #       since we commit=False here
-            # Probably we should carry though 'data' somehow so it gets accumulated
-            # until commit...?
-            yield data
+            # to propagate statistics from this call into commit msg since we commit=False here
+            # we update data with stats which gets a new instance if wasn't present
+            yield updated(data, {'datalad_stats': stats})
         return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
     def finalize(self, data):
         """Finalize operations -- commit uncommited, prune abandoned? etc"""
+        self.repo.precommit()
         if self.repo.dirty:  # or self.tracker.dirty # for dry run
             lgr.info("Repository found dirty -- adding and committing")
             #    # TODO: introduce activities tracker
-            _call(self.repo.annex_add, '.', options=self.options) # so everything is committed
+            _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
             stats = data.get('datalad_stats', None)
             stats_str = stats.as_str(mode='line') if stats else ''
-            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options="-a")
+            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options=["-a"])
+            if stats:
+                _call(stats.reset)
         else:
             lgr.info("Found branch non-dirty - nothing is committed")
         self._states = []

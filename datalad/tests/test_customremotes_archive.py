@@ -81,7 +81,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle.annex_addurl_to_file(fn_extracted, file_url, ['--relaxed'])
     handle.annex_drop(fn_extracted)
 
-    list_of_remotes = handle.annex_whereis(fn_extracted)
+    list_of_remotes = handle.annex_whereis(fn_extracted, output='descriptions')
     in_('[%s]' % ARCHIVES_SPECIAL_REMOTE, list_of_remotes)
 
     assert_false(handle.file_has_content(fn_extracted))
