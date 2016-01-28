@@ -111,8 +111,8 @@ def pipeline(dataset, versioned_urls=True):
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-			    # There might be archives within archives, so we need to loop
-				{'loop': True},
+                # There might be archives within archives, so we need to loop
+                {'loop': True},
                 find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True), #  we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
                     #rename=[
