@@ -273,7 +273,7 @@ if on_windows:
         os.utime(filepath, (time.time(), mtime))
 else:
     def lmtime(filepath, mtime):
-        """Set mtime for files, while de-referencing symlinks.
+        """Set mtime for files, while not de-referencing symlinks.
 
         To overcome absence of os.lutime
 
