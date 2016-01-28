@@ -671,6 +671,7 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
     with swallow_outputs() as cmo:
         annex.annex_get(fname)
     key_location = annex.get_contentlocation(key, batch=batch)
+    assert(key_location)
     # they both should point to the same location eventually
     eq_(os.path.realpath(opj(annex.path, fname)),
         os.path.realpath(opj(annex.path, key_location)))
@@ -682,9 +683,10 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
         eq_(os.path.realpath(opj(annex.path, fname)),
             os.path.realpath(opj(annex.path, key_location)))
 
+
 def test_AnnexRepo_get_contentlocation():
-    yield _test_AnnexRepo_get_contentlocation, False
-    yield _test_AnnexRepo_get_contentlocation, True
+    for batch in (False, True):
+        yield _test_AnnexRepo_get_contentlocation, batch
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),

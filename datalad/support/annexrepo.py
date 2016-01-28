@@ -24,7 +24,8 @@ from subprocess import Popen, PIPE
 
 from functools import wraps
 
-from six import string_types, PY3
+from six import string_types
+from six.moves import filter
 from six.moves.configparser import NoOptionError
 from six.moves.urllib.parse import quote as urlquote
 
@@ -444,7 +445,15 @@ class AnnexRepo(GitRepo):
                 # Not sure, whether or not this can actually happen
                 raise e
 
-        return out.rstrip(linesep).splitlines()[0]
+        entries = out.rstrip(linesep).splitlines()
+        # filter out the ones which start with (: http://git-annex.branchable.com/bugs/lookupkey_started_to_spit_out___34__debug__34___messages_to_stdout/?updated
+        entries = list(filter(lambda x: not x.startswith('('), entries))
+        if len(entries) > 1:
+            lgr.warning("Got multiple entries in reply asking for a key of a file: %s"
+                        % (str(entries)))
+        elif not entries:
+            raise FileNotInAnnexError("Could not get a key for a file %s -- empty output" % file_)
+        return entries[0]
 
     @normalize_paths
     def file_has_content(self, files):
@@ -619,6 +628,12 @@ class AnnexRepo(GitRepo):
         batch: bool, optional
             initiate or continue with a batched run of annex addurl, instead of just
             calling a single git annex addurl command
+
+        Returns
+        -------
+        dict
+          In batch mode only ATM returns dict representation of json output returned
+          by annex
         """
         options = options[:] if options else []
         git_options = []
@@ -660,6 +675,7 @@ class AnnexRepo(GitRepo):
                         cmd="addurl",
                         msg="Error, annex reported failure for addurl: %s"
                         % str(out_json))
+            return out_json
 
 
     def annex_addurls(self, urls, options=None, backend=None, cwd=None):
