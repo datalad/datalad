@@ -303,8 +303,9 @@ class Annexificator(object):
             lgr.debug("Adding %s directly into git since no url was provided" % (filepath))
             # So we have only filename
             assert(fpath)
-            # Just add into annex without addurl
-            _call(self.repo.annex_add, fpath)
+            # Just add into git directly for now
+            # TODO: tune  annex_add so we could use its json output, and may be even batch it
+            _call(self.repo.git_add, fpath)
             _call(stats.increment, 'add_git')
         elif self.mode == 'full':
             # Since addurl ignores annex.largefiles we need first to download that file and then
