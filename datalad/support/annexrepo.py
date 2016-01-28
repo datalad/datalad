@@ -364,8 +364,7 @@ class AnnexRepo(GitRepo):
         """
         options = options[:] if options else []
 
-        self._run_annex_command('add', annex_options=options + files,
-                                backend=backend)
+        return list(self._run_annex_command_json('add', args=options + files, backend=backend))
 
     def annex_proxy(self, git_cmd, **kwargs):
         """Use git-annex as a proxy to git
@@ -741,14 +740,15 @@ class AnnexRepo(GitRepo):
         return remotes
 
 
-    def _run_annex_command_json(self, command, args=[]):
+    def _run_annex_command_json(self, command, args=[], **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
         """
         try:
             # TODO: refactor to account for possible --batch ones
             out, err = self._run_annex_command(
                     command,
-                    annex_options=['--json'] + args)
+                    annex_options=['--json'] + args,
+                    **kwargs)
         except CommandError as e:
             # if multiple files, whereis may technically fail,
             # but still returns correct response
