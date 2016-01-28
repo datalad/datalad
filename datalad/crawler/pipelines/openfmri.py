@@ -8,6 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """A pipeline for crawling openfmri dataset"""
 
+import os
+from os.path import lexists
+
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import css_match, a_href_match
@@ -26,6 +29,8 @@ lgr = getLogger("datalad.crawler.pipelines.openfmri")
 
 def extract_readme(data):
     # TODO - extract data from the page/response
+    if lexists("README.txt"):
+        os.unlink("README.txt")
     with open("README.txt", "w") as f:
         f.write("OpenfMRI dataset from %(url)s" % data)
     lgr.info("Generated README.txt")
