@@ -9,6 +9,7 @@
 """Proxy basic file operations (such as open) to obtain files automagically upon I/O
 """
 
+import sys
 from mock import patch
 from six import PY2
 import six.moves.builtins as __builtin__
@@ -24,6 +25,7 @@ import logging
 from os.path import dirname, abspath, pardir, join as opj, exists, basename, lexists
 from git.exc import InvalidGitRepositoryError
 
+from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
 from .support.gitrepo import GitRepo
 from .support.exceptions import CommandError
@@ -53,6 +55,7 @@ class AutomagicIO(object):
             self._h5py_File = None
         self._autoget = autoget
         self._in_open = False
+        self._log_online = True
         if activate:
             self.activate()
 
@@ -113,7 +116,7 @@ class AutomagicIO(object):
         except Exception as e:
             # If anything goes wrong -- we should complain and proceed
             with patch(origname, origfunc):
-                lgr.warning("Failed proxying open with %r, %r: %s", args, kwargs, e)
+                lgr.warning("Failed proxying open with %r, %r: %s", args, kwargs, exc_str(e))
         finally:
             self._in_open = False
         # finally give it back to stock open
@@ -151,9 +154,18 @@ class AutomagicIO(object):
         # either it has content
         if not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
-            annex.annex_get(filepath)
+            annex.annex_get(filepath, log_online=self._log_online)
 
     def activate(self):
+        # Some beasts (e.g. tornado used by IPython) override outputs, and
+        # provide fileno which throws exception.  In such cases we should not log online
+        self._log_online = hasattr(sys.stdout, 'fileno') and hasattr(sys.stderr, 'fileno')
+        try:
+            if self._log_online:
+                sys.stdout.fileno()
+                sys.stderr.fileno()
+        except:
+            self._log_online = False
         if self.active:
             lgr.warning("%s already active. No action taken" % self)
             return

@@ -21,7 +21,11 @@ from .utils import use_cassette
 
 @use_cassette('fixtures/vcr_cassettes/s3_test0.yaml')
 def test_version_url():
-    if not keyring.get_password(S3_TEST_CREDENTIAL, 'secret_id'):
+    try: # TODO:  with RFing of keyring 8.0 to have keyrings.alt on wheezy get_password throws RuntimeError
+        pw = keyring.get_password(S3_TEST_CREDENTIAL, 'secret_id')
+    except RuntimeError:
+        pw = None
+    if not pw:
         # will skip under tox as well -- some environ variable(s) must be passed
         raise SkipTest("Do not have access to S3 key/secret.  Test skipped")
     for url_pref in ('http://openfmri.s3.amazonaws.com', 'https://s3.amazonaws.com/openfmri'):

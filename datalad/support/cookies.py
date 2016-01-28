@@ -35,7 +35,7 @@ class CookiesDB(object):
             cookies_dir = os.path.dirname(filename)
         else:
             cookies_dir = os.path.join(appdirs.user_config_dir(), 'datalad')  # FIXME prolly shouldn't hardcode 'datalad'
-            filename = os.path.join(cookies_dir, 'cookies.db')
+            filename = os.path.join(cookies_dir, 'cookies')
 
         # TODO: guarantee restricted permissions
 
@@ -43,7 +43,7 @@ class CookiesDB(object):
             os.makedirs(cookies_dir)
 
         db = self._cookies_db = shelve.open(filename, writeback=True)
-        atexit.register(lambda : db.close())
+        atexit.register(db.close)
 
     def _get_provider(self, url):
         if self._cookies_db is None:
