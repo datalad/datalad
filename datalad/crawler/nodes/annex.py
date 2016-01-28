@@ -271,6 +271,8 @@ class Annexificator(object):
         if url:
             downloader = self._providers.get_provider(url).get_downloader(url)
 
+            # request status since we would need it in either mode
+            remote_status = downloader.get_status(url)
             if lexists(filepath):
                 # Check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT
@@ -282,7 +284,7 @@ class Annexificator(object):
                 # APP2:  no explicit local_status
                 # if self.mode != 'full' and fpath == '1-copy.dat':
                 #     import pdb; pdb.set_trace()
-                remote_status = downloader.get_status(url)
+
                 # TODO: what if the file came from another url bearing the same mtime and size????
                 #       unlikely but possible.  We would need to provide URL for comparison(s)
                 if self.mode == 'relaxed' or not self.statusdb.is_different(fpath, remote_status, url):
@@ -295,9 +297,6 @@ class Annexificator(object):
                     if self.yield_non_updated:
                         yield updated_data  # There might be more to it!
                     return
-            elif self.mode != 'full':
-                # we would need remote_status to set mtime of the symlink
-                remote_status = downloader.get_status(url)
 
         if not url:
             lgr.debug("Adding %s directly into git since no url was provided" % (filepath))
@@ -306,36 +305,55 @@ class Annexificator(object):
             # Just add into annex without addurl
             _call(self.repo.annex_add, fpath)
             _call(stats.increment, 'add_git')
-        elif self.mode == 'full':
-            # Since addurl ignores annex.largefiles we need first to download that file and then
-            # annex add it
-            # see http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
-            lgr.debug("Downloading %s into %s and adding to annex" % (url, filepath))
-            def _download_and_git_annex_add(url, fpath):
-                # Just to feed into _call for dry-run
-                filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
-                assert(filepath_downloaded == filepath)
-                self.repo.annex_add(fpath, options=self.options)
-                # and if the file ended up under annex, and not directly under git -- addurl
-                # TODO: better function which explicitly checks if file is under annex or either under git
-                if self.repo.file_has_content(fpath):
-                    stats.add_annex += 1
-                    self.repo.annex_addurl_to_file(fpath, url, batch=True)
-                else:
-                    stats.add_git += 1
-            _call(_download_and_git_annex_add, url, fpath)
+        # elif self.mode == 'full':
+        #     # Since addurl ignores annex.largefiles we need first to download that file and then
+        #     # annex add it
+        #     # see http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
+        #     lgr.debug("Downloading %s into %s and adding to annex" % (url, filepath))
+        #     def _download_and_git_annex_add(url, fpath):
+        #         # Just to feed into _call for dry-run
+        #         filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
+        #         assert(filepath_downloaded == filepath)
+        #         self.repo.annex_add(fpath, options=self.options)
+        #         # and if the file ended up under annex, and not directly under git -- addurl
+        #         # TODO: better function which explicitly checks if file is under annex or either under git
+        #         if self.repo.file_has_content(fpath):
+        #             stats.add_annex += 1
+        #             self.repo.annex_addurl_to_file(fpath, url, batch=True)
+        #         else:
+        #             stats.add_git += 1
+        #     _call(_download_and_git_annex_add, url, fpath)
         else:
             # !!!! If file shouldn't get under annex due to largefile setting -- we must download it!!!
             # TODO: http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option/#comment-b43ef555564cc78c6dee2092f7eb9bac
-            annex_options = self.options + ["--%s" % self.mode]
-            lgr.debug("Pointing %s to %s within annex in %s mode" % (url, filepath, self.mode))
+            # we should make use of   matchexpression   command, but that might reincarnated
+            # above code so just left it commented out for now
+            annex_options = self.options
+            if self.mode == 'full':
+                lgr.debug("Downloading %s into %s and adding to annex" % (url, filepath))
+            else:
+                annex_options = annex_options + ["--%s" % self.mode]
+                lgr.debug("Pointing %s to %s within annex in %s mode" % (url, filepath, self.mode))
+
             if lexists(filepath):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
                 _call(unlink, filepath)
                 _call(stats.increment, 'overwritten')
-            _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options, batch=True)
-            _call(stats.increment, 'add_annex')
 
+            # TODO: We need to implement our special remote here since no downloaders used
+            out_json = _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options, batch=True)
+            added_to_annex = 'key' in out_json
+
+            if self.mode == 'full' or not added_to_annex:
+                # we need to adjust our download stats since addurl doesn't do that and we do not use our downloaders here
+                _call(stats.increment, 'downloaded')
+                _call(stats.increment, 'downloaded_size', _call(lambda: os.stat(filepath).st_size))
+
+            if out_json:  # if not try -- should be here!
+                _call(stats.increment, 'add_annex' if added_to_annex else 'add_git')
+
+        # So we have downloaded the beast
+        # Since annex doesn't care to set mtime for the symlink itself we better set it outselves
         if remote_status and lexists(filepath):  # and islink(filepath):
             # Set mtime of the symlink or git-added file itself
             # utime dereferences!

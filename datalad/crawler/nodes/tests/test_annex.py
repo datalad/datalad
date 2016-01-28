@@ -51,24 +51,26 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     expected_output = [input.copy()]   # nothing to be added/changed
     output = list(annex(input))
     assert_equal(output, expected_output)
+
+    # addurl is batched, and we haven't forced annex flushing so there should
+    # be a batched process
+    assert_equal(len(annex.repo._batched), 1)
+    assert_raises(AssertionError, ok_file_under_git, tfile, annexed=True)
+    # if we finalize, it should flush batched annexes and commit
+    list(annex.finalize({}))
+    assert(lexists(tfile))
+
+    ok_file_under_git(tfile, annexed=True)
     if mode == 'full':
-        ok_file_under_git(tfile, annexed=True)
         ok_file_has_content(tfile, '1.dat load')
     else:
-        # addurl is batched, and we haven't forced annex flushing so there should
-        # be a batched process
-        assert_equal(len(annex.repo._batched), 1)
-        assert_raises(AssertionError, ok_file_under_git, tfile, annexed=True)
-        # if we finalize, it should flush batched annexes and commit
-        list(annex.finalize({}))
         # in fast or relaxed mode there must not be any content
         assert_raises(AssertionError, ok_file_has_content, tfile, '1.dat load')
-        assert(lexists(tfile))
+
     whereis = annex.repo.annex_whereis(tfile)
     assert_in(annex.repo.WEB_UUID, whereis)  # url must have been added
-    assert_equal(len(whereis), 1 + int(mode=='full'))
+    assert_equal(len(whereis), 1 + int(mode == 'full'))
     # TODO: check the url
-
     # Neither file should not be attempted to download again, since nothing changed
     # and by default we do use files db
     output = list(annex(input))
@@ -94,16 +96,16 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     assert_equal(stats, ActivityStats(files=2, urls=2, **kwargs))
 
     # Download into a file which will be added to git
+    # TODO: for now added to git only in full mode. in --fast or --relaxed, still goes to annex
+    # http://git-annex.branchable.com/bugs/treatment_of_largefiles_is_not_working_for_addurl_--fast___40__or_--relaxed__41__/
     input = {'url': "%sd1/1.dat" % topurl, 'filename': '1.txt', 'datalad_stats': ActivityStats()}
     tfile = opj(outdir, '1.txt')
     output = list(annex(input))
     annexed = mode not in {'full'}
+    list(annex.finalize({}))
     if not annexed:
         ok_file_has_content(tfile, '1.dat load+')
     else:
-        # TODO: unfortunately we can't decide to add .txt without providing
-        # our own parser for  annex.largefiles  ATM
-        list(annex.finalize({}))
         assert_raises(AssertionError, ok_file_has_content, tfile, '1.dat load+')
     ok_file_under_git(tfile, annexed=annexed)
     assert_equal(len(output), 1)
@@ -127,7 +129,7 @@ def _test_add_archive_content_tar(direct, repo_path):
                           allow_dirty=True,
                           mode=mode,
                           direct=direct,
-                          options=["-c", "annex.largefiles=exclude=*.txt"])
+                          options=["-c", "annex.largefiles=exclude=*.txt and exclude=SOMEOTHER"])
     output_add = list(annex({'filename': '1.tar'}))  # adding it to annex
     assert_equal(output_add, [{'filename': '1.tar'}])
 
