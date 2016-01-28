@@ -320,9 +320,9 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
                           target_file, url, annex_options)
 
-                annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
+                out_json = annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
 
-                if annex.is_under_annex(target_file, batch=True):
+                if 'key' in out_json: # annex.is_under_annex(target_file, batch=True):
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))

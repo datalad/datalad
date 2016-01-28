@@ -137,14 +137,13 @@ def _test_add_archive_content_tar(direct, repo_path):
         annex.add_archive_content(
             existing='archive-suffix',
             strip_leading_dirs=True,)(output_add[0]))
-    # http://git-annex.branchable.com/bugs/addurl_--batch_from_url_from_a_custom_special_remote_adds_to_annex_disregarding_largefiles___40__on_first_run__41__/?updated
-    # TODO: largefiles instruction seems to be ignored on the first run, but works in direct mode
     assert_equal(output_addarchive,
-                 [{'datalad_stats': ActivityStats(add_annex=1 + int(not direct), add_git=int(direct), files=3, renamed=2), 'filename': '1.tar'}])
+                 [{'datalad_stats': ActivityStats(add_annex=1, add_git=1, files=3, renamed=2),
+                   'filename': '1.tar'}])
     if not direct:  # Notimplemented otherwise
         assert_true(annex.repo.dirty)
     annex.repo.commit("added")
-    ok_file_under_git(repo_path, 'file.txt', annexed=True)
+    ok_file_under_git(repo_path, 'file.txt', annexed=False)
     ok_file_under_git(repo_path, '1.dat', annexed=True)
     assert_false(lexists(opj(repo_path, '1.tar')))
     if not direct:  # Notimplemented otherwise

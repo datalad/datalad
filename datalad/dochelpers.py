@@ -308,7 +308,7 @@ def exc_str(exc=None, limit=None):
     out = str(exc)
     if limit is None:
         # TODO: config logging.exceptions.traceback_levels = 1
-        limit = 1
+        limit = int(os.environ.get('DATALAD_EXC_STR_TBLIMIT', '1'))
     try:
         exctype, value, tb = sys.exc_info()
         if not exc:

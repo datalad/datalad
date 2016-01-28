@@ -9,6 +9,9 @@
 """Tests for dochelpers (largely copied from PyMVPA, the same copyright)
 """
 
+import os
+from mock import patch
+
 from ..dochelpers import single_or_plural, borrowdoc, borrowkwargs
 from ..dochelpers import exc_str
 
@@ -142,9 +145,16 @@ def test_exc_str():
     try:
         f()
     except Exception as e:
-        estr_ = exc_str()
+        # default one:
         estr2 = exc_str(e, 2)
-        estr1 = exc_str(e)
+        estr1 = exc_str(e, 1)
+        # and we can control it via environ by default
+        with patch.dict('os.environ', {'DATALAD_EXC_STR_TBLIMIT': '3'}):
+            estr3 = exc_str(e)
+        with patch.dict('os.environ', {}, clear=True):
+            estr_ = exc_str()
+
+    assert_re_in("my bad again \[test_dochelpers.py:test_exc_str:...,test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr3)
     assert_re_in("my bad again \[test_dochelpers.py:f:...,test_dochelpers.py:f2:...\]", estr2)
     assert_re_in("my bad again \[test_dochelpers.py:f2:...\]", estr1)
     assert_equal(estr_, estr1)
