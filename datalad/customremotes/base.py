@@ -73,7 +73,7 @@ send () {
 
 """
 
-    def __init__(self, repopath, custom_remote_name):
+    def __init__(self, repopath, custom_remote_name=None):
         super(AnnexExchangeProtocol, self).__init__()
         self.repopath = repopath
         self.custom_remote_name = custom_remote_name
@@ -88,8 +88,8 @@ send () {
         if not exists(d):
             os.makedirs(d)
 
-        self._file = _file = \
-            opj(d, 'git-annex-remote-' + self.custom_remote_name.rstrip(':'))
+        suf = '-' + self.custom_remote_name.rstrip(':') if self.custom_remote_name else ''
+        self._file = _file = opj(d, 'git-annex-remote-datalad' + suf)
 
         if exists(_file):
             lgr.debug("Commenting out previous entries")
@@ -172,7 +172,7 @@ class AnnexCustomRemote(object):
 
     # Must be defined in subclasses.  There is no classlevel properties, so leaving as this for now
 
-    # CUSTOM_REMOTE_NAME = None
+    CUSTOM_REMOTE_NAME = None  # if None -- no additional custom remote name
     # SUPPORTED_SCHEMES = ()
 
     AVAILABILITY = DEFAULT_AVAILABILITY

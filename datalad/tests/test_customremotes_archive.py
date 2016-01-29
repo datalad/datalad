@@ -11,7 +11,7 @@
 import shlex
 from os.path import realpath, pardir, join as opj, dirname, pathsep
 from ..customremotes.base import AnnexExchangeProtocol
-from ..customremotes.archive import AnnexArchiveCustomRemote
+from ..customremotes.archive import ArchiveAnnexCustomRemote
 from ..cmd import Runner
 from ..support.handlerepo import HandleRepo
 from ..consts import ARCHIVES_SPECIAL_REMOTE
@@ -56,7 +56,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
         env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
 
     if os.environ.get('DATALAD_PROTOCOL_REMOTE'):
-        protocol = AnnexExchangeProtocol(d, 'dl+archive:')
+        protocol = AnnexExchangeProtocol(d, 'archive')
     else:
         protocol = None
 
@@ -65,7 +65,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle = HandleRepo(d, runner=r, direct=direct)
     handle.annex_initremote(
         ARCHIVES_SPECIAL_REMOTE,
-        ['encryption=none', 'type=external', 'externaltype=dl+archive',
+        ['encryption=none', 'type=external', 'externaltype=datalad-archive',
          'autoenable=true'
          ])
     # We want two maximally obscure names, which are also different
@@ -74,7 +74,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle.add_to_annex(fn_extracted, "Added the load file")
 
     # Operations with archive remote URL
-    annexcr = AnnexArchiveCustomRemote(path=d)
+    annexcr = ArchiveAnnexCustomRemote(path=d)
     # few quick tests for get_file_url
 
     eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat"), "dl+archive:xyz/a.dat")
