@@ -160,6 +160,7 @@ send () {
     def do_execute_callables(self):
         return True
 
+
 class AnnexCustomRemote(object):
     """Base class to provide custom special remotes for git-annex
 
@@ -521,7 +522,6 @@ class AnnexCustomRemote(object):
         """Gets URL(s) associated with a Key.
 
         """
-        assert(self.url_prefix == self.url_prefix)
         # FIXME: there seems to be a bug
         # http://git-annex.branchable.com/bugs/GETURLS_doesn__39__t_return_URLs_if_prefix_is_provided/?updated
         # thus for now requesting without prefix and filtering manually

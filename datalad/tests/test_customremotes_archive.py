@@ -74,7 +74,16 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle.add_to_annex(fn_extracted, "Added the load file")
 
     # Operations with archive remote URL
-    file_url = AnnexArchiveCustomRemote(path=d).get_file_url(
+    annexcr = AnnexArchiveCustomRemote(path=d)
+    # few quick tests for get_file_url
+
+    eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat"), "dl+archive:xyz/a.dat")
+    eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat", size=999), "dl+archive:xyz/a.dat#size=999")
+
+    eq_(annexcr._parse_url("dl+archive:xyz/a.dat#size=999"), ("xyz", "a.dat", {'size': 999}))
+    eq_(annexcr._parse_url("dl+archive:xyz/a.dat"), ("xyz", "a.dat", {}))  # old format without size
+
+    file_url = annexcr.get_file_url(
         archive_file=fn_archive,
         file=fn_archive.replace('.tar.gz', '') + '/d/'+fn_inarchive_obscure)
 

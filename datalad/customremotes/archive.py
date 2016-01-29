@@ -11,6 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import os
+import re
 from os.path import exists, join as opj, basename, abspath
 
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
@@ -56,9 +57,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         Examples:
         ---------
 
-        dl+archive:SHA256E-s176--69...3e.tar.gz/s123/1/d2/2d
+        dl+archive:SHA256E-s176--69...3e.tar.gz/1/d2/2d#size=123
             when size of file within archive was known to be 123
-        dl+archive:SHA256E-s176--69...3e.tar.gz//1/d2/2d
+        dl+archive:SHA256E-s176--69...3e.tar.gz/1/d2/2d
             when size of file within archive was not provided
 
         Parameters
@@ -73,19 +74,29 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             archive_key = self.repo.get_file_key(archive_file)
         assert(archive_key is not None)
         file_quoted = urlquote(file)
-        size_str = 's%d' if size else ''
-        return '%s%s/%s/%s' % (self.url_prefix, archive_key, size_str, file_quoted.lstrip('/'))
+        attrs = {}  # looking forward for more
+        if size is not None:
+            attrs['size'] = size
+        sattrs = '#%s' % ('&'.join("%s=%s" % x for x in attrs.items())) if attrs else ''
+        return '%s%s/%s%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'), sattrs)
 
     @property
     def cache(self):
         return self._cache
 
     def _parse_url(self, url):
+        """Parse url and return archive key, file within archive and additional attributes (such as size)
+        """
         assert(url[:len(self.url_prefix)] == self.url_prefix)
-        key, size_file = url[len(self.url_prefix):].split('/', 1)
-        # for compatibility for now. TODO: remove eventually since we do not have AFAIK
-        # annexes in production which use non-sized URLs version
-        return key, file_
+        key, file_attrs = url[len(self.url_prefix):].split('/', 1)
+        if '#' in file_attrs:
+            file_, attrs_str = file_attrs.split('#', 1)
+            attrs = dict(x.split('=', 1) for x in attrs_str.split('&'))
+            if 'size' in attrs:
+                attrs['size'] = int(attrs['size'])
+        else:
+            file_, attrs = file_attrs, {}
+        return key, file_, attrs
 
     #
     # Helper methods
@@ -116,7 +127,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         """Given a key, figure out target archive key, and file within archive
         """
         url = self._get_key_url(key)
-        return self._parse_url(url)
+        return self._parse_url(url)[:2]  # skip size
 
     # Protocol implementation
     def req_CHECKURL(self, url):
@@ -145,25 +156,28 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  only if just archive portion of url is given or the one pointing
         #  to specific file?
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
-        akey, afile = self._parse_url(url)
+        akey, afile, attrs = self._parse_url(url)
+        size = attrs.get('size', None)
 
         # But reply that present only if archive is present
         # TODO: this would throw exception if not present, so this statement is kinda bogus
-        akey_fpath = self.get_contentlocation(akey) #, relative_to_top=True))
+        akey_fpath = self.get_contentlocation(akey)  #, relative_to_top=True))
         if akey_fpath:
             akey_path = opj(self.path, akey_fpath)
 
             # if for testing we want to force getting the archive extracted
             # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
             efile = self.cache[akey_path].get_extracted_filename(afile)
-            if exists(efile):
+
+            if size is None and exists(efile):
                 size = os.stat(efile).st_size
-            else:
+
+            if size is None:
                 size = 'UNKNOWN'
 
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
-            self.send("CHECKURL-CONTENTS", size)#, basename(afile))
+            self.send("CHECKURL-CONTENTS", size)  #, basename(afile))
         else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available

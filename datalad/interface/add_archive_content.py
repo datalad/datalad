@@ -261,7 +261,7 @@ class AddArchiveContent(Interface):
                     except StopIteration:
                         continue
 
-                url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
+                url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
                 # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
 
