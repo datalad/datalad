@@ -11,8 +11,9 @@
 from ...support.handlerepo import HandleRepo
 from ...consts import DATALAD_SPECIAL_REMOTE
 from ...tests.utils import *
-from . import _get_custom_runner
 
+from . import _get_custom_runner
+from ...support.exceptions import CommandError
 
 @with_tempfile()
 def check_basic_scenario(direct, d):
@@ -22,8 +23,25 @@ def check_basic_scenario(direct, d):
         ['encryption=none', 'type=external', 'externaltype=%s' % DATALAD_SPECIAL_REMOTE,
          'autoenable=true'])
 
+    # TODO skip if no boto or no credentials
+    # Let's try to add some file which we should have access to
+    with swallow_outputs() as cmo:
+        handle.annex_addurls(['s3://datalad-test0-versioned/3versions-allversioned.txt'])
+        assert_in('100%', cmo.err)  # we do provide our progress indicator
+
+    # if we provide some bogus address which we can't access, we shouldn't pollute output
+    with swallow_outputs() as cmo, swallow_logs() as cml:
+        with assert_raises(CommandError) as cme:
+            handle.annex_addurls(['s3://datalad-test0-versioned/3versions-allversioned.txt_bogus'])
+        # assert_equal(cml.out, '')
+        err, out = cmo.err, cmo.out
+    assert_equal(out, '')
+    assert_in('addurl: 1 failed', err)
+    # and there should be nothing more
+
+
 
 def test_basic_scenario():
     yield check_basic_scenario, False
-    if not on_windows:
+    if False: #not on_windows:
         yield check_basic_scenario, True

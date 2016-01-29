@@ -21,7 +21,7 @@ lgr = logging.getLogger('datalad.customremotes.datalad')
 
 from ..cmd import link_file_load, Runner
 from ..support.exceptions import CommandError
-from ..utils import getpwd
+from ..utils import swallow_logs, swallow_outputs
 from .base import AnnexCustomRemote
 from ..dochelpers import exc_str
 
@@ -73,12 +73,13 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         """
 
         try:
-            status = self._providers.get_status(url)
-            filename = status.get('filename', None)
-            resp = ["CHECKURL-CONTENTS", status.get('size', 'UNKNOWN')] + \
-                   ([filename] if filename else [])
+            with swallow_logs():
+                status = self._providers.get_status(url)
+            size = str(status.size) if status.size is not None else 'UNKNOWN'
+            resp = ["CHECKURL-CONTENTS", size] + \
+                   ([status.filename] if status.filename else [])
         except Exception as exc:
-            self.error("Failed to check url %s: %s" % (url, exc_str(exc)))
+            self.debug("Failed to check url %s: %s" % (url, exc_str(exc)))
             resp = ["CHECKURL-FAILURE"]
         self.send(*resp)
 
@@ -102,7 +103,8 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         for url in self.get_URLS(key):
             # somewhat duplicate of CHECKURL
             try:
-                status = self._providers.get_status(url)
+                with swallow_logs():
+                    status = self._providers.get_status(url)
                 if status:  # TODO:  anything specific to check???
                     resp = "CHECKPRESENT-SUCCESS"
                     break
@@ -110,7 +112,7 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
                 # we can connect to that server but that specific url is N/A,
                 # probably check the connection etc
             except Exception as exc:
-                self.error("Failed to check status of url %s: %s" % (url, exc_str(exc)))
+                self.debug("Failed to check status of url %s: %s" % (url, exc_str(exc)))
         self.send(resp, key)
 
     def req_REMOVE(self, key):
@@ -138,6 +140,8 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
     def _transfer(self, cmd, key, path):
 
+        # TODO: We might want that one to be a generator so we do not bother requesting
+        # all possible urls at once from annex.
         urls = self.get_URLS(key)
 
         if self._last_url in urls:
@@ -150,13 +154,14 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         for url in urls:
             try:
                 downloaded_path = self._providers.download(url, path=path, overwrite=True)
-                assert(downloaded_path == path)
+                lgr.info("Succesfully downloaded %s into %s" % (url, downloaded_path))
                 self.send('TRANSFER-SUCCESS', cmd, key)
                 return
             except Exception as exc:
-                self.error("Failed to download url %s for key %s: %s" % (url, key, exc_str(exc)))
+                self.debug("Failed to download url %s for key %s: %s" % (url, key, exc_str(exc)))
 
-        raise RuntimeError("Failed to download from any of %d locations" % len(urls))
+        self.send('TRANSFER-FAILURE', cmd, key,
+                  "Failed to download from any of %d locations" % len(urls))
 
 
 from .main import main as super_main

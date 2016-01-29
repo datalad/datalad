@@ -536,10 +536,7 @@ class AnnexCustomRemote(object):
                     urls.append(url[0])
                 else:
                     break
-            urls_ = [u for u in urls
-                     if u.startswith(scheme_)]
-            assert(urls_ == urls)
-            self.heavydebug("Received URLS: %s" % urls)
+        self.heavydebug("Received URLS: %s" % urls)
 
         if not urls:
             raise ValueError("Did not get any URLs for %s which we support" % key)

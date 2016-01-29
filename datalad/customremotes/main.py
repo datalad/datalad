@@ -20,6 +20,7 @@ from ..cmdline import helpers
 from ..cmdline.main import _license_info
 
 from ..utils import setup_exceptionhook
+from ..ui import ui
 
 backends = ['archive']
 
@@ -108,6 +109,8 @@ def main(args=None, backend=None):
     parser = setup_parser(backend=backend)
     # parse cmd args
     args = parser.parse_args(args)
+
+    ui.set_backend('annex')  # stdin/stdout will be used for interactions with annex
 
     if args.common_debug:
         # So we could see/stop clearly at the point of failure
