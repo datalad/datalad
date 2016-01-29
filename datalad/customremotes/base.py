@@ -115,7 +115,7 @@ send () {
         self.initiate()
         with open(self._file, 'a') as f:
             f.write('%s### %s%s' % (os.linesep, cmd, os.linesep))
-        lgr.error("New section in the protocol: "
+        lgr.info("New section in the protocol: "
                       "cd %s; PATH=%s:$PATH %s"
                       % (realpath(self.repopath),
                          dirname(self._file),
@@ -425,7 +425,7 @@ class AnnexCustomRemote(object):
     # TODO: we should unify what to be overriden and some will provide CHECKURL
 
     def req_TRANSFER(self, cmd, key, file):
-        if cmd in ("STORE", "RETRIEVE"):
+        if cmd in ("RETRIEVE",):
             lgr.info("%s key %s into/from %s" % (cmd, key, file))
             self._transfer(cmd, key, file)
         else:
@@ -540,6 +540,10 @@ class AnnexCustomRemote(object):
                      if u.startswith(scheme_)]
             assert(urls_ == urls)
             self.heavydebug("Received URLS: %s" % urls)
+
+        if not urls:
+            raise ValueError("Did not get any URLs for %s which we support" % key)
+
         return urls
 
     def _get_key_path(self, key):

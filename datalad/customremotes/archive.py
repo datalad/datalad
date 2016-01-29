@@ -115,9 +115,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             If could not figure out any URL
         """
         urls = self.get_URLS(key)
-        if not urls:
-            raise ValueError("Do not have any URLs for %s" % key)
-        elif len(urls) == 1:
+
+        if len(urls) == 1:
             return urls[0]
         else:  # multiple
             # TODO:  utilize cache to check which archives might already be
@@ -184,11 +183,14 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
             self.send("CHECKURL-CONTENTS", size)  #, basename(afile))
+
+            # so it was a good successful one -- record
+            self._last_url = url
         else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
-        self._last_url = url
+
 
     def req_CHECKPRESENT(self, key):
         """Check if copy is available

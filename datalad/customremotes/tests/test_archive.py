@@ -8,24 +8,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-import shlex
-from os.path import realpath, pardir, join as opj, dirname, pathsep
-from ..customremotes.base import AnnexExchangeProtocol
-from ..customremotes.archive import ArchiveAnnexCustomRemote
-from ..cmd import Runner
-from ..support.handlerepo import HandleRepo
-from ..consts import ARCHIVES_SPECIAL_REMOTE
-from .utils import *
+from ..archive import ArchiveAnnexCustomRemote
+from ...support.handlerepo import HandleRepo
+from ...consts import ARCHIVES_SPECIAL_REMOTE
+from ...tests.utils import *
 
-
-def get_bindir_PATH():
-    # we will need to adjust PATH
-    bindir = realpath(opj(dirname(__file__), pardir, pardir, 'bin'))
-    PATH = os.environ['PATH']
-    if bindir not in PATH:
-        PATH = '%s%s%s' % (bindir, pathsep, PATH)
-        lgr.log(5, "Adjusted PATH to become {}".format(os.environ['PATH']))
-    return PATH
+from . import _get_custom_runner
 
 # both files will have the same content
 # fn_inarchive_obscure = 'test.dat'
@@ -45,24 +33,8 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
           (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
           (fn_extracted_obscure, '123')))
 @with_tempfile()
-#@prof
 def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
-    # We could just propagate current environ I guess to versatile our testing
-    env = os.environ.copy()
-    env.update({'PATH': get_bindir_PATH(),
-                'DATALAD_LOGTARGET': d2 + "_custom.log"})
-
-    if os.environ.get('DATALAD_LOGLEVEL'):
-        env['DATALAD_LOGLEVEL'] = os.environ.get('DATALAD_LOGLEVEL')
-
-    if os.environ.get('DATALAD_PROTOCOL_REMOTE'):
-        protocol = AnnexExchangeProtocol(d, 'archive')
-    else:
-        protocol = None
-
-    r = Runner(cwd=d, env=env, protocol=protocol)
-
-    handle = HandleRepo(d, runner=r, direct=direct)
+    handle = HandleRepo(d, runner=_get_custom_runner(d), direct=direct)
     handle.annex_initremote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=datalad-archive',
@@ -109,7 +81,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
 
     # Let's create a clone and verify chain of getting file through the tarball
     cloned_handle = HandleRepo(d2, d,
-                           runner=Runner(cwd=d2, env=env, protocol=protocol),
+                           runner=_get_custom_runner(d2),
                            direct=direct)
     # we still need to enable manually atm that special remote for archives
     # cloned_handle.annex_enableremote('annexed-archives')
@@ -120,9 +92,6 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_true(cloned_handle.file_has_content(fn_extracted))
     # as a result it would also fetch tarball
     assert_true(cloned_handle.file_has_content(fn_archive))
-
-    # TODO: dropurl, addurl without --relaxed, addurl to non-existing file
-    #prof.print_stats()
 
 
 def test_basic_scenario():

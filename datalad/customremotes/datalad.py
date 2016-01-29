@@ -23,6 +23,9 @@ from ..cmd import link_file_load, Runner
 from ..support.exceptions import CommandError
 from ..utils import getpwd
 from .base import AnnexCustomRemote
+from ..dochelpers import exc_str
+
+from ..downloaders.providers import Providers
 
 
 class DataladAnnexCustomRemote(AnnexCustomRemote):
@@ -35,13 +38,14 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
 
     AVAILABILITY = "global"
 
-    # def __init__(self, persistent_cache=True, **kwargs):
-    #     super(DataladAnnexCustomRemote, self).__init__(**kwargs)
-    #     # annex requests load by KEY not but URL which it originally asked
-    #     # about.  So for a key we might get back multiple URLs and as a
-    #     # heuristic let's use the most recently asked one
-    #
-    #     self._last_url = None  # for heuristic to choose among multiple URLs
+    def __init__(self, persistent_cache=True, **kwargs):
+        super(DataladAnnexCustomRemote, self).__init__(**kwargs)
+        # annex requests load by KEY not but URL which it originally asked
+        # about.  So for a key we might get back multiple URLs and as a
+        # heuristic let's use the most recently asked one
+
+        self._last_url = None  # for heuristic to choose among multiple URLs
+        self._providers = Providers.from_config_files()
 
     #
     # Helper methods
@@ -67,44 +71,19 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         CHECKURL-FAILURE
             Indicates that the requested url could not be accessed.
         """
-        # TODO:  what about those MULTI and list to be returned?
-        #  should we return all filenames or keys within archive?
-        #  might be way too many?
-        #  only if just archive portion of url is given or the one pointing
-        #  to specific file?
-        lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
-        akey, afile, attrs = self._parse_url(url)
-        size = attrs.get('size', None)
 
-        # But reply that present only if archive is present
-        # TODO: this would throw exception if not present, so this statement is kinda bogus
-        akey_fpath = self.get_contentlocation(akey)  #, relative_to_top=True))
-        if akey_fpath:
-            akey_path = opj(self.path, akey_fpath)
-
-            # if for testing we want to force getting the archive extracted
-            # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
-            efile = self.cache[akey_path].get_extracted_filename(afile)
-
-            if size is None and exists(efile):
-                size = os.stat(efile).st_size
-
-            if size is None:
-                size = 'UNKNOWN'
-
-            # FIXME: providing filename causes annex to not even talk to ask
-            # upon drop :-/
-            self.send("CHECKURL-CONTENTS", size)  #, basename(afile))
-        else:
-            # TODO: theoretically we should first check if key is available from
-            # any remote to know if file is available
-            self.send("CHECKURL-FAILURE")
-        # self._last_url = url
+        try:
+            status = self._providers.get_status(url)
+            filename = status.get('filename', None)
+            resp = ["CHECKURL-CONTENTS", status.get('size', 'UNKNOWN')] + \
+                   ([filename] if filename else [])
+        except Exception as exc:
+            self.error("Failed to check url %s: %s" % (url, exc_str(exc)))
+            resp = ["CHECKURL-FAILURE"]
+        self.send(*resp)
 
     def req_CHECKPRESENT(self, key):
         """Check if copy is available
-
-        TODO: just proxy the call to annex for underlying tarball
 
         Replies
 
@@ -118,18 +97,21 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
             Indicates that it is not currently possible to verify if the key is
             present in the remote. (Perhaps the remote cannot be contacted.)
         """
-        # TODO: so we need to maintain mapping from urls to keys.  Then
-        # we could even store the filename within archive
-        # Otherwise it is unrealistic to even require to recompute key if we
-        # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
-        akey, afile = self._get_akey_afile(key)
-        if self.get_contentlocation(akey):
-            self.send("CHECKPRESENT-SUCCESS", key)
-        else:
-            # TODO: proxy the same to annex itself to verify check for archive.
-            # If archive is no longer available -- then CHECKPRESENT-FAILURE
-            self.send("CHECKPRESENT-UNKNOWN", key)
+        resp = "CHECKPRESENT-UNKNOWN"
+        for url in self.get_URLS(key):
+            # somewhat duplicate of CHECKURL
+            try:
+                status = self._providers.get_status(url)
+                if status:  # TODO:  anything specific to check???
+                    resp = "CHECKPRESENT-SUCCESS"
+                    break
+                # TODO:  for CHECKPRESENT-FAILURE we somehow need to figure out that
+                # we can connect to that server but that specific url is N/A,
+                # probably check the connection etc
+            except Exception as exc:
+                self.error("Failed to check status of url %s: %s" % (url, exc_str(exc)))
+        self.send(resp, key)
 
     def req_REMOVE(self, key):
         """
@@ -139,17 +121,8 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         REMOVE-FAILURE Key ErrorMsg
             Indicates that the key was unable to be removed from the remote.
         """
-        # TODO: proxy query to the underlying tarball under annex that if
-        # tarball was removed (not available at all) -- report success,
-        # otherwise failure (current the only one)
-        akey, afile = self._get_akey_afile(key)
-        if False:
-            # TODO: proxy, checking present of local tarball is not sufficient
-            #  not exists(self.get_key_path(key)):
-            self.send("REMOVE-SUCCESS", akey)
-        else:
-            self.send("REMOVE-FAILURE", akey,
-                      "Removal from file archives is not supported")
+        self.send("REMOVE-FAILURE", key,
+                  "Removal of content from urls is not possible")
 
     def req_WHEREIS(self, key):
         """
@@ -160,55 +133,30 @@ class DataladAnnexCustomRemote(AnnexCustomRemote):
         WHEREIS-FAILURE
             Indicates that no location is known for a key.
         """
+        # All that information is stored in annex itself, we can't complement anything
         self.send("WHEREIS-FAILURE")
-        """
-        although more logical is to report back success, it leads to imho more confusing
-        duplication. See
-        http://git-annex.branchable.com/design/external_special_remote_protocol/#comment-3f9588f6a972ae566347b6f467b53b54
-
-        try:
-            key, file = self._get_akey_afile(key)
-            self.send("WHEREIS-SUCCESS", "file %s within archive %s" % (file, key))
-        except ValueError:
-            self.send("WHEREIS-FAILURE")
-        """
 
     def _transfer(self, cmd, key, path):
 
-        akey, afile = self._get_akey_afile(key)
-        akey_fpath = self.get_contentlocation(akey)
-        if akey_fpath:  # present
-            akey_path = opj(self.path, akey_fpath)
-        else:
-            # TODO: make it more stringent?
-            # Command could have fail to run if key was not present locally yet
-            # Thus retrieve the key using annex
+        urls = self.get_URLS(key)
+
+        if self._last_url in urls:
+            # place it first among candidates... some kind of a heuristic
+            urls.pop(self._last_url)
+            urls = [self._last_url] + urls
+
+        # TODO: priorities etc depending on previous experience or settings
+
+        for url in urls:
             try:
-                # TODO: we need to report user somehow about this happening and progress on the download
-                self.runner(["git-annex", "get", "--key", akey],
-                            cwd=self.path, expect_stderr=True)
-            except Exception as e:
-                #from celery.contrib import rdb
-                #rdb.set_trace()
-                self.error("Failed to fetch {akey} containing {key}: {e}".format(**locals()))
+                downloaded_path = self._providers.download(url, path=path, overwrite=True)
+                assert(downloaded_path == path)
+                self.send('TRANSFER-SUCCESS', cmd, key)
                 return
-            akey_fpath = self.get_contentlocation(akey)
-            if not akey_fpath:
-                raise RuntimeError("We were reported to fetch it alright but now can't get its location.  Check logic")
+            except Exception as exc:
+                self.error("Failed to download url %s for key %s: %s" % (url, key, exc_str(exc)))
 
-        akey_path = opj(self.repo.path, akey_fpath)
-        assert exists(akey_path), "Key file %s is not present" % akey_path
-
-        # Extract that bloody file from the bloody archive
-        # TODO: implement/use caching, for now a simple one
-        #  actually patool doesn't support extraction of a single file
-        #  https://github.com/wummel/patool/issues/20
-        # so
-        pwd = getpwd()
-        lgr.debug("Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
-        apath = self.cache[akey_path].get_extracted_file(afile)
-        link_file_load(apath, path)
-        self.send('TRANSFER-SUCCESS', cmd, key)
+        raise RuntimeError("Failed to download from any of %d locations" % len(urls))
 
 
 from .main import main as super_main

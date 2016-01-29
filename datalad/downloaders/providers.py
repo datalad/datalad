@@ -367,6 +367,8 @@ class Providers(object):
     def fetch(self, url, *args, **kwargs):
         return self.get_provider(url).get_downloader(url).fetch(url, *args, **kwargs)
 
+    def get_status(self, url, *args, **kwargs):
+        return self.get_provider(url).get_downloader(url).get_status(url, *args, **kwargs)
 
     def needs_authentication(self, url):
         provider = self.get_provider(url, only_nondefault=True)
