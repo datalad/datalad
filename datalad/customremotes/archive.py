@@ -24,6 +24,7 @@ from ..support.exceptions import CommandError
 from ..support.archives import ArchivesCache
 from ..utils import getpwd
 from .base import AnnexCustomRemote
+from .base import URI_PREFIX
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
@@ -34,7 +35,11 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
      Archives should also be under annex control.
     """
 
-    PREFIX = "archive"
+    CUSTOM_REMOTE_NAME = "archive"
+    SUPPORTED_SCHEMES = (AnnexCustomRemote._get_custom_scheme(CUSTOM_REMOTE_NAME),)
+    # Since we support only 1 scheme here
+    URL_PREFIX = SUPPORTED_SCHEMES[0] + ":"
+
     AVAILABILITY = "local"
 
     def __init__(self, persistent_cache=True, **kwargs):
@@ -78,7 +83,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         if size is not None:
             attrs['size'] = size
         sattrs = '#%s' % ('&'.join("%s=%s" % x for x in attrs.items())) if attrs else ''
-        return '%s%s/%s%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'), sattrs)
+        return '%s%s/%s%s' % (self.URL_PREFIX, archive_key, file_quoted.lstrip('/'), sattrs)
 
     @property
     def cache(self):
@@ -87,8 +92,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def _parse_url(self, url):
         """Parse url and return archive key, file within archive and additional attributes (such as size)
         """
-        assert(url[:len(self.url_prefix)] == self.url_prefix)
-        key, file_attrs = url[len(self.url_prefix):].split('/', 1)
+        url_prefix = self.URL_PREFIX
+        assert(url[:len(url_prefix)] == url_prefix)
+        key, file_attrs = url[len(url_prefix):].split('/', 1)
         if '#' in file_attrs:
             file_, attrs_str = file_attrs.split('#', 1)
             attrs = dict(x.split('=', 1) for x in attrs_str.split('&'))

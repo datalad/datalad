@@ -18,6 +18,7 @@ from os.path import exists, join as opj, realpath, dirname, lexists
 from traceback import format_exc
 
 from six.moves import range
+from six.moves.urllib.parse import urlparse, urlunparse
 
 from ..cmd import Runner
 from ..support.exceptions import CommandError
@@ -72,10 +73,10 @@ send () {
 
 """
 
-    def __init__(self, repopath, url_prefix):
+    def __init__(self, repopath, custom_remote_name):
         super(AnnexExchangeProtocol, self).__init__()
         self.repopath = repopath
-        self.url_prefix = url_prefix
+        self.custom_remote_name = custom_remote_name
         self._file = None
         self._initiated = False
 
@@ -88,7 +89,7 @@ send () {
             os.makedirs(d)
 
         self._file = _file = \
-            opj(d, 'git-annex-remote-' + self.url_prefix.rstrip(':'))
+            opj(d, 'git-annex-remote-' + self.custom_remote_name.rstrip(':'))
 
         if exists(_file):
             lgr.debug("Commenting out previous entries")
@@ -169,6 +170,11 @@ class AnnexCustomRemote(object):
     http://git-annex.branchable.com/design/external_special_remote_protocol/
     """
 
+    # Must be defined in subclasses.  There is no classlevel properties, so leaving as this for now
+
+    # CUSTOM_REMOTE_NAME = None
+    # SUPPORTED_SCHEMES = ()
+
     AVAILABILITY = DEFAULT_AVAILABILITY
 
     def __init__(self, path=None, cost=DEFAULT_COST):  # , availability=DEFAULT_AVAILABILITY):
@@ -200,30 +206,26 @@ class AnnexCustomRemote(object):
         #self.availability = availability.upper()
         assert(self.AVAILABILITY.upper() in ("LOCAL", "GLOBAL"))
 
-        # prefix which will be used in all URLs supported by this custom remote
-        # https://tools.ietf.org/html/rfc2718 dictates "URL Schemes" standard
-        # 2.1.2   suggests that we do use // since all of our URLs will define
-        #         some hierarchical structure.  But actually since we might encode
-        #         additional information (such as size) into the URL, it will not be
-        #         strictly conforming it. Thus we will not use //
-        self.url_prefix = "%s%s:" % (URI_PREFIX, '+' + self.PREFIX if self.PREFIX else '')
-
         # To signal either we are in the loop and e.g. could correspond to annex
         self._in_the_loop = False
-        self._protocol = AnnexExchangeProtocol(self.path, self.url_prefix) \
+        self._protocol = AnnexExchangeProtocol(self.path, self.CUSTOM_REMOTE_NAME) \
                          if os.environ.get('DATALAD_PROTOCOL_REMOTE') \
                          else None
 
         self._contentlocations = DictCache(size_limit=100)  # TODO: config ?
 
 
-    # Just an obscure way to provide "Abstract attribute"
-    @property
-    def PREFIX(self):
-        """Just a helper to guarantee that PREFIX gets assigned in derived class
+    @classmethod
+    def _get_custom_scheme(cls, prefix):
+        """Helper to generate custom datalad URL prefixes
         """
-        raise ValueError("Each derived class should carry its own PREFIX")
-
+        # prefix which will be used in all URLs supported by this custom remote
+        # https://tools.ietf.org/html/rfc2718 dictates "URL Schemes" standard
+        # 2.1.2   suggests that we do use // since all of our URLs will define
+        #         some hierarchical structure.  But actually since we might encode
+        #         additional information (such as size) into the URL, it will not be
+        #         strictly conforming it. Thus we will not use //
+        return "%s+%s" % (URI_PREFIX, prefix)  # if .PREFIX else '')
 
     # Helpers functionality
 
@@ -412,7 +414,8 @@ class AnnexCustomRemote(object):
         self.send("AVAILABILITY", self.AVAILABILITY.upper())
 
     def req_CLAIMURL(self, url):
-        if url.startswith(self.url_prefix):
+        scheme = urlparse(url).scheme
+        if scheme in self.SUPPORTED_SCHEMES:
             self.debug("Claiming url %r" % url)
             self.send("CLAIMURL-SUCCESS")
         else:
@@ -522,24 +525,21 @@ class AnnexCustomRemote(object):
         """Gets URL(s) associated with a Key.
 
         """
-        # FIXME: there seems to be a bug
-        # http://git-annex.branchable.com/bugs/GETURLS_doesn__39__t_return_URLs_if_prefix_is_provided/?updated
-        # thus for now requesting without prefix and filtering manually
-        #self.send("GETURLS", key, ":" + self.url_prefix)
-        # with annex >= 5.20150327+git27-g6af24b6-1, should be alright
-        self.send("GETURLS", key, self.url_prefix)
         urls = []
-        while True:
-            url = self.read("VALUE", 1)[1:]
-            if url:
-                assert(len(url) == 1)
-                urls.append(url[0])
-            else:
-                break
-        urls_ = [u for u in urls
-                 if u.startswith(self.url_prefix)]
-        assert(urls_ == urls)
-        self.heavydebug("Received URLS: %s" % urls)
+        for scheme in self.SUPPORTED_SCHEMES:
+            scheme_ = scheme + ":"
+            self.send("GETURLS", key, scheme_)
+            while True:
+                url = self.read("VALUE", 1)[1:]
+                if url:
+                    assert(len(url) == 1)
+                    urls.append(url[0])
+                else:
+                    break
+            urls_ = [u for u in urls
+                     if u.startswith(scheme_)]
+            assert(urls_ == urls)
+            self.heavydebug("Received URLS: %s" % urls)
         return urls
 
     def _get_key_path(self, key):
