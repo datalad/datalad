@@ -19,7 +19,9 @@ from ...tests.utils import with_tempfile
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_in
 from ...tests.utils import use_cassette
+from ...tests.utils import assert_raises
 from ...dochelpers import exc_str
+from ...downloaders.base import DownloadError
 
 try:
     import boto
@@ -47,3 +49,7 @@ def test_mtime(tempfile):
     with swallow_outputs():
         _get_test_providers(url).download(url, path=tempfile)
     assert_equal(os.stat(tempfile).st_mtime, 1446873817)
+
+    # and if url is wrong
+    url = 's3://datalad-test0-versioned/nonexisting'
+    assert_raises(DownloadError, _get_test_providers(url).download, url, path=tempfile, overwrite=True)
