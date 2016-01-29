@@ -12,16 +12,54 @@
 
 __docformat__ = 'restructuredtext'
 
-from .dialog import ConsoleLog, DialogUI
+from .dialog import ConsoleLog, DialogUI, UnderAnnexUI
 from ..utils import is_interactive
 
+from logging import getLogger
+lgr = getLogger('datalad.ui')
 
 # TODO: implement logic on selection of the ui based on the cfg and environment
 # e.g. we cannot use DialogUI if session is not interactive
 # TODO:  GitAnnexUI where interactive queries (such as question) should get to the
 # user by proxying some other appropriate (cmdline or GUI) UI, while others, such
 # as reporting on progress etc -- should get back to the annex
-if not is_interactive():
-    ui = ConsoleLog()
-else:
-    ui = DialogUI()
+
+# TODO: singleton
+class _UI_Switcher(object):
+    """
+    Poor man helper to switch between different backends at run-time.
+    """
+    def __init__(self, backend=None):
+        self._backend = None
+        self._ui = None
+        self.set_backend(backend)
+
+    def set_backend(self, backend):
+        if backend and (backend == self._backend):
+            lgr.debug("not changing backend since the same %s" % backend)
+            return
+        if backend is None:
+            backend = 'console' if not is_interactive() else 'dialog'
+        self._ui = {
+                'console': ConsoleLog,
+                'dialog': DialogUI,
+                'annex': UnderAnnexUI,
+            }[backend]()
+        lgr.debug("UI set to %s" % self._ui)
+        self._backend = backend
+
+    @property
+    def backend(self):
+        return self._backend
+
+    @property
+    def ui(self):
+        return self._ui
+
+    # Delegate other methods to the actual UI
+    def __getattribute__(self, item):
+        if item.startswith('_') or item in {'set_backend', 'backend', 'ui'}:
+            return super(_UI_Switcher, self).__getattribute__(item)
+        return getattr(self._ui, item)
+
+ui = _UI_Switcher()
