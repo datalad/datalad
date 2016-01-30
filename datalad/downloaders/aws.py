@@ -63,6 +63,8 @@ class S3Authenticator(Authenticator):
         try:
             bucket = conn.get_bucket(bucket_name)
         except S3ResponseError as e:
+            if e.error_code == 'AccessDenied':
+                raise AccessDeniedError(exc_str(e))
             lgr.debug("Cannot access bucket %s by name", bucket_name)
             all_buckets = conn.get_all_buckets()
             all_bucket_names = [b.name for b in all_buckets]
