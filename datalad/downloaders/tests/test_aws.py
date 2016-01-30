@@ -28,7 +28,9 @@ try:
 except Exception as e:
     raise SkipTest("boto module is not available: %s" % exc_str(e))
 
-from .test_http import check_download_external_url, _get_test_providers
+from .test_http import check_download_external_url
+from datalad.downloaders.tests.utils import get_test_providers
+
 
 @use_cassette('fixtures/vcr_cassettes/test_s3_download_basic.yaml', record_mode='all')
 def test_s3_download_basic():
@@ -47,9 +49,9 @@ test_s3_download_basic.tags = ['network']
 def test_mtime(tempfile):
     url = 's3://datalad-test0-versioned/2versions-nonversioned1.txt?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
     with swallow_outputs():
-        _get_test_providers(url).download(url, path=tempfile)
+        get_test_providers(url).download(url, path=tempfile)
     assert_equal(os.stat(tempfile).st_mtime, 1446873817)
 
     # and if url is wrong
     url = 's3://datalad-test0-versioned/nonexisting'
-    assert_raises(DownloadError, _get_test_providers(url).download, url, path=tempfile, overwrite=True)
+    assert_raises(DownloadError, get_test_providers(url).download, url, path=tempfile, overwrite=True)
