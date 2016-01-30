@@ -57,9 +57,14 @@ class _UI_Switcher(object):
         return self._ui
 
     # Delegate other methods to the actual UI
-    def __getattribute__(self, item):
-        if item.startswith('_') or item in {'set_backend', 'backend', 'ui'}:
-            return super(_UI_Switcher, self).__getattribute__(item)
-        return getattr(self._ui, item)
+    def __getattribute__(self, key):
+        if key.startswith('_') or key in {'set_backend', 'backend', 'ui'}:
+            return super(_UI_Switcher, self).__getattribute__(key)
+        return getattr(self._ui, key)
+
+    def __setattr__(self, key, value):
+        if key.startswith('_') or key in {'set_backend', 'backend', 'ui'}:
+            return super(_UI_Switcher, self).__setattr__(key, value)
+        return setattr(self._ui, key, value)
 
 ui = _UI_Switcher()

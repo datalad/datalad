@@ -16,7 +16,7 @@ from os.path import join as opj
 from glob import glob
 from .base import Interface
 from ..ui import ui
-from ..utils import rmtree
+from ..utils import rmtree, getpwd
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 from ..support.annexrepo import AnnexRepo
@@ -47,9 +47,17 @@ class Clean(Interface):
     def __call__(self, annex=None):
         if annex is None:
             annex = get_repo_instance(class_=AnnexRepo)
-        archive_temp_topdir = opj(annex.path, ARCHIVES_TEMP_DIR)
+        topdir = opj(annex.path, ARCHIVES_TEMP_DIR)
         temp_archives_dirs = glob(opj(annex.path, ARCHIVES_TEMP_DIR, '*'))
         if temp_archives_dirs:
-            ui.message("Removing %d temporary archives directories: %s"
-                       % (len(temp_archives_dirs), ", ".join(temp_archives_dirs)))
-            rmtree(archive_temp_topdir)
+            pl = len(temp_archives_dirs) > 1
+            pl1, pl2 = ('s', 'ies') if pl else ('', 'y')
+            
+            pwd = getpwd()
+            # relative version if possible
+            rtopdir = topdir[len(pwd)+1:] if topdir.startswith(pwd) else topdir
+            ui.message("Removing %d temporary archive director%s under %s: %s"
+                       % (len(temp_archives_dirs), pl2,
+                          rtopdir,
+                          ", ".join(sorted([x[len(topdir)+1:] for x in temp_archives_dirs]))))
+            rmtree(topdir)
