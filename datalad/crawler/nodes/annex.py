@@ -306,7 +306,7 @@ class Annexificator(object):
             assert(fpath)
             # Just add into git directly for now
             # TODO: tune  annex_add so we could use its json output, and may be even batch it
-            out_json = _call(self.repo.annex_add, fpath)
+            out_json = _call(self.repo.annex_add, fpath, options=self.options)
             _call(stats.increment, 'add_annex' if 'key' in out_json else 'add_git')
         # elif self.mode == 'full':
         #     # Since addurl ignores annex.largefiles we need first to download that file and then
