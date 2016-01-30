@@ -25,7 +25,7 @@ from ..support.network import rfc2822_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader
-from .base import DownloadError, AccessDeniedError
+from .base import DownloadError, AccessDeniedError, TargetFileAbsent
 from ..support.s3 import boto, S3ResponseError
 from ..support.status import FileStatus
 
@@ -140,7 +140,7 @@ class S3Downloader(BaseDownloader):
             raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
         if key is None:
-            raise DownloadError("No key returned for %s from url %s" % (url_filepath, url))
+            raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
 
         target_size = key.size  # S3 specific
         headers = {
