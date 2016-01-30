@@ -114,6 +114,16 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     stats.downloaded_time = 0
     assert_equal(stats, ActivityStats(files=1, urls=1, add_git=1-int(annexed), add_annex=int(annexed), **download_stats))
 
+    # Let's add a file without specifying URL
+    sfilepath = opj(outdir, 'sample.txt')
+    with open(sfilepath, 'w') as f:
+        f.write("sample")
+    ok_file_has_content(sfilepath, "sample")
+    output = list(annex({'filename': 'sample.txt', 'datalad_stats': ActivityStats()}))
+    ok_file_under_git(sfilepath, annexed=False)
+    assert(output)
+    assert_equal(output[0]['datalad_stats'], ActivityStats(files=1, add_git=1))
+
 
 def test_annex_file():
     for mode in ('full', 'fast', 'relaxed',):
