@@ -43,7 +43,7 @@ def pipeline(dataset, versioned_urls=True):
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README* and exclude=*.[mc]"])
+        options=["-c", "annex.largefiles=exclude=*.txt and exclude=*.json and exclude=README* and exclude=*.[mc]"])
 
     return [
         annex.switch_branch('incoming'),
