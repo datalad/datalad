@@ -107,7 +107,6 @@ class ConsoleLog(object):
 
 @auto_repr
 class DialogUI(ConsoleLog, InteractiveUI):
-    _to_flush = ''
 
     def question(self, text,
                  title=None, choices=None,
@@ -140,14 +139,17 @@ Question? [choice1|choice2]
             attempt += 1
             if attempt >= 100:
                 raise RuntimeError("This is 100th attempt. Something really went wrong")
-            self.out.write(msg + ": " + self._to_flush)
-            self.out.flush()  # not effective for stderr for some reason under annex
+            if not hidden:
+                self.out.write(msg + ": ")
+                self.out.flush()  # not effective for stderr for some reason under annex
 
-            # TODO: raw_input works only if stdin was not controlled by
-            # (e.g. if coming from annex).  So we might need to do the
-            # same trick as get_pass() does while directly dealing with /dev/pty
-            # and provide per-OS handling with stdin being override
-            response = (raw_input if PY2 else input)() if not hidden else getpass('')
+                # TODO: raw_input works only if stdin was not controlled by
+                # (e.g. if coming from annex).  So we might need to do the
+                # same trick as get_pass() does while directly dealing with /dev/pty
+                # and provide per-OS handling with stdin being override
+                response = (raw_input if PY2 else input)()
+            else:
+                response = getpass(msg + ": ")
 
             if not response and default:
                 response = default
@@ -164,7 +166,6 @@ Question? [choice1|choice2]
 # poor man thingie for now
 @auto_repr
 class UnderAnnexUI(DialogUI):
-    _to_flush = '\n'  # dirty ugly workaround for python somehow not flushing when stderr.write
     def __init__(self, **kwargs):
         if 'out' not in kwargs:
             # to avoid buffering
