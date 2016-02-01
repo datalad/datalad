@@ -49,7 +49,7 @@ class initiate_handle(object):
     """
     def __init__(self, template, handle_name=None, collection_name=None,
                  path=None, branch=None,
-                 data_fields=[], add_fields={}, existing='raise'):
+                 data_fields=[], add_fields={}, existing=None):
         """
         Parameters
         ----------
@@ -71,7 +71,7 @@ class initiate_handle(object):
         add_fields : dict, optional
           Dictionary of additional fields to store in the crawler configuration
           to be passed into the template
-        existing : ('skip', 'raise', 'replace'), optional
+        existing : ('skip', 'raise', 'replace', crawl'), optional
           Behavior if encountering existing handle
         """
         # TODO: add_fields might not be flexible enough for storing more elaborate
@@ -147,6 +147,8 @@ class initiate_handle(object):
         lgr.debug("Request to initialize a handle at %s", handle_path)
 
         if exists(handle_path):
+            # TODO: config.crawl.existing_handle = crawl, skip, crawl, raise
+            existing = self.existing or 'skip'
             if self.existing == 'skip':
                 yield data
                 return
@@ -154,7 +156,7 @@ class initiate_handle(object):
                 raise RuntimeError("%s already exists" % handle_path)
             elif self.existing == 'replace':
                 _call(rmtree, handle_path)
-            else: # TODO: 'crawl'  ;)
+            else:  # TODO: 'crawl'  ;)
                 raise ValueError(self.existing)
         _call(self._initiate_handle, handle_path, handle_name)
         _call(self._save_crawl_config, handle_path, handle_name, data)

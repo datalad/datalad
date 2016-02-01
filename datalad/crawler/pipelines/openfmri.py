@@ -112,7 +112,8 @@ def pipeline(dataset, versioned_urls=True):
             # ],
             # TODO: describe_handle
         ],
-        annex.switch_branch('master'),
+        # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
+        annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
@@ -120,9 +121,6 @@ def pipeline(dataset, versioned_urls=True):
                 {'loop': True},
                 find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True), #  we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
-                    #rename=[
-                    #    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
-                    #],
 					existing='archive-suffix',
 					strip_leading_dirs=True,
                     # overwrite=True,
@@ -132,5 +130,7 @@ def pipeline(dataset, versioned_urls=True):
                 # annex, # not needed since above add_archive_content adds to annex
             ],
         ],
+        annex.switch_branch('master'),
+        annex.merge_branch('incoming-processed'), #, commit=False),
         annex.finalize,
     ]
