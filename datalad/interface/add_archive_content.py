@@ -198,10 +198,10 @@ class AddArchiveContent(Interface):
         # now we simply need to go through every file in that archive and
         lgr.info("Adding content of the archive %s into annex %s", archive, annex)
 
-        from datalad.customremotes.archive import AnnexArchiveCustomRemote
+        from datalad.customremotes.archive import ArchiveAnnexCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
         # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
-        annexarchive = AnnexArchiveCustomRemote(path=annex.path, persistent_cache=True)
+        annexarchive = ArchiveAnnexCustomRemote(path=annex.path, persistent_cache=True)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = True
         earchive = annexarchive.cache[key_path]
@@ -211,7 +211,7 @@ class AddArchiveContent(Interface):
             lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
             annex.annex_initremote(
                 ARCHIVES_SPECIAL_REMOTE,
-                ['encryption=none', 'type=external', 'externaltype=dl+archive',
+                ['encryption=none', 'type=external', 'externaltype=datalad-archive',
                  'autoenable=true'])
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
@@ -261,7 +261,7 @@ class AddArchiveContent(Interface):
                     except StopIteration:
                         continue
 
-                url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
+                url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
                 # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
 
@@ -320,9 +320,9 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
                           target_file, url, annex_options)
 
-                annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
+                out_json = annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
 
-                if annex.is_under_annex(target_file, batch=True):
+                if 'key' in out_json: # annex.is_under_annex(target_file, batch=True):
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))

@@ -25,12 +25,15 @@ from ..support.network import rfc2822_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader
-from .base import DownloadError, AccessDeniedError
+from .base import DownloadError, AccessDeniedError, TargetFileAbsent
 from ..support.s3 import boto, S3ResponseError
 from ..support.status import FileStatus
 
+import logging
 from logging import getLogger
 lgr = getLogger('datalad.http')
+boto_lgr = logging.getLogger('boto')
+boto_lgr.handlers = lgr.handlers  # Use our handlers
 
 __docformat__ = 'restructuredtext'
 
@@ -51,11 +54,17 @@ class S3Authenticator(Authenticator):
         credentials = credential()
         if not boto:
             raise RuntimeError("%s requires boto module which is N/A" % self)
+
+        # Shut up boto if we do not care to listen ;)
+        # boto_lgr.setLevel(logging.CRITICAL if lgr.getEffectiveLevel() > logging.DEBUG else logging.DEBUG)
+
         conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
 
         try:
             bucket = conn.get_bucket(bucket_name)
         except S3ResponseError as e:
+            if e.error_code == 'AccessDenied':
+                raise AccessDeniedError(exc_str(e))
             lgr.debug("Cannot access bucket %s by name", bucket_name)
             all_buckets = conn.get_all_buckets()
             all_bucket_names = [b.name for b in all_buckets]
@@ -130,6 +139,9 @@ class S3Downloader(BaseDownloader):
         except S3ResponseError as e:
             raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
+        if key is None:
+            raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
+
         target_size = key.size  # S3 specific
         headers = {
             'Content-Length': key.size,

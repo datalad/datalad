@@ -151,8 +151,16 @@ class AutomagicIO(object):
         if not isinstance(annex, AnnexRepo):
             # not an annex -- can do nothing
             return
+
+        # "quick" check first if under annex at all
+        try:
+            # might fail.  TODO: troubleshoot when it does e.g.
+            # datalad/tests/test_auto.py:test_proxying_open_testrepobased
+            under_annex = annex.is_under_annex(filepath, batch=True)
+        except:
+            under_annex = None
         # either it has content
-        if not annex.file_has_content(filepath):
+        if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
             annex.annex_get(filepath, log_online=self._log_online)
 

@@ -481,6 +481,9 @@ class BaseDownloader(object):
 class DownloadError(Exception):
     pass
 
+class TargetFileAbsent(DownloadError):
+    pass
+
 class AccessDeniedError(DownloadError):
     pass
 

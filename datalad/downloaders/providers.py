@@ -16,6 +16,7 @@ from six.moves.urllib.parse import urlparse
 
 from os.path import dirname, abspath, join as pathjoin
 
+from ..dochelpers import exc_str
 from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..ui import ui
 from ..utils import auto_repr
@@ -81,7 +82,11 @@ class Credential(object):
     @property
     def is_known(self):
         uid = self.uid
-        return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
+        try:
+            return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
+        except Exception as exc:
+            lgr.warning("Failed to query keyring: %s" % exc_str(exc))
+            return False
 
     # should implement corresponding handling (get/set) via keyring module
     def __call__(self):
@@ -362,6 +367,8 @@ class Providers(object):
     def fetch(self, url, *args, **kwargs):
         return self.get_provider(url).get_downloader(url).fetch(url, *args, **kwargs)
 
+    def get_status(self, url, *args, **kwargs):
+        return self.get_provider(url).get_downloader(url).get_status(url, *args, **kwargs)
 
     def needs_authentication(self, url):
         provider = self.get_provider(url, only_nondefault=True)

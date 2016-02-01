@@ -14,6 +14,12 @@ from nose.tools import assert_not_equal
 def test_FileStatus_basic():
     assert_equal(FileStatus(size=0), FileStatus(size=0))
     assert_not_equal(FileStatus(size=0), FileStatus(size=1))
+    # mtimes allow trimming if one is int
+    assert_equal(FileStatus(mtime=0), FileStatus(mtime=0.9999))
+    assert_equal(FileStatus(mtime=0), FileStatus(mtime=0.0001))
+    assert_not_equal(FileStatus(mtime=0.2), FileStatus(mtime=0.1))
+    assert_not_equal(FileStatus(mtime=0.2), FileStatus(mtime=None))
+    assert_not_equal(FileStatus(mtime=1), FileStatus(mtime=None))
     # adding more information would result in not-equal
     assert_not_equal(FileStatus(size=0), FileStatus(size=0, mtime=123))
     # empty ones can't be compared

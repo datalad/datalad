@@ -25,4 +25,6 @@ CRAWLER_META_CONFIG_PATH = join(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
 DATALAD_COLLECTION_NAME = "datalad-local"
 
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
+DATALAD_SPECIAL_REMOTE = 'datalad'
+
 ARCHIVES_TEMP_DIR = join('.git', 'datalad', 'tmp', 'archives')

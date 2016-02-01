@@ -96,9 +96,9 @@ class ActivityStats(object):
             out[k] = out[k] + v
         return out
 
-    def increment(self, k):
+    def increment(self, k, v=1):
         """Helper for incrementing counters"""
-        self._current[k] += 1
+        self._current[k] += v
 
     def _reset_values(self, d, vals={}):
         for c in _COUNTS:

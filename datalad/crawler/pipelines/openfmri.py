@@ -8,6 +8,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """A pipeline for crawling openfmri dataset"""
 
+import os
+from os.path import lexists
+
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import css_match, a_href_match
@@ -26,6 +29,8 @@ lgr = getLogger("datalad.crawler.pipelines.openfmri")
 
 def extract_readme(data):
     # TODO - extract data from the page/response
+    if lexists("README.txt"):
+        os.unlink("README.txt")
     with open("README.txt", "w") as f:
         f.write("OpenfMRI dataset from %(url)s" % data)
     lgr.info("Generated README.txt")
@@ -38,7 +43,7 @@ def pipeline(dataset, versioned_urls=True):
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
+        options=["-c", "annex.largefiles=exclude=*.txt and exclude=*.json and exclude=README* and exclude=*.[mc]"])
 
     return [
         annex.switch_branch('incoming'),
@@ -107,15 +112,15 @@ def pipeline(dataset, versioned_urls=True):
             # ],
             # TODO: describe_handle
         ],
-        annex.switch_branch('master'),
+        # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
+        annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+                # There might be archives within archives, so we need to loop
+                {'loop': True},
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True), #  we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
-                    #rename=[
-                    #    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
-                    #],
 					existing='archive-suffix',
 					strip_leading_dirs=True,
                     # overwrite=True,
@@ -125,5 +130,7 @@ def pipeline(dataset, versioned_urls=True):
                 # annex, # not needed since above add_archive_content adds to annex
             ],
         ],
+        annex.switch_branch('master'),
+        annex.merge_branch('incoming-processed'), #, commit=False),
         annex.finalize,
     ]
