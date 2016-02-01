@@ -33,13 +33,29 @@ class FileStatus(object):
         if other.size is None and other.mtime is None and other.filename is None:
             return NotImplemented
 
+        same = \
+            self.size == other.size and \
+            self.filename == other.filename
+        if not same:
+            return False
+
+        # now deal with time.
+
         # TODO: provide a config option for mtime comparison precision
         #  we might want to claim times equal up to a second precision
         #  since e.g. some file systems do not even store sub-sec timing
-        return \
-            self.size == other.size and \
-            self.mtime == other.mtime and \
-            self.filename == other.filename
+        # TODO: config crawl.mtime_delta
+
+        # if any of them int and another float -- we need to trim float to int
+        if self.mtime == other.mtime:
+            return True
+        elif self.mtime is None or other.mtime is None:
+            return False
+
+        # none is None if here and not equal exactly
+        if isinstance(self.mtime, int) or isinstance(other.mtime, int):
+            return int(self.mtime) == int(other.mtime)
+        return False
 
     def __ne__(self, other):
         out = self == other

@@ -151,15 +151,17 @@ def test_AnnexRepo_annex_add(src, annex_path):
     f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
-    ar.annex_add(filename)
+    out_json = ar.annex_add(filename)
     if not ar.is_direct_mode():
         assert_true(os.path.islink(filename_abs),
                     "Annexed file is not a link.")
     else:
         assert_false(os.path.islink(filename_abs),
                      "Annexed file is link in direct mode.")
+    assert_in('key', out_json)
     key = ar.get_file_key(filename)
     assert_false(key == '')
+    assert_equal(key, out_json['key'])
     # could test for the actual key, but if there's something
     # and no exception raised, it's fine anyway.
 
