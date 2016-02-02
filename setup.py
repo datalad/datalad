@@ -30,7 +30,7 @@ setup(
     entry_points={
         'console_scripts': [
             'datalad=datalad.cmdline.main:main',
-            'git-annex-remote-datalad-archive=datalad.customremotes.archive:main',
+            'git-annex-remote-datalad-archives=datalad.customremotes.archives:main',
             'git-annex-remote-datalad=datalad.customremotes.datalad:main',
         ],
     },

@@ -9,6 +9,7 @@
 """Basic crawler for the web
 """
 
+from os.path import splitext, dirname, basename
 from ...utils import updated
 from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError
@@ -90,6 +91,8 @@ class crawl_url(object):
         return self._visit_url(data[self._input], data)
 
 
+
+
 """
     for extractors, actions in conditionals:
         extractors = _assure_listuple(extractors)
@@ -109,3 +112,32 @@ class crawl_url(object):
                 seen_urls.add(url)
 """
 
+# TODO: probably might sense to RF into just a generic TSV file parser
+def parse_checksums(digest=None):
+    """Generates a node capable of parsing checksums file and generating new URLs
+
+    Base of the available in data url is used for new URLs
+    """
+    def _parse_checksums(data):
+        url = data['url']
+        urlsplit = url.split('/')
+        topurl = '/'.join(urlsplit[:-1])
+        if digest is None:
+            # deduce from url's file extension
+            filename = urlsplit[-1]
+            base, ext = splitext(filename)
+            digest_ = ext if ext else digest
+
+        content = data['response']
+        # split into separate lines, first entry is checksum, 2nd file path
+        for line in content.split('\n'):
+            if not line:  # empty line
+                continue
+            checksum, fpath = line.split(None, 1)
+            yield updated(data, {'digest': digest or digest_,
+                                 'checksum': checksum,
+                                 'path': dirname(fpath),
+                                 'filename': basename(fpath),
+                                 'url': "%s/%s" % (topurl, fpath)
+                                 })
+    return _parse_checksums

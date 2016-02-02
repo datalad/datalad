@@ -188,6 +188,7 @@ class Annexificator(object):
     Should be relative. If absolute found -- ValueError is raised
     """
     def __init__(self, path=None, mode='full', options=None,
+                 special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
                  statusdb=None,
                  **kwargs):
@@ -202,6 +203,8 @@ class Annexificator(object):
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
           annex modes where no actual download is performed and files' keys are their urls
+        special_remotes : list, optional
+          List of custom special remotes to initialize and enable by default.
         yield_non_updated : bool, optional
           Either to yield original data (with filepath) if load was not updated in annex
         statusdb : , optional
@@ -221,6 +224,16 @@ class Annexificator(object):
         # Well -- different annexifiers might have different ideas for the backend, but
         # then those could be overriden via options
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
+
+        git_remotes = self.repo.git_get_remotes()
+        if special_remotes:
+            for remote in special_remotes:
+                if remote not in git_remotes:
+                    self.repo.annex_initremote(
+                            remote,
+                            ['encryption=none', 'type=external', 'autoenable=true',
+                             'externaltype=%s' % remote])
+
         self.mode = mode
         self.options = options or []
         self._states = []

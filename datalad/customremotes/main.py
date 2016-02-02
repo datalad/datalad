@@ -77,7 +77,7 @@ def _main(args, backend=None):
     # initializations etc.
     assert(backend is not None)
     if backend == 'archive':
-        from .archive import ArchiveAnnexCustomRemote
+        from .archives import ArchiveAnnexCustomRemote
         remote = ArchiveAnnexCustomRemote()
     elif backend == 'datalad':
         from .datalad import DataladAnnexCustomRemote

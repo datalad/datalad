@@ -36,7 +36,7 @@ def pipeline(**kwargs):
         initiate_handle(
             template="crcns",
             data_fields=['dataset_category', 'dataset'],
-            branch='incoming',  # there will be archives etc
+            # branch='incoming',  # there will be archives etc
             existing='adjust',
             # further any additional options
         )

@@ -20,7 +20,7 @@ from ....tests.utils import ok_file_under_git
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import assert_cwd_unchanged
 from ...pipeline import load_pipeline_from_config
-from ....consts import CRAWLER_META_CONFIG_PATH
+from ....consts import CRAWLER_META_CONFIG_PATH, DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ....support.stats import ActivityStats
 
 @with_tempfile(mkdir=True)
@@ -139,6 +139,7 @@ def _test_add_archive_content_tar(direct, repo_path):
                           allow_dirty=True,
                           mode=mode,
                           direct=direct,
+                          special_remotes=[DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE],
                           options=["-c", "annex.largefiles=exclude=*.txt and exclude=SOMEOTHER"])
     output_add = list(annex({'filename': '1.tar'}))  # adding it to annex
     assert_equal(output_add, [{'filename': '1.tar'}])

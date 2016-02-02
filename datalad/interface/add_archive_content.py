@@ -67,6 +67,11 @@ class AddArchiveContent(Interface):
             doc="""Flag to move all files directories up, from how they were stored in an archive,
                    if that one contained a number (possibly more than 1 down) single leading
                    directories."""),
+        leading_dirs_depth=Parameter(
+            args=("--leading-dirs-depth",),
+            action="store",
+            type=int,
+            doc="""Maximal depth to strip leading directories to. If not specified (None), no limit"""),
         existing=Parameter(
             args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
@@ -142,7 +147,7 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, annex=None, strip_leading_dirs=False,
+    def __call__(self, archive, annex=None, strip_leading_dirs=False, leading_dirs_depth=None,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None):
@@ -198,7 +203,7 @@ class AddArchiveContent(Interface):
         # now we simply need to go through every file in that archive and
         lgr.info("Adding content of the archive %s into annex %s", archive, annex)
 
-        from datalad.customremotes.archive import ArchiveAnnexCustomRemote
+        from datalad.customremotes.archives import ArchiveAnnexCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
         # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
         annexarchive = ArchiveAnnexCustomRemote(path=annex.path, persistent_cache=True)
@@ -224,7 +229,7 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
-            leading_dir = earchive.get_leading_directory() if strip_leading_dirs else None
+            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth) if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
             # dedicated stats which would be added to passed in (if any)

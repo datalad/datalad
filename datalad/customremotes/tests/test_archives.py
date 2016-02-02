@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
-from ..archive import ArchiveAnnexCustomRemote
+from ..archives import ArchiveAnnexCustomRemote
 from ...support.handlerepo import HandleRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from ...tests.utils import *
@@ -37,7 +37,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     handle = HandleRepo(d, runner=_get_custom_runner(d), direct=direct)
     handle.annex_initremote(
         ARCHIVES_SPECIAL_REMOTE,
-        ['encryption=none', 'type=external', 'externaltype=datalad-archive',
+        ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
          'autoenable=true'
          ])
     # We want two maximally obscure names, which are also different
