@@ -216,7 +216,7 @@ class AddArchiveContent(Interface):
             lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
             annex.annex_initremote(
                 ARCHIVES_SPECIAL_REMOTE,
-                ['encryption=none', 'type=external', 'externaltype=datalad-archive',
+                ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
                  'autoenable=true'])
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
