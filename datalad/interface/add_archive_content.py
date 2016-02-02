@@ -86,7 +86,7 @@ class AddArchiveContent(Interface):
         exclude=Parameter(
             args=("-e", "--exclude"),
             action='append',
-            doc="""Regular expression for filenames which to exclude from being added to annex.
+            doc="""Regular expressions for filenames which to exclude from being added to annex.
             Applied after --rename if that one is specified.  For exact matching, use anchoring.""",
             constraints=EnsureStr() | EnsureNone()
         ),
@@ -229,7 +229,7 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
-            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth) if strip_leading_dirs else None
+            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth, exclude=exclude) if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
             # dedicated stats which would be added to passed in (if any)
