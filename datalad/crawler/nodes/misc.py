@@ -147,9 +147,9 @@ def get_disposition_filename(data):
     """
     yield updated(data, {'filename': get_url_disposition_filename(data['url'])})
 
-class interrupt_if(object):
-    """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
-
+class _act_if(object):
+    """Base class for nodes which would act if input data matches regexps
+    """
     def __init__(self, values):
         """
 
@@ -168,7 +168,26 @@ class interrupt_if(object):
                 yield data
                 # and quit
                 return
+        for v in self._act(data):
+            yield v
+
+    def _act(self):
+        raise NotImplementedError
+
+
+class interrupt_if(_act_if):
+    """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
+
+    def _act(self, data):
         raise FinishPipeline
+
+
+class skip_if(_act_if):
+    """Skip (do not yield anything) further pipeline processing whenever obtained data matches provided value(s)"""
+
+    def _act(self, data):
+        return []  # nothing will be yielded etc
+
 
 @auto_repr
 class range_node(object):

@@ -13,6 +13,7 @@ from six import next
 from ..misc import get_disposition_filename
 from ..misc import range_node
 from ..misc import interrupt_if
+from ..misc import skip_if
 from ..misc import func_to_node
 from ..misc import sub
 from ..misc import find_files
@@ -59,6 +60,17 @@ def test_interrupt_if():
     # and that we would interrupt while matching multiple values
     eq_(list(n(tdict)), [tdict])
     assert_raises(FinishPipeline, next, interrupt_if(tdict)(tdict))
+
+def test_skip_if():
+    n = skip_if({'v1': 'done'})
+    assert_equal(list(n(dict(v1='done'))), [])
+    assert_equal(list(n(dict(v1='not done'))), [{'v1': 'not done'}])
+    assert_equal(list(n(dict(v1='done', someother=123))), [])
+    tdict = dict(v1='not yet', someother=123)
+    # and that we would interrupt while matching multiple values
+    eq_(list(n(tdict)), [tdict])
+    assert_equal(list(skip_if(tdict)(tdict)), [])
+
 
 def test_func_to_node():
     int_node = func_to_node(int)  # node which requires nothing and nothing of output is used
