@@ -9,8 +9,16 @@
 """Basic crawler for the web
 """
 
-from os.path import splitext, dirname, basename
+import re
+from distutils.version import LooseVersion
+
+import os
+from os import unlink
+from os.path import splitext, dirname, basename, curdir
+from os.path import lexists
+from os.path import join as opj
 from ...utils import updated
+from ...utils import find_files
 from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError
 from ...downloaders.providers import Providers
@@ -141,3 +149,133 @@ def parse_checksums(digest=None):
                                  'url': "%s/%s" % (topurl, fpath)
                                  })
     return _parse_checksums
+
+"""
+Versioned files examples
+
+- version might be in the middle of the filename
+
+README.txt                     ds030_R1.0.0_10631-10704.tgz@  ds030_R1.0.0_11104-11143.tgz@  ds030_R1.0.0_50067-60001.tgz@  ds030_R1.0.0_70001-70033.tgz@
+ds030_R1.0.0_10150-10274.tgz@  ds030_R1.0.0_10707-10844.tgz@  ds030_R1.0.0_11149-50016.tgz@  ds030_R1.0.0_60005-60021.tgz@  ds030_R1.0.0_70034-70057.tgz@
+ds030_R1.0.0_10280-10365.tgz@  ds030_R1.0.0_10855-10958.tgz@  ds030_R1.0.0_50020-50036.tgz@  ds030_R1.0.0_60022-60048.tgz@  ds030_R1.0.0_70058-70076.tgz@
+ds030_R1.0.0_10370-10506.tgz@  ds030_R1.0.0_10963-11052.tgz@  ds030_R1.0.0_50038-50053.tgz@  ds030_R1.0.0_60049-60068.tgz@  ds030_R1.0.0_70077-70086.tgz@
+ds030_R1.0.0_10517-10629.tgz@  ds030_R1.0.0_11059-11098.tgz@  ds030_R1.0.0_50054-50066.tgz@  ds030_R1.0.0_60070-60089.tgz@  ds030_R1.0.0_metadata_and_derivatives.tgz@
+
+- version might be duplicated
+
+http://ftp.ncbi.nlm.nih.gov/1000genomes/ftp/release/20110521/ALL.chr22.phase1_release_v3.20101123.snps_indels_svs.genotypes.vcf.gz
+http://ftp.ncbi.nlm.nih.gov/1000genomes/ftp/release/20130502/ALL.chr22.phase3_shapeit2_mvncall_integrated_v5a.20130502.genotypes.vcf.gz
+
+so there is a directory with that version and then version in the filename.  I guess we should operate in this case at the
+level of directories and then with additional rename command strip suffix in the filename
+"""
+
+def prune_to_the_next_version(
+    # ATM wouldn't deal with multiple notations for versioning present in the same tree TODO?
+    # ATM -- non deep -- just leading  TODO?
+    regex,
+    topdir=curdir,
+    dirs=True,  # either match directory names
+    name='version',      # optional,  to identify "versionier"
+    # ha -- we could store status in prev commit msg may be? then no need for any additional files !
+    store_version_info='commit',  # other methods -- some kind of db??
+    unversioned='oldest',  # 'latest' - consider to be the latest one, 'oldest' the oldest, 'mtime' -judge by mtime, 'fail'
+    mtimes='ignore',  # check -- fail if revisioning says otherwise, None/'ignore',
+    rename=True,  # rename last version into the one without version suffix
+    flag_to_redo='loop'  # "flag" to redo the loop if newer versions are yet to be processed
+    ):
+    """Handle versioned files in the current tree to process only "next" revision
+
+    """
+
+    def _prune_to_the_next_version(data):
+
+        # TODO: RF this dark magic
+        stats = data['datalad_stats']
+        if not hasattr(stats, 'flags'):
+            stats.flags = object()
+
+        if mtimes != 'ignore':
+            raise NotImplementedError(mtimes)
+
+        # collect all versioned files
+        vfpaths = {}  # file -> [versions]
+        all_versions = set()
+        for vfpath in find_files(regex, dirs=dirs, topdir=topdir):
+            # reapply regex to extract version
+            res = re.search(regex, vfpath)
+            fpath = vfpath[:res.start()] + vfpath[res.end():]  # unversioned one
+            version = res.groupdict().get('version', vfpath[res.start():res.end()])
+            if fpath not in vfpaths:
+                vfpaths[fpath] = {}
+            # 1 more version, must not be there already!
+            assert(version not in vfpaths[fpath])
+            vfpaths[fpath][version] = vfpath
+            all_versions.add(version)
+        lgr.log(5, "Found %d versioned files of %d versions: %s", len(vfpaths), len(all_versions), vfpaths)
+
+        # check if for each one of them there is no unversioned one or handle it
+        for fpath in vfpaths:
+            if lexists(fpath):
+                if unversioned == 'fail':
+                    raise RuntimeError(
+                        "There is an unversioned file %s whenever also following "
+                        "versions were found: %s" % (fpath, vfpaths[fpath]))
+                else:
+                    raise NotImplemented(unversioned)
+
+        # For now simple implementation which assumes no per-file separate versioning,
+        # necessity to overlay next versions on top of previous for other files, etc
+        # TODO: handle more complex scenarios
+
+        # theoretically shouln't be necessary and code below should be general enough
+        # to work in this case TODO: remove
+        if not all_versions:
+            # no versioned files -- nothing for us to do here
+            yield data
+            return
+
+        # sort all the versions and prepend with 'None'
+        all_versions = [None] + map(str, sorted(map(LooseVersion, all_versions)))
+
+        # get last processed version
+        prev_version = None  # TODO
+
+        # Get next version
+        prev_version_index = all_versions.index(prev_version)
+        if prev_version_index < len(all_versions):
+            current_version_index = prev_version_index + 1
+        else:
+            assert(prev_version is not None)  # since we quit early above, shouldn' happen
+            lgr.debug("No new versions found from previous %s" % prev_version)
+            # How do we exit all the pipelining!!!???
+            #  If this was a 'refresh' run which didn't fetch anything new,
+            #  and we did get here, we should re-process prev version but signal
+            #  that no additional looping is needed
+            current_version_index = prev_version_index
+
+        # Set the flag so we loop or not -- depends if new versions available
+        setattr(stats.flags, flag_to_redo, current_version_index + 1 < len(all_versions))
+        current_version = all_versions[current_version_index]
+
+        # Go through all versioned files and remove all but current one
+        # Since implementation is limited ATM, raise exception if there is no current
+        # version for some file
+        removed_other_versions = 0
+        for fpath, versions in vfpaths.items():
+            if current_version not in versions:
+                raise RuntimeError("Found no version %s for file %s. Available: %s"
+                                   % (current_version, fpath, versions))
+            for version, vfpath in versions.items():
+                if version != current_version:
+                    lgr.debug("Removing %s since not of current version %s" % (vfpath, current_version))
+                    unlink(vfpath)
+                    removed_other_versions += 1
+                elif rename:
+                    lgr.debug("Renaming %s into %s" % (vfpath, fpath))
+                    os.rename(vfpath, fpath)
+
+        # TODO: something about stats for e.g. removed_other_versions
+        yield updated(data, {'version': current_version})
+
+    return _prune_to_the_next_version

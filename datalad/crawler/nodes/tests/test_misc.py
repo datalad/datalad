@@ -61,15 +61,21 @@ def test_interrupt_if():
     eq_(list(n(tdict)), [tdict])
     assert_raises(FinishPipeline, next, interrupt_if(tdict)(tdict))
 
+    eq_(list(interrupt_if({'v1': 'ye.$'})(tdict)), [tdict])
+    assert_raises(FinishPipeline, next, interrupt_if({'v1': 'ye.$'}, re=True)(tdict))
+
 def test_skip_if():
     n = skip_if({'v1': 'done'})
-    assert_equal(list(n(dict(v1='done'))), [])
-    assert_equal(list(n(dict(v1='not done'))), [{'v1': 'not done'}])
-    assert_equal(list(n(dict(v1='done', someother=123))), [])
+    eq_(list(n(dict(v1='done'))), [])
+    eq_(list(n(dict(v1='not done'))), [{'v1': 'not done'}])
+    eq_(list(n(dict(v1='done', someother=123))), [])
     tdict = dict(v1='not yet', someother=123)
     # and that we would interrupt while matching multiple values
     eq_(list(n(tdict)), [tdict])
-    assert_equal(list(skip_if(tdict)(tdict)), [])
+    eq_(list(skip_if(tdict)(tdict)), [])
+
+    eq_(list(skip_if({'v1': 'ye.$'})(tdict)), [tdict])
+    eq_(list(skip_if({'v1': 'ye.$'}, re=True)(tdict)), [])
 
 
 def test_func_to_node():

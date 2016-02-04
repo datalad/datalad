@@ -148,9 +148,9 @@ def get_disposition_filename(data):
     yield updated(data, {'filename': get_url_disposition_filename(data['url'])})
 
 class _act_if(object):
-    """Base class for nodes which would act if input data matches regexps
+    """Base class for nodes which would act if input data matches specified values
     """
-    def __init__(self, values):
+    def __init__(self, values, re=False):
         """
 
         Parameters
@@ -158,12 +158,17 @@ class _act_if(object):
         values: dict
           Key/value pairs to compare arrived data against.  Would raise
           FinishPipeline if all keys have matched target values
+        re: bool, optional
+          If specified values to be treated as regular expression to be
+          searched
         """
         self.values = values
+        self.re = re
 
     def __call__(self, data):
+        comp = re.search if self.re else lambda x,y: x==y
         for k, v in iteritems(self.values):
-            if not (k in data and v == data[k]):
+            if not (k in data and comp(v, data[k])):
                 # do nothing and pass the data further
                 yield data
                 # and quit
@@ -174,14 +179,14 @@ class _act_if(object):
     def _act(self):
         raise NotImplementedError
 
-
+@auto_repr
 class interrupt_if(_act_if):
     """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
 
     def _act(self, data):
         raise FinishPipeline
 
-
+@auto_repr
 class skip_if(_act_if):
     """Skip (do not yield anything) further pipeline processing whenever obtained data matches provided value(s)"""
 

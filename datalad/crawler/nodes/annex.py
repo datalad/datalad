@@ -385,6 +385,8 @@ class Annexificator(object):
             if out_json:  # if not try -- should be here!
                 _call(stats.increment, 'add_annex' if added_to_annex else 'add_git')
 
+        # TODO!!:  sanity check that no large files are added to git directly!
+
         # So we have downloaded the beast
         # Since annex doesn't care to set mtime for the symlink itself we better set it outselves
         if remote_status and lexists(filepath):  # and islink(filepath):
@@ -480,7 +482,7 @@ class Annexificator(object):
         ----------
         branch: str
           Branch to be merged
-        strategy: None or 'theirs', optional
+        strategy: None or 'theirs', 'theirs-adhoc', optional
           With 'theirs' strategy remote branch content is used 100% as is.
           'theirs' with commit=False can be used to prepare data from that branch for
           processing by further steps in the pipeline
@@ -523,6 +525,25 @@ class Annexificator(object):
                     stats = data.get('datalad_stats', None)
                     if stats:
                         stats.merges.append([branch, self.repo.git_get_active_branch()])
+            elif strategy == "theirs-adhoc":
+                # since git can't repeat the same merge, we need to do it manually
+                """
+# method 1 -- via temp commit
+git merge -s ours --no-commit --no-ff b2
+...
+git commit -m 'removed 1234'
+# inline git rev-parse 'HEAD^{tree}'
+echo 'doing merge from 731cb77efff5a92b1c8ec1b5af4717442f7d9a45' | git commit-tree `git rev-parse 'HEAD^{tree}'` \
+ -p HEAD^ -p b2
+git reset --hard d5686b10a91d745043c2074d61764a19e8a67bc6 # to that treeish returned
+
+# method 2 --
+git merge -s ours --no-commit --no-ff b2
+# needs to write .git/MERGE_HEAD  to be used later on for b2
+...
+git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git write-tree` -p HEAD -p b2)
+                """
+                raise NotImplementedError()
             yield data
         return merge_branch
 
@@ -550,7 +571,6 @@ class Annexificator(object):
             stats = data.get('datalad_stats', ActivityStats())
             archive = self._get_fpath(data, stats)
             # TODO: may be adjust annex_options
-            #import pdb; pdb.set_trace()
             annex = add_archive_content(
                 archive, annex=self.repo,
                 delete=True, key=False, commit=commit, allow_dirty=True,

@@ -13,6 +13,7 @@ from os.path import lexists
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
+from ..nodes.crawl_url import prune_to_the_next_version
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import sub
@@ -113,9 +114,22 @@ def pipeline(dataset, versioned_urls=True):
             # TODO: describe_handle
         ],
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
+        # [ {'loop': 'datalad_stats.flags.loop_versions',  # to loop while there is a flag in stats to process all the versions
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
+            prune_to_the_next_version(
+                # ATM wouldn't deal with multiple notations for versioning present in the same tree TODO?
+                # ATM -- non deep -- just leading  TODO?
+                '_R(?P<version>\d+[\.\d]*)(?=[\._])',
+                name='revisions',      # optional,  to identify "versionier"
+                # ha -- we could store status in prev commit msg may be? then no need for any additional files !
+                store_version_info='commit',  # other methods -- some kind of db
+                unversioned='oldest',  # 'latest' - consider to be the latest one, 'oldest' the oldest, 'mtime' -judge by mtime, 'fail'
+                mtimes='check',  # check -- fail if revisioning says otherwise, None/'ignore',
+                rename=True,  # rename last version into the one without version suffix
+                flag_to_redo='loop_versions'  # "flag" to redo the loop if newer versions are yet to be processed
+            ),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
                 {'loop': True},
@@ -123,6 +137,7 @@ def pipeline(dataset, versioned_urls=True):
                 annex.add_archive_content(
 					existing='archive-suffix',
 					strip_leading_dirs=True,
+                    exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
                     # overwrite=True,
                     # TODO: we might need a safeguard for cases if multiple subdirectories within a single tarball
                     #rename=
@@ -132,5 +147,6 @@ def pipeline(dataset, versioned_urls=True):
         ],
         annex.switch_branch('master'),
         annex.merge_branch('incoming-processed'), #, commit=False),
+        # ] # finish the loop for versioned ones
         annex.finalize,
     ]
