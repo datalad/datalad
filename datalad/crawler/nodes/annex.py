@@ -14,13 +14,17 @@ import time
 from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
 from os.path import split as ops
 from os import unlink, makedirs
-
+from collections import OrderedDict
 from humanize import naturalsize
+from six import iteritems
+
+from git import Repo
 
 from ...api import add_archive_content
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
+from ...utils import find_files
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
@@ -28,6 +32,7 @@ from ...support.gitrepo import GitRepo
 from ...support.annexrepo import AnnexRepo
 from ...support.handlerepo import HandleRepo
 from ...support.stats import ActivityStats
+from ...support.versions import get_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -556,27 +561,94 @@ git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git writ
         self.repo.precommit()  # so that all batched annexes stop
         self.repo.cmd_call_wrapper.run(["git", "commit"] + options)
 
-    def commit_versions(self, ALL_THE_ARGS_FOR_prune_to_the_next_version):
+    def _unstage(self, fpaths):
+        self.repo.cmd_call_wrapper.run(["git", "reset"] + fpaths)
+
+    def _stage(self, fpaths):
+        self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
+
+
+    def commit_versions(self,
+                        regex,
+                        topdir=curdir,
+                        dirs=True,  # either match directory names
+                        rename=False,
+                        **kwargs):
         """Generate multiple commits if multiple versions were staged
         """
         def _commit_versions(data):
-            # figure out versioned files
+            # figure out versions for all files (so we could handle conflicts with existing
+            # non versioned)
+            # TODO:  we need to care only about staged (and unstaged?) files ATM!
+            # So let's do it.  And use separate/new Git repo since we are doing manual commits through
+            # calls to git.  TODO: RF to avoid this
+            repo = Repo(self.repo.path)
+            staged = repo.
+
+            notstaged = []
+            for obj in repo.index.diff(None):
+                assert()
+                nonstaged
+
+            versions = get_versions(find_files(self.repo.path, dirs=dirs, topdir=topdir), regex, **kwargs)
+
+            # we don't really care about unversioned ones... overlay and all that ;)
+            if None in versions:
+                versions.pop(None)
+
+            # take only new versions to deal with
+            prev_version = None  # TODO
+
+            if prev_version is None:
+                new_versions = versions  # consider all!
+            else:
+                if prev_version not in versions:
+                    # probably it should be all ok, we just need to figure out where to start
+                    # but for now -- FAIL... TODO
+                    raise RuntimeError("previous version %s not found among %s" % (prev_version, versions.keys()))
+                version_keys = list(versions.keys())
+                new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
 
             # early return if no special treatment is needed
             nnew_versions = len(new_versions)
-            if nnew_versions > 1:
+            if nnew_versions <= 1:
                 # if a single new version -- no special treatment is needed
                 # we can't return a generator here
                 for d in self.finalize(data):
                     yield d
                 return
 
-            # unstage versioned files from the index
+            # unstage all versioned files from the index
+            self.repo.precommit()  # so that all batched annexes stop
             nunstaged = 0  # ???
-            for iversion, version in enumerate(new_versions):  # for all versions past previous
-                # add files of that version to index
-                nunstaged -= 1
+            for version, fpaths in iteritems(versions):
+                nfpaths = len(fpaths)
+                lgr.debug("Unstaging %d files for version %s", nfpaths, version)
+                nunstaged += nfpaths
+                _call(self._unstage, list(fpaths))
+
+            for iversion, (version, fpaths) in enumerate(iteritems(new_versions)):  # for all versions past previous
+                # stage/add files of that version to index
+                if rename:
+                    # we need to rename and create a new vfpaths
+                    vfpaths = []
+                    for fpath, vfpath in iteritems(fpaths):
+                        # ATM we do not allow unversioned -- should have failed earlier, if not HERE!
+                        # assert(not lexists(fpath))
+                        # nope!  it must be there from previous commit of a versioned file!
+                        # so rely on logic before
+                        lgr.debug("Renaming %s into %s" % (vfpath, fpath))
+                        os.rename(vfpath, fpath)
+                        vfpaths.append(fpath)
+                else:
+                    # so far we didn't bother about status, so just values would be sufficient
+                    vfpaths = list(fpaths.values())
+                nfpaths = len(vfpaths)
+                lgr.debug("Staging %d files for version %s", nfpaths, version)
+                nunstaged -= nfpaths
+                assert(nfpaths >= 0)
                 assert(nunstaged >= 0)
+                _call(self._stage, vfpaths)
                 # RF: with .finalize to avoid code duplication etc
                 # ??? what to do about stats and states?  reset them or somehow tune/figure it out?
                 vmsg = "Version #%d/%d: %s. Remaining unstaged: %d " % (iversion, nnew_versions, version, nunstaged)
@@ -585,6 +657,7 @@ git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git writ
                 # unless we update data, no need to yield multiple times I guess
                 # but shouldn't hurt
                 yield data
+            assert(nunstaged == 0)  # we at the end committed all of them!
 
         return _commit_versions
 
