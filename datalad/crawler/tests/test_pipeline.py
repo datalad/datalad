@@ -171,6 +171,7 @@ def _out(ld):
                 out[k] = v
     return outl
 
+
 def test_pipeline_linear_simple():
     sink = Sink()
     pipeline = [
@@ -190,8 +191,10 @@ def test_pipeline_linear_simple():
     eq_(pipeline_output, DEFAULT_OUTPUT)
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}])
 
+
 def test_pipeline_unknown_opts():
     assert_raises(ValueError, run_pipeline, [{'xxx': 1}])
+
 
 def test_pipeline_linear_nested_order():
     sink = Sink()
@@ -264,6 +267,7 @@ def test_pipeline_linear_nested():
     pipeline_output = run_pipeline(pipeline)
     eq_(pipeline_output, _out([{'out1': 1, 'out2': 2}]))
 
+
 def test_pipeline_recursive():
     def less3(data):
         """a little helper which would not yield whenever input x>3"""
@@ -276,6 +280,7 @@ def test_pipeline_recursive():
     ]
     pipeline_output = run_pipeline(pipeline, dict(x=0))
     eq_(pipeline_output, _out([{'x': 1}, {'x': 2}, {'x': 3}]))
+
 
 def test_pipeline_looping():
     count = [0, 0]
@@ -291,7 +296,15 @@ def test_pipeline_looping():
         count[1] += 1
         yield updated(data, {'count': count[0]})
 
+    def passthrough(data):
+        yield data
+
     pipeline_output = run_pipeline([{'loop': True}, count_threetimes], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0}]))
+    eq_(count, [3, 0])
+
+    # and even if the node not yielding is note the first node
+    pipeline_output = run_pipeline([{'loop': True}, passthrough, count_threetimes], dict(x=0))
     eq_(pipeline_output, _out([{'x': 0}]))
     eq_(count, [3, 0])
 
