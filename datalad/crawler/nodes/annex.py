@@ -480,19 +480,21 @@ class Annexificator(object):
             yield updated(data, {"git_branch": branch})
         return switch_branch
 
-    def merge_branch(self, branch, strategy=None, commit=True, skip_no_changes=None):
+    def merge_branch(self, branch, strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
         """Merge a branch into a current branch
 
         Parameters
         ----------
         branch: str
           Branch to be merged
-        strategy: None or 'theirs', 'theirs-adhoc', optional
+        strategy: None or 'theirs', optional
           With 'theirs' strategy remote branch content is used 100% as is.
           'theirs' with commit=False can be used to prepare data from that branch for
           processing by further steps in the pipeline
         commit: bool, optional
           Either to commit when merge is complete
+        one_commit_at_at_time: bool, optional
+          Either to generate
         skip_no_changes: None or bool, optional
           Either to not perform any action if there is no changes from previous merge
           point. If None, config TODO will be consulted with default of being True (i.e. skip
@@ -504,7 +506,9 @@ class Annexificator(object):
         def merge_branch(data):
             if self.repo.dirty:
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
-            last_merged_checksum = self.repo.git_get_merge_base([self.repo.git_get_active_branch(), branch])
+            active_branch = self.repo.git_get_active_branch()
+
+            last_merged_checksum = self.repo.git_get_merge_base([active_branch, branch])
             if last_merged_checksum == self.repo.git_get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
                 skip_no_changes_ = skip_no_changes
@@ -515,41 +519,40 @@ class Annexificator(object):
                     lgr.debug("Skipping the merge")
                     return
 
-            lgr.info("Initiating merge of %(branch)s using strategy %(strategy)s", locals())
+            if one_commit_at_a_time:
+                # we need to get through the history
+                # TODO:  --left-only does smth else -- ideally we should figure out
+                #  how to jsut get through left part of the tree and merge those
+                out, err = self.repo.cmd_call_wrapper.run(["git", "log", "--oneline", "%s..%s" % (active_branch, branch)])
+                assert out  # there should be some commits since above check said that they differ
+                all_to_merge = [l.split(None, 1)[0] for l in out.split('\n')]
+            else:
+                all_to_merge = [branch]
+
+            nmerges = len(all_to_merge)
+            lgr.info("Initiating %(nmerges)d merges of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
-            if strategy is None:
-                self.repo.git_merge(branch, options=options)
-            elif strategy == 'theirs':
-                self.repo.git_merge(branch, options=["-s", "ours", "--no-commit"], expect_stderr=True)
-                self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % branch)
-                self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
+            for to_merge in all_to_merge:
+                if strategy is None:
+                    self.repo.git_merge(to_merge, options=options)
+                elif strategy == 'theirs':
+                    self.repo.git_merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
+                    self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % to_merge)
+                    self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
+                else:
+                    raise NotImplementedError(strategy)
+
                 if commit:
-                    self._commit("Merged %s using strategy %s" % (branch, strategy), options=["-a"])
+                    if strategy is not None:
+                        msg = branch if (nmerges == 1) else ("%s (%s)" % (branch, to_merge))
+                        self._commit("Merged %s using strategy %s" % (msg, strategy), options=["-a"])
                 else:
                     # Record into our activity stats
                     stats = data.get('datalad_stats', None)
                     if stats:
-                        stats.merges.append([branch, self.repo.git_get_active_branch()])
-            elif strategy == "theirs-adhoc":
-                # since git can't repeat the same merge, we need to do it manually
-                """
-# method 1 -- via temp commit
-git merge -s ours --no-commit --no-ff b2
-...
-git commit -m 'removed 1234'
-# inline git rev-parse 'HEAD^{tree}'
-echo 'doing merge from 731cb77efff5a92b1c8ec1b5af4717442f7d9a45' | git commit-tree `git rev-parse 'HEAD^{tree}'` \
- -p HEAD^ -p b2
-git reset --hard d5686b10a91d745043c2074d61764a19e8a67bc6 # to that treeish returned
+                        stats.merges.append([branch, active_branch])
 
-# method 2 --
-git merge -s ours --no-commit --no-ff b2
-# needs to write .git/MERGE_HEAD  to be used later on for b2
-...
-git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git write-tree` -p HEAD -p b2)
-                """
-                raise NotImplementedError()
-            yield data
+                yield data
         return merge_branch
 
     def _commit(self, msg=None, options=[]):
@@ -570,7 +573,6 @@ git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git writ
 
     def commit_versions(self,
                         regex,
-                        topdir=curdir,
                         dirs=True,  # either match directory names
                         rename=False,
                         **kwargs):
@@ -583,14 +585,28 @@ git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git writ
             # So let's do it.  And use separate/new Git repo since we are doing manual commits through
             # calls to git.  TODO: RF to avoid this
             repo = Repo(self.repo.path)
-            staged = repo.
 
-            notstaged = []
-            for obj in repo.index.diff(None):
-                assert()
-                nonstaged
+            def process_diff(diff):
+                """returns full paths for files in the diff"""
+                out = []
+                for obj in diff:
+                    assert(not obj.renamed)  # not handling atm
+                    assert(not obj.deleted_file)  # not handling atm
+                    assert(obj.a_path == obj.b_path)  # not handling atm
+                    out.append(opj(self.repo.path, obj.a_path))
+                return out
 
-            versions = get_versions(find_files(self.repo.path, dirs=dirs, topdir=topdir), regex, **kwargs)
+            staged = process_diff(repo.index.diff(repo.head))
+            notstaged = process_diff(repo.index.diff(None))
+
+            # Verify that everything is under control!
+            assert(not notstaged)  # not handling atm, although should be safe I guess just needs logic to not unstage them
+            assert(not repo.untracked_files)  # not handling atm
+
+            if not dirs:
+                raise NotImplementedError("ATM matching will happen to dirnames as well")
+
+            versions = get_versions(staged, regex, **kwargs)
 
             # we don't really care about unversioned ones... overlay and all that ;)
             if None in versions:
@@ -602,12 +618,20 @@ git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git writ
             if prev_version is None:
                 new_versions = versions  # consider all!
             else:
+                version_keys = list(versions.keys())
                 if prev_version not in versions:
                     # probably it should be all ok, we just need to figure out where to start
                     # but for now -- FAIL... TODO
                     raise RuntimeError("previous version %s not found among %s" % (prev_version, versions.keys()))
-                version_keys = list(versions.keys())
                 new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
+                # if we have "new_versions" smallest one smaller than previous -- we got a problem!
+                # TODO: how to handle ==? which could be legit if more stuff was added for the same
+                # version?  but then if we already tagged with that -- we would need special handling
+                if new_versions:
+                    smallest_new_version = next(new_versions.keys())
+                    if smallest_new_version <= prev_version:
+                        raise ValueError("Smallest new version %s is <= prev_version %s"
+                                         % (smallest_new_version, prev_version))
 
             # early return if no special treatment is needed
             nnew_versions = len(new_versions)

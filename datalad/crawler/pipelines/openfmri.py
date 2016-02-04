@@ -37,10 +37,10 @@ def extract_readme(data):
     lgr.info("Generated README.txt")
     yield {'filename': "README.txt"}
 
-def pipeline(dataset, versioned_urls=True):
+def pipeline(dataset, versioned_urls=True, topurl='https://openfmri.org/dataset'):
     """Pipeline to crawl/annex an openfmri dataset"""
 
-    dataset_url = 'https://openfmri.org/dataset/%s' % dataset
+    dataset_url = '%s/%s' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
@@ -112,31 +112,24 @@ def pipeline(dataset, versioned_urls=True):
             #    annex,
             # ],
             # TODO: describe_handle
+            # Now some true magic -- possibly multiple commits, 1 per each detected version!
+            # Do not rename to stay consistent with single version commits... and stuff can change
+            # for the same version I am afraid...
+            annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])', rename=False)
         ],
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
         # [ {'loop': 'datalad_stats.flags.loop_versions',  # to loop while there is a flag in stats to process all the versions
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
-            annex.merge_branch('incoming', strategy='theirs', commit=False),
-            __prune_to_the_next_version(
-                # ATM wouldn't deal with multiple notations for versioning present in the same tree TODO?
-                # ATM -- non deep -- just leading  TODO?
-                '_R(?P<version>\d+[\.\d]*)(?=[\._])',
-                name='revisions',      # optional,  to identify "versionier"
-                # ha -- we could store status in prev commit msg may be? then no need for any additional files !
-                store_version_info='commit',  # other methods -- some kind of db
-                unversioned='oldest',  # 'latest' - consider to be the latest one, 'oldest' the oldest, 'mtime' -judge by mtime, 'fail'
-                mtimes='check',  # check -- fail if revisioning says otherwise, None/'ignore',
-                rename=True,  # rename last version into the one without version suffix
-                flag_to_redo='loop_versions'  # "flag" to redo the loop if newer versions are yet to be processed
-            ),
+            {'loop': True},  # loop for multiple versions merges
+            annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
                 {'loop': True},
-                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True), #  we fail if none found -- there must be some! ;)),
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  #  we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
-					existing='archive-suffix',
-					strip_leading_dirs=True,
+                    existing='archive-suffix',
+                    strip_leading_dirs=True,
                     exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
                     # overwrite=True,
                     # TODO: we might need a safeguard for cases if multiple subdirectories within a single tarball
@@ -144,9 +137,11 @@ def pipeline(dataset, versioned_urls=True):
                 ),
                 # annex, # not needed since above add_archive_content adds to annex
             ],
+            annex.switch_branch('master'),
+            annex.merge_branch('incoming-processed', commit=True),
+            annex.switch_branch('incoming-processed'),  # so we could possibly merge more
         ],
         annex.switch_branch('master'),
-        annex.merge_branch('incoming-processed'), #, commit=False),
         # ] # finish the loop for versioned ones
         annex.finalize,
     ]

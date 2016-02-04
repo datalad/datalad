@@ -20,11 +20,6 @@ from os.path import join as opj
 
 from collections import OrderedDict
 from six import iteritems
-from ..utils import updated
-from ..utils import find_files
-from ..dochelpers import exc_str
-from ..downloaders.base import DownloadError
-from ..downloaders.providers import Providers
 
 from logging import getLogger
 lgr = getLogger('datalad.support.versions')
