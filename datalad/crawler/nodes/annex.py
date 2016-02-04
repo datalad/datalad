@@ -556,6 +556,38 @@ git reset --hard $(echo "doing merge via write-tree" | git commit-tree `git writ
         self.repo.precommit()  # so that all batched annexes stop
         self.repo.cmd_call_wrapper.run(["git", "commit"] + options)
 
+    def commit_versions(self, ALL_THE_ARGS_FOR_prune_to_the_next_version):
+        """Generate multiple commits if multiple versions were staged
+        """
+        def _commit_versions(data):
+            # figure out versioned files
+
+            # early return if no special treatment is needed
+            nnew_versions = len(new_versions)
+            if nnew_versions > 1:
+                # if a single new version -- no special treatment is needed
+                # we can't return a generator here
+                for d in self.finalize(data):
+                    yield d
+                return
+
+            # unstage versioned files from the index
+            nunstaged = 0  # ???
+            for iversion, version in enumerate(new_versions):  # for all versions past previous
+                # add files of that version to index
+                nunstaged -= 1
+                assert(nunstaged >= 0)
+                # RF: with .finalize to avoid code duplication etc
+                # ??? what to do about stats and states?  reset them or somehow tune/figure it out?
+                vmsg = "Version #%d/%d: %s. Remaining unstaged: %d " % (iversion, nnew_versions, version, nunstaged)
+                _call(self._commit, "%sFinalizing %s %s" % (vmsg, ','.join(self._states), stats_str), options=[])
+
+                # unless we update data, no need to yield multiple times I guess
+                # but shouldn't hurt
+                yield data
+
+        return _commit_versions
+
 
     #TODO: @borrow_kwargs from api_add_...
     def add_archive_content(self, commit=False, **aac_kwargs):

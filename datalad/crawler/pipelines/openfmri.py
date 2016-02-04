@@ -13,7 +13,7 @@ from os.path import lexists
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
-from ..nodes.crawl_url import prune_to_the_next_version
+from ..nodes.crawl_url import __prune_to_the_next_version
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import sub
@@ -118,7 +118,7 @@ def pipeline(dataset, versioned_urls=True):
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
-            prune_to_the_next_version(
+            __prune_to_the_next_version(
                 # ATM wouldn't deal with multiple notations for versioning present in the same tree TODO?
                 # ATM -- non deep -- just leading  TODO?
                 '_R(?P<version>\d+[\.\d]*)(?=[\._])',

@@ -14,11 +14,12 @@ from datalad.tests.utils import eq_, ok_
 from datalad.tests.utils import serve_path_via_http, with_tree
 from ..crawl_url import crawl_url
 from ..crawl_url import parse_checksums
-from ..crawl_url import prune_to_the_next_version
+from ..crawl_url import __prune_to_the_next_version
 from ..matches import a_href_match
 from ...pipeline import run_pipeline
 from ....tests.utils import assert_equal
 from ....tests.utils import assert_false
+from ....tests.utils import SkipTest
 from ....utils import updated
 
 pages_loop = dict(
@@ -82,14 +83,14 @@ bcd  d1/f1.txt
     'f1_r1.1': 'v1.1',
     'unversioned': 'buga',
 })
-def test_prune_to_the_next_version_basic(topdir):
+def __test_prune_to_the_next_version_basic(topdir):
     # ATM doesn't care about many things and I guess ideally it should have been just a function
     # taking a list of files or something like that.  ATM it looks at the drive, and requires
     # internal "db" to mark what was the previous processed/known version
     from ....support.stats import ActivityStats
     activity_stats = ActivityStats()
     input = {'datalad_stats': activity_stats}
-    pn = prune_to_the_next_version('_r(?P<version>.*)', topdir=topdir)
+    pn = __prune_to_the_next_version('_r(?P<version>.*)', topdir=topdir)
 
     output = list(pn(input))
     assert_equal(output, [updated(input, {'version': '1'})])
@@ -97,7 +98,7 @@ def test_prune_to_the_next_version_basic(topdir):
     # by default -- renaming the file into the one without version
     assert_equal(glob(opj(topdir, '*')), [opj(topdir, 'f1'), opj(topdir, 'unversioned')])
 
-
+    raise SkipTest("we need to figure out what we actually want")
     # TODO: we need to bring to the same state as before!
     # if we do it 2nd time, version should progress
     output = list(pn(input))

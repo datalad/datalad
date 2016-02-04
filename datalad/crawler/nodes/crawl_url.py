@@ -17,9 +17,12 @@ from os import unlink
 from os.path import splitext, dirname, basename, curdir
 from os.path import lexists
 from os.path import join as opj
+
+from six import iteritems
 from ...utils import updated
 from ...utils import find_files
 from ...dochelpers import exc_str
+from ...support.versions import get_versions
 from ...downloaders.base import DownloadError
 from ...downloaders.providers import Providers
 
@@ -170,7 +173,7 @@ so there is a directory with that version and then version in the filename.  I g
 level of directories and then with additional rename command strip suffix in the filename
 """
 
-def prune_to_the_next_version(
+def __prune_to_the_next_version(
     # ATM wouldn't deal with multiple notations for versioning present in the same tree TODO?
     # ATM -- non deep -- just leading  TODO?
     regex,
@@ -198,55 +201,48 @@ def prune_to_the_next_version(
         if mtimes != 'ignore':
             raise NotImplementedError(mtimes)
 
-        # collect all versioned files
-        vfpaths = {}  # file -> [versions]
-        all_versions = set()
-        for vfpath in find_files(regex, dirs=dirs, topdir=topdir):
-            # reapply regex to extract version
-            res = re.search(regex, vfpath)
-            fpath = vfpath[:res.start()] + vfpath[res.end():]  # unversioned one
-            version = res.groupdict().get('version', vfpath[res.start():res.end()])
-            if fpath not in vfpaths:
-                vfpaths[fpath] = {}
-            # 1 more version, must not be there already!
-            assert(version not in vfpaths[fpath])
-            vfpaths[fpath][version] = vfpath
-            all_versions.add(version)
-        lgr.log(5, "Found %d versioned files of %d versions: %s", len(vfpaths), len(all_versions), vfpaths)
+        versions = get_versions(
+                find_files('.', dirs=dirs, topdir=topdir),
+                regex=regex,
+                unversioned=unversioned)
 
-        # check if for each one of them there is no unversioned one or handle it
-        for fpath in vfpaths:
-            if lexists(fpath):
-                if unversioned == 'fail':
-                    raise RuntimeError(
-                        "There is an unversioned file %s whenever also following "
-                        "versions were found: %s" % (fpath, vfpaths[fpath]))
-                else:
-                    raise NotImplemented(unversioned)
+        # gave . regex now
+        # # since we gave only regex matching ones to get_versions, there will be no None
+        # # versioned
+        # # check if for each one of them there is no unversioned one or handle it
+        # for fpath in vfpaths:
+        #     if lexists(fpath):
+        #         if unversioned == 'fail':
+        #             raise RuntimeError(
+        #                 "There is an unversioned file %s whenever also following "
+        #                 "versions were found: %s" % (fpath, vfpaths[fpath]))
+        #         else:
+        #             raise NotImplemented(unversioned)
 
         # For now simple implementation which assumes no per-file separate versioning,
         # necessity to overlay next versions on top of previous for other files, etc
         # TODO: handle more complex scenarios
 
-        # theoretically shouln't be necessary and code below should be general enough
+        # theoretically shouldn't be necessary and code below should be general enough
         # to work in this case TODO: remove
-        if not all_versions:
-            # no versioned files -- nothing for us to do here
+        versions_keys = versions.keys()
+        if len(versions) <= 1 or (len(versions) == 2 and versions_keys[0] == [None]):
+            # no versioned files -- or just 1 version of top of None
             yield data
             return
 
-        # sort all the versions and prepend with 'None'
-        all_versions = [None] + map(str, sorted(map(LooseVersion, all_versions)))
+        # # sort all the versions and prepend with 'None'
+        # all_versions = [None] + map(str, sorted(map(LooseVersion, all_versions)))
 
         # get last processed version
         prev_version = None  # TODO
 
         # Get next version
-        prev_version_index = all_versions.index(prev_version)
-        if prev_version_index < len(all_versions):
+        prev_version_index = versions_keys.index(prev_version)
+        if prev_version_index < len(versions):
             current_version_index = prev_version_index + 1
         else:
-            assert(prev_version is not None)  # since we quit early above, shouldn' happen
+            assert(prev_version is not None)  # since we quit early above, shouldn't happen
             lgr.debug("No new versions found from previous %s" % prev_version)
             # How do we exit all the pipelining!!!???
             #  If this was a 'refresh' run which didn't fetch anything new,
@@ -255,18 +251,18 @@ def prune_to_the_next_version(
             current_version_index = prev_version_index
 
         # Set the flag so we loop or not -- depends if new versions available
-        setattr(stats.flags, flag_to_redo, current_version_index + 1 < len(all_versions))
-        current_version = all_versions[current_version_index]
+        setattr(stats.flags, flag_to_redo, current_version_index + 1 < len(versions))
+        current_version = versions_keys[current_version_index]
 
         # Go through all versioned files and remove all but current one
         # Since implementation is limited ATM, raise exception if there is no current
         # version for some file
         removed_other_versions = 0
-        for fpath, versions in vfpaths.items():
-            if current_version not in versions:
-                raise RuntimeError("Found no version %s for file %s. Available: %s"
-                                   % (current_version, fpath, versions))
-            for version, vfpath in versions.items():
+        for version, fpaths in iteritems(versions):
+            if version is None:
+                # Nothing to be done AFAIK
+                continue
+            for fpath, vfpath in iteritems(fpaths):
                 if version != current_version:
                     lgr.debug("Removing %s since not of current version %s" % (vfpath, current_version))
                     unlink(vfpath)
