@@ -18,6 +18,7 @@ from ..nodes.misc import assign
 from ..nodes.misc import sub
 from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
+from ..nodes.misc import skip_if
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
 from ...utils import updated
@@ -48,7 +49,13 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
         backend="MD5E",
         special_remotes=[DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE],
         # many datasets are actually quite small, so we can simply git them up
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"])
+        # below one didn't work out as it should have -- caused major headache either due to bug here or in annex
+        # and comitting to git large .mat and .h5 files
+        # options=["-c", "annex.largefiles=exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"]
+        #
+        # CRCNS requires authorization, so only README* should go straight under git
+        options=["-c", "annex.largefiles=exclude=README"]
+    )
 
     crawler = crawl_url(dataset_url)
     return [
@@ -72,6 +79,9 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
                 parse_checksums(digest='md5'),
                 # they all contain filelist and checksums.md5 which we can make use of without explicit crawling
                 # no longer valid
+                # TODO:  do not download checksums.md (annex would do it) and filelist.txt (includes download
+                #   instructions which might confuse, not help)
+                skip_if({'url': '(checksums.md5|filelist.txt)$'}, re=True),
                 annex,
             ],
         ],
@@ -79,10 +89,11 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True), # So we fail if none found -- there must be some! ;)),
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
-					existing='archive-suffix',
-					strip_leading_dirs=True,  leading_dirs_depth=2,
+                    existing='archive-suffix',
+                    strip_leading_dirs=True,  leading_dirs_depth=2,
+                    exclude='.*__MACOSX$',  # some junk penetrates
                 ),
             ],
         ],
