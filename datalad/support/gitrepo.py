@@ -381,6 +381,10 @@ class GitRepo(object):
 
         return self.repo.index.remove(files, working_tree=True, **kwargs)
 
+    def precommit(self):
+        """Perform pre-commit maintenance tasks
+        """
+        self.repo.index.write()  # flush possibly cached in GitPython changes to index
 
     def git_commit(self, msg=None, options=None):
         """Commit changes to git.

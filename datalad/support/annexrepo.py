@@ -872,6 +872,7 @@ class AnnexRepo(GitRepo):
         since they might still need to flush their changes into index
         """
         self._batched.close()
+        super(AnnexRepo, self).precommit()
 
     # TODO: oh -- API for this better gets RFed sooner than later!
     #       by overloading commit in GitRepo
