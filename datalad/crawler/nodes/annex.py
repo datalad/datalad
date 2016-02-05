@@ -481,13 +481,17 @@ class Annexificator(object):
             yield updated(data, {"git_branch": branch})
         return switch_branch
 
-    def merge_branch(self, branch, strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
+    def merge_branch(self, branch, target_branch=None,
+                     strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
         """Merge a branch into a current branch
 
         Parameters
         ----------
         branch: str
           Branch to be merged
+        target_branch: str, optional
+          Into which branch to merge. If not None, it will be checked out first.
+          At the end we will return into original branch
         strategy: None or 'theirs', optional
           With 'theirs' strategy remote branch content is used 100% as is.
           'theirs' with commit=False can be used to prepare data from that branch for
@@ -505,11 +509,19 @@ class Annexificator(object):
         assert(strategy in (None, 'theirs'))
 
         def merge_branch(data):
+
+            if target_branch is not None:
+                orig_branch = self.repo.git_get_active_branch()
+                target_branch_ = target_branch
+                list(self.switch_branch(target_branch_)(data))
+            else:
+                orig_branch = None
+                target_branch_ = self.repo.git_get_active_branch()
+
             if self.repo.dirty:
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
-            active_branch = self.repo.git_get_active_branch()
 
-            last_merged_checksum = self.repo.git_get_merge_base([active_branch, branch])
+            last_merged_checksum = self.repo.git_get_merge_base([target_branch_, branch])
             if last_merged_checksum == self.repo.git_get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
                 skip_no_changes_ = skip_no_changes
@@ -521,35 +533,27 @@ class Annexificator(object):
                     return
 
             if one_commit_at_a_time:
-                # we need to get through the history
-                # TODO:  --left-only does smth else -- ideally we should figure out
-                #  how to jsut get through left part of the tree and merge those
                 all_to_merge = list(
                         self.repo.git_get_branch_commits(
                                 branch,
                                 limit='left-only',
                                 stop=last_merged_checksum,
                                 value='hexsha'))[::-1]
-                # log_arg = "%s..%s" % (active_branch, branch) \
-                #     if active_branch in self.repo.git_get_branches() \
-                #     else branch
-                # out, err = self.repo.cmd_call_wrapper.run(["git", "log", "--oneline", log_arg])
-                # assert out  # there should be some commits since above check said that they differ
-                # assert not err
-                # all_to_merge = [l.split(None, 1)[0] for l in out.split('\n') if l][::-1]
             else:
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
             lgr.info("Initiating %(nmerges)d merges of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
-            #import pdb; pdb.set_trace()
+
             for to_merge in all_to_merge:
+                # we might have switched away to orig_branch
+                if self.repo.git_get_active_branch() != target_branch_:
+                    self.repo.git_checkout(target_branch_)
                 if strategy is None:
                     self.repo.git_merge(to_merge, options=options)
                 elif strategy == 'theirs':
                     self.repo.git_merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
-                    #self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % to_merge)
                     self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
                     self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
                 else:
@@ -563,8 +567,9 @@ class Annexificator(object):
                     # Record into our activity stats
                     stats = data.get('datalad_stats', None)
                     if stats:
-                        stats.merges.append([branch, active_branch])
-
+                        stats.merges.append([branch, target_branch_])
+                if orig_branch is not None:
+                    self.repo.git_checkout(orig_branch)
                 yield data
         return merge_branch
 
@@ -793,10 +798,7 @@ class Annexificator(object):
                         os.unlink(vfpathfull)
 
             yield data
-
-
         return _remove_other_versions
-
 
     #TODO: @borrow_kwargs from api_add_...
     def add_archive_content(self, commit=False, **aac_kwargs):

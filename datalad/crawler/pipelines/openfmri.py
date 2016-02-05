@@ -62,17 +62,7 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
                extract_readme,
                annex,
             ],
-            [  # and collect all URLs under "AWS Link"
-                # no longer valid
-                #css_match('.field-name-field-aws-link a',
-                #          xpaths={'url': '@href',
-                #                  'url_text': 'text()'},
-                #          min_count=1),
-                # and don't know how to select all the a after h4
-                # xpath('//h4[contains(text(), "Data:")]')
-                # so let's just select all the ones going to /tarballs/
-                # some are not on S3 yet, so no /tarballs/ prefix e.g. ds 158
-                #a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
+            [  # and collect all URLs pointing to tarballs
                 a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
                 # Since all content of openfmri is anyways available openly, no need atm
                 # to use https which complicates proxying etc. Thus replace for AWS urls
@@ -80,54 +70,19 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
                 # TODO: might want to become an option for get_versioned_url? 
                 sub({
                  'url': {
-                   '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'
-                }}),
+                   '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'}}),
                 func_to_node(get_versioned_url,
                              data_args=['url'],
                              outputs=['url'],
                              kwargs={'guarantee_versioned': versioned_urls,
                                      'verify': True}),
-
-                # TODO: we need to "version" those urls which we can version, e.g.,
-                # if coming from versioned S3 buckets
-                # version_url,
-                # TODO TEMP -- too heavy, use some bogie for now
-                #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie.tgz'}),
-                #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_2.tgz'}),
-                #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_4.tgz'}),
-                #assign({'filename': 'ds005_raw_boogie.tgz'}),
-
                 annex,
             ],
-            # Some of them ship their own license.txt, so let's just use that one
-            # TODO: add a check and only if not present -- populate
-            # [  # and license information
-            #    css_match('.field-name-field-license a',
-            #              xpaths={'url': '@href',
-            #                      'url_text': 'text()'}),
-            #    # TODO: HTML dump of that page for the license wouldn't be as useful I guess,
-            #    # so let's provide our collection of most common referenced artifacts
-            #    # in few formats
-            #    assign({'filename': 'license.txt'}),
-            #    annex,
-            # ],
             # TODO: describe_handle
-            # Now some true magic -- possibly multiple commits, 1 per each detected version!
-            # Do not rename to stay consistent with single version commits... and stuff can change
-            # for the same version I am afraid...
+            # Now some true magic -- possibly multiple commits, 1 per each detected new version!
             annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])'),
-            # D'oh -- but without rename, whenever we merge we end up with multiple per each version!
-            # so we would then need to strip them again while in incoming, while needing to pass in
-            # version to make it all robust etc... bleh
-            # Alternative is to remove previous versions upon commit here BUT it would complicate crawling...
-            # unless we finally introduce that DB with mtimes etc but allow it to list files which we remove
-            # from within incoming
-            # So -- either rename or remove!  Renaming would complicate when non-versioned also would be present
-            # but is pretty much implemented already ATM, so let's proceed with rename!  When non-versioned would
-            # appear we would treat it as prev version
         ],
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
-        # [ {'loop': 'datalad_stats.flags.loop_versions',  # to loop while there is a flag in stats to process all the versions
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             {'loop': True},  # loop for multiple versions merges
@@ -144,16 +99,11 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
                     leading_dirs_depth=1,
                     exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
                     # overwrite=True,
-                    # TODO: we might need a safeguard for cases if multiple subdirectories within a single tarball
-                    #rename=
+                    # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball
                 ),
-                # annex, # not needed since above add_archive_content adds to annex
             ],
-            annex.switch_branch('master'),
-            annex.merge_branch('incoming-processed', commit=True),
-            annex.switch_branch('incoming-processed'),  # so we could possibly merge more
+            annex.merge_branch('incoming-processed', target_branch='master', commit=True),
         ],
         annex.switch_branch('master'),
-        # ] # finish the loop for versioned ones
         annex.finalize,
     ]
