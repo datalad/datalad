@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
 from glob import glob
 from os.path import join as opj
 
@@ -21,6 +22,7 @@ from ...pipeline import load_pipeline_from_script
 from ....support.stats import ActivityStats
 from ....support.annexrepo import AnnexRepo
 
+from ....api import clean
 from ....utils import chpwd
 from ....utils import find_files
 from ....tests.utils import with_tree
@@ -39,6 +41,31 @@ from ..openfmri import pipeline as ofpipeline
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
+
+
+#
+# Some helpers
+#
+
+def check_dropall_get(repo):
+    # TODO: drop all annex content for all revisions, clean the cache, get the content for all files in
+    # master in all of its revisions
+    t1w_fpath = opj(repo.path, 'sub-1', 'anat', 'sub-1_T1w.dat')
+    ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
+    # --force since it would fail to verify presence in case we remove archives keys... TODO
+    repo._annex_custom_command([], ["git", "annex", "drop", "--all", "--force"])
+    clean(annex=repo)  # remove possible extracted archives
+    with assert_raises(AssertionError):
+        ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
+    repo.annex_get('.')
+    ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
+
+
+def add_to_index(index_file, content):
+    with open(index_file) as f:
+        old_index = f.read()
+    with open(index_file, 'w') as f:
+        f.write(old_index.replace(_PLUG_HERE, content + _PLUG_HERE))
 
 
 @skip_if_no_network
@@ -214,10 +241,11 @@ def test_openfmri_pipeline1(ind, topurl, outd):
         eq_(set(glob('*')), {'changelog.txt', 'README.txt', 'sub-1'})
         all_files = sorted(find_files('.'))
 
-    ok_file_has_content(opj(outd, 'sub-1', 'anat', 'sub-1_T1w.dat'), "mighty load 1.0.1")
+    t1w_fpath = opj(outd, 'sub-1', 'anat', 'sub-1_T1w.dat')
+    ok_file_has_content(t1w_fpath, "mighty load 1.0.1")
     ok_file_under_git(opj(outd, 'changelog.txt'), annexed=False)
     ok_file_under_git(opj(outd, 'README.txt'), annexed=False)
-    ok_file_under_git(opj(outd, 'sub-1', 'anat', 'sub-1_T1w.dat'), annexed=True)
+    ok_file_under_git(t1w_fpath, annexed=True)
 
     target_files = {'./.datalad/config.ttl', './.datalad/crawl/crawl.cfg', './.datalad/crawl/versions/incoming.json', './.datalad/datalad.ttl', './README.txt', './changelog.txt',
             './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
@@ -242,13 +270,11 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     eq_(out[0]['datalad_stats'], ActivityStats(files=4, overwritten=1, skipped=3, downloaded=1, add_git=1, urls=4, downloaded_size=26))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
-    # add new revision, rerun pipeline and check that stuff was processed/added correctly
-    with open(opj(ind, 'ds666', 'index.html')) as f:
-        old_index = f.read()
-    with open(opj(ind, 'ds666', 'index.html'), 'w') as f:
-        f.write(old_index.replace(_PLUG_HERE, '<a href="ds666_R2.0.0.tar.gz">Raw data on AWS version 2.0.0</a>'))
-
     # rerun pipeline when new content is available
+    # add new revision, rerun pipeline and check that stuff was processed/added correctly
+    add_to_index(opj(ind, 'ds666', 'index.html'),
+                 content = '<a href="ds666_R2.0.0.tar.gz">Raw data on AWS version 2.0.0</a>')
+
     with chpwd(outd):
         out = run_pipeline(pipeline)
         all_files_updated = sorted(find_files('.'))
@@ -274,7 +300,89 @@ def test_openfmri_pipeline1(ind, topurl, outd):
         ActivityStats(files=7, skipped=4, downloaded=1,
                       merges=[['incoming', 'incoming-processed']], renamed=1, urls=5, add_annex=2))
 
-    # TODO: drop all annex content for all revisions, clean the cache, get the content for all files in
-    # master in all of its revisions
+    check_dropall_get(repo)
+test_openfmri_pipeline1.tags = ['integration']
 
-test_openfmri_pipeline1.tags = ['intergration']
+
+@with_tree(tree={
+    'ds666': {
+        'index.html': """<html><body>
+                            <a href="release_history.txt">Release History</a>
+                            <a href="ds666.tar.gz">Raw data on AWS version 1</a>
+                            %s
+                          </body></html>""" % _PLUG_HERE,
+        'release_history.txt': '1.0.1 fixed\n1.0.0 whatever',
+        'ds666.tar.gz':     {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "1.0.0"}}}},
+        'ds666_R2.0.0.tar.gz':     {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 2.0.0"}}}},
+    }},
+    archives_leading_dir=False
+)
+@serve_path_via_http
+@with_tempfile
+def test_openfmri_pipeline2(ind, topurl, outd):
+    # no versioned files -- should still work! ;)
+
+    list(initiate_handle(
+        template="openfmri",
+        handle_name='dataladtest-ds666',
+        path=outd,
+        data_fields=['dataset'])({'dataset': 'ds666'}))
+
+    with chpwd(outd):
+        pipeline = ofpipeline('ds666', versioned_urls=False, topurl=topurl)
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+
+    repo = AnnexRepo(outd, create=False)  # to be used in the checks
+    # Inspect the tree -- that we have all the branches
+    branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
+    eq_(set(repo.git_get_branches()), branches)
+    # We do not have custom changes in master yet, so it just follows incoming-processed atm
+    # eq_(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
+    # Since we did initiate_handle -- now we have separate master!
+    assert_not_equal(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
+    # and that one is different from incoming
+    assert_not_equal(repo.git_get_hexsha('incoming'), repo.git_get_hexsha('incoming-processed'))
+
+    # TODO: tags for the versions
+    # actually the tree should look quite neat with 1.0.0 tag having 1 parent in incoming
+    # 1.0.1 having 1.0.0 and the 2nd commit in incoming as parents
+
+    commits = {b: list(repo.git_get_branch_commits(b)) for b in branches}
+    commits_hexsha = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_l = {b: list(repo.git_get_branch_commits(b, limit='left-only')) for b in branches}
+    eq_(len(commits['incoming']), 1)
+    eq_(len(commits_l['incoming']), 1)
+    eq_(len(commits['incoming-processed']), 2)
+    eq_(len(commits_l['incoming-processed']), 2)  # because original merge has only 1 parent - incoming
+    eq_(len(commits['master']), 5)  # all commits out there
+    eq_(len(commits_l['master']), 3)
+
+    # rerun pipeline -- make sure we are on the same in all branches!
+    with chpwd(outd):
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+
+    commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
+    # actually we do manage to download 1 since it is committed directly to git
+    # eq_(out[0]['datalad_stats'], ActivityStats())
+    # Nothing was committed so stats leaked all the way up
+    eq_(out[0]['datalad_stats'], ActivityStats(files=2, overwritten=1, skipped=1, downloaded=1, add_git=1, urls=2, downloaded_size=26))
+    eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
+
+    os.rename(opj(ind, 'ds666', 'ds666_R2.0.0.tar.gz'), opj(ind, 'ds666', 'ds666.tar.gz'))
+
+    with chpwd(outd):
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+    eq_(out[0]['datalad_stats'], ActivityStats())  # was committed
+    stats_total = out[0]['datalad_stats'].get_total()
+    stats_total.downloaded_size = 0
+    eq_(stats_total,
+        ActivityStats(files=4, overwritten=1, skipped=1, downloaded=1,
+                      merges=[['incoming', 'incoming-processed']],
+                      renamed=1, urls=2, add_annex=2))
+
+    check_dropall_get(repo)
+test_openfmri_pipeline2.tags = ['integration']
