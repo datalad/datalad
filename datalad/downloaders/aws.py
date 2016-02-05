@@ -126,7 +126,7 @@ class S3Downloader(BaseDownloader):
         self._bucket = self.authenticator.authenticate(bucket_name, self.credential)
         return False
 
-    def _get_download_details(self, url):
+    def _get_download_details(self, url, **kwargs):
         bucket_name, url_filepath, params = self._parse_url(url)
         if params:
             newkeys = set(params.keys()) - {'versionId'}

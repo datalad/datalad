@@ -339,7 +339,7 @@ class BaseDownloader(object):
         return self._cache
 
 
-    def _fetch(self, url, cache=None, size=None):
+    def _fetch(self, url, cache=None, size=None, allow_redirects=True):
         """Fetch content from a url into a file.
 
         Very similar to _download but lacks any "file" management and decodes
@@ -359,7 +359,6 @@ class BaseDownloader(object):
         bytes, dict
           content, headers
         """
-
         if cache is None:
             cache = cfg.getboolean('crawl', 'cache', False)
 
@@ -373,7 +372,7 @@ class BaseDownloader(object):
                     lgr.warning("Failed to unpack loaded from cache for %s: %s",
                                 url, exc_str(exc))
 
-        downloader, target_size, url_filename, headers = self._get_download_details(url)
+        downloader, target_size, url_filename, headers = self._get_download_details(url, allow_redirects=allow_redirects)
 
         if size is not None:
             if size == 0:
@@ -423,7 +422,9 @@ class BaseDownloader(object):
         """
         lgr.info("Fetching %r", url)
         # Do not return headers, just content
-        return self._access(self._fetch, url, **kwargs)[0]
+        out = self._access(self._fetch, url, **kwargs)
+        # import pdb; pdb.set_trace()
+        return out[0]
 
 
     def get_status(self, url, old_status=None, **kwargs):
@@ -486,6 +487,14 @@ class TargetFileAbsent(DownloadError):
 
 class AccessDeniedError(DownloadError):
     pass
+
+class AccessFailedError(DownloadError):
+    pass
+
+class UnhandledRedirectError(DownloadError):
+    def __init__(self, msg=None, url=None, **kwargs):
+        super(UnhandledRedirectError, self).__init__(msg, **kwargs)
+        self.url = url
 
 #
 # Authenticators    XXX might go into authenticators.py

@@ -31,7 +31,7 @@ from ..support.status import FileStatus
 
 from .base import Authenticator
 from .base import BaseDownloader
-from .base import DownloadError, AccessDeniedError
+from .base import DownloadError, AccessDeniedError, AccessFailedError, UnhandledRedirectError
 
 from logging import getLogger
 from ..log import LoggerHelper
@@ -55,7 +55,7 @@ if lgr.getEffectiveLevel() < 10:
 __docformat__ = 'restructuredtext'
 
 
-def check_response_status(response, err_prefix=""):
+def check_response_status(response, err_prefix="", session=None):
     """Check if response's status_code signals problem with authentication etc
 
     ATM succeeds only if response code was 200
@@ -65,16 +65,26 @@ def check_response_status(response, err_prefix=""):
     # 401 would be for digest authentication mechanism, or if we first ask which mechanisms are
     # supported.... must be linked into the logic if we decide to automagically detect which
     # mechanism or to give more sensible error message
+    err_msg = err_prefix + "status code %d" % response.status_code
     if response.status_code in {404}:
         # It could have been that form_url is wrong, so let's just say that
         # TODO: actually may be that is where we could use tagid and actually determine the form submission url
         raise DownloadError(err_prefix + "not found")
     elif 400 <= response.status_code < 500:
-        raise AccessDeniedError(err_prefix + "status code %d" % response.status_code)
+        raise AccessDeniedError(err_msg)
     elif response.status_code in {200}:
         pass
+    elif response.status_code in {301, 307}:
+        if session is None:
+            raise AccessFailedError(err_msg + " no session was provided")
+        redirs = list(session.resolve_redirects(response, response.request))
+        if len(redirs) > 1:
+            lgr.warning("Multiple redirects aren't supported yet.  Taking first")
+        elif len(redirs) == 0:
+            raise AccessFailedError("No redirects were resolved")
+        raise UnhandledRedirectError(err_msg, url=redirs[0].url)
     else:
-        raise AccessDeniedError(err_prefix + "status code %d" % response.status_code)
+        raise AccessFailedError(err_msg)
 
 
 @auto_repr
@@ -114,7 +124,7 @@ class HTTPBaseAuthenticator(Authenticator):
         response = self._post_credential(credentials, post_url, session)
 
         err_prefix = "Authentication to %s failed: " % post_url
-        check_response_status(response, err_prefix)
+        check_response_status(response, err_prefix, session=session)
 
         response_text = response.text
         self.check_for_auth_failure(response_text, err_prefix)
@@ -298,10 +308,10 @@ class HTTPDownloader(BaseDownloader):
 
         return False
 
-    def _get_download_details(self, url, chunk_size=1024**2):
+    def _get_download_details(self, url, chunk_size=1024**2, allow_redirects=True):
         # TODO: possibly make chunk size adaptive
-        response = self._session.get(url, stream=True)
-        check_response_status(response)
+        response = self._session.get(url, stream=True, allow_redirects=allow_redirects)
+        check_response_status(response, session=self._session)
         headers = response.headers
         target_size = int(headers.get('Content-Length', '0').strip()) or None
         # Consult about filename.  Since we already have headers,
