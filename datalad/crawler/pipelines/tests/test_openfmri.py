@@ -22,7 +22,8 @@ from ....support.annexrepo import AnnexRepo
 
 from ....utils import chpwd
 from ....tests.utils import with_tree
-from ....tests.utils import eq_, ok_, assert_raises
+from ....tests.utils import SkipTest
+from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
 from ....tests.utils import assert_in
 from ....tests.utils import skip_if_no_module
 from ....tests.utils import with_tempfile
@@ -136,14 +137,35 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
 
 @with_tree(tree={
     'ds666': {
-
+        'index.html': """<html><body>
+                            <a href="release_history.txt">Release History</a>
+                            <a href="ds666_R1.0.0.tar.gz">Raw data on AWS version 1</a>
+                            <a href="ds666_R1.0.1.tar.gz">Raw data on AWS version 2</a>
+                          </body></html>""",
+        'release_history.txt': '1.0.1 fixed\n1.0.0 whatever',
+        'ds666_R1.0.0.tar.gz': {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 1.0.0"}}}},
+        'ds666_R1.0.1.tar.gz': {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 1.0.1"}}}},
     }
 })
 @serve_path_via_http
 @with_tempfile(mkdir=True)
 def test_openfmri_pipeline1(ind, topurl, outd):
-    AnnexRepo(outd, create=True)
+    repo = AnnexRepo(outd, create=True)
     with chpwd(outd):
         pipeline = ofpipeline('ds666', versioned_urls=False, topurl=topurl)
+        out = run_pipeline(pipeline)
+    # Inspect the tree -- that we have all the branches
+    eq_(set(repo.git_get_branches()), {'master', 'incoming', 'incoming-processed', 'git-annex'})
+    # We do not have custom changes in master yet, so it just follows incoming-processed atm
+    eq_(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
+    # but that one is different from incoming
+    assert_not_equal(repo.git_get_hexsha('incoming'), repo.git_get_hexsha('incoming-processed'))
 
-    out = run_pipeline(pipeline)
+    # TODO: tags for the versions
+    # actually the tree should look quite neat with 1.0.0 tag having 1 parent in incoming
+    # 1.0.1 having 1.0.0 and the 2nd commit in incoming as parents
+
+    # TODO: fix up commit messages in incoming
+    eq_(len(out), 1)
+    print outd
+    raise SkipTest("many TODO")

@@ -37,10 +37,10 @@ def extract_readme(data):
     lgr.info("Generated README.txt")
     yield {'filename': "README.txt"}
 
-def pipeline(dataset, versioned_urls=True, topurl='https://openfmri.org/dataset'):
+def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/"):
     """Pipeline to crawl/annex an openfmri dataset"""
 
-    dataset_url = '%s/%s' % (topurl, dataset)
+    dataset_url = '%s%s' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc

@@ -468,7 +468,8 @@ class Annexificator(object):
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
                     self.repo.git_checkout(branch, options="--orphan")
-                    self.repo.git_remove('.', r=True, f=True) # TODO: might be insufficient if directories etc  TEST/fix
+                    if self.repo.dirty:
+                        self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
@@ -523,15 +524,20 @@ class Annexificator(object):
                 # we need to get through the history
                 # TODO:  --left-only does smth else -- ideally we should figure out
                 #  how to jsut get through left part of the tree and merge those
-                out, err = self.repo.cmd_call_wrapper.run(["git", "log", "--oneline", "%s..%s" % (active_branch, branch)])
+                log_arg = "%s..%s" % (active_branch, branch) \
+                    if active_branch in self.repo.git_get_branches() \
+                    else branch
+                out, err = self.repo.cmd_call_wrapper.run(["git", "log", "--oneline", log_arg])
                 assert out  # there should be some commits since above check said that they differ
-                all_to_merge = [l.split(None, 1)[0] for l in out.split('\n')]
+                assert not err
+                all_to_merge = [l.split(None, 1)[0] for l in out.split('\n') if l][::-1]
             else:
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
             lgr.info("Initiating %(nmerges)d merges of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
+            #import pdb; pdb.set_trace()
             for to_merge in all_to_merge:
                 if strategy is None:
                     self.repo.git_merge(to_merge, options=options)
@@ -565,11 +571,36 @@ class Annexificator(object):
         self.repo.cmd_call_wrapper.run(["git", "commit"] + options)
 
     def _unstage(self, fpaths):
+        #import pdb; pdb.set_trace()
         self.repo.cmd_call_wrapper.run(["git", "reset"] + fpaths)
 
     def _stage(self, fpaths):
         self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
 
+    def _get_status(self):
+        """Custom check of status to see what files were staged, untracked etc
+        until
+        https://github.com/gitpython-developers/GitPython/issues/379#issuecomment-180101921
+        is resolved
+        """
+        out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
+        assert not err
+        staged, notstaged, untracked = [], [], []
+        for l in out.split('\n'):
+            if not l:
+                continue
+            act = l[:2]  # first two characters is what is happening to the file
+            fname = l[3:]
+            try:
+                {'??': untracked,
+                 'A ': staged,
+                 'M ': staged,
+                 ' M': notstaged,
+                 }[act].append(fname)
+                # for the purpose of this use we don't even want MM or anything else
+            except KeyError:
+                raise RuntimeError("git status %r not yet supported. TODO" % act)
+        return staged, notstaged, untracked
 
     def commit_versions(self,
                         regex,
@@ -579,29 +610,34 @@ class Annexificator(object):
         """Generate multiple commits if multiple versions were staged
         """
         def _commit_versions(data):
+            self.repo.precommit()  # so that all batched annexes stop
+
             # figure out versions for all files (so we could handle conflicts with existing
             # non versioned)
             # TODO:  we need to care only about staged (and unstaged?) files ATM!
             # So let's do it.  And use separate/new Git repo since we are doing manual commits through
             # calls to git.  TODO: RF to avoid this
-            repo = Repo(self.repo.path)
-
-            def process_diff(diff):
-                """returns full paths for files in the diff"""
-                out = []
-                for obj in diff:
-                    assert(not obj.renamed)  # not handling atm
-                    assert(not obj.deleted_file)  # not handling atm
-                    assert(obj.a_path == obj.b_path)  # not handling atm
-                    out.append(opj(self.repo.path, obj.a_path))
-                return out
-
-            staged = process_diff(repo.index.diff(repo.head))
-            notstaged = process_diff(repo.index.diff(None))
+            # Not usable for us ATM due to
+            # https://github.com/gitpython-developers/GitPython/issues/379
+            # repo = Repo(self.repo.path)
+            #
+            # def process_diff(diff):
+            #     """returns full paths for files in the diff"""
+            #     out = []
+            #     for obj in diff:
+            #         assert(not obj.renamed)  # not handling atm
+            #         assert(not obj.deleted_file)  # not handling atm
+            #         assert(obj.a_path == obj.b_path)  # not handling atm
+            #         out.append(opj(self.repo.path, obj.a_path))
+            #     return out
+            #
+            # staged = process_diff(repo.index.diff('HEAD'))#repo.head.commit))
+            # notstaged = process_diff(repo.index.diff(None))
+            staged, notstaged, untracked = self._get_status()
 
             # Verify that everything is under control!
             assert(not notstaged)  # not handling atm, although should be safe I guess just needs logic to not unstage them
-            assert(not repo.untracked_files)  # not handling atm
+            assert(not untracked)  # not handling atm
 
             if not dirs:
                 raise NotImplementedError("ATM matching will happen to dirnames as well")
@@ -643,13 +679,15 @@ class Annexificator(object):
                 return
 
             # unstage all versioned files from the index
-            self.repo.precommit()  # so that all batched annexes stop
             nunstaged = 0  # ???
             for version, fpaths in iteritems(versions):
                 nfpaths = len(fpaths)
                 lgr.debug("Unstaging %d files for version %s", nfpaths, version)
                 nunstaged += nfpaths
-                _call(self._unstage, list(fpaths))
+                _call(self._unstage, list(fpaths.values()))
+
+            stats = data.get('datalad_stats', None)
+            stats_str = stats.as_str(mode='line') if stats else ''
 
             for iversion, (version, fpaths) in enumerate(iteritems(new_versions)):  # for all versions past previous
                 # stage/add files of that version to index
@@ -673,10 +711,15 @@ class Annexificator(object):
                 assert(nfpaths >= 0)
                 assert(nunstaged >= 0)
                 _call(self._stage, vfpaths)
+
                 # RF: with .finalize to avoid code duplication etc
                 # ??? what to do about stats and states?  reset them or somehow tune/figure it out?
-                vmsg = "Version #%d/%d: %s. Remaining unstaged: %d " % (iversion, nnew_versions, version, nunstaged)
-                _call(self._commit, "%sFinalizing %s %s" % (vmsg, ','.join(self._states), stats_str), options=[])
+                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d of " % (iversion, nnew_versions, version, nunstaged)
+
+                if stats:
+                    _call(stats.reset)
+
+                _call(self._commit, "%s %s %s" % (vmsg, ','.join(self._states), stats_str), options=[])
 
                 # unless we update data, no need to yield multiple times I guess
                 # but shouldn't hurt
@@ -721,6 +764,7 @@ class Annexificator(object):
             lgr.info("Repository found dirty -- adding and committing")
             #    # TODO: introduce activities tracker
             _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
+
             stats = data.get('datalad_stats', None)
             stats_str = stats.as_str(mode='line') if stats else ''
             _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options=["-a"])

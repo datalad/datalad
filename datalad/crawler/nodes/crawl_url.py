@@ -23,7 +23,7 @@ from ...utils import updated
 from ...utils import find_files
 from ...dochelpers import exc_str
 from ...support.versions import get_versions
-from ...downloaders.base import DownloadError
+from ...downloaders.base import DownloadError, UnhandledRedirectError
 from ...downloaders.providers import Providers
 
 from logging import getLogger
@@ -64,20 +64,37 @@ class crawl_url(object):
     def _visit_url(self, url, data):
         if url in self._seen:
             return
-        self._seen.add(url)
         # this is just a cruel first attempt
         lgr.debug("Visiting %s" % url)
+
         try:
-            page = self._providers.fetch(url)
+            retry = 0
+            orig_url = url
+            while True:
+                retry += 1
+                if retry > 100:
+                    raise DownloadError("We have followed 100 redirects already. Something is wrong!")
+                try:
+                    self._seen.add(url)
+                    page = self._providers.fetch(url, allow_redirects=False)
+                    break
+                except UnhandledRedirectError as exc:
+                    # since we care about tracking URL for proper full url construction
+                    # we should disallow redirects and handle them manually here
+                    lgr.debug("URL %s was redirected to %s" % (url, exc.url))
+                    if url == exc.url:
+                        raise DownloadError("Was redirected to the same url upon %s" % exc_str(exc))
+                    url = exc.url
         except DownloadError as exc:
             lgr.warning("URL %s failed to download: %s" % (url, exc_str(exc)))
             if self.failed in {None, 'skip'}:
-                # TODO: config  -- failed='skip' should be a config option, for now always skipping
+                # TODO: config  -- crawl.failed='skip' should be a config option, for now always skipping
                 return
             raise  # otherwise -- kaboom
 
         data_ = updated(data, zip(self._output, (page, url)))
         yield data_
+
         # now recurse if matchers were provided
         matchers = self._matchers
         if matchers:
