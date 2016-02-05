@@ -38,6 +38,7 @@ class crawl_url(object):
                  url=None, matchers=None,
                  input='url',
                  failed=None,
+                 cache_redirects=True,
                  output=('response', 'url')):
         """If url is None, would try to pick it up from data[input]
 
@@ -48,6 +49,8 @@ class crawl_url(object):
           Expect page content in and should produce url field
         failed: {skip}, optional
           What to do about failing urls. If None -- would consult (eventually) the config
+        cache_redirects: bool, optional
+          Either to remember redirects for subsequent invocations
         """
         self._url = url
         self._matchers = matchers
@@ -55,6 +58,9 @@ class crawl_url(object):
         self._output = output
         self._seen = set()
         self._providers = Providers.from_config_files()
+        # Partially to overcome stuck redirect
+        # https://github.com/kennethreitz/requests/issues/2997
+        self._redirects_cache = {} if cache_redirects else None
         self.failed = failed
 
     def reset(self):
@@ -70,6 +76,8 @@ class crawl_url(object):
         try:
             retry = 0
             orig_url = url
+            if self._redirects_cache is not None:
+                url = self._redirects_cache.get(url, url)
             while True:
                 retry += 1
                 if retry > 100:
@@ -85,6 +93,8 @@ class crawl_url(object):
                     if url == exc.url:
                         raise DownloadError("Was redirected to the same url upon %s" % exc_str(exc))
                     url = exc.url
+                    if self._redirects_cache is not None:
+                        self._redirects_cache[orig_url] = exc.url
         except DownloadError as exc:
             lgr.warning("URL %s failed to download: %s" % (url, exc_str(exc)))
             if self.failed in {None, 'skip'}:

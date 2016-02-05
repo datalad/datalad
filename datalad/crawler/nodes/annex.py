@@ -40,6 +40,7 @@ from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..dbs.files import AnnexFileAttributesDB
+from ..dbs.versions import SingleVersionDB
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.annex')
@@ -155,7 +156,6 @@ class initiate_handle(object):
             handle_path = self.path
 
         lgr.debug("Request to initialize a handle at %s", handle_path)
-
         init = True
         if exists(handle_path):
             # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
@@ -524,13 +524,19 @@ class Annexificator(object):
                 # we need to get through the history
                 # TODO:  --left-only does smth else -- ideally we should figure out
                 #  how to jsut get through left part of the tree and merge those
-                log_arg = "%s..%s" % (active_branch, branch) \
-                    if active_branch in self.repo.git_get_branches() \
-                    else branch
-                out, err = self.repo.cmd_call_wrapper.run(["git", "log", "--oneline", log_arg])
-                assert out  # there should be some commits since above check said that they differ
-                assert not err
-                all_to_merge = [l.split(None, 1)[0] for l in out.split('\n') if l][::-1]
+                all_to_merge = list(
+                        self.repo.git_get_branch_commits(
+                                branch,
+                                limit='left-only',
+                                stop=last_merged_checksum,
+                                value='hexsha'))[::-1]
+                # log_arg = "%s..%s" % (active_branch, branch) \
+                #     if active_branch in self.repo.git_get_branches() \
+                #     else branch
+                # out, err = self.repo.cmd_call_wrapper.run(["git", "log", "--oneline", log_arg])
+                # assert out  # there should be some commits since above check said that they differ
+                # assert not err
+                # all_to_merge = [l.split(None, 1)[0] for l in out.split('\n') if l][::-1]
             else:
                 all_to_merge = [branch]
 
@@ -543,7 +549,8 @@ class Annexificator(object):
                     self.repo.git_merge(to_merge, options=options)
                 elif strategy == 'theirs':
                     self.repo.git_merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
-                    self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % to_merge)
+                    #self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % to_merge)
+                    self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
                     self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
                 else:
                     raise NotImplementedError(strategy)
@@ -561,21 +568,26 @@ class Annexificator(object):
                 yield data
         return merge_branch
 
+    # At least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
         # We need a custom commit due to "fancy" merges and GitPython
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
+        # and apparently not actively developed
         if msg is not None:
             options = options + ["-m", msg]
         self.repo.precommit()  # so that all batched annexes stop
-        self.repo.cmd_call_wrapper.run(["git", "commit"] + options)
+        self.repo._git_custom_command([], ["git", "commit"] + options)
+        #self.repo.commit(msg)
+        #self.repo.repo.git.commit(options)
 
     def _unstage(self, fpaths):
-        #import pdb; pdb.set_trace()
-        self.repo.cmd_call_wrapper.run(["git", "reset"] + fpaths)
+        # self.repo.cmd_call_wrapper.run(["git", "reset"] + fpaths)
+        self.repo._git_custom_command(fpaths, ["git", "reset"])
 
     def _stage(self, fpaths):
-        self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
+        self.repo.git_add(fpaths)
+        # self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
 
     def _get_status(self):
         """Custom check of status to see what files were staged, untracked etc
@@ -583,7 +595,8 @@ class Annexificator(object):
         https://github.com/gitpython-developers/GitPython/issues/379#issuecomment-180101921
         is resolved
         """
-        out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
+        #out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
+        out, err = self.repo._git_custom_command([], ["git", "status", "--porcelain"])
         assert not err
         staged, notstaged, untracked = [], [], []
         for l in out.split('\n'):
@@ -649,7 +662,8 @@ class Annexificator(object):
                 versions.pop(None)
 
             # take only new versions to deal with
-            prev_version = None  # TODO
+            versions_db = SingleVersionDB(self.repo)
+            prev_version = versions_db.version
 
             if prev_version is None:
                 new_versions = versions  # consider all!
@@ -714,13 +728,14 @@ class Annexificator(object):
 
                 # RF: with .finalize to avoid code duplication etc
                 # ??? what to do about stats and states?  reset them or somehow tune/figure it out?
-                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d of " % (iversion, nnew_versions, version, nunstaged)
+                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d of " % (iversion+1, nnew_versions, version, nunstaged)
 
                 if stats:
                     _call(stats.reset)
 
+                if version:
+                    _call(setattr, versions_db, 'version', version)
                 _call(self._commit, "%s %s %s" % (vmsg, ','.join(self._states), stats_str), options=[])
-
                 # unless we update data, no need to yield multiple times I guess
                 # but shouldn't hurt
                 yield data

@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from glob import glob
 from os.path import join as opj
 
 from ...nodes.crawl_url import crawl_url
@@ -21,15 +22,18 @@ from ....support.stats import ActivityStats
 from ....support.annexrepo import AnnexRepo
 
 from ....utils import chpwd
+from ....utils import find_files
 from ....tests.utils import with_tree
 from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
-from ....tests.utils import assert_in
+from ....tests.utils import assert_in, assert_not_in
 from ....tests.utils import skip_if_no_module
 from ....tests.utils import with_tempfile
 from ....tests.utils import serve_path_via_http
 from ....tests.utils import skip_if_no_network
 from ....tests.utils import use_cassette
+from ....tests.utils import ok_file_has_content
+from ....tests.utils import ok_file_under_git
 
 from ..openfmri import pipeline as ofpipeline
 
@@ -134,38 +138,130 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
 
     run_pipeline(pipeline)
 
-
+_PLUG_HERE = '<!-- PLUG HERE -->'
 @with_tree(tree={
     'ds666': {
         'index.html': """<html><body>
                             <a href="release_history.txt">Release History</a>
                             <a href="ds666_R1.0.0.tar.gz">Raw data on AWS version 1</a>
                             <a href="ds666_R1.0.1.tar.gz">Raw data on AWS version 2</a>
-                          </body></html>""",
+                            <a href="ds666-beh_R1.0.1.tar.gz">Beh data on AWS version 2</a>
+                            %s
+                          </body></html>""" % _PLUG_HERE,
         'release_history.txt': '1.0.1 fixed\n1.0.0 whatever',
-        'ds666_R1.0.0.tar.gz': {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 1.0.0"}}}},
-        'ds666_R1.0.1.tar.gz': {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 1.0.1"}}}},
-    }
-})
+        'ds666_R1.0.0.tar.gz':     {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 1.0.0"}}}},
+        'ds666_R1.0.1.tar.gz':     {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 1.0.1"}}}},
+        'ds666-beh_R1.0.1.tar.gz': {'beh.tar.gz': {'ds666': {'sub-1': {'beh': {'responses.tsv': "1"}}}}},
+        'ds666_R2.0.0.tar.gz':     {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 2.0.0"}}}},
+    }},
+    archives_leading_dir=False
+)
 @serve_path_via_http
-@with_tempfile(mkdir=True)
+@with_tempfile
 def test_openfmri_pipeline1(ind, topurl, outd):
-    repo = AnnexRepo(outd, create=True)
+
+    list(initiate_handle(
+        template="openfmri",
+        handle_name='dataladtest-ds666',
+        path=outd,
+        data_fields=['dataset'])({'dataset': 'ds666'}))
+
     with chpwd(outd):
         pipeline = ofpipeline('ds666', versioned_urls=False, topurl=topurl)
         out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+
+    repo = AnnexRepo(outd, create=False)  # to be used in the checks
     # Inspect the tree -- that we have all the branches
-    eq_(set(repo.git_get_branches()), {'master', 'incoming', 'incoming-processed', 'git-annex'})
+    branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
+    eq_(set(repo.git_get_branches()), branches)
     # We do not have custom changes in master yet, so it just follows incoming-processed atm
-    eq_(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
-    # but that one is different from incoming
+    # eq_(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
+    # Since we did initiate_handle -- now we have separate master!
+    assert_not_equal(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
+    # and that one is different from incoming
     assert_not_equal(repo.git_get_hexsha('incoming'), repo.git_get_hexsha('incoming-processed'))
 
     # TODO: tags for the versions
     # actually the tree should look quite neat with 1.0.0 tag having 1 parent in incoming
     # 1.0.1 having 1.0.0 and the 2nd commit in incoming as parents
 
+    commits = {b: list(repo.git_get_branch_commits(b)) for b in branches}
+    commits_hexsha = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_l = {b: list(repo.git_get_branch_commits(b, limit='left-only')) for b in branches}
+    eq_(len(commits['incoming']), 2)
+    eq_(len(commits_l['incoming']), 2)
+    eq_(len(commits['incoming-processed']), 4)
+    eq_(len(commits_l['incoming-processed']), 3)  # because original merge has only 1 parent - incoming
+    eq_(len(commits['master']), 8)  # all commits out there
+    eq_(len(commits_l['master']), 4)
+
+    def hexsha(l):
+        return l.__class__(x.hexsha for x in l)
+
+    # Verify that we have desired tree of merges
+    eq_(hexsha(commits_l['incoming-processed'][0].parents), (commits_l['incoming-processed'][1].hexsha,
+                                                             commits_l['incoming'][0].hexsha))
+    eq_(hexsha(commits_l['incoming-processed'][1].parents), (commits_l['incoming'][1].hexsha,))
+
+    eq_(hexsha(commits_l['master'][0].parents), (commits_l['master'][1].hexsha,
+                                                 commits_l['incoming-processed'][0].hexsha))
+
+    eq_(hexsha(commits_l['master'][1].parents), (commits_l['master'][2].hexsha,
+                                                 commits_l['incoming-processed'][1].hexsha))
+
+    with chpwd(outd):
+        eq_(set(glob('*')), {'changelog.txt', 'README.txt', 'sub-1'})
+        all_files = sorted(find_files('.'))
+
+    ok_file_has_content(opj(outd, 'sub-1', 'anat', 'sub-1_T1w.dat'), "mighty load 1.0.1")
+    ok_file_under_git(opj(outd, 'changelog.txt'), annexed=False)
+    ok_file_under_git(opj(outd, 'README.txt'), annexed=False)
+    ok_file_under_git(opj(outd, 'sub-1', 'anat', 'sub-1_T1w.dat'), annexed=True)
+
+    eq_(set(all_files), {'./.datalad/config.ttl', './.datalad/crawl/crawl.cfg',
+                         './.datalad/crawl/versions/incoming',
+                         './.datalad/datalad.ttl',
+                         './README.txt', './changelog.txt',
+                         './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'})
+
+    # check that -beh was committed in 2nd commit in incoming, not the first one
+    assert_not_in('ds666-beh.tar.gz', repo.git_get_files(commits_l['incoming'][-1]))
+    assert_in('ds666-beh.tar.gz', repo.git_get_files(commits_l['incoming'][0]))
+
     # TODO: fix up commit messages in incoming
+
+    # rerun pipeline -- make sure we are on the same in all branches!
+    with chpwd(outd):
+        out = run_pipeline(pipeline)
     eq_(len(out), 1)
-    print outd
-    raise SkipTest("many TODO")
+
+    commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
+    eq_(out[0]['datalad_stats'], ActivityStats())
+
+    # add new revision, rerun pipeline and check that stuff was processed/added correctly
+    with open(opj(ind, 'ds666', 'index.html')) as f:
+        old_index = f.read()
+    with open(opj(ind, 'ds666', 'index.html'), 'w') as f:
+        f.write(old_index.replace(_PLUG_HERE, '<a href="ds666_R2.0.0.tar.gz">Raw data on AWS version 2.0.0</a>'))
+
+    # rerun pipeline -- make sure we are on the same in all branches!
+    with chpwd(outd):
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+    assert_not_equal(out[0]['datalad_stats'].get_total(), ActivityStats())
+
+    # new instance so it re-reads git stuff etc
+    repo = AnnexRepo(outd, create=False)  # to be used in the checks
+    commits_ = {b: list(repo.git_get_branch_commits(b)) for b in branches}
+    commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_l_ = {b: list(repo.git_get_branch_commits(b, limit='left-only')) for b in branches}
+
+    assert_not_equal(commits_hexsha, commits_hexsha_)
+
+
+
+    # TODO: drop all annex content for all revisions, clean the cache, get the content for all files in master in all of its revisions
+
+test_openfmri_pipeline1.tags = ['intergration']
