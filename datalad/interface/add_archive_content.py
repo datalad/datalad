@@ -72,6 +72,7 @@ class AddArchiveContent(Interface):
             action="store",
             type=int,
             doc="""Maximal depth to strip leading directories to. If not specified (None), no limit"""),
+        # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
