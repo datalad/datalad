@@ -398,7 +398,9 @@ class GitRepo(object):
         # what gitpython would do about it. doc says that it would
         # convert to string anyways.... bleh
         if not msg:
-            msg = "What would be a good default message?"
+            msg = "Commit"  # there is no good default
+        if options:
+            raise NotImplementedError
         lgr.debug("Committing with msg=%r" % msg)
         self.cmd_call_wrapper(self.repo.index.commit, msg)
         #
@@ -630,6 +632,48 @@ class GitRepo(object):
         out, err = self._git_custom_command(
             '', 'git config --get remote.%s.url' % name)
         return out.rstrip(linesep)
+
+    def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
+        """Return GitPython's commits for the branch
+
+        Pretty much similar to what 'git log <branch>' does.
+        It is a generator which returns top commits first
+
+        Parameters
+        ----------
+        branch: str
+        limit: None | 'left-only', optional
+          Limit which commits to report.  If None -- all commits (merged or not),
+          if 'left-only' -- only the commits from the left side of the tree upon merges
+        stop: str, optional
+          hexsha of the commit at which stop reporting (matched one is not reported either)
+        value: None | 'hexsha', optional
+          What to yield.  If None - entire commit object is yielded, if 'hexsha' only its hexsha
+        """
+
+        fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
+
+        if not limit:
+            def gen():
+                # traverse doesn't yield original commit
+                co = self.repo.branches[branch].commit
+                yield co
+                for co_ in co.traverse():
+                    yield co_
+        elif limit == 'left-only':
+            # we need a custom implementation since couldn't figure out how to do with .traversal
+            def gen():
+                co = self.repo.branches[branch].commit
+                while co:
+                    yield co
+                    co = co.parents[0] if co.parents else None
+        else:
+            raise ValueError(limit)
+
+        for c in gen():
+            if stop and c.hexsha == stop:
+                return
+            yield fvalue(c)
 
     def git_pull(self, name='', options=''):
         """

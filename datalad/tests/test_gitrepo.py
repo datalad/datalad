@@ -30,6 +30,7 @@ from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import assert_re_in
 from .utils import ok_
+from .utils import SkipTest
 from .utils_testrepos import BasicHandleTestRepo
 
 
@@ -542,6 +543,26 @@ def test_GitRepo_get_merge_base(src):
     # if points to some empty/non-existing branch - should also be None
     assert(repo.git_get_merge_base(['nonexistent', branch2]) is None)
 
+@with_tempfile(mkdir=True)
+def test_GitRepo_git_get_branch_commits(src):
+
+    repo = GitRepo(src, create=True)
+    with open(opj(src, 'file.txt'), 'w') as f:
+        f.write('load')
+    repo.git_add('*')
+    repo.git_commit('committing')
+
+    commits = list(repo.git_get_branch_commits('master'))
+    eq_(len(commits), 1)
+    commits_stop0 = list(repo.git_get_branch_commits('master', stop=commits[0].hexsha))
+    eq_(commits_stop0, [])
+    commits_hexsha = list(repo.git_get_branch_commits('master', value='hexsha'))
+    commits_hexsha_left = list(repo.git_get_branch_commits('master', value='hexsha', limit='left-only'))
+    eq_([commits[0].hexsha], commits_hexsha)
+    # our unittest is rudimentary ;-)
+    eq_(commits_hexsha_left, commits_hexsha)
+
+    raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 # TODO:
 #   def git_fetch(self, name, options=''):
