@@ -11,12 +11,13 @@
 
 import os
 import time
-from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
+from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
 from six import iteritems
+from distutils.version import LooseVersion
 
 from git import Repo
 
@@ -220,8 +221,7 @@ class Annexificator(object):
           to be passed into AnnexRepo
         """
         if path is None:
-            from os.path import curdir
-            path = curdir
+            path = realpath(curdir)
         # TODO: commented out to ease developing for now
         #self.repo = _call(AnnexRepo, path, **kwargs)
         # TODO: backend -- should be fetched from the config I guess... or should we
@@ -651,11 +651,19 @@ class Annexificator(object):
             # Verify that everything is under control!
             assert(not notstaged)  # not handling atm, although should be safe I guess just needs logic to not unstage them
             assert(not untracked)  # not handling atm
+            if not staged:
+                return  # nothing to be done -- so we wash our hands off entirely
 
             if not dirs:
                 raise NotImplementedError("ATM matching will happen to dirnames as well")
 
             versions = get_versions(staged, regex, **kwargs)
+
+            if not versions:
+                # no versioned files were added, nothing to do really
+                for d in self.finalize(data):
+                    yield d
+                return
 
             # we don't really care about unversioned ones... overlay and all that ;)
             if None in versions:
@@ -669,31 +677,43 @@ class Annexificator(object):
                 new_versions = versions  # consider all!
             else:
                 version_keys = list(versions.keys())
-                if prev_version not in versions:
-                    # probably it should be all ok, we just need to figure out where to start
-                    # but for now -- FAIL... TODO
-                    raise RuntimeError("previous version %s not found among %s" % (prev_version, versions.keys()))
-                new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
+                if prev_version not in versions_db.versions:
+                    # shouldn't happen
+                    raise RuntimeError("previous version %s not found among known to DB: %s" % (prev_version, versions_db.versions.keys()))
+                # all new versions must be greater than the previous version
+                # since otherwise it would mean that we are complementing previous version and it might be
+                # a sign of a problem
+                assert(all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
+                # old implementation when we didn't have entire versions db stored
+                #new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
+                new_versions = versions
                 # if we have "new_versions" smallest one smaller than previous -- we got a problem!
                 # TODO: how to handle ==? which could be legit if more stuff was added for the same
                 # version?  but then if we already tagged with that -- we would need special handling
-                if new_versions:
-                    smallest_new_version = next(new_versions.keys())
-                    if smallest_new_version <= prev_version:
+
+            if new_versions:
+                smallest_new_version = next(iter(new_versions))
+                if prev_version:
+                    if LooseVersion(smallest_new_version) <= LooseVersion(prev_version):
                         raise ValueError("Smallest new version %s is <= prev_version %s"
                                          % (smallest_new_version, prev_version))
+
+            versions_db.update_versions(versions)  # store all new known versions
 
             # early return if no special treatment is needed
             nnew_versions = len(new_versions)
             if nnew_versions <= 1:
-                # if a single new version -- no special treatment is needed
+                # if a single new version -- no special treatment is needed, but we need to
+                # inform db about this new version
+                if nnew_versions == 1:
+                    _call(setattr, versions_db, 'version', smallest_new_version)
                 # we can't return a generator here
                 for d in self.finalize(data):
                     yield d
                 return
 
             # unstage all versioned files from the index
-            nunstaged = 0  # ???
+            nunstaged = 0
             for version, fpaths in iteritems(versions):
                 nfpaths = len(fpaths)
                 lgr.debug("Unstaging %d files for version %s", nfpaths, version)
@@ -742,6 +762,40 @@ class Annexificator(object):
             assert(nunstaged == 0)  # we at the end committed all of them!
 
         return _commit_versions
+
+
+    def remove_other_versions(self, name=None, overlay=False):
+        """Remove other (non-current) versions of the files
+
+        Pretty much to be used in tandem with commit_versions
+        """
+        def _remove_other_versions(data):
+            if overlay:
+                raise NotImplementedError(overlay)
+
+            versions_db = SingleVersionDB(self.repo, name=name)
+
+            current_version = versions_db.version
+
+            if not current_version:
+                lgr.info("No version information was found, skipping remove_other_versions")
+                yield data
+                return
+
+            for version, fpaths in iteritems(versions_db.versions):
+                # we do not care about non-versioned or current version
+                if version is None or current_version == version:
+                    continue   # skip current version
+                for fpath, vfpath in iteritems(fpaths):
+                    vfpathfull = opj(self.repo.path, vfpath)
+                    if lexists(vfpathfull):
+                        lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
+                        os.unlink(vfpathfull)
+
+            yield data
+
+
+        return _remove_other_versions
 
 
     #TODO: @borrow_kwargs from api_add_...

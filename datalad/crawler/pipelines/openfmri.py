@@ -115,7 +115,7 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
             # Now some true magic -- possibly multiple commits, 1 per each detected version!
             # Do not rename to stay consistent with single version commits... and stuff can change
             # for the same version I am afraid...
-            annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])', rename=True),
+            annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])'),
             # D'oh -- but without rename, whenever we merge we end up with multiple per each version!
             # so we would then need to strip them again while in incoming, while needing to pass in
             # version to make it all robust etc... bleh
@@ -132,6 +132,8 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             {'loop': True},  # loop for multiple versions merges
             annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False),
+            # still we would have all the versions present -- we need to restrict only to the current one!
+            annex.remove_other_versions('incoming'),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
                 {'loop': True},
