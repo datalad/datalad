@@ -40,14 +40,11 @@ class ActivityStats(object):
     Could be done so many other ways
     """
     __metrics__ = _COUNTS + _LISTS
-    __slots__ = __metrics__ + ('_current', '_total', 'flags')
+    __slots__ = __metrics__ + ('_current', '_total')
 
     def __init__(self, **vals):
         self._current = {}
         self._total = {}
-        class flags(object):
-            pass
-        self.flags = flags()  # TODO: formalize
         self.reset(full=True, vals=vals)
 
     def __repr__(self):

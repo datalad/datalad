@@ -35,6 +35,8 @@ class AnnexFileAttributesDB(object):
         ----------
         annex : AnnexRepo
           Annex repository which will be consulted on the size and full path
+        track_queried : bool, optional
+          Either to track what file paths were queried
         """
         self.annex = annex
         # which file paths were referred
@@ -93,6 +95,10 @@ class AnnexFileAttributesDB(object):
             size=size,
             mtime=mtime
         )
+
+    def set(self, fpath, status):
+        # This DB doesn't implement it
+        pass
 
     def is_different(self, fpath, status, url=None):
         """Return True if file pointed by fpath newer in status

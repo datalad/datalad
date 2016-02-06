@@ -162,6 +162,15 @@ def _test_add_archive_content_tar(direct, repo_path):
     if not direct:  # Notimplemented otherwise
         assert_false(annex.repo.dirty)
 
+
 def test_add_archive_content_tar():
     for direct in (True, False):
         yield _test_add_archive_content_tar, direct
+
+
+def test_commit_versions():
+    raise SkipTest("TODO: is tested only as a part of test_openfmri.py")
+
+
+def test_remove_other_versions():
+    raise SkipTest("TODO: is tested only as a part of test_openfmri.py")

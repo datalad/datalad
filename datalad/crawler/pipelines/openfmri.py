@@ -13,7 +13,6 @@ from os.path import lexists
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
-from ..nodes.crawl_url import __prune_to_the_next_version
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import sub
