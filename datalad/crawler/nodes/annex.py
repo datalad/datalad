@@ -17,10 +17,12 @@ from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
 from six import iteritems
+from six import string_types
 from distutils.version import LooseVersion
 
 from git import Repo
 
+from ...version import __version__
 from ...api import add_archive_content
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
@@ -241,7 +243,7 @@ class Annexificator(object):
 
         self.mode = mode
         self.options = options or []
-        self._states = []
+        self._states = set()
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
         self.yield_non_updated = yield_non_updated
@@ -401,9 +403,7 @@ class Annexificator(object):
             # *nix only!  TODO
             _call(lmtime, filepath, remote_status.mtime)
 
-        state = "adding files to git/annex"
-        if state not in self._states:
-            self._states.append(state)
+        self._states.add("Added files to git/annex")
 
         # WiP: commented out to do testing before merge
         # db_filename = self.db.get_filename(url)
@@ -460,7 +460,7 @@ class Annexificator(object):
         def switch_branch(data):
             """Switches to the branch %s""" % branch
             # if self.repo.dirty
-            list(self.finalize(data))
+            list(self.finalize()(data))
             existing_branches = self.repo.git_get_branches()
             if branch not in existing_branches:
                 # TODO: this should be a part of the gitrepo logic
@@ -666,7 +666,7 @@ class Annexificator(object):
 
             if not versions:
                 # no versioned files were added, nothing to do really
-                for d in self.finalize(data):
+                for d in self.finalize()(data):
                     yield d
                 return
 
@@ -713,7 +713,7 @@ class Annexificator(object):
                 if nnew_versions == 1:
                     _call(setattr, versions_db, 'version', smallest_new_version)
                 # we can't return a generator here
-                for d in self.finalize(data):
+                for d in self.finalize()(data):
                     yield d
                 return
 
@@ -726,7 +726,7 @@ class Annexificator(object):
                 _call(self._unstage, list(fpaths.values()))
 
             stats = data.get('datalad_stats', None)
-            stats_str = stats.as_str(mode='line') if stats else ''
+            stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
 
             for iversion, (version, fpaths) in enumerate(iteritems(new_versions)):  # for all versions past previous
                 # stage/add files of that version to index
@@ -751,16 +751,16 @@ class Annexificator(object):
                 assert(nunstaged >= 0)
                 _call(self._stage, vfpaths)
 
-                # RF: with .finalize to avoid code duplication etc
+                # RF: with .finalize() to avoid code duplication etc
                 # ??? what to do about stats and states?  reset them or somehow tune/figure it out?
-                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d of " % (iversion+1, nnew_versions, version, nunstaged)
+                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d" % (iversion+1, nnew_versions, version, nunstaged)
 
                 if stats:
                     _call(stats.reset)
 
                 if version:
                     _call(setattr, versions_db, 'version', version)
-                _call(self._commit, "%s %s %s" % (vmsg, ','.join(self._states), stats_str), options=[])
+                _call(self._commit, "%s (%s)%s" % (', '.join(self._states), vmsg, stats_str), options=[])
                 # unless we update data, no need to yield multiple times I guess
                 # but shouldn't hurt
                 yield data
@@ -777,7 +777,7 @@ class Annexificator(object):
         def _remove_other_versions(data):
             if overlay:
                 raise NotImplementedError(overlay)
-
+            stats = data.get('datalad_stats', None)
             versions_db = SingleVersionDB(self.repo, name=name)
 
             current_version = versions_db.version
@@ -796,6 +796,9 @@ class Annexificator(object):
                     if lexists(vfpathfull):
                         lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
                         os.unlink(vfpathfull)
+
+            if stats:
+                stats.versions.append(current_version)
 
             yield data
         return _remove_other_versions
@@ -821,6 +824,7 @@ class Annexificator(object):
                 stats=stats,
                 **aac_kwargs
             )
+            self._states.add("Added files from extracted archives")
             assert(annex is self.repo)   # must be the same annex, and no new created
             # to propagate statistics from this call into commit msg since we commit=False here
             # we update data with stats which gets a new instance if wasn't present
@@ -828,20 +832,50 @@ class Annexificator(object):
         return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, data):
-        """Finalize operations -- commit uncommited, prune abandoned? etc"""
-        self.repo.precommit()
-        if self.repo.dirty:  # or self.tracker.dirty # for dry run
-            lgr.info("Repository found dirty -- adding and committing")
-            #    # TODO: introduce activities tracker
-            _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
+    def finalize(self, tag=False):
+        """Finalize operations -- commit uncommited, prune abandoned? etc
 
+        Parameters
+        ----------
+        tag: bool or str, optional
+          If set, information in datalad_stats and data can be used to tag release if
+          versions is non-empty.
+          If True, simply the last version to be used.  If str, it is .format'ed
+          using datalad_stats, so something like "r{stats.versions[0]}" can be used.
+          Also `last_version` is provided as the last one from stats.versions (None
+          if empty)
+
+        """
+        def _finalize(data):
+            self.repo.precommit()
             stats = data.get('datalad_stats', None)
-            stats_str = stats.as_str(mode='line') if stats else ''
-            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options=["-a"])
-            if stats:
-                _call(stats.reset)
-        else:
-            lgr.info("Found branch non-dirty - nothing is committed")
-        self._states = []
-        yield data
+            if self.repo.dirty:  # or self.tracker.dirty # for dry run
+                lgr.info("Repository found dirty -- adding and committing")
+                #    # TODO: introduce activities tracker
+                _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
+
+                stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
+                _call(self._commit, "%s%s" % (', '.join(self._states), stats_str), options=["-a"])
+                if stats:
+                    _call(stats.reset)
+            else:
+                lgr.info("Found branch non-dirty - nothing is committed")
+
+            if tag and stats:
+                # versions survive only in total_stats
+                total_stats = stats.get_total()
+                if total_stats.versions:
+                    last_version = total_stats.versions[-1]
+                    if isinstance(tag, string_types):
+                        tag_ = tag.format(stats=total_stats, data=data, last_version=last_version)
+                    else:
+                        tag_ = last_version
+                    # TODO: config.tag.sign
+                    stats_str = "\n\n" + total_stats.as_str(mode='full')
+                    if tag_ in self.repo.repo.tags:
+                        # TODO: config.tag.allow_override
+                        raise RuntimeError("There is already tag %s in the repository" % tag)
+                    self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
+            self._states = set()
+            yield data
+        return _finalize

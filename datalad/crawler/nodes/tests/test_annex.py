@@ -57,7 +57,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     assert_equal(len(annex.repo._batched), 1)
     assert_raises(AssertionError, ok_file_under_git, tfile, annexed=True)
     # if we finalize, it should flush batched annexes and commit
-    list(annex.finalize({}))
+    list(annex.finalize()({}))
     assert(lexists(tfile))
 
     ok_file_under_git(tfile, annexed=True)
@@ -102,7 +102,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     tfile = opj(outdir, '1.txt')
     output = list(annex(input))
     annexed = mode not in {'full'}
-    list(annex.finalize({}))
+    list(annex.finalize()({}))
     if not annexed:
         ok_file_has_content(tfile, '1.dat load+')
     else:

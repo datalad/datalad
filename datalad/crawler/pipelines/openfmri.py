@@ -66,7 +66,7 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
                 # Since all content of openfmri is anyways available openly, no need atm
                 # to use https which complicates proxying etc. Thus replace for AWS urls
                 # to openfmri S3 from https to http
-                # TODO: might want to become an option for get_versioned_url? 
+                # TODO: might want to become an option for get_versioned_url?
                 sub({
                  'url': {
                    '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'}}),
@@ -82,9 +82,9 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
             annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])'),
         ],
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
-        annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             {'loop': True},  # loop for multiple versions merges
+            annex.switch_branch('incoming-processed'),
             annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False),
             # still we would have all the versions present -- we need to restrict only to the current one!
             annex.remove_other_versions('incoming'),
@@ -101,8 +101,9 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
                     # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball
                 ),
             ],
-            annex.merge_branch('incoming-processed', target_branch='master', commit=True),
+            annex.switch_branch('master'),
+            annex.merge_branch('incoming-processed', commit=True),
+            annex.finalize(tag=True),
         ],
         annex.switch_branch('master'),
-        annex.finalize,
     ]

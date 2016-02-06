@@ -48,7 +48,7 @@ lgr = getLogger('datalad.crawl.tests')
 #
 
 def check_dropall_get(repo):
-    # TODO: drop all annex content for all revisions, clean the cache, get the content for all files in
+    # drop all annex content for all revisions, clean the cache, get the content for all files in
     # master in all of its revisions
     t1w_fpath = opj(repo.path, 'sub-1', 'anat', 'sub-1_T1w.dat')
     ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
@@ -144,14 +144,6 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
             css_match('.field-name-field-aws-link a',
                       xpaths={'url': '@href',
                               'url_text': 'text()'}),
-            # TODO:  here we need to provide means to rename some files
-            # but first those names need to be extracted... pretty much
-            # we need conditional sub-pipelines which do yield (or return?)
-            # some result back to the main flow, e.g.
-            # get_url_filename,
-            # [ {'yield_result': True; },
-            #   field_matches_re(filename='.*release_history.*'),
-            #   assign({'filename': 'license:txt'}) ]
             annex,
         ],
         [  # and license information
@@ -165,7 +157,10 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
 
     run_pipeline(pipeline)
 
+
 _PLUG_HERE = '<!-- PLUG HERE -->'
+
+
 @with_tree(tree={
     'ds666': {
         'index.html': """<html><body>
@@ -209,7 +204,6 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     # and that one is different from incoming
     assert_not_equal(repo.git_get_hexsha('incoming'), repo.git_get_hexsha('incoming-processed'))
 
-    # TODO: tags for the versions
     # actually the tree should look quite neat with 1.0.0 tag having 1 parent in incoming
     # 1.0.1 having 1.0.0 and the 2nd commit in incoming as parents
 
@@ -222,6 +216,12 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     eq_(len(commits_l['incoming-processed']), 3)  # because original merge has only 1 parent - incoming
     eq_(len(commits['master']), 8)  # all commits out there
     eq_(len(commits_l['master']), 4)
+
+    # Check tags for the versions
+    eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
+    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.1'])
+    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][1].hexsha)  # next to the last one
+    eq_(repo.repo.tags[1].commit.hexsha, commits_l['master'][0].hexsha)  # the last one
 
     def hexsha(l):
         return l.__class__(x.hexsha for x in l)
@@ -247,15 +247,15 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     ok_file_under_git(opj(outd, 'README.txt'), annexed=False)
     ok_file_under_git(t1w_fpath, annexed=True)
 
-    target_files = {'./.datalad/config.ttl', './.datalad/crawl/crawl.cfg', './.datalad/crawl/versions/incoming.json', './.datalad/datalad.ttl', './README.txt', './changelog.txt',
-            './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
+    target_files = {
+        './.datalad/config.ttl', './.datalad/crawl/crawl.cfg',
+        './.datalad/crawl/versions/incoming.json', './.datalad/datalad.ttl',
+        './README.txt', './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
     eq_(set(all_files), target_files)
 
     # check that -beh was committed in 2nd commit in incoming, not the first one
     assert_not_in('ds666-beh_R1.0.1.tar.gz', repo.git_get_files(commits_l['incoming'][-1]))
     assert_in('ds666-beh_R1.0.1.tar.gz', repo.git_get_files(commits_l['incoming'][0]))
-
-    # TODO: fix up commit messages in incoming
 
     # rerun pipeline -- make sure we are on the same in all branches!
     with chpwd(outd):
@@ -294,11 +294,12 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     eq_(out[0]['datalad_stats'], ActivityStats())  # commit happened so stats were consumed
     # numbers seems to be right
     total_stats = out[0]['datalad_stats'].get_total()
-    # but for some reason downloaded_size fluctuates.... why? TODO
+    # but for some reason downloaded_size fluctuates.... why? probably archiving...?
     total_stats.downloaded_size = 0
     eq_(total_stats,
-        ActivityStats(files=7, skipped=4, downloaded=1,
-                      merges=[['incoming', 'incoming-processed']], renamed=1, urls=5, add_annex=2))
+        ActivityStats(files=7, skipped=4, downloaded=1, renamed=1, urls=5, add_annex=2,
+                      versions=['2.0.0'],
+                      merges=[['incoming', 'incoming-processed']]))
 
     check_dropall_get(repo)
 test_openfmri_pipeline1.tags = ['integration']
@@ -344,7 +345,6 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     # and that one is different from incoming
     assert_not_equal(repo.git_get_hexsha('incoming'), repo.git_get_hexsha('incoming-processed'))
 
-    # TODO: tags for the versions
     # actually the tree should look quite neat with 1.0.0 tag having 1 parent in incoming
     # 1.0.1 having 1.0.0 and the 2nd commit in incoming as parents
 
