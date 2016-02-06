@@ -27,6 +27,7 @@ import time
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
 from six import reraise
+from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
@@ -105,7 +106,10 @@ def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=
     if archives_leading_dir:
         compress_files([dirname], name, path=path, overwrite=overwrite)
     else:
-        compress_files(map(basename, glob.glob(opj(full_dirname, '*'))), opj(pardir, name), path=opj(path, dirname), overwrite=overwrite)
+        compress_files(list(map(basename, glob.glob(opj(full_dirname, '*')))),
+                       opj(pardir, name),
+                       path=opj(path, dirname),
+                       overwrite=overwrite)
     # remove original tree
     shutil.rmtree(full_dirname)
 
