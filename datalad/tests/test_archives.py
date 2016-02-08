@@ -157,9 +157,9 @@ def test_ArchivesCache():
     assert_false(exists(cache_path))
 
 
-def _test_get_leading_directory(ea, return_value, target_value, depth=None):
+def _test_get_leading_directory(ea, return_value, target_value, kwargs={}):
     with patch.object(ExtractedArchive, 'get_extracted_files', return_value=return_value):
-        assert_equal(ea.get_leading_directory(depth=depth), target_value)
+        assert_equal(ea.get_leading_directory(**kwargs), target_value)
 
 
 def test_get_leading_directory():
@@ -170,5 +170,8 @@ def test_get_leading_directory():
     yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d', 'f2')], 'd'
     yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d2', 'f2')], None
     yield _test_get_leading_directory, ea, [opj('d', 'd2', 'f'), opj('d', 'd2', 'f2')], opj('d', 'd2')
-    yield _test_get_leading_directory, ea, [opj('d', 'd2', 'f'), opj('d', 'd2', 'f2')], 'd', 1
+    yield _test_get_leading_directory, ea, [opj('d', 'd2', 'f'), opj('d', 'd2', 'f2')], 'd', {'depth': 1}
+    # with some parasitic files
+    yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('._d')], 'd', {'exclude': ['\._.*']}
+    yield _test_get_leading_directory, ea, [opj('d', 'd1', 'f'), opj('d', '._d'), '._x'], opj('d', 'd1'), {'exclude': ['\._.*']}
 

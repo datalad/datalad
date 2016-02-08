@@ -20,7 +20,7 @@ from ....tests.utils import ok_file_under_git
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import assert_cwd_unchanged
 from ...pipeline import load_pipeline_from_config
-from ....consts import CRAWLER_META_CONFIG_PATH
+from ....consts import CRAWLER_META_CONFIG_PATH, DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ....support.stats import ActivityStats
 
 @with_tempfile(mkdir=True)
@@ -57,7 +57,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     assert_equal(len(annex.repo._batched), 1)
     assert_raises(AssertionError, ok_file_under_git, tfile, annexed=True)
     # if we finalize, it should flush batched annexes and commit
-    list(annex.finalize({}))
+    list(annex.finalize()({}))
     assert(lexists(tfile))
 
     ok_file_under_git(tfile, annexed=True)
@@ -102,7 +102,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
     tfile = opj(outdir, '1.txt')
     output = list(annex(input))
     annexed = mode not in {'full'}
-    list(annex.finalize({}))
+    list(annex.finalize()({}))
     if not annexed:
         ok_file_has_content(tfile, '1.dat load+')
     else:
@@ -139,6 +139,7 @@ def _test_add_archive_content_tar(direct, repo_path):
                           allow_dirty=True,
                           mode=mode,
                           direct=direct,
+                          special_remotes=[DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE],
                           options=["-c", "annex.largefiles=exclude=*.txt and exclude=SOMEOTHER"])
     output_add = list(annex({'filename': '1.tar'}))  # adding it to annex
     assert_equal(output_add, [{'filename': '1.tar'}])
@@ -161,6 +162,15 @@ def _test_add_archive_content_tar(direct, repo_path):
     if not direct:  # Notimplemented otherwise
         assert_false(annex.repo.dirty)
 
+
 def test_add_archive_content_tar():
     for direct in (True, False):
         yield _test_add_archive_content_tar, direct
+
+
+def test_commit_versions():
+    raise SkipTest("TODO: is tested only as a part of test_openfmri.py")
+
+
+def test_remove_other_versions():
+    raise SkipTest("TODO: is tested only as a part of test_openfmri.py")

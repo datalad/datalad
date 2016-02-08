@@ -67,6 +67,12 @@ class AddArchiveContent(Interface):
             doc="""Flag to move all files directories up, from how they were stored in an archive,
                    if that one contained a number (possibly more than 1 down) single leading
                    directories."""),
+        leading_dirs_depth=Parameter(
+            args=("--leading-dirs-depth",),
+            action="store",
+            type=int,
+            doc="""Maximal depth to strip leading directories to. If not specified (None), no limit"""),
+        # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
@@ -81,7 +87,7 @@ class AddArchiveContent(Interface):
         exclude=Parameter(
             args=("-e", "--exclude"),
             action='append',
-            doc="""Regular expression for filenames which to exclude from being added to annex.
+            doc="""Regular expressions for filenames which to exclude from being added to annex.
             Applied after --rename if that one is specified.  For exact matching, use anchoring.""",
             constraints=EnsureStr() | EnsureNone()
         ),
@@ -142,7 +148,7 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, annex=None, strip_leading_dirs=False,
+    def __call__(self, archive, annex=None, strip_leading_dirs=False, leading_dirs_depth=None,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None):
@@ -198,10 +204,10 @@ class AddArchiveContent(Interface):
         # now we simply need to go through every file in that archive and
         lgr.info("Adding content of the archive %s into annex %s", archive, annex)
 
-        from datalad.customremotes.archive import AnnexArchiveCustomRemote
+        from datalad.customremotes.archives import ArchiveAnnexCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
         # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
-        annexarchive = AnnexArchiveCustomRemote(path=annex.path, persistent_cache=True)
+        annexarchive = ArchiveAnnexCustomRemote(path=annex.path, persistent_cache=True)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = True
         earchive = annexarchive.cache[key_path]
@@ -211,7 +217,7 @@ class AddArchiveContent(Interface):
             lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
             annex.annex_initremote(
                 ARCHIVES_SPECIAL_REMOTE,
-                ['encryption=none', 'type=external', 'externaltype=dl+archive',
+                ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
                  'autoenable=true'])
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
@@ -224,7 +230,7 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
-            leading_dir = earchive.get_leading_directory() if strip_leading_dirs else None
+            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth, exclude=exclude) if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
             # dedicated stats which would be added to passed in (if any)
@@ -261,7 +267,7 @@ class AddArchiveContent(Interface):
                     except StopIteration:
                         continue
 
-                url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
+                url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
                 # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
 

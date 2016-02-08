@@ -11,16 +11,23 @@
 
 import os
 import time
-from os.path import expanduser, join as opj, exists, isabs, lexists, islink, realpath
+from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os import unlink, makedirs
-
+from collections import OrderedDict
 from humanize import naturalsize
+from six import iteritems
+from six import string_types
+from distutils.version import LooseVersion
 
+from git import Repo
+
+from ...version import __version__
 from ...api import add_archive_content
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
+from ...utils import find_files
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
@@ -28,6 +35,7 @@ from ...support.gitrepo import GitRepo
 from ...support.annexrepo import AnnexRepo
 from ...support.handlerepo import HandleRepo
 from ...support.stats import ActivityStats
+from ...support.versions import get_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
 
 from ... import cfg
@@ -35,6 +43,7 @@ from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
 from ..dbs.files import AnnexFileAttributesDB
+from ..dbs.versions import SingleVersionDB
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.annex')
@@ -43,13 +52,13 @@ _runner = get_runner()
 _call = _runner.call
 _run = _runner.run
 
-
+# TODO: make use of datalad_stats
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
     def __init__(self, template, handle_name=None, collection_name=None,
                  path=None, branch=None,
-                 data_fields=[], add_fields={}, existing='raise'):
+                 data_fields=[], add_fields={}, existing=None):
         """
         Parameters
         ----------
@@ -71,7 +80,7 @@ class initiate_handle(object):
         add_fields : dict, optional
           Dictionary of additional fields to store in the crawler configuration
           to be passed into the template
-        existing : ('skip', 'raise', 'replace'), optional
+        existing : ('skip', 'raise', 'replace', crawl'), optional
           Behavior if encountering existing handle
         """
         # TODO: add_fields might not be flexible enough for storing more elaborate
@@ -86,6 +95,7 @@ class initiate_handle(object):
         self.branch = branch
 
     def _initiate_handle(self, path, name):
+        lgr.info("Initiating handle %s" % name)
         if self.branch is not None:
             # Because all the 'create' magic is stuffed into the constructor ATM
             # we need first initiate a git repository
@@ -101,6 +111,7 @@ class initiate_handle(object):
                        create=True)
 
     def _save_crawl_config(self, handle_path, name, data):
+        lgr.info("Creating handle configuration for %s" % name)
         repo = GitRepo(handle_path)
         crawl_config_dir = opj(handle_path, CRAWLER_META_DIR)
         if not exists(crawl_config_dir):
@@ -129,7 +140,10 @@ class initiate_handle(object):
         with open(crawl_config, 'w') as f:
             cfg.write(f)
         repo.git_add(crawl_config)
-        repo.git_commit("Initialized crawling configuration to use template %s" % self.template)
+        if repo.dirty:
+            repo.git_commit("Initialized crawling configuration to use template %s" % self.template)
+        else:
+            lgr.debug("Repository is not dirty -- not committing")
 
 
     def __call__(self, data={}):
@@ -145,18 +159,26 @@ class initiate_handle(object):
             handle_path = self.path
 
         lgr.debug("Request to initialize a handle at %s", handle_path)
-
+        init = True
         if exists(handle_path):
-            if self.existing == 'skip':
+            # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
+            # TODO: config crawl.collection.crawl_new = false|true
+            existing = self.existing or 'skip'
+            if existing == 'skip':
+                lgr.info("Skipping handle %s since already exists" % handle_name)
                 yield data
                 return
-            elif self.existing == 'raise':
+            elif existing == 'raise':
                 raise RuntimeError("%s already exists" % handle_path)
-            elif self.existing == 'replace':
+            elif existing == 'replace':
                 _call(rmtree, handle_path)
-            else: # TODO: 'crawl'  ;)
+            elif existing == 'adjust':
+                # E.g. just regenerate configs/meta
+                init = False
+            else:  # TODO: 'crawl'  ;)
                 raise ValueError(self.existing)
-        _call(self._initiate_handle, handle_path, handle_name)
+        if init:
+            _call(self._initiate_handle, handle_path, handle_name)
         _call(self._save_crawl_config, handle_path, handle_name, data)
 
 
@@ -174,6 +196,7 @@ class Annexificator(object):
     Should be relative. If absolute found -- ValueError is raised
     """
     def __init__(self, path=None, mode='full', options=None,
+                 special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
                  statusdb=None,
                  **kwargs):
@@ -188,6 +211,8 @@ class Annexificator(object):
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
           annex modes where no actual download is performed and files' keys are their urls
+        special_remotes : list, optional
+          List of custom special remotes to initialize and enable by default.
         yield_non_updated : bool, optional
           Either to yield original data (with filepath) if load was not updated in annex
         statusdb : , optional
@@ -198,8 +223,7 @@ class Annexificator(object):
           to be passed into AnnexRepo
         """
         if path is None:
-            from os.path import curdir
-            path = curdir
+            path = realpath(curdir)
         # TODO: commented out to ease developing for now
         #self.repo = _call(AnnexRepo, path, **kwargs)
         # TODO: backend -- should be fetched from the config I guess... or should we
@@ -207,9 +231,19 @@ class Annexificator(object):
         # Well -- different annexifiers might have different ideas for the backend, but
         # then those could be overriden via options
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
+
+        git_remotes = self.repo.git_get_remotes()
+        if special_remotes:
+            for remote in special_remotes:
+                if remote not in git_remotes:
+                    self.repo.annex_initremote(
+                            remote,
+                            ['encryption=none', 'type=external', 'autoenable=true',
+                             'externaltype=%s' % remote])
+
         self.mode = mode
         self.options = options or []
-        self._states = []
+        self._states = set()
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
         self.yield_non_updated = yield_non_updated
@@ -358,6 +392,8 @@ class Annexificator(object):
             if out_json:  # if not try -- should be here!
                 _call(stats.increment, 'add_annex' if added_to_annex else 'add_git')
 
+        # TODO!!:  sanity check that no large files are added to git directly!
+
         # So we have downloaded the beast
         # Since annex doesn't care to set mtime for the symlink itself we better set it outselves
         if remote_status and lexists(filepath):  # and islink(filepath):
@@ -367,9 +403,7 @@ class Annexificator(object):
             # *nix only!  TODO
             _call(lmtime, filepath, remote_status.mtime)
 
-        state = "adding files to git/annex"
-        if state not in self._states:
-            self._states.append(state)
+        self._states.add("Added files to git/annex")
 
         # WiP: commented out to do testing before merge
         # db_filename = self.db.get_filename(url)
@@ -426,7 +460,7 @@ class Annexificator(object):
         def switch_branch(data):
             """Switches to the branch %s""" % branch
             # if self.repo.dirty
-            list(self.finalize(data))
+            list(self.finalize()(data))
             existing_branches = self.repo.git_get_branches()
             if branch not in existing_branches:
                 # TODO: this should be a part of the gitrepo logic
@@ -434,7 +468,8 @@ class Annexificator(object):
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
                     self.repo.git_checkout(branch, options="--orphan")
-                    self.repo.git_remove('.', r=True, f=True) # TODO: might be insufficient if directories etc  TEST/fix
+                    if self.repo.dirty:
+                        self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
@@ -446,19 +481,25 @@ class Annexificator(object):
             yield updated(data, {"git_branch": branch})
         return switch_branch
 
-    def merge_branch(self, branch, strategy=None, commit=True, skip_no_changes=None):
+    def merge_branch(self, branch, target_branch=None,
+                     strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
         """Merge a branch into a current branch
 
         Parameters
         ----------
         branch: str
           Branch to be merged
+        target_branch: str, optional
+          Into which branch to merge. If not None, it will be checked out first.
+          At the end we will return into original branch
         strategy: None or 'theirs', optional
           With 'theirs' strategy remote branch content is used 100% as is.
           'theirs' with commit=False can be used to prepare data from that branch for
           processing by further steps in the pipeline
         commit: bool, optional
           Either to commit when merge is complete
+        one_commit_at_at_time: bool, optional
+          Either to generate
         skip_no_changes: None or bool, optional
           Either to not perform any action if there is no changes from previous merge
           point. If None, config TODO will be consulted with default of being True (i.e. skip
@@ -468,9 +509,19 @@ class Annexificator(object):
         assert(strategy in (None, 'theirs'))
 
         def merge_branch(data):
+
+            if target_branch is not None:
+                orig_branch = self.repo.git_get_active_branch()
+                target_branch_ = target_branch
+                list(self.switch_branch(target_branch_)(data))
+            else:
+                orig_branch = None
+                target_branch_ = self.repo.git_get_active_branch()
+
             if self.repo.dirty:
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
-            last_merged_checksum = self.repo.git_get_merge_base([self.repo.git_get_active_branch(), branch])
+
+            last_merged_checksum = self.repo.git_get_merge_base([target_branch_, branch])
             if last_merged_checksum == self.repo.git_get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
                 skip_no_changes_ = skip_no_changes
@@ -481,33 +532,276 @@ class Annexificator(object):
                     lgr.debug("Skipping the merge")
                     return
 
-            lgr.info("Initiating merge of %(branch)s using strategy %(strategy)s", locals())
+            if one_commit_at_a_time:
+                all_to_merge = list(
+                        self.repo.git_get_branch_commits(
+                                branch,
+                                limit='left-only',
+                                stop=last_merged_checksum,
+                                value='hexsha'))[::-1]
+            else:
+                all_to_merge = [branch]
+
+            nmerges = len(all_to_merge)
+            lgr.info("Initiating %(nmerges)d merges of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
-            if strategy is None:
-                self.repo.git_merge(branch, options=options)
-            elif strategy == 'theirs':
-                self.repo.git_merge(branch, options=["-s", "ours", "--no-commit"], expect_stderr=True)
-                self.repo.cmd_call_wrapper.run("git read-tree -m -u %s" % branch)
-                self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
+
+            for to_merge in all_to_merge:
+                # we might have switched away to orig_branch
+                if self.repo.git_get_active_branch() != target_branch_:
+                    self.repo.git_checkout(target_branch_)
+                if strategy is None:
+                    self.repo.git_merge(to_merge, options=options)
+                elif strategy == 'theirs':
+                    self.repo.git_merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
+                    self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
+                    self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
+                else:
+                    raise NotImplementedError(strategy)
+
                 if commit:
-                    self._commit("Merged %s using strategy %s" % (branch, strategy), options=["-a"])
+                    if strategy is not None:
+                        msg = branch if (nmerges == 1) else ("%s (%s)" % (branch, to_merge))
+                        self._commit("Merged %s using strategy %s" % (msg, strategy), options=["-a"])
                 else:
                     # Record into our activity stats
                     stats = data.get('datalad_stats', None)
                     if stats:
-                        stats.merges.append([branch, self.repo.git_get_active_branch()])
-            yield data
+                        stats.merges.append([branch, target_branch_])
+                if orig_branch is not None:
+                    self.repo.git_checkout(orig_branch)
+                yield data
         return merge_branch
 
+    # At least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
         # We need a custom commit due to "fancy" merges and GitPython
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
+        # and apparently not actively developed
         if msg is not None:
             options = options + ["-m", msg]
         self.repo.precommit()  # so that all batched annexes stop
-        self.repo.cmd_call_wrapper.run(["git", "commit"] + options)
+        self.repo._git_custom_command([], ["git", "commit"] + options)
+        #self.repo.commit(msg)
+        #self.repo.repo.git.commit(options)
 
+    def _unstage(self, fpaths):
+        # self.repo.cmd_call_wrapper.run(["git", "reset"] + fpaths)
+        self.repo._git_custom_command(fpaths, ["git", "reset"])
+
+    def _stage(self, fpaths):
+        self.repo.git_add(fpaths)
+        # self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
+
+    def _get_status(self):
+        """Custom check of status to see what files were staged, untracked etc
+        until
+        https://github.com/gitpython-developers/GitPython/issues/379#issuecomment-180101921
+        is resolved
+        """
+        #out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
+        out, err = self.repo._git_custom_command([], ["git", "status", "--porcelain"])
+        assert not err
+        staged, notstaged, untracked = [], [], []
+        for l in out.split('\n'):
+            if not l:
+                continue
+            act = l[:2]  # first two characters is what is happening to the file
+            fname = l[3:]
+            try:
+                {'??': untracked,
+                 'A ': staged,
+                 'M ': staged,
+                 ' M': notstaged,
+                 }[act].append(fname)
+                # for the purpose of this use we don't even want MM or anything else
+            except KeyError:
+                raise RuntimeError("git status %r not yet supported. TODO" % act)
+        return staged, notstaged, untracked
+
+    def commit_versions(self,
+                        regex,
+                        dirs=True,  # either match directory names
+                        rename=False,
+                        **kwargs):
+        """Generate multiple commits if multiple versions were staged
+        """
+        def _commit_versions(data):
+            self.repo.precommit()  # so that all batched annexes stop
+
+            # figure out versions for all files (so we could handle conflicts with existing
+            # non versioned)
+            # TODO:  we need to care only about staged (and unstaged?) files ATM!
+            # So let's do it.  And use separate/new Git repo since we are doing manual commits through
+            # calls to git.  TODO: RF to avoid this
+            # Not usable for us ATM due to
+            # https://github.com/gitpython-developers/GitPython/issues/379
+            # repo = Repo(self.repo.path)
+            #
+            # def process_diff(diff):
+            #     """returns full paths for files in the diff"""
+            #     out = []
+            #     for obj in diff:
+            #         assert(not obj.renamed)  # not handling atm
+            #         assert(not obj.deleted_file)  # not handling atm
+            #         assert(obj.a_path == obj.b_path)  # not handling atm
+            #         out.append(opj(self.repo.path, obj.a_path))
+            #     return out
+            #
+            # staged = process_diff(repo.index.diff('HEAD'))#repo.head.commit))
+            # notstaged = process_diff(repo.index.diff(None))
+            staged, notstaged, untracked = self._get_status()
+
+            # Verify that everything is under control!
+            assert(not notstaged)  # not handling atm, although should be safe I guess just needs logic to not unstage them
+            assert(not untracked)  # not handling atm
+            if not staged:
+                return  # nothing to be done -- so we wash our hands off entirely
+
+            if not dirs:
+                raise NotImplementedError("ATM matching will happen to dirnames as well")
+
+            versions = get_versions(staged, regex, **kwargs)
+
+            if not versions:
+                # no versioned files were added, nothing to do really
+                for d in self.finalize()(data):
+                    yield d
+                return
+
+            # we don't really care about unversioned ones... overlay and all that ;)
+            if None in versions:
+                versions.pop(None)
+
+            # take only new versions to deal with
+            versions_db = SingleVersionDB(self.repo)
+            prev_version = versions_db.version
+
+            if prev_version is None:
+                new_versions = versions  # consider all!
+            else:
+                version_keys = list(versions.keys())
+                if prev_version not in versions_db.versions:
+                    # shouldn't happen
+                    raise RuntimeError("previous version %s not found among known to DB: %s" % (prev_version, versions_db.versions.keys()))
+                # all new versions must be greater than the previous version
+                # since otherwise it would mean that we are complementing previous version and it might be
+                # a sign of a problem
+                assert(all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
+                # old implementation when we didn't have entire versions db stored
+                #new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
+                new_versions = versions
+                # if we have "new_versions" smallest one smaller than previous -- we got a problem!
+                # TODO: how to handle ==? which could be legit if more stuff was added for the same
+                # version?  but then if we already tagged with that -- we would need special handling
+
+            if new_versions:
+                smallest_new_version = next(iter(new_versions))
+                if prev_version:
+                    if LooseVersion(smallest_new_version) <= LooseVersion(prev_version):
+                        raise ValueError("Smallest new version %s is <= prev_version %s"
+                                         % (smallest_new_version, prev_version))
+
+            versions_db.update_versions(versions)  # store all new known versions
+
+            # early return if no special treatment is needed
+            nnew_versions = len(new_versions)
+            if nnew_versions <= 1:
+                # if a single new version -- no special treatment is needed, but we need to
+                # inform db about this new version
+                if nnew_versions == 1:
+                    _call(setattr, versions_db, 'version', smallest_new_version)
+                # we can't return a generator here
+                for d in self.finalize()(data):
+                    yield d
+                return
+
+            # unstage all versioned files from the index
+            nunstaged = 0
+            for version, fpaths in iteritems(versions):
+                nfpaths = len(fpaths)
+                lgr.debug("Unstaging %d files for version %s", nfpaths, version)
+                nunstaged += nfpaths
+                _call(self._unstage, list(fpaths.values()))
+
+            stats = data.get('datalad_stats', None)
+            stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
+
+            for iversion, (version, fpaths) in enumerate(iteritems(new_versions)):  # for all versions past previous
+                # stage/add files of that version to index
+                if rename:
+                    # we need to rename and create a new vfpaths
+                    vfpaths = []
+                    for fpath, vfpath in iteritems(fpaths):
+                        # ATM we do not allow unversioned -- should have failed earlier, if not HERE!
+                        # assert(not lexists(fpath))
+                        # nope!  it must be there from previous commit of a versioned file!
+                        # so rely on logic before
+                        lgr.debug("Renaming %s into %s" % (vfpath, fpath))
+                        os.rename(vfpath, fpath)
+                        vfpaths.append(fpath)
+                else:
+                    # so far we didn't bother about status, so just values would be sufficient
+                    vfpaths = list(fpaths.values())
+                nfpaths = len(vfpaths)
+                lgr.debug("Staging %d files for version %s", nfpaths, version)
+                nunstaged -= nfpaths
+                assert(nfpaths >= 0)
+                assert(nunstaged >= 0)
+                _call(self._stage, vfpaths)
+
+                # RF: with .finalize() to avoid code duplication etc
+                # ??? what to do about stats and states?  reset them or somehow tune/figure it out?
+                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d" % (iversion+1, nnew_versions, version, nunstaged)
+
+                if stats:
+                    _call(stats.reset)
+
+                if version:
+                    _call(setattr, versions_db, 'version', version)
+                _call(self._commit, "%s (%s)%s" % (', '.join(self._states), vmsg, stats_str), options=[])
+                # unless we update data, no need to yield multiple times I guess
+                # but shouldn't hurt
+                yield data
+            assert(nunstaged == 0)  # we at the end committed all of them!
+
+        return _commit_versions
+
+
+    def remove_other_versions(self, name=None, overlay=False):
+        """Remove other (non-current) versions of the files
+
+        Pretty much to be used in tandem with commit_versions
+        """
+        def _remove_other_versions(data):
+            if overlay:
+                raise NotImplementedError(overlay)
+            stats = data.get('datalad_stats', None)
+            versions_db = SingleVersionDB(self.repo, name=name)
+
+            current_version = versions_db.version
+
+            if not current_version:
+                lgr.info("No version information was found, skipping remove_other_versions")
+                yield data
+                return
+
+            for version, fpaths in iteritems(versions_db.versions):
+                # we do not care about non-versioned or current version
+                if version is None or current_version == version:
+                    continue   # skip current version
+                for fpath, vfpath in iteritems(fpaths):
+                    vfpathfull = opj(self.repo.path, vfpath)
+                    if lexists(vfpathfull):
+                        lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
+                        os.unlink(vfpathfull)
+
+            if stats:
+                stats.versions.append(current_version)
+
+            yield data
+        return _remove_other_versions
 
     #TODO: @borrow_kwargs from api_add_...
     def add_archive_content(self, commit=False, **aac_kwargs):
@@ -523,7 +817,6 @@ class Annexificator(object):
             stats = data.get('datalad_stats', ActivityStats())
             archive = self._get_fpath(data, stats)
             # TODO: may be adjust annex_options
-            #import pdb; pdb.set_trace()
             annex = add_archive_content(
                 archive, annex=self.repo,
                 delete=True, key=False, commit=commit, allow_dirty=True,
@@ -531,6 +824,7 @@ class Annexificator(object):
                 stats=stats,
                 **aac_kwargs
             )
+            self._states.add("Added files from extracted archives")
             assert(annex is self.repo)   # must be the same annex, and no new created
             # to propagate statistics from this call into commit msg since we commit=False here
             # we update data with stats which gets a new instance if wasn't present
@@ -538,19 +832,50 @@ class Annexificator(object):
         return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, data):
-        """Finalize operations -- commit uncommited, prune abandoned? etc"""
-        self.repo.precommit()
-        if self.repo.dirty:  # or self.tracker.dirty # for dry run
-            lgr.info("Repository found dirty -- adding and committing")
-            #    # TODO: introduce activities tracker
-            _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
+    def finalize(self, tag=False):
+        """Finalize operations -- commit uncommited, prune abandoned? etc
+
+        Parameters
+        ----------
+        tag: bool or str, optional
+          If set, information in datalad_stats and data can be used to tag release if
+          versions is non-empty.
+          If True, simply the last version to be used.  If str, it is .format'ed
+          using datalad_stats, so something like "r{stats.versions[0]}" can be used.
+          Also `last_version` is provided as the last one from stats.versions (None
+          if empty)
+
+        """
+        def _finalize(data):
+            self.repo.precommit()
             stats = data.get('datalad_stats', None)
-            stats_str = stats.as_str(mode='line') if stats else ''
-            _call(self._commit, "Finalizing %s %s" % (','.join(self._states), stats_str), options=["-a"])
-            if stats:
-                _call(stats.reset)
-        else:
-            lgr.info("Found branch non-dirty - nothing is committed")
-        self._states = []
-        yield data
+            if self.repo.dirty:  # or self.tracker.dirty # for dry run
+                lgr.info("Repository found dirty -- adding and committing")
+                #    # TODO: introduce activities tracker
+                _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
+
+                stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
+                _call(self._commit, "%s%s" % (', '.join(self._states), stats_str), options=["-a"])
+                if stats:
+                    _call(stats.reset)
+            else:
+                lgr.info("Found branch non-dirty - nothing is committed")
+
+            if tag and stats:
+                # versions survive only in total_stats
+                total_stats = stats.get_total()
+                if total_stats.versions:
+                    last_version = total_stats.versions[-1]
+                    if isinstance(tag, string_types):
+                        tag_ = tag.format(stats=total_stats, data=data, last_version=last_version)
+                    else:
+                        tag_ = last_version
+                    # TODO: config.tag.sign
+                    stats_str = "\n\n" + total_stats.as_str(mode='full')
+                    if tag_ in self.repo.repo.tags:
+                        # TODO: config.tag.allow_override
+                        raise RuntimeError("There is already tag %s in the repository" % tag)
+                    self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
+            self._states = set()
+            yield data
+        return _finalize

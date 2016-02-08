@@ -77,6 +77,17 @@ PIPELINE_OPTS = dict(
 )
 
 
+def reset_pipeline(pipeline):
+    """Given a pipeline, traverses its nodes and calls .reset on them if they have such an attribute
+    """
+    if pipeline:
+        for node in pipeline:
+            if isinstance(node, (list, tuple)):
+                reset_pipeline(node)
+            elif hasattr(node, '__call__') and hasattr(node, 'reset'):
+                lgr.log(1, "Resetting node %s" % node)
+                node.reset()
+
 def run_pipeline(*args, **kwargs):
     """Run pipeline and assemble results into a list
 
@@ -106,7 +117,7 @@ def _get_pipeline_opts(pipeline):
     return opts, pipeline
 
 
-def xrun_pipeline(pipeline, data=None, stats=None):
+def xrun_pipeline(pipeline, data=None, stats=None, reset=True):
     """Yield results from the pipeline.
 
     """
@@ -117,6 +128,10 @@ def xrun_pipeline(pipeline, data=None, stats=None):
         lgr.log(5, "%s: " + msg, id_pipeline, *args)
 
     _log("%s", pipeline)
+
+    if reset:
+        _log("Resetting pipeline")
+        reset_pipeline(pipeline)
 
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
@@ -207,7 +222,7 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
     if isinstance(node, (list, tuple)):
         lgr.debug("Pipe: %s" % str(node))
         # we have got a step which is yet another entire pipeline
-        pipeline_gen = xrun_pipeline(node, data)
+        pipeline_gen = xrun_pipeline(node, data, reset=False)
         if pipeline_gen:
             # should be similar to as running a node
             data_in_to_loop = pipeline_gen

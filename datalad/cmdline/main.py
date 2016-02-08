@@ -27,7 +27,7 @@ from ..dochelpers import exc_str
 
 def _license_info():
     return """\
-Copyright (c) 2013-2015 DataLad developers
+Copyright (c) 2013-2016 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

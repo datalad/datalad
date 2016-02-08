@@ -36,10 +36,10 @@ def extract_readme(data):
     lgr.info("Generated README.txt")
     yield {'filename': "README.txt"}
 
-def pipeline(dataset, versioned_urls=True):
+def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/"):
     """Pipeline to crawl/annex an openfmri dataset"""
 
-    dataset_url = 'https://openfmri.org/dataset/%s' % dataset
+    dataset_url = '%s%s' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
@@ -61,76 +61,49 @@ def pipeline(dataset, versioned_urls=True):
                extract_readme,
                annex,
             ],
-            [  # and collect all URLs under "AWS Link"
-                # no longer valid
-                #css_match('.field-name-field-aws-link a',
-                #          xpaths={'url': '@href',
-                #                  'url_text': 'text()'},
-                #          min_count=1),
-                # and don't know how to select all the a after h4
-                # xpath('//h4[contains(text(), "Data:")]')
-                # so let's just select all the ones going to /tarballs/
-                # some are not on S3 yet, so no /tarballs/ prefix e.g. ds 158
-                #a_href_match('.*/tarballs/.*\.(tgz|tar.*|zip)', min_count=1),
+            [  # and collect all URLs pointing to tarballs
                 a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
                 # Since all content of openfmri is anyways available openly, no need atm
                 # to use https which complicates proxying etc. Thus replace for AWS urls
                 # to openfmri S3 from https to http
-                # TODO: might want to become an option for get_versioned_url? 
+                # TODO: might want to become an option for get_versioned_url?
                 sub({
                  'url': {
-                   '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'
-                }}),
+                   '(http)s?(://.*openfmri\.s3\.amazonaws.com/|://s3\.amazonaws\.com/openfmri/)': r'\1\2'}}),
                 func_to_node(get_versioned_url,
                              data_args=['url'],
                              outputs=['url'],
                              kwargs={'guarantee_versioned': versioned_urls,
                                      'verify': True}),
-
-                # TODO: we need to "version" those urls which we can version, e.g.,
-                # if coming from versioned S3 buckets
-                # version_url,
-                # TODO TEMP -- too heavy, use some bogie for now
-                #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie.tgz'}),
-                #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_2.tgz'}),
-                #assign({'url': 'http://www.onerussian.com/tmp/ds005_raw_boogie_4.tgz'}),
-                #assign({'filename': 'ds005_raw_boogie.tgz'}),
-
                 annex,
             ],
-            # Some of them ship their own license.txt, so let's just use that one
-            # TODO: add a check and only if not present -- populate
-            # [  # and license information
-            #    css_match('.field-name-field-license a',
-            #              xpaths={'url': '@href',
-            #                      'url_text': 'text()'}),
-            #    # TODO: HTML dump of that page for the license wouldn't be as useful I guess,
-            #    # so let's provide our collection of most common referenced artifacts
-            #    # in few formats
-            #    assign({'filename': 'license.txt'}),
-            #    annex,
-            # ],
             # TODO: describe_handle
+            # Now some true magic -- possibly multiple commits, 1 per each detected new version!
+            annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])'),
         ],
-        annex.switch_branch('master'),
+        # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
-            annex.merge_branch('incoming', strategy='theirs', commit=False),
+            {'loop': True},  # loop for multiple versions merges
+            annex.switch_branch('incoming-processed'),
+            annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False),
+            # still we would have all the versions present -- we need to restrict only to the current one!
+            annex.remove_other_versions('incoming'),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
                 {'loop': True},
-                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True), #  we fail if none found -- there must be some! ;)),
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  #  we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
-                    #rename=[
-                    #    r"|^[^/]*/(.*)|\1"  # e.g. to strip leading dir, or could prepend etc
-                    #],
-					existing='archive-suffix',
-					strip_leading_dirs=True,
+                    existing='archive-suffix',
+                    strip_leading_dirs=True,
+                    leading_dirs_depth=1,
+                    exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
                     # overwrite=True,
-                    # TODO: we might need a safeguard for cases if multiple subdirectories within a single tarball
-                    #rename=
+                    # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball
                 ),
-                # annex, # not needed since above add_archive_content adds to annex
             ],
+            annex.switch_branch('master'),
+            annex.merge_branch('incoming-processed', commit=True),
+            annex.finalize(tag=True),
         ],
-        annex.finalize,
+        annex.switch_branch('master'),
     ]

@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import os
 import sys
 from six import PY2
 from getpass import getpass
@@ -138,15 +139,17 @@ Question? [choice1|choice2]
             attempt += 1
             if attempt >= 100:
                 raise RuntimeError("This is 100th attempt. Something really went wrong")
+            if not hidden:
+                self.out.write(msg + ": ")
+                self.out.flush()  # not effective for stderr for some reason under annex
 
-            self.out.write(msg + ": ")
-            self.out.flush()
-
-            # TODO: raw_input works only if stdin was not controlled by
-            # (e.g. if coming from annex).  So we might need to do the
-            # same trick as get_pass() does while directly dealing with /dev/pty
-            # and provide per-OS handling with stdin being override
-            response = (raw_input if PY2 else input)() if not hidden else getpass('')
+                # TODO: raw_input works only if stdin was not controlled by
+                # (e.g. if coming from annex).  So we might need to do the
+                # same trick as get_pass() does while directly dealing with /dev/pty
+                # and provide per-OS handling with stdin being override
+                response = (raw_input if PY2 else input)()
+            else:
+                response = getpass(msg + ": ")
 
             if not response and default:
                 response = default
@@ -158,3 +161,16 @@ Question? [choice1|choice2]
                 continue
             break
         return response
+
+
+# poor man thingie for now
+@auto_repr
+class UnderAnnexUI(DialogUI):
+    def __init__(self, **kwargs):
+        if 'out' not in kwargs:
+            # to avoid buffering
+            # http://stackoverflow.com/a/181654/1265472
+            #kwargs['out'] = os.fdopen(sys.stderr.fileno(), 'w', 0)
+            # but wasn't effective! sp kist straogjt for now
+            kwargs['out'] = sys.stderr
+        super(UnderAnnexUI, self).__init__(**kwargs)

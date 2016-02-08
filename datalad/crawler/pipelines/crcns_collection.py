@@ -26,14 +26,18 @@ def pipeline(**kwargs):
         crawl_url("http://crcns.org/data-sets",
             matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
 #                      a_href_match('.*/data-sets/[\S+/\S+'),]),
+        # TODO:  such matchers don't have state so if they get to the same url from multiple
+        # pages they pass that content twice.  Implement state to remember yielded results +
+        # .reset() for nodes with state so we could first get through the pipe elements and reset
+        # them all
         a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
         # https://openfmri.org/dataset/ds000001/
         assign({'handle_name': '%(dataset)s'}, interpolate=True),
         initiate_handle(
             template="crcns",
-            data_fields=['dataset'],
-            branch='incoming',  # there will be archives etc
-            existing='skip',
+            data_fields=['dataset_category', 'dataset'],
+            # branch='incoming',  # there will be archives etc
+            existing='adjust',
             # further any additional options
         )
     ]

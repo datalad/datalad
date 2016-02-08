@@ -27,6 +27,7 @@ import time
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
 from six import reraise
+from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
@@ -94,20 +95,26 @@ def skip_if_no_module(module):
         raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
 
 
-def create_tree_archive(path, name, load, overwrite=False):
+def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
     dirname = file_basename(name)
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
-    create_tree(full_dirname, load)
+    create_tree(full_dirname, load, archives_leading_dir=archives_leading_dir)
     # create archive
-    compress_files([dirname], name, path=path, overwrite=overwrite)
+    if archives_leading_dir:
+        compress_files([dirname], name, path=path, overwrite=overwrite)
+    else:
+        compress_files(list(map(basename, glob.glob(opj(full_dirname, '*')))),
+                       opj(pardir, name),
+                       path=opj(path, dirname),
+                       overwrite=overwrite)
     # remove original tree
     shutil.rmtree(full_dirname)
 
 
-def create_tree(path, tree):
+def create_tree(path, tree, archives_leading_dir=True):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -123,9 +130,9 @@ def create_tree(path, tree):
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar'):
-                create_tree_archive(path, name, load)
+                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load)
+                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
             #encoding = sys.getfilesystemencoding()
             #if isinstance(full_name, text_type):
@@ -329,13 +336,13 @@ def ok_file_has_content(path, content):
 #
 
 @optional_args
-def with_tree(t, tree=None, **tkwargs):
+def with_tree(t, tree=None, archives_leading_dir=True, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
         tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
         d = tempfile.mkdtemp(**tkwargs_)
-        create_tree(d, tree)
+        create_tree(d, tree, archives_leading_dir=archives_leading_dir)
         try:
             return t(*(arg + (d,)), **kw)
         finally:

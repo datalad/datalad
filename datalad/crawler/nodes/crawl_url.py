@@ -9,9 +9,21 @@
 """Basic crawler for the web
 """
 
+import re
+from distutils.version import LooseVersion
+
+import os
+from os import unlink
+from os.path import splitext, dirname, basename, curdir
+from os.path import lexists
+from os.path import join as opj
+
+from six import iteritems
 from ...utils import updated
+from ...utils import find_files
 from ...dochelpers import exc_str
-from ...downloaders.base import DownloadError
+from ...support.versions import get_versions
+from ...downloaders.base import DownloadError, UnhandledRedirectError
 from ...downloaders.providers import Providers
 
 from logging import getLogger
@@ -26,6 +38,7 @@ class crawl_url(object):
                  url=None, matchers=None,
                  input='url',
                  failed=None,
+                 cache_redirects=True,
                  output=('response', 'url')):
         """If url is None, would try to pick it up from data[input]
 
@@ -36,6 +49,8 @@ class crawl_url(object):
           Expect page content in and should produce url field
         failed: {skip}, optional
           What to do about failing urls. If None -- would consult (eventually) the config
+        cache_redirects: bool, optional
+          Either to remember redirects for subsequent invocations
         """
         self._url = url
         self._matchers = matchers
@@ -43,6 +58,9 @@ class crawl_url(object):
         self._output = output
         self._seen = set()
         self._providers = Providers.from_config_files()
+        # Partially to overcome stuck redirect
+        # https://github.com/kennethreitz/requests/issues/2997
+        self._redirects_cache = {} if cache_redirects else None
         self.failed = failed
 
     def reset(self):
@@ -52,20 +70,41 @@ class crawl_url(object):
     def _visit_url(self, url, data):
         if url in self._seen:
             return
-        self._seen.add(url)
         # this is just a cruel first attempt
         lgr.debug("Visiting %s" % url)
+
         try:
-            page = self._providers.fetch(url)
+            retry = 0
+            orig_url = url
+            if self._redirects_cache is not None:
+                url = self._redirects_cache.get(url, url)
+            while True:
+                retry += 1
+                if retry > 100:
+                    raise DownloadError("We have followed 100 redirects already. Something is wrong!")
+                try:
+                    self._seen.add(url)
+                    page = self._providers.fetch(url, allow_redirects=False)
+                    break
+                except UnhandledRedirectError as exc:
+                    # since we care about tracking URL for proper full url construction
+                    # we should disallow redirects and handle them manually here
+                    lgr.debug("URL %s was redirected to %s" % (url, exc.url))
+                    if url == exc.url:
+                        raise DownloadError("Was redirected to the same url upon %s" % exc_str(exc))
+                    url = exc.url
+                    if self._redirects_cache is not None:
+                        self._redirects_cache[orig_url] = exc.url
         except DownloadError as exc:
             lgr.warning("URL %s failed to download: %s" % (url, exc_str(exc)))
             if self.failed in {None, 'skip'}:
-                # TODO: config  -- failed='skip' should be a config option, for now always skipping
+                # TODO: config  -- crawl.failed='skip' should be a config option, for now always skipping
                 return
             raise  # otherwise -- kaboom
 
         data_ = updated(data, zip(self._output, (page, url)))
         yield data_
+
         # now recurse if matchers were provided
         matchers = self._matchers
         if matchers:
@@ -90,6 +129,8 @@ class crawl_url(object):
         return self._visit_url(data[self._input], data)
 
 
+
+
 """
     for extractors, actions in conditionals:
         extractors = _assure_listuple(extractors)
@@ -109,3 +150,32 @@ class crawl_url(object):
                 seen_urls.add(url)
 """
 
+# TODO: probably might sense to RF into just a generic TSV file parser
+def parse_checksums(digest=None):
+    """Generates a node capable of parsing checksums file and generating new URLs
+
+    Base of the available in data url is used for new URLs
+    """
+    def _parse_checksums(data):
+        url = data['url']
+        urlsplit = url.split('/')
+        topurl = '/'.join(urlsplit[:-1])
+        if digest is None:
+            # deduce from url's file extension
+            filename = urlsplit[-1]
+            base, ext = splitext(filename)
+            digest_ = ext if ext else digest
+
+        content = data['response']
+        # split into separate lines, first entry is checksum, 2nd file path
+        for line in content.split('\n'):
+            if not line:  # empty line
+                continue
+            checksum, fpath = line.split(None, 1)
+            yield updated(data, {'digest': digest or digest_,
+                                 'checksum': checksum,
+                                 'path': dirname(fpath),
+                                 'filename': basename(fpath),
+                                 'url': "%s/%s" % (topurl, fpath)
+                                 })
+    return _parse_checksums

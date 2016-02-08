@@ -19,6 +19,7 @@ from ...consts import ARCHIVES_TEMP_DIR
 from ...support.annexrepo import AnnexRepo
 from ...tests.utils import with_tempfile
 from ...utils import swallow_outputs
+from ...utils import chpwd
 from ...tests.utils import assert_equal, assert_in
 from ...tests.utils import use_cassette
 
@@ -33,4 +34,14 @@ def test_ls(d):
     makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus'))
     with swallow_outputs() as cmo:
         assert_equal(clean(annex=repo), None)  # no output ATM
-        assert_in("Removing 1 temporary", cmo.out)
+        assert_equal("Removing 1 temporary archive directory under %s: somebogus"
+                  % opj(d, ARCHIVES_TEMP_DIR), cmo.out.rstrip())
+
+    # relative path
+    makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus'))
+    makedirs(opj(d, ARCHIVES_TEMP_DIR, 'somebogus2'))
+    with chpwd(d), \
+         swallow_outputs() as cmo:
+        assert_equal(clean(), None)  # no output ATM
+        assert_equal("Removing 2 temporary archive directories under %s: somebogus, somebogus2"
+                  % ARCHIVES_TEMP_DIR, cmo.out.rstrip())
