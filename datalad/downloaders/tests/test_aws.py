@@ -9,8 +9,9 @@
 """Tests for S3 downloader"""
 
 import os
-from ..aws import S3Downloader
+from mock import patch
 
+from ..aws import S3Authenticator
 from ..providers import Providers, Credential  # to test against crcns
 
 from ...tests.utils import swallow_outputs
@@ -28,16 +29,23 @@ try:
 except Exception as e:
     raise SkipTest("boto module is not available: %s" % exc_str(e))
 
+from .utils import get_test_providers
 from .test_http import check_download_external_url
 from datalad.downloaders.tests.utils import get_test_providers
 
+url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'
+url_2versions_nonversioned1_ver1 = url_2versions_nonversioned1 + '?versionId=null'
+url_2versions_nonversioned1_ver2 = url_2versions_nonversioned1 + '?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
 
+# TODO: I think record_mode='all' must not be necessary here but something makes interaction
+# different across runs
 @use_cassette('fixtures/vcr_cassettes/test_s3_download_basic.yaml', record_mode='all')
 def test_s3_download_basic():
+
     for url, success_str, failed_str in [
-        ('s3://datalad-test0-versioned/2versions-nonversioned1.txt', 'version2', 'version1'),
-        ('s3://datalad-test0-versioned/2versions-nonversioned1.txt?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo', 'version2', 'version1'),
-        ('s3://datalad-test0-versioned/2versions-nonversioned1.txt?versionId=null', 'version1', 'version2'),
+        (url_2versions_nonversioned1, 'version2', 'version1'),
+        (url_2versions_nonversioned1_ver2, 'version2', 'version1'),
+        (url_2versions_nonversioned1_ver1, 'version1', 'version2'),
     ]:
         yield check_download_external_url, url, failed_str, success_str
 test_s3_download_basic.tags = ['network']
@@ -47,7 +55,7 @@ test_s3_download_basic.tags = ['network']
 @use_cassette('fixtures/vcr_cassettes/test_s3_mtime.yaml')
 @with_tempfile
 def test_mtime(tempfile):
-    url = 's3://datalad-test0-versioned/2versions-nonversioned1.txt?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
+    url = url_2versions_nonversioned1_ver2
     with swallow_outputs():
         get_test_providers(url).download(url, path=tempfile)
     assert_equal(os.stat(tempfile).st_mtime, 1446873817)
@@ -55,3 +63,26 @@ def test_mtime(tempfile):
     # and if url is wrong
     url = 's3://datalad-test0-versioned/nonexisting'
     assert_raises(DownloadError, get_test_providers(url).download, url, path=tempfile, overwrite=True)
+
+
+@use_cassette('fixtures/vcr_cassettes/test_s3_reuse_session.yaml')
+@with_tempfile
+# forgot how to tell it not to change return value, so this side_effect beast now
+@patch.object(S3Authenticator, 'authenticate', side_effect=S3Authenticator.authenticate, autospec=True)
+def test_reuse_session(tempfile, mocked_auth):
+    Providers.reset_default_providers()  # necessary for the testing below
+    providers = get_test_providers(url_2versions_nonversioned1_ver1)  # to check credentials
+    with swallow_outputs():
+        providers.download(url_2versions_nonversioned1_ver1, path=tempfile)
+    assert_equal(mocked_auth.call_count, 1)
+
+    providers2 = Providers.from_config_files()
+    with swallow_outputs():
+        providers2.download(url_2versions_nonversioned1_ver2, path=tempfile, overwrite=True)
+    assert_equal(mocked_auth.call_count, 1)
+
+    # but if we reload -- everything reloads and we need to authenticate again
+    providers2 = Providers.from_config_files(reload=True)
+    with swallow_outputs():
+        providers2.download(url_2versions_nonversioned1_ver2, path=tempfile, overwrite=True)
+    assert_equal(mocked_auth.call_count, 2)
