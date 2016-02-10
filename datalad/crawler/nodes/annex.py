@@ -6,7 +6,9 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Nodes to interact with annex -- add files etc
+"""Nodes to interact with annex -- initiate a new handle or operate with existing one
+
+via Annexificator class, which could be used to add files, checkout branches etc
 """
 
 import os
@@ -874,7 +876,7 @@ class Annexificator(object):
                     stats_str = "\n\n" + total_stats.as_str(mode='full')
                     if tag_ in self.repo.repo.tags:
                         # TODO: config.tag.allow_override
-                        raise RuntimeError("There is already tag %s in the repository" % tag)
+                        raise RuntimeError("There is already tag %s in the repository. Delete it first" % tag_)
                     self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
             self._states = set()
             yield data
