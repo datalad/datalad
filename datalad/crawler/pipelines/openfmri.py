@@ -83,6 +83,7 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
             # Now some true magic -- possibly multiple commits, 1 per each detected new version!
             annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])'),
         ],
+        annex.remove_obsolete(),  # should be called while still within incoming but only once
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             {'loop': True},  # loop for multiple versions merges

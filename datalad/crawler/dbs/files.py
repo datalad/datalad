@@ -20,6 +20,7 @@ from ...support.exceptions import CommandError
 from ...utils import auto_repr
 from ...utils import swallow_logs
 from ...utils import find_files
+from ...consts import HANDLE_META_DIR
 
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
@@ -74,7 +75,8 @@ class AnnexFileAttributesDB(object):
         if self._track_queried:
             self._queried_filepaths.add(filepath)
 
-        assert(lexists(filepath))  # of check and return None?
+        if not lexists(filepath):
+            return None
 
         # I wish I could just test using filesystem stats but that would not
         # be reliable, and also file might not even be here.
@@ -104,8 +106,11 @@ class AnnexFileAttributesDB(object):
             mtime=mtime
         )
 
-    def set(self, fpath, status):
-        # This DB doesn't implement it
+    def set(self, fpath, status=None):
+        # This DB doesn't implement much of it, besides marking internally that we do care about this file
+        filepath = self._get_fullpath(fpath)
+        if self._track_queried:
+            self._queried_filepaths.add(filepath)
         pass
 
     def is_different(self, fpath, status, url=None):
@@ -126,8 +131,16 @@ class AnnexFileAttributesDB(object):
         if not self._track_queried:
             raise RuntimeError("Cannot determine which files were removed since track_queried was set to False")
         obsolete = []
+        # those aren't tracked by annexificator
+        datalad_path = opj(self.annex.path, HANDLE_META_DIR)
         for fpath in find_files('.*', topdir=self.annex.path):
             filepath = self._get_fullpath(fpath)
+            if filepath.startswith(datalad_path):
+                continue
             if fpath not in self._queried_filepaths:
                 obsolete.append(filepath)
         return obsolete
+
+    def reset(self):
+        """Reset internal state, e.g. about known queried filedpaths"""
+        self._queried_filepaths = set()

@@ -19,7 +19,7 @@ from ..utils import auto_repr
 _COUNTS = (
     'files', 'urls',
     'add_git', 'add_annex',
-    'skipped', 'overwritten', 'renamed',
+    'skipped', 'overwritten', 'renamed', 'removed',
     'downloaded', 'downloaded_size', 'downloaded_time'
 )
 _LISTS = (
@@ -139,6 +139,7 @@ URLs processed: {urls}
 Files processed: {files}
  skipped: {skipped}
  renamed: {renamed}
+ removed: {removed}
  added to git: {add_git}
  added to annex: {add_annex}
  overwritten: {overwritten}
@@ -160,6 +161,7 @@ Branches merged:
             ("Files processed", "files"),
             (" skipped", "skipped"),
             (" renamed", "renamed"),
+            (" removed", "removed"),
             (" overwritten", "overwritten"),
             (" +git",  "add_git"),
             (" +annex", "add_annex"),

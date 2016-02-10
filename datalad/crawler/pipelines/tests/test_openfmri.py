@@ -25,6 +25,7 @@ from ....support.annexrepo import AnnexRepo
 from ....api import clean
 from ....utils import chpwd
 from ....utils import find_files
+from ....utils import swallow_logs
 from ....tests.utils import with_tree
 from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
@@ -66,6 +67,13 @@ def add_to_index(index_file, content):
         old_index = f.read()
     with open(index_file, 'w') as f:
         f.write(old_index.replace(_PLUG_HERE, content + _PLUG_HERE))
+
+
+def remove_from_index(index_file, regexp):
+    with open(index_file) as f:
+        old_index = f.read()
+    with open(index_file, 'w') as f:
+        f.write(re.sub(regexp, '', old_index))
 
 
 @skip_if_no_network
@@ -251,6 +259,11 @@ def test_openfmri_pipeline1(ind, topurl, outd):
         './.datalad/config.ttl', './.datalad/crawl/crawl.cfg',
         './.datalad/crawl/versions/incoming.json', './.datalad/datalad.ttl',
         './README.txt', './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
+    target_incoming_files = {
+        'README.txt', 'changelog.txt',
+        'ds666-beh_R1.0.1.tar.gz', 'ds666_R1.0.0.tar.gz', 'ds666_R1.0.1.tar.gz', 'ds666_R2.0.0.tar.gz',
+        '.datalad/crawl/versions/incoming.json'
+    }
     eq_(set(all_files), target_files)
 
     # check that -beh was committed in 2nd commit in incoming, not the first one
@@ -272,7 +285,8 @@ def test_openfmri_pipeline1(ind, topurl, outd):
 
     # rerun pipeline when new content is available
     # add new revision, rerun pipeline and check that stuff was processed/added correctly
-    add_to_index(opj(ind, 'ds666', 'index.html'),
+    index_html = opj(ind, 'ds666', 'index.html')
+    add_to_index(index_html,
                  content = '<a href="ds666_R2.0.0.tar.gz">Raw data on AWS version 2.0.0</a>')
 
     with chpwd(outd):
@@ -302,6 +316,32 @@ def test_openfmri_pipeline1(ind, topurl, outd):
                       merges=[['incoming', 'incoming-processed']]))
 
     check_dropall_get(repo)
+
+    # Let's see if pipeline would remove files we stopped tracking
+    remove_from_index(index_html, '<a href=.ds666_R1.0.0[^<]*</a>')
+    with chpwd(outd):
+        with swallow_logs() as cml:
+            out = run_pipeline(pipeline)
+            # since files get removed in incoming, but repreprocessed completely
+            # incomming-processed and merged into master -- new commits will come
+            # They shouldn't have any difference but still should be new commits
+            assert_in("There is already tag 2.0.0 in the repository", cml.out)
+    eq_(len(out), 1)
+    incoming_files = repo.git_get_files('incoming')
+    target_incoming_files.remove('ds666_R1.0.0.tar.gz')
+    eq_(set(incoming_files), target_incoming_files)
+    commits_hexsha_removed = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    # so no new changes to master/incomming-processed since older revision was removed
+    for b in 'master', 'incoming-processed':
+        eq_(repo.repo.branches[b].commit.diff(commits_hexsha_[b][0]), [])
+    dincoming = repo.repo.branches['incoming'].commit.diff(commits_hexsha_['incoming'][0])
+    eq_(len(dincoming), 1)  # 1 diff object -- 1 file removed
+    # since it seems to diff "from current to the specified", it will be listed as new_file
+    assert dincoming[0].new_file
+
+    eq_(out[0]['datalad_stats'].get_total().removed, 1)
+    assert_not_equal(commits_hexsha_, commits_hexsha_removed)
+
 test_openfmri_pipeline1.tags = ['integration']
 
 
