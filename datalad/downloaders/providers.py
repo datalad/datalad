@@ -240,7 +240,8 @@ class Providers(object):
         For sample configs look into datalad/downloaders/configs/providers.cfg
 
         If files is None, loading is "lazy".  Specify reload=True to force
-        reload
+        reload.  reset_default_providers could also be used to reset the memoized
+        providers
         """
         # lazy part
         if files is None and cls._DEFAULT_PROVIDERS and not reload:
@@ -248,6 +249,7 @@ class Providers(object):
 
         config = SafeConfigParserWithIncludes()
         # TODO: support all those other paths
+        files_orig = files
         if files is None:
             files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
         config.read(files)
@@ -281,13 +283,17 @@ class Providers(object):
 
         providers = Providers(list(providers.values()))
 
-        if files is None:
+        if files_orig is None:
             # Store providers for lazy access
             cls._DEFAULT_PROVIDERS = providers
 
         return providers
 
-
+    @classmethod
+    def reset_default_providers(cls):
+        """Resets to None memoized by from_config_files providers
+        """
+        cls._DEFAULT_PROVIDERS = None
 
 
     @classmethod

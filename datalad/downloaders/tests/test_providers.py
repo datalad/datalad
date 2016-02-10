@@ -46,6 +46,10 @@ def test_Providers_OnStockConfiguration():
     # should list all the providers atm
     assert_equal(providers_repr.count('Provider('), len(providers))
 
+    # Should be a lazy evaluator unless reload is specified
+    assert(providers is Providers.from_config_files())
+    assert(providers is not Providers.from_config_files(reload=True))
+
 
 def test_Providers_default_ones():
     providers = Providers()  # empty one

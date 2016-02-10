@@ -12,7 +12,7 @@ import re
 import six.moves.builtins as __builtin__
 import time
 
-from os.path import curdir, basename
+from os.path import curdir, basename, exists, realpath, islink
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
 import logging
@@ -283,6 +283,11 @@ else:
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
         Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        if islink(filepath) and exists(realpath(filepath)):
+            # trust noone - adjust also of the target file
+            # since it seemed like downloading under OSX (was it using curl?)
+            # didn't bother with timestamps
+            os.utime(filepath, (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 

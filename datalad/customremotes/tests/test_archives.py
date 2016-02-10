@@ -93,6 +93,10 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     # as a result it would also fetch tarball
     assert_true(cloned_handle.file_has_content(fn_archive))
 
+    # verify that we can drop if original archive gets dropped but available online:
+    #  -- done as part of the test_add_archive_content.py
+    # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
+
 
 def test_basic_scenario():
     yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False

@@ -12,13 +12,9 @@ from unittest import SkipTest
 
 from datalad.downloaders import Providers
 
-_test_providers = None
-
-def get_test_providers(url=None):
-    """Return reusable instance of our global providers"""
-    global _test_providers
-    if not _test_providers:
-        _test_providers = Providers.from_config_files()
+def get_test_providers(url=None, reload=False):
+    """Return reusable instance of our global providers + verify credentials for url"""
+    _test_providers = Providers.from_config_files(reload=reload)
     if url is not None:
         # check if we have credentials for the url
         provider = _test_providers.get_provider(url)

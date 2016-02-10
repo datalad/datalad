@@ -454,16 +454,18 @@ def test_run_under_dir(d):
 
 def test_use_cassette_if_no_vcr():
     # just test that our do nothing decorator does the right thing if vcr is not present
+    skip = False
     try:
         import vcr
-        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
+        skip = True
     except ImportError:
         pass
     except:
         # if anything else goes wrong with importing vcr, we still should be able to
         # run use_cassette
         pass
-
+    if skip:
+        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
     @use_cassette("some_path")
     def checker(x):
         return x + 1

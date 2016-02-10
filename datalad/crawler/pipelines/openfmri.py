@@ -43,7 +43,9 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
-        options=["-c", "annex.largefiles=exclude=*.txt and exclude=*.json and exclude=README* and exclude=*.[mc]"])
+        # leave in Git only obvious descriptors and code snippets -- the rest goes to annex
+        # so may be eventually we could take advantage of git tags for changing layout
+        options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"])
 
     return [
         annex.switch_branch('incoming'),

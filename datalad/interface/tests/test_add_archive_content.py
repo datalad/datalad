@@ -20,13 +20,14 @@ from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
 from ...tests.utils import ok_archives_caches
+from ...tests.utils import SkipTest
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
 from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
 from ...utils import chpwd, getpwd
 
-from ...api import add_archive_content
+from ...api import add_archive_content, clean
 
 
 # within top directory
@@ -170,7 +171,19 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     # TODO: check if persistent archive is there for the 1.tar.gz
 
-    chpwd(orig_pwd)  # just to avoid warnings ;)
+    # We should be able to drop everything since available online
+    with swallow_outputs():
+        clean(annex=repo)
+    repo.annex_drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
+
+    raise SkipTest("TODO: wait for https://git-annex.branchable.com/todo/checkpresentkey_without_explicit_remote")
+    # bug was that dropping didn't work since archive was dropped first
+    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+    repo.annex_drop(opj('1', '1 f.txt'))  # should be all kosher
+    repo.annex_get(opj('1', '1 f.txt'))  # and should be able to get it again
+
+    # TODO: verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
