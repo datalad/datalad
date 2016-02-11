@@ -10,63 +10,58 @@
 
 """
 
-import os
-import json
-from os.path import join as opj, exists, lexists, islink, realpath, basename, dirname
 from collections import OrderedDict
-from distutils.version import LooseVersion
 from six import iteritems
 
-from ...dochelpers import exc_str
 from ...utils import auto_repr
 from ...consts import CRAWLER_META_VERSIONS_DIR
 
+from .base import JsonBaseDB
 
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
 
 __docformat__ = 'restructuredtext'
 
+
 @auto_repr
-class SingleVersionDB(object):
+class SingleVersionDB(JsonBaseDB):
     """
     Simple helper to store/retrieve information about the version of the last scraped
+
+    Since we do not expect many changes being done to this DB it also
+    saves its state into the file upon any change
     """
     __version__ = 1
+    __crawler_subdir__ = CRAWLER_META_VERSIONS_DIR
 
-    def __init__(self, repo, name=None):
-        self.repo = repo
-        self.name = name
-        self._filepath = opj(realpath(repo.path),
-                             CRAWLER_META_VERSIONS_DIR,
-                             (name or repo.git_get_active_branch())+'.json')
-        self._db = {'db_version': SingleVersionDB.__version__,
-                    'version': None,
-                    'versions': OrderedDict()
-                    }
-        if lexists(self._filepath):
-            self.load()
+    #
+    # Defining abstract methods implementations
+    #
+    def _get_empty_db(self):
+        return {'version': None,
+                'versions': OrderedDict()}
 
-    def load(self):
-        with open(self._filepath) as f:
-            db = json.load(f)  # return f.read().strip()
-        assert(set(db.keys()) == {'db_version', 'version', 'versions'})
-        assert(db['db_version'] == SingleVersionDB.__version__)
+    def _get_loaded_db(self, db):
+        """Given a DB loaded from a file, prepare it for being used
+        """
+        assert (set(db.keys()) == {'db_version', 'version', 'versions'})
+        # no compatibility layers for now
+        assert (db['db_version'] == self.__class__.__version__)
         db['versions'] = OrderedDict(db['versions'])
-        self._db = db
+        return db
 
-    def save(self):
+    def _get_db_to_save(self):
+        """Return DB to be saved as JSON file
+        """
         db = self._db.copy()
         # since we have it ordered, let's store as list of items
         db['versions'] = list(db['versions'].items())
-        d = dirname(self._filepath)
-        if not exists(d):
-            os.makedirs(d)
-        lgr.debug("Writing versionsdb to %s" % self._filepath)
-        with open(self._filepath, 'w') as f:
-            json.dump(db, f, indent=2, sort_keys=True, separators=(',', ': '))
-        self.repo.git_add(self._filepath)  # stage to be committed
+        return db
 
+    #
+    # Custom properties and methods
+    #
     @property
     def version(self):
         return self._db['version']
