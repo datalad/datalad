@@ -7,7 +7,8 @@ repositories, while fetching data load from the original data providers.
 
 # Status
 
-It is currently in a "prototype" state, i.e. **a mess**.  Codebase is
+It is currently in a heavy initial development mode to establish core
+functionality which could be used by others.  Codebase is
 rapidly growing, functionality is usable for many use-cases but not
 yet officially released to public since its organization and
 configuration will be a subject for a considerable reorganization and
