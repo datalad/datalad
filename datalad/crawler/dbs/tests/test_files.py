@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
-from os.path import join as opj
+from os.path import join as opj, curdir, sep
 from ..files import AnnexFileAttributesDB
 
 from ....tests.utils import with_tree
@@ -70,3 +70,30 @@ def test_AnnexFileAttributesDB(path):
     #with chpwd(opj(path, 'd')):
     #    status2_dir = db.get('./file2.txt')
     #    assert_equal(status2, status2_dir)
+
+    # since we asked about each file we added to DB/annex -- none should be
+    # known as "deleted"
+    assert_equal(db.get_obsolete(), [])
+
+    # but if we create another db which wasn't queried yet
+    db2 = AnnexFileAttributesDB(annex=annex)
+    # all files should be returned
+    assert_equal(
+            set(db2.get_obsolete()),
+            {opj(path, p) for p in ['file1.txt', filep2, '2git']})
+    # and if we query one, it shouldn't be listed as deleted any more
+    status2_ = db2.get(filep2)
+    assert_equal(status2, status2_)
+    assert_equal(
+            set(db2.get_obsolete()),
+            {opj(path, p) for p in ['file1.txt', '2git']})
+
+    # and if we queried with ./ prefix, should work still
+    db2.get(curdir + sep + 'file1.txt')
+    assert_equal(
+            set(db2.get_obsolete()),
+            {opj(path, p) for p in ['2git']})
+
+    # and if we queried with full path, should work still
+    db2.get(opj(path, '2git'))
+    assert_equal(db2.get_obsolete(), [])

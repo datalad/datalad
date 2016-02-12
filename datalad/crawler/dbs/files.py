@@ -11,13 +11,16 @@
 """
 
 import os
-from os.path import join as opj, exists, lexists, islink, realpath, basename
+from os.path import join as opj, exists, lexists, islink, realpath, basename, normpath
+from os.path import isabs
 
 from ...dochelpers import exc_str
 from ...support.status import FileStatus
 from ...support.exceptions import CommandError
 from ...utils import auto_repr
 from ...utils import swallow_logs
+from ...utils import find_files
+from ...consts import HANDLE_META_DIR
 
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
@@ -51,6 +54,12 @@ class AnnexFileAttributesDB(object):
     def queried_filepaths(self):
         return self._queried_filepaths
 
+    def _get_fullpath(self, fpath):
+        if isabs(fpath):
+            return normpath(fpath)
+        else:
+            return normpath(opj(self.annex.path, fpath))
+
     # TODO: think if default should be provided
     def get(self, fpath):
         """Given a file (under annex) relative path, return its status record
@@ -62,11 +71,12 @@ class AnnexFileAttributesDB(object):
         fpath: str
           Path (relative to the top of the repo) of the file to get stats of
         """
-        filepath = opj(self.annex.path, fpath)
+        filepath = self._get_fullpath(fpath)
         if self._track_queried:
             self._queried_filepaths.add(filepath)
 
-        assert(lexists(filepath))  # of check and return None?
+        if not lexists(filepath):
+            return None
 
         # I wish I could just test using filesystem stats but that would not
         # be reliable, and also file might not even be here.
@@ -96,8 +106,11 @@ class AnnexFileAttributesDB(object):
             mtime=mtime
         )
 
-    def set(self, fpath, status):
-        # This DB doesn't implement it
+    def set(self, fpath, status=None):
+        # This DB doesn't implement much of it, besides marking internally that we do care about this file
+        filepath = self._get_fullpath(fpath)
+        if self._track_queried:
+            self._queried_filepaths.add(filepath)
         pass
 
     def is_different(self, fpath, status, url=None):
@@ -109,3 +122,25 @@ class AnnexFileAttributesDB(object):
         if status.filename and not old_status.filename:
             old_status.filename = basename(fpath)
         return old_status != status
+
+    def get_obsolete(self):
+        """Returns paths which weren't queried, thus must have been deleted
+
+        Note that it doesn't track across branches etc.
+        """
+        if not self._track_queried:
+            raise RuntimeError("Cannot determine which files were removed since track_queried was set to False")
+        obsolete = []
+        # those aren't tracked by annexificator
+        datalad_path = opj(self.annex.path, HANDLE_META_DIR)
+        for fpath in find_files('.*', topdir=self.annex.path):
+            filepath = self._get_fullpath(fpath)
+            if filepath.startswith(datalad_path):
+                continue
+            if fpath not in self._queried_filepaths:
+                obsolete.append(filepath)
+        return obsolete
+
+    def reset(self):
+        """Reset internal state, e.g. about known queried filedpaths"""
+        self._queried_filepaths = set()

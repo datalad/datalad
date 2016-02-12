@@ -6,7 +6,9 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Nodes to interact with annex -- add files etc
+"""Nodes to interact with annex -- initiate a new handle or operate with existing one
+
+via Annexificator class, which could be used to add files, checkout branches etc
 """
 
 import os
@@ -271,6 +273,9 @@ class Annexificator(object):
         # might need to go outside -- since has nothing to do with self
         raise NotImplementedError()
 
+    def reset(self):
+        self.statusdb.reset()
+
     @staticmethod
     def _get_filename_from_url(url):
         if url is None:
@@ -333,6 +338,10 @@ class Annexificator(object):
                     if self.yield_non_updated:
                         yield updated_data  # There might be more to it!
                     return
+        else:
+            # just to mark file as still of interest to us so it doesn't get wiped out later
+            # as it should have happened if we removed creation/tracking of that file intentionally
+            self.statusdb.get(fpath)
 
         if not url:
             lgr.debug("Adding %s to annex without url being provided" % (filepath))
@@ -396,14 +405,20 @@ class Annexificator(object):
 
         # So we have downloaded the beast
         # Since annex doesn't care to set mtime for the symlink itself we better set it outselves
-        if remote_status and lexists(filepath):  # and islink(filepath):
-            # Set mtime of the symlink or git-added file itself
-            # utime dereferences!
-            # _call(os.utime, filepath, (time.time(), remote_status.mtime))
-            # *nix only!  TODO
-            _call(lmtime, filepath, remote_status.mtime)
+        if lexists(filepath):  # and islink(filepath):
+            if remote_status:
+                # Set mtime of the symlink or git-added file itself
+                # utime dereferences!
+                # _call(os.utime, filepath, (time.time(), remote_status.mtime))
+                # *nix only!  TODO
+                _call(lmtime, filepath, remote_status.mtime)
+                _call(self.statusdb.set, filepath, remote_status)
+            else:
+                # we still need to inform db about this file so later it would signal to remove it
+                # if we no longer care about it
+                _call(self.statusdb.set, filepath)
 
-        self._states.add("Added files to git/annex")
+        self._states.add("Updated git/annex from a remote location")
 
         # WiP: commented out to do testing before merge
         # db_filename = self.db.get_filename(url)
@@ -851,7 +866,6 @@ class Annexificator(object):
             stats = data.get('datalad_stats', None)
             if self.repo.dirty:  # or self.tracker.dirty # for dry run
                 lgr.info("Repository found dirty -- adding and committing")
-                #    # TODO: introduce activities tracker
                 _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
 
                 stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
@@ -874,8 +888,31 @@ class Annexificator(object):
                     stats_str = "\n\n" + total_stats.as_str(mode='full')
                     if tag_ in self.repo.repo.tags:
                         # TODO: config.tag.allow_override
-                        raise RuntimeError("There is already tag %s in the repository" % tag)
-                    self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
+                        lgr.warning("There is already tag %s in the repository. Delete it first if you want it updated" % tag_)
+                    else:
+                        self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
             self._states = set()
             yield data
         return _finalize
+
+    def remove_obsolete(self):
+        """Remove obsolete files which were not referenced in queries to db
+
+        Note that it doesn't reset any state within statusdb upon call, so shouldn't be
+        called multiple times for the same state.
+        """
+        # made as a class so could be reset
+        class _remove_obsolete(object):
+            def __call__(self_, data):
+                obsolete = self.statusdb.get_obsolete()
+                if obsolete:
+                    lgr.info('Removing %d obsolete files' % len(obsolete))
+                    stats = data.get('datalad_stats', None)
+                    _call(self.repo.git_remove, obsolete)
+                    if stats:
+                        _call(stats.increment, 'removed', len(obsolete))
+                yield data
+            def reset(self_):
+                self.statusdb.reset()
+
+        return _remove_obsolete()
