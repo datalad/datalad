@@ -243,14 +243,17 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
         for data_ in data_in_to_loop:
             if log_level <= 4:
                 # provide details of what keys got changed
-                lgr.log(4, "O1: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_))
+                stats_str = data_['datalad_stats'].as_str(mode='line') if 'datalad_stats' in data_ else ''
+                lgr.log(4, "O1: +%s, -%s, ch%s, ch?%s %s", *(_compare_dicts(data, data_) + (stats_str,)))
             if pipeline_tail:
                 lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
                 lgr.log(5, " passed keys: %s", data_.keys())
                 for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
                     if log_level <= 3:
                         # provide details of what keys got changed
-                        lgr.log(3, "O2: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_out))
+                        # TODO: difference from previous stats!
+                        stats_str = data_['datalad_stats'].as_str(mode='line') if 'datalad_stats' in data_ else ''
+                        lgr.log(3, "O2: +%s, -%s, ch%s, ch?%s %s", *(_compare_dicts(data, data_out) + (stats_str,)))
                     if 'outputs' in output:
                         yield data_out
             else:

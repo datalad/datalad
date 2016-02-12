@@ -34,7 +34,10 @@ def extract_readme(data):
     with open("README.txt", "w") as f:
         f.write("OpenfMRI dataset from %(url)s" % data)
     lgr.info("Generated README.txt")
-    yield {'filename': "README.txt"}
+    yield {'filename': "README.txt",
+           # TODO: think how we should sweat about this one
+           # 'datalad_stats': data['datalad_stats']
+           }
 
 def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/"):
     """Pipeline to crawl/annex an openfmri dataset"""

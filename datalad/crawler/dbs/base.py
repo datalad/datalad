@@ -40,22 +40,44 @@ class JsonBaseDB(object):
         #super(JsonBaseDB, self).__init__()
         self.repo = repo
         self.name = name
-        self._filepath = opj(realpath(repo.path),
-                             self.__class__.__crawler_subdir__,
-                             (name or repo.git_get_active_branch())+'.json')
+        self._filepath = None
+        self._loaded = None
+        self.__db = None
+
+    def _assure_loaded(self):
+        """Make it lazy loading/creation so we get actual active branch where it is used
+        """
+        if self._filepath is not None:
+            return
+        self._filepath = opj(realpath(self.repo.path),
+                     self.__class__.__crawler_subdir__,
+                     (self.name or self.repo.git_get_active_branch())+'.json')
         if lexists(self._filepath):
             self.load()
+            self._loaded = True
         else:
-            self._db = self._get_empty_db()
-            self._db['db_version'] = self.__class__.__version__
+            self.__db = self.get_empty_db()
+            self._loaded = False  # so we don't bother saving an empty one if was not loaded
+
+    @property
+    def _db(self):
+        self._assure_loaded()
+        return self.__db
 
     def load(self):
+        self._assure_loaded()
         with open(self._filepath) as f:
             json_db = json.load(f)  # return f.read().strip()
-        self._db = self._get_loaded_db(json_db)
+        self.__db = self._get_loaded_db(json_db)
 
     def save(self):
+        if self._filepath is None:
+            # Nothing to do
+            return
         db = self._get_db_to_save()
+        if (not self._loaded) and (db == self.get_empty_db()):
+            lgr.debug("DB %s which we defaulted to found to be empty, not saving" % self)
+            return
 
         d = dirname(self._filepath)
         if not exists(d):
@@ -68,6 +90,12 @@ class JsonBaseDB(object):
     @property
     def db_version(self):
         return self._db['db_version']
+
+    def get_empty_db(self):
+        """Return default empty DB.  Relies on subclass'es specific"""
+        db = self._get_empty_db()
+        db['db_version'] = self.__class__.__version__
+        return db
 
     @abstractmethod
     def _get_empty_db(self):
@@ -116,7 +144,7 @@ class AnnexBaseDB(object):
     def queried_filepaths(self):
         return self._queried_filepaths
 
-    def _get_fullpath(self, fpath):
+    def _get_filepath(self, fpath):
         if isabs(fpath):
             return normpath(fpath)
         else:
@@ -133,7 +161,7 @@ class AnnexBaseDB(object):
         fpath: str
           Path (relative to the top of the repo) of the file to get stats of
         """
-        filepath = self._get_fullpath(fpath)
+        filepath = self._get_filepath(fpath)
         if self._track_queried:
             self._queried_filepaths.add(filepath)
 
@@ -144,13 +172,20 @@ class AnnexBaseDB(object):
 
 
     def set(self, fpath, status=None):
-        # This DB doesn't implement much of it, besides marking internally that we do care about this file
-        filepath = self._get_fullpath(fpath)
+        """Set a new status for the fpath. If status is None, get from available file
+        """
+        filepath = self._get_filepath(fpath)
         if self._track_queried:
             self._queried_filepaths.add(filepath)
         self._set(filepath, status)
 
     def _set(self, filepath, status):
+        raise NotImplementedError("must be defined in subclasses")
+
+    def remove(self, fpath):
+        self._remove(self._get_filepath(fpath))
+
+    def _remove(self, filepath):
         raise NotImplementedError("must be defined in subclasses")
 
     def is_different(self, fpath, status, url=None):
@@ -164,7 +199,7 @@ class AnnexBaseDB(object):
         return old_status != status
 
     def get_obsolete(self):
-        """Returns paths which weren't queried, thus must have been deleted
+        """Returns full paths for files which weren't queried, thus must have been deleted
 
         Note that it doesn't track across branches etc.
         """
@@ -174,7 +209,7 @@ class AnnexBaseDB(object):
         # those aren't tracked by annexificator
         datalad_path = opj(self.annex.path, HANDLE_META_DIR)
         for fpath in find_files('.*', topdir=self.annex.path):
-            filepath = self._get_fullpath(fpath)
+            filepath = self._get_filepath(fpath)
             if filepath.startswith(datalad_path):
                 continue
             if fpath not in self._queried_filepaths:

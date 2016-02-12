@@ -282,12 +282,16 @@ else:
         from .cmd import Runner
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
+        lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
         Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
-        if islink(filepath) and exists(realpath(filepath)):
+        rfilepath = realpath(filepath)
+        if islink(filepath) and exists(rfilepath):
             # trust noone - adjust also of the target file
             # since it seemed like downloading under OSX (was it using curl?)
             # didn't bother with timestamps
-            os.utime(filepath, (time.time(), mtime))
+            lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
+                    rfilepath, mtime)
+            os.utime(rfilepath, (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 

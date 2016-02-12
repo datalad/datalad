@@ -75,10 +75,14 @@ class AnnexFileAttributesDB(AnnexBaseDB):
         )
 
     def _set(self, filepath, status):
+        # This DB doesn't implement much of it, besides marking internally that we do care about this file
         pass
 
     def save(self):
         # nothing for us to do but AnnexJsonStatusesDB has it so let's keep it common
+        pass
+
+    def _remove(self, filepath):
         pass
 
 
@@ -117,8 +121,8 @@ class AnnexJsonStatusesDB(JsonBaseDB, AnnexFileAttributesDB):
         return fpath
 
     def _get_fileattributes_status(self, fpath):
-        fullpath = self._get_fullpath(fpath)
-        return AnnexFileAttributesDB._get(self, fullpath)
+        filepath = self._get_filepath(fpath)
+        return AnnexFileAttributesDB._get(self, filepath)
 
     def _get(self, filepath):
         # TODO: may be avoid this all fpath -> filepath -> fpath?
@@ -132,6 +136,18 @@ class AnnexJsonStatusesDB(JsonBaseDB, AnnexFileAttributesDB):
     # TODO: get URL all the way here?
     def _set(self, filepath, status):
         fpath = self._get_fpath(filepath)
-        self._db['files'][fpath] = {f: getattr(status, f)
-                                    for f in ('size', 'mtime', 'filename')
-                                    if getattr(status, f) is not None}
+        if status is None:
+            status_dict = {}
+            # get it from the locally available file
+            # status = AnnexFileAttributesDB._get(self, filepath)
+            # NOPE since then generated files would keep changing
+        else:
+            status_dict = {f: getattr(status, f)
+                           for f in ('size', 'mtime', 'filename')
+                           if getattr(status, f) is not None}
+        self._db['files'][fpath] = status_dict
+
+    def _remove(self, filepath):
+        fpath = self._get_fpath(filepath)
+        if fpath in self._db['files']:
+            self._db['files'].pop(fpath)

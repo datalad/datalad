@@ -44,7 +44,7 @@ from ... import cfg
 from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
-from ..dbs.files import AnnexFileAttributesDB
+from ..dbs.files import AnnexFileAttributesDB, AnnexJsonStatusesDB
 from ..dbs.versions import SingleVersionDB
 
 from logging import getLogger
@@ -219,7 +219,7 @@ class Annexificator(object):
           Either to yield original data (with filepath) if load was not updated in annex
         statusdb : , optional
           DB of file statuses which will be used to figure out if remote load has changed.
-          If None, instance of AnnexFileAttributesDB will be used which will decide based on
+          If None, instance of AnnexJsonStatusesDB will be used which will decide based on
           information in annex and file(s) mtime on the disk
         **kwargs : dict, optional
           to be passed into AnnexRepo
@@ -254,7 +254,8 @@ class Annexificator(object):
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
 
         if statusdb is None:
-            statusdb = AnnexFileAttributesDB(annex=self.repo)
+            statusdb = AnnexJsonStatusesDB(annex=self.repo)
+            #statusdb = AnnexFileAttributesDB(annex=self.repo)
         self.statusdb = statusdb
 
 
@@ -350,7 +351,6 @@ class Annexificator(object):
             # Just add into git directly for now
             # TODO: tune  annex_add so we could use its json output, and may be even batch it
             out_json = _call(self.repo.annex_add, fpath, options=self.options)
-            _call(stats.increment, 'add_annex' if 'key' in out_json else 'add_git')
         # elif self.mode == 'full':
         #     # Since addurl ignores annex.largefiles we need first to download that file and then
         #     # annex add it
@@ -398,8 +398,10 @@ class Annexificator(object):
                 _call(stats.increment, 'downloaded')
                 _call(stats.increment, 'downloaded_size', _call(lambda: os.stat(filepath).st_size))
 
-            if out_json:  # if not try -- should be here!
-                _call(stats.increment, 'add_annex' if added_to_annex else 'add_git')
+        # file might have been added but really not changed anything (e.g. the same README was generated)
+        # TODO:
+        #if out_json:  # if not try -- should be here!
+        _call(stats.increment, 'add_annex' if 'key' in out_json else 'add_git')
 
         # TODO!!:  sanity check that no large files are added to git directly!
 
@@ -588,6 +590,11 @@ class Annexificator(object):
                 yield data
         return merge_branch
 
+    def _precommit(self):
+        self.repo.precommit()  # so that all batched annexes stop
+        if self.statusdb:
+            self.statusdb.save()
+
     # At least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
         # We need a custom commit due to "fancy" merges and GitPython
@@ -596,7 +603,7 @@ class Annexificator(object):
         # and apparently not actively developed
         if msg is not None:
             options = options + ["-m", msg]
-        self.repo.precommit()  # so that all batched annexes stop
+        self._precommit()  # so that all batched annexes stop
         self.repo._git_custom_command([], ["git", "commit"] + options)
         #self.repo.commit(msg)
         #self.repo.repo.git.commit(options)
@@ -643,7 +650,7 @@ class Annexificator(object):
         """Generate multiple commits if multiple versions were staged
         """
         def _commit_versions(data):
-            self.repo.precommit()  # so that all batched annexes stop
+            self._precommit()  # so that all batched annexes stop
 
             # figure out versions for all files (so we could handle conflicts with existing
             # non versioned)
@@ -862,7 +869,7 @@ class Annexificator(object):
 
         """
         def _finalize(data):
-            self.repo.precommit()
+            self._precommit()
             stats = data.get('datalad_stats', None)
             if self.repo.dirty:  # or self.tracker.dirty # for dry run
                 lgr.info("Repository found dirty -- adding and committing")
@@ -911,6 +918,8 @@ class Annexificator(object):
                     _call(self.repo.git_remove, obsolete)
                     if stats:
                         _call(stats.increment, 'removed', len(obsolete))
+                    for filepath in obsolete:
+                        self.statusdb.remove(filepath)
                 yield data
             def reset(self_):
                 self.statusdb.reset()
