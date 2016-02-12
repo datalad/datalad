@@ -115,7 +115,7 @@ class JsonBaseDB(object):
 
 
 @auto_repr
-class AnnexBaseDB(object):
+class FileStatusesBaseDB(object):
     """Base class for DBs to monitor status of the files
     """
 
@@ -130,7 +130,7 @@ class AnnexBaseDB(object):
           Either to track what file paths were queried
         """
         # with all the multiple inheritance smth is not working out as should
-        # super(AnnexBaseDB, self).__init__()
+        # super(FileStatusesBaseDB, self).__init__()
         self.annex = annex
         # which file paths were referred
         self._track_queried = track_queried

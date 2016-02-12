@@ -44,7 +44,7 @@ from ... import cfg
 from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
-from ..dbs.files import AnnexFileAttributesDB, AnnexJsonStatusesDB
+from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
 
 from logging import getLogger
@@ -219,7 +219,7 @@ class Annexificator(object):
           Either to yield original data (with filepath) if load was not updated in annex
         statusdb : , optional
           DB of file statuses which will be used to figure out if remote load has changed.
-          If None, instance of AnnexJsonStatusesDB will be used which will decide based on
+          If None, instance of JsonFileStatusesDB will be used which will decide based on
           information in annex and file(s) mtime on the disk
         **kwargs : dict, optional
           to be passed into AnnexRepo
@@ -254,8 +254,8 @@ class Annexificator(object):
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
 
         if statusdb is None:
-            statusdb = AnnexJsonStatusesDB(annex=self.repo)
-            #statusdb = AnnexFileAttributesDB(annex=self.repo)
+            statusdb = JsonFileStatusesDB(annex=self.repo)
+            #statusdb = PhysicalFileStatusesDB(annex=self.repo)
         self.statusdb = statusdb
 
 

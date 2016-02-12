@@ -9,7 +9,7 @@
 
 import os
 from os.path import join as opj, curdir, sep
-from ..files import AnnexFileAttributesDB, AnnexJsonStatusesDB
+from ..files import PhysicalFileStatusesDB, JsonFileStatusesDB
 
 from ....tests.utils import with_tree
 from ....tests.utils import assert_equal
@@ -30,15 +30,15 @@ def _test_AnnexDB(cls, path):
     filepath2 = opj(path, filep2)
 
     annex = AnnexRepo(path, create=True)
-    # AnnexFileAttributesDB relies on information in annex so files
+    # PhysicalFileStatusesDB relies on information in annex so files
     # must be committed first
     annex.annex_add('file1.txt')
     annex.git_commit("initial commit")
     db = cls(annex=annex)
 
     def set_db_status_from_file(fpath):
-        """To test AnnexJsonStatusesDB we need to keep updating status stored"""
-        if cls is AnnexJsonStatusesDB:
+        """To test JsonFileStatusesDB we need to keep updating status stored"""
+        if cls is JsonFileStatusesDB:
             # we need first to set the status
             db.set(fpath, db._get_fileattributes_status(fpath))
 
@@ -112,6 +112,6 @@ def _test_AnnexDB(cls, path):
     assert_equal(db2.get_obsolete(), [])
 
 def test_AnnexDBs():
-    for cls in (AnnexFileAttributesDB,
-                AnnexJsonStatusesDB,):
+    for cls in (PhysicalFileStatusesDB,
+                JsonFileStatusesDB,):
         yield _test_AnnexDB, cls

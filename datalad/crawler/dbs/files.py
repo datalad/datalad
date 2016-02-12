@@ -20,20 +20,20 @@ from ...utils import auto_repr
 from ...utils import swallow_logs
 from ...consts import CRAWLER_META_STATUSES_DIR
 
-from .base import JsonBaseDB, AnnexBaseDB
+from .base import JsonBaseDB, FileStatusesBaseDB
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
 
 __docformat__ = 'restructuredtext'
 
-__all__ = ['AnnexFileAttributesDB']
+__all__ = ['PhysicalFileStatusesDB']
 
 #
 # Concrete implementations
 #
 
 @auto_repr
-class AnnexFileAttributesDB(AnnexBaseDB):
+class PhysicalFileStatusesDB(FileStatusesBaseDB):
     """Non-persistent DB based on file attributes
 
     It uses file modification times and size as known to annex to deduce
@@ -79,7 +79,7 @@ class AnnexFileAttributesDB(AnnexBaseDB):
         pass
 
     def save(self):
-        # nothing for us to do but AnnexJsonStatusesDB has it so let's keep it common
+        # nothing for us to do but JsonFileStatusesDB has it so let's keep it common
         pass
 
     def _remove(self, filepath):
@@ -87,7 +87,7 @@ class AnnexFileAttributesDB(AnnexBaseDB):
 
 
 @auto_repr
-class AnnexJsonStatusesDB(JsonBaseDB, AnnexFileAttributesDB):
+class JsonFileStatusesDB(JsonBaseDB, PhysicalFileStatusesDB):
     """Persistent DB to store information about files' size/mtime/filename in a json file
     """
 
@@ -95,7 +95,7 @@ class AnnexJsonStatusesDB(JsonBaseDB, AnnexFileAttributesDB):
     __crawler_subdir__ = CRAWLER_META_STATUSES_DIR
 
     def __init__(self, annex, track_queried=True, name=None):
-        AnnexFileAttributesDB.__init__(self, annex, track_queried=track_queried)
+        PhysicalFileStatusesDB.__init__(self, annex, track_queried=track_queried)
         JsonBaseDB.__init__(self, annex, name=name)
 
     #
@@ -122,7 +122,7 @@ class AnnexJsonStatusesDB(JsonBaseDB, AnnexFileAttributesDB):
 
     def _get_fileattributes_status(self, fpath):
         filepath = self._get_filepath(fpath)
-        return AnnexFileAttributesDB._get(self, filepath)
+        return PhysicalFileStatusesDB._get(self, filepath)
 
     def _get(self, filepath):
         # TODO: may be avoid this all fpath -> filepath -> fpath?
@@ -139,7 +139,7 @@ class AnnexJsonStatusesDB(JsonBaseDB, AnnexFileAttributesDB):
         if status is None:
             status_dict = {}
             # get it from the locally available file
-            # status = AnnexFileAttributesDB._get(self, filepath)
+            # status = PhysicalFileStatusesDB._get(self, filepath)
             # NOPE since then generated files would keep changing
         else:
             status_dict = {f: getattr(status, f)
