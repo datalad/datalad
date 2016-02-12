@@ -242,3 +242,25 @@ def test_pipeline_linear_top_isnested_pipeline():
     ]
     pipeline_output = run_pipeline(pipeline)
     eq_(was_called, ['yes'])
+
+
+def test_pipeline_updated_stats():
+    def n1(data):
+        data['datalad_stats'].increment('add_git')
+        yield data
+    def n2(data):  # doesn't care to maintain previous stats
+        data = data.copy()
+        data['datalad_stats'] = ActivityStats(files=2)
+        data['out'] = 1
+        yield data
+    pipeline_output = run_pipeline([{'output': 'outputs'}, n1, n2])
+    eq_(pipeline_output, [{'datalad_stats': ActivityStats(files=2, add_git=1), 'out': 1}])
+
+def test_pipeline_dropped_stats():
+    def n1(data):
+        data['datalad_stats'].increment('add_git')
+        yield data
+    def n2(data):  # doesn't care to maintain previous stats
+        yield {'out': 1}
+    pipeline_output = run_pipeline([{'output': 'outputs'}, n1, n2])
+    eq_(pipeline_output, [{'datalad_stats': ActivityStats(add_git=1), 'out': 1}])

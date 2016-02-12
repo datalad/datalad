@@ -279,14 +279,9 @@ def test_openfmri_pipeline1(ind, topurl, outd):
 
     commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
-    # actually we do manage to download 1 since it is committed directly to git
-    # eq_(out[0]['datalad_stats'], ActivityStats())
+    # actually we do manage to add_git 1 (README) since it is generated committed directly to git
     # Nothing was committed so stats leaked all the way up
-    # That was errorneous because changelog.txt in git was redownloaded since with non-persistent
-    # db, mtime for it got changed during git checkout. Thus below assumption was wrong!
-    # also files=4 although should have been 5 with README. but that one wiped out datalad_stats
-    # so did not affect stats
-    eq_(out[0]['datalad_stats'], ActivityStats(files=4, skipped=4, urls=4))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=5, skipped=4, urls=4, add_git=1))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     # rerun pipeline when new content is available
@@ -317,7 +312,8 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     # but for some reason downloaded_size fluctuates.... why? probably archiving...?
     total_stats.downloaded_size = 0
     eq_(total_stats,
-        ActivityStats(files=7, skipped=4, downloaded=1, renamed=1, urls=5, add_annex=2,
+        ActivityStats(files=8, skipped=4, downloaded=1, renamed=1, urls=5,
+                      add_annex=2, add_git=1, # README
                       versions=['2.0.0'],
                       merges=[['incoming', 'incoming-processed']]))
 
@@ -417,7 +413,7 @@ def test_openfmri_pipeline2(ind, topurl, outd):
 
     commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
-    eq_(out[0]['datalad_stats'], ActivityStats(files=2, skipped=2, urls=2))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=3, skipped=2, urls=2, add_git=1))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     os.rename(opj(ind, 'ds666', 'ds666_R2.0.0.tar.gz'), opj(ind, 'ds666', 'ds666.tar.gz'))
@@ -429,9 +425,9 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     stats_total = out[0]['datalad_stats'].get_total()
     stats_total.downloaded_size = 0
     eq_(stats_total,
-        ActivityStats(files=4, overwritten=1, skipped=1, downloaded=1,
+        ActivityStats(files=5, overwritten=1, skipped=1, downloaded=1,
                       merges=[['incoming', 'incoming-processed']],
-                      renamed=1, urls=2, add_annex=2))
+                      renamed=1, urls=2, add_annex=2, add_git=1))
 
     check_dropall_get(repo)
 test_openfmri_pipeline2.tags = ['integration']

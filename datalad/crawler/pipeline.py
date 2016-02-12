@@ -232,15 +232,26 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
             # normally, its input would have been provided back
             lgr.log(7, "Pipeline generator %s returned None", node)
             data_in_to_loop = []
+        prev_stats = None  # we do not care to check if entire pipeline drops stats
+                           # since it is done below at the node level
     else:  # it is a "node" which should generate (or return) us an iterable to feed
            # its elements into the rest of the pipeline
         lgr.debug("Node: %s" % node)
+        prev_stats = data.get('datalad_stats', None)  # so we could check if node doesn't dump it
         data_in_to_loop = node(data)
 
     log_level = lgr.getEffectiveLevel()
     data_out = None
     if data_in_to_loop:
         for data_ in data_in_to_loop:
+            if prev_stats is not None:
+                new_stats = data_.get('datalad_stats', None)
+                if new_stats is None or new_stats is not prev_stats:
+                    lgr.debug("Node %s has changed stats to %s from %s. Updating and using previous one",
+                              node, prev_stats, new_stats)
+                    if new_stats is not None:
+                        prev_stats += new_stats
+                    data_['datalad_stats'] = prev_stats
             if log_level <= 4:
                 # provide details of what keys got changed
                 stats_str = data_['datalad_stats'].as_str(mode='line') if 'datalad_stats' in data_ else ''
