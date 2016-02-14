@@ -1,5 +1,6 @@
 # ---- Main dependencies
-GitPython>=1.0.1
+#GitPython>=1.0.3
+https://github.com/gitpython-developers/GitPython/archive/master.zip
 rdflib>=4.2.0
 six>=1.8.0
 patool>=1.7
