@@ -24,7 +24,7 @@ from ..utils import assure_list_from_str
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
 from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
-from .aws import S3Authenticator, S3Downloader
+from .s3 import S3Authenticator, S3Downloader
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')

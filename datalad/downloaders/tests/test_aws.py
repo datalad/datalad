@@ -11,7 +11,7 @@
 import os
 from mock import patch
 
-from ..aws import S3Authenticator
+from ..s3 import S3Authenticator
 from ..providers import Providers, Credential  # to test against crcns
 
 from ...tests.utils import swallow_outputs
