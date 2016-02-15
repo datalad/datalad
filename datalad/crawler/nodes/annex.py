@@ -113,7 +113,7 @@ class initiate_handle(object):
                        create=True)
 
     def _save_crawl_config(self, handle_path, name, data):
-        lgr.info("Creating handle configuration for %s" % name)
+        lgr.debug("Creating handle configuration for %s" % name)
         repo = GitRepo(handle_path)
         crawl_config_dir = opj(handle_path, CRAWLER_META_DIR)
         if not exists(crawl_config_dir):
