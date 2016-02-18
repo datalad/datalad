@@ -150,7 +150,7 @@ def get_disposition_filename(data):
 class _act_if(object):
     """Base class for nodes which would act if input data matches specified values
     """
-    def __init__(self, values, re=False):
+    def __init__(self, values, re=False, negate=False):
         """
 
         Parameters
@@ -161,23 +161,31 @@ class _act_if(object):
         re: bool, optional
           If specified values to be treated as regular expression to be
           searched
+        negate: bool, optional
+          Reverses, so acts (skips, etc) if no match
         """
         self.values = values
         self.re = re
+        self.negate = negate
 
     def __call__(self, data):
-        comp = re.search if self.re else lambda x,y: x==y
+        comp = re.search if self.re else lambda x, y: x == y
+        matched = True
         for k, v in iteritems(self.values):
             if not (k in data and comp(v, data[k])):
                 # do nothing and pass the data further
-                yield data
-                # and quit
-                return
-        for v in self._act(data):
-            yield v
+                matched = False
+                break
+
+        if matched != self.negate:
+            for v in self._act(data):
+                yield v
+        else:
+            yield data
 
     def _act(self):
         raise NotImplementedError
+
 
 @auto_repr
 class interrupt_if(_act_if):

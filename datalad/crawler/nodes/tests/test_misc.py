@@ -72,10 +72,26 @@ def test_skip_if():
     tdict = dict(v1='not yet', someother=123)
     # and that we would interrupt while matching multiple values
     eq_(list(n(tdict)), [tdict])
+
     eq_(list(skip_if(tdict)(tdict)), [])
 
     eq_(list(skip_if({'v1': 'ye.$'})(tdict)), [tdict])
     eq_(list(skip_if({'v1': 'ye.$'}, re=True)(tdict)), [])
+
+
+def test_skip_if_negate():
+    n = skip_if({'v1': 'done'}, negate=True)
+    eq_(list(n(dict(v1='done'))), [dict(v1='done')])
+    eq_(list(n(dict(v1='not done'))), [])
+    eq_(list(n(dict(v1='done', someother=123))), [dict(v1='done', someother=123)])
+    tdict = dict(v1='done', someother=123)
+    # and that we would interrupt while matching multiple values
+    eq_(list(n(tdict)), [tdict])
+
+    eq_(list(skip_if(tdict, negate=True)(tdict)), [tdict])
+
+    eq_(list(skip_if({'v1': 'don.$'}, negate=True)(tdict)), [])
+    eq_(list(skip_if({'v1': 'don.$'}, re=True, negate=True)(tdict)), [tdict])
 
 
 def test_func_to_node():

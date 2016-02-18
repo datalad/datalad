@@ -89,6 +89,10 @@ class S3Downloader(BaseDownloader):
         super(S3Downloader, self).__init__(**kwargs)
         self._bucket = None
 
+    @property
+    def bucket(self):
+        return self._bucket
+
     @classmethod
     def _parse_url(cls, url):
         """Parses s3:// url and returns bucket name, prefix, additional query elements
@@ -145,9 +149,12 @@ class S3Downloader(BaseDownloader):
         target_size = key.size  # S3 specific
         headers = {
             'Content-Length': key.size,
-            'Content-Disposition': key.name,
-            'Last-Modified': rfc2822_to_epoch(key.last_modified),
+            'Content-Disposition': key.name
         }
+
+        if key.last_modified:
+            headers['Last-Modified'] = rfc2822_to_epoch(key.last_modified)
+
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 

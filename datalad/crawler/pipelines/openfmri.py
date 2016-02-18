@@ -48,6 +48,7 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
         create=False,  # must be already initialized etc
         # leave in Git only obvious descriptors and code snippets -- the rest goes to annex
         # so may be eventually we could take advantage of git tags for changing layout
+        statusdb='json',
         options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"])
 
     return [

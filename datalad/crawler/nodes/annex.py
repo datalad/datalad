@@ -217,10 +217,16 @@ class Annexificator(object):
           List of custom special remotes to initialize and enable by default.
         yield_non_updated : bool, optional
           Either to yield original data (with filepath) if load was not updated in annex
-        statusdb : , optional
+        statusdb : {'json', 'fileattr'}, optional
           DB of file statuses which will be used to figure out if remote load has changed.
-          If None, instance of JsonFileStatusesDB will be used which will decide based on
-          information in annex and file(s) mtime on the disk
+          If None, no statusdb will be used so Annexificator will process every given url
+          as if it lead to new content.  'json' -- JsonFileStatusesDB will
+          be used which will store information about each provided file/url into a json file.
+          'fileattr' -- PhysicalFileStatusesDB will be used to decide based on
+          information in annex and file(s) mtime on the disk.
+          Note that statusdb "lives" within branch, so switch_branch would drop existing DB (which
+          should get committed within the branch) and would create a new one if db is requested
+          again.
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -253,10 +259,8 @@ class Annexificator(object):
         if (not allow_dirty) and self.repo.dirty:
             raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
 
-        if statusdb is None:
-            statusdb = JsonFileStatusesDB(annex=self.repo)
-            #statusdb = PhysicalFileStatusesDB(annex=self.repo)
         self.statusdb = statusdb
+        self._statusdb = None  # actual DB to be instantiated later
 
 
     # def add(self, filename, url=None):
@@ -275,7 +279,8 @@ class Annexificator(object):
         raise NotImplementedError()
 
     def reset(self):
-        self.statusdb.reset()
+        if self._statusdb:
+            self._statusdb.reset()
 
     @staticmethod
     def _get_filename_from_url(url):
@@ -310,6 +315,16 @@ class Annexificator(object):
                                       #TODO? 'filepath': filepath
                                       })
         remote_status = None
+        if self.statusdb is not None and self._statusdb is None:
+            if isinstance(self.statusdb, string_types):
+                # Initiate the DB
+                self._statusdb = {
+                    'json': JsonFileStatusesDB,
+                    'fileattr': PhysicalFileStatusesDB}[self.statusdb](annex=self.repo)
+            else:
+                # use provided persistent instance
+                self._statusdb = self.statusdb
+        statusdb = self._statusdb
         if url:
             downloader = self._providers.get_provider(url).get_downloader(url)
 
@@ -329,7 +344,7 @@ class Annexificator(object):
 
                 # TODO: what if the file came from another url bearing the same mtime and size????
                 #       unlikely but possible.  We would need to provide URL for comparison(s)
-                if self.mode == 'relaxed' or not self.statusdb.is_different(fpath, remote_status, url):
+                if self.mode == 'relaxed' or (statusdb is not None and not statusdb.is_different(fpath, remote_status, url)):
                     # TODO:  check if remote_status < local_status, i.e. mtime jumped back
                     # and if so -- warning or may be according to some config setting -- skip
                     # e.g. config.get('crawl', 'new_older_files') == 'skip'
@@ -342,7 +357,8 @@ class Annexificator(object):
         else:
             # just to mark file as still of interest to us so it doesn't get wiped out later
             # as it should have happened if we removed creation/tracking of that file intentionally
-            self.statusdb.get(fpath)
+            if statusdb:
+                statusdb.get(fpath)
 
         if not url:
             lgr.debug("Adding %s to annex without url being provided" % (filepath))
@@ -414,11 +430,13 @@ class Annexificator(object):
                 # _call(os.utime, filepath, (time.time(), remote_status.mtime))
                 # *nix only!  TODO
                 _call(lmtime, filepath, remote_status.mtime)
-                _call(self.statusdb.set, filepath, remote_status)
+                if statusdb:
+                    _call(statusdb.set, filepath, remote_status)
             else:
                 # we still need to inform db about this file so later it would signal to remove it
                 # if we no longer care about it
-                _call(self.statusdb.set, filepath)
+                if statusdb:
+                    _call(statusdb.set, filepath)
 
         self._states.add("Updated git/annex from a remote location")
 
@@ -478,6 +496,8 @@ class Annexificator(object):
             """Switches to the branch %s""" % branch
             # if self.repo.dirty
             list(self.finalize()(data))
+            # statusdb is valid only within the same branch
+            self._statusdb = None
             existing_branches = self.repo.git_get_branches()
             if branch not in existing_branches:
                 # TODO: this should be a part of the gitrepo logic
@@ -592,8 +612,8 @@ class Annexificator(object):
 
     def _precommit(self):
         self.repo.precommit()  # so that all batched annexes stop
-        if self.statusdb:
-            self.statusdb.save()
+        if self._statusdb:
+            self._statusdb.save()
 
     # At least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
@@ -911,7 +931,8 @@ class Annexificator(object):
         # made as a class so could be reset
         class _remove_obsolete(object):
             def __call__(self_, data):
-                obsolete = self.statusdb.get_obsolete()
+                statusdb = self._statusdb
+                obsolete = statusdb.get_obsolete()
                 if obsolete:
                     lgr.info('Removing %d obsolete files' % len(obsolete))
                     stats = data.get('datalad_stats', None)
@@ -919,9 +940,10 @@ class Annexificator(object):
                     if stats:
                         _call(stats.increment, 'removed', len(obsolete))
                     for filepath in obsolete:
-                        self.statusdb.remove(filepath)
+                        statusdb.remove(filepath)
                 yield data
             def reset(self_):
-                self.statusdb.reset()
+                if self._statusdb:
+                    self._statusdb.reset()
 
         return _remove_obsolete()
