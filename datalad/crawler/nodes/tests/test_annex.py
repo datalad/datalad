@@ -44,7 +44,9 @@ def test_initialize_handle(path):
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 def _test_annex_file(mode, topdir, topurl, outdir):
-    annex = Annexificator(path=outdir, mode=mode, options=["-c", "annex.largefiles=exclude=*.txt"])
+    annex = Annexificator(path=outdir, mode=mode,
+                          statusdb='fileattr',
+                          options=["-c", "annex.largefiles=exclude=*.txt"])
 
     input = {'url': "%sd1/1.dat" % topurl, 'filename': '1-copy.dat'}
     tfile = opj(outdir, '1-copy.dat')
