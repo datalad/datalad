@@ -41,7 +41,7 @@ install:
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - git submodule update --init --recursive
-  - cd ..; pip install -q coveralls; cd -
+  - cd ..; pip install -q coveralls codecov; cd -
   - pip install -r requirements.txt
   # Verify that setup.py build doesn't puke
   - python setup.py build
@@ -58,6 +58,7 @@ script:
 
 after_success:
   - coveralls
+  - codecov
 
 # makes it only more difficult to comprehend the failing output.  Enable only when necessary
 # for a particular debugging
