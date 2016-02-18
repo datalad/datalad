@@ -52,7 +52,7 @@ class TraceBack(object):
     def __call__(self):
         ftb = traceback.extract_stack(limit=100)[:-2]
         entries = [[mbasename(x[0]), str(x[1])] for x in ftb if mbasename(x[0]) != 'logging.__init__']
-        entries = [ e for e in entries if e[0] != 'unittest' ]
+        entries = [e for e in entries if e[0] != 'unittest']
 
         # lets make it more consize
         entries_out = [entries[0]]
@@ -107,7 +107,8 @@ class ColorFormatter(logging.Formatter):
         logging.Formatter.__init__(self, msg)
 
     def _get_format(self, log_name=False):
-        return (("" if os.environ.get("DATALAD_LOGNODATE", None) else "$BOLD%(asctime)-15s$RESET ") +
+        # TODO: config log.timestamp=True
+        return (("" if not int(os.environ.get("DATALAD_LOG_TIMESTAMP", True)) else "$BOLD%(asctime)-15s$RESET ") +
                 ("%(name)-15s " if log_name else "") +
                 "[%(levelname)s] "
                 "%(message)s "
@@ -220,7 +221,7 @@ class LoggerHelper(object):
         loghandler.setFormatter(
             ColorFormatter(use_color=use_color,
                            log_name=self._get_environ("LOGNAME", False)))
-        #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
+        #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
         self.set_level()  # set default logging level

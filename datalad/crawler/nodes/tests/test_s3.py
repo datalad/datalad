@@ -90,3 +90,5 @@ def test_crawl_s3(path):
     out = run_pipeline(pipeline)
     raise SkipTest("TODO:  should track prev version and next rerun should be nothing new")
     eq_(out, [{'datalad_stats': ActivityStats()}])
+    # TODO: could be boto f.ck ups (e.g. build 1000 for python3) due to recent rename of aws -> s3?
+    # but they don't reproduce locally

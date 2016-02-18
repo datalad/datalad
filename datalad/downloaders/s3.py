@@ -33,7 +33,8 @@ import logging
 from logging import getLogger
 lgr = getLogger('datalad.http')
 boto_lgr = logging.getLogger('boto')
-boto_lgr.handlers = lgr.handlers  # Use our handlers
+# not in effect at all, probably those are setup later
+#boto_lgr.handlers = lgr.handlers  # Use our handlers
 
 __docformat__ = 'restructuredtext'
 
@@ -56,7 +57,11 @@ class S3Authenticator(Authenticator):
             raise RuntimeError("%s requires boto module which is N/A" % self)
 
         # Shut up boto if we do not care to listen ;)
-        # boto_lgr.setLevel(logging.CRITICAL if lgr.getEffectiveLevel() > logging.DEBUG else logging.DEBUG)
+        boto_lgr.setLevel(
+            logging.CRITICAL
+            if lgr.getEffectiveLevel() > logging.DEBUG
+            else logging.DEBUG
+        )
 
         conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
 
