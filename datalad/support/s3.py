@@ -14,10 +14,11 @@ import mimetypes
 
 from os.path import splitext
 
-import keyring
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
+
+from .keyring_ import keyring
 
 from ..dochelpers import exc_str
 

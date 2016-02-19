@@ -14,7 +14,8 @@ from ..support.s3 import get_versioned_url, S3_TEST_CREDENTIAL
 
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
-import keyring
+
+from ..support.keyring_ import keyring
 
 from .utils import use_cassette
 
