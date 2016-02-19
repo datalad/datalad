@@ -105,3 +105,16 @@ def test_basic_scenario():
     #yield check_basic_scenario, 'a.tar.gz', fn_extracted_obscure, False
     #yield check_basic_scenario, fn_archive_obscure, 'simple.txt', False
     yield check_basic_scenario, fn_archive_obscure, fn_extracted_obscure, False
+
+
+def test_no_rdflib_loaded():
+    # rely on rdflib polluting stdout to see that it is not loaded whenever we load this remote
+    # since that adds 300ms delay for no immediate use
+    from ...cmd import Runner
+    runner = Runner()
+    with swallow_outputs() as cmo:
+        runner.run([sys.executable, '-c', 'import datalad.customremotes.archives, sys; print([k for k in sys.modules if k.startswith("rdflib")])'],
+               log_stdout=False, log_stderr=False)
+        # print cmo.out
+        assert_not_in("rdflib", cmo.out)
+        assert_not_in("rdflib", cmo.err)
