@@ -18,13 +18,16 @@ import logging
 import os
 import shutil
 import shlex
+import atexit
+import functools
 
 from six import PY3, PY2
 from six import string_types, binary_type
 
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol, DryRunProtocol
+from .support.protocol import NullProtocol, DryRunProtocol, \
+    ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import on_windows
 from . import cfg
 
@@ -70,7 +73,24 @@ class Runner(object):
 
         self.cwd = cwd
         self.env = env
-        self.protocol = NullProtocol() if protocol is None else protocol
+        if protocol is None:
+            # TODO: config cmd.protocol = null
+            cfg = os.environ.get('DATALAD_CMD_PROTOCOL', 'null')
+            protocol = {
+                'externals-time': ExecutionTimeExternalsProtocol,
+                'time': ExecutionTimeProtocol,
+                'null': NullProtocol
+            }[cfg]()
+            if cfg != 'null':
+                # we need to dump it into a file at the end
+                # TODO: config cmd.protocol_prefix = protocol
+                filename = '%s-%s.log' % (
+                    os.environ.get('DATALAD_CMD_PROTOCOL_PREFIX', 'protocol'),
+                    id(self)
+                )
+                atexit.register(functools.partial(protocol.write_to_file, filename))
+
+        self.protocol = protocol
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
