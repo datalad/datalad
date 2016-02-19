@@ -379,7 +379,7 @@ def link_file_load(src, dst, dry_run=False):
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
     else:
-        lgr.log(1, "Hardlinking finished")
+        lgr.log(2, "Hardlinking finished")
 
 
 def get_runner(*args, **kwargs):

@@ -264,3 +264,28 @@ def test_pipeline_dropped_stats():
         yield {'out': 1}
     pipeline_output = run_pipeline([{'output': 'outputs'}, n1, n2])
     eq_(pipeline_output, [{'datalad_stats': ActivityStats(add_git=1), 'out': 1}])
+
+def test_pipeline_stats_persist():
+    # to test that we would get proper stats returned in various pipeline layouts
+    def n1(data):
+        data['datalad_stats'].increment('add_git')
+        yield data
+
+    def p(data):
+        yield data
+
+    def n2(data):  # doesn't care to maintain previous stats
+        data['datalad_stats'].increment('add_annex')
+        yield data
+
+    target_stats = ActivityStats(add_git=1, add_annex=1)
+
+    def assert_pipeline(pipeline):
+        eq_(run_pipeline(pipeline), [{'datalad_stats': target_stats}])
+
+    assert_pipeline([n1, n2])
+    assert_pipeline([n1, [n2]])
+    assert_pipeline([[n1], [n2]])
+    assert_pipeline([n1, [n2, p]])
+    assert_pipeline([[n1], n2])
+    assert_pipeline([[n1, p], n2])

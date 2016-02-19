@@ -117,7 +117,7 @@ class initiate_handle(object):
         repo = GitRepo(handle_path)
         crawl_config_dir = opj(handle_path, CRAWLER_META_DIR)
         if not exists(crawl_config_dir):
-            lgr.log(1, "Creating %s", crawl_config_dir)
+            lgr.log(2, "Creating %s", crawl_config_dir)
             makedirs(crawl_config_dir)
 
         crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)

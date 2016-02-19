@@ -85,7 +85,7 @@ def reset_pipeline(pipeline):
             if isinstance(node, (list, tuple)):
                 reset_pipeline(node)
             elif hasattr(node, '__call__') and hasattr(node, 'reset'):
-                lgr.log(1, "Resetting node %s" % node)
+                lgr.log(2, "Resetting node %s" % node)
                 node.reset()
 
 def run_pipeline(*args, **kwargs):

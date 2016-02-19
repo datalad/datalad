@@ -31,7 +31,7 @@ from ....support.stats import ActivityStats
 
 from ..s3 import crawl_s3
 
-# @use_cassette('fixtures/vcr_cassettes/test_crawl_s3')
+@use_cassette('fixtures/vcr_cassettes/test_crawl_s3')
 @with_tempfile
 def test_crawl_s3(path):
     #crawler = crawl_s3('datalad-test0-versioned')
@@ -81,14 +81,19 @@ def test_crawl_s3(path):
     # so we just get the "most recent existed" view of all of them without having commits
     # for previous versions but  annex  processing them thus doing all house-keeping
     # necessary
+    #pipeline = [crawl_s3('datalad-test0-versioned', strategy='naive'), annex]
     pipeline = [[crawl_s3('datalad-test0-versioned', strategy='naive'), annex], annex.finalize()]
+    #pipeline = [crawl_s3('datalad-test0-versioned', strategy='naive'), annex, annex.finalize()]
 
     out = run_pipeline(pipeline)
-    eq_(out, [{'datalad_stats': ActivityStats(files=14, overwritten=5, downloaded=14, urls=14, add_annex=14, downloaded_size=112)}])
+    # things are committed and thus stats are empty
+    eq_(out, [{'datalad_stats': ActivityStats()}])
+    eq_(out[0]['datalad_stats'].get_total(), ActivityStats(files=14, overwritten=5, downloaded=14, urls=14, add_annex=14, downloaded_size=112))
 
     # if we rerun -- nothing new should have been done.  I.e. it is the
     out = run_pipeline(pipeline)
     raise SkipTest("TODO:  should track prev version and next rerun should be nothing new")
     eq_(out, [{'datalad_stats': ActivityStats()}])
+    eq_(out[0]['datalad_stats'].get_total(), ActivityStats())
     # TODO: could be boto f.ck ups (e.g. build 1000 for python3) due to recent rename of aws -> s3?
     # but they don't reproduce locally

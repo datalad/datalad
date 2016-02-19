@@ -1073,9 +1073,9 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
         i += 1
         if maxlines > 0 and i > maxlines:
             raise IOError("Expected no more than %d lines. So far received: %r" % (maxlines, out))
-        lgr.log(1, "Expecting a line")
+        lgr.log(2, "Expecting a line")
         line = stdout.readline()
-        lgr.log(1, "Received line %r" % line)
+        lgr.log(2, "Received line %r" % line)
         out += line
         if re.match(r'^.*\b(failed|ok)$', line.rstrip()):
             break

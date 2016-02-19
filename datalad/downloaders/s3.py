@@ -59,7 +59,7 @@ class S3Authenticator(Authenticator):
         # Shut up boto if we do not care to listen ;)
         boto_lgr.setLevel(
             logging.CRITICAL
-            if lgr.getEffectiveLevel() > logging.DEBUG
+            if lgr.getEffectiveLevel() > 1
             else logging.DEBUG
         )
 
