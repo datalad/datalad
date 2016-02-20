@@ -92,7 +92,14 @@ class crawl_s3(object):
             staged.add(filename)
             if isinstance(e, Key):
                 url = get_key_url(e, schema=self.url_schema)
-                yield updated(data, {'url': url, 'filename': filename})
+                # generate and pass along the status right away since we can
+                yield updated(
+                    data,
+                    {
+                        'url': url,
+                        'url_status': S3Downloader.get_key_status(e, dateformat='iso8601'),
+                        'filename': filename
+                    })
             elif isinstance(e, DeleteMarker):
                 if strategy == 'TODO':
                     yield updated(data, {'filename': filename, 'datalad-action': 'delete'})

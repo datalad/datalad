@@ -31,7 +31,7 @@ from ....support.stats import ActivityStats
 
 from ..s3 import crawl_s3
 
-@use_cassette('fixtures/vcr_cassettes/test_crawl_s3')
+@use_cassette('fixtures/vcr_cassettes/test_crawl_s3.yaml')
 @with_tempfile
 def test_crawl_s3(path):
     #crawler = crawl_s3('datalad-test0-versioned')

@@ -329,7 +329,7 @@ class Annexificator(object):
             downloader = self._providers.get_provider(url).get_downloader(url)
 
             # request status since we would need it in either mode
-            remote_status = downloader.get_status(url)
+            remote_status = data['url_status'] if 'url_status' in data else downloader.get_status(url)
             if lexists(filepath):
                 # Check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT

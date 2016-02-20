@@ -21,7 +21,7 @@ from ..utils import auto_repr
 from ..utils import assure_dict_from_str
 from ..dochelpers import borrowkwargs, exc_str
 from ..support.network import get_url_straight_filename
-from ..support.network import rfc2822_to_epoch
+from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader
@@ -186,6 +186,20 @@ class S3Downloader(BaseDownloader):
         # TODO: possibly return a "header"
         return download_into_fp, target_size, url_filename, headers
 
+    @classmethod
+    def get_key_headers(cls, key, dateformat='rfc2822'):
+        headers = {
+            'Content-Length': key.size,
+            'Content-Disposition': key.name
+        }
+
+        if key.last_modified:
+            # boto would return time string the way amazon returns which returns
+            # it in two different ones depending on how key information was obtained:
+            # https://github.com/boto/boto/issues/466
+            headers['Last-Modified'] = {'rfc2822': rfc2822_to_epoch,
+                                        'iso8601': iso8601_to_epoch}[dateformat](key.last_modified)
+        return headers
 
     @classmethod
     def get_status_from_headers(cls, headers):
@@ -197,3 +211,6 @@ class S3Downloader(BaseDownloader):
             filename=headers.get('Content-Disposition')
         )
 
+    @classmethod
+    def get_key_status(cls, key, dateformat='rfc2822'):
+        return cls.get_status_from_headers(cls.get_key_headers(key, dateformat=dateformat))

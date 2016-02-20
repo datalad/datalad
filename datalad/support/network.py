@@ -138,6 +138,10 @@ def rfc2822_to_epoch(datestr):
     """Given rfc2822 date/time format, return seconds since epoch"""
     return mktime_tz(parsedate_tz(datestr))
 
+import calendar
+from datetime import datetime
+def iso8601_to_epoch(datestr):
+    return calendar.timegm(datetime.strptime(datestr, "%Y-%m-%dT%H:%M:%S.%fZ").timetuple())
 
 def __urlopen_requests(url, header_vals=None):
     # XXX Workaround for now for ... broken code
