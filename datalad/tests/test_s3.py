@@ -20,7 +20,7 @@ from ..support.keyring_ import keyring
 from .utils import use_cassette
 
 
-@use_cassette('fixtures/vcr_cassettes/s3_test0.yaml')
+@use_cassette('s3_test0')
 def test_version_url():
     try: # TODO:  with RFing of keyring 8.0 to have keyrings.alt on wheezy get_password throws RuntimeError
         pw = keyring.get_password(S3_TEST_CREDENTIAL, 'secret_id')

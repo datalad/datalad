@@ -77,7 +77,7 @@ def remove_from_index(index_file, regexp):
 
 
 @skip_if_no_network
-@use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
+@use_cassette('openfmri')
 def __test_basic_openfmri_top_pipeline():
     skip_if_no_module('scrapy')  # e.g. not present under Python3
     sink1 = Sink()
@@ -124,7 +124,7 @@ def __test_basic_openfmri_top_pipeline():
 
 
 @skip_if_no_network
-@use_cassette('fixtures/vcr_cassettes/openfmri-1.yaml')
+@use_cassette('openfmri-1')
 @with_tempfile(mkdir=True)
 def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     skip_if_no_module('scrapy')  # e.g. not present under Python3

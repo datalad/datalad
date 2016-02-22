@@ -583,7 +583,14 @@ try:
 
     def use_cassette(path, return_body=None, **kwargs):
         """Adapter so we could create/use custom use_cassette with custom parameters
+
+        Parameters
+        ----------
+        path : str
+          If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
         """
+        if not isabs(path):  # so it was given as a name
+            path = "fixtures/vcr_cassettes/%s.yaml" % path
         lgr.debug("Using cassette %s" % path)
         if return_body is not None:
             my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
