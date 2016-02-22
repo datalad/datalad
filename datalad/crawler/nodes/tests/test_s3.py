@@ -20,6 +20,7 @@ from ....tests.utils import assert_equal
 from ....tests.utils import assert_false
 from ....tests.utils import SkipTest
 from ....tests.utils import use_cassette
+from ....tests.utils import externals_use_cassette
 from ....utils import updated
 from ....utils import chpwd
 from ....downloaders.tests.utils import get_test_providers
@@ -85,13 +86,16 @@ def test_crawl_s3(path):
     pipeline = [[crawl_s3('datalad-test0-versioned', strategy='naive'), annex], annex.finalize()]
     #pipeline = [crawl_s3('datalad-test0-versioned', strategy='naive'), annex, annex.finalize()]
 
-    out = run_pipeline(pipeline)
+    with externals_use_cassette('fixtures/vcr_cassettes/test_crawl_s3-pipeline1.yaml'):
+        out = run_pipeline(pipeline)
     # things are committed and thus stats are empty
     eq_(out, [{'datalad_stats': ActivityStats()}])
     eq_(out[0]['datalad_stats'].get_total(), ActivityStats(files=14, overwritten=5, downloaded=14, urls=14, add_annex=14, downloaded_size=112))
 
     # if we rerun -- nothing new should have been done.  I.e. it is the
-    out = run_pipeline(pipeline)
+    # and ATM we can reuse the same cassette
+    with externals_use_cassette('fixtures/vcr_cassettes/test_crawl_s3-pipeline1.yaml'):
+        out = run_pipeline(pipeline)
     raise SkipTest("TODO:  should track prev version and next rerun should be nothing new")
     eq_(out, [{'datalad_stats': ActivityStats()}])
     eq_(out[0]['datalad_stats'].get_total(), ActivityStats())
