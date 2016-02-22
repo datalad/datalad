@@ -19,6 +19,8 @@ from six import iteritems, string_types
 from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
 from datalad.utils import updated
 from ..pipeline import FinishPipeline
+from ..pipeline import xrun_pipeline
+from ..pipeline import PIPELINE_TYPES
 from ...utils import auto_repr
 from ...utils import find_files as _find_files
 
@@ -327,3 +329,63 @@ class find_files(object):
         self._total_count += count
         if not self._total_count and self.fail_if_none:
             raise RuntimeError("We did not match any file using regex %r" % self.regex)
+
+
+@auto_repr
+class switch(object):
+    """Helper node which would decide which sub-pipeline/node to execute based on values in data
+    """
+
+    def __init__(self, key, mapping, default=None, missing='raise'):
+        """
+        Parameters
+        ----------
+        key: str
+        mapping: dict
+        default: node or pipeline, optional
+          node or pipeline to use if no mapping was found
+        missing: ('raise', 'stop', 'skip'), optional
+          If value is missing in the mapping or key is missing in data
+          (yeah, not differentiating atm), and no default is provided:
+          'raise' - would just raise KeyError, 'stop' - would not yield
+          anything in effect stopping any down processing, 'skip' - would
+          just yield input data
+        """
+        self.key = key
+        self.mapping = mapping
+        self.missing = missing
+        self.default = default
+
+    @property
+    def missing(self):
+        return self._missing
+
+    @missing.setter
+    def missing(self, value):
+        assert(value in {'raise', 'skip', 'stop'})
+        self._missing = value
+
+    def __call__(self, data):
+        # make decision which sub-pipeline
+        try:
+            pipeline = self.mapping[data[self.key]]
+        except KeyError:
+            if self.default is not None:
+                pipeline = self.default
+            elif self.missing == 'raise':
+                raise
+            elif self.missing == 'skip':
+                yield data
+                return
+            elif self.missing == 'stop':
+                return
+
+        if not isinstance(pipeline, PIPELINE_TYPES):
+            # it was a node, return its output
+            gen = pipeline(data)
+        else:
+            gen = xrun_pipeline(pipeline, data)
+
+        # run and yield each result
+        for out in gen:
+            yield out

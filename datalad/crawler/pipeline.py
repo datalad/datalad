@@ -76,13 +76,15 @@ PIPELINE_OPTS = dict(
     loop=False,        # either to feed results into itself (until None returned)
 )
 
+# which data types depict object being a pipeline
+PIPELINE_TYPES = (list, tuple)
 
 def reset_pipeline(pipeline):
     """Given a pipeline, traverses its nodes and calls .reset on them if they have such an attribute
     """
     if pipeline:
         for node in pipeline:
-            if isinstance(node, (list, tuple)):
+            if isinstance(node, PIPELINE_TYPES):
                 reset_pipeline(node)
             elif hasattr(node, '__call__') and hasattr(node, 'reset'):
                 lgr.log(2, "Resetting node %s" % node)
@@ -141,7 +143,7 @@ def xrun_pipeline(pipeline, data=None, stats=None, reset=True):
         if stats is not None:
             raise ValueError("We were provided stats to use, but data has already datalad_stats")
     else:
-        data['datalad_stats'] = stats or ActivityStats()
+        data = updated(data, {'datalad_stats': stats or ActivityStats()})
 
     if not len(pipeline):
         return
