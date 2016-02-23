@@ -154,6 +154,11 @@ class crawl_s3(object):
 
         # Adding None so we could deal with the last commit within the loop without duplicating
         # logic later outside
+        def update_versiondb(e, force=False):
+            # This way we could recover easier after a crash
+            # TODO: config crawl.crawl_s3.versiondb.saveaftereach=True
+            if force or True:
+                versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
         for e in versions_sorted + [None]:
             filename = e.name if e is not None else None
             if filename in staged or e is None:
@@ -166,7 +171,7 @@ class crawl_s3(object):
                         # upon next rerun.  Record should contain
                         # last_modified, name, versionid
                         # TODO?  what if e_prev was a DeleteMarker???
-                        versions_db.version = dict(zip(version_fields, get_version_cmp(e_prev)))
+                        update_versiondb(e_prev, force=True)
                     if strategy == 'commit-versions':
                         yield updated(data, {'datalad_action': 'commit'})
                         if self.ncommits:
@@ -190,9 +195,11 @@ class crawl_s3(object):
                         'filename': filename,
                         'datalad_action': 'annex',
                     })
+                update_versiondb(e)
             elif isinstance(e, DeleteMarker):
                 if strategy == 'commit-versions':
                     yield updated(data, {'filename': filename, 'datalad_action': 'remove'})
+                update_versiondb(e)
             else:
                 raise ValueError("Don't know how to treat %s" % e)
             e_prev = e
