@@ -59,6 +59,7 @@ class crawl_s3(object):
                  strategy='naive',
                  versionfx=get_version_for_key,
                  repo=None,
+                 ncommits=None,
                  ):
         """
 
@@ -72,6 +73,10 @@ class crawl_s3(object):
           If not None, to define a version from the last processed key
         repo: GitRepo, optional
           Under which to store information about latest scraped version
+        ncommits: int or None, optional
+          If specified, used as max number of commits to perform.
+          ??? In principle the same effect could be achieved by a node
+          raising FinishPipeline after n'th commit
         """
         self.bucket = bucket
         self.prefix = prefix
@@ -80,6 +85,7 @@ class crawl_s3(object):
         self.strategy = strategy
         self.versionfx = versionfx
         self.repo = repo
+        self.ncommits = ncommits
 
     def __call__(self, data):
 
@@ -113,12 +119,13 @@ class crawl_s3(object):
         versions_sorted = sorted(all_versions, key=cmp)  # attrgetter('last_modified'))
         # print '\n'.join(map(str, [cmp(k) for k in versions_sorted]))
 
+        version_fields = ['last-modified', 'name', 'version-id']
         def get_version_cmp(k):
             # this one will return action version_id so we could uniquely identify
             return k.last_modified, k.name, k.version_id
 
         if prev_version:
-            last_modified_, name_, version_id_ = prev_version
+            last_modified_, name_, version_id_ = [prev_version[f] for f in version_fields]
             # roll forward until we get to the element > this
             # to not breed list copies
             for i, k in enumerate(versions_sorted):
@@ -138,6 +145,7 @@ class crawl_s3(object):
         staged = set()
         strategy = self.strategy
         e_prev = None
+        ncommits = self.ncommits or 0
 
         # Adding None so we could deal with the last commit within the loop without duplicating
         # logic later outside
@@ -153,9 +161,15 @@ class crawl_s3(object):
                         # upon next rerun.  Record should contain
                         # last_modified, name, versionid
                         # TODO?  what if e_prev was a DeleteMarker???
-                        versions_db.version = get_version_cmp(e_prev)
+                        versions_db.version = dict(zip(version_fields, get_version_cmp(e_prev)))
                     if strategy == 'commit-versions':
                         yield updated(data, {'datalad_action': 'commit'})
+                        if self.ncommits:
+                            ncommits += 1
+                            if self.ncommits <= ncommits:
+                                lgr.debug("Interrupting on %dth commit since asked to do %d",
+                                          ncommits, self.ncommits)
+                                break
                     staged.clear()
                 if e is None:
                     break  # we are done

@@ -16,8 +16,10 @@ from ....consts import DATALAD_SPECIAL_REMOTE
 from ....downloaders.tests.utils import get_test_providers
 from ....support.stats import ActivityStats
 from ....utils import swallow_logs
+from ....utils import rmtree
 
 from ....tests.utils import eq_
+from ....tests.utils import assert_not_equal
 from ....tests.utils import assert_in, assert_not_in
 from ....tests.utils import SkipTest
 from ....tests.utils import use_cassette
@@ -26,12 +28,7 @@ from ....tests.utils import with_tempfile
 
 
 def _annex(path):
-    annex = Annexificator(path)
-    # TODO:  we need helper functions for those two and RF all copies of such code
-    annex.repo.annex_initremote(
-        DATALAD_SPECIAL_REMOTE,
-        ['encryption=none', 'type=external', 'externaltype=%s' % DATALAD_SPECIAL_REMOTE,
-         'autoenable=true'])
+    annex = Annexificator(path, special_remotes=[DATALAD_SPECIAL_REMOTE])
 
     url = 's3://datalad-test0-versioned'
     providers = get_test_providers(url)  # to skip if no credentials
@@ -118,3 +115,51 @@ def test_crawl_s3_commit_versions(path):
             assert_not_in("There is already a tag %s" % target_version, cml.out)
     eq_(out, [{'datalad_stats': ActivityStats()}])
     eq_(out[0]['datalad_stats'].get_total(), ActivityStats())  # Really nothing was done
+
+
+# theoretically reusing the same cassette should have worked but doesn't
+@use_cassette('test_crawl_s3_commit_versions_one_at_a_time')
+@with_tempfile
+def test_crawl_s3_commit_versions_one_at_a_time(path):
+    annex = _annex(path)
+
+    # Fancier setup so we could do any of desired actions within a single sweep
+    pipeline = [
+        crawl_s3('datalad-test0-versioned', strategy='commit-versions', repo=annex.repo, ncommits=1),
+        switch('datalad_action',
+               {
+                   'commit': annex.finalize(tag=True),
+                   'remove': annex.remove,
+                   'annex':  annex,
+               })
+    ]
+
+    with externals_use_cassette('test_crawl_s3-pipeline1'):
+        with swallow_logs() as cml:
+            out = run_pipeline(pipeline)
+            assert_not_in("There is already a tag %s" % target_version, cml.out)
+    # things are committed and thus stats are empty
+    eq_(out, [{'datalad_stats': ActivityStats()}])
+    total_stats_all = total_stats = out[0]['datalad_stats'].get_total()
+    eq_(total_stats,
+        # Deletions come as 'files' as well atm
+        ActivityStats(files=3, downloaded=3, urls=3, add_annex=3, downloaded_size=24, versions=[target_version]))
+
+    # and there should be 7 more, every time changing the total stats
+    for t in range(1, 8):
+        with externals_use_cassette('test_crawl_s3-pipeline1'):
+            with swallow_logs() as cml:
+                out = run_pipeline(pipeline)
+                assert_in("There is already a tag %s" % target_version, cml.out)
+        total_stats_ = out[0]['datalad_stats'].get_total()
+        assert_not_equal(total_stats, total_stats_)
+        total_stats = total_stats_
+        total_stats_all += total_stats
+
+    # with total stats at the end to be the same as if all at once
+    total_stats_all.versions = []
+    eq_(total_stats_all,
+        # Deletions come as 'files' as well atm
+        ActivityStats(files=17, overwritten=3, downloaded=14, urls=14, add_annex=14, removed=3, downloaded_size=112))
+
+
