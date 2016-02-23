@@ -11,70 +11,40 @@
 """
 
 import os
-from os.path import join as opj, exists, lexists, islink, realpath, basename, normpath
-from os.path import isabs
+from os.path import join as opj, exists, lexists, islink, realpath, sep
 
 from ...dochelpers import exc_str
 from ...support.status import FileStatus
 from ...support.exceptions import CommandError
 from ...utils import auto_repr
 from ...utils import swallow_logs
-from ...utils import find_files
-from ...consts import HANDLE_META_DIR
+from ...consts import CRAWLER_META_STATUSES_DIR
 
+from .base import JsonBaseDB, FileStatusesBaseDB
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
 
 __docformat__ = 'restructuredtext'
 
+__all__ = ['PhysicalFileStatusesDB']
+
+#
+# Concrete implementations
+#
 
 @auto_repr
-class AnnexFileAttributesDB(object):
+class PhysicalFileStatusesDB(FileStatusesBaseDB):
+    """Non-persistent DB based on file attributes
 
-    def __init__(self, annex, track_queried=True):
-        """
+    It uses file modification times and size as known to annex to deduce
+    if new version is available
 
-        Parameters
-        ----------
-        annex : AnnexRepo
-          Annex repository which will be consulted on the size and full path
-        track_queried : bool, optional
-          Either to track what file paths were queried
-        """
-        self.annex = annex
-        # which file paths were referred
-        self._track_queried = track_queried
-        self._queried_filepaths = set()
+    In general should not be used since neither git nor annex stores any files
+    meta-information (besides mode, and size) so mtime would get lost while switching
+    the branches and dropping the load
+    """
 
-    @property
-    def track_queried(self):
-        return self._track_queried
-
-    @property
-    def queried_filepaths(self):
-        return self._queried_filepaths
-
-    def _get_fullpath(self, fpath):
-        if isabs(fpath):
-            return normpath(fpath)
-        else:
-            return normpath(opj(self.annex.path, fpath))
-
-    # TODO: think if default should be provided
-    def get(self, fpath):
-        """Given a file (under annex) relative path, return its status record
-
-        annex information about size etc might be used if load is not available
-
-        Parameters
-        ----------
-        fpath: str
-          Path (relative to the top of the repo) of the file to get stats of
-        """
-        filepath = self._get_fullpath(fpath)
-        if self._track_queried:
-            self._queried_filepaths.add(filepath)
-
+    def _get(self, filepath):
         if not lexists(filepath):
             return None
 
@@ -84,7 +54,7 @@ class AnnexFileAttributesDB(object):
         filestat = os.lstat(filepath)
         try:
             with swallow_logs():
-                info = self.annex.annex_info(fpath)
+                info = self.annex.annex_info(filepath, batch=True)
             size = info['size']
         except (CommandError, TypeError) as exc:
             # must be under git or a plain file
@@ -94,53 +64,90 @@ class AnnexFileAttributesDB(object):
         # deduce mtime from the file or a content which it points to. Take the oldest (I wonder
         # if it would bite ;) XXX)
         mtime = filestat.st_mtime
-
-        if islink(fpath):
+        if islink(filepath):
             filepath_ = realpath(filepath)  # symlinked to
             if exists(filepath_):
                 mtime_ = os.stat(filepath_).st_mtime
                 mtime = min(mtime_, mtime)
-
         return FileStatus(
-            size=size,
-            mtime=mtime
+                size=size,
+                mtime=mtime
         )
 
-    def set(self, fpath, status=None):
+    def _set(self, filepath, status):
         # This DB doesn't implement much of it, besides marking internally that we do care about this file
-        filepath = self._get_fullpath(fpath)
-        if self._track_queried:
-            self._queried_filepaths.add(filepath)
         pass
 
-    def is_different(self, fpath, status, url=None):
-        """Return True if file pointed by fpath newer in status
+    def save(self):
+        # nothing for us to do but JsonFileStatusesDB has it so let's keep it common
+        pass
+
+    def _remove(self, filepath):
+        pass
+
+
+@auto_repr
+class JsonFileStatusesDB(JsonBaseDB, PhysicalFileStatusesDB):
+    """Persistent DB to store information about files' size/mtime/filename in a json file
+    """
+
+    __version__ = 1
+    __crawler_subdir__ = CRAWLER_META_STATUSES_DIR
+
+    def __init__(self, annex, track_queried=True, name=None):
+        PhysicalFileStatusesDB.__init__(self, annex, track_queried=track_queried)
+        JsonBaseDB.__init__(self, annex, name=name)
+
+    #
+    # Defining abstract methods implementations
+    #
+    def _get_empty_db(self):
+        return {'files': {}}
+
+    def _get_loaded_db(self, db):
+        """Given a DB loaded from a file, prepare it for being used
         """
-        # TODO: make use of URL -- we should validate that url is among those associated
-        #  with the file
-        old_status = self.get(fpath)
-        if status.filename and not old_status.filename:
-            old_status.filename = basename(fpath)
-        return old_status != status
+        assert (set(db.keys()) == {'db_version', 'files'})
+        return db
 
-    def get_obsolete(self):
-        """Returns paths which weren't queried, thus must have been deleted
-
-        Note that it doesn't track across branches etc.
+    def _get_db_to_save(self):
+        """Return DB to be saved as JSON file
         """
-        if not self._track_queried:
-            raise RuntimeError("Cannot determine which files were removed since track_queried was set to False")
-        obsolete = []
-        # those aren't tracked by annexificator
-        datalad_path = opj(self.annex.path, HANDLE_META_DIR)
-        for fpath in find_files('.*', topdir=self.annex.path):
-            filepath = self._get_fullpath(fpath)
-            if filepath.startswith(datalad_path):
-                continue
-            if fpath not in self._queried_filepaths:
-                obsolete.append(filepath)
-        return obsolete
+        return self._db
 
-    def reset(self):
-        """Reset internal state, e.g. about known queried filedpaths"""
-        self._queried_filepaths = set()
+    def _get_fpath(self, filepath):
+        assert (filepath.startswith(self.annex.path))
+        fpath = filepath[len(self.annex.path.rstrip(sep)) + 1:]
+        return fpath
+
+    def _get_fileattributes_status(self, fpath):
+        filepath = self._get_filepath(fpath)
+        return PhysicalFileStatusesDB._get(self, filepath)
+
+    def _get(self, filepath):
+        # TODO: may be avoid this all fpath -> filepath -> fpath?
+        fpath = self._get_fpath(filepath)
+
+        files = self._db['files']
+        if fpath not in files:
+            return None
+        return FileStatus(**files[fpath])
+
+    # TODO: get URL all the way here?
+    def _set(self, filepath, status):
+        fpath = self._get_fpath(filepath)
+        if status is None:
+            status_dict = {}
+            # get it from the locally available file
+            # status = PhysicalFileStatusesDB._get(self, filepath)
+            # NOPE since then generated files would keep changing
+        else:
+            status_dict = {f: getattr(status, f)
+                           for f in ('size', 'mtime', 'filename')
+                           if getattr(status, f) is not None}
+        self._db['files'][fpath] = status_dict
+
+    def _remove(self, filepath):
+        fpath = self._get_fpath(filepath)
+        if fpath in self._db['files']:
+            self._db['files'].pop(fpath)

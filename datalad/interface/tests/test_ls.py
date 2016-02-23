@@ -20,8 +20,8 @@ from ...tests.utils import use_cassette
 from datalad.downloaders.tests.utils import get_test_providers
 
 
-@use_cassette('fixtures/vcr_cassettes/ls_s3.yaml')
-def test_ls():
+@use_cassette('test_ls_s3')
+def test_ls_s3():
     url = 's3://datalad-test0-versioned/'
     with swallow_outputs():
         # just to skip if no credentials
@@ -30,4 +30,4 @@ def test_ls():
     with swallow_outputs() as cmo:
         assert_equal(ls(url), None) # not output ATM
         assert_in('Bucket info:', cmo.out)
-test_ls.tags = ['network']
+test_ls_s3.tags = ['network']

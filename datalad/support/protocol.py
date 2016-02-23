@@ -159,7 +159,8 @@ class ProtocolInterface(object):
         file_: str
           path of the file, the protocol is written to.
         """
-
+        # TODO: separate protocolling data from presentation since we might want
+        # to dump as json
         with open(file_, 'w') as f:
             f.write(self.__str__())
 

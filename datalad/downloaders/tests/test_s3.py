@@ -11,7 +11,7 @@
 import os
 from mock import patch
 
-from ..aws import S3Authenticator
+from ..s3 import S3Authenticator
 from ..providers import Providers, Credential  # to test against crcns
 
 from ...tests.utils import swallow_outputs
@@ -52,7 +52,7 @@ test_s3_download_basic.tags = ['network']
 
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
-@use_cassette('fixtures/vcr_cassettes/test_s3_mtime.yaml')
+@use_cassette('test_s3_mtime')
 @with_tempfile
 def test_mtime(tempfile):
     url = url_2versions_nonversioned1_ver2
@@ -65,7 +65,7 @@ def test_mtime(tempfile):
     assert_raises(DownloadError, get_test_providers(url).download, url, path=tempfile, overwrite=True)
 
 
-@use_cassette('fixtures/vcr_cassettes/test_s3_reuse_session.yaml')
+@use_cassette('test_s3_reuse_session')
 @with_tempfile
 # forgot how to tell it not to change return value, so this side_effect beast now
 @patch.object(S3Authenticator, 'authenticate', side_effect=S3Authenticator.authenticate, autospec=True)

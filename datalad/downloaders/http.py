@@ -37,7 +37,7 @@ from logging import getLogger
 from ..log import LoggerHelper
 lgr = getLogger('datalad.http')
 
-if lgr.getEffectiveLevel() < 10:
+if lgr.getEffectiveLevel() <= 1:
     # Let's also enable requests etc debugging
 
     # These two lines enable debugging at httplib level (requests->urllib3->http.client)

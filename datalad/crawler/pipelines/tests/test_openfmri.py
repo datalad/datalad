@@ -77,7 +77,7 @@ def remove_from_index(index_file, regexp):
 
 
 @skip_if_no_network
-@use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
+@use_cassette('openfmri')
 def __test_basic_openfmri_top_pipeline():
     skip_if_no_module('scrapy')  # e.g. not present under Python3
     sink1 = Sink()
@@ -124,7 +124,7 @@ def __test_basic_openfmri_top_pipeline():
 
 
 @skip_if_no_network
-@use_cassette('fixtures/vcr_cassettes/openfmri-1.yaml')
+@use_cassette('openfmri-1')
 @with_tempfile(mkdir=True)
 def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     skip_if_no_module('scrapy')  # e.g. not present under Python3
@@ -256,12 +256,14 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     ok_file_under_git(t1w_fpath, annexed=True)
 
     target_files = {
-        './.datalad/config.ttl', './.datalad/crawl/crawl.cfg',
-        './.datalad/crawl/versions/incoming.json', './.datalad/datalad.ttl',
+        './.datalad/config.ttl', './.datalad/crawl/crawl.cfg', './.datalad/datalad.ttl',
+        './.datalad/crawl/statuses/incoming.json',
+        './.datalad/crawl/versions/incoming.json',
         './README.txt', './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
     target_incoming_files = {
         'README.txt', 'changelog.txt',
         'ds666-beh_R1.0.1.tar.gz', 'ds666_R1.0.0.tar.gz', 'ds666_R1.0.1.tar.gz', 'ds666_R2.0.0.tar.gz',
+        '.datalad/crawl/statuses/incoming.json',
         '.datalad/crawl/versions/incoming.json'
     }
     eq_(set(all_files), target_files)
@@ -277,17 +279,16 @@ def test_openfmri_pipeline1(ind, topurl, outd):
 
     commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
-    # actually we do manage to download 1 since it is committed directly to git
-    # eq_(out[0]['datalad_stats'], ActivityStats())
+    # actually we do manage to add_git 1 (README) since it is generated committed directly to git
     # Nothing was committed so stats leaked all the way up
-    eq_(out[0]['datalad_stats'], ActivityStats(files=4, overwritten=1, skipped=3, downloaded=1, add_git=1, urls=4, downloaded_size=26))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=5, skipped=4, urls=4, add_git=1))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     # rerun pipeline when new content is available
     # add new revision, rerun pipeline and check that stuff was processed/added correctly
     index_html = opj(ind, 'ds666', 'index.html')
     add_to_index(index_html,
-                 content = '<a href="ds666_R2.0.0.tar.gz">Raw data on AWS version 2.0.0</a>')
+                 content='<a href="ds666_R2.0.0.tar.gz">Raw data on AWS version 2.0.0</a>')
 
     with chpwd(outd):
         out = run_pipeline(pipeline)
@@ -311,7 +312,8 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     # but for some reason downloaded_size fluctuates.... why? probably archiving...?
     total_stats.downloaded_size = 0
     eq_(total_stats,
-        ActivityStats(files=7, skipped=4, downloaded=1, renamed=1, urls=5, add_annex=2,
+        ActivityStats(files=8, skipped=4, downloaded=1, renamed=1, urls=5,
+                      add_annex=2, add_git=1, # README
                       versions=['2.0.0'],
                       merges=[['incoming', 'incoming-processed']]))
 
@@ -325,19 +327,25 @@ def test_openfmri_pipeline1(ind, topurl, outd):
             # since files get removed in incoming, but repreprocessed completely
             # incomming-processed and merged into master -- new commits will come
             # They shouldn't have any difference but still should be new commits
-            assert_in("There is already tag 2.0.0 in the repository", cml.out)
+            assert_in("There is already a tag 2.0.0 in the repository", cml.out)
     eq_(len(out), 1)
     incoming_files = repo.git_get_files('incoming')
     target_incoming_files.remove('ds666_R1.0.0.tar.gz')
     eq_(set(incoming_files), target_incoming_files)
     commits_hexsha_removed = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
-    # so no new changes to master/incomming-processed since older revision was removed
+    # our 'statuses' database should have recorded the change thus got a diff
+    # which propagated through all branches
     for b in 'master', 'incoming-processed':
-        eq_(repo.repo.branches[b].commit.diff(commits_hexsha_[b][0]), [])
+        # with non persistent DB we had no changes
+        # eq_(repo.repo.branches[b].commit.diff(commits_hexsha_[b][0]), [])
+        eq_(repo.repo.branches[b].commit.diff(commits_hexsha_[b][0])[0].a_path,
+            '.datalad/crawl/statuses/incoming.json')
     dincoming = repo.repo.branches['incoming'].commit.diff(commits_hexsha_['incoming'][0])
-    eq_(len(dincoming), 1)  # 1 diff object -- 1 file removed
+    eq_(len(dincoming), 2)  # 2 diff objects -- 1 file removed, 1 statuses updated
+    eq_(set([d.a_path for d in dincoming]),
+        {'.datalad/crawl/statuses/incoming.json', 'ds666_R1.0.0.tar.gz'})
     # since it seems to diff "from current to the specified", it will be listed as new_file
-    assert dincoming[0].new_file
+    assert any(d.new_file for d in dincoming)
 
     eq_(out[0]['datalad_stats'].get_total().removed, 1)
     assert_not_equal(commits_hexsha_, commits_hexsha_removed)
@@ -405,10 +413,7 @@ def test_openfmri_pipeline2(ind, topurl, outd):
 
     commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
-    # actually we do manage to download 1 since it is committed directly to git
-    # eq_(out[0]['datalad_stats'], ActivityStats())
-    # Nothing was committed so stats leaked all the way up
-    eq_(out[0]['datalad_stats'], ActivityStats(files=2, overwritten=1, skipped=1, downloaded=1, add_git=1, urls=2, downloaded_size=26))
+    eq_(out[0]['datalad_stats'], ActivityStats(files=3, skipped=2, urls=2, add_git=1))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())
 
     os.rename(opj(ind, 'ds666', 'ds666_R2.0.0.tar.gz'), opj(ind, 'ds666', 'ds666.tar.gz'))
@@ -420,9 +425,9 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     stats_total = out[0]['datalad_stats'].get_total()
     stats_total.downloaded_size = 0
     eq_(stats_total,
-        ActivityStats(files=4, overwritten=1, skipped=1, downloaded=1,
+        ActivityStats(files=5, overwritten=1, skipped=1, downloaded=1,
                       merges=[['incoming', 'incoming-processed']],
-                      renamed=1, urls=2, add_annex=2))
+                      renamed=1, urls=2, add_annex=2, add_git=1))
 
     check_dropall_get(repo)
 test_openfmri_pipeline2.tags = ['integration']

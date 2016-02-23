@@ -21,6 +21,7 @@ from six import string_types
 
 from functools import wraps
 
+import git
 from git import Repo
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from git.objects.blob import Blob
@@ -290,6 +291,14 @@ class GitRepo(object):
                 # log here but let caller decide what to do
                 lgr.error(str(e))
                 raise
+            except ValueError as e:
+                if git.__version__ == '1.0.2' and e.message == "I/O operation on closed file":
+                    # bug https://github.com/gitpython-developers/GitPython/issues/383
+                    raise GitCommandError("clone has failed, telling ya",
+                                          999,  # good number
+                                          stdout="%s already exists" if exists(path) else ""
+                                          )
+                raise  # reraise original
 
         if create and not exists(opj(path, '.git')):
             try:

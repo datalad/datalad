@@ -52,7 +52,7 @@ class TraceBack(object):
     def __call__(self):
         ftb = traceback.extract_stack(limit=100)[:-2]
         entries = [[mbasename(x[0]), str(x[1])] for x in ftb if mbasename(x[0]) != 'logging.__init__']
-        entries = [ e for e in entries if e[0] != 'unittest' ]
+        entries = [e for e in entries if e[0] != 'unittest']
 
         # lets make it more consize
         entries_out = [entries[0]]
@@ -96,19 +96,21 @@ class ColorFormatter(logging.Formatter):
       'ERROR': RED
     }
 
-    def __init__(self, use_color=None, log_name=False):
+    def __init__(self, use_color=None, log_name=False, log_pid=False):
         if use_color is None:
             # if 'auto' - use color only if all streams are tty
             use_color = is_interactive()
         self.use_color = use_color and platform.system() != 'Windows'  # don't use color on windows
-        msg = self.formatter_msg(self._get_format(log_name), self.use_color)
+        msg = self.formatter_msg(self._get_format(log_name, log_pid), self.use_color)
         self._tb = TraceBack(collide=os.environ.get('DATALAD_LOGTRACEBACK', '') == 'collide') \
             if os.environ.get('DATALAD_LOGTRACEBACK', False) else None
         logging.Formatter.__init__(self, msg)
 
-    def _get_format(self, log_name=False):
-        return (("" if os.environ.get("DATALAD_LOGNODATE", None) else "$BOLD%(asctime)-15s$RESET ") +
+    def _get_format(self, log_name=False, log_pid=False):
+        # TODO: config log.timestamp=True
+        return (("" if not int(os.environ.get("DATALAD_LOG_TIMESTAMP", True)) else "$BOLD%(asctime)-15s$RESET ") +
                 ("%(name)-15s " if log_name else "") +
+                ("{%(process)d}" if log_pid else "") +
                 "[%(levelname)s] "
                 "%(message)s "
                 "($BOLD%(filename)s$RESET:%(lineno)d)")
@@ -219,8 +221,11 @@ class LoggerHelper(object):
         # But now improve with colors and useful information such as time
         loghandler.setFormatter(
             ColorFormatter(use_color=use_color,
-                           log_name=self._get_environ("LOGNAME", False)))
-        #logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
+                           # TODO: config log.name, pid
+                           log_name=self._get_environ("LOGNAME", False),
+                           log_pid=self._get_environ("LOGPID", False),
+                           ))
+        #  logging.Formatter('%(asctime)-15s %(levelname)-6s %(message)s'))
         self.lgr.addHandler(loghandler)
 
         self.set_level()  # set default logging level

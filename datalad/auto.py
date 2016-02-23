@@ -86,7 +86,7 @@ class AutomagicIO(object):
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
             with patch(origname, origfunc):
-                lgr.log(1, "Proxying open with %r %r", args, kwargs)
+                lgr.log(2, "Proxying open with %r %r", args, kwargs)
 
                 # had to go with *args since in PY2 it is name, in PY3 file
                 # deduce arguments
@@ -137,7 +137,7 @@ class AutomagicIO(object):
             return
         # if filepath is not there at all (program just "checked" if it could access it
         if not lexists(filepath):
-            lgr.log(1, "Not testing/getting file %s since it is not there", filepath)
+            lgr.log(2, "Not testing/getting file %s since it is not there", filepath)
             return
         # deduce directory for filepath
         filedir = dirname(filepath)

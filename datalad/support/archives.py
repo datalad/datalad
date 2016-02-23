@@ -457,7 +457,7 @@ class ExtractedArchive(object):
         self.assure_extracted()
         path = self.get_extracted_filename(afile)
         # TODO: make robust
-        lgr.log(1, "Verifying that %s exists" % abspath(path))
+        lgr.log(2, "Verifying that %s exists" % abspath(path))
         assert exists(path), "%s must exist" % path
         return path
 

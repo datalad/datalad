@@ -18,7 +18,6 @@ from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.handlerepo import HandleRepo
 from datalad.support.handle_backends import HandleRepoBackend
 from datalad.support.handle import Handle

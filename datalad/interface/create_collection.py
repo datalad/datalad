@@ -18,10 +18,6 @@ from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo
-from datalad.support.collection_backends import CollectionRepoBackend
-from datalad.support.collection import Collection
-from datalad.cmdline.helpers import get_datalad_master
 
 
 class CreateCollection(Interface):
@@ -56,6 +52,10 @@ class CreateCollection(Interface):
         -------
         Collection
         """
+
+        from datalad.support.collectionrepo import CollectionRepo
+        from datalad.support.collection_backends import CollectionRepoBackend
+        from datalad.cmdline.helpers import get_datalad_master
 
         local_master = get_datalad_master()
 

@@ -16,6 +16,7 @@ from six.moves.urllib.error import HTTPError
 
 from .base import Interface
 from ..ui import ui
+from ..support.s3 import get_key_url
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 
@@ -66,6 +67,10 @@ class Ls(Interface):
 
         bucket_name, prefix = bucket_prefix.split('/', 1)
 
+        if '?' in prefix:
+            ui.message("We do not care about URL options ATM, they get stripped")
+            prefix = prefix[:prefix.index('?')]
+
         ui.message("Connecting to bucket: %s" % bucket_name)
         if config_file:
             config = SafeConfigParser(); config.read(config_file)
@@ -110,11 +115,14 @@ class Ls(Interface):
 
         prefix_all_versions = list(bucket.list_versions(prefix))
 
-        max_length = max((len(e.name) for e in prefix_all_versions))
+        if not prefix_all_versions:
+            ui.error("No output was provided for prefix %r" % prefix)
+        else:
+            max_length = max((len(e.name) for e in prefix_all_versions))
         for e in prefix_all_versions:
             ui.message(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), cr=' ')
             if isinstance(e, Key):
-                url = "http://{e.bucket.name}.s3.amazonaws.com/{e.name}?versionId={e.version_id}".format(e=e)
+                url = get_key_url(e, schema='http')
                 try:
                     _ = urlopen(Request(url))
                     urlok = "OK"

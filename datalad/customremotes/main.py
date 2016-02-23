@@ -12,6 +12,7 @@ __docformat__ = 'restructuredtext'
 
 
 import argparse
+import os
 
 from .. import __doc__ as m__doc__, __version__ as m__version__
 from ..log import lgr
@@ -20,6 +21,7 @@ from ..cmdline import helpers
 from ..cmdline.main import _license_info
 
 from ..utils import setup_exceptionhook
+from ..utils import use_cassette
 from ..ui import ui
 
 backends = ['archive']
@@ -96,7 +98,12 @@ def _main(args, backend=None):
         print(remote.url_prefix)
     elif args.command is None:
         # If no command - run the special remote
-        remote.main()
+        if 'DATALAD_USECASSETTE' in os.environ:
+            # optionally feeding it a cassette, used by tests
+            with use_cassette(os.environ['DATALAD_USECASSETTE']):
+                remote.main()
+        else:
+            remote.main()
     else:
         raise ValueError("Unknown command %s" % command)
 
