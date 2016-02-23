@@ -98,6 +98,9 @@ class S3Downloader(BaseDownloader):
     def bucket(self):
         return self._bucket
 
+    def reset(self):
+        self._bucket = None
+
     @classmethod
     def _parse_url(cls, url):
         """Parses s3:// url and returns bucket name, prefix, additional query elements

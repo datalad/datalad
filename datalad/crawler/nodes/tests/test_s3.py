@@ -18,7 +18,7 @@ from ....support.stats import ActivityStats
 from ....utils import swallow_logs
 
 from ....tests.utils import eq_
-from ....tests.utils import assert_in
+from ....tests.utils import assert_in, assert_not_in
 from ....tests.utils import SkipTest
 from ....tests.utils import use_cassette
 from ....tests.utils import externals_use_cassette
@@ -33,8 +33,13 @@ def _annex(path):
         ['encryption=none', 'type=external', 'externaltype=%s' % DATALAD_SPECIAL_REMOTE,
          'autoenable=true'])
 
-    get_test_providers('s3://datalad-test0-versioned')  # to skip if no credentials
+    url = 's3://datalad-test0-versioned'
+    providers = get_test_providers(url)  # to skip if no credentials
+    # start with a fresh bucket each time so we could reuse the same vcr tapes work
+    providers.get_provider(url).get_downloader(url).reset()
     return annex
+
+target_version = '0.0.20151107'
 
 @use_cassette('test_crawl_s3')
 @with_tempfile
@@ -46,7 +51,7 @@ def test_crawl_s3(path):
     # necessary
     pipeline = [
         [
-            crawl_s3('datalad-test0-versioned', strategy='naive'),
+            crawl_s3('datalad-test0-versioned', strategy='naive', repo=annex.repo),
             annex
         ],
         annex.finalize()
@@ -56,28 +61,27 @@ def test_crawl_s3(path):
         out = run_pipeline(pipeline)
     # things are committed and thus stats are empty
     eq_(out, [{'datalad_stats': ActivityStats()}])
-    eq_(out[0]['datalad_stats'].get_total(), ActivityStats(files=14, overwritten=5, downloaded=14, urls=14, add_annex=14, downloaded_size=112))
+    total_stats = out[0]['datalad_stats'].get_total()
+    eq_(set(total_stats.versions), {target_version})  # we have a bunch of them since not uniq'ing them and they are all the same
+    total_stats.versions = []
+    eq_(total_stats, ActivityStats(files=14, overwritten=5, downloaded=14, urls=14, add_annex=14, downloaded_size=112))
 
     # if we rerun -- nothing new should have been done.  I.e. it is the
     # and ATM we can reuse the same cassette
     with externals_use_cassette('test_crawl_s3-pipeline1'):
         out = run_pipeline(pipeline)
-    raise SkipTest("TODO:  should track prev version and next rerun should be nothing new")
     eq_(out, [{'datalad_stats': ActivityStats()}])
     eq_(out[0]['datalad_stats'].get_total(), ActivityStats())
-    # TODO: could be boto f.ck ups (e.g. build 1000 for python3) due to recent rename of aws -> s3?
-    # but they don't reproduce locally
 
 
 @use_cassette('test_crawl_s3')
 @with_tempfile
 def test_crawl_s3_commit_versions(path):
-    target_version = '0.0.20151107'
     annex = _annex(path)
 
     # Fancier setup so we could do any of desired actions within a single sweep
     pipeline = [
-        crawl_s3('datalad-test0-versioned', strategy='commit-versions'),
+        crawl_s3('datalad-test0-versioned', strategy='commit-versions', repo=annex.repo),
         switch('datalad_action',
                {
                    'commit': annex.finalize(tag=True),
@@ -111,6 +115,6 @@ def test_crawl_s3_commit_versions(path):
     with externals_use_cassette('test_crawl_s3-pipeline1'):
         with swallow_logs() as cml:
             out = run_pipeline(pipeline)
-            raise SkipTest("TODO:  should track prev version and next rerun should be nothing new")
             assert_not_in("There is already a tag %s" % target_version, cml.out)
     eq_(out, [{'datalad_stats': ActivityStats()}])
+    eq_(out[0]['datalad_stats'].get_total(), ActivityStats())  # Really nothing was done

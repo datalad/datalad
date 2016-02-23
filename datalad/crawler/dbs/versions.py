@@ -27,7 +27,7 @@ __docformat__ = 'restructuredtext'
 @auto_repr
 class SingleVersionDB(JsonBaseDB):
     """
-    Simple helper to store/retrieve information about the version of the last scraped
+    Simple helper to store/retrieve information about the last scraped version
 
     Since we do not expect many changes being done to this DB it also
     saves its state into the file upon any change
