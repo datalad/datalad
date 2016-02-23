@@ -873,8 +873,9 @@ class Annexificator(object):
             yield updated(data, {'datalad_stats': stats})
         return _add_archive_content
 
+
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, tag=False):
+    def finalize(self, tag=False, existing_tag=None):
         """Finalize operations -- commit uncommited, prune abandoned? etc
 
         Parameters
@@ -886,7 +887,9 @@ class Annexificator(object):
           using datalad_stats, so something like "r{stats.versions[0]}" can be used.
           Also `last_version` is provided as the last one from stats.versions (None
           if empty)
-
+        existing_tag: None or '+suffix', optional
+          What to do if tag already exists, if None -- warning is issued. If `+suffix`
+          +0, +1, +2 ... are tried until available one is found.
         """
         def _finalize(data):
             self._precommit()
@@ -913,11 +916,24 @@ class Annexificator(object):
                         tag_ = last_version
                     # TODO: config.tag.sign
                     stats_str = "\n\n" + total_stats.as_str(mode='full')
-                    if tag_ in self.repo.repo.tags:
+                    tags = self.repo.repo.tags
+                    if tag_ in tags:
                         # TODO: config.tag.allow_override
-                        lgr.warning("There is already tag %s in the repository. Delete it first if you want it updated" % tag_)
-                    else:
-                        self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
+                        if existing_tag == '+suffix':
+                            lgr.warning("There is already a tag %s in the repository. Delete it first if you want it updated" % tag_)
+                            tag_ = None
+                        elif existing_tag is None:
+                            suf = 1
+                            while True:
+                                tag__ = '%s+%d' % (tag_, suf)
+                                if tag__ not in tags:
+                                    break
+                                suf += 1
+                            lgr.warning("There is already a tag %s in the repository. Tagging as %s" % (tag_, tag__))
+                            tag_ = tag__
+                        else:
+                            raise ValueError(existing_tag)
+                    self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
             self._states = set()
             yield data
         return _finalize
@@ -947,3 +963,14 @@ class Annexificator(object):
                     self._statusdb.reset()
 
         return _remove_obsolete()
+
+    def remove(self, data):
+        """Removed passed along file name from git/annex"""
+        stats = data.get('datalad_stats', None)
+        self._states.add("Removed files")
+        filename = self._get_fpath(data, stats)
+        # TODO: not sure if we should may be check if exists, and skip/just complain if not
+        if stats:
+            _call(stats.increment, 'removed')
+        _call(self.repo.git_remove, filename)
+        yield data
