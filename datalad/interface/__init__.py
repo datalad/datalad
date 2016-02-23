@@ -41,6 +41,8 @@ from .publish_collection import PublishCollection
 from .import_metadata import ImportMetadata
 from .add_archive_content import AddArchiveContent
 from .download_url import DownloadURL
+from .ls import Ls
+from .clean import Clean
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -83,4 +85,6 @@ _group_misc = (
         ImportMetadata,
         AddArchiveContent,
         DownloadURL,
+        Ls,
+        Clean,
     ])

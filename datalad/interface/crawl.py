@@ -89,4 +89,12 @@ class Crawl(Interface):
                 pipeline = load_pipeline_from_config(path)
 
             lgr.info("Running pipeline %s" % str(pipeline))
-            run_pipeline(pipeline)
+            # TODO: capture the state of all branches so in case of crash
+            # we could gracefully reset back
+            try:
+                run_pipeline(pipeline)
+            except Exception as exc:
+                # TODO: config.crawl.failure = full-reset | last-good-master
+                # probably ask via ui which action should be performed unless
+                # explicitly specified
+                raise

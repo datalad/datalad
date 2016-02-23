@@ -20,13 +20,14 @@ from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
 from ...tests.utils import ok_archives_caches
+from ...tests.utils import SkipTest
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
 from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
 from ...utils import chpwd, getpwd
 
-from ...api import add_archive_content
+from ...api import add_archive_content, clean
 
 
 # within top directory
@@ -48,6 +49,10 @@ tree1args = dict(
         ('3u', {  # updated file content
           '1.tar.gz': {
              '1 f.txt': '1 f load3'
+          }}),
+        ('4u', {  # updated file content
+          '1.tar.gz': {
+             '1 f.txt': '1 f load4'
           }}),
         ('d1', (('1.tar.gz', (
                     ('2 f.txt', '2 f load'),
@@ -78,7 +83,7 @@ def test_add_archive_content(path_orig, url, repo_path):
     # Let's add first archive to the repo so we could test
     with swallow_outputs():
         repo.annex_addurls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
-        for s in range(1, 4):
+        for s in range(1, 5):
             repo.annex_addurls([opj(url, '%du/1.tar.gz' % s)], options=["--pathdepth", "-2"])
     repo.git_commit("added 1.tar.gz")
 
@@ -110,9 +115,10 @@ def test_add_archive_content(path_orig, url, repo_path):
     d1_basic_checks()
     add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix')
     add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix')
+    add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix')
     # rudimentary test
     assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
-                 ['1 f.txt', '1 f.txt-1', '1 f.txt-1.1'])
+                 ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
     whereis = repo.annex_whereis(glob(opj(repo_path, '1', '1*')))
     # they all must be the same
     assert(all([x == whereis[0] for x in whereis[1:]]))
@@ -165,7 +171,19 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     # TODO: check if persistent archive is there for the 1.tar.gz
 
-    chpwd(orig_pwd)  # just to avoid warnings ;)
+    # We should be able to drop everything since available online
+    with swallow_outputs():
+        clean(annex=repo)
+    repo.annex_drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
+
+    raise SkipTest("TODO: wait for https://git-annex.branchable.com/todo/checkpresentkey_without_explicit_remote")
+    # bug was that dropping didn't work since archive was dropped first
+    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+    repo.annex_drop(opj('1', '1 f.txt'))  # should be all kosher
+    repo.annex_get(opj('1', '1 f.txt'))  # and should be able to get it again
+
+    # TODO: verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)

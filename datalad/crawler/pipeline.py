@@ -76,6 +76,19 @@ PIPELINE_OPTS = dict(
     loop=False,        # either to feed results into itself (until None returned)
 )
 
+# which data types depict object being a pipeline
+PIPELINE_TYPES = (list, tuple)
+
+def reset_pipeline(pipeline):
+    """Given a pipeline, traverses its nodes and calls .reset on them if they have such an attribute
+    """
+    if pipeline:
+        for node in pipeline:
+            if isinstance(node, PIPELINE_TYPES):
+                reset_pipeline(node)
+            elif hasattr(node, '__call__') and hasattr(node, 'reset'):
+                lgr.log(2, "Resetting node %s" % node)
+                node.reset()
 
 def run_pipeline(*args, **kwargs):
     """Run pipeline and assemble results into a list
@@ -106,7 +119,7 @@ def _get_pipeline_opts(pipeline):
     return opts, pipeline
 
 
-def xrun_pipeline(pipeline, data=None, stats=None):
+def xrun_pipeline(pipeline, data=None, stats=None, reset=True):
     """Yield results from the pipeline.
 
     """
@@ -118,6 +131,10 @@ def xrun_pipeline(pipeline, data=None, stats=None):
 
     _log("%s", pipeline)
 
+    if reset:
+        _log("Resetting pipeline")
+        reset_pipeline(pipeline)
+
     # just for paranoids and PEP8-disturbed, since theoretically every node
     # should not change the data, so having default {} should be sufficient
     data = data or {}
@@ -126,7 +143,7 @@ def xrun_pipeline(pipeline, data=None, stats=None):
         if stats is not None:
             raise ValueError("We were provided stats to use, but data has already datalad_stats")
     else:
-        data['datalad_stats'] = stats or ActivityStats()
+        data = updated(data, {'datalad_stats': stats or ActivityStats()})
 
     if not len(pipeline):
         return
@@ -144,13 +161,19 @@ def xrun_pipeline(pipeline, data=None, stats=None):
     if output not in ('input',  'last-output', 'outputs', 'input+outputs'):
         raise ValueError("Unknown output=%r" % output)
 
+    if opts['loop'] and output == 'input':
+        lgr.debug("Assigning output='last-output' for sub-pipeline since we want to loop until pipeline returns anything")
+        output_sub = 'last-output'
+    else:
+        output_sub = output
+
     log_level = lgr.getEffectiveLevel()
     data_out = None
     while data_to_process:
         _log("processing data. %d left to go", len(data_to_process))
         data_in = data_to_process.pop(0)
         try:
-            for idata_out, data_out in enumerate(xrun_pipeline_steps(pipeline, data_in, output=output)):
+            for idata_out, data_out in enumerate(xrun_pipeline_steps(pipeline, data_in, output=output_sub)):
                 if log_level <= 3:
                         # provide details of what keys got changed
                         # TODO: unify with 2nd place where it was invoked
@@ -201,7 +224,7 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
     if isinstance(node, (list, tuple)):
         lgr.debug("Pipe: %s" % str(node))
         # we have got a step which is yet another entire pipeline
-        pipeline_gen = xrun_pipeline(node, data)
+        pipeline_gen = xrun_pipeline(node, data, reset=False)
         if pipeline_gen:
             # should be similar to as running a node
             data_in_to_loop = pipeline_gen
@@ -211,25 +234,39 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
             # normally, its input would have been provided back
             lgr.log(7, "Pipeline generator %s returned None", node)
             data_in_to_loop = []
+        prev_stats = None  # we do not care to check if entire pipeline drops stats
+                           # since it is done below at the node level
     else:  # it is a "node" which should generate (or return) us an iterable to feed
            # its elements into the rest of the pipeline
         lgr.debug("Node: %s" % node)
+        prev_stats = data.get('datalad_stats', None)  # so we could check if node doesn't dump it
         data_in_to_loop = node(data)
 
     log_level = lgr.getEffectiveLevel()
     data_out = None
     if data_in_to_loop:
         for data_ in data_in_to_loop:
+            if prev_stats is not None:
+                new_stats = data_.get('datalad_stats', None)
+                if new_stats is None or new_stats is not prev_stats:
+                    lgr.debug("Node %s has changed stats to %s from %s. Updating and using previous one",
+                              node, prev_stats, new_stats)
+                    if new_stats is not None:
+                        prev_stats += new_stats
+                    data_['datalad_stats'] = prev_stats
             if log_level <= 4:
                 # provide details of what keys got changed
-                lgr.log(4, "O1: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_))
+                stats_str = data_['datalad_stats'].as_str(mode='line') if 'datalad_stats' in data_ else ''
+                lgr.log(4, "O1: +%s, -%s, ch%s, ch?%s %s", *(_compare_dicts(data, data_) + (stats_str,)))
             if pipeline_tail:
                 lgr.log(7, " pass %d keys into tail with %d elements", len(data_), len(pipeline_tail))
                 lgr.log(5, " passed keys: %s", data_.keys())
                 for data_out in xrun_pipeline_steps(pipeline_tail, data_, output=output):
                     if log_level <= 3:
                         # provide details of what keys got changed
-                        lgr.log(3, "O2: +%s, -%s, ch%s, ch?%s", *_compare_dicts(data, data_out))
+                        # TODO: difference from previous stats!
+                        stats_str = data_['datalad_stats'].as_str(mode='line') if 'datalad_stats' in data_ else ''
+                        lgr.log(3, "O2: +%s, -%s, ch%s, ch?%s %s", *(_compare_dicts(data, data_out) + (stats_str,)))
                     if 'outputs' in output:
                         yield data_out
             else:

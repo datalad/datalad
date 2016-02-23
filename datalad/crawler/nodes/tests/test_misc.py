@@ -7,14 +7,21 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import os
+from os.path import join as opj
 from six import next
 from ..misc import get_disposition_filename
 from ..misc import range_node
 from ..misc import interrupt_if
+from ..misc import skip_if
 from ..misc import func_to_node
 from ..misc import sub
+from ..misc import find_files
+from ..misc import switch
 from ...pipeline import FinishPipeline
-
+from ....tests.utils import with_tree
+from ....utils import updated
+from ...tests.test_pipeline import _out
 from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import ok_generator
@@ -55,6 +62,39 @@ def test_interrupt_if():
     # and that we would interrupt while matching multiple values
     eq_(list(n(tdict)), [tdict])
     assert_raises(FinishPipeline, next, interrupt_if(tdict)(tdict))
+
+    eq_(list(interrupt_if({'v1': 'ye.$'})(tdict)), [tdict])
+    assert_raises(FinishPipeline, next, interrupt_if({'v1': 'ye.$'}, re=True)(tdict))
+
+def test_skip_if():
+    n = skip_if({'v1': 'done'})
+    eq_(list(n(dict(v1='done'))), [])
+    eq_(list(n(dict(v1='not done'))), [{'v1': 'not done'}])
+    eq_(list(n(dict(v1='done', someother=123))), [])
+    tdict = dict(v1='not yet', someother=123)
+    # and that we would interrupt while matching multiple values
+    eq_(list(n(tdict)), [tdict])
+
+    eq_(list(skip_if(tdict)(tdict)), [])
+
+    eq_(list(skip_if({'v1': 'ye.$'})(tdict)), [tdict])
+    eq_(list(skip_if({'v1': 'ye.$'}, re=True)(tdict)), [])
+
+
+def test_skip_if_negate():
+    n = skip_if({'v1': 'done'}, negate=True)
+    eq_(list(n(dict(v1='done'))), [dict(v1='done')])
+    eq_(list(n(dict(v1='not done'))), [])
+    eq_(list(n(dict(v1='done', someother=123))), [dict(v1='done', someother=123)])
+    tdict = dict(v1='done', someother=123)
+    # and that we would interrupt while matching multiple values
+    eq_(list(n(tdict)), [tdict])
+
+    eq_(list(skip_if(tdict, negate=True)(tdict)), [tdict])
+
+    eq_(list(skip_if({'v1': 'don.$'}, negate=True)(tdict)), [])
+    eq_(list(skip_if({'v1': 'don.$'}, re=True, negate=True)(tdict)), [tdict])
+
 
 def test_func_to_node():
     int_node = func_to_node(int)  # node which requires nothing and nothing of output is used
@@ -98,3 +138,62 @@ def test_sub():
             list(s({'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
             [{'url': "http://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"}]
     )
+
+
+@with_tree(tree={'1': '1', '1.txt': '2'})
+def test_find_files(d):
+    assert_equal(sorted(list(sorted(x.items())) for x in find_files('.*', topdir=d)({})),
+                 [[('filename', '1'), ('path', d)], [('filename', '1.txt'), ('path', d)]])
+    assert_equal(list(find_files('.*\.txt', topdir=d)({})), [{'path': d, 'filename': '1.txt'}])
+    assert_equal(list(find_files('notmatchable', topdir=d)({})), [])
+    assert_raises(RuntimeError, list, find_files('notmatchable', topdir=d, fail_if_none=True)({}))
+
+    # and fail_if_none should operate globally i.e. this should be fine
+    ff = find_files('.*\.txt', topdir=d, fail_if_none=True)
+    assert_equal(list(ff({})), [{'path': d, 'filename': '1.txt'}])
+    os.unlink(opj(d, '1.txt'))
+    assert_equal(list(ff({})), [])
+
+
+def test_switch():
+    ran = []
+    def n2(data):
+        for i in range(2):
+            ran.append(len(ran))
+            yield updated(data, {'f2': 'x_%d' % i})
+
+    switch_node = switch(
+        'f1',
+        {
+            1: sub({'f2': {'_': '1'}}),
+            # should be able to consume nodes and pipelines
+            2: [n2],
+        }
+    )
+    out = list(switch_node({'f1': 1, 'f2': 'x_'}))
+    assert_equal(out, [{'f1': 1, 'f2': 'x1'}])
+    assert_equal(ran, [])
+    # but in the 2nd case, the thing is a sub-pipeline so it behaves as such without spitting
+    # out its output
+    out = list(switch_node({'f1': 2, 'f2': 'x_'}))
+    assert_equal(out, _out([{'f1': 2, 'f2': 'x_'}]))
+    assert_equal(ran, [0, 1])  # but does execute just fine
+
+    # if there is a value mapping doesn't exist for, by default would fail
+    data_missing = {'f1': 3, 'f2': 'x_'}
+    assert_raises(KeyError, list, switch_node(data_missing))
+    switch_node.missing = 'skip'
+    assert_equal(list(switch_node(data_missing)), [data_missing])
+    switch_node.missing = 'stop'
+    assert_equal(list(switch_node(data_missing)), [])
+
+    # and if there is a default -- we should be all good
+    switch_node.default = sub({'f2': {'_': '_default'}})
+    assert_equal(list(switch_node(data_missing)), [{'f1': 3, 'f2': 'x_default'}])
+
+    # and if we make it output all outputs, we would get them!
+    switch_node.mapping[2].insert(0, {'output': 'outputs'})
+    out = list(switch_node({'f1': 2, 'f2': 'x_'}))
+    assert_equal(out, _out([{'f1': 2, 'f2': 'x_0'}, {'f1': 2, 'f2': 'x_1'}]))
+
+

@@ -8,8 +8,8 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
-from os.path import join as opj
-from ..files import AnnexFileAttributesDB
+from os.path import join as opj, curdir, sep
+from ..files import PhysicalFileStatusesDB, JsonFileStatusesDB
 
 from ....tests.utils import with_tree
 from ....tests.utils import assert_equal
@@ -23,20 +23,26 @@ from ....support.annexrepo import AnnexRepo
           '2git': 'load',
           'd': {
               'file2.txt': 'load2'
-          }
-    }
-)
-def test_AnnexFileAttributesDB(path):
+          }})
+def _test_AnnexDB(cls, path):
     filepath1 = opj(path, 'file1.txt')
     filep2 = opj('d', 'file2.txt')
     filepath2 = opj(path, filep2)
 
     annex = AnnexRepo(path, create=True)
-    # AnnexFileAttributesDB relies on information in annex so files
+    # PhysicalFileStatusesDB relies on information in annex so files
     # must be committed first
     annex.annex_add('file1.txt')
     annex.git_commit("initial commit")
-    db = AnnexFileAttributesDB(annex=annex)
+    db = cls(annex=annex)
+
+    def set_db_status_from_file(fpath):
+        """To test JsonFileStatusesDB we need to keep updating status stored"""
+        if cls is JsonFileStatusesDB:
+            # we need first to set the status
+            db.set(fpath, db._get_fileattributes_status(fpath))
+
+    set_db_status_from_file('file1.txt')
     status1 = db.get('file1.txt')
     assert(status1.size)
 
@@ -54,15 +60,18 @@ def test_AnnexFileAttributesDB(path):
     os.unlink(filepath1)  # under annex- - we don't have unlock yet and thus can't inplace augment
     with open(filepath1, 'a') as f:
         f.write('+')
+    set_db_status_from_file(filepath1)
     assert(db.is_different('file1.txt', status1))
 
     # we should be able to get status of files out and inside of git
+    set_db_status_from_file('2git')
     status_git1 = db.get('2git')
     annex.git_add('2git')
     annex.git_commit("added 2git")
     assert_equal(db.get('2git'), status_git1)
 
     # we should be able to get status of files with relative path to top dir and abs path
+    set_db_status_from_file(filep2)
     status2 = db.get(filep2)
     status2_full = db.get(filepath2)
     assert_equal(status2, status2_full)
@@ -70,3 +79,39 @@ def test_AnnexFileAttributesDB(path):
     #with chpwd(opj(path, 'd')):
     #    status2_dir = db.get('./file2.txt')
     #    assert_equal(status2, status2_dir)
+
+    # since we asked about each file we added to DB/annex -- none should be
+    # known as "deleted"
+    assert_equal(db.get_obsolete(), [])
+
+    # Possibly save its state to persistent storage
+    #import pdb; pdb.set_trace()
+    db.save()
+
+    # but if we create another db which wasn't queried yet
+    db2 = cls(annex=annex)
+    # all files should be returned
+    assert_equal(
+            set(db2.get_obsolete()),
+            {opj(path, p) for p in ['file1.txt', filep2, '2git']})
+    # and if we query one, it shouldn't be listed as deleted any more
+    status2_ = db2.get(filep2)
+    assert_equal(status2, status2_)
+    assert_equal(
+            set(db2.get_obsolete()),
+            {opj(path, p) for p in ['file1.txt', '2git']})
+
+    # and if we queried with ./ prefix, should work still
+    db2.get(curdir + sep + 'file1.txt')
+    assert_equal(
+            set(db2.get_obsolete()),
+            {opj(path, p) for p in ['2git']})
+
+    # and if we queried with full path, should work still
+    db2.get(opj(path, '2git'))
+    assert_equal(db2.get_obsolete(), [])
+
+def test_AnnexDBs():
+    for cls in (PhysicalFileStatusesDB,
+                JsonFileStatusesDB,):
+        yield _test_AnnexDB, cls

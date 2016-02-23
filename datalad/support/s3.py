@@ -14,10 +14,11 @@ import mimetypes
 
 from os.path import splitext
 
-import keyring
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
+
+from .keyring_ import keyring
 
 from ..dochelpers import exc_str
 
@@ -76,6 +77,15 @@ class VersionedFilesPool(object):
     def reset_version(self, filename):
         self._versions[filename] = 0
 
+def get_key_url(e, schema='http'):
+    """Generate an s3:// or http:// url given a key
+    """
+    if schema == 'http':
+        return "http://{e.bucket.name}.s3.amazonaws.com/{e.name}?versionId={e.version_id}".format(e=e)
+    elif schema == 's3':
+        return "s3://{e.bucket.name}/{e.name}?versionId={e.version_id}".format(e=e)
+    else:
+        raise ValueError(schema)
 
 def prune_and_delete_bucket(bucket):
     """Deletes all the content and then deletes bucket

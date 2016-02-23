@@ -16,6 +16,7 @@ from six.moves.urllib.parse import urlparse
 
 from os.path import dirname, abspath, join as pathjoin
 
+from ..dochelpers import exc_str
 from ..support.configparserinc import SafeConfigParserWithIncludes
 from ..ui import ui
 from ..utils import auto_repr
@@ -23,7 +24,7 @@ from ..utils import assure_list_from_str
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
 from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
-from .aws import S3Authenticator, S3Downloader
+from .s3 import S3Authenticator, S3Downloader
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')
@@ -42,7 +43,7 @@ def resolve_url_to_name(d, url):
 
 
 
-import keyring
+from ..support.keyring_ import keyring
 
 @auto_repr
 class Credential(object):
@@ -81,7 +82,11 @@ class Credential(object):
     @property
     def is_known(self):
         uid = self.uid
-        return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
+        try:
+            return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
+        except Exception as exc:
+            lgr.warning("Failed to query keyring: %s" % exc_str(exc))
+            return False
 
     # should implement corresponding handling (get/set) via keyring module
     def __call__(self):
@@ -235,7 +240,8 @@ class Providers(object):
         For sample configs look into datalad/downloaders/configs/providers.cfg
 
         If files is None, loading is "lazy".  Specify reload=True to force
-        reload
+        reload.  reset_default_providers could also be used to reset the memoized
+        providers
         """
         # lazy part
         if files is None and cls._DEFAULT_PROVIDERS and not reload:
@@ -243,6 +249,7 @@ class Providers(object):
 
         config = SafeConfigParserWithIncludes()
         # TODO: support all those other paths
+        files_orig = files
         if files is None:
             files = glob(pathjoin(dirname(abspath(__file__)), 'configs', '*.cfg'))
         config.read(files)
@@ -276,13 +283,17 @@ class Providers(object):
 
         providers = Providers(list(providers.values()))
 
-        if files is None:
+        if files_orig is None:
             # Store providers for lazy access
             cls._DEFAULT_PROVIDERS = providers
 
         return providers
 
-
+    @classmethod
+    def reset_default_providers(cls):
+        """Resets to None memoized by from_config_files providers
+        """
+        cls._DEFAULT_PROVIDERS = None
 
 
     @classmethod
@@ -362,6 +373,8 @@ class Providers(object):
     def fetch(self, url, *args, **kwargs):
         return self.get_provider(url).get_downloader(url).fetch(url, *args, **kwargs)
 
+    def get_status(self, url, *args, **kwargs):
+        return self.get_provider(url).get_downloader(url).get_status(url, *args, **kwargs)
 
     def needs_authentication(self, url):
         provider = self.get_provider(url, only_nondefault=True)

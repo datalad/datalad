@@ -19,16 +19,18 @@ from ..utils import auto_repr
 _COUNTS = (
     'files', 'urls',
     'add_git', 'add_annex',
-    'skipped', 'overwritten', 'renamed',
+    'skipped', 'overwritten', 'renamed', 'removed',
     'downloaded', 'downloaded_size', 'downloaded_time'
 )
 _LISTS = (
-    'merges',
+    'merges',    # merges which were carried out (from -> to)
+    'versions',  # versions encountered.  Latest would be used for tagging
 )
 _FORMATTERS = {
     # TODO:
-    'downloaded_size' : humanize.naturalsize,
-    'merges': lambda merges: ", ".join('->'.join(merge) for merge in merges)
+    'downloaded_size': humanize.naturalsize,
+    'merges': lambda merges: ", ".join('->'.join(merge) for merge in merges),
+    'versions': lambda versions: ', '.join(versions)
 }
 
 # @auto_repr
@@ -96,9 +98,9 @@ class ActivityStats(object):
             out[k] = out[k] + v
         return out
 
-    def increment(self, k):
+    def increment(self, k, v=1):
         """Helper for incrementing counters"""
-        self._current[k] += 1
+        self._current[k] += v
 
     def _reset_values(self, d, vals={}):
         for c in _COUNTS:
@@ -137,6 +139,7 @@ URLs processed: {urls}
 Files processed: {files}
  skipped: {skipped}
  renamed: {renamed}
+ removed: {removed}
  added to git: {add_git}
  added to annex: {add_annex}
  overwritten: {overwritten}
@@ -158,6 +161,7 @@ Branches merged:
             ("Files processed", "files"),
             (" skipped", "skipped"),
             (" renamed", "renamed"),
+            (" removed", "removed"),
             (" overwritten", "overwritten"),
             (" +git",  "add_git"),
             (" +annex", "add_annex"),

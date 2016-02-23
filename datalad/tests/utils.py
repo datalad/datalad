@@ -27,6 +27,7 @@ import time
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
 from six import reraise
+from six.moves import map
 
 from functools import wraps
 from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
@@ -51,41 +52,6 @@ from . import _TEMP_PATHS_GENERATED
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
 
-try:
-    # TEMP: Just to overcome problem with testing on jessie with older requests
-    # https://github.com/kevin1024/vcrpy/issues/215
-    import vcr.patch as _vcrp
-    import requests as _
-    try:
-        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
-    except ImportError:
-        def returnnothing(*args, **kwargs):
-            return()
-        _vcrp.CassettePatcherBuilder._requests = returnnothing
-
-    from vcr import use_cassette as _use_cassette, VCR as _VCR
-
-    def use_cassette(path, return_body=None, **kwargs):
-        """Adapter so we could create/use custom use_cassette with custom parameters
-        """
-        if return_body is not None:
-            my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
-            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
-        else:
-            return _use_cassette(path, **kwargs)  # just a straight one
-
-except Exception as exc:
-    if not isinstance(exc, ImportError):
-        # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
-        lgr.warning("Failed to import vcr, no cassettes will be available: %s", exc_str(exc, limit=10))
-    # If there is no vcr.py -- provide a do nothing decorator for use_cassette
-    def use_cassette(*args, **kwargs):
-        def do_nothing_decorator(t):
-            @wraps(t)
-            def wrapper(*args, **kwargs):
-                return t(*args, **kwargs)
-            return wrapper
-        return do_nothing_decorator
 
 def skip_if_no_module(module):
     try:
@@ -94,20 +60,26 @@ def skip_if_no_module(module):
         raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
 
 
-def create_tree_archive(path, name, load, overwrite=False):
+def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
     dirname = file_basename(name)
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
-    create_tree(full_dirname, load)
+    create_tree(full_dirname, load, archives_leading_dir=archives_leading_dir)
     # create archive
-    compress_files([dirname], name, path=path, overwrite=overwrite)
+    if archives_leading_dir:
+        compress_files([dirname], name, path=path, overwrite=overwrite)
+    else:
+        compress_files(list(map(basename, glob.glob(opj(full_dirname, '*')))),
+                       opj(pardir, name),
+                       path=opj(path, dirname),
+                       overwrite=overwrite)
     # remove original tree
     shutil.rmtree(full_dirname)
 
 
-def create_tree(path, tree):
+def create_tree(path, tree, archives_leading_dir=True):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -123,9 +95,9 @@ def create_tree(path, tree):
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
             if name.endswith('.tar.gz') or name.endswith('.tar'):
-                create_tree_archive(path, name, load)
+                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load)
+                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
             #encoding = sys.getfilesystemencoding()
             #if isinstance(full_name, text_type):
@@ -329,13 +301,13 @@ def ok_file_has_content(path, content):
 #
 
 @optional_args
-def with_tree(t, tree=None, **tkwargs):
+def with_tree(t, tree=None, archives_leading_dir=True, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
         tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
         d = tempfile.mkdtemp(**tkwargs_)
-        create_tree(d, tree)
+        create_tree(d, tree, archives_leading_dir=archives_leading_dir)
         try:
             return t(*(arg + (d,)), **kw)
         finally:

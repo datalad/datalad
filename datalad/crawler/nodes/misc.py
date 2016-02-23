@@ -19,6 +19,8 @@ from six import iteritems, string_types
 from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
 from datalad.utils import updated
 from ..pipeline import FinishPipeline
+from ..pipeline import xrun_pipeline
+from ..pipeline import PIPELINE_TYPES
 from ...utils import auto_repr
 from ...utils import find_files as _find_files
 
@@ -147,10 +149,10 @@ def get_disposition_filename(data):
     """
     yield updated(data, {'filename': get_url_disposition_filename(data['url'])})
 
-class interrupt_if(object):
-    """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
-
-    def __init__(self, values):
+class _act_if(object):
+    """Base class for nodes which would act if input data matches specified values
+    """
+    def __init__(self, values, re=False, negate=False):
         """
 
         Parameters
@@ -158,17 +160,49 @@ class interrupt_if(object):
         values: dict
           Key/value pairs to compare arrived data against.  Would raise
           FinishPipeline if all keys have matched target values
+        re: bool, optional
+          If specified values to be treated as regular expression to be
+          searched
+        negate: bool, optional
+          Reverses, so acts (skips, etc) if no match
         """
         self.values = values
+        self.re = re
+        self.negate = negate
 
     def __call__(self, data):
+        comp = re.search if self.re else lambda x, y: x == y
+        matched = True
         for k, v in iteritems(self.values):
-            if not (k in data and v == data[k]):
+            if not (k in data and comp(v, data[k])):
                 # do nothing and pass the data further
-                yield data
-                # and quit
-                return
+                matched = False
+                break
+
+        if matched != self.negate:
+            for v in self._act(data):
+                yield v
+        else:
+            yield data
+
+    def _act(self):
+        raise NotImplementedError
+
+
+@auto_repr
+class interrupt_if(_act_if):
+    """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
+
+    def _act(self, data):
         raise FinishPipeline
+
+@auto_repr
+class skip_if(_act_if):
+    """Skip (do not yield anything) further pipeline processing whenever obtained data matches provided value(s)"""
+
+    def _act(self, data):
+        return []  # nothing will be yielded etc
+
 
 @auto_repr
 class range_node(object):
@@ -274,11 +308,16 @@ class find_files(object):
           Directory where to search
         dirs: bool, optional
           Either to match directories
+        fail_if_none: bool, optional
+          Fail if none file matched throughout the life-time of this object, i.e.
+          counts through multiple runs (if any run had files matched -- it is ok
+          to have no matched files on subsequent run)
         """
         self.regex = regex
         self.topdir = topdir
         self.dirs = dirs
         self.fail_if_none = fail_if_none
+        self._total_count = 0
 
     def __call__(self, data):
         count = 0
@@ -287,5 +326,66 @@ class find_files(object):
             count += 1
             path, filename = ops(fpath)
             yield updated(data, {'path': path, 'filename': filename})
-        if not count:
+        self._total_count += count
+        if not self._total_count and self.fail_if_none:
             raise RuntimeError("We did not match any file using regex %r" % self.regex)
+
+
+@auto_repr
+class switch(object):
+    """Helper node which would decide which sub-pipeline/node to execute based on values in data
+    """
+
+    def __init__(self, key, mapping, default=None, missing='raise'):
+        """
+        Parameters
+        ----------
+        key: str
+        mapping: dict
+        default: node or pipeline, optional
+          node or pipeline to use if no mapping was found
+        missing: ('raise', 'stop', 'skip'), optional
+          If value is missing in the mapping or key is missing in data
+          (yeah, not differentiating atm), and no default is provided:
+          'raise' - would just raise KeyError, 'stop' - would not yield
+          anything in effect stopping any down processing, 'skip' - would
+          just yield input data
+        """
+        self.key = key
+        self.mapping = mapping
+        self.missing = missing
+        self.default = default
+
+    @property
+    def missing(self):
+        return self._missing
+
+    @missing.setter
+    def missing(self, value):
+        assert(value in {'raise', 'skip', 'stop'})
+        self._missing = value
+
+    def __call__(self, data):
+        # make decision which sub-pipeline
+        try:
+            pipeline = self.mapping[data[self.key]]
+        except KeyError:
+            if self.default is not None:
+                pipeline = self.default
+            elif self.missing == 'raise':
+                raise
+            elif self.missing == 'skip':
+                yield data
+                return
+            elif self.missing == 'stop':
+                return
+
+        if not isinstance(pipeline, PIPELINE_TYPES):
+            # it was a node, return its output
+            gen = pipeline(data)
+        else:
+            gen = xrun_pipeline(pipeline, data)
+
+        # run and yield each result
+        for out in gen:
+            yield out

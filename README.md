@@ -7,7 +7,8 @@ repositories, while fetching data load from the original data providers.
 
 # Status
 
-It is currently in a "prototype" state, i.e. **a mess**.  Codebase is
+It is currently in a heavy initial development mode to establish core
+functionality which could be used by others.  Codebase is
 rapidly growing, functionality is usable for many use-cases but not
 yet officially released to public since its organization and
 configuration will be a subject for a considerable reorganization and
@@ -24,6 +25,8 @@ internals and/or contributing to the project.
 
 * [![Coverage Status](https://coveralls.io/repos/datalad/datalad/badge.png?branch=master)](https://coveralls.io/r/datalad/datalad)
 
+* [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
+
 * [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org)
 
 # Dependencies
@@ -35,7 +38,7 @@ On Debian-based systems we recommend to enable
 backports of recent fixed external modules we depend upon:
 
 ```sh
-apt-get install patool python-bs4 python-git python-joblib python-testtools python-mock python-nose git-annex-standalone
+apt-get install patool python-bs4 python-git python-testtools python-mock python-nose git-annex-standalone
 ```
 
 or otherwise you can use pip to install Python modules

@@ -21,16 +21,20 @@ from ..utils import auto_repr
 from ..utils import assure_dict_from_str
 from ..dochelpers import borrowkwargs, exc_str
 from ..support.network import get_url_straight_filename
-from ..support.network import rfc2822_to_epoch
+from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
 
 from .base import Authenticator
 from .base import BaseDownloader
-from .base import DownloadError, AccessDeniedError
+from .base import DownloadError, AccessDeniedError, TargetFileAbsent
 from ..support.s3 import boto, S3ResponseError
 from ..support.status import FileStatus
 
+import logging
 from logging import getLogger
 lgr = getLogger('datalad.http')
+boto_lgr = logging.getLogger('boto')
+# not in effect at all, probably those are setup later
+#boto_lgr.handlers = lgr.handlers  # Use our handlers
 
 __docformat__ = 'restructuredtext'
 
@@ -51,11 +55,21 @@ class S3Authenticator(Authenticator):
         credentials = credential()
         if not boto:
             raise RuntimeError("%s requires boto module which is N/A" % self)
+
+        # Shut up boto if we do not care to listen ;)
+        boto_lgr.setLevel(
+            logging.CRITICAL
+            if lgr.getEffectiveLevel() > 1
+            else logging.DEBUG
+        )
+
         conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
 
         try:
             bucket = conn.get_bucket(bucket_name)
         except S3ResponseError as e:
+            if e.error_code == 'AccessDenied':
+                raise AccessDeniedError(exc_str(e))
             lgr.debug("Cannot access bucket %s by name", bucket_name)
             all_buckets = conn.get_all_buckets()
             all_bucket_names = [b.name for b in all_buckets]
@@ -78,6 +92,13 @@ class S3Downloader(BaseDownloader):
     @borrowkwargs(BaseDownloader)
     def __init__(self, **kwargs):
         super(S3Downloader, self).__init__(**kwargs)
+        self._bucket = None
+
+    @property
+    def bucket(self):
+        return self._bucket
+
+    def reset(self):
         self._bucket = None
 
     @classmethod
@@ -117,7 +138,7 @@ class S3Downloader(BaseDownloader):
         self._bucket = self.authenticator.authenticate(bucket_name, self.credential)
         return False
 
-    def _get_download_details(self, url):
+    def _get_download_details(self, url, **kwargs):
         bucket_name, url_filepath, params = self._parse_url(url)
         if params:
             newkeys = set(params.keys()) - {'versionId'}
@@ -130,12 +151,18 @@ class S3Downloader(BaseDownloader):
         except S3ResponseError as e:
             raise DownloadError("S3 refused to provide the key for %s from url %s: %s"
                                 % (url_filepath, url, e))
+        if key is None:
+            raise TargetFileAbsent("No key returned for %s from url %s" % (url_filepath, url))
+
         target_size = key.size  # S3 specific
         headers = {
             'Content-Length': key.size,
-            'Content-Disposition': key.name,
-            'Last-Modified': rfc2822_to_epoch(key.last_modified),
+            'Content-Disposition': key.name
         }
+
+        if key.last_modified:
+            headers['Last-Modified'] = rfc2822_to_epoch(key.last_modified)
+
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
@@ -162,6 +189,20 @@ class S3Downloader(BaseDownloader):
         # TODO: possibly return a "header"
         return download_into_fp, target_size, url_filename, headers
 
+    @classmethod
+    def get_key_headers(cls, key, dateformat='rfc2822'):
+        headers = {
+            'Content-Length': key.size,
+            'Content-Disposition': key.name
+        }
+
+        if key.last_modified:
+            # boto would return time string the way amazon returns which returns
+            # it in two different ones depending on how key information was obtained:
+            # https://github.com/boto/boto/issues/466
+            headers['Last-Modified'] = {'rfc2822': rfc2822_to_epoch,
+                                        'iso8601': iso8601_to_epoch}[dateformat](key.last_modified)
+        return headers
 
     @classmethod
     def get_status_from_headers(cls, headers):
@@ -173,3 +214,6 @@ class S3Downloader(BaseDownloader):
             filename=headers.get('Content-Disposition')
         )
 
+    @classmethod
+    def get_key_status(cls, key, dateformat='rfc2822'):
+        return cls.get_status_from_headers(cls.get_key_headers(key, dateformat=dateformat))

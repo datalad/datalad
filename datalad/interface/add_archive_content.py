@@ -67,6 +67,12 @@ class AddArchiveContent(Interface):
             doc="""Flag to move all files directories up, from how they were stored in an archive,
                    if that one contained a number (possibly more than 1 down) single leading
                    directories."""),
+        leading_dirs_depth=Parameter(
+            args=("--leading-dirs-depth",),
+            action="store",
+            type=int,
+            doc="""Maximal depth to strip leading directories to. If not specified (None), no limit"""),
+        # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
@@ -81,7 +87,7 @@ class AddArchiveContent(Interface):
         exclude=Parameter(
             args=("-e", "--exclude"),
             action='append',
-            doc="""Regular expression for filenames which to exclude from being added to annex.
+            doc="""Regular expressions for filenames which to exclude from being added to annex.
             Applied after --rename if that one is specified.  For exact matching, use anchoring.""",
             constraints=EnsureStr() | EnsureNone()
         ),
@@ -142,7 +148,7 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, annex=None, strip_leading_dirs=False,
+    def __call__(self, archive, annex=None, strip_leading_dirs=False, leading_dirs_depth=None,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None):
@@ -198,10 +204,10 @@ class AddArchiveContent(Interface):
         # now we simply need to go through every file in that archive and
         lgr.info("Adding content of the archive %s into annex %s", archive, annex)
 
-        from datalad.customremotes.archive import AnnexArchiveCustomRemote
+        from datalad.customremotes.archives import ArchiveAnnexCustomRemote
         # TODO: shouldn't we be able just to pass existing AnnexRepo instance?
         # TODO: we will use persistent cache so we could just (ab)use possibly extracted archive
-        annexarchive = AnnexArchiveCustomRemote(path=annex.path, persistent_cache=True)
+        annexarchive = ArchiveAnnexCustomRemote(path=annex.path, persistent_cache=True)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = True
         earchive = annexarchive.cache[key_path]
@@ -211,7 +217,7 @@ class AddArchiveContent(Interface):
             lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
             annex.annex_initremote(
                 ARCHIVES_SPECIAL_REMOTE,
-                ['encryption=none', 'type=external', 'externaltype=dl+archive',
+                ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
                  'autoenable=true'])
         else:
             lgr.debug("Special remote {} already exists".format(ARCHIVES_SPECIAL_REMOTE))
@@ -224,7 +230,7 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
-            leading_dir = earchive.get_leading_directory() if strip_leading_dirs else None
+            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth, exclude=exclude) if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
             # dedicated stats which would be added to passed in (if any)
@@ -261,7 +267,7 @@ class AddArchiveContent(Interface):
                     except StopIteration:
                         continue
 
-                url = annexarchive.get_file_url(archive_key=key, file=extracted_file)
+                url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
                 # lgr.debug("mv {extracted_path} {target_file}. URL: {url}".format(**locals()))
 
@@ -279,19 +285,28 @@ class AddArchiveContent(Interface):
                         rmtree(target_file)
                     else:
                         target_file_orig_ = target_file
+
+                        # To keep extension intact -- operate on the base of the filename
+                        p, fn = os.path.split(target_file)
+                        ends_with_dot = fn.endswith('.')
+                        fn_base, fn_ext = file_basename(fn, return_ext=True)
+
                         if existing == 'archive-suffix':
-                            target_file += '-%s' % file_basename(origin)
+                            fn_base += '-%s' % file_basename(origin)
                         elif existing == 'numeric-suffix':
                             pass  # archive-suffix will have the same logic
                         else:
                             raise ValueError(existing)
                         # keep incrementing index in the suffix until file doesn't collide
                         suf, i = '', 0
-                        while lexists(target_file + suf):
-                            lgr.debug("File %s already exists" % (target_file + suf))
+                        while True:
+                            target_file_new = opj(p, fn_base + suf + ('.' if (fn_ext or ends_with_dot) else '') + fn_ext)
+                            if not lexists(target_file_new):
+                                break
+                            lgr.debug("File %s already exists" % target_file_new)
                             i += 1
                             suf = '.%d' % i
-                        target_file += suf
+                        target_file = target_file_new
                         lgr.debug("Original file %s will be saved into %s"
                                   % (target_file_orig_, target_file))
                         # TODO: should we reserve smth like
@@ -311,9 +326,9 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
                           target_file, url, annex_options)
 
-                annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
+                out_json = annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
 
-                if annex.is_under_annex(target_file, batch=True):
+                if 'key' in out_json: # annex.is_under_annex(target_file, batch=True):
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))

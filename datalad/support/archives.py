@@ -13,6 +13,7 @@
 from distutils.version import StrictVersion
 import hashlib
 import patoolib
+import re
 # There were issues, so let's stay consistently with recent version
 assert(StrictVersion(patoolib.__version__) >= "1.7")
 
@@ -401,7 +402,7 @@ class ExtractedArchive(object):
             for name in files:
                 yield opj(root, name)[path_len:]
 
-    def get_leading_directory(self, depth=None):
+    def get_leading_directory(self, depth=None, exclude=None):
         """Return leading directory of the content within archive
 
         Parameters
@@ -409,6 +410,9 @@ class ExtractedArchive(object):
         depth: int or None, optional
           Maximal depth of leading directories to consider.  If None - no upper
           limit
+        exclude: list of str, optional
+          Regular expressions for file/directory names to be excluded from consideration.
+          Applied to the entire relative path to the file as in the archive
 
         Returns
         -------
@@ -418,6 +422,13 @@ class ExtractedArchive(object):
         leading = None
         # returns only files, so no need to check if a dir or not
         for fpath in self.get_extracted_files():
+            if exclude:
+                try:  # since we need to skip outside loop from inside loop
+                    for regexp in exclude:
+                        if re.search(regexp, fpath):
+                            raise StopIteration
+                except StopIteration:
+                    continue
             lpath = fpath.split(opsep)
             dpath = lpath[:-1]  # directory path components
             if leading is None:
@@ -446,7 +457,7 @@ class ExtractedArchive(object):
         self.assure_extracted()
         path = self.get_extracted_filename(afile)
         # TODO: make robust
-        lgr.log(1, "Verifying that %s exists" % abspath(path))
+        lgr.log(2, "Verifying that %s exists" % abspath(path))
         assert exists(path), "%s must exist" % path
         return path
 

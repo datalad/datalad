@@ -298,7 +298,7 @@ import os
 import sys
 import traceback
 # TODO: make limit respect config/environement parameter
-def exc_str(exc=None, limit=1):
+def exc_str(exc=None, limit=None):
     """Enhanced str for exceptions.  Should include original location
 
     Parameters
@@ -306,7 +306,9 @@ def exc_str(exc=None, limit=1):
     Exception to
     """
     out = str(exc)
-
+    if limit is None:
+        # TODO: config logging.exceptions.traceback_levels = 1
+        limit = int(os.environ.get('DATALAD_EXC_STR_TBLIMIT', '1'))
     try:
         exctype, value, tb = sys.exc_info()
         if not exc:

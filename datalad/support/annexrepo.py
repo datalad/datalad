@@ -24,7 +24,8 @@ from subprocess import Popen, PIPE
 
 from functools import wraps
 
-from six import string_types, PY3
+from six import string_types
+from six.moves import filter
 from six.moves.configparser import NoOptionError
 from six.moves.urllib.parse import quote as urlquote
 
@@ -323,7 +324,7 @@ class AnnexRepo(GitRepo):
         # on crippled filesystem for example (think so)?
 
     @normalize_paths
-    def annex_get(self, files, options=None):
+    def annex_get(self, files, log_online=True, options=None):
         """Get the actual content of files
 
         Parameters
@@ -338,9 +339,10 @@ class AnnexRepo(GitRepo):
         options = options[:] if options else []
 
         # don't capture stderr, since it provides progress display
+        # but if no online logging, then log it
         self._run_annex_command('get', annex_options=options + files,
-                                log_stdout=True, log_stderr=False,
-                                log_online=True, expect_stderr=True)
+                                log_stdout=True, log_stderr=not log_online,
+                                log_online=log_online, expect_stderr=True)
 
     # TODO: Moved from HandleRepo. Just a temporary alias.
     # When renaming is done, melt with annex_get
@@ -362,8 +364,7 @@ class AnnexRepo(GitRepo):
         """
         options = options[:] if options else []
 
-        self._run_annex_command('add', annex_options=options + files,
-                                backend=backend)
+        return list(self._run_annex_command_json('add', args=options + files, backend=backend))
 
     def annex_proxy(self, git_cmd, **kwargs):
         """Use git-annex as a proxy to git
@@ -443,7 +444,15 @@ class AnnexRepo(GitRepo):
                 # Not sure, whether or not this can actually happen
                 raise e
 
-        return out.rstrip(linesep).splitlines()[0]
+        entries = out.rstrip(linesep).splitlines()
+        # filter out the ones which start with (: http://git-annex.branchable.com/bugs/lookupkey_started_to_spit_out___34__debug__34___messages_to_stdout/?updated
+        entries = list(filter(lambda x: not x.startswith('('), entries))
+        if len(entries) > 1:
+            lgr.warning("Got multiple entries in reply asking for a key of a file: %s"
+                        % (str(entries)))
+        elif not entries:
+            raise FileNotInAnnexError("Could not get a key for a file %s -- empty output" % file_)
+        return entries[0]
 
     @normalize_paths
     def file_has_content(self, files):
@@ -618,6 +627,12 @@ class AnnexRepo(GitRepo):
         batch: bool, optional
             initiate or continue with a batched run of annex addurl, instead of just
             calling a single git annex addurl command
+
+        Returns
+        -------
+        dict
+          In batch mode only ATM returns dict representation of json output returned
+          by annex
         """
         options = options[:] if options else []
         git_options = []
@@ -659,6 +674,7 @@ class AnnexRepo(GitRepo):
                         cmd="addurl",
                         msg="Error, annex reported failure for addurl: %s"
                         % str(out_json))
+            return out_json
 
 
     def annex_addurls(self, urls, options=None, backend=None, cwd=None):
@@ -724,14 +740,15 @@ class AnnexRepo(GitRepo):
         return remotes
 
 
-    def _run_annex_command_json(self, command, args=[]):
+    def _run_annex_command_json(self, command, args=[], **kwargs):
         """Run an annex command with --json and load output results into a tuple of dicts
         """
         try:
             # TODO: refactor to account for possible --batch ones
             out, err = self._run_annex_command(
                     command,
-                    annex_options=['--json'] + args)
+                    annex_options=['--json'] + args,
+                    **kwargs)
         except CommandError as e:
             # if multiple files, whereis may technically fail,
             # but still returns correct response
@@ -855,6 +872,7 @@ class AnnexRepo(GitRepo):
         since they might still need to flush their changes into index
         """
         self._batched.close()
+        super(AnnexRepo, self).precommit()
 
     # TODO: oh -- API for this better gets RFed sooner than later!
     #       by overloading commit in GitRepo
@@ -1055,9 +1073,9 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
         i += 1
         if maxlines > 0 and i > maxlines:
             raise IOError("Expected no more than %d lines. So far received: %r" % (maxlines, out))
-        lgr.log(1, "Expecting a line")
+        lgr.log(2, "Expecting a line")
         line = stdout.readline()
-        lgr.log(1, "Received line %r" % line)
+        lgr.log(2, "Received line %r" % line)
         out += line
         if re.match(r'^.*\b(failed|ok)$', line.rstrip()):
             break

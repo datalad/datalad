@@ -12,7 +12,7 @@ import re
 import six.moves.builtins as __builtin__
 import time
 
-from os.path import curdir, basename
+from os.path import curdir, basename, exists, realpath, islink
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
 import logging
@@ -253,12 +253,17 @@ def rmtemp(f, *args, **kwargs):
         lgr.info("Keeping temp file: %s" % f)
 
 
-def file_basename(name):
+def file_basename(name, return_ext=False):
     """
-    Strips up to 2 extensions of length up to 4 characters, so we could get
-    rid of .tar.gz etc
+    Strips up to 2 extensions of length up to 4 characters and starting with alpha
+    not a digit, so we could get rid of .tar.gz etc
     """
-    return re.sub('(\.\S{0,4}){0,2}$', '', basename(name))
+    bname = basename(name)
+    fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
+    if return_ext:
+        return fbname, bname[len(fbname)+1:]
+    else:
+        return fbname
 
 
 if on_windows:
@@ -268,7 +273,7 @@ if on_windows:
         os.utime(filepath, (time.time(), mtime))
 else:
     def lmtime(filepath, mtime):
-        """Set mtime for files, while de-referencing symlinks.
+        """Set mtime for files, while not de-referencing symlinks.
 
         To overcome absence of os.lutime
 
@@ -277,7 +282,16 @@ else:
         from .cmd import Runner
         # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
         smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
+        lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
         Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        rfilepath = realpath(filepath)
+        if islink(filepath) and exists(rfilepath):
+            # trust noone - adjust also of the target file
+            # since it seemed like downloading under OSX (was it using curl?)
+            # didn't bother with timestamps
+            lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
+                    rfilepath, mtime)
+            os.utime(rfilepath, (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
@@ -551,6 +565,64 @@ def swallow_logs(new_level=None):
     finally:
         lgr.handlers, lgr.level = old_handlers, old_level
         adapter.cleanup()
+
+
+try:
+    # TEMP: Just to overcome problem with testing on jessie with older requests
+    # https://github.com/kevin1024/vcrpy/issues/215
+    import vcr.patch as _vcrp
+    import requests as _
+    try:
+        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
+    except ImportError:
+        def returnnothing(*args, **kwargs):
+            return()
+        _vcrp.CassettePatcherBuilder._requests = returnnothing
+
+    from vcr import use_cassette as _use_cassette, VCR as _VCR
+
+    def use_cassette(path, return_body=None, **kwargs):
+        """Adapter so we could create/use custom use_cassette with custom parameters
+
+        Parameters
+        ----------
+        path : str
+          If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
+        """
+        if not isabs(path):  # so it was given as a name
+            path = "fixtures/vcr_cassettes/%s.yaml" % path
+        lgr.debug("Using cassette %s" % path)
+        if return_body is not None:
+            my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
+            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
+        else:
+            return _use_cassette(path, **kwargs)  # just a straight one
+
+except Exception as exc:
+    if not isinstance(exc, ImportError):
+        # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
+        lgr.warning("Failed to import vcr, no cassettes will be available: %s", exc_str(exc, limit=10))
+    # If there is no vcr.py -- provide a do nothing decorator for use_cassette
+    def use_cassette(*args, **kwargs):
+        def do_nothing_decorator(t):
+            @wraps(t)
+            def wrapper(*args, **kwargs):
+                lgr.debug("Not using vcr cassette")
+                return t(*args, **kwargs)
+            return wrapper
+        return do_nothing_decorator
+
+
+@contextmanager
+def externals_use_cassette(path):
+    """Helper to pass instruction via env variables to use specified cassette
+
+    For instance whenever we are testing custom special remotes invoked by the annex
+    but want to minimize their network traffic by using vcr.py
+    """
+    from mock import patch
+    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(path)}):
+        yield
 
 
 #

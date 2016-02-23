@@ -11,6 +11,10 @@
 from .interface.base import update_docstring_with_parameters as _update_docstring
 from .interface.base import get_interface_groups as _get_interface_groups
 from .interface.base import dedent_docstring as _dedent_docstring
+# TODO:  make those lazy!  ATM importing api requires importing nearly everything
+# which causes even e.g. unrelated to distribution parts import rdflib (300ms alone)
+# etc.  Ideally all the bindings/docstrings should be generated upon the first
+# access to them from within api module
 from . import interface as _interfaces
 
 # auto detect all available interfaces and generate a function-based

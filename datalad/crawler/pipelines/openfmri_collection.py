@@ -39,7 +39,8 @@ def pipeline(
         initiate_handle(
             template="openfmri",
             data_fields=['dataset'],
-            branch='incoming',  # there will be archives etc
+            # let's all specs and modifications reside in master
+            # branch='incoming',  # there will be archives etc
             existing='skip'
             # further any additional options
         )

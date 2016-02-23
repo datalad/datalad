@@ -41,7 +41,8 @@ def test_AnnexRepo_instance_from_clone(src, dst):
     # there's already a git-repo at that path and therefore can't clone to `dst`
     with swallow_logs() as cm:
         assert_raises(GitCommandError, AnnexRepo, dst, src)
-        assert("already exists" in cm.out)
+        if git.__version__ != "1.0.2":
+            assert("already exists" in cm.out)
 
 
 @ignore_nose_capturing_stdout
@@ -151,15 +152,17 @@ def test_AnnexRepo_annex_add(src, annex_path):
     f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
-    ar.annex_add(filename)
+    out_json = ar.annex_add(filename)
     if not ar.is_direct_mode():
         assert_true(os.path.islink(filename_abs),
                     "Annexed file is not a link.")
     else:
         assert_false(os.path.islink(filename_abs),
                      "Annexed file is link in direct mode.")
+    assert_in('key', out_json)
     key = ar.get_file_key(filename)
     assert_false(key == '')
+    assert_equal(key, out_json['key'])
     # could test for the actual key, but if there's something
     # and no exception raised, it's fine anyway.
 
@@ -671,6 +674,7 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
     with swallow_outputs() as cmo:
         annex.annex_get(fname)
     key_location = annex.get_contentlocation(key, batch=batch)
+    assert(key_location)
     # they both should point to the same location eventually
     eq_(os.path.realpath(opj(annex.path, fname)),
         os.path.realpath(opj(annex.path, key_location)))
@@ -682,9 +686,10 @@ def _test_AnnexRepo_get_contentlocation(batch, path):
         eq_(os.path.realpath(opj(annex.path, fname)),
             os.path.realpath(opj(annex.path, key_location)))
 
+
 def test_AnnexRepo_get_contentlocation():
-    yield _test_AnnexRepo_get_contentlocation, False
-    yield _test_AnnexRepo_get_contentlocation, True
+    for batch in (False, True):
+        yield _test_AnnexRepo_get_contentlocation, batch
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
