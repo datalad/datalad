@@ -158,7 +158,7 @@ def test_find_files(d):
 def test_switch():
     ran = []
     def n2(data):
-        for i in xrange(2):
+        for i in range(2):
             ran.append(len(ran))
             yield updated(data, {'f2': 'x_%d' % i})
 
