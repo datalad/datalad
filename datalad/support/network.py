@@ -207,33 +207,3 @@ def dlurljoin(u_path, url):
             return os.path.join(u_path, url)
     # TODO: recall where all this dirname came from and bring into the test
     return urljoin(os.path.dirname(u_path) + '/', url)
-
-
-# TODO should it be a node maybe?
-class SimpleURLStamper(object):
-    """Gets a simple stamp about the URL: {url, time, size} of whatever was provided in the header
-    """
-    def __init__(self, mode='full'):
-        self.mode = mode
-
-    def __call__(self, url):
-        # Extracted from above madness
-        # TODO: add mode alike to 'relaxed' where we would not
-        # care about content-disposition filename
-        # http://stackoverflow.com/questions/862173/how-to-download-a-file-using-python-in-a-smarter-way
-        request = Request(url)
-
-        # No traffic compression since we do not know how to identify
-        # exactly either it has to be decompressed
-        # request.add_header('Accept-encoding', 'gzip,deflate')
-        #
-        # TODO: think about stamping etc -- we seems to be redoing
-        # what git-annex does for us already... not really
-        r = retry_urlopen(request)
-        try:
-            r_info = r.info()
-            r_stamp = get_url_response_stamp(url, r_info)
-
-            return dict(mtime=r_stamp['mtime'], size=r_stamp['size'], url=url)
-        finally:
-            r.close()
