@@ -24,14 +24,12 @@ import time
 
 from six import iteritems
 from ...utils import updated
-from ...utils import find_files
 from ...dochelpers import exc_str
 from ...support.s3 import get_key_url
 from ...support.network import iso8601_to_epoch
-from ...support.versions import get_versions
-from ...downloaders.base import DownloadError, UnhandledRedirectError
 from ...downloaders.providers import Providers
 from ...downloaders.s3 import S3Downloader
+from ...downloaders.base import TargetFileAbsent
 from ..dbs.versions import SingleVersionDB
 
 from logging import getLogger
@@ -97,7 +95,11 @@ class crawl_s3(object):
         downloader = providers.get_provider(url).get_downloader(url)
 
         # bucket = provider.authenticator.authenticate(bucket_name, provider.credential)
-        _ = downloader.get_status(url)  # just to authenticate and establish connection
+        try:
+            _ = downloader.get_status(url)  # just to authenticate and establish connection
+        except TargetFileAbsent as exc:
+            lgr.debug("Initial URL %s lead to not something downloader could fetch: %s", url, exc_str(exc))
+            pass
         bucket = downloader.bucket
         assert(bucket is not None)
 
@@ -137,7 +139,10 @@ class crawl_s3(object):
                     # go by name/version_id to be matched and then switch to the next one
                     if (n, vid) == (name_, version_id_):
                         start = i+1  # from the next one
+                        if stats:
+                            stats.increment('skipped')
                         break
+                stats.increment('skipped')
             versions_sorted = versions_sorted[start:]
 
         # a set of items which we have already seen/yielded so hitting any of them again

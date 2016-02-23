@@ -67,8 +67,8 @@ def test_crawl_s3(path):
     # and ATM we can reuse the same cassette
     with externals_use_cassette('test_crawl_s3-pipeline1'):
         out = run_pipeline(pipeline)
-    eq_(out, [{'datalad_stats': ActivityStats()}])
-    eq_(out[0]['datalad_stats'].get_total(), ActivityStats())
+    eq_(out, [{'datalad_stats': ActivityStats(skipped=17)}])
+    eq_(out[0]['datalad_stats'].get_total(), ActivityStats(skipped=17))
 
 
 @use_cassette('test_crawl_s3')
@@ -113,8 +113,8 @@ def test_crawl_s3_commit_versions(path):
         with swallow_logs() as cml:
             out = run_pipeline(pipeline)
             assert_not_in("There is already a tag %s" % target_version, cml.out)
-    eq_(out, [{'datalad_stats': ActivityStats()}])
-    eq_(out[0]['datalad_stats'].get_total(), ActivityStats())  # Really nothing was done
+    eq_(out, [{'datalad_stats': ActivityStats(skipped=17)}])
+    eq_(out[0]['datalad_stats'].get_total(), ActivityStats(skipped=17))  # Really nothing was done
 
 
 # theoretically reusing the same cassette should have worked but doesn't
@@ -160,6 +160,6 @@ def test_crawl_s3_commit_versions_one_at_a_time(path):
     total_stats_all.versions = []
     eq_(total_stats_all,
         # Deletions come as 'files' as well atm
-        ActivityStats(files=17, overwritten=3, downloaded=14, urls=14, add_annex=14, removed=3, downloaded_size=112))
+        ActivityStats(files=17, skipped=72, overwritten=3, downloaded=14, urls=14, add_annex=14, removed=3, downloaded_size=112))
 
 
