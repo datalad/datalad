@@ -327,7 +327,7 @@ def test_openfmri_pipeline1(ind, topurl, outd):
             # since files get removed in incoming, but repreprocessed completely
             # incomming-processed and merged into master -- new commits will come
             # They shouldn't have any difference but still should be new commits
-            assert_in("There is already tag 2.0.0 in the repository", cml.out)
+            assert_in("There is already a tag 2.0.0 in the repository", cml.out)
     eq_(len(out), 1)
     incoming_files = repo.git_get_files('incoming')
     target_incoming_files.remove('ds666_R1.0.0.tar.gz')
