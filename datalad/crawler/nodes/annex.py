@@ -30,6 +30,7 @@ from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
+from ...utils import auto_repr
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
@@ -55,11 +56,12 @@ _call = _runner.call
 _run = _runner.run
 
 # TODO: make use of datalad_stats
+@auto_repr
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
     def __init__(self, template, handle_name=None, collection_name=None,
-                 path=None, branch=None,
+                 path=None, branch=None, backend=None,
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
@@ -75,6 +77,10 @@ class initiate_handle(object):
           default path for all new handles (DATALAD_CRAWL_COLLECTIONSPATH)
         branch : str, optional
           Which branch to initialize
+        backend : str, optional
+          Supported by git-annex backend.  By default (if None specified),
+          it is MD5E backend to improve compatibility with filesystems
+          having a relatively small limit for a maximum path size
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
           the handle crawling options -- would be passed into the corresponding
@@ -95,6 +101,9 @@ class initiate_handle(object):
         self.existing = existing
         self.path = path
         self.branch = branch
+        # TODO: config.crawl.default_backend = 'MD5E'
+        # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
+        self.backend = backend or 'MD5E'
 
     def _initiate_handle(self, path, name):
         lgr.info("Initiating handle %s" % name)
@@ -107,10 +116,11 @@ class initiate_handle(object):
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creater"
         return HandleRepo(
-                       path,
-                       direct=cfg.getboolean('crawl', 'init direct', default=False),
-                       name=name,
-                       create=True)
+            path,
+            direct=cfg.getboolean('crawl', 'init direct', default=False),
+            name=name,
+            backend=self.backend,
+            create=True)
 
     def _save_crawl_config(self, handle_path, name, data):
         lgr.debug("Creating handle configuration for %s" % name)

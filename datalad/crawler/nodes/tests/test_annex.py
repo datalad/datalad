@@ -19,9 +19,11 @@ from ....tests.utils import with_tree, serve_path_via_http
 from ....tests.utils import ok_file_under_git
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import assert_cwd_unchanged
+from ....tests.utils import put_file_under_git
 from ...pipeline import load_pipeline_from_config
 from ....consts import CRAWLER_META_CONFIG_PATH, DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ....support.stats import ActivityStats
+from ....support.annexrepo import AnnexRepo
 
 @with_tempfile(mkdir=True)
 def test_initialize_handle(path):
@@ -33,6 +35,12 @@ def test_initialize_handle(path):
     crawl_cfg = opj(handle_path, CRAWLER_META_CONFIG_PATH)
     ok_(exists, crawl_cfg)
     pipeline = load_pipeline_from_config(crawl_cfg)
+
+    # by default we should initiate to MD5E backend
+    f = opj(handle_path, 'test.dat')
+    annex = put_file_under_git(f, content="test", annexed=True)
+    eq_(annex.get_file_backend(f), 'MD5E')
+
     raise SkipTest("TODO much more")
 
 
