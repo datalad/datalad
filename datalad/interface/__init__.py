@@ -19,6 +19,7 @@ from .create_handle import CreateHandle
 from .register_collection import RegisterCollection
 from .add_handle import AddHandle
 from .install_handle import InstallHandle
+from .POC_install import POCInstallHandle
 from .unregister_collection import UnregisterCollection
 from .list_collections import ListCollection
 from .list_handles import ListHandles
@@ -61,6 +62,7 @@ _group_handle = (
         CreateHandle,
         AddHandle,
         InstallHandle,
+        POCInstallHandle,
         UninstallHandle,
         ListHandles,
         Get,

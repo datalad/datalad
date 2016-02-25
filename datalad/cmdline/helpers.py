@@ -227,6 +227,7 @@ from os.path import join as opj
 
 dirs = AppDirs("datalad", "datalad.org")
 
+
 def get_datalad_master():
     """Return "master" collection on which all collection operations will be done
     """
@@ -240,6 +241,27 @@ def get_datalad_master():
         env_path or opj(dirs.user_data_dir, DATALAD_COLLECTION_NAME),
         create=True
     )
+
+
+def POC_get_datalad_master():
+    """Return "master" handle.
+
+    Note
+    ----
+    This is a temporary version of the above get_datalad_master, marked by the prefix POC.
+     Not for general use in datalad yet.
+    """
+
+    from ..support.gitrepo import GitRepo
+    from ..consts import DATALAD_COLLECTION_NAME
+
+    # Allow to have "master" collection be specified by environment variable
+    env_path = os.environ.get('DATALAD_COLLECTION_PATH', None)
+    return GitRepo(
+        env_path or opj(dirs.user_data_dir, "POC_", DATALAD_COLLECTION_NAME),
+        create=True
+    )
+
 
 
 # Notes:
