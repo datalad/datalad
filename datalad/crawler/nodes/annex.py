@@ -522,7 +522,8 @@ class Annexificator(object):
                     self.repo.git_checkout(branch, options="--orphan")
                     if self.repo.dirty:
                         self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
-                    backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
+                    backends = self.repo.default_backends
+                    backend = backends[0] if backends else cfg.get('crawl', 'default backend', default='MD5E')
                     if backend:
                         put_file_under_git(self.repo.path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
                 else:
