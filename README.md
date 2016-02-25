@@ -49,7 +49,7 @@ described in [CONTRIBUTING.md](CONTRIBUTING.md) and possibly use tox and new
 versions of dependencies from pypy:
 
 ```sh
-apt-get install -y -q python-{dev,testtools,nose,pip,vcr,virtualenv} python-tox
+apt-get install -y -q python-{dev,httpretty,testtools,nose,pip,vcr,virtualenv} python-tox
 # Some libraries which might be needed for installing via pip
 apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
 ```
