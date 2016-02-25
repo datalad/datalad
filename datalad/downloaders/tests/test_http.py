@@ -26,6 +26,8 @@ from ...tests.utils import with_fake_cookies_db
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
+    if PY3:
+        raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
     import httpretty
 except ImportError:
     class NoHTTPPretty(object):
