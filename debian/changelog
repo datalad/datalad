@@ -1,3 +1,9 @@
+datalad (0.1+git573-gec0b018-1) neurodebian-devel; urgency=medium
+
+  * New upstream snapshot from 0.1-573-gec0b018
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 25 Feb 2016 12:33:14 -0500
+
 datalad (0.1-1) neurodebian-devel; urgency=medium
 
   * Fresh upstream release with a sketch of publishing functionality
