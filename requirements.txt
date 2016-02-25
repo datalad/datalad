@@ -35,10 +35,7 @@ beautifulsoup4
 nose>=1.3.4
 testtools
 vcrpy
-#httpretty >= 0.8.13 may be even more since python 3.4,5 is not supported
-# https://github.com/gabrielfalcao/HTTPretty/archive/master.zip
-# until https://github.com/gabrielfalcao/HTTPretty/pull/279 gets a resolution
-https://github.com/yarikoptic/HTTPretty/archive/bf-3.x.zip
+httpretty>=0.8.14
 msgpack-python
 
 # -- Optional for Testing
