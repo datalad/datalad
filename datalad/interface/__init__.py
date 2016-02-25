@@ -19,7 +19,6 @@ from .create_handle import CreateHandle
 from .register_collection import RegisterCollection
 from .add_handle import AddHandle
 from .install_handle import InstallHandle
-from .POC_install import POCInstallHandle
 from .unregister_collection import UnregisterCollection
 from .list_collections import ListCollection
 from .list_handles import ListHandles
@@ -44,6 +43,13 @@ from .add_archive_content import AddArchiveContent
 from .download_url import DownloadURL
 from .ls import Ls
 from .clean import Clean
+from .POC_install import POCInstallHandle
+from .POC_add import POCAdd
+from .POC_create import POCCreate
+from .POC_move import POCMove
+from .POC_remove import POCRemove
+from .POC_update import POCUpdate
+from .POC_uninstall import POCUninstall
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -60,14 +66,20 @@ _group_handle = (
     'Commands for handle operations',
     [
         CreateHandle,
+        POCCreate,
         AddHandle,
+        POCAdd,
+        POCRemove,
         InstallHandle,
         POCInstallHandle,
         UninstallHandle,
+        POCUninstall,
+        POCMove,
         ListHandles,
         Get,
         Drop,
         UpgradeHandle,
+        POCUpdate,
         PublishHandle,
     ])
 

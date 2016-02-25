@@ -65,6 +65,8 @@ class POCInstallHandle(Interface):
 
         if exists(url):
             url = abspath(expandvars(expanduser(url)))
+
+        # TODO: rollback on exception during git calls?
         master._git_custom_command('', ["git", "submodule", "add", url, name])
         master._git_custom_command('', ["git", "submodule", "update", "--init",
                                         "--recursive" if recursive else '',
