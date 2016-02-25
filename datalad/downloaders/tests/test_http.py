@@ -25,13 +25,13 @@ from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
-if PY3:
+try:
+    import httpretty
+except ImportError:
     class NoHTTPPretty(object):
        __bool__ = __nonzero__ = lambda s: False
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
-else:
-    import httpretty
 
 from mock import patch
 from ...tests.utils import assert_in
