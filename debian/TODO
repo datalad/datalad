@@ -1,0 +1,6 @@
+Please lintian
+
+W: datalad: package-installs-into-obsolete-dir etc/bash_completion.d/ : ^etc/bash_completion.d/ -> usr/share/bash-completion/completions (see also https://bugs.debian.org/776954)
+W: datalad: package-installs-into-obsolete-dir etc/bash_completion.d/datalad : ^etc/bash_completion.d/ -> usr/share/bash-completion/completions (see also https://bugs.debian.org/776954)
+W: datalad: binary-without-manpage usr/bin/git-annex-remote-datalad
+W: datalad: binary-without-manpage usr/bin/git-annex-remote-datalad-archives

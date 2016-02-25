@@ -29,8 +29,7 @@ Build-Depends:
  python-setuptools,
  python-six (>= 1.8.0~),
  python-sparqlwrapper,
- python-testtools,
- python-vcr
+ python-testtools
 Standards-Version: 3.9.7
 Homepage: http://datalad.org
 Vcs-Git: git://github.com/datalad/datalad -b debian
@@ -42,7 +41,8 @@ Section: science
 Depends:
  python-argcomplete,
  python-datalad (= ${binary:Version}),
- ${misc:Depends}
+ ${misc:Depends},
+ ${python:Depends}
 Description: data files crawler and data distribution
  DataLad is a data distribution providing access to a wide range of
  data resources already available online (initially aiming for
@@ -79,14 +79,15 @@ Depends:
  ${python:Depends}
 Recommends:
  patool,
- python-bs4,
  python-html5lib,
  python-httpretty,
  python-msgpack,
  python-nose,
  python-numpy,
  python-scrapy,
- python-testtools,
+ python-testtools
+Suggests:
+ python-bs4,
  python-vcr
 Description: data files crawler and data distribution (Python 2)
  DataLad is a data distribution providing access to a wide range of
