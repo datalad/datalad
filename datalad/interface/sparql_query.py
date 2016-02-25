@@ -22,8 +22,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf
 from datalad.support.collectionrepo import CollectionRepo
 from datalad.support.collection import MetaCollection
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class SPARQLQuery(Interface):
@@ -41,12 +40,15 @@ class SPARQLQuery(Interface):
             constraints=EnsureListOf(string_types) | EnsureNone()))
 
     def __call__(self, query, collections=None):
+        """
+        Returns
+        -------
+        rdflib.query.QueryResult
+        """
 
         # TODO: sanity checks for the query;
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'),
-                                      name="local")
+        local_master = get_datalad_master()
 
         be_list = list()
         if collections == [] or collections is None:
@@ -83,3 +85,6 @@ class SPARQLQuery(Interface):
                 out += "\t%s" % col
             out.lstrip('\t')
             print(out)
+
+        if not self.cmdline:
+            return results

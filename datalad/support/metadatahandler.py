@@ -61,8 +61,8 @@ class MetadataImporter(object):
         descriptor'. You can add additional graphs to the `self._graphs`
         dictionary.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         target_class: str
           the type of repo, the metadata is to be imported to;
           either "Handle" or "Collection"
@@ -127,8 +127,8 @@ class MetadataImporter(object):
     def get_graphs(self):
         """gets the imported data
 
-        Returns:
-        --------
+        Returns
+        -------
         dict of rdflib.Graph
         """
         return self._graphs
@@ -145,8 +145,8 @@ class MetadataImporter(object):
         repository only, for example.
         This means: Either `files` or `data` has to be provided by the caller.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: str or list of str
           Either a path to the file or directory to be imported or a list
           containing paths to the files.
@@ -173,8 +173,8 @@ class MetadataImporter(object):
         The default implementation just stores every graph stored in
         `self._graphs['key']` in the file 'key.ttl'.
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         path: str
           path to the directory to save the metadata in.
         """
@@ -214,8 +214,8 @@ class PlainTextImporter(MetadataImporter):
 
 
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         files: str or list of str
           a path to the file or directory to be imported or a list containing
           such paths.
@@ -291,20 +291,31 @@ class PlainTextImporter(MetadataImporter):
                 continue
             parts = author.split()
 
+            # TODO: This has to become at least as flexible as api.describe:
             # create author's node:
-            if parts[-1].startswith('<') and parts[-1].endswith('>'):
-                node = URIRef(parts[-1][1:-1])
-                name = Literal(author[0:-len(parts[-1])-1].strip())
-            else:
+            node = None
+            name = None
+            for part in parts:
+                if part.startswith('<') and part.endswith('>'):
+                    if '@' in part:  # rudimentary check for email
+                        node = URIRef("mailto:" + part[1:-1])
+                    else:
+                        node = URIRef(part[1:-1])
+                    name = Literal(author[0:-len(part)-1].strip())
+                    break
+
+            if node is None:
                 node = EMP.__getattr__("author" + str(i))
                 i += 1
+            if name is None:
                 name = Literal(author.strip())
 
             self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
                                                         PROV.Person))
             self._graphs[REPO_STD_META_FILE[0:-4]].add((node, RDF.type,
                                                         FOAF.Person))
-            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, FOAF.name, name))
+            self._graphs[REPO_STD_META_FILE[0:-4]].add((node, FOAF.name,
+                                                        Literal(name)))
 
             # the actual 'authoring' relation:
             self._graphs[REPO_STD_META_FILE[0:-4]].add((self._about_uri,
@@ -369,6 +380,8 @@ class CustomImporter(MetadataImporter):
 
             for file_ in files:
                 if not isdir(file_):
+                    if not file_.endswith(".ttl"):
+                        continue
                     self._graphs[basename(file_).rstrip('.ttl')] = \
                         Graph().parse(file_, format="turtle")
 
@@ -380,8 +393,8 @@ class CustomImporter(MetadataImporter):
     def set_graphs(self, graphs):
         """sets the metadata
 
-        Parameters:
-        -----------
+        Parameters
+        ----------
         graphs: dict of rdflib.Graph
             the keys are expected to be the filenames without ending as
             returned by `get_graphs`.

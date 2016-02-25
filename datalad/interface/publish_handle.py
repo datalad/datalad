@@ -14,19 +14,22 @@ __docformat__ = 'restructuredtext'
 
 from os import curdir
 from os.path import exists, join as opj, abspath, expandvars, expanduser, isdir
+
+from six import string_types
+
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
 from ..support.handlerepo import HandleRepo
+from ..support.handle_backends import HandleRepoBackend
+from ..support.handle import Handle
 from ..support.annexrepo import AnnexRepo
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..consts import REPO_STD_META_FILE, HANDLE_META_DIR
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from ..cmdline.helpers import get_datalad_master
 
 
 class PublishHandle(Interface):
@@ -65,6 +68,11 @@ class PublishHandle(Interface):
 
     def __call__(self, target, handle=curdir, url=None, remote=None,
                  ssh_options=None):
+        """
+        Returns
+        -------
+        Handle
+        """
 
         local_handle_repo = get_repo_instance(
             abspath(expandvars(expanduser(handle))), HandleRepo)
@@ -120,7 +128,6 @@ class PublishHandle(Interface):
         local_handle_repo.git_remote_add(remote, url)
 
         # TODO: may be use git annex testremote?
-
         # 1. push local branch "publish" to remote branch "master"
         # we want to push to master, so a different branch has to be checked
         # out in target; in general we can't explicitly allow for the local
@@ -137,13 +144,15 @@ class PublishHandle(Interface):
         local_handle_repo.git_push("%s +git-annex:git-annex" % remote)
 
         # 3. copy locally available files:
-        annex_ssh = "-c annex.ssh-options=\"%s\"" % ssh_options \
-            if ssh_options is not None else ''
+        if ssh_options and not isinstance(ssh_options, string_types):
+            ssh_options = ' '.join(ssh_options)
+        annex_ssh = ['-c', 'annex.ssh-options=%s' % ssh_options] \
+            if ssh_options is not None \
+            else []
         for file_ in local_handle_repo.get_annexed_files():
             if local_handle_repo.file_has_content(file_):
-                cmd_str = "git annex copy %s %s --to=%s" % (annex_ssh, file_,
-                                                            remote)
-                local_handle_repo._annex_custom_command('', cmd_str)
+                cmd = ["git", "annex", "copy"] + annex_ssh + [file_, "--to=%s" % remote]
+                local_handle_repo._annex_custom_command('', cmd, expect_stderr=True)
 
         # Note: Currently, this is only relevant, when publish-handle is called
         # directly (with local target). Obviously doesn't work remotely!
@@ -153,3 +162,6 @@ class PublishHandle(Interface):
 
         # finally:
         local_handle_repo.git_checkout("master")
+
+        if not self.cmdline:
+            return HandleRepoBackend(local_handle_repo, remote + "/master")

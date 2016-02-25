@@ -1,4 +1,10 @@
 #!/bin/sh
+
+set -e
+set -u
+
+# THIS THING MUST BE SILENT on stdout so that git process wouldn't take it as its input
+# echo Running "$@"
 if test "$1" = "-p"
 then
 	PORT=:$2

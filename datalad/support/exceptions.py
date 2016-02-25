@@ -10,7 +10,6 @@
 """
 
 
-#
 class CommandError(RuntimeError):
     """Thrown if a command call fails.
     """
@@ -30,6 +29,11 @@ class CommandError(RuntimeError):
         to_str += ".\n%s" % self.msg
         return to_str
 
+class AnnexBatchCommandError(CommandError):
+    """Thrown if a batched command to annex fails
+
+    """
+    pass
 
 class CommandNotAvailableError(CommandError):
     """Thrown if a command is not available due to certain circumstances.
@@ -61,5 +65,12 @@ class FileNotInRepositoryError(FileNotInAnnexError):
 
 class CollectionBrokenError(Exception):
     """Thrown if a collection repository is somehow invalid
+    """
+    pass
+
+
+class ReadOnlyBackendError(Exception):
+    """Thrown if a Collection or Handle is trying to write to a read-only
+    backend.
     """
     pass

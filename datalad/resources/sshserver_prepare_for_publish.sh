@@ -38,7 +38,7 @@ printf "DATALAD_COLLECTION_REPO_%s: post-update hook DATALAD_END\n" "$COL_REPO_N
 
 # may be there is a better solution, but for now, checkout a temporary branch
 # to allow pushing to master
-git -C "$COL_REPO_NAME" checkout -b TEMP
+git -C "$COL_REPO_NAME" checkout -q -b TEMP
 printf "DATALAD_COLLECTION_REPO_%s: checkout_tmp DATALAD_END\n" "$COL_REPO_NAME"
 
 for name in "$@"; do
@@ -51,7 +51,7 @@ for name in "$@"; do
     git annex init $git_annex_init_options \
         && printf "DATALAD_HANDLE_REPO_%s: annex_init DATALAD_END\nDATALAD_HANDLE_REPO_INFO_%s: %s DATALAD_END\n" \ "$name" "$name" "`git annex info`" \
         || printf "DATALAD_HANDLE_REPO_%s: annex_init_error DATALAD_END\n" "$name"
-    git checkout -b TEMP
+    git checkout -q -b TEMP
     printf "DATALAD_HANDLE_REPO_%s: checkout_tmp DATALAD_END\n" "$name"
     cd "$curdir"
 done

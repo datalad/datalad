@@ -15,15 +15,23 @@ __docformat__ = 'restructuredtext'
 from mock import patch
 from ...api import get
 
-from ...tests.utils import with_testrepos
+from ...support.annexrepo import AnnexRepo
+#from ...tests.utils import with_testrepos
+from ...tests.utils import with_tempfile
 from ...tests.utils import assert_cwd_unchanged
 from ...utils import chpwd
 
-@with_testrepos('basic', flavors=['clone'])
+#@with_testrepos('basic_annex', flavors=['clone'], count=1)
+@with_tempfile(mkdir=True)
 @assert_cwd_unchanged(ok_to_chdir=True)
 @patch('datalad.support.annexrepo.AnnexRepo.annex_get')
 def test_get_basic(repo_path, annex_get_mocked):
+    hndl = AnnexRepo(repo_path, create=True)
     chpwd(repo_path)
+    with open('test-annex.dat', 'w') as f:
+        f.write('123')
+    hndl.annex_add('test-annex.dat')
+    hndl.commit("test")
     get(['test-annex.dat'])
     annex_get_mocked.assert_called_with(['test-annex.dat'])
 

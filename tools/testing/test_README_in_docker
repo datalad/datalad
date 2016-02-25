@@ -1,0 +1,60 @@
+#!/bin/bash
+#emacs: -*- mode: shell-script; c-basic-offset: 4; tab-width: 4; indent-tabs-mode: t -*- 
+#ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+# Helper to generate a Docker instance mapping user uder docker into your USER/UID/GID
+# and allowing to run tox within that clean automatically generated according to
+# README.md's apt-get lines environment
+#
+set -e
+#set -x
+set -u
+
+DL_DIST=$1
+
+topdir=$(realpath `dirname $0`)
+dockerfile=$topdir/test_README_in_docker-Dockerfile
+# echo "D: $DL_APT"
+sed -e "s,DL_DIST,$DL_DIST,g" \
+    -e "s,DL_USER,$USER,g" \
+    -e "s,DL_UID,`id -u`,g" \
+    -e "s,DL_GID,`id -g`,g" \
+    -e "s,DL_GIT_USER_EMAIL,`git config --get user.email`,g" \
+    -e "s,DL_GIT_USER_NAME,`git config --get user.name`,g" \
+    $dockerfile.in >| $dockerfile
+
+#DL_APT=$(grep '^\(apt-get\|pip\)' ./../../README.md)
+
+grep '^apt-get ' ./../../README.md | sed -e 's|python-{|python{,3}-{|g' \
+| while read aptline; do
+    sed -i -e "s|\(\(.*\)DL_APT\(.*\)\)|\2$aptline\3\n\1|g" $dockerfile
+    :
+done
+sed -e '/DL_APT/d' -i $dockerfile
+
+tag=datalad:test_README_${USER}_$DL_DIST
+echo "I: tag $tag"
+if docker images | grep -q datalad.*test_README.*$DL_DIST; then
+    echo "I: tag already exists -- skipping rebuilding"
+else
+    docker build -t $tag -f $dockerfile . #&& rm Dockerfile
+    #docker build --no-cache=True -t $tag -f $dockerfile . #&& rm Dockerfile
+fi
+
+topgitdir=`realpath ${topdir}/../..`
+echo "I: top git dir $topgitdir"
+
+tox="$topgitdir/.tox"
+if [ -e "$tox" ]; then
+    echo "I: removing existing tox under $tox"
+    rm -r $tox
+fi
+
+echo "I: running tox within docker"
+docker run -it --rm=true -v $topgitdir:/home/$USER/datalad $tag tox --sitepackages

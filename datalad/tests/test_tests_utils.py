@@ -13,11 +13,16 @@ import os
 import random
 import traceback
 
-from bs4 import BeautifulSoup
+try:
+    # optional direct dependency we might want to kick out
+    import bs4
+except ImportError:
+    bs4 = None
+
 from glob import glob
 from os.path import exists, join as opj, basename
 
-from six import PY2
+from six import PY2, PY3
 from six import text_type
 from six.moves.urllib.request import urlopen
 
@@ -34,10 +39,13 @@ from .utils import eq_, ok_, assert_false, ok_startswith, nok_startswith, \
     on_windows, assert_raises, assert_cwd_unchanged, serve_path_via_http, \
     ok_symlink, assert_true, ok_good_symlink, ok_broken_symlink
 
+from .utils import ok_generator
 from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import run_under_dir
+from .utils import use_cassette
+from .utils import skip_if
 
 #
 # Test with_tempfile, especially nested invocations
@@ -98,8 +106,8 @@ def test_with_testrepos():
     check_with_testrepos()
 
     eq_(len(repos),
-        2 if on_windows # TODO -- would fail now in DTGALAD_TESTS_NONETWORK mode
-          else (3 if os.environ.get('DATALAD_TESTS_NONETWORK') else 4))  # local, local-url, clone, network
+        2 if on_windows # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
+          else (18 if os.environ.get('DATALAD_TESTS_NONETWORK') else 19))  # local, local-url, clone, network
 
     for repo in repos:
         if not (repo.startswith('git://') or repo.startswith('http')):
@@ -227,6 +235,20 @@ def test_nok_startswith():
     assert_raises(AssertionError, nok_startswith, 'abc', 'a')
     assert_raises(AssertionError, nok_startswith, 'abc', 'abc')
 
+def test_ok_generator():
+    def func(a, b=1):
+        return a+b
+    def gen(a, b=1):
+        yield a+b
+    # not sure how to determine if xrange is a generator
+    if PY2:
+        assert_raises(AssertionError, ok_generator, xrange(2))
+    assert_raises(AssertionError, ok_generator, range(2))
+    assert_raises(AssertionError, ok_generator, gen)
+    ok_generator(gen(1))
+    assert_raises(AssertionError, ok_generator, func)
+    assert_raises(AssertionError, ok_generator, func(1))
+
 
 def _test_assert_Xwd_unchanged(func):
     orig_cwd = os.getcwd()
@@ -341,7 +363,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         u = urlopen(url)
         assert_true(u.getcode() == 200)
         html = u.read()
-        soup = BeautifulSoup(html, "html.parser")
+        soup = bs4.BeautifulSoup(html, "html.parser")
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
 
@@ -350,6 +372,8 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         html = u.read().decode()
         assert(test_txt == html)
 
+    if bs4 is None:
+        raise SkipTest("bs4 is absent")
     test_path_and_url()
 
 
@@ -382,7 +406,7 @@ def test_assert_re_in():
     assert_re_in("ab", ("", "abc", "laskdjf"))
     assert_raises(AssertionError, assert_re_in, "ab$", ("ddd", ""))
 
-    # shouldn't "match" the emty list
+    # shouldn't "match" the empty list
     assert_raises(AssertionError, assert_re_in, "", [])
 
 
@@ -398,6 +422,19 @@ def test_skip_if_no_network():
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
+
+def test_skip_if():
+
+    with assert_raises(SkipTest):
+        @skip_if(True)
+        def f():
+            raise AssertionError("must have not been ran")
+        f()
+
+    @skip_if(False)
+    def f():
+        return "magical"
+    eq_(f(), 'magical')
 
 
 @assert_cwd_unchanged
@@ -420,3 +457,24 @@ def test_run_under_dir(d):
     assert_raises(AssertionError, f, 1, 3)
     eq_(getpwd(), orig_pwd)
     eq_(os.getcwd(), orig_cwd)
+
+
+def test_use_cassette_if_no_vcr():
+    # just test that our do nothing decorator does the right thing if vcr is not present
+    skip = False
+    try:
+        import vcr
+        skip = True
+    except ImportError:
+        pass
+    except:
+        # if anything else goes wrong with importing vcr, we still should be able to
+        # run use_cassette
+        pass
+    if skip:
+        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
+    @use_cassette("some_path")
+    def checker(x):
+        return x + 1
+
+    eq_(checker(1), 2)

@@ -17,18 +17,21 @@ from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..support.handlerepo import HandleRepo
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class Update(Interface):
     """Update information from a remote repository.
+
+    Gets information about changes from remote repositories. These are
+    registered collections or the original source repositories of your
+    installed handles, for example.
 
     Examples:
 
@@ -56,8 +59,7 @@ class Update(Interface):
 
         # TODO: use name of local master, instead of --all option!
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if key == curdir:
             try:

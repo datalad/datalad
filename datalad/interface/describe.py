@@ -17,22 +17,42 @@ from os.path import exists, join as opj, isfile
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.collection import Collection
+from datalad.support.handle import Handle
 from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend, \
+    CollectionRepoHandleBackend
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
-    EMP, RDF, PAV, PROV, FOAF, DCTERMS
+    EMP, RDF, PAV, PROV, FOAF, DCTERMS, RDFS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
 from ..consts import HANDLE_META_DIR, REPO_STD_META_FILE
-from appdirs import AppDirs
-from six.moves.urllib.parse import urlparse
+from datalad.cmdline.helpers import get_datalad_master
+from datalad.utils import get_local_file_url
 
-dirs = AppDirs("datalad", "datalad.org")
+from six.moves.urllib.parse import urlparse
 
 
 class Describe(Interface):
     """Add metadata to the repository in cwd.
+
+    Allows for adding basic metadata like author, description or license to
+    a collection or handle. It's also possible to attach these metadata
+    properties to different entities than just the repos, which is intended to
+    be used for sub entities in the metadata. In that case the subject to be
+    described has to be identified by its URI, which is used as its reference
+    in the RDF data.
+    This command is for use within a handle's or a collection's repository.
+    It's manipulating the metadata of the repository in the current working
+    directory.
+
+    Examples:
+
+    $ datalad describe --author "Some guy" \
+            --author-email "some.guy@example.com" \
+            --license MIT
     """
     # TODO: A lot of doc ;)
 
@@ -69,10 +89,14 @@ class Describe(Interface):
     def __call__(self, subject=None, author=None, author_orcid=None,
                  author_email=None, author_page=None, license=None,
                  description=None):
+        """
+        Returns
+        -------
+        Handle or Collection
+        """
 
         repo = get_repo_instance()
 
-        # TODO: use path constants!
         if isinstance(repo, CollectionRepo):
             target_class = 'Collection'
             if subject in [repo.name, None]:
@@ -86,8 +110,8 @@ class Describe(Interface):
                 files = opj(repo.path, repo._key2filename(subject))
             else:
                 # TODO: look for internal entities as subject
-                lgr.error("Subject '%s' unknwon." % subject)
-                raise RuntimeError("Subject '%s' unknwon." % subject)
+                lgr.error("Subject '%s' unknown." % subject)
+                raise RuntimeError("Subject '%s' unknown." % subject)
         elif isinstance(repo, HandleRepo):
             target_class = 'Handle'
             if subject in [repo.name, None]:
@@ -96,8 +120,8 @@ class Describe(Interface):
                 files = opj(repo.path, HANDLE_META_DIR)
             else:
                 # TODO: look for internal entities as subject
-                lgr.error("Subject '%s' unknwon." % subject)
-                raise RuntimeError("Subject '%s' unknwon." % subject)
+                lgr.error("Subject '%s' unknown." % subject)
+                raise RuntimeError("Subject '%s' unknown." % subject)
         else:
             lgr.error("Don't know how to handle object of class %s" %
                       repo.__class__)
@@ -173,8 +197,7 @@ class Describe(Interface):
             repo.git_commit("Metadata changed.")
 
         # Update metadata of local master collection:
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if isinstance(repo, CollectionRepo):
             # update master if it is a registered collection:
@@ -183,14 +206,27 @@ class Describe(Interface):
                     local_master.git_fetch(c)
         elif isinstance(repo, HandleRepo):
             # update master if it is an installed handle:
-            for h in local_master.get_handle_list():
-                if repo.path == urlparse(
-                        CollectionRepoHandleBackend(local_master, h).url).path:
-                    local_master.import_metadata_to_handle(CustomImporter,
-                                                           key=h,
-                                                           files=opj(
-                                                               repo.path,
-                                                               HANDLE_META_DIR))
+
+            # TODO: Create method to get a handle's name by it's url from a
+            # collection and move the code below there.
+            meta_graph = local_master.get_collection_graphs(
+                files=[REPO_STD_META_FILE])[REPO_STD_META_FILE[:-4]]
+            handle_name = meta_graph.value(
+                subject=URIRef(get_local_file_url(repo.path)),
+                predicate=RDFS.label)
+            if handle_name is not None:
+                local_master.import_metadata_to_handle(CustomImporter,
+                                                       key=handle_name,
+                                                       files=opj(
+                                                           repo.path,
+                                                           HANDLE_META_DIR))
 
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
+
+        if not self.cmdline:
+            if isinstance(repo, CollectionRepo):
+                return CollectionRepoBackend(repo)
+            elif isinstance(repo, HandleRepo):
+                return HandleRepoBackend(repo)
+

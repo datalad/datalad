@@ -9,6 +9,7 @@
 """Miscellaneous utilities to assist with testing"""
 
 import glob
+import inspect
 import shutil
 import stat
 import os
@@ -26,13 +27,14 @@ import time
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
 from six import reraise
+from six.moves import map
 
 from functools import wraps
-from os.path import exists, realpath, join as opj, pardir
+from os.path import exists, realpath, join as opj, pardir, split as pathsplit, curdir
 
 from nose.tools import \
-    assert_equal, assert_raises, assert_greater, assert_true, assert_false, \
-    assert_in, assert_in as in_, \
+    assert_equal, assert_not_equal, assert_raises, assert_greater, assert_true, assert_false, \
+    assert_in, assert_not_in, assert_in as in_, assert_is, \
     raises, ok_, eq_, make_decorator
 
 from nose import SkipTest
@@ -42,22 +44,42 @@ from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
+from ..dochelpers import exc_str
+from ..cmdline.helpers import get_repo_instance
+from ..consts import ARCHIVES_TEMP_DIR
+from . import _TEMP_PATHS_GENERATED
+
+# temp paths used by clones
+_TEMP_PATHS_CLONES = set()
 
 
-def create_tree_archive(path, name, load, overwrite=False):
+def skip_if_no_module(module):
+    try:
+        imp = __import__(module)
+    except Exception as exc:
+        raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
+
+
+def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
-    dirname = name[:-7]
+    dirname = file_basename(name)
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
-    create_tree(full_dirname, load)
+    create_tree(full_dirname, load, archives_leading_dir=archives_leading_dir)
     # create archive
-    compress_files([dirname], name, path=path, overwrite=overwrite)
+    if archives_leading_dir:
+        compress_files([dirname], name, path=path, overwrite=overwrite)
+    else:
+        compress_files(list(map(basename, glob.glob(opj(full_dirname, '*')))),
+                       opj(pardir, name),
+                       path=opj(path, dirname),
+                       overwrite=overwrite)
     # remove original tree
     shutil.rmtree(full_dirname)
 
 
-def create_tree(path, tree):
+def create_tree(path, tree, archives_leading_dir=True):
     """Given a list of tuples (name, load) create such a tree
 
     if load is a tuple itself -- that would create either a subtree or an archive
@@ -66,13 +88,16 @@ def create_tree(path, tree):
     if not exists(path):
         os.makedirs(path)
 
+    if isinstance(tree, dict):
+        tree = tree.items()
+
     for name, load in tree:
         full_name = opj(path, name)
-        if isinstance(load, tuple):
-            if name.endswith('.tar.gz'):
-                create_tree_archive(path, name, load)
+        if isinstance(load, (tuple, list, dict)):
+            if name.endswith('.tar.gz') or name.endswith('.tar'):
+                create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             else:
-                create_tree(full_name, load)
+                create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
         else:
             #encoding = sys.getfilesystemencoding()
             #if isinstance(full_name, text_type):
@@ -89,6 +114,7 @@ def create_tree(path, tree):
 import git
 import os
 from os.path import exists, join
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileNotInAnnexError
 from ..utils import chpwd, getpwd
 
@@ -136,14 +162,42 @@ def ok_clean_git(path, annex=True, untracked=[]):
         eq_(head_diffs, [])
 
 
-def ok_file_under_git(path, filename, annexed=False):
-    repo = AnnexRepo(path)
-    assert(filename in repo.get_indexed_files())  # file is known to Git
+def ok_file_under_git(path, filename=None, annexed=False):
+    """Test if file is present and under git/annex control
+
+    If relative path provided, then test from current directory
+    """
+    if filename is None:
+        # path provides the path and the name
+        path, filename = pathsplit(path)
+
     try:
-        repo.get_file_key(filename)
-        in_annex = True
-    except FileNotInAnnexError as e:
+        # if succeeds when must not (not `annexed`) -- fail
+        repo = get_repo_instance(path, class_=AnnexRepo)
+        annex = True
+    except RuntimeError as e:
+        # TODO: make a dedicated Exception
+        if "No annex repository found in" in str(e):
+            repo = get_repo_instance(path, class_=GitRepo)
+            annex = False
+        else:
+            raise
+
+    # path to the file within the repository
+    file_repo_dir = os.path.relpath(path, repo.path)
+    file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
+    assert(file_repo_path in repo.get_indexed_files())  # file is known to Git
+
+    if annex:
+        try:
+            # operates on relative to curdir path
+            repo.get_file_key(opj(path, filename))
+            in_annex = True
+        except FileNotInAnnexError as e:
+            in_annex = False
+    else:
         in_annex = False
+
     assert(annexed == in_annex)
 
 #
@@ -153,7 +207,7 @@ def ok_file_under_git(path, filename, annexed=False):
 def ok_symlink(path):
     """Checks whether path is either a working or broken symlink"""
     link_path = os.path.islink(path)
-    if not link_path: 
+    if not link_path:
         raise AssertionError("Path {} seems not to be a symlink".format(path))
 
 
@@ -176,6 +230,11 @@ def ok_broken_symlink(path):
 def ok_startswith(s, prefix):
     ok_(s.startswith(prefix),
         msg="String %r doesn't start with %r" % (s, prefix))
+
+
+def ok_endswith(s, suffix):
+    ok_(s.endswith(suffix),
+        msg="String %r doesn't end with %r" % (s, suffix))
 
 
 def nok_startswith(s, prefix):
@@ -208,21 +267,49 @@ def ok_annex_get(ar, files, network=True):
     else:
         ok_(all(has_content))
 
+def ok_generator(gen):
+    assert_true(inspect.isgenerator(gen), msg="%s is not a generator" % gen)
+
+def ok_archives_caches(repopath, n=1, persistent=None):
+    """Given a path to repository verify number of archives
+
+    Parameters
+    ----------
+    repopath : str
+      Path to the repository
+    n : int, optional
+      Number of archives directories to expect
+    persistent: bool or None, optional
+      If None -- both persistent and not count.
+    """
+    # looking into subdirectories
+    glob_ptn = opj(repopath,
+                   ARCHIVES_TEMP_DIR + {None: '*', True: '', False: '-*'}[persistent],
+                   '*')
+    dirs = glob.glob(glob_ptn)
+    assert_equal(len(dirs), n,
+                 msg="Found following dirs when needed %d of them: %s" % (n, dirs))
+
+def ok_file_has_content(path, content):
+    """Verify that file exists and has expected content"""
+    assert(exists(path))
+    with open(path, 'r') as f:
+        assert_equal(f.read(), content)
 
 #
 # Decorators
 #
 
 @optional_args
-def with_tree(t, tree=None, **tkwargs):
+def with_tree(t, tree=None, archives_leading_dir=True, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
         tkwargs_ = get_tempfile_kwargs(tkwargs, prefix="tree", wrapped=t)
         d = tempfile.mkdtemp(**tkwargs_)
-        create_tree(d, tree)
+        create_tree(d, tree, archives_leading_dir=archives_leading_dir)
         try:
-            t(*(arg + (d,)), **kw)
+            return t(*(arg + (d,)), **kw)
         finally:
             rmtemp(d)
     return newfunc
@@ -255,14 +342,14 @@ def _multiproc_serve_path_via_http(hostname, path_to_serve_from, queue): # pragm
 def serve_path_via_http(tfunc, *targs):
     """Decorator which serves content of a directory via http url
     """
-    
+
     @wraps(tfunc)
     def newfunc(*args, **kwargs):
 
         if targs:
             # if a path is passed into serve_path_via_http, then it's in targs
             assert len(targs) == 1
-            path = targs[0] 
+            path = targs[0]
 
         elif len(args) > 1:
             args, path = args[:-1], args[-1]
@@ -279,7 +366,7 @@ def serve_path_via_http(tfunc, *targs):
         hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http, 
+        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http,
                                                 args=(hostname, path, queue))
         multi_proc.start()
         port = queue.get(timeout=300)
@@ -287,7 +374,7 @@ def serve_path_via_http(tfunc, *targs):
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
-            tfunc(*(args + (path, url)), **kwargs)
+            return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
@@ -303,7 +390,8 @@ def with_tempfile(t, *targs, **tkwargs):
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    *targs, **tkwargs:
+    `*targs`:
+    `**tkwargs`:
         All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
         the function t.  If no 'prefix' argument is provided, it will be
@@ -331,9 +419,10 @@ def with_tempfile(t, *targs, **tkwargs):
         # dir=... will override this.
         mkdir = tkwargs_.pop('mkdir', False)
 
-
         filename = {False: tempfile.mktemp,
                     True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
+        filename = realpath(filename)
+
         if __debug__:
             lgr.debug('Running %s with temporary filename %s'
                       % (t.__name__, filename))
@@ -398,7 +487,7 @@ def clone_url(url):
     runner = Runner()
     tdir = tempfile.mkdtemp(**get_tempfile_kwargs({}, prefix='clone_url'))
     _ = runner(["git", "clone", url, tdir], expect_stderr=True)
-    open(opj(tdir, ".git", "remove-me"), "w").write("Please")  # signal for it to be removed after
+    _TEMP_PATHS_CLONES.add(tdir)
     return tdir
 
 
@@ -407,19 +496,52 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicTestRepo, TestRepo
-_basic_test_repo = BasicTestRepo()
-_TESTREPOS = {'basic':
-                  {'network': 'git://github.com/datalad/testrepo--basic--r1',
-                   'local': _basic_test_repo.path,
-                   'local-url': _basic_test_repo.url}}
+from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
+    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo, \
+    CollectionTestRepo
+
+_TESTREPOS = None
 
 def _get_testrepos_uris(regex, flavors):
+    global _TESTREPOS
+    # we should instantiate those whenever test repos actually asked for
+    # TODO: just absorb all this lazy construction within some class
+    if not _TESTREPOS:
+        _basic_annex_test_repo = BasicAnnexTestRepo()
+        _basic_handle_test_repo = BasicHandleTestRepo()
+        _basic_collection_test_repo = BasicCollectionTestRepo()
+        _basic_git_test_repo = BasicGitTestRepo()
+        _md_pt_handle_test_repo = MetadataPTHandleTestRepo()
+        _collection_test_repo = CollectionTestRepo()
+        _TESTREPOS = {'basic_annex':
+                        {'network': 'git://github.com/datalad/testrepo--basic--r1',
+                         'local': _basic_annex_test_repo.path,
+                         'local-url': _basic_annex_test_repo.url},
+                      'basic_annex_handle':
+                        {'local': _basic_handle_test_repo.path,
+                         'local-url': _basic_handle_test_repo.url},
+                      'basic_git':
+                        {'local': _basic_git_test_repo.path,
+                         'local-url': _basic_git_test_repo.url},
+                      'basic_git_collection':
+                        {'local': _basic_collection_test_repo.path,
+                         'local-url': _basic_collection_test_repo.url},
+                      'meta_pt_annex_handle':
+                        {'local': _md_pt_handle_test_repo.path,
+                         'local-url': _md_pt_handle_test_repo.url},
+                      'collection':
+                        {'local': _collection_test_repo.path,
+                         'local-url': _collection_test_repo.url}}
+        # assure that now we do have those test repos created -- delayed
+        # their creation until actually used
+        if not on_windows:
+            _basic_annex_test_repo.create()
+            _basic_handle_test_repo.create()
+            _basic_collection_test_repo.create()
+            _basic_git_test_repo.create()
+            _md_pt_handle_test_repo.create()
+            _collection_test_repo.create()
     uris = []
-    # assure that now we do have those test repos created -- delayed
-    # their creation until actually used
-    if not on_windows:
-        _basic_test_repo.create()
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
             continue
@@ -436,13 +558,13 @@ def _get_testrepos_uris(regex, flavors):
 
 
 @optional_args
-def with_testrepos(t, regex='.*', flavors='auto', skip=False):
-    """Decorator to provide a test repository available locally and/or over the Internet
+def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
+    """Decorator to provide a local/remote test repository
 
     All tests under datalad/tests/testrepos are stored in two-level hierarchy,
-    where top-level name describes nature/identifier of the test repository, and
-    there could be multiple instances (e.g. generated differently) of the same
-    "content"
+    where top-level name describes nature/identifier of the test repository,
+    and there could be multiple instances (e.g. generated differently) of the
+    same "content"
 
     Parameters
     ----------
@@ -451,17 +573,19 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
     flavors : {'auto', 'local', 'local-url', 'clone', 'network', 'network-clone'} or list of thereof, optional
       What URIs to provide.  E.g. 'local' would just provide path to the
       repository, while 'network' would provide url of the remote location
-      available on Internet containing the test repository.  'clone' would clone repository
-      first to a temporary location. 'network-clone' would first clone from the network
-      location. 'auto' would include the list of appropriate
-      ones (e.g., no 'network*' flavors if network tests are "forbidden").
+      available on Internet containing the test repository.  'clone' would
+      clone repository first to a temporary location. 'network-clone' would
+      first clone from the network location. 'auto' would include the list of
+      appropriate ones (e.g., no 'network*' flavors if network tests are
+      "forbidden").
+    count: int, optional
+      If specified, only up to that number of repositories to test with
 
     Examples
     --------
-
-        @with_testrepos('basic')
-        def test_write(repo):
-            assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
+    >>> @with_testrepos('basic_annex')
+    >>> def test_write(repo):
+    ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
 
@@ -480,18 +604,39 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False):
             if not testrepos_uris:
                 raise SkipTest("No non-networked repos to test on")
 
+        ntested = 0
         for uri in testrepos_uris:
+            if count and ntested >= count:
+                break
+            ntested += 1
             if __debug__:
                 lgr.debug('Running %s on %s' % (t.__name__, uri))
             try:
                 t(*(arg + (uri,)), **kw)
             finally:
-                # ad-hoc but works
-                if exists(uri) and exists(opj(uri, ".git", "remove-me")):
+                if uri in _TEMP_PATHS_CLONES:
+                    _TEMP_PATHS_CLONES.discard(uri)
                     rmtemp(uri)
                 pass  # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
+
+@optional_args
+def with_fake_cookies_db(func, cookies={}):
+    """mock original cookies db with a fake one for the duration of the test
+    """
+    from ..support.cookies import cookies_db
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        try:
+            orig_cookies_db = cookies_db._cookies_db
+            cookies_db._cookies_db = cookies.copy()
+            return func(*args, **kwargs)
+        finally:
+            cookies_db._cookies_db = orig_cookies_db
+    return newfunc
+
 
 def skip_if_no_network(func):
     """Skip test completely in NONETWORK settings
@@ -511,6 +656,18 @@ def skip_if_on_windows(func):
     def newfunc(*args, **kwargs):
         if on_windows:
             raise SkipTest("Skipping on Windows")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+@optional_args
+def skip_if(func, cond=True, msg=None):
+    """Skip test for specific condition
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if cond:
+            raise SkipTest(msg if msg else "condition was True")
         return func(*args, **kwargs)
     return newfunc
 
@@ -613,6 +770,24 @@ def ignore_nose_capturing_stdout(func):
             else:
                 raise
     return newfunc
+
+def skip_httpretty_on_problematic_pythons(func):
+    """As discovered some httpretty bug causes a side-effect
+    on other tests on some Pythons.  So we skip the test if such
+    problematic combination detected
+
+    References
+    https://travis-ci.org/datalad/datalad/jobs/94464988
+    http://stackoverflow.com/a/29603206/1265472
+    """
+
+    @make_decorator(func)
+    def newfunc(*args, **kwargs):
+        if sys.version_info[:3] == (3, 4, 2):
+            raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
+        return func(*args, **kwargs)
+    return newfunc
+
 
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure

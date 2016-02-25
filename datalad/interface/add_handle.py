@@ -18,20 +18,32 @@ from os.path import join as opj, abspath, expanduser, expandvars, isdir, exists
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoHandleBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from datalad.support.handlerepo import HandleRepo
+from datalad.support.handle import Handle
 from datalad.support.metadatahandler import CustomImporter
 from datalad.consts import HANDLE_META_DIR, REPO_STD_META_FILE
+from datalad.cmdline.helpers import get_datalad_master
 
-from appdirs import AppDirs
 from six.moves.urllib.parse import urlparse
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 class AddHandle(Interface):
-    """Add a handle to a collection."""
+    """Add a handle to a collection.
+
+    This results in the handle to be included in the collection.
+    Optionally you can give it a new name, that is used to reference that
+    handle via the collection it is to be added to.
+    The collection has to be locally available.
+    Example:
+
+        $ datalad add-handle MyPreciousHandle MyFancyCollection NewFancyHandle
+
+        $ datalad add-handle MyPreciousHandle MyFancyCollection
+
+        inside/MyPreciousHandle$ datalad add-handle . MyFancyCollection
+    """
     _params_ = dict(
         handle=Parameter(
             doc="path to or name of the handle",
@@ -47,12 +59,13 @@ class AddHandle(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, handle, collection, name=None):
+        """
+        Returns
+        -------
+        Handle
+        """
 
-        # TODO: - add a remote handle by its url
-        #       - handle and collection can be addressed via name or path/url
-
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
+        local_master = get_datalad_master()
 
         if isdir(abspath(expandvars(expanduser(handle)))):
             h_path = abspath(expandvars(expanduser(handle)))
@@ -97,3 +110,8 @@ class AddHandle(Interface):
         # TODO: More sophisticated: Check whether the collection is registered.
         # Might be a different name than collection_repo.name or not at all.
         local_master.git_fetch(collection_repo.name)
+
+        if not self.cmdline:
+            return CollectionRepoHandleBackend(collection_repo,
+                                               name if name is not None
+                                               else handle_repo.name)

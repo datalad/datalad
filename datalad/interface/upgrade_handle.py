@@ -17,16 +17,17 @@ from os.path import exists, join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
 from ..support.handlerepo import HandleRepo
+from datalad.support.handle_backends import HandleRepoBackend, \
+    CollectionRepoHandleBackend
+from ..support.handle import Handle
 from ..support.metadatahandler import CustomImporter, URIRef, Literal, DLNS, \
     EMP, RDF, PAV, PROV, FOAF, DCTERMS
 from ..cmdline.helpers import get_repo_instance
 from ..log import lgr
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class UpgradeHandle(Interface):
@@ -46,9 +47,13 @@ class UpgradeHandle(Interface):
             action="store_true"))
 
     def __call__(self, handle=curdir, upgrade_data=False):
+        """
+        Returns
+        -------
+        Handle
+        """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if exists(handle):
             repo = get_repo_instance(handle, HandleRepo)
@@ -82,3 +87,6 @@ class UpgradeHandle(Interface):
         if upgrade_data:
             # upgrade content:
             repo.get(files_to_upgrade)
+
+        if not self.cmdline:
+            return HandleRepoBackend(repo)

@@ -18,14 +18,20 @@ from os.path import join as opj, abspath, expandvars, expanduser
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.collectionrepo import CollectionRepo
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
 
 
 class CreateCollection(Interface):
-    """Create a new collection."""
+    """Create a new collection.
+
+    Creates an empty collection repository and registers it with datalad.
+    You can give it name to be used by datalad to address that collection.
+    Otherwise the base directory's name of the repository is used.
+    Either way, it's not possible to use the same name twice.
+
+    Example:
+
+        $ datalad create-collection /some/where/my_collection MyFirstCollection
+    """
     _params_ = dict(
         path=Parameter(
             args=('path',),
@@ -40,9 +46,19 @@ class CreateCollection(Interface):
             constraints=EnsureStr() | EnsureNone()))
 
     def __call__(self, path=curdir, name=None):
+        # TODO: Collection => graph => lazy
+        """
+        Returns
+        -------
+        Collection
+        """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                          'localcollection'))
+        from datalad.support.collectionrepo import CollectionRepo
+        from datalad.support.collection_backends import CollectionRepoBackend
+        from datalad.cmdline.helpers import get_datalad_master
+
+        local_master = get_datalad_master()
+
         # create the collection:
         new_collection = CollectionRepo(abspath(expandvars(expanduser(path))),
                                         name=name, create=True)
@@ -53,3 +69,6 @@ class CreateCollection(Interface):
         # register with local master:
         local_master.git_remote_add(new_collection.name, new_collection.path)
         local_master.git_fetch(new_collection.name)
+
+        if not self.cmdline:
+            return CollectionRepoBackend(new_collection)

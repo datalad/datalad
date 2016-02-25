@@ -8,12 +8,18 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import collections
+import re
 import six.moves.builtins as __builtin__
+import time
+
+from os.path import curdir, basename, exists, realpath, islink
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 
-import re
 import logging
-import shutil, stat, os, sys
+import shutil
+import stat
+import os
+import sys
 import tempfile
 import platform
 import gc
@@ -41,6 +47,57 @@ except:  # pragma: no cover
 # Little helpers
 #
 
+def not_supported_on_windows(msg=None):
+    """A little helper to be invoked to consistently fail whenever functionality is
+    not supported (yet) on Windows
+    """
+    if on_windows:
+        raise NotImplementedError("This functionality is not yet implemented for Windows OS"
+                                  + (": %s" % msg if msg else ""))
+
+
+def shortened_repr(value, l=30):
+    try:
+        if hasattr(value, '__repr__') and (value.__repr__ is not object.__repr__):
+            value_repr = repr(value)
+            if not value_repr.startswith('<') and len(value_repr) > l:
+                value_repr = "<<%s...>>" % (value_repr[:l-8])
+            elif value_repr.startswith('<') and value_repr.endswith('>') and ' object at 0x':
+                raise ValueError("I hate those useless long reprs")
+        else:
+            raise ValueError("gimme class")
+    except Exception as e:
+        value_repr = "<%s>" % value.__class__.__name__.split('.')[-1]
+    return value_repr
+
+
+def __auto_repr__(obj):
+    attr_names = tuple()
+    if hasattr(obj, '__dict__'):
+        attr_names += tuple(obj.__dict__.keys())
+    if hasattr(obj, '__slots__'):
+        attr_names += tuple(obj.__slots__)
+
+    items = []
+    for attr in sorted(set(attr_names)):
+        if attr.startswith('_'):
+            continue
+        value = getattr(obj, attr)
+        items.append("%s=%s" % (attr, shortened_repr(value)))
+
+    return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
+
+def auto_repr(cls):
+    """Decorator for a class to assign it an automagic quick and dirty __repr__
+
+    It uses public class attributes to prepare repr of a class
+
+    Original idea: http://stackoverflow.com/a/27799004/1265472
+    """
+
+    cls.__repr__ = __auto_repr__
+    return cls
+
 def is_interactive():
     """Return True if all in/outs are tty"""
     # TODO: check on windows if hasattr check would work correctly and add value:
@@ -58,6 +115,39 @@ def sorted_files(dout):
     return sorted(sum([[opj(r, f)[len(dout)+1:] for f in files]
                        for r,d,files in os.walk(dout)
                        if not '.git' in r], []))
+
+from os.path import sep as dirsep
+_VCS_REGEX = '%s\.(git|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+    """Generator to find files matching regex
+
+    Parameters
+    ----------
+    regex: basestring
+    exclude: basestring, optional
+      Matches to exclude
+    exclude_vcs:
+      If True, excludes commonly known VCS subdirectories.  If string, used
+      as regex to exclude those files (regex: %r)
+    topdir: basestring, optional
+      Directory where to search
+    dirs: bool, optional
+      Either to match directories as well as files
+    """ % _VCS_REGEX
+
+    for dirpath, dirnames, filenames in os.walk(topdir):
+        names = (dirnames + filenames) if dirs else filenames
+        # TODO: might want to uniformize on windows to use '/'
+        paths = (opj(dirpath, name) for name in names)
+        for path in filter(re.compile(regex).search, paths):
+            path = path.rstrip(dirsep)
+            if exclude and re.search(exclude, path):
+                continue
+            if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            yield path
+
 
 #### windows workaround ###
 # TODO: There should be a better way
@@ -99,7 +189,7 @@ def rotree(path, ro=True, chmod_files=True):
     else:
         chmod = lambda f: os.chmod(f, os.stat(f).st_mode | stat.S_IWRITE | stat.S_IREAD)
 
-    for root, dirs, files in os.walk(path):
+    for root, dirs, files in os.walk(path, followlinks=False):
         if chmod_files:
             for f in files:
                 fullf = opj(root, f)
@@ -118,14 +208,20 @@ def rmtree(path, chmod_files='auto', *args, **kwargs):
        Either to make files writable also before removal.  Usually it is just
        a matter of directories to have write permissions.
        If 'auto' it would chmod files on windows by default
-    *args, **kwargs :
+    `*args` :
+    `**kwargs` :
        Passed into shutil.rmtree call
     """
     # Give W permissions back only to directories, no need to bother with files
     if chmod_files == 'auto':
         chmod_files = on_windows
-    rotree(path, ro=False, chmod_files=chmod_files)
-    shutil.rmtree(path, *args, **kwargs)
+
+    if not os.path.islink(path):
+        rotree(path, ro=False, chmod_files=chmod_files)
+        shutil.rmtree(path, *args, **kwargs)
+    else:
+        # just remove the symlink
+        os.unlink(path)
 
 
 def rmtemp(f, *args, **kwargs):
@@ -135,6 +231,9 @@ def rmtemp(f, *args, **kwargs):
     environment variable is defined
     """
     if not os.environ.get('DATALAD_TESTS_KEEPTEMP'):
+        if not os.path.lexists(f):
+            lgr.debug("Path %s does not exist, so can't be removed" % f)
+            return
         lgr.log(5, "Removing temp file: %s" % f)
         # Can also be a directory
         if os.path.isdir(f):
@@ -145,13 +244,99 @@ def rmtemp(f, *args, **kwargs):
                     os.unlink(f)
                 except OSError as e:
                     if i < 9:
-                        sleep(0.5)
+                        sleep(0.1)
                         continue
                     else:
                         raise
                 break
     else:
         lgr.info("Keeping temp file: %s" % f)
+
+
+def file_basename(name, return_ext=False):
+    """
+    Strips up to 2 extensions of length up to 4 characters and starting with alpha
+    not a digit, so we could get rid of .tar.gz etc
+    """
+    bname = basename(name)
+    fbname = re.sub('(\.[a-zA-Z_]\S{1,4}){0,2}$', '', bname)
+    if return_ext:
+        return fbname, bname[len(fbname)+1:]
+    else:
+        return fbname
+
+
+if on_windows:
+    def lmtime(filepath, mtime):
+        """Set mtime for files.  On Windows a merely adapter to os.utime
+        """
+        os.utime(filepath, (time.time(), mtime))
+else:
+    def lmtime(filepath, mtime):
+        """Set mtime for files, while not de-referencing symlinks.
+
+        To overcome absence of os.lutime
+
+        Works only on linux and OSX ATM
+        """
+        from .cmd import Runner
+        # convert mtime to format touch understands [[CC]YY]MMDDhhmm[.SS]
+        smtime = time.strftime("%Y%m%d%H%M.%S", time.localtime(mtime))
+        lgr.log(3, "Setting mtime for %s to %s == %s", filepath, mtime, smtime)
+        Runner().run(['touch', '-h', '-t', '%s' % smtime, filepath])
+        rfilepath = realpath(filepath)
+        if islink(filepath) and exists(rfilepath):
+            # trust noone - adjust also of the target file
+            # since it seemed like downloading under OSX (was it using curl?)
+            # didn't bother with timestamps
+            lgr.log(3, "File is a symlink to %s Setting mtime for it to %s",
+                    rfilepath, mtime)
+            os.utime(rfilepath, (time.time(), mtime))
+        # doesn't work on OSX
+        # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
+
+def assure_list_from_str(s, sep='\n'):
+    """Given a multiline string convert it to a list of return None if empty
+
+    Parameters
+    ----------
+    s: str or list
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, list):
+        return s
+    return s.split(sep)
+
+
+def assure_dict_from_str(s, **kwargs):
+    """Given a multiline string with key=value items convert it to a dictionary
+
+    Parameters
+    ----------
+    s: str or dict
+
+    Returns None if input s is empty
+    """
+
+    if not s:
+        return None
+
+    if isinstance(s, dict):
+        return s
+
+    out = {}
+    for value_str in assure_list_from_str(s, **kwargs):
+        if '=' not in value_str:
+            raise ValueError("{} is not in key=value format".format(repr(value_str)))
+        k, v = value_str.split('=', 1)
+        if k in out:
+            err  = "key {} was already defined in {}, but new value {} was provided".format(k, out, v)
+            raise ValueError(err)
+        out[k] = v
+    return out
 
 
 #
@@ -169,7 +354,7 @@ def optional_args(decorator):
             @my_decorator
             def function(): pass
 
-        Calls decorator with decorator(f, *args, **kwargs)"""
+        Calls decorator with decorator(f, `*args`, `**kwargs`)"""
 
     @wraps(decorator)
     def wrapper(*args, **kwargs):
@@ -188,7 +373,7 @@ def optional_args(decorator):
 
 
 # TODO: just provide decorators for tempfile.mk* functions. This is ugly!
-def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
+def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
     """Updates kwargs to be passed to tempfile. calls depending on env vars
     """
     # operate on a copy of tkwargs to avoid any side-effects
@@ -209,6 +394,21 @@ def get_tempfile_kwargs(tkwargs, prefix="", wrapped=None):
 
     return tkwargs_
 
+@optional_args
+def line_profile(func):
+    """Q&D helper to line profile the function and spit out stats
+    """
+    import line_profiler
+    prof = line_profiler.LineProfiler()
+
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        try:
+            pfunc = prof(func)
+            return pfunc(*args, **kwargs)
+        finally:
+            prof.print_stats()
+    return newfunc
 
 #
 # Context Managers
@@ -283,18 +483,21 @@ def swallow_outputs():
             # must be some other file one -- leave it alone
             oldprint(*args, sep=sep, end=end, file=file)
 
+    from .ui import ui
     # preserve -- they could have been mocked already
     oldprint = getattr(__builtin__, 'print')
     oldout, olderr = sys.stdout, sys.stderr
+    olduiout = ui.out
     adapter = StringIOAdapter()
 
     try:
         sys.stdout, sys.stderr = adapter.handles
+        ui.out = adapter.handles[0]
         setattr(__builtin__, 'print', fake_print)
 
         yield adapter
     finally:
-        sys.stdout, sys.stderr = oldout, olderr
+        sys.stdout, sys.stderr, ui.out = oldout, olderr, olduiout
         setattr(__builtin__, 'print',  oldprint)
         adapter.cleanup()
 
@@ -364,6 +567,64 @@ def swallow_logs(new_level=None):
         adapter.cleanup()
 
 
+try:
+    # TEMP: Just to overcome problem with testing on jessie with older requests
+    # https://github.com/kevin1024/vcrpy/issues/215
+    import vcr.patch as _vcrp
+    import requests as _
+    try:
+        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
+    except ImportError:
+        def returnnothing(*args, **kwargs):
+            return()
+        _vcrp.CassettePatcherBuilder._requests = returnnothing
+
+    from vcr import use_cassette as _use_cassette, VCR as _VCR
+
+    def use_cassette(path, return_body=None, **kwargs):
+        """Adapter so we could create/use custom use_cassette with custom parameters
+
+        Parameters
+        ----------
+        path : str
+          If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
+        """
+        if not isabs(path):  # so it was given as a name
+            path = "fixtures/vcr_cassettes/%s.yaml" % path
+        lgr.debug("Using cassette %s" % path)
+        if return_body is not None:
+            my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
+            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
+        else:
+            return _use_cassette(path, **kwargs)  # just a straight one
+
+except Exception as exc:
+    if not isinstance(exc, ImportError):
+        # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
+        lgr.warning("Failed to import vcr, no cassettes will be available: %s", exc_str(exc, limit=10))
+    # If there is no vcr.py -- provide a do nothing decorator for use_cassette
+    def use_cassette(*args, **kwargs):
+        def do_nothing_decorator(t):
+            @wraps(t)
+            def wrapper(*args, **kwargs):
+                lgr.debug("Not using vcr cassette")
+                return t(*args, **kwargs)
+            return wrapper
+        return do_nothing_decorator
+
+
+@contextmanager
+def externals_use_cassette(path):
+    """Helper to pass instruction via env variables to use specified cassette
+
+    For instance whenever we are testing custom special remotes invoked by the annex
+    but want to minimize their network traffic by using vcr.py
+    """
+    from mock import patch
+    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(path)}):
+        yield
+
+
 #
 # Additional handlers
 #
@@ -402,17 +663,14 @@ def assure_dir(*args):
         os.makedirs(dirname)
     return dirname
 
-def chpwd(path):
-    """Wrapper around os.chdir which also adjusts environ['PWD']
+def updated(d, update):
+    """Return a copy of the input with the 'update'
 
-    The reason is that otherwise PWD is simply inherited from the shell
-    and we have no ability to assess directory path without dereferencing
-    symlinks
+    Primarily for updating dictionaries
     """
-    if not isabs(path):
-        path = normpath(opj(getpwd(), path))
-    os.chdir(path)  # for grep people -- ok, to chdir here!
-    os.environ['PWD'] = path
+    d = d.copy()
+    d.update(update)
+    return d
 
 def getpwd():
     """Try to return a CWD without dereferencing possible symlinks
@@ -423,3 +681,42 @@ def getpwd():
         return os.environ['PWD']
     except KeyError:
         return os.getcwd()
+
+class chpwd(object):
+    """Wrapper around os.chdir which also adjusts environ['PWD']
+
+    The reason is that otherwise PWD is simply inherited from the shell
+    and we have no ability to assess directory path without dereferencing
+    symlinks.
+
+    If used as a context manager it allows to temporarily change directory
+    to the given path
+    """
+    def __init__(self, path, mkdir=False):
+
+        if path:
+            pwd = getpwd()
+            self._prev_pwd = pwd
+        else:
+            self._prev_pwd = None
+            return
+
+        if not isabs(path):
+            path = normpath(opj(pwd, path))
+        if not os.path.exists(path) and mkdir:
+            self._mkdir = True
+            os.mkdir(path)
+        else:
+            self._mkdir = False
+
+        os.chdir(path)  # for grep people -- ok, to chdir here!
+        os.environ['PWD'] = path
+
+    def __enter__(self):
+        # nothing more to do really, chdir was in the constructor
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._prev_pwd:
+            chpwd(self._prev_pwd)
+

@@ -17,16 +17,34 @@ import logging
 from mock import patch
 from six import PY3
 
-from os.path import join as opj, isabs, abspath
+from os.path import dirname, normpath, pardir, basename
+from collections import OrderedDict
+
+from ..dochelpers import exc_str
+from ..utils import updated
+from ..utils import get_local_file_url
+from os.path import join as opj, isabs, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
 from ..utils import get_local_file_url, get_url_path
 from ..utils import getpwd, chpwd
+from ..utils import auto_repr
+from ..utils import find_files
+from ..utils import line_profile
+from ..utils import not_supported_on_windows
+from ..utils import file_basename
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
+from .utils import assure_dict_from_str, assure_list_from_str
+from .utils import ok_generator
+from .utils import assert_not_in
+from .utils import assert_raises
+from .utils import ok_startswith
+from .utils import skip_if_no_module
+
 
 @with_tempfile(mkdir=True)
 def test_rotree(d):
@@ -131,6 +149,21 @@ def test_md5sum_archive(d):
     # just a smoke (encoding/decoding) test for md5sum
     _ = md5sum(opj(d, '1.tar.gz'))
 
+def test_updated():
+    d = {}
+    eq_(updated(d, {1: 2}), {1: 2})
+    eq_(d, {})
+
+    d = {'a': 'b'}
+    eq_(updated(d, ((0, 1), (2, 3))), {0: 1, 'a': 'b', 2: 3})
+    eq_(d, {'a': 'b'})
+
+    # and that it would maintain the type
+    d = OrderedDict(((99, 0), ('z', 0), ('a', 0)))
+    d_ = updated(d, {0: 1})
+    ok_(isinstance(d_, OrderedDict))
+    eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
+
 def test_get_local_file_url_linux():
     assert_equal(get_local_file_url('/a'), 'file:///a')
     assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
@@ -154,6 +187,12 @@ def test_getpwd_basic():
     ok_(isabs(pwd))
     eq_(os.getcwd(), abspath(pwd))
 
+    # that we do not chdir anywhere if None provided
+    with patch('os.chdir') as oschdir:
+        with chpwd(None):
+            eq_(getpwd(), pwd)
+        assert_false(oschdir.called)
+
 
 @skip_if_on_windows
 @with_tempfile(mkdir=True)
@@ -162,16 +201,157 @@ def test_getpwd_symlink(tdir):
     sdir = opj(tdir, 's1')
     pwd_orig = getpwd()
     os.symlink('.', sdir)
+    s1dir = opj(sdir, 's1')
+    s2dir = opj(sdir, 's2')
     try:
         chpwd(sdir)
         pwd = getpwd()
         eq_(pwd, sdir)
         chpwd('s1')
-        eq_(getpwd(), opj(sdir, 's1'))
+        eq_(getpwd(), s1dir)
         chpwd('.')
-        eq_(getpwd(), opj(sdir, 's1'))
+        eq_(getpwd(), s1dir)
         chpwd('..')
         eq_(getpwd(), sdir)
     finally:
         chpwd(pwd_orig)
 
+    # test context handler way of use
+    with chpwd(s1dir):
+        eq_(getpwd(), s1dir)
+    eq_(getpwd(), pwd_orig)
+
+    assert_false(exists(s2dir))
+    with assert_raises(OSError):
+        with chpwd(s2dir):
+            pass
+    with chpwd(s2dir, mkdir=True):
+        ok_(exists(s2dir))
+        eq_(getpwd(), s2dir)
+
+
+def test_auto_repr():
+
+    class withoutrepr:
+        def __init__(self):
+            self.a = "does not matter"
+
+    @auto_repr
+    class buga:
+        def __init__(self):
+            self.a = 1
+            self.b = list(range(100))
+            self.c = withoutrepr()
+            self._c = "protect me"
+
+        def some(self):
+            return "some"
+
+    assert_equal(repr(buga()), "buga(a=1, b=<<[0, 1, 2, 3, 4, 5, 6, ...>>, c=<withoutrepr>)")
+    assert_equal(buga().some(), "some")
+
+
+def test_assure_list_from_str():
+    assert_equal(assure_list_from_str(''), None)
+    assert_equal(assure_list_from_str([]), None)
+    assert_equal(assure_list_from_str('somestring'), ['somestring'])
+    assert_equal(assure_list_from_str('some\nmultiline\nstring'), ['some', 'multiline', 'string'])
+    assert_equal(assure_list_from_str(['something']), ['something'])
+    assert_equal(assure_list_from_str(['a', 'listof', 'stuff']), ['a', 'listof', 'stuff'])
+
+
+def test_assure_dict_from_str():
+    assert_equal(assure_dict_from_str(''), None)
+    assert_equal(assure_dict_from_str({}), None)
+    assert_equal(assure_dict_from_str(
+            '__ac_name={user}\n__ac_password={password}\nsubmit=Log in\ncookies_enabled='), dict(
+             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+    assert_equal(assure_dict_from_str(
+        dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
+             __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+
+
+def test_find_files():
+    tests_dir = dirname(__file__)
+    proj_dir = normpath(opj(dirname(__file__), pardir))
+
+    ff = find_files('.*', proj_dir)
+    ok_generator(ff)
+    files = list(ff)
+    assert(len(files) > 10)  # we have more than 10 test files here
+    assert_in(opj(tests_dir, 'test_utils.py'), files)
+    # and no directories should be mentioned
+    assert_not_in(tests_dir, files)
+
+    ff2 = find_files('.*', proj_dir, dirs=True)
+    files2 = list(ff2)
+    assert_in(opj(tests_dir, 'test_utils.py'), files2)
+    assert_in(tests_dir, files2)
+
+    # now actually matching the path
+    ff3 = find_files('.*/test_.*\.py$', proj_dir, dirs=True)
+    files3 = list(ff3)
+    assert_in(opj(tests_dir, 'test_utils.py'), files3)
+    assert_not_in(tests_dir, files3)
+    for f in files3:
+        ok_startswith(basename(f), 'test_')
+
+from .utils import with_tree
+@with_tree(tree={
+    '.git': {
+        '1': '2'
+    },
+    'd1': {
+        '.git': 'possibly a link from submodule'
+    },
+    'git': 'just a file'
+})
+def test_find_files_exclude_vcs(repo):
+    ff = find_files('.*', repo, dirs=True)
+    files = list(ff)
+    assert_equal({basename(f) for f in files}, {'d1', 'git'})
+    assert_not_in(opj(repo, '.git'), files)
+
+    ff = find_files('.*', repo, dirs=True, exclude_vcs=False)
+    files = list(ff)
+    assert_equal({basename(f) for f in files}, {'d1', 'git', '.git', '1'})
+    assert_in(opj(repo, '.git'), files)
+
+
+def test_line_profile():
+    skip_if_no_module('line_profiler')
+
+    @line_profile
+    def f(j):
+        i = j + 1  # xyz
+        return i
+
+    with swallow_outputs() as cmo:
+        assert_equal(f(3), 4)
+        assert_equal(cmo.err, '')
+        assert_in('i = j + 1  # xyz', cmo.out)
+
+
+def test_not_supported_on_windows():
+    with patch('datalad.utils.on_windows', True):
+        assert_raises(NotImplementedError, not_supported_on_windows)
+        assert_raises(NotImplementedError, not_supported_on_windows, "msg")
+
+    with patch('datalad.utils.on_windows', False):
+        assert_equal(not_supported_on_windows(), None)
+        assert_equal(not_supported_on_windows("msg"), None)
+
+
+def test_file_basename():
+    eq_(file_basename('1'), '1')
+    eq_(file_basename('d1/1'), '1')
+    eq_(file_basename('/d1/1'), '1')
+    eq_(file_basename('1.'), '1.')
+    eq_(file_basename('1.tar.gz'), '1')
+    eq_(file_basename('1.Tar.gz'), '1')
+    eq_(file_basename('1._bak.gz'), '1')
+    eq_(file_basename('1.tar.gz', return_ext=True), ('1', 'tar.gz'))
+    eq_(file_basename('/tmp/1.tar.gz'), '1')
+    eq_(file_basename('/tmp/1.longish.gz'), '1.longish')
+    eq_(file_basename('1_R1.1.1.tar.gz'), '1_R1.1.1')
+    eq_(file_basename('ds202_R1.1.1.tgz'), 'ds202_R1.1.1')

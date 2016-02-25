@@ -16,22 +16,24 @@ __docformat__ = 'restructuredtext'
 from os.path import join as opj
 import logging
 
-from appdirs import AppDirs
 from six.moves.urllib.parse import urlparse
 
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
-from datalad.support.collectionrepo import CollectionRepo, \
-    CollectionRepoHandleBackend
+from datalad.support.collectionrepo import CollectionRepo
+from datalad.support.handle_backends import CollectionRepoHandleBackend
 from ..utils import rmtree
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 lgr = logging.getLogger('datalad.interface.uninstall-handle')
 
+
 class UninstallHandle(Interface):
     """Uninstall a handle.
+
+    Uninstall a before installed handle. This unregisters the handle with
+    datalad and deletes the repository.
 
     Examples:
 
@@ -44,8 +46,9 @@ class UninstallHandle(Interface):
 
     def __call__(self, handle):
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        # TODO: unifying: also accept path to handle
+
+        local_master = get_datalad_master()
 
         if handle not in local_master.get_handle_list():
             raise ValueError("Handle '%s' unknown." % handle)

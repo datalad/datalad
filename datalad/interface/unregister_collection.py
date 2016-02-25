@@ -19,13 +19,16 @@ from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.collectionrepo import CollectionRepo
-from appdirs import AppDirs
-
-dirs = AppDirs("datalad", "datalad.org")
+from datalad.cmdline.helpers import get_datalad_master
 
 
 class UnregisterCollection(Interface):
-    """Unregister a collection with datalad."""
+    """Unregister a collection with datalad.
+
+    Makes that collection unknown to datalad. This means it's no longer
+    included in searches and it's not available as a source of handles,
+    for example.
+    """
     _params_ = dict(
         name=Parameter(
             doc="name of the collection to unregister",
@@ -33,6 +36,5 @@ class UnregisterCollection(Interface):
 
     def __call__(self, name):
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
         local_master.git_remote_remove(name)

@@ -16,17 +16,21 @@ from os.path import join as opj
 from .base import Interface
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureBool, EnsureNone
-from ..support.collectionrepo import CollectionRepo, CollectionRepoBackend, \
-    CollectionRepoHandleBackend
+from ..support.collectionrepo import CollectionRepo
+from datalad.support.collection_backends import CollectionRepoBackend
+from datalad.support.handle_backends import CollectionRepoHandleBackend
+from datalad.cmdline.helpers import get_datalad_master
 from ..log import lgr
-from appdirs import AppDirs
-from six.moves.urllib.parse import urlparse
 
-dirs = AppDirs("datalad", "datalad.org")
+from six.moves.urllib.parse import urlparse
 
 
 class Whereis(Interface):
-    """Find a handle or collection by its name"""
+    """Get the location of a handle or collection.
+
+    Finds a handle or collection on local filesystem by its name and returns
+    the path to that location.
+    """
 
     _params_ = dict(
         key=Parameter(
@@ -35,15 +39,22 @@ class Whereis(Interface):
             constraints=EnsureStr()))
 
     def __call__(self, key):
+        """
+        Returns
+        -------
+        str
+        """
 
-        local_master = CollectionRepo(opj(dirs.user_data_dir,
-                                      'localcollection'))
+        local_master = get_datalad_master()
 
         if key in local_master.git_get_remotes():
-            location = CollectionRepoBackend(local_master, key).url
+            location = CollectionRepoBackend(local_master, key + "/master").url
         elif key in local_master.get_handle_list():
             location = CollectionRepoHandleBackend(local_master, key).url
         else:
             lgr.error("Unknown name '%s'" % key)
 
-        print(urlparse(location).path)
+        result = urlparse(location).path
+        print(result)
+        if not self.cmdline:
+            return result

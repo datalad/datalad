@@ -9,260 +9,250 @@
 """Implements datalad collection metadata representation.
 """
 
-from abc import ABCMeta, abstractmethod, abstractproperty
-from copy import deepcopy
+
 import logging
-import gc
+from abc import ABCMeta, abstractmethod, abstractproperty
 
-from rdflib import Graph, URIRef, ConjunctiveGraph, Literal
+from rdflib import ConjunctiveGraph
 from rdflib.plugins.memory import IOMemory
+from six import iterkeys
 
-from .handle import Handle
-from .metadatahandler import DLNS, RDF, DCTERMS
+from datalad.support.exceptions import CollectionBrokenError
+from datalad.support.metadatahandler import DLNS, RDF, DCTERMS
 
 lgr = logging.getLogger('datalad.collection')
 
 
-class CollectionBackend(object):
-    """Interface to be implemented by backends for collections.
-
-    Abstract class defining an interface, that needs to be implemented
-    by any class that aims to provide a backend for collections.
-    """
+class Collection(dict):
 
     __metaclass__ = ABCMeta
 
-    @abstractmethod
-    def get_handles(self):
-        """Get a dictionary of Handle instances.
-
-        The dictionary contains the handles that belong to the collection.
-
-        Returns:
-        --------
-        dictionary of Handle
-          keys are the handles' names, values the corresponding Handle
-          instances
-        """
-        pass
-
-    @abstractmethod
-    def get_collection(self):
-        """Get the metadata of the collection itself.
-
-        Returns named Graph.
-
-        Returns:
-        --------
-        rdflib.Graph
-        """
-
-    @abstractmethod
-    def commit_collection(self, collection, msg):
-        """Commit a collection.
-
-        Commits changes of the runtime representation `collection` to the
-        backend. Accepts a commit message.
-
-        Parameters:
-        -----------
-        collection: Collection
-        msg: str
-        """
-
-    @abstractproperty
-    def url(self):
-        """
-
-        :return:
-        """
-
-
-    # TODO: We'll probably need a method to get a url of the collection.
-    # Since collections are branches of repos in case of a repo-backend,
-    # just the url won't be sufficient. On the other hand, by now it remains
-    # unclear whether or not "installing" a collection (cloning the repo) will
-    # be needed. Nevertheless: Think how to obtain a clone/checkout of a certain
-    # collection. Even if someone wants to do it without datalad he needs a way
-    # to retrieve all needed information. Depending on desired API to this, it
-    # could simply be done via the CollectionRepo instance instead of a
-    # Collection instance.
-
-# TODO: Add/remove for Collections and MetaCollections.
-# Collection => done. It's a dictionary.
-# So, let a meta collection be a dictionary of collections?
-# Actually, that way the meta data isn't updated. So, add/remove handle
-# probably still necessary.
-#
-# => just override __setitem__ and __delitem__!
-#
-# Done for collections.
-
-
-# #############################################
-# TODO: May it's possible to have only one graph store and use
-# ReadOnlyGraphAggregate instead of ConjunctiveGraph for
-# Collections/MetaCollections. Could save time and space. But need to figure
-# out how general queries work with that one.
-#
-# Nope. ReadOnlyGraphAggregate doesn't limit query()-method to its scope.
-# Still queries the whole store. At least when querying for a
-# certain graph(i.e. handle/collection)
-# #############################################
-
-
-class Collection(dict):
-    """A collection of handles.
-
-    Runtime representation of a collection's metadata. This is independent on
-    its physical representation and therefore uses any CollectionBackend to set
-    and/or retrieve the data.
-
-    A Collection is a dictionary, which's keys are the handles' names.
-    The values are Handle instances representing the metadata of these handles.
-    Additionally, a Collection has attributes to store data about the
-    collection itself:
-
-    Attributes of a collection:
-    name:               str
-    store:              IOMemory
-    meta:               (named) Graph
-    conjunctive_graph:  ConjunctiveGraph
-
-    To represent the metadata, Collections use a named graph per handle and an
-    additional named graph for collection level metadata. These graphs can be
-    queried via the collection's graph store and its corresponding conjunctive
-    graph.
-    """
-
-    def __init__(self, src=None, name=None):
-        # TODO: What about the 'name' option? How to treat it, in case src
-        # provides a name already? For now use it only if src==None.
-        # type(src) == Collection => copy has its own 'name'?
-        # type(src) == Backend => rename in backend?
-
+    def __init__(self):
         super(Collection, self).__init__()
 
-        if isinstance(src, Collection):
-            self._backend = None
-            # TODO: confirm this is correct behaviour and document it.
-            # Means, it is a pure runtime copy with no persistence and no
-            # update from backend.
+        self.store = IOMemory()
+        self._graph = None
+        self._update_listeners = list()
 
-            self.update(src)
-            self.store = IOMemory()
-            for graph in src.store.contexts():
-                self.store.add_graph(graph)
-                if graph.identifier == Literal(src.name):
-                    self.meta = graph
+    def __repr__(self):
+        return "<Collection name=%s (%s), handles=%s>" % (self.name,
+                                                          type(self),
+                                                          list(iterkeys(self)))
+
+    # TODO: Not sure yet, whether this should be abstract or provide a
+    #       default implementation
+    @abstractmethod
+    def __eq__(self, other):
+        pass
+
+    # TODO: Does the URI linking make sense, regarding lazy loading of the
+    # handles themselves? This leads to all the handle.meta being called and
+    # therefore constructed!
+    # But: If we don't override setitem and delitem - when to update collection
+    # graph?
+    # - on update_store only? But then collection-level would not be actually
+    #   valid rdf until update_store()
+
+    def __delitem__(self, key):
+        self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
+        if self_uri is None:
+            raise CollectionBrokenError()
+        key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
+        if key_uri is None or key_uri == DLNS.this:
+            raise ValueError("Handle '%s' has invalid URI: %s." % (key, key_uri))
+        self.meta.remove((self_uri, DCTERMS.hasPart, key_uri))
+        self.store.remove_graph(self[key].name)
+        self[key].remove_update_listener(self.handle_update_listener)
+        super(Collection, self).__delitem__(key)
+
+    # TODO: Check for replace in setitem, register_handle!
+
+    def __setitem__(self, handle_name, handle):
+        """Sugaring to be used to assign a brand new handle, not known to the
+        collection.
+        """
+        self.register_handle(handle, handle_name=handle_name, add_handle_uri=True)
+
+    def register_handle(self, handle, handle_name=None, add_handle_uri=None):
+        """Register a given handle
+
+        Parameters
+        ----------
+        handle_name: str
+        handle: Handle
+        add_handle_uri: bool or None, optional
+          Add handle uri to the collection meta-data.  If None, and no name was
+          provided (thus it could have not being known) -- assume True
+        """
+
+        # if no handle_name was provided -- take it from the handle
+        if handle_name is None:
+            handle_name = handle.name
+            if add_handle_uri is None:
+                add_handle_uri = True
+
+        super(Collection, self).__setitem__(handle_name, handle)
+        handle.register_update_listener(self.handle_update_listener)
+
+        if add_handle_uri is None:
+            add_handle_uri = False
+
+        if add_handle_uri:
+            self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
+            if self_uri is None:
+                raise CollectionBrokenError()  # TODO: Proper exceptions
+
+            # Load it from the handle itself
+            key_uri = self[handle_name].meta.value(predicate=RDF.type, object=DLNS.Handle)
+            if key_uri is None or key_uri == DLNS.this:
+                if self[handle_name].url is not None:
+                    # replace URI in graph:
+                    # Note: This assumes handle.meta is modifiable, meaning repo
+                    #       backends currently need to override it.
+                    from rdflib import URIRef
+                    self[handle_name].meta.remove((key_uri, RDF.type, DLNS.Handle))
+                    key_uri = URIRef(self[handle_name].url)
+                    self[handle_name].meta.add((key_uri, RDF.type, DLNS.Handle))
                 else:
-                    self[str(graph.identifier)].meta = graph
+                    super(Collection, self).__delitem__(handle_name)
+                    raise ValueError("Handle '%s' has neither a valid URI (%s) nor an URL." % (handle_name, key_uri))
+            self.meta.add((self_uri, DCTERMS.hasPart, key_uri))
+            self.store.add_graph(self[handle_name].meta)
+            self.notify_update_listeners(self[handle_name].meta)
 
-            self.conjunctive_graph = ConjunctiveGraph(store=self.store)
+    def handle_update_listener(self, handle):
+        # TODO: For now just updates the handle graph. No checks for
+        # consistency like in register_handle yet.
+        self.store.add_graph(handle.meta)
+        self.notify_update_listeners(handle.meta)
 
-        elif isinstance(src, CollectionBackend):
-            self._backend = src
-            self.store = None
-            # TODO: check for existence in reload() fails otherwise;
-            # If it turns out, that reload is never required outside of
-            # constructor, that check isn't needed!
-
-            self._reload()
-        elif src is None:
-            self._backend = None
-            self.store = IOMemory()
-            self.meta = Graph(store=self.store, identifier=Literal(name))
-            self.meta.add((DLNS.this, RDF.type, DLNS.Collection))
-            self.conjunctive_graph = ConjunctiveGraph(store=self.store)
-
-        else:
-            lgr.error("Unknown source for Collection(): %s" % type(src))
-            raise TypeError('Unknown source for Collection(): %s' % type(src))
+    def fsck(self):
+        """Verify that the collection is in legit state. If not - FIX IT!
+        """
+        # TODO: verify that all the registered handles URIs are valid:
+        #  1. that local path key_uris point to existing handles paths
+        #  2. Go through local handles and run their .fsck
+        # Subclasses should extend the checks (e.g. checking git fsck, git annex fsck, etc)
+        raise NotImplementedError()
 
     @property
     def name(self):
+        """Name of the collection.
+
+        Returns
+        -------
+        str
+        """
         return str(self.meta.identifier)
 
-    def __delitem__(self, key):
+    @abstractproperty
+    def url(self):
+        """URL of the physical representation of the collection.
 
-        lgr.error("__delitem__ called.")
-        self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
-        key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
-        self.meta.remove((self_uri, DCTERMS.hasPart, key_uri))
-        self.store.remove_graph(self[key].name)
-        super(Collection, self).__delitem__(key)
+        This is a read-only property, since an url can only be provided by a
+        physically existing collection. It doesn't make sense to tell a backend
+        to change it.
 
-    def __setitem__(self, key, value):
-        if not isinstance(value, Handle):
-            raise TypeError("Can't add non-Handle object to a collection.")
-
-        super(Collection, self).__setitem__(key, value)
-        self_uri = self.meta.value(predicate=RDF.type, object=DLNS.Collection)
-        key_uri = self[key].meta.value(predicate=RDF.type, object=DLNS.Handle)
-        self.meta.add((self_uri, DCTERMS.hasPart, key_uri))
-        self.store.add_graph(self[key].meta)
-
-    def _reload(self):
-        # TODO: When do we need to reload outside of the constructor?
-        # May be override self.update() to additionally reload in case
-        # there is a backend.
-
-        if not self._backend:
-            # TODO: Error or warning? Depends on when we want to call this one.
-            # By now this should be an error (or even an exception).
-            lgr.error("Missing collection backend.")
-            return
-
-        # get the handles as instances of class Handle:
-        self.update(self._backend.get_handles())
-
-        # get collection level data:
-        collection_data = self._backend.get_collection()
-
-        # TODO: May be a backend can just pass a newly created store containing
-        # all the needed graphs. Would save us time and space for copy, but
-        # seems to be less flexible in case we find another way to store a set
-        # of named graphs and their conjunctive graph without the need of every
-        # collection to have its own store.
-        # Note: By using store.add() there seems to be no copy at all.
-        # Need to check in detail, how this is stored and whether it still
-        # works as intended.
-        # Note 2: Definitely not a copy and seems to work. Need more queries to
-        # check.
-
-        # cleanup old store, if exists
-        if self.store is not None:
-            self.store.gc()
-            del self.store
-            gc.collect()
-        # create new store for the graphs:
-        self.store = IOMemory()
-
-        # add collection's own graph:
-        self.store.add_graph(collection_data)
-        self.meta = collection_data
-
-        # add handles' graphs:
-        for handle in self:
-            self.store.add_graph(self[handle].meta)
-
-        # reference to the conjunctive graph to be queried:
-        self.conjunctive_graph = ConjunctiveGraph(store=self.store)
-
-    def query(self):
-        # Note: As long as we use general SPARQL-Queries, no method is needed,
-        # since this is a method of rdflib.Graph/rdflib.Store.
-        # But we will need some kind of prepared queries here.
-        # Also depends on the implementation of the 'ontology translation layer'
+        Returns
+        -------
+        str
+        """
         pass
 
+    def get_meta(self):
+        if self._graph is None:
+            lgr.debug("Updating collection metadata graph.")
+            self.update_metadata()
+        return self._graph
+
+    def set_meta(self, data):
+        self._graph = data
+
+    meta = property(get_meta, set_meta, doc="""
+    Named rdflib.Graph representing the metadata of the collection.
+    This is a lazy loading property, that is created only when accessed. Note,
+    that this is not necessarily always in sync with the underlying backend.
+    Therefore `update_metadata` and `commit` are provided, to explicitly make
+    sure it's synchronized.""")
+
+    @abstractmethod
+    def update_metadata(self):
+        """Update the graph containing the collection's metadata.
+
+        Called to update 'self._graph' from the collection's backend.
+        Creates a named graph, whose identifier is the name of the collection.
+
+        Note: Should call self.notify_update_listeners()
+        """
+        pass
+        # TODO: what about runtime changes? discard? Meh ...
+
+    @abstractmethod
     def commit(self, msg="Collection updated."):
+        # commit metadata only? Or even changed handle list? The latter!
+        pass
 
-        if not self._backend:
-            lgr.error("Missing collection backend.")
-            raise RuntimeError("Missing collection backend.")
+    def update_graph_store(self):
+        """Update the entire graph store.
 
-        self._backend.commit_collection(self, msg)
+        Update all the metadata graphs from their backends, the collection
+        level metadata as well as the handles' metadata. Makes sure, that all
+        the graphs are available and up-to-date in the collection's graph
+        store. This is especially needed before querying the graph store, due
+        to the fact, that graphs are loaded on demand.
+        """
+
+        # TODO: Currently we update from backend here. Maybe just make sure
+        # every graph is added and make update from backend an option?
+        # Additionally, what about changes in backend?
+        # => handle may not be in self yet!
+        for handle in self:
+            self[handle].update_metadata()
+        self.update_metadata()
+
+    # overriding dict.update():
+    # def update(self, other=None, **kwargs):
+    #     super(Collection, self).update(other, **kwargs)
+    #     TODO: Update collection-level metadata (hasPArt)
+    #           => implicit: setitem, delitem?
+
+    def sparql_query(self, query):
+        # don't query store directly! This wouldn't ensure the store to be
+        # fully loaded.
+        self.update_graph_store()
+        return ConjunctiveGraph(store=self.store).query(query)
+
+    # TODO:
+    # override pop()!
+    # what about clear()?
+    # copy()?
+
+    def register_update_listener(self, listener):
+        """
+
+        Parameters
+        ----------
+        listener: callable
+        """
+        # TODO: Why does "if listener not in self._update..." not work?
+        for l in self._update_listeners:
+            if l is listener:
+                return
+        self._update_listeners.append(listener)
+
+    def remove_update_listener(self, listener):
+        """
+
+        Parameters
+        ----------
+        listener: callable
+        """
+
+        self._update_listeners.remove(listener)
+
+    def notify_update_listeners(self, graph):
+        for listener in self._update_listeners:
+            listener(self, graph)
 
 
 class MetaCollection(dict):
@@ -282,76 +272,102 @@ class MetaCollection(dict):
     """
 
     def __init__(self, src=None, name=None):
+        """
+
+        Parameters
+        ----------
+        src
+        name
+
+        Returns
+        -------
+
+        """
         super(MetaCollection, self).__init__()
 
         self.name = name
+
+        # TODO: Not sure whether 'store' and 'conjunctive_graph' should be
+        #       public. (requires the user to know exactly when to update)
         self.store = IOMemory()
-
-        if isinstance(src, MetaCollection):
-            self.update(src)
-            self.name = src.name
-            # TODO: See Collection: How to treat names in case of a copy?
-
-        elif isinstance(src, list):
-            for item in src:
-                if isinstance(item, Collection):
-                    self[str(item.name)] = item
-                elif isinstance(item, CollectionBackend):
-                    new_item = Collection(src=item)
-                    self[str(new_item.name)] = new_item
-                else:
-                    e_msg = "Can't retrieve collection from %s." % type(item)
-                    lgr.error(e_msg)
-                    raise TypeError(e_msg)
-
-        elif isinstance(src, dict):
-            for key in src:
-                if isinstance(src[key], Collection):
-                    self[key] = src[key]
-                elif isinstance(src[key], CollectionBackend):
-                    self[key] = Collection(src=src[key])
-                else:
-                    e_msg = "Can't retrieve collection from %s." % \
-                            type(src[key])
-                    lgr.error(e_msg)
-                    raise TypeError(e_msg)
-
-        elif src is None:
-            pass
-        else:
-            e_msg = "Invalid source type for MetaCollection: %s" % type(src)
-            lgr.error(e_msg)
-            raise TypeError(e_msg)
-
-        # join the stores:
-        for collection in self:
-            for graph in self[collection].store.contexts():
-                self.store.add_graph(graph)
-                # TODO: Note: Removed all the copying of the graphs and correcting
-                # their references, since we now always use
-                # 'collection/branch/handle' as key. But: Implementation of
-                # this changed behaviour is not well tested yet.
-
         self.conjunctive_graph = ConjunctiveGraph(store=self.store)
 
-    def __setitem__(self, key, value):
-        if not isinstance(value, Collection):
-            raise TypeError("Can't add non-Collection type to MetaCollection.")
+        if src is not None:
+            # retrieve key, value pairs for the dictionary:
+            if isinstance(src, dict):
+                self.update(src)
+                for collection in self:
+                    for graph in self[collection].store.contexts():
+                        self.store.add_graph(graph)
+                    self[collection].register_update_listener(
+                        self.collection_update_listener)
+            else:
+                # assume iterable of Collection items:
+                for item in src:
+                    self[item.name] = item
 
-        super(MetaCollection, self).__setitem__(key, value)
-        for graph in value.store.contexts():
+    def __setitem__(self, collection_name, collection):
+        super(MetaCollection, self).__setitem__(collection_name, collection)
+        # add the graphs of the collection and its handles to the graph store:
+        # Note: Only acquires graphs, that are currently loaded by the
+        #       collections!
+        for graph in collection.store.contexts():
             self.store.add_graph(graph)
+        collection.register_update_listener(self.collection_update_listener)
 
-    def __delitem__(self, key):
-        # delete the graphs of the collection and its handles:
-        for graph in self[key].store.contexts():
+    # TODO: if handle names always use collection_name/handle_name in the
+    # context of collections, __delitem__ and pop should use this pattern to
+    # remove graphs instead of looking at the CURRENT store of the collection!
+
+    def __delitem__(self, collection_name):
+        # remove the graphs of the collection and its handles from the graph
+        # store:
+        for graph in self[collection_name].store.contexts():
             self.store.remove_graph(graph)
+        self[collection_name].remove_update_listener(self.collection_update_listener)
         # delete the entry itself:
-        super(MetaCollection, self).__delitem__(key)
+        super(MetaCollection, self).__delitem__(collection_name)
 
-    def query(self):
-        """ Perform query on the meta collection.
-        Note: It's self.conjunctive_graph or self.store respectively,
-        what is to be queried here.
+    def pop(self, collection_name, default=None):
+        # remove the graphs of the collection and its handles from the graph
+        # store:
+        for graph in self[collection_name].store.contexts():
+            self.store.remove_graph(graph)
+        self[collection_name].remove_update_listener(self.collection_update_listener)
+        return super(MetaCollection, self).pop(collection_name,
+                                               default=default)
+
+    def collection_update_listener(self, collection, graph):
+        self.store.add_graph(graph)
+        # TODO: For now no sanity checks.
+
+    def update_graph_store(self):
         """
-        pass
+        """
+
+        #self.store.gc()
+        #self.store = IOMemory()
+
+        for collection in self:
+            self[collection].update_graph_store()
+
+        #self.conjunctive_graph = ConjunctiveGraph(store=self.store)
+
+    def query(self, query, update=True):
+        """Perform query on the meta collection.
+
+        Parameters
+        ----------
+        query: str
+        update: bool
+
+        Returns
+        -------
+        rdflib.plugins.sparql.processor.SPARQLResult
+        """
+
+        if update:
+            self.update_graph_store()
+        return self.conjunctive_graph.query(query)
+
+    # TODO: to be a *Collection it must fulfill the same API?
