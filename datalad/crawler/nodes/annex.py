@@ -31,6 +31,7 @@ from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
+from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
@@ -101,9 +102,8 @@ class initiate_handle(object):
         self.existing = existing
         self.path = path
         self.branch = branch
-        # TODO: config.crawl.default_backend = 'MD5E'
         # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
-        self.backend = backend or 'MD5E'
+        self.backend = backend
 
     def _initiate_handle(self, path, name):
         lgr.info("Initiating handle %s" % name)
@@ -115,12 +115,17 @@ class initiate_handle(object):
             git_repo.git_checkout(self.branch, options="--orphan")
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creater"
-        return HandleRepo(
+        backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
+        repo = HandleRepo(
             path,
             direct=cfg.getboolean('crawl', 'init direct', default=False),
             name=name,
-            backend=self.backend,
+            backend=backend,
             create=True)
+        # TODO: centralize
+        if backend:
+            put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
+        return repo
 
     def _save_crawl_config(self, handle_path, name, data):
         lgr.debug("Creating handle configuration for %s" % name)
@@ -517,6 +522,9 @@ class Annexificator(object):
                     self.repo.git_checkout(branch, options="--orphan")
                     if self.repo.dirty:
                         self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
+                    backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
+                    if backend:
+                        put_file_under_git(self.repo.path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
