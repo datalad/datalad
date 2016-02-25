@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Downlaoder tests helper utils"""
+"""Downloader tests helper utils"""
 
 from unittest import SkipTest
 
@@ -17,8 +17,11 @@ def get_test_providers(url=None, reload=False):
     _test_providers = Providers.from_config_files(reload=reload)
     if url is not None:
         # check if we have credentials for the url
-        provider = _test_providers.get_provider(url)
-        if not provider.credential.is_known:
+        provider = _test_providers.get_provider(url, only_nondefault=True)
+        if provider is None or provider.credential is None:
+            # no registered provider, or no credential needed,must be all kosher to access
+            pass
+        elif not provider.credential.is_known:
             raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
     return _test_providers
 get_test_providers.__test__ = False
