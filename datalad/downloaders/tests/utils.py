@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Downlaoder tests helper utils"""
+"""Downloader tests helper utils"""
 
 from unittest import SkipTest
 
