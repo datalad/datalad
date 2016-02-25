@@ -13,3 +13,13 @@ these commands.
 
 __docformat__ = 'restructuredtext'
 
+
+def get_submodules(repo):
+    """
+
+    :param repo: GitRepo
+    :return: list
+    """
+    # TODO: May be check for more than just being represented in GitPython.
+    # Figure out, what the presence of a submodule therein actually implies.
+    return [sm.name for sm in repo.repo.submodules]

@@ -18,6 +18,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.cmdline.helpers import POC_get_datalad_master
 from .base import Interface
+from .POC_helpers import get_submodules
 
 
 class POCInstallHandle(Interface):
@@ -58,12 +59,8 @@ class POCInstallHandle(Interface):
 
         master = POC_get_datalad_master()
 
-        # check if a handle with taht name already exists:
-        # via GitPython:
-        #if name in [sm.name for sm in master.repo.submodules]:
-        #    raise ValueError("Handle '%s' already installed." % name)
-        # or may be just check the path instead?:
-        if exists(opj(master.path, name)):
+        # check if a handle with that name already exists:
+        if name in get_submodules(master):
             raise ValueError("Handle '%s' already installed." % name)
 
         if exists(url):
