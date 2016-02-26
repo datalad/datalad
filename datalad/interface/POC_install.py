@@ -19,6 +19,7 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.cmdline.helpers import POC_get_datalad_master
 from .base import Interface
 from .POC_helpers import get_submodules
+from datalad.cmd import CommandError
 
 
 class POCInstallHandle(Interface):
@@ -60,17 +61,29 @@ class POCInstallHandle(Interface):
         master = POC_get_datalad_master()
 
         # check if a handle with that name already exists:
-        if name in get_submodules(master):
-            raise ValueError("Handle '%s' already installed." % name)
+        # TODO: Decide whether or not we want to check the optional name before
+        # even calling "git submodule add" or just wait for its feedback.
+        # if name in get_submodules(master):
+        #     raise ValueError("Handle '%s' already installed." % name)
 
         if exists(url):
             url = abspath(expandvars(expanduser(url)))
 
         # TODO: rollback on exception during git calls?
-        master._git_custom_command('', ["git", "submodule", "add", url, name])
+        try:
+            master._git_custom_command('', ["git", "submodule", "add", url,
+                                            name if name is not None else ''])
+        except CommandError as e:
+            m = e.stderr.strip()
+            if m.endswith("' already exists in the index") \
+                    and m.startswith("'"):
+                raise ValueError("Handle %s already installed." % m[0:-28])
+            else:
+                raise
+
         master._git_custom_command('', ["git", "submodule", "update", "--init",
                                         "--recursive" if recursive else '',
-                                        name])
+                                        name if name is not None else ''])
 
         # TODO: msg should also list installed subhandles!
         master.git_commit("Installed handle '%s'" % name)
