@@ -26,7 +26,8 @@ from ....support.stats import ActivityStats
 from ....support.annexrepo import AnnexRepo
 
 @with_tempfile(mkdir=True)
-def test_initialize_handle(path):
+@with_tempfile()
+def test_initialize_handle(path, path2):
     handle_path = opj(path, 'test')
     datas = list(initiate_handle('template', 'testhandle', path=handle_path)())
     assert_equal(len(datas), 1)
@@ -37,9 +38,17 @@ def test_initialize_handle(path):
     pipeline = load_pipeline_from_config(crawl_cfg)
 
     # by default we should initiate to MD5E backend
-    f = opj(handle_path, 'test.dat')
+    fname = 'test.dat'
+    f = opj(handle_path, fname)
     annex = put_file_under_git(f, content="test", annexed=True)
     eq_(annex.get_file_backend(f), 'MD5E')
+
+    # and even if we clone it -- nope -- since persistence is set by Annexificator
+    # so we don't need to explicitly to commit it just in master since that might
+    # not be the branch we will end up working in
+    annex2 = AnnexRepo(path2, url=handle_path)
+    annex3 = put_file_under_git(path2, 'test2.dat', content="test2", annexed=True)
+    eq_(annex3.get_file_backend('test2.dat'), 'MD5E')
 
     raise SkipTest("TODO much more")
 
