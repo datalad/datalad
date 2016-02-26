@@ -75,6 +75,8 @@ class POCInstallHandle(Interface):
                                             name if name is not None else ''])
         except CommandError as e:
             m = e.stderr.strip()
+            # TODO: Is there a better way to evaluate git's message?
+            # These strings may change from time to time.
             if m.endswith("' already exists in the index") \
                     and m.startswith("'"):
                 raise ValueError("Handle %s already installed." % m[0:-28])

@@ -258,7 +258,7 @@ def POC_get_datalad_master():
     # Allow to have "master" collection be specified by environment variable
     env_path = os.environ.get('DATALAD_COLLECTION_PATH', None)
     return GitRepo(
-        env_path or opj(dirs.user_data_dir, "POC_", DATALAD_COLLECTION_NAME),
+        env_path or opj(dirs.user_data_dir, "POC_" + DATALAD_COLLECTION_NAME),
         create=True
     )
 
