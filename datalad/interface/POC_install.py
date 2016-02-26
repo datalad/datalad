@@ -13,6 +13,8 @@
 __docformat__ = 'restructuredtext'
 
 
+import logging
+
 from os.path import join as opj, abspath, expanduser, expandvars, exists
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
@@ -21,6 +23,7 @@ from .base import Interface
 from .POC_helpers import get_submodules
 from datalad.cmd import CommandError
 
+lgr = logging.getLogger('datalad.interface.POC_install')
 
 class POCInstallHandle(Interface):
     """Install a handle."""
@@ -69,6 +72,8 @@ class POCInstallHandle(Interface):
         if exists(url):
             url = abspath(expandvars(expanduser(url)))
 
+        submodules_pre = get_submodules(master)
+
         # TODO: rollback on exception during git calls?
         try:
             master._git_custom_command('', ["git", "submodule", "add", url,
@@ -83,13 +88,38 @@ class POCInstallHandle(Interface):
             else:
                 raise
 
+        submodules_post = get_submodules(master)
+
+        # check what git added:
+        submodules_added = [sm for sm in submodules_post
+                            if sm not in submodules_pre]
+        dbg_msg = ""
+        for sm in submodules_added:
+            dbg_msg += "Added submodule:\nname: %s\npath: %s\nurl: %s\n" \
+                       % (sm, submodules_post[sm]["path"],
+                          submodules_post[sm]["url"])
+        lgr.debug(dbg_msg)
+        assert len(submodules_added) == 1
+
+        # evaluate name of added submodule:
+        if name is not None:
+            assert submodules_added[0] == name
+        else:
+            name = submodules_added[0]
+
+        # init and update the submodule(s):
         master._git_custom_command('', ["git", "submodule", "update", "--init",
                                         "--recursive" if recursive else '',
-                                        name if name is not None else ''])
+                                        name])
 
+        # commit the changes to masterhandle:
         # TODO: msg should also list installed subhandles!
+        # (so should the final user output)
         master.git_commit("Installed handle '%s'" % name)
 
+        lgr.info("Successfully installed handle '%s' from %s at %s." %
+                 (name, submodules_post[name]["url"],
+                  opj(master.path, submodules_post[name]["path"])))
 
 
 
