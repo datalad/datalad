@@ -27,6 +27,7 @@ from datalad.cmd import CommandError
 
 lgr = logging.getLogger('datalad.interface.POC_install')
 
+
 class POCInstallHandle(Interface):
     """Install a handle."""
 
@@ -118,24 +119,30 @@ class POCInstallHandle(Interface):
             name = submodules_added[0]
 
         # init and update the submodule(s):
-        master._git_custom_command('', ["git", "submodule", "update", "--init",
-                                        "--recursive" if recursive else '',
-                                        name])
+        std_out, std_err = \
+            master._git_custom_command('', ["git", "submodule", "update",
+                                            "--init", "--recursive"
+                                            if recursive else '', name])
+        # catch possibly included subhandles:
+        import re
+        subhandles = re.findall("Submodule path '(.+?)'", std_out)
+        # and sort by length, which gives us simple hierarchy information
+        subhandles.sort(key=len)
+
+        
 
         # TODO: move worktree if destination is not default:
 
-
-
-
-
-
         # commit the changes to masterhandle:
-        # TODO: msg should also list installed subhandles!
-        # (so should the final user output)
-        master.git_commit("Installed handle '%s'" % name)
+        commit_msg = "Installed handle '%s'\n" % name
+        for sh in subhandles:
+            commit_msg += "Installed subhandle '%s'\n" % sh
+        master.git_commit(commit_msg)
 
         # init annex if it is an annex:
-        # TODO: Recurse into submodules
+        # TODO: Recurse into submodules (This requires a proper representation
+        # of submodule hierarchy, which respects possibly moved working trees)
+
         if is_annex(opj(master.path, submodules_post[name]["path"])):
             lgr.debug("Annex detected in submodule '%s'. Calling annex init ..."
                       % name)
@@ -146,9 +153,12 @@ class POCInstallHandle(Interface):
                       create=False,
                       init=False)._annex_init()
 
+        # final user output
         lgr.info("Successfully installed handle '%s' from %s at %s." %
                  (name, submodules_post[name]["url"],
                   opj(master.path, submodules_post[name]["path"])))
-
-
-
+        if subhandles:
+            msg = "Included Subhandles:\n"
+            for sh in subhandles:
+                msg += sh + "\n"
+            lgr.info(msg)

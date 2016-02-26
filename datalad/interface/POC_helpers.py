@@ -47,3 +47,4 @@ def is_annex(path):
     from datalad.support.gitrepo import GitRepo
     repo = GitRepo(path, create=False)
     return "origin/git-annex" in repo.git_get_remote_branches()
+
