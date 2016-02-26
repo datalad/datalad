@@ -118,18 +118,30 @@ class POCInstallHandle(Interface):
         else:
             name = submodules_added[0]
 
+        # Note: May be move worktree before init, since init creates the
+        # entries in git/config from gitmodules. So we may need to change the
+        # gitmodules only.
+        # TODO: Test it!
+
         # init and update the submodule(s):
         std_out, std_err = \
             master._git_custom_command('', ["git", "submodule", "update",
                                             "--init", "--recursive"
                                             if recursive else '', name])
-        # catch possibly included subhandles:
+
+        # get list of updated (and initialized) subhandles from output:
         import re
         subhandles = re.findall("Submodule path '(.+?)'", std_out)
         # and sort by length, which gives us simple hierarchy information
         subhandles.sort(key=len)
 
-        
+        # get created hierarchy of submodules including paths and urls as a
+        # nested dict:
+        hierarchy = get_submodules(master)[name]
+        import json
+        lgr.debug("Submodule '%s':\n" % name + str(json.dumps(hierarchy,
+                                                              indent=4)))
+
 
         # TODO: move worktree if destination is not default:
 

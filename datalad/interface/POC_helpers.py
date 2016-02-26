@@ -13,25 +13,32 @@ these commands.
 
 __docformat__ = 'restructuredtext'
 
+
 from os.path import join as opj
+from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError
 
 
 def get_submodules(repo):
     """
 
     :param repo: GitRepo
-    :return: list
+    :return: dict
     """
-    # TODO: May be check for more than just being represented in GitPython.
-    # Figure out, what the presence of a submodule therein actually implies.
-    # return [sm.name for sm in repo.repo.submodules]
 
     parser = get_module_parser(repo)
     submodules = dict()
     for entry in parser.sections():
-        submodules[entry[11:-1]] = dict()
-        submodules[entry[11:-1]]["path"] = parser.get_value(entry, "path")
-        submodules[entry[11:-1]]["url"] = parser.get_value(entry, "url")
+        name = entry[11:-1]
+        submodules[name] = dict()
+        submodules[name]["path"] = parser.get_value(entry, "path")
+        submodules[name]["url"] = parser.get_value(entry, "url")
+        try:
+            rec_repo = GitRepo(opj(repo.path, submodules[name]["path"]), create=False)
+            submodules[name]["submodules"] = get_submodules(rec_repo)
+        except InvalidGitRepositoryError:
+            # non initialized submodule is invalid repo, so no information
+            # about further submodules
+            submodules[name]["submodules"] = {}
     return submodules
 
 
