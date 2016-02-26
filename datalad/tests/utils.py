@@ -190,7 +190,7 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if content is None:
         content = ""
     with open(opj(path, filename), 'w') as f_:
-        f_.write(content.encode())
+        f_.write(content)
 
     if annexed:
         if not isinstance(repo, AnnexRepo):
