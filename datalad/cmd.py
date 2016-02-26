@@ -18,12 +18,16 @@ import logging
 import os
 import shutil
 import shlex
+import atexit
+import functools
 
-from six import PY3
+from six import PY3, PY2
 from six import string_types, binary_type
 
+from .dochelpers import exc_str
 from .support.exceptions import CommandError
-from .support.protocol import NullProtocol, DryRunProtocol
+from .support.protocol import NullProtocol, DryRunProtocol, \
+    ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
 from .utils import on_windows
 from . import cfg
 
@@ -31,6 +35,11 @@ lgr = logging.getLogger('datalad.cmd')
 
 _TEMP_std = sys.stdout, sys.stderr
 
+if PY2:
+    # TODO apparently there is a recommended substitution for Python2
+    # which is a backported implementation of python3 subprocess
+    # https://pypi.python.org/pypi/subprocess32/
+    pass
 
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
@@ -64,7 +73,24 @@ class Runner(object):
 
         self.cwd = cwd
         self.env = env
-        self.protocol = NullProtocol() if protocol is None else protocol
+        if protocol is None:
+            # TODO: config cmd.protocol = null
+            cfg = os.environ.get('DATALAD_CMD_PROTOCOL', 'null')
+            protocol = {
+                'externals-time': ExecutionTimeExternalsProtocol,
+                'time': ExecutionTimeProtocol,
+                'null': NullProtocol
+            }[cfg]()
+            if cfg != 'null':
+                # we need to dump it into a file at the end
+                # TODO: config cmd.protocol_prefix = protocol
+                filename = '%s-%s.log' % (
+                    os.environ.get('DATALAD_CMD_PROTOCOL_PREFIX', 'protocol'),
+                    id(self)
+                )
+                atexit.register(functools.partial(protocol.write_to_file, filename))
+
+        self.protocol = protocol
 
     def __call__(self, cmd, *args, **kwargs):
         """Convenience method
@@ -231,7 +257,7 @@ class Runner(object):
             except Exception as e:
                 prot_exc = e
                 lgr.error("Failed to start %r%r: %s" %
-                          (cmd, " under %r" % cwd if cwd else '', e))
+                          (cmd, " under %r" % cwd if cwd else '', exc_str(e)))
                 raise
 
             finally:
@@ -348,12 +374,13 @@ def link_file_load(src, dst, dry_run=False):
 
     try:
         os.link(src_realpath, dst)
-    except  AttributeError as e:
+    except AttributeError as e:
         lgr.warn("Linking of %s failed (%s), copying file" % (src, e))
         shutil.copyfile(src_realpath, dst)
         shutil.copystat(src_realpath, dst)
     else:
-        lgr.log(1, "Hardlinking finished")
+        lgr.log(2, "Hardlinking finished")
+
 
 def get_runner(*args, **kwargs):
     # TODO:  this is all crawl specific -- should be moved away

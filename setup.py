@@ -7,6 +7,9 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 # Minimalistic setup.py for now
 
+from glob import glob
+from os.path import sep as pathsep
+
 from setuptools import setup, find_packages
 
 import datalad.version
@@ -30,11 +33,16 @@ setup(
     entry_points={
         'console_scripts': [
             'datalad=datalad.cmdline.main:main',
-            'git-annex-remote-dl+archive=datalad.customremotes.archive:main'],
+            'git-annex-remote-datalad-archives=datalad.customremotes.archives:main',
+            'git-annex-remote-datalad=datalad.customremotes.datalad:main',
+        ],
     },
     package_data={
-        'datalad': ['resources/sshserver_prepare_for_publish.sh',
-                    'resources/sshserver_cleanup_after_publish.sh',
-                    'resources/git_ssh.sh']
+        'datalad': [
+            'resources/git_ssh.sh',
+            'resources/sshserver_cleanup_after_publish.sh',
+            'resources/sshserver_prepare_for_publish.sh',
+        ] + \
+        [p.split(pathsep, 1)[1] for p in glob('datalad/downloaders/configs/*.cfg')]
     }
 )

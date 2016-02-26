@@ -11,6 +11,7 @@
 __docformat__ = 'restructuredtext'
 
 import os
+import re
 from os.path import exists, join as opj, basename, abspath
 
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
@@ -23,21 +24,26 @@ from ..support.exceptions import CommandError
 from ..support.archives import ArchivesCache
 from ..utils import getpwd
 from .base import AnnexCustomRemote
+from .base import URI_PREFIX
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
 #       into a separate class
-class AnnexArchiveCustomRemote(AnnexCustomRemote):
+class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     """Special custom remote allowing to obtain files from archives
 
      Archives should also be under annex control.
     """
 
-    PREFIX = "archive"
+    CUSTOM_REMOTE_NAME = "archive"
+    SUPPORTED_SCHEMES = (AnnexCustomRemote._get_custom_scheme(CUSTOM_REMOTE_NAME),)
+    # Since we support only 1 scheme here
+    URL_PREFIX = SUPPORTED_SCHEMES[0] + ":"
+
     AVAILABILITY = "local"
 
     def __init__(self, persistent_cache=True, **kwargs):
-        super(AnnexArchiveCustomRemote, self).__init__(**kwargs)
+        super(ArchiveAnnexCustomRemote, self).__init__(**kwargs)
         # annex requests load by KEY not but URL which it originally asked
         # about.  So for a key we might get back multiple URLs and as a
         # heuristic let's use the most recently asked one
@@ -48,10 +54,23 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def stop(self, *args):
         """Stop communication with annex"""
         self._cache.clean()
-        super(AnnexArchiveCustomRemote, self).stop(*args)
+        super(ArchiveAnnexCustomRemote, self).stop(*args)
 
-    def get_file_url(self, archive_file=None, archive_key=None, file=None):
+    def get_file_url(self, archive_file=None, archive_key=None, file=None, size=None):
         """Given archive (file or a key) and a file -- compose URL for access
+
+        Examples:
+        ---------
+
+        dl+archive:SHA256E-s176--69...3e.tar.gz/1/d2/2d#size=123
+            when size of file within archive was known to be 123
+        dl+archive:SHA256E-s176--69...3e.tar.gz/1/d2/2d
+            when size of file within archive was not provided
+
+        Parameters
+        ----------
+        size: int, optional
+          Size of the file.  If not provided, will simply be empty
         """
         assert(file is not None)
         if archive_file is not None:
@@ -60,16 +79,30 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             archive_key = self.repo.get_file_key(archive_file)
         assert(archive_key is not None)
         file_quoted = urlquote(file)
-        return '%s%s/%s' % (self.url_prefix, archive_key, file_quoted.lstrip('/'))
+        attrs = {}  # looking forward for more
+        if size is not None:
+            attrs['size'] = size
+        sattrs = '#%s' % ('&'.join("%s=%s" % x for x in attrs.items())) if attrs else ''
+        return '%s%s/%s%s' % (self.URL_PREFIX, archive_key, file_quoted.lstrip('/'), sattrs)
 
     @property
     def cache(self):
         return self._cache
 
     def _parse_url(self, url):
-        assert(url[:len(self.url_prefix)] == self.url_prefix)
-        key, file_ = url[len(self.url_prefix):].split('/', 1)
-        return key, file_
+        """Parse url and return archive key, file within archive and additional attributes (such as size)
+        """
+        url_prefix = self.URL_PREFIX
+        assert(url[:len(url_prefix)] == url_prefix)
+        key, file_attrs = url[len(url_prefix):].split('/', 1)
+        if '#' in file_attrs:
+            file_, attrs_str = file_attrs.split('#', 1)
+            attrs = dict(x.split('=', 1) for x in attrs_str.split('&'))
+            if 'size' in attrs:
+                attrs['size'] = int(attrs['size'])
+        else:
+            file_, attrs = file_attrs, {}
+        return key, file_, attrs
 
     #
     # Helper methods
@@ -82,9 +115,8 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
             If could not figure out any URL
         """
         urls = self.get_URLS(key)
-        if not urls:
-            raise ValueError("Do not have any URLs for %s" % key)
-        elif len(urls) == 1:
+
+        if len(urls) == 1:
             return urls[0]
         else:  # multiple
             # TODO:  utilize cache to check which archives might already be
@@ -100,7 +132,7 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         """Given a key, figure out target archive key, and file within archive
         """
         url = self._get_key_url(key)
-        return self._parse_url(url)
+        return self._parse_url(url)[:2]  # skip size
 
     # Protocol implementation
     def req_CHECKURL(self, url):
@@ -129,30 +161,36 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         #  only if just archive portion of url is given or the one pointing
         #  to specific file?
         lgr.debug("Current directory: %s, url: %s" % (os.getcwd(), url))
-        akey, afile = self._parse_url(url)
+        akey, afile, attrs = self._parse_url(url)
+        size = attrs.get('size', None)
 
         # But reply that present only if archive is present
         # TODO: this would throw exception if not present, so this statement is kinda bogus
-        try:
-            # throws exception if not present
-            akey_path = opj(self.path, self.repo.get_contentlocation(akey))#, relative_to_top=True))
+        akey_fpath = self.get_contentlocation(akey)  #, relative_to_top=True))
+        if akey_fpath:
+            akey_path = opj(self.path, akey_fpath)
 
             # if for testing we want to force getting the archive extracted
             # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
             efile = self.cache[akey_path].get_extracted_filename(afile)
-            if exists(efile):
+
+            if size is None and exists(efile):
                 size = os.stat(efile).st_size
-            else:
+
+            if size is None:
                 size = 'UNKNOWN'
 
             # FIXME: providing filename causes annex to not even talk to ask
             # upon drop :-/
-            self.send("CHECKURL-CONTENTS", size)#, basename(afile))
-        except CommandError:
+            self.send("CHECKURL-CONTENTS", size)  #, basename(afile))
+
+            # so it was a good successful one -- record
+            self._last_url = url
+        else:
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
-        self._last_url = url
+
 
     def req_CHECKPRESENT(self, key):
         """Check if copy is available
@@ -177,10 +215,9 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
         akey, afile = self._get_akey_afile(key)
-        try:
-            self.repo.get_contentlocation(akey)
+        if self.get_contentlocation(akey):
             self.send("CHECKPRESENT-SUCCESS", key)
-        except CommandError:
+        else:
             # TODO: proxy the same to annex itself to verify check for archive.
             # If archive is no longer available -- then CHECKPRESENT-FAILURE
             self.send("CHECKPRESENT-UNKNOWN", key)
@@ -230,22 +267,28 @@ class AnnexArchiveCustomRemote(AnnexCustomRemote):
     def _transfer(self, cmd, key, path):
 
         akey, afile = self._get_akey_afile(key)
-        try:
-            akey_path = opj(self.path, self.repo.get_contentlocation(akey))
-        except CommandError:
+        akey_fpath = self.get_contentlocation(akey)
+        if akey_fpath:  # present
+            akey_path = opj(self.path, akey_fpath)
+        else:
             # TODO: make it more stringent?
             # Command could have fail to run if key was not present locally yet
             # Thus retrieve the key using annex
             try:
+                # TODO: we need to report user somehow about this happening and progress on the download
                 self.runner(["git-annex", "get", "--key", akey],
                             cwd=self.path, expect_stderr=True)
-                akey_path = self.repo.get_contentlocation(akey)
-                assert exists(opj(self.repo.path, akey_path)), "Key file %s is not present" % akey_path
             except Exception as e:
                 #from celery.contrib import rdb
                 #rdb.set_trace()
                 self.error("Failed to fetch {akey} containing {key}: {e}".format(**locals()))
                 return
+            akey_fpath = self.get_contentlocation(akey)
+            if not akey_fpath:
+                raise RuntimeError("We were reported to fetch it alright but now can't get its location.  Check logic")
+
+        akey_path = opj(self.repo.path, akey_fpath)
+        assert exists(akey_path), "Key file %s is not present" % akey_path
 
         # Extract that bloody file from the bloody archive
         # TODO: implement/use caching, for now a simple one

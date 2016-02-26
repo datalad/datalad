@@ -13,7 +13,12 @@ import os
 import random
 import traceback
 
-from bs4 import BeautifulSoup
+try:
+    # optional direct dependency we might want to kick out
+    import bs4
+except ImportError:
+    bs4 = None
+
 from glob import glob
 from os.path import exists, join as opj, basename
 
@@ -358,7 +363,7 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         u = urlopen(url)
         assert_true(u.getcode() == 200)
         html = u.read()
-        soup = BeautifulSoup(html, "html.parser")
+        soup = bs4.BeautifulSoup(html, "html.parser")
         href_links = [txt.get('href') for txt in soup.find_all('a')]
         assert_true(len(href_links) == 1)
 
@@ -367,6 +372,8 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         html = u.read().decode()
         assert(test_txt == html)
 
+    if bs4 is None:
+        raise SkipTest("bs4 is absent")
     test_path_and_url()
 
 
@@ -454,16 +461,18 @@ def test_run_under_dir(d):
 
 def test_use_cassette_if_no_vcr():
     # just test that our do nothing decorator does the right thing if vcr is not present
+    skip = False
     try:
         import vcr
-        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
+        skip = True
     except ImportError:
         pass
     except:
         # if anything else goes wrong with importing vcr, we still should be able to
         # run use_cassette
         pass
-
+    if skip:
+        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
     @use_cassette("some_path")
     def checker(x):
         return x + 1

@@ -8,30 +8,32 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for http downloader"""
 
-import os
-from os.path import join as opj
 import time
 from calendar import timegm
-import six.moves.builtins as __builtin__
 from six import PY3
 
-from ..base import DownloadError
-from ..http import HTTPDownloader
-from ..http import HTMLFormAuthenticator
-from ..providers import Providers, Credential  # to test against crcns
-from ...support.cookies import CookiesDB
+import os
+import six.moves.builtins as __builtin__
+from os.path import join as opj
 
+from datalad.downloaders.tests.utils import get_test_providers
+from ..base import DownloadError
+from ..http import HTMLFormAuthenticator
+from ..http import HTTPDownloader
+from ..providers import Credential  # to test against crcns
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
-if PY3:
+try:
+    if PY3:
+        raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
+    import httpretty
+except ImportError:
     class NoHTTPPretty(object):
        __bool__ = __nonzero__ = lambda s: False
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
-else:
-    import httpretty
 
 from mock import patch
 from ...tests.utils import assert_in
@@ -46,9 +48,8 @@ from ...tests.utils import swallow_logs
 from ...tests.utils import swallow_outputs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
-from ...tests.utils import SkipTest
-from ...tests.utils import skip_httpretty_on_problematic_pythons
 from ...tests.utils import skip_if
+from ...support.status import FileStatus
 
 def test_docstring():
     doc = HTTPDownloader.__init__.__doc__
@@ -103,25 +104,10 @@ def test_HTTPDownloader_basic(toppath, topurl):
     # TODO: access denied detection
 
 
-_test_providers = None
-
-def _get_test_providers(url=None):
-    """Return reusable instance of our global providers"""
-    global _test_providers
-    if not _test_providers:
-        _test_providers = Providers.from_config_files()
-    if url is not None:
-        # check if we have credentials for the url
-        provider = _test_providers.get_provider(url)
-        if not provider.credential.is_known:
-            raise SkipTest("This test requires known credentials for %s" % provider.credential.name)
-    return _test_providers
-
-
 @with_tempfile(mkdir=True)
 def check_download_external_url(url, failed_str, success_str, d):
     fpath = opj(d, get_url_straight_filename(url))
-    providers = _get_test_providers(url)  # url for check of credentials
+    providers = get_test_providers(url)  # url for check of credentials
     provider = providers.get_provider(url)
     downloader = provider.get_downloader(url)
 
@@ -163,8 +149,9 @@ def check_download_external_url(url, failed_str, success_str, d):
 
     # Verify status
     status = downloader.get_status(url)
-    assert_in('Last-Modified', status)
-    assert_in('Content-Length', status)
+    assert(isinstance(status, FileStatus))
+    assert(status.mtime)
+    assert(status.size)
     # TODO -- more and more specific
 
 
@@ -192,22 +179,24 @@ def test_mtime(path, url, tempfile):
 
     file_url = "%s/%s" % (url, 'file.dat')
     with swallow_outputs():
-        _get_test_providers().download(file_url, path=tempfile)
+        get_test_providers().download(file_url, path=tempfile)
     assert_equal(os.stat(tempfile).st_mtime, 1000)
+
 
 def test_get_status_from_headers():
     # function doesn't do any value transformation ATM
     headers = {
         'Content-Length': '123',
         # some other file record - we don't test content here yet
-        'Content-Disposition': "bogus.txt",
+        'Content-Disposition': 'attachment; filename="bogus.txt"',
         'Last-Modified': 'Sat, 07 Nov 2015 05:23:36 GMT'
     }
     headers['bogus1'] = '123'
     assert_equal(
             HTTPDownloader.get_status_from_headers(headers),
-            {'Content-Length': 123, 'Content-Disposition': "bogus.txt", 'Last-Modified': 1446873816})
-    assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}), {'Content-Length': 123})
+            FileStatus(size=123, filename='bogus.txt', mtime=1446873816))
+    assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}),
+                 FileStatus(size=123))
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!

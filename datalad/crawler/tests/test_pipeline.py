@@ -17,6 +17,8 @@ from ..nodes.misc import Sink, assign, range_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
 from ..pipeline import load_pipeline_from_script
 
+from ...support.stats import ActivityStats
+
 from ...tests.utils import with_tree
 from ...tests.utils import eq_, ok_, assert_raises
 from ...tests.utils import assert_in
@@ -48,97 +50,6 @@ class AssertOrder(object):
         return _assert_order
 
 
-@skip_if_no_network
-@use_cassette('fixtures/vcr_cassettes/openfmri.yaml')
-def __test_basic_openfmri_top_pipeline():
-    skip_if_no_module('scrapy')  # e.g. not present under Python3
-    sink1 = Sink()
-    sink2 = Sink()
-    sink_licenses = Sink()
-    pipeline = [
-        crawl_url("https://openfmri.org/data-sets"),
-        a_href_match(".*/dataset/(?P<dataset_dir>ds0*(?P<dataset>[1-9][0-9]*))$"),
-        # if we wanted we could instruct to crawl inside
-        [
-            crawl_url(),
-            [# and collect all URLs under "AWS Link"
-                css_match('.field-name-field-aws-link a',
-                           xpaths={'url': '@href',
-                                   'url_text': 'text()'}),
-                sink2
-             ],
-            [# and license information
-                css_match('.field-name-field-license a',
-                           xpaths={'url': '@href',
-                                   'url_text': 'text()'}),
-                sink_licenses
-            ],
-        ],
-        sink1
-    ]
-
-    run_pipeline(pipeline)
-    # we should have collected all the URLs to the datasets
-    urls = [e['url'] for e in sink1.data]
-    ok_(len(urls) > 20)  # there should be at least 20 listed there
-    ok_(all([url.startswith('https://openfmri.org/dataset/ds00') for url in urls]))
-    # got our dataset_dir entries as well
-    ok_(all([e['dataset_dir'].startswith('ds0') for e in sink1.data]))
-
-    # and sink2 should collect everything downloadable from under AWS Link section
-    # test that we got all needed tags etc propagated properly!
-    all_aws_entries = sink2.get_values('dataset', 'url_text', 'url')
-    ok_(len(all_aws_entries) > len(urls))  # that we have at least as many ;-)
-    #print('\n'.join(map(str, all_aws_entries)))
-    all_licenses = sink_licenses.get_values('dataset', 'url_text', 'url')
-    eq_(len(all_licenses), len(urls))
-    #print('\n'.join(map(str, all_licenses)))
-
-
-@skip_if_no_network
-@use_cassette('fixtures/vcr_cassettes/openfmri-1.yaml')
-@with_tempfile(mkdir=True)
-def __test_basic_openfmri_dataset_pipeline_with_annex(path):
-    skip_if_no_module('scrapy')  # e.g. not present under Python3
-    dataset_index = 1
-    dataset_name = 'ds%06d' % dataset_index
-    dataset_url = 'https://openfmri.org/dataset/' + dataset_name
-    # needs to be a non-existing directory
-    handle_path = opj(path, dataset_name)
-    # we need to pre-initiate handle
-    list(initiate_handle('openfmri', dataset_index, path=handle_path)())
-
-    annex = Annexificator(handle_path, create=False,  # must be already initialized etc
-                          options=["-c", "annex.largefiles='exclude=*.txt'"])
-
-    pipeline = [
-        crawl_url(dataset_url),
-        [  # and collect all URLs under "AWS Link"
-            css_match('.field-name-field-aws-link a',
-                      xpaths={'url': '@href',
-                              'url_text': 'text()'}),
-            # TODO:  here we need to provide means to rename some files
-            # but first those names need to be extracted... pretty much
-            # we need conditional sub-pipelines which do yield (or return?)
-            # some result back to the main flow, e.g.
-            # get_url_filename,
-            # [ {'yield_result': True; },
-            #   field_matches_re(filename='.*release_history.*'),
-            #   assign({'filename': 'license:txt'}) ]
-            annex,
-        ],
-        [  # and license information
-            css_match('.field-name-field-license a',
-                      xpaths={'url': '@href',
-                              'url_text': 'text()'}),
-            assign({'filename': 'license.txt'}),
-            annex,
-        ],
-    ]
-
-    run_pipeline(pipeline)
-
-
 @with_tree(tree={
     'pipeline.py': 'pipeline = lambda: [1]',
     'pipeline2.py': 'pipeline = lambda x: [2*x]',
@@ -149,6 +60,20 @@ def test_load_pipeline_from_script(d):
     assert_raises(RuntimeError, load_pipeline_from_script, opj(d, 'unlikelytobethere.py'))
 
 
+DEFAULT_OUTPUT = [{'datalad_stats': ActivityStats()}]
+def _out(ld):
+    """Adjust output entry to include default outputs as well
+    """
+    outl = []
+    for d in ld:
+        out = d.copy()
+        outl.append(out)
+        for k, v in DEFAULT_OUTPUT[0].items():
+            if k not in out:
+                out[k] = v
+    return outl
+
+
 def test_pipeline_linear_simple():
     sink = Sink()
     pipeline = [
@@ -157,7 +82,7 @@ def test_pipeline_linear_simple():
         sink
     ]
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])  # by default 'input' is output and input is made empty dict if not provided
+    eq_(pipeline_output, DEFAULT_OUTPUT)  # by default 'input' is output and input is made empty dict if not provided
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
                     {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}])
 
@@ -165,11 +90,13 @@ def test_pipeline_linear_simple():
     # stop at that matching point, but otherwise there should be no crash etc
     sink.clean()
     pipeline_output = run_pipeline(pipeline + [interrupt_if({'out1': 0, 'out2': 1})])
-    eq_(pipeline_output, [{}])
+    eq_(pipeline_output, DEFAULT_OUTPUT)
     eq_(sink.data, [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}])
+
 
 def test_pipeline_unknown_opts():
     assert_raises(ValueError, run_pipeline, [{'xxx': 1}])
+
 
 def test_pipeline_linear_nested_order():
     sink = Sink()
@@ -207,7 +134,7 @@ def test_pipeline_linear_nested():
     all_pairs = [{'out1': 0, 'out2': 0}, {'out1': 0, 'out2': 1}, {'out1': 0, 'out2': 2},
                  {'out1': 1, 'out2': 0}, {'out1': 1, 'out2': 1}, {'out1': 1, 'out2': 2}]
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])
+    eq_(pipeline_output, DEFAULT_OUTPUT)
     eq_(sink.data, all_pairs)
     # and output is not seen outside of the nested pipeline
     eq_(sink2.data, [{'out1': 0}, {'out1': 1}])
@@ -218,7 +145,7 @@ def test_pipeline_linear_nested():
     pipeline[1].insert(0, {'output': 'outputs'})
 
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])  # by default no output produced
+    eq_(pipeline_output, DEFAULT_OUTPUT)  # by default no output produced
     eq_(sink.data, all_pairs)
     # and output was passed outside from the nested pipeline
     eq_(sink2.data, all_pairs)
@@ -227,19 +154,21 @@ def test_pipeline_linear_nested():
     sink2.clean()
     pipeline[1][0] = {'output': 'last-output'}
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{}])  # by default no output produced
+    eq_(pipeline_output, DEFAULT_OUTPUT)  # by default no output produced
     # only the last output from the nested pipeline appeared outside
     eq_(sink2.data, [{'out1': 0, 'out2': 2}, {'out1': 1, 'out2': 2}])
 
     # Let's now add output to the top-most pipeline
     pipeline.insert(0, {'output': 'outputs'})
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{'out1': 0, 'out2': 2}, {'out1': 1, 'out2': 2}])
+    eq_(pipeline_output, _out([{'out1': 0, 'out2': 2},
+                               {'out1': 1, 'out2': 2}]))
 
     # and if we ask only for the last one
     pipeline[0] = {'output': 'last-output'}
     pipeline_output = run_pipeline(pipeline)
-    eq_(pipeline_output, [{'out1': 1, 'out2': 2}])
+    eq_(pipeline_output, _out([{'out1': 1, 'out2': 2}]))
+
 
 def test_pipeline_recursive():
     def less3(data):
@@ -252,7 +181,53 @@ def test_pipeline_recursive():
         less3,
     ]
     pipeline_output = run_pipeline(pipeline, dict(x=0))
-    eq_(pipeline_output, [{'x': 1}, {'x': 2}, {'x': 3}])
+    eq_(pipeline_output, _out([{'x': 1}, {'x': 2}, {'x': 3}]))
+
+
+def test_pipeline_looping():
+    count = [0, 0]
+    def count_threetimes(data):
+        """helper to not yield anything if done it 3 times by now"""
+        if count[0] >= 3:
+            return
+        count[0] += 1
+        for i in range(count[0]):
+            yield updated(data, dict(somevar=(i, count[0])))
+
+    def add_count(data):
+        count[1] += 1
+        yield updated(data, {'count': count[0]})
+
+    def passthrough(data):
+        yield data
+
+    pipeline_output = run_pipeline([{'loop': True}, count_threetimes], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0}]))
+    eq_(count, [3, 0])
+
+    # and even if the node not yielding is note the first node
+    pipeline_output = run_pipeline([{'loop': True}, passthrough, count_threetimes], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0}]))
+    eq_(count, [3, 0])
+
+    count[0] = 0
+    # Let's rerun with explicit last-output, which would also affect output of this pipeline
+    pipeline_output = run_pipeline([{'loop': True, 'output': 'last-output'}, count_threetimes], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0, 'somevar': (2, 3)}]))
+    eq_(count, [3, 0])
+
+    # and if pipeline is composite, i.e. more than a single step, so we could make sure everything is called
+    count[0] = 0
+    pipeline_output = run_pipeline([{'loop': True}, count_threetimes, add_count], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0}]))
+    eq_(count, [3, 6])
+
+    count[0] = count[1] = 0
+    # Let's rerun with explicit last-output, which would also affect output of this pipeline
+    pipeline_output = run_pipeline([{'loop': True, 'output': 'last-output'}, count_threetimes, add_count], dict(x=0))
+    eq_(pipeline_output, _out([{'x': 0, 'somevar': (2, 3), 'count': 3}]))
+    eq_(count, [3, 6])
+
 
 
 def test_pipeline_linear_top_isnested_pipeline():
@@ -267,3 +242,50 @@ def test_pipeline_linear_top_isnested_pipeline():
     ]
     pipeline_output = run_pipeline(pipeline)
     eq_(was_called, ['yes'])
+
+
+def test_pipeline_updated_stats():
+    def n1(data):
+        data['datalad_stats'].increment('add_git')
+        yield data
+    def n2(data):  # doesn't care to maintain previous stats
+        data = data.copy()
+        data['datalad_stats'] = ActivityStats(files=2)
+        data['out'] = 1
+        yield data
+    pipeline_output = run_pipeline([{'output': 'outputs'}, n1, n2])
+    eq_(pipeline_output, [{'datalad_stats': ActivityStats(files=2, add_git=1), 'out': 1}])
+
+def test_pipeline_dropped_stats():
+    def n1(data):
+        data['datalad_stats'].increment('add_git')
+        yield data
+    def n2(data):  # doesn't care to maintain previous stats
+        yield {'out': 1}
+    pipeline_output = run_pipeline([{'output': 'outputs'}, n1, n2])
+    eq_(pipeline_output, [{'datalad_stats': ActivityStats(add_git=1), 'out': 1}])
+
+def test_pipeline_stats_persist():
+    # to test that we would get proper stats returned in various pipeline layouts
+    def n1(data):
+        data['datalad_stats'].increment('add_git')
+        yield data
+
+    def p(data):
+        yield data
+
+    def n2(data):  # doesn't care to maintain previous stats
+        data['datalad_stats'].increment('add_annex')
+        yield data
+
+    target_stats = ActivityStats(add_git=1, add_annex=1)
+
+    def assert_pipeline(pipeline):
+        eq_(run_pipeline(pipeline), [{'datalad_stats': target_stats}])
+
+    assert_pipeline([n1, n2])
+    assert_pipeline([n1, [n2]])
+    assert_pipeline([[n1], [n2]])
+    assert_pipeline([n1, [n2, p]])
+    assert_pipeline([[n1], n2])
+    assert_pipeline([[n1, p], n2])

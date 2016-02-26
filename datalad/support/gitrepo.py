@@ -21,6 +21,7 @@ from six import string_types
 
 from functools import wraps
 
+import git
 from git import Repo
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from git.objects.blob import Blob
@@ -120,7 +121,7 @@ def normalize_path(func):
 
 
 @optional_args
-def normalize_paths(func, match_return_type=True):
+def normalize_paths(func, match_return_type=True, map_filenames_back=False):
     """Decorator to provide unified path conversions.
 
     Note
@@ -134,7 +135,11 @@ def normalize_paths(func, match_return_type=True):
 
     Accepts either a list of paths or a single path in a str. Passes a list
     to decorated function either way, but would return based on the value of
-    match_return_type and possibly input argument
+    match_return_type and possibly input argument.
+
+    If a call to the wrapped function includes normalize_path and it is False
+    no normalization happens for that function call (used for calls to wrapped
+    functions within wrapped functions, while possible CWD is within a repository)
 
     Parameters
     ----------
@@ -142,30 +147,60 @@ def normalize_paths(func, match_return_type=True):
       If True, and a single string was passed in, it would return the first
       element of the output (after verifying that it is a list of length 1).
       It makes easier to work with single files input.
+    map_filenames_back : bool, optional
+      If True and returned value is a dictionary, it assumes to carry entries
+      one per file, and then filenames are mapped back to as provided from the
+      normalized (from the root of the repo) paths
     """
 
     @wraps(func)
     def newfunc(self, files, *args, **kwargs):
-        if isinstance(files, string_types) or not files:
-            files_new = [_normalize_path(self.path, files)]
-            single_file = True
-        elif isinstance(files, list):
-            files_new = [_normalize_path(self.path, path) for path in files]
-            single_file = False
+
+        normalize = _normalize_path if kwargs.pop('normalize_paths', True) \
+            else lambda rpath, filepath: filepath
+
+        if files:
+            if isinstance(files, string_types) or not files:
+                files_new = [normalize(self.path, files)]
+                single_file = True
+            elif isinstance(files, list):
+                files_new = [normalize(self.path, path) for path in files]
+                single_file = False
+            else:
+                raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
+                                 type(files))
         else:
-            raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
-                             type(files))
+            single_file = None
+            files_new = []
+
+        if map_filenames_back:
+            def remap_filenames(out):
+                """Helper to map files back to non-normalized paths"""
+                if isinstance(out, dict):
+                    assert(len(out) == len(files_new))
+                    files_ = [files] if single_file else files
+                    mapped = out.__class__()
+                    for fin, fout in zip(files_, files_new):
+                        mapped[fin] = out[fout]
+                    return mapped
+                else:
+                    return out
+        else:
+            remap_filenames = lambda x: x
 
         result = func(self, files_new, *args, **kwargs)
 
-        if (result is None) or not match_return_type or not single_file:
+        if single_file is None:
+            # no files were provided, nothing we can do really
+            return result
+        elif (result is None) or not match_return_type or not single_file:
             # If function doesn't return anything or no denormalization
             # was requested or it was not a single file
-            return result
+            return remap_filenames(result)
         elif single_file:
             if len(result) != 1:
                 # Magic doesn't apply
-                return result
+                return remap_filenames(result)
             elif isinstance(result, (list, tuple)):
                 return result[0]
             elif isinstance(result, dict) and tuple(result)[0] == files_new[0]:
@@ -173,7 +208,7 @@ def normalize_paths(func, match_return_type=True):
                 return tuple(result.values())[0]
             else:
                 # no magic can apply
-                return result
+                return remap_filenames(result)
         else:
             return RuntimeError("should have not got here... check logic")
 
@@ -256,6 +291,14 @@ class GitRepo(object):
                 # log here but let caller decide what to do
                 lgr.error(str(e))
                 raise
+            except ValueError as e:
+                if git.__version__ == '1.0.2' and e.message == "I/O operation on closed file":
+                    # bug https://github.com/gitpython-developers/GitPython/issues/383
+                    raise GitCommandError("clone has failed, telling ya",
+                                          999,  # good number
+                                          stdout="%s already exists" if exists(path) else ""
+                                          )
+                raise  # reraise original
 
         if create and not exists(opj(path, '.git')):
             try:
@@ -347,6 +390,10 @@ class GitRepo(object):
 
         return self.repo.index.remove(files, working_tree=True, **kwargs)
 
+    def precommit(self):
+        """Perform pre-commit maintenance tasks
+        """
+        self.repo.index.write()  # flush possibly cached in GitPython changes to index
 
     def git_commit(self, msg=None, options=None):
         """Commit changes to git.
@@ -364,9 +411,17 @@ class GitRepo(object):
         # what gitpython would do about it. doc says that it would
         # convert to string anyways.... bleh
         if not msg:
-            msg = "What would be a good default message?"
-
+            msg = "Commit"  # there is no good default
+        if options:
+            raise NotImplementedError
+        lgr.debug("Committing with msg=%r" % msg)
         self.cmd_call_wrapper(self.repo.index.commit, msg)
+        #
+        #  Was blaming of too much state causes side-effects while interlaving with
+        #  git annex cmds so this snippet if to use outside git call
+        #self._git_custom_command([], ['git', 'commit'] + \
+        #                         (["-m", msg] if msg else []) + \
+        #                         (options if options else []))
 
     def get_indexed_files(self):
         """Get a list of files in git's index
@@ -379,6 +434,59 @@ class GitRepo(object):
 
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
+
+    def git_get_hexsha(self, branch=None):
+        """Return a hexsha for a given branch name. If None - of current branch
+
+        Parameters
+        ----------
+        branch: str, optional
+        """
+        # TODO: support not only a branch but any treeish
+        if branch is None:
+            return self.repo.active_branch.object.hexsha
+        for b in self.repo.branches:
+            if b.name == branch:
+                return b.object.hexsha
+        raise ValueError("Unknown branch %s" % branch)
+
+    def git_get_merge_base(self, treeishes):
+        """Get a merge base hexsha
+
+        Parameters
+        ----------
+        treeishes: str or list of str
+          List of treeishes (branches, hexshas, etc) to determine the merge base of.
+          If a single value provided, returns merge_base with the current branch.
+
+        Returns
+        -------
+        str or None
+          If no merge-base for given commits, or specified treeish doesn't exist,
+          None returned
+        """
+        if isinstance(treeishes, string_types):
+            treeishes = [treeishes]
+        if not treeishes:
+            raise ValueError("Provide at least a single value")
+        elif len(treeishes) == 1:
+            treeishes = treeishes + [self.git_get_active_branch()]
+
+        try:
+            bases = self.repo.merge_base(*treeishes)
+        except GitCommandError as exc:
+            if "fatal: Not a valid object name" in str(exc):
+                return None
+            raise
+
+        if not bases:
+            return None
+        assert(len(bases) == 1)  # we do not do 'all' yet
+        return bases[0].hexsha
+
+    def git_get_active_branch(self):
+
+        return self.repo.active_branch.name
 
     def git_get_branches(self):
         """Get all branches of the repo.
@@ -414,9 +522,50 @@ class GitRepo(object):
     def git_get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
 
-    def git_get_active_branch(self):
+    def git_get_files(self, branch=None):
+        """Get a list of files in git.
 
-        return self.repo.active_branch.name
+        Lists the files in the (remote) branch.
+
+        Parameters
+        ----------
+        branch: str
+          Name of the branch to query. Default: active branch.
+
+        Returns
+        -------
+        [str]
+          list of files.
+        """
+
+        if branch is None:
+            # active branch can be queried way faster:
+            return self.get_indexed_files()
+        else:
+            return [item.path for item in self.repo.tree(branch).traverse()
+                    if isinstance(item, Blob)]
+
+    def git_get_file_content(self, file_, branch='HEAD'):
+        """
+
+        Returns
+        -------
+        [str]
+          content of file_ as a list of lines.
+        """
+
+        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
+
+        # in python3 a byte string is returned. Need to convert it:
+        from six import PY3
+        if PY3:
+            conv_str = u''
+            for b in bytes(content_str):
+                conv_str += chr(b)
+            return conv_str.splitlines()
+        else:
+            return content_str.splitlines()
+        # TODO: keep splitlines?
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
@@ -497,6 +646,48 @@ class GitRepo(object):
             '', 'git config --get remote.%s.url' % name)
         return out.rstrip(linesep)
 
+    def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
+        """Return GitPython's commits for the branch
+
+        Pretty much similar to what 'git log <branch>' does.
+        It is a generator which returns top commits first
+
+        Parameters
+        ----------
+        branch: str
+        limit: None | 'left-only', optional
+          Limit which commits to report.  If None -- all commits (merged or not),
+          if 'left-only' -- only the commits from the left side of the tree upon merges
+        stop: str, optional
+          hexsha of the commit at which stop reporting (matched one is not reported either)
+        value: None | 'hexsha', optional
+          What to yield.  If None - entire commit object is yielded, if 'hexsha' only its hexsha
+        """
+
+        fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
+
+        if not limit:
+            def gen():
+                # traverse doesn't yield original commit
+                co = self.repo.branches[branch].commit
+                yield co
+                for co_ in co.traverse():
+                    yield co_
+        elif limit == 'left-only':
+            # we need a custom implementation since couldn't figure out how to do with .traversal
+            def gen():
+                co = self.repo.branches[branch].commit
+                while co:
+                    yield co
+                    co = co.parents[0] if co.parents else None
+        else:
+            raise ValueError(limit)
+
+        for c in gen():
+            if stop and c.hexsha == stop:
+                return
+            yield fvalue(c)
+
     def git_pull(self, name='', options=''):
         """
         """
@@ -518,53 +709,10 @@ class GitRepo(object):
         self._git_custom_command('', 'git checkout %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_get_files(self, branch=None):
-        """Get a list of files in git.
-
-        Lists the files in the (remote) branch.
-
-        Parameters
-        ----------
-        branch: str
-          Name of the branch to query. Default: active branch.
-
-        Returns
-        -------
-        [str]
-          list of files.
-        """
-
-        if branch is None:
-            # active branch can be queried way faster:
-            return self.get_indexed_files()
-        else:
-            return [item.path for item in self.repo.tree(branch).traverse()
-                    if isinstance(item, Blob)]
-
-    def git_get_file_content(self, file_, branch='HEAD'):
-        """
-
-        Returns
-        -------
-        [str]
-          content of file_ as a list of lines.
-        """
-
-        content_str = self.repo.commit(branch).tree[file_].data_stream.read()
-
-        # in python3 a byte string is returned. Need to convert it:
-        from six import PY3
-        if PY3:
-            conv_str = u''
-            for b in bytes(content_str):
-                conv_str += chr(b)
-            return conv_str.splitlines()
-        else:
-            return content_str.splitlines()
-        # TODO: keep splitlines?
-
-    def git_merge(self, name, options='', **kwargs):
-        self._git_custom_command('', 'git merge %s %s' % (options, name), **kwargs)
+    def git_merge(self, name, options=[], msg=None, **kwargs):
+        if msg:
+            options = options + ["-m", msg]
+        self._git_custom_command('', ['git', 'merge'] + options + [name], **kwargs)
 
     def git_remove_branch(self, branch):
         self._git_custom_command('', 'git branch -D %s' % branch)

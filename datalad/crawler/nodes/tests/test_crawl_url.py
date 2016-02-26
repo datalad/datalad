@@ -8,11 +8,18 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 # now with some recursive structure of directories
 
+from glob import glob
+from os.path import exists, join as opj
 from datalad.tests.utils import eq_, ok_
 from datalad.tests.utils import serve_path_via_http, with_tree
 from ..crawl_url import crawl_url
+from ..crawl_url import parse_checksums
 from ..matches import a_href_match
 from ...pipeline import run_pipeline
+from ....tests.utils import assert_equal
+from ....tests.utils import assert_false
+from ....tests.utils import SkipTest
+from ....utils import updated
 
 pages_loop = dict(
     tree=(
@@ -50,3 +57,21 @@ def test_recurse_loop_http(path, url):
     ]
     pipeline_results = run_pipeline(pipeline)
     eq_(sorted([d['url'].replace(url, '') for d in pipeline_results]), target_pages)
+
+
+def test_parse_checksums():
+    response = """\
+abc  f1.txt
+bcd  d1/f1.txt
+"""
+    out = list(parse_checksums(digest='md5')(
+            {'response': response,
+            'url': 'http://example.com/subdir/checksums.md5'}))
+    assert_equal(len(out), 2)
+    assert_equal(out[0]['path'], '')
+    assert_equal(out[0]['filename'], 'f1.txt')
+    assert_equal(out[0]['url'], 'http://example.com/subdir/f1.txt')
+
+    assert_equal(out[1]['path'], 'd1')
+    assert_equal(out[1]['filename'], 'f1.txt')
+    assert_equal(out[1]['url'], 'http://example.com/subdir/d1/f1.txt')

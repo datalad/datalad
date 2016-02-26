@@ -10,25 +10,26 @@
 
 """
 
-from ..support.s3 import get_versioned_url, S3_TEST_CREDENTIAL
+from ..support.s3 import get_versioned_url
+from ..downloaders.tests.utils import get_test_providers
 
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
-import keyring
+
+from ..support.keyring_ import keyring
 
 from .utils import use_cassette
 
 
-@use_cassette('fixtures/vcr_cassettes/s3_test0.yaml')
+@use_cassette('s3_test0')
 def test_version_url():
-    if not keyring.get_password(S3_TEST_CREDENTIAL, 'secret_id'):
-        # will skip under tox as well -- some environ variable(s) must be passed
-        raise SkipTest("Do not have access to S3 key/secret.  Test skipped")
-    eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz"),
-        "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?versionId=null")
+    get_test_providers('s3://openfmri/tarballs')  # to verify having credentials to access openfmri via S3
+    for url_pref in ('http://openfmri.s3.amazonaws.com', 'https://s3.amazonaws.com/openfmri'):
+        eq_(get_versioned_url(url_pref + "/tarballs/ds001_raw.tgz"),
+            url_pref + "/tarballs/ds001_raw.tgz?versionId=null")
 
-    eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"),
-        "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1&versionId=null")
+        eq_(get_versioned_url("http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1"),
+            "http://openfmri.s3.amazonaws.com/tarballs/ds001_raw.tgz?param=1&versionId=null")
 
     # something is wrong there
     #print(get_versioned_url("http://openfmri.s3.amazonaws.com/ds001/demographics.txt"))

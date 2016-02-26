@@ -14,10 +14,11 @@ import mimetypes
 
 from os.path import splitext
 
-import keyring
 import logging
 import datalad.log  # Just to have lgr setup happen this one used a script
 lgr = logging.getLogger('datalad.s3')
+
+from .keyring_ import keyring
 
 from ..dochelpers import exc_str
 
@@ -76,6 +77,15 @@ class VersionedFilesPool(object):
     def reset_version(self, filename):
         self._versions[filename] = 0
 
+def get_key_url(e, schema='http'):
+    """Generate an s3:// or http:// url given a key
+    """
+    if schema == 'http':
+        return "http://{e.bucket.name}.s3.amazonaws.com/{e.name}?versionId={e.version_id}".format(e=e)
+    elif schema == 's3':
+        return "s3://{e.bucket.name}/{e.name}?versionId={e.version_id}".format(e=e)
+    else:
+        raise ValueError(schema)
 
 def prune_and_delete_bucket(bucket):
     """Deletes all the content and then deletes bucket
@@ -194,12 +204,18 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
     """
     url_rec = urlparse(url)
 
-    s3_bucket = None # if AWS S3
+    s3_bucket, fpath = None, url_rec.path.lstrip('/')
+
     if url_rec.netloc.endswith('.s3.amazonaws.com'):
         if not url_rec.scheme in ('http', 'https'):
             raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
         # we know how to slice this cat
         s3_bucket = url_rec.netloc.split('.', 1)[0]
+    elif url_rec.netloc == 's3.amazonaws.com':
+        if not url_rec.scheme in ('http', 'https'):
+            raise ValueError("Do not know how to handle %s scheme" % url_rec.scheme)
+        # url is s3.amazonaws.com/bucket/PATH
+        s3_bucket, fpath = fpath.split('/', 1)
     elif url_rec.scheme == 's3':
         s3_bucket = url_rec.netloc # must be
         # and for now implement magical conversion to URL
@@ -228,7 +244,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             supports_versioning = 'maybe'
 
         if supports_versioning:
-            fpath = url_rec.path.lstrip('/')
+
             all_keys = bucket.list_versions(fpath)
             # Filter and sort them so the newest one on top
             all_keys = [x for x in sorted(all_keys, key=lambda x: (x.last_modified, x.is_latest))

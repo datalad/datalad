@@ -9,6 +9,7 @@
 """Proxy basic file operations (such as open) to obtain files automagically upon I/O
 """
 
+import sys
 from mock import patch
 from six import PY2
 import six.moves.builtins as __builtin__
@@ -24,6 +25,7 @@ import logging
 from os.path import dirname, abspath, pardir, join as opj, exists, basename, lexists
 from git.exc import InvalidGitRepositoryError
 
+from .dochelpers import exc_str
 from .support.annexrepo import AnnexRepo
 from .support.gitrepo import GitRepo
 from .support.exceptions import CommandError
@@ -53,6 +55,7 @@ class AutomagicIO(object):
             self._h5py_File = None
         self._autoget = autoget
         self._in_open = False
+        self._log_online = True
         if activate:
             self.activate()
 
@@ -83,7 +86,7 @@ class AutomagicIO(object):
             # return stock open for the duration of handling so that
             # logging etc could workout correctly
             with patch(origname, origfunc):
-                lgr.log(1, "Proxying open with %r %r", args, kwargs)
+                lgr.log(2, "Proxying open with %r %r", args, kwargs)
 
                 # had to go with *args since in PY2 it is name, in PY3 file
                 # deduce arguments
@@ -113,7 +116,7 @@ class AutomagicIO(object):
         except Exception as e:
             # If anything goes wrong -- we should complain and proceed
             with patch(origname, origfunc):
-                lgr.warning("Failed proxying open with %r, %r: %s", args, kwargs, e)
+                lgr.warning("Failed proxying open with %r, %r: %s", args, kwargs, exc_str(e))
         finally:
             self._in_open = False
         # finally give it back to stock open
@@ -134,7 +137,7 @@ class AutomagicIO(object):
             return
         # if filepath is not there at all (program just "checked" if it could access it
         if not lexists(filepath):
-            lgr.log(1, "Not testing/getting file %s since it is not there", filepath)
+            lgr.log(2, "Not testing/getting file %s since it is not there", filepath)
             return
         # deduce directory for filepath
         filedir = dirname(filepath)
@@ -148,12 +151,29 @@ class AutomagicIO(object):
         if not isinstance(annex, AnnexRepo):
             # not an annex -- can do nothing
             return
+
+        # "quick" check first if under annex at all
+        try:
+            # might fail.  TODO: troubleshoot when it does e.g.
+            # datalad/tests/test_auto.py:test_proxying_open_testrepobased
+            under_annex = annex.is_under_annex(filepath, batch=True)
+        except:
+            under_annex = None
         # either it has content
-        if not annex.file_has_content(filepath):
+        if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
-            annex.annex_get(filepath)
+            annex.annex_get(filepath, log_online=self._log_online)
 
     def activate(self):
+        # Some beasts (e.g. tornado used by IPython) override outputs, and
+        # provide fileno which throws exception.  In such cases we should not log online
+        self._log_online = hasattr(sys.stdout, 'fileno') and hasattr(sys.stderr, 'fileno')
+        try:
+            if self._log_online:
+                sys.stdout.fileno()
+                sys.stderr.fileno()
+        except:
+            self._log_online = False
         if self.active:
             lgr.warning("%s already active. No action taken" % self)
             return

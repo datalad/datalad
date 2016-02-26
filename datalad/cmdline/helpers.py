@@ -285,14 +285,17 @@ def get_repo_instance(path=curdir, class_=None):
 
 
 from appdirs import AppDirs
-from datalad.support.collectionrepo import CollectionRepo
 from os.path import join as opj
-from datalad.consts import DATALAD_COLLECTION_NAME
 
 dirs = AppDirs("datalad", "datalad.org")
+
 def get_datalad_master():
     """Return "master" collection on which all collection operations will be done
     """
+    # Delay imports to not load rdflib until necessary
+    from ..support.collectionrepo import CollectionRepo
+    from ..consts import DATALAD_COLLECTION_NAME
+
     # Allow to have "master" collection be specified by environment variable
     env_path = os.environ.get('DATALAD_COLLECTION_PATH', None)
     return CollectionRepo(

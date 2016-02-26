@@ -200,7 +200,7 @@ class BaseDownloader(object):
             raise DownloadError("Downloaded size %d differs from original %d" % (downloaded_size, target_size))
 
 
-    def _download(self, url, path=None, overwrite=False, size=None):
+    def _download(self, url, path=None, overwrite=False, size=None, stats=None):
         """Download content into a file
 
         Parameters
@@ -237,7 +237,8 @@ class BaseDownloader(object):
         else:
             filepath = url_filename
 
-        if exists(filepath) and not overwrite:
+        existed = exists(filepath)
+        if existed and not overwrite:
             raise DownloadError("File %s already exists" % filepath)
 
         # FETCH CONTENT
@@ -255,7 +256,9 @@ class BaseDownloader(object):
                 # TODO: url might be a bit too long for the beast.
                 # Consider to improve to make it animated as well, or shorten here
                 pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
+                t0 = time.time()
                 downloader(fp, pbar, size=size)
+                downloaded_time = time.time() - t0
                 pbar.finish()
             downloaded_size = os.stat(temp_filepath).st_size
 
@@ -264,13 +267,18 @@ class BaseDownloader(object):
             self._verify_download(url, downloaded_size, target_size, temp_filepath)
 
             # adjust atime/mtime according to headers/status
-            if 'Last-Modified' in status:
-                lgr.log(5, "Setting mtime for %s to be %s", temp_filepath, status['Last-Modified'])
-                os.utime(temp_filepath, (time.time(), status['Last-Modified']))
+            if status.mtime:
+                lgr.log(5, "Setting mtime for %s to be %s", temp_filepath, status.mtime)
+                os.utime(temp_filepath, (time.time(), status.mtime))
 
             # place successfully downloaded over the filepath
             os.rename(temp_filepath, filepath)
 
+            if stats:
+                stats.downloaded += 1
+                stats.overwritten += int(existed)
+                stats.downloaded_size += downloaded_size
+                stats.downloaded_time += downloaded_time
         except AccessDeniedError as e:
             raise
         except Exception as e:
@@ -331,7 +339,7 @@ class BaseDownloader(object):
         return self._cache
 
 
-    def _fetch(self, url, cache=None, size=None):
+    def _fetch(self, url, cache=None, size=None, allow_redirects=True):
         """Fetch content from a url into a file.
 
         Very similar to _download but lacks any "file" management and decodes
@@ -351,7 +359,6 @@ class BaseDownloader(object):
         bytes, dict
           content, headers
         """
-
         if cache is None:
             cache = cfg.getboolean('crawl', 'cache', False)
 
@@ -365,7 +372,7 @@ class BaseDownloader(object):
                     lgr.warning("Failed to unpack loaded from cache for %s: %s",
                                 url, exc_str(exc))
 
-        downloader, target_size, url_filename, headers = self._get_download_details(url)
+        downloader, target_size, url_filename, headers = self._get_download_details(url, allow_redirects=allow_redirects)
 
         if size is not None:
             if size == 0:
@@ -415,7 +422,9 @@ class BaseDownloader(object):
         """
         lgr.info("Fetching %r", url)
         # Do not return headers, just content
-        return self._access(self._fetch, url, **kwargs)[0]
+        out = self._access(self._fetch, url, **kwargs)
+        # import pdb; pdb.set_trace()
+        return out[0]
 
 
     def get_status(self, url, old_status=None, **kwargs):
@@ -425,7 +434,7 @@ class BaseDownloader(object):
         ----------
         url : string
           URL to access
-        old_status : dict, optional
+        old_status : FileStatus, optional
           Previous status record.  If provided, might serve as a shortcut
           to assess if status has changed, and if not -- return the same
           record
@@ -473,8 +482,19 @@ class BaseDownloader(object):
 class DownloadError(Exception):
     pass
 
+class TargetFileAbsent(DownloadError):
+    pass
+
 class AccessDeniedError(DownloadError):
     pass
+
+class AccessFailedError(DownloadError):
+    pass
+
+class UnhandledRedirectError(DownloadError):
+    def __init__(self, msg=None, url=None, **kwargs):
+        super(UnhandledRedirectError, self).__init__(msg, **kwargs)
+        self.url = url
 
 #
 # Authenticators    XXX might go into authenticators.py

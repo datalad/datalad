@@ -1,12 +1,16 @@
 # ---- Main dependencies
-GitPython>=0.3.7
+#GitPython>=1.0.3
+https://github.com/gitpython-developers/GitPython/archive/master.zip
 rdflib>=4.2.0
 six>=1.8.0
 patool>=1.7
 appdirs
 keyring
+# moved into a separate package in 8.0
+keyrings.alt
 # mock is also used for auto.py, not only for testing
 mock
+humanize
 
 # ---- Downloaders
 boto
@@ -24,14 +28,15 @@ https://github.com/yarikoptic/scrapy/archive/master.zip
 
 # To be gone whenever refactoring is complete and network.py scraping is gone
 beautifulsoup4
-joblib
+# no longer used ATM
+# joblib
 
 # ---- Testing
 nose>=1.3.4
 testtools
 vcrpy
-#httpretty >= 0.8.13 may be even more since python 3.4,5 is not supported
-# https://github.com/gabrielfalcao/HTTPretty/archive/master.zip
-# until https://github.com/gabrielfalcao/HTTPretty/pull/279 gets a resolution
-https://github.com/yarikoptic/HTTPretty/archive/bf-3.x.zip
+httpretty>=0.8.14
 msgpack-python
+
+# -- Optional for Testing
+nose-timer

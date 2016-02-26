@@ -12,19 +12,22 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import exists, join as opj, pardir
+from os.path import exists, join as opj, pardir, basename, lexists
+from glob import glob
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_tempfile, assert_in
+from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
 from ...tests.utils import ok_archives_caches
+from ...tests.utils import SkipTest
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
 from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
 from ...utils import chpwd, getpwd
 
-from ...api import add_archive_content
+from ...api import add_archive_content, clean
 
 
 # within top directory
@@ -35,6 +38,22 @@ tree1args = dict(
         ('1.tar.gz', (
             ('1 f.txt', '1 f load'),
             ('d', (('1d', ''),)), )),
+        ('1u', {
+          '1.tar.gz': { # updated file content
+             '1 f.txt': '1 f load1'
+          }}),
+        ('2u', {  # updated file content
+          '1.tar.gz': {
+             '1 f.txt': '1 f load2'
+          }}),
+        ('3u', {  # updated file content
+          '1.tar.gz': {
+             '1 f.txt': '1 f load3'
+          }}),
+        ('4u', {  # updated file content
+          '1.tar.gz': {
+             '1 f.txt': '1 f load4'
+          }}),
         ('d1', (('1.tar.gz', (
                     ('2 f.txt', '2 f load'),
                     ('d2', (
@@ -42,6 +61,7 @@ tree1args = dict(
                      )),),),),
     )
 )
+
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**tree1args)
@@ -63,6 +83,8 @@ def test_add_archive_content(path_orig, url, repo_path):
     # Let's add first archive to the repo so we could test
     with swallow_outputs():
         repo.annex_addurls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+        for s in range(1, 5):
+            repo.annex_addurls([opj(url, '%du/1.tar.gz' % s)], options=["--pathdepth", "-2"])
     repo.git_commit("added 1.tar.gz")
 
     key_1tar = repo.get_file_key('1.tar.gz')  # will be used in the test later
@@ -78,15 +100,28 @@ def test_add_archive_content(path_orig, url, repo_path):
     eq_(repo.path, repo_.path)
     d1_basic_checks()
 
-    # If ran again, should fail due to override=False
+    # If ran again, should proceed just fine since the content is the same so no changes would be made really
+    add_archive_content('1.tar.gz')
+
+    # But that other one carries updated file, so should fail due to overwrite
     with assert_raises(RuntimeError) as cme:
-        add_archive_content('1.tar.gz')
+        add_archive_content(opj('1u', '1.tar.gz'))
+
     # TODO: somewhat not precise since we have two possible "already exists"
     # -- in caching and overwrite check
     assert_in("already exists", str(cme.exception))
     # but should do fine if overrides are allowed
-    add_archive_content('1.tar.gz', overwrite=True)
+    add_archive_content(opj('1u', '1.tar.gz'), existing='overwrite')
     d1_basic_checks()
+    add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix')
+    add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix')
+    add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix')
+    # rudimentary test
+    assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
+                 ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
+    whereis = repo.annex_whereis(glob(opj(repo_path, '1', '1*')))
+    # they all must be the same
+    assert(all([x == whereis[0] for x in whereis[1:]]))
 
     # and we should be able to reference it while under subdirectory
     subdir = opj(repo_path, 'subdir')
@@ -136,8 +171,60 @@ def test_add_archive_content(path_orig, url, repo_path):
 
     # TODO: check if persistent archive is there for the 1.tar.gz
 
-    chpwd(orig_pwd)  # just to avoid warnings ;)
+    # We should be able to drop everything since available online
+    with swallow_outputs():
+        clean(annex=repo)
+    repo.annex_drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+    chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 
+    raise SkipTest("TODO: wait for https://git-annex.branchable.com/todo/checkpresentkey_without_explicit_remote")
+    # bug was that dropping didn't work since archive was dropped first
+    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+    repo.annex_drop(opj('1', '1 f.txt'))  # should be all kosher
+    repo.annex_get(opj('1', '1 f.txt'))  # and should be able to get it again
+
+    # TODO: verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**tree1args)
+@serve_path_via_http()
+@with_tempfile(mkdir=True)
+def test_add_archive_content_strip_leading(path_orig, url, repo_path):
+    direct = False  # TODO: test on undirect, but too long ATM
+    orig_pwd = getpwd()
+    chpwd(repo_path)
+
+    repo = AnnexRepo(repo_path, create=True, direct=direct)
+
+    # Let's add first archive to the repo so we could test
+    with swallow_outputs():
+        repo.annex_addurls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+    repo.git_commit("added 1.tar.gz")
+
+    add_archive_content('1.tar.gz', strip_leading_dirs=True)
+    ok_(not exists('1'))
+    ok_file_under_git(repo.path, '1 f.txt', annexed=True)
+    ok_file_under_git('d', '1d', annexed=True)
+    ok_archives_caches(repo.path, 0)
+
+    chpwd(orig_pwd)  # just to avoid warnings ;)
 
 # looking for the future tagging of lengthy tests
 test_add_archive_content.tags = ['integration']
+
+
+@assert_cwd_unchanged()
+@with_tree(tree={'1.tar': {'file.txt': 'load',
+                           '1.dat': 'load2'}})
+def test_add_archive_content_tar(repo_path):
+    # To test that .tar gets removed
+    direct = False  # TODO: test on undirect, but too long ATM
+    annex = AnnexRepo(repo_path, create=True, direct=direct)
+    # Let's add first archive to the annex so we could test
+    annex.annex_add('1.tar')
+    annex.commit(msg="added 1.tar")
+    #print annex.path
+    #import pdb; pdb.set_trace()
+    add_archive_content('1.tar', annex=annex, strip_leading_dirs=True, delete=True)
+    assert_false(lexists(opj(repo_path, '1.tar')))

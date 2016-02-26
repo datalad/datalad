@@ -12,31 +12,42 @@ __docformat__ = 'restructuredtext'
 
 
 import argparse
-import logging
-import sys
-import textwrap
+import os
 
-import datalad
-from datalad import log
-from datalad.log import lgr
+from .. import __doc__ as m__doc__, __version__ as m__version__
+from ..log import lgr
 
-import datalad.cmdline as mvcmd
 from ..cmdline import helpers
 from ..cmdline.main import _license_info
 
 from ..utils import setup_exceptionhook
+from ..utils import use_cassette
+from ..ui import ui
 
-def setup_parser():
+backends = ['archive']
+
+
+def setup_parser(backend):
+
+    suffix, desc = {
+     'datalad': ('',
+                 "download content from various URLs (http{,s}, s3, etc) possibly "
+                 "requiring authentication or custom access mechanisms using "
+                 "DataLad's downloaders"),
+     'archive': ('-archive',
+                 "extract content from archives (.tar{,.gz}, .zip, etc) which are "
+                 "in turn managed by git-annex.  See `datalad add-archive-content` "
+                 "command")
+     }[backend]
     # setup cmdline args parser
     # main parser
     # TODO: should be encapsulated for resharing with the main datalad's
     parser = argparse.ArgumentParser(
                     fromfile_prefix_chars='@',
                     # usage="%(prog)s ...",
-                    description="%s\n\n" % datalad.__doc__ +
-     "git-annex-remote-datalad command line tool enriches git-annex special "
-     "remotes with some additional ones",
-                    epilog='"DataLad git-annex very special remote"',
+                    description="%s\n\n" % m__doc__ +
+     "git-annex-remote-datalad%s is a git-annex custom special remote to %s" % (suffix, desc),
+                    epilog='"DataLad\'s git-annex very special remote"',
                     formatter_class=argparse.RawDescriptionHelpFormatter,
                     add_help=False,
                 )
@@ -45,7 +56,7 @@ def setup_parser():
     helpers.parser_add_common_opt(parser, 'log_level')
     helpers.parser_add_common_opt(parser,
                                   'version',
-                                  version='datalad %s\n\n%s' % (datalad.__version__,
+                                  version='datalad %s\n\n%s' % (m__version__,
                                                               _license_info()))
     if __debug__:
         parser.add_argument(
@@ -58,6 +69,7 @@ def setup_parser():
     )
     return parser
 
+
 def _main(args, backend=None):
     """Unprotected portion"""
     # TODO: For now we have only one, but we might need to actually become aware
@@ -66,9 +78,12 @@ def _main(args, backend=None):
     # single beast -- probably wouldn't fly since we do might need different
     # initializations etc.
     assert(backend is not None)
-    if backend == "archive":
-        from .archive import AnnexArchiveCustomRemote
-        remote = AnnexArchiveCustomRemote()
+    if backend == 'archive':
+        from .archives import ArchiveAnnexCustomRemote
+        remote = ArchiveAnnexCustomRemote()
+    elif backend == 'datalad':
+        from .datalad import DataladAnnexCustomRemote
+        remote = DataladAnnexCustomRemote()
     else:
         raise ValueError("I don't know anything about %r backend. "
                          "Known are: %s" % backends)
@@ -83,18 +98,26 @@ def _main(args, backend=None):
         print(remote.url_prefix)
     elif args.command is None:
         # If no command - run the special remote
-        remote.main()
+        if 'DATALAD_USECASSETTE' in os.environ:
+            # optionally feeding it a cassette, used by tests
+            with use_cassette(os.environ['DATALAD_USECASSETTE']):
+                remote.main()
+        else:
+            remote.main()
     else:
         raise ValueError("Unknown command %s" % command)
+
 
 def main(args=None, backend=None):
     import sys
     # TODO: redirect lgr output to stderr if it is stdout and not "forced"
     # by env variable...
     #
-    parser = setup_parser()
+    parser = setup_parser(backend=backend)
     # parse cmd args
     args = parser.parse_args(args)
+
+    ui.set_backend('annex')  # stdin/stdout will be used for interactions with annex
 
     if args.common_debug:
         # So we could see/stop clearly at the point of failure

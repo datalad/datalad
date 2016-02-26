@@ -14,6 +14,7 @@ from os.path import join as opj, dirname
 
 from mock import patch
 
+from six.moves import StringIO
 from .utils import with_testrepos
 from .utils import assert_raises, eq_, ok_, assert_false, assert_true
 from .utils import swallow_outputs
@@ -112,6 +113,22 @@ def _test_proxying_open(generate_load, verify_load, repo):
         assert_false(annex2.file_has_content(fpath2_2))
         verify_load(fpath2_2)
         assert_true(annex2.file_has_content(fpath2_2))
+
+    # if we override stdout with something not supporting fileno, like tornado
+    # does which ruins using get under IPython
+    # TODO: we might need to refuse any online logging in other places like that
+    annex2.annex_drop(fpath2_2)
+    class StringIOfileno(StringIO):
+        def fileno(self):
+            raise Exception("I have no clue how to do fileno")
+
+    with patch('sys.stdout', new_callable=StringIOfileno), \
+         patch('sys.stderr', new_callable=StringIOfileno):
+        with AutomagicIO():
+            assert_false(annex2.file_has_content(fpath2_2))
+            verify_load(fpath2_2)
+            assert_true(annex2.file_has_content(fpath2_2))
+
 
 def test_proxying_open_h5py():
     def generate_hdf5(f):

@@ -12,6 +12,7 @@ from .utils import eq_, ok_, assert_raises
 from ..support.network import same_website, dlurljoin
 from ..support.network import get_tld
 from ..support.network import get_url_straight_filename
+from ..support.network import get_response_disposition_filename
 
 
 def test_same_website():
@@ -61,3 +62,8 @@ def test_get_url_straight_filename():
 from ..support.network import rfc2822_to_epoch
 def test_rfc2822_to_epoch():
     eq_(rfc2822_to_epoch("Thu, 16 Oct 2014 01:16:17 EDT"), 1413436577)
+
+
+def test_get_response_disposition_filename():
+    eq_(get_response_disposition_filename('attachment;filename="Part1-Subjects1-99.tar"'), "Part1-Subjects1-99.tar")
+    eq_(get_response_disposition_filename('attachment'), None)

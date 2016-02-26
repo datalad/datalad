@@ -21,13 +21,12 @@ import datalad
 from datalad.log import lgr
 
 from datalad.cmdline import helpers
-from ..interface.base import dedent_docstring, get_interface_groups
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
 def _license_info():
     return """\
-Copyright (c) 2013-2015 DataLad developers
+Copyright (c) 2013-2016 DataLad developers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -50,6 +49,8 @@ THE SOFTWARE.
 
 
 def setup_parser():
+    # Delay since can be a heavy import
+    from ..interface.base import dedent_docstring, get_interface_groups
     # setup cmdline args parser
     # main parser
     parser = argparse.ArgumentParser(

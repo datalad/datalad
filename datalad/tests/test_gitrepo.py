@@ -30,6 +30,7 @@ from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import assert_re_in
 from .utils import ok_
+from .utils import SkipTest
 from .utils_testrepos import BasicHandleTestRepo
 
 
@@ -266,7 +267,7 @@ def test_GitRepo_files_decorator():
         expect.append(_normalize_path(test_instance.path, item))
     eq_(test_instance.decorated_many(files_to_test), expect)
 
-    eq_(test_instance.decorated_many(''), '')
+    eq_(test_instance.decorated_many(''), [])
 
     assert_raises(ValueError, test_instance.decorated_many, 1)
     assert_raises(ValueError, test_instance.decorated_one, 1)
@@ -507,6 +508,61 @@ def test_GitRepo_dirty():
     assert_false(repo.dirty)
 
 
+@with_tempfile(mkdir=True)
+def test_GitRepo_get_merge_base(src):
+    repo = GitRepo(src, create=True)
+    with open(opj(src, 'file.txt'), 'w') as f:
+        f.write('load')
+    repo.git_add('*')
+    repo.git_commit('committing')
+
+    assert_raises(ValueError, repo.git_get_merge_base, [])
+    branch1 = repo.git_get_active_branch()
+    branch1_hexsha = repo.git_get_hexsha()
+    eq_(len(branch1_hexsha), 40)
+    eq_(repo.git_get_merge_base(branch1), branch1_hexsha)
+
+    # Let's create a detached branch
+    branch2 = "_detach_"
+    repo.git_checkout(branch2, options="--orphan")
+    # it will have all the files
+    # Must not do:  https://github.com/gitpython-developers/GitPython/issues/375
+    # repo.git_add('.')
+    repo.git_add('*')
+    # NOTE: fun part is that we should have at least a different commit message
+    # so it results in a different checksum ;)
+    repo.git_commit("committing again")
+    assert(repo.get_indexed_files())  # we did commit
+    assert(repo.git_get_merge_base(branch1) is None)
+    assert(repo.git_get_merge_base([branch2, branch1]) is None)
+
+    # Let's merge them up -- then merge base should match the master
+    repo.git_merge(branch1)
+    eq_(repo.git_get_merge_base(branch1), branch1_hexsha)
+
+    # if points to some empty/non-existing branch - should also be None
+    assert(repo.git_get_merge_base(['nonexistent', branch2]) is None)
+
+@with_tempfile(mkdir=True)
+def test_GitRepo_git_get_branch_commits(src):
+
+    repo = GitRepo(src, create=True)
+    with open(opj(src, 'file.txt'), 'w') as f:
+        f.write('load')
+    repo.git_add('*')
+    repo.git_commit('committing')
+
+    commits = list(repo.git_get_branch_commits('master'))
+    eq_(len(commits), 1)
+    commits_stop0 = list(repo.git_get_branch_commits('master', stop=commits[0].hexsha))
+    eq_(commits_stop0, [])
+    commits_hexsha = list(repo.git_get_branch_commits('master', value='hexsha'))
+    commits_hexsha_left = list(repo.git_get_branch_commits('master', value='hexsha', limit='left-only'))
+    eq_([commits[0].hexsha], commits_hexsha)
+    # our unittest is rudimentary ;-)
+    eq_(commits_hexsha_left, commits_hexsha)
+
+    raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 # TODO:
 #   def git_fetch(self, name, options=''):

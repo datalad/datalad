@@ -7,7 +7,8 @@ repositories, while fetching data load from the original data providers.
 
 # Status
 
-It is currently in a "prototype" state, i.e. **a mess**.  Codebase is
+It is currently in a heavy initial development mode to establish core
+functionality which could be used by others.  Codebase is
 rapidly growing, functionality is usable for many use-cases but not
 yet officially released to public since its organization and
 configuration will be a subject for a considerable reorganization and
@@ -24,21 +25,37 @@ internals and/or contributing to the project.
 
 * [![Coverage Status](https://coveralls.io/repos/datalad/datalad/badge.png?branch=master)](https://coveralls.io/r/datalad/datalad)
 
+* [![codecov.io](https://codecov.io/github/datalad/datalad/coverage.svg?branch=master)](https://codecov.io/github/datalad/datalad?branch=master)
+
 * [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org)
 
 # Dependencies
 
 Although we now support Python 3 (>= 3.3), primarily we still use Python 2.7
-and thus instructions below are for python 2.7 deployments. 
-On Debian-based systems we recommend to enable
-[NeuroDebian](http://neuro.debian.net) since we use it to provide
-backports of recent fixed external modules we depend upon:
+and thus instructions below are for python 2.7 deployments.  Replace `python-{` 
+with `python{,3}-{` to also install dependencies for Python 3 (e.g., if you would
+like to develop and test through tox).
+
+On Debian-based systems we recommend to enable [NeuroDebian](http://neuro.debian.net)
+since we use it to provide backports of recent fixed external modules we depend upon:
 
 ```sh
-apt-get install patool python-bs4 python-git python-joblib python-testtools python-mock python-nose git-annex-standalone
+apt-get install -y -q git git-annex-standalone
+apt-get install -y -q patool python-scrapy python-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,rdflib,setuptools,six,sparqlwrapper}
 ```
 
-or otherwise you can use pip to install Python modules
+or additionally, if you would like to develop and run our tests battery as
+described in [CONTRIBUTING.md](CONTRIBUTING.md) and possibly use tox and new
+versions of dependencies from pypy:
+
+```sh
+apt-get install -y -q python-{dev,httpretty,testtools,nose,pip,vcr,virtualenv} python-tox
+# Some libraries which might be needed for installing via pip
+apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
+```
+
+or use pip to install Python modules (prior installation of those libraries listed above
+might be necessary)
 
 ```sh
 pip install -r requirements.txt
