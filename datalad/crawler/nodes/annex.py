@@ -56,6 +56,7 @@ _runner = get_runner()
 _call = _runner.call
 _run = _runner.run
 
+
 # TODO: make use of datalad_stats
 @auto_repr
 class initiate_handle(object):
@@ -522,10 +523,6 @@ class Annexificator(object):
                     self.repo.git_checkout(branch, options="--orphan")
                     if self.repo.dirty:
                         self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
-                    backends = self.repo.default_backends
-                    backend = backends[0] if backends else cfg.get('crawl', 'default backend', default='MD5E')
-                    if backend:
-                        put_file_under_git(self.repo.path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
@@ -633,6 +630,15 @@ class Annexificator(object):
         self.repo.precommit()  # so that all batched annexes stop
         if self._statusdb:
             self._statusdb.save()
+        # there is something to commit and backends was set but no .gitattributes yet
+        path = self.repo.path
+        if self.repo.dirty and not exists(opj(path, '.gitattributes')):
+            backends = self.repo.default_backends
+            if backends:
+                # then record default backend into the .gitattributes
+                put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backends[0],
+                                   annexed=False)
+
 
     # At least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
@@ -969,7 +975,8 @@ class Annexificator(object):
                 statusdb = self._statusdb
                 obsolete = statusdb.get_obsolete()
                 if obsolete:
-                    lgr.info('Removing %d obsolete files' % len(obsolete))
+                    files_str = ": " + ', '.join(obsolete) if len(obsolete) < 10 else ""
+                    lgr.info('Removing %d obsolete files%s' % (len(obsolete), files_str))
                     stats = data.get('datalad_stats', None)
                     _call(self.repo.git_remove, obsolete)
                     if stats:
