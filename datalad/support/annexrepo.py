@@ -1020,6 +1020,17 @@ class AnnexRepo(GitRepo):
 
         return [self.get_file_key(f).split('-')[0] for f in files]
 
+    @property
+    def default_backends(self):
+        try:
+            backends = self.repo.config_reader().get_value("annex", "backends")
+            if backends:
+                return backends.split()
+            else:
+                return None
+        except NoOptionError:
+            return None
+
     def annex_fsck(self):
         self._run_annex_command('fsck')
 

@@ -117,7 +117,7 @@ def sorted_files(dout):
                        if not '.git' in r], []))
 
 from os.path import sep as dirsep
-_VCS_REGEX = '%s\.(git|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
 
 def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
     """Generator to find files matching regex

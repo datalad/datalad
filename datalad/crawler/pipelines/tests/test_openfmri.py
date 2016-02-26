@@ -261,6 +261,7 @@ def test_openfmri_pipeline1(ind, topurl, outd):
         './.datalad/crawl/versions/incoming.json',
         './README.txt', './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
     target_incoming_files = {
+        '.gitattributes',  # we marked default backend right in the incoming
         'README.txt', 'changelog.txt',
         'ds666-beh_R1.0.1.tar.gz', 'ds666_R1.0.0.tar.gz', 'ds666_R1.0.1.tar.gz', 'ds666_R2.0.0.tar.gz',
         '.datalad/crawl/statuses/incoming.json',
