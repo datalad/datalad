@@ -18,9 +18,11 @@ import logging
 from os.path import join as opj, abspath, expanduser, expandvars, exists
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.cmdline.helpers import POC_get_datalad_master
 from .base import Interface
-from .POC_helpers import get_submodules
+from .POC_helpers import get_submodules, is_annex
 from datalad.cmd import CommandError
 
 lgr = logging.getLogger('datalad.interface.POC_install')
@@ -37,13 +39,17 @@ class POCInstallHandle(Interface):
             action="store_true",
             doc="""If set this installs all possibly existing subhandles,
              too."""),
+        dest=Parameter(
+            doc="Path where to install the handle. By default this is "
+                "path/to/my/datalad/masterhandle/name.",
+            constraints=EnsureStr() | EnsureNone()),
         name=Parameter(
             doc="local name of the installed handle. If not provided, it is "
                 "derived from the url. Hierarchical names like 'foo/bar' are "
                 "supported.",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, url, recursive=False, name=None):
+    def __call__(self, url, recursive=False, dest=None, name=None):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
 
@@ -51,6 +57,10 @@ class POCInstallHandle(Interface):
         ----
         First implementation just accepts an url and a name and installs
         within master.
+
+        For the proof of concept this implementation avoids the use of
+        current GitRepo/AnnexRepo implementation (which aren't prepared for the
+        use of submodules), except for direct git (annex) calls.
         """
 
         # TODO: Enhance functionality (see Note in docstring):
@@ -112,10 +122,29 @@ class POCInstallHandle(Interface):
                                         "--recursive" if recursive else '',
                                         name])
 
+        # TODO: move worktree if destination is not default:
+
+
+
+
+
+
         # commit the changes to masterhandle:
         # TODO: msg should also list installed subhandles!
         # (so should the final user output)
         master.git_commit("Installed handle '%s'" % name)
+
+        # init annex if it is an annex:
+        # TODO: Recurse into submodules
+        if is_annex(opj(master.path, submodules_post[name]["path"])):
+            lgr.debug("Annex detected in submodule '%s'. Calling annex init ..."
+                      % name)
+            # Note: The following call might look strange, since init=False is
+            # followed by a call of annex_init. This is intentional for the POC
+            # implementation.
+            AnnexRepo(opj(master.path, submodules_post[name]["path"]),
+                      create=False,
+                      init=False)._annex_init()
 
         lgr.info("Successfully installed handle '%s' from %s at %s." %
                  (name, submodules_post[name]["url"],

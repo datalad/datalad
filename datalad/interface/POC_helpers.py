@@ -15,6 +15,7 @@ __docformat__ = 'restructuredtext'
 
 from os.path import join as opj
 
+
 def get_submodules(repo):
     """
 
@@ -37,9 +38,12 @@ def get_submodules(repo):
 def get_module_parser(repo):
 
     from git import GitConfigParser
-
     parser = GitConfigParser(opj(repo.path, ".gitmodules"))
     parser.read()
-
     return parser
 
+
+def is_annex(path):
+    from datalad.support.gitrepo import GitRepo
+    repo = GitRepo(path, create=False)
+    return "origin/git-annex" in repo.git_get_remote_branches()
