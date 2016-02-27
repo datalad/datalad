@@ -11,6 +11,7 @@
 
 import re
 from distutils.version import LooseVersion
+import time
 
 import os
 from os import unlink
@@ -19,13 +20,15 @@ from os.path import lexists
 from os.path import join as opj
 
 from collections import OrderedDict
+from collections import defaultdict
 from six import iteritems
 
 from logging import getLogger
 lgr = getLogger('datalad.support.versions')
 
 
-def get_versions(vfpath_statuses, regex, overlay=True, unversioned='fail', versioneer=None):
+def get_versions(vfpath_statuses, regex, overlay=True,
+                 unversioned=None, default=None, versioneer=None):
     """Return an ordered dict of versions with entries being vfpath_statuses
 
     ATM doesn't care about statuses but it might in the future so we could
@@ -43,10 +46,19 @@ def get_versions(vfpath_statuses, regex, overlay=True, unversioned='fail', versi
     overlay: bool, optional
       Assume overlayed structure, so if a file misses an entry for some version,
       it is ok
-    uversioned: ('fail'), optional
-      What to do if detected both versioned and unversioned file
+    unversioned: ('fail', 'default'), optional
+      What to do if detected both versioned and unversioned file.
+      If `default` then specified `default` argument can be used as a
+      format string for time.strftime which by default we provide
+      '%Y%m%d' (corresponds to `YYYYMMDD`) from mtime of the provided status.
+      If no '%' found in `default`, its value is used as is and no status is needed.
+      If `unversioned` is None and `default` is specified -- assume 'default', and
+      'fail' otherwise.
+    default: str, optional
+      Default version to use in case of unversioned is 'default'
     versioneer: callable, optional
-      To convert parsed out version
+      To convert parsed out version, provided the unversioned filename,
+      version and status
 
     Returns
     -------
@@ -55,6 +67,11 @@ def get_versions(vfpath_statuses, regex, overlay=True, unversioned='fail', versi
       Last one if no statuses were provided
 
     """
+    if unversioned is None:
+        unversioned = 'fail' if default is None else 'default'
+    if unversioned == 'default' and default is None:
+        default = '0.0.%Y%m%d'
+
     if not overlay:
         raise NotImplementedError(overlay)
         # we should add a check that if there is a gap in versions for some file
@@ -63,20 +80,35 @@ def get_versions(vfpath_statuses, regex, overlay=True, unversioned='fail', versi
 
     # collect all versioned files for now in non-ordered dict
     # vfpaths = {}  # file -> [versions]
-    all_versions = {}  # version -> {fpath: (vfpath, status)}
+    all_versions = defaultdict(dict)  # version -> {fpath: (vfpath, status)}
     nunversioned = nversioned = 0
+    statuses = {}
     for entry in vfpath_statuses:
         if isinstance(entry, tuple):
             vfpath, status = entry
         else:
             vfpath, status = entry, None
+        statuses[vfpath] = status  # might come handy later
         # reapply regex to extract version
         res = re.search(regex, vfpath)
         if not res:
             # unversioned
             nunversioned += 1
-            version = None
             fpath = vfpath
+            if unversioned == 'fail':
+                # just will be checked later if there is no conflicts
+                version = None
+            elif unversioned == 'default':
+                if '%' in default:  # so we seek strftime formatting
+                    if status is None:
+                        raise ValueError(
+                            "No status was provided within %r entry. "
+                            "No mtime could be figured out for this unversioned file" % entry)
+                    version = time.strftime(default, time.localtime(status.mtime))
+                else:  # just the default
+                    version = default
+            else:
+                raise ValueError("Do not know how to handle %r" % (unversioned,))
         else:
             nversioned += 1
             fpath = vfpath[:res.start()] + vfpath[res.end():]  # unversioned one
@@ -92,9 +124,7 @@ def get_versions(vfpath_statuses, regex, overlay=True, unversioned='fail', versi
             else:
                 version = vfpath[res.start():res.end()]
             if versioneer:
-                version = versioneer(version)
-        if version not in all_versions:
-            all_versions[version] = {}
+                version = versioneer(fpath, version, status)
 
         # 1 more version for the file, must not be there already!
         assert(fpath not in all_versions[version])
@@ -124,7 +154,6 @@ def get_versions(vfpath_statuses, regex, overlay=True, unversioned='fail', versi
                         raise ValueError(
                             "There is an unversioned file %r whenever also following "
                             "version for it was found: %s" % (fpath, version))
-
     return versions
 
 

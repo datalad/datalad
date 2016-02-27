@@ -10,6 +10,7 @@
 from ..versions import get_versions
 from ...tests.utils import assert_equal, assert_false
 from ...tests.utils import assert_raises
+from ...support.status import FileStatus
 from nose.tools import assert_not_equal
 from collections import OrderedDict as od
 
@@ -20,7 +21,7 @@ def test_get_versions_regex():
     # no versioneer, so version is left as the full match
     assert_equal(get_versions([fn], '_r\d+[.\d]*_'), od([('_r1.0_', {'fbuga': fn})]))
     # use versioneer to tune it up
-    assert_equal(get_versions([fn], '_r\d+[.\d]*_', versioneer=lambda x: x.strip('_r')), od([('1.0', {'fbuga': fn})]))
+    assert_equal(get_versions([fn], '_r\d+[.\d]*_', versioneer=lambda f, v, *args: v.strip('_r')), od([('1.0', {'fbuga': fn})]))
     # use group
     assert_equal(get_versions([fn], '_r(\d+[.\d]*)_'), od([('1.0', {'fbuga': fn})]))
     # and now non memorizing lookup for the trailing _ which then would leave it for the fpath
@@ -54,3 +55,23 @@ def test_get_versions():
     assert_equal(get_versions([('f1', None)], '\d+'), od([('1', {'f': ('f1', None)})]))
     assert_equal(get_versions(['un', ('d1/f1', None), 'd1/f2', 'd2/f2'], '(?<=f)\d+'),
                  od([(None, {'un': 'un'}), ('1', {'d1/f': ('d1/f1', None)}), ('2', {'d1/f': 'd1/f2', 'd2/f': 'd2/f2'})]))
+
+
+def test_get_versions_default_version():
+    # by default we raise exception if conflict was detected
+    assert_raises(ValueError, get_versions, ['f1', 'f'], '\d+')
+    # but for default default_version we would need mtime, so raising another one again
+    assert_raises(ValueError, get_versions, ['f1', 'f'], '\d+', unversioned='default')
+    fstatus = FileStatus(mtime=1456538387)
+    assert_equal(get_versions(['f1', ('f', fstatus)], '\d+', unversioned='default'),
+                 od([('0.0.20160226', {'f': ('f', fstatus)}), ('1', {'f': 'f1'})]))
+    assert_equal(get_versions(['f1', ('f', fstatus)], '\d+', unversioned='default', default='1.0.0'),
+                 od([('1', {'f': 'f1'}), ('1.0.0', {'f': ('f', fstatus)})]))
+    # and we should be able to assign default one which has no % in its default
+    # even without mtime
+    assert_equal(get_versions(['f1', 'f'], '\d+', unversioned='default', default='0.0.1'),
+                 od([('0.0.1', {'f': 'f'}), ('1', {'f': 'f1'})]))
+
+    # if default is specified but not unversioned -- the same
+    assert_equal(get_versions(['f1', 'f'], '\d+', default='0.0.1'),
+             od([('0.0.1', {'f': 'f'}), ('1', {'f': 'f1'})]))
