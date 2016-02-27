@@ -779,3 +779,18 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     raise SkipTest("TODO: more, e.g. add with a custom backend")
     # TODO: also with different modes (relaxed, fast)
     # TODO: verify that file is added with that backend and that we got a new batched process
+
+
+@with_tempfile(mkdir=True)
+def test_annex_backends(path):
+    repo = AnnexRepo(path)
+    eq_(repo.default_backends, None)
+
+    rmtree(path)
+
+    repo = AnnexRepo(path, backend='MD5E')
+    eq_(repo.default_backends, ['MD5E'])
+
+    # persists
+    repo = AnnexRepo(path)
+    eq_(repo.default_backends, ['MD5E'])

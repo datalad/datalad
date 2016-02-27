@@ -30,6 +30,8 @@ from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
+from ...utils import auto_repr
+from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
@@ -54,12 +56,14 @@ _runner = get_runner()
 _call = _runner.call
 _run = _runner.run
 
+
 # TODO: make use of datalad_stats
+@auto_repr
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
     def __init__(self, template, handle_name=None, collection_name=None,
-                 path=None, branch=None,
+                 path=None, branch=None, backend=None,
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
@@ -75,6 +79,10 @@ class initiate_handle(object):
           default path for all new handles (DATALAD_CRAWL_COLLECTIONSPATH)
         branch : str, optional
           Which branch to initialize
+        backend : str, optional
+          Supported by git-annex backend.  By default (if None specified),
+          it is MD5E backend to improve compatibility with filesystems
+          having a relatively small limit for a maximum path size
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
           the handle crawling options -- would be passed into the corresponding
@@ -95,6 +103,8 @@ class initiate_handle(object):
         self.existing = existing
         self.path = path
         self.branch = branch
+        # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
+        self.backend = backend
 
     def _initiate_handle(self, path, name):
         lgr.info("Initiating handle %s" % name)
@@ -106,11 +116,17 @@ class initiate_handle(object):
             git_repo.git_checkout(self.branch, options="--orphan")
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creater"
-        return HandleRepo(
-                       path,
-                       direct=cfg.getboolean('crawl', 'init direct', default=False),
-                       name=name,
-                       create=True)
+        backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
+        repo = HandleRepo(
+            path,
+            direct=cfg.getboolean('crawl', 'init direct', default=False),
+            name=name,
+            backend=backend,
+            create=True)
+        # TODO: centralize
+        if backend:
+            put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
+        return repo
 
     def _save_crawl_config(self, handle_path, name, data):
         lgr.debug("Creating handle configuration for %s" % name)
@@ -614,6 +630,15 @@ class Annexificator(object):
         self.repo.precommit()  # so that all batched annexes stop
         if self._statusdb:
             self._statusdb.save()
+        # there is something to commit and backends was set but no .gitattributes yet
+        path = self.repo.path
+        if self.repo.dirty and not exists(opj(path, '.gitattributes')):
+            backends = self.repo.default_backends
+            if backends:
+                # then record default backend into the .gitattributes
+                put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backends[0],
+                                   annexed=False)
+
 
     # At least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
@@ -950,7 +975,8 @@ class Annexificator(object):
                 statusdb = self._statusdb
                 obsolete = statusdb.get_obsolete()
                 if obsolete:
-                    lgr.info('Removing %d obsolete files' % len(obsolete))
+                    files_str = ": " + ', '.join(obsolete) if len(obsolete) < 10 else ""
+                    lgr.info('Removing %d obsolete files%s' % (len(obsolete), files_str))
                     stats = data.get('datalad_stats', None)
                     _call(self.repo.git_remove, obsolete)
                     if stats:
