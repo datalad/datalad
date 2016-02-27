@@ -62,7 +62,7 @@ def test_get_versions_default_version():
     assert_raises(ValueError, get_versions, ['f1', 'f'], '\d+')
     # but for default default_version we would need mtime, so raising another one again
     assert_raises(ValueError, get_versions, ['f1', 'f'], '\d+', unversioned='default')
-    fstatus = FileStatus(mtime=1456538387)
+    fstatus = FileStatus(mtime=1456495187)
     assert_equal(get_versions(['f1', ('f', fstatus)], '\d+', unversioned='default'),
                  od([('0.0.20160226', {'f': ('f', fstatus)}), ('1', {'f': 'f1'})]))
     assert_equal(get_versions(['f1', ('f', fstatus)], '\d+', unversioned='default', default='1.0.0'),
