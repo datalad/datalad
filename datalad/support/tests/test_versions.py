@@ -75,3 +75,15 @@ def test_get_versions_default_version():
     # if default is specified but not unversioned -- the same
     assert_equal(get_versions(['f1', 'f'], '\d+', default='0.0.1'),
              od([('0.0.1', {'f': 'f'}), ('1', {'f': 'f1'})]))
+
+    # and what about always versioned and some which do not have to be versioned?
+    # test run without forcing
+    assert_equal(get_versions(['README', 'f1', 'f', ('ds', fstatus)], '\d+', default='%Y'),
+                 od([(None, {'README': 'README', 'ds': ('ds', fstatus)}),
+                     ('1', {'f': 'f1'}),
+                     ('2016', {'f': 'f'})]))
+    assert_equal(get_versions(['README', 'f1', 'f', ('ds', fstatus)], '\d+', default='%Y', always_versioned='^ds.*'),
+             od([(None, {'README': 'README'}),
+                 ('1', {'f': 'f1'}),
+                 ('2016', {'f': 'f', 'ds': ('ds', fstatus)})]))
+
