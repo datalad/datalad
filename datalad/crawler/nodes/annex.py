@@ -693,6 +693,12 @@ class Annexificator(object):
                         rename=False,
                         **kwargs):
         """Generate multiple commits if multiple versions were staged
+
+        Parameters
+        ----------
+        TODO
+        **kwargs: dict, optional
+          Passed to get_versions
         """
         def _commit_versions(data):
             self._precommit()  # so that all batched annexes stop
