@@ -445,7 +445,8 @@ class Annexificator(object):
                 # utime dereferences!
                 # _call(os.utime, filepath, (time.time(), remote_status.mtime))
                 # *nix only!  TODO
-                _call(lmtime, filepath, remote_status.mtime)
+                if remote_status.mtime:
+                    _call(lmtime, filepath, remote_status.mtime)
                 if statusdb:
                     _call(statusdb.set, filepath, remote_status)
             else:
