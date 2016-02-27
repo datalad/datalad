@@ -46,5 +46,6 @@ manpages: bin
 		DATALAD_HELP2MAN=1 PYTHONPATH=. help2man --no-discard-stderr \
 			--help-option="--help-np" -N -n "$$summary" \
 				"bin/datalad $${cmd}" > build/man/datalad-$${cmd}.1 ; \
+		sed -i -e "4 s/^datalad /datalad $${cmd} /" build/man/datalad-$${cmd}.1 ; \
 	done
 
