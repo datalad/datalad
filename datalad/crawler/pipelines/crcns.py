@@ -54,7 +54,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
         # options=["-c", "annex.largefiles=exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"]
         #
         # CRCNS requires authorization, so only README* should go straight under git
-        options=["-c", "annex.largefiles=exclude=README"]
+        options=["-c", "annex.largefiles=exclude=README*"]
     )
 
     crawler = crawl_url(dataset_url)

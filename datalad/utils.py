@@ -47,6 +47,15 @@ except:  # pragma: no cover
 # Little helpers
 #
 
+
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
+
 def not_supported_on_windows(msg=None):
     """A little helper to be invoked to consistently fail whenever functionality is
     not supported (yet) on Windows
