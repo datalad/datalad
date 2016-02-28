@@ -30,7 +30,8 @@ from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.crcns")
 
 def extract_readme(data):
-    # TODO - extract data from the page/response
+    # TODO - extract data from the page/response  but not into README I guess since majority of datasets
+    # already provide README
     if os.path.exists("README.txt"):
         os.unlink("README.txt")
     with open("README.txt", "w") as f:
@@ -47,6 +48,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
     annex = Annexificator(
         create=False,  # must be already initialized etc
         backend="MD5E",
+        statusdb='json',
         special_remotes=[DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE],
         # many datasets are actually quite small, so we can simply git them up
         # below one didn't work out as it should have -- caused major headache either due to bug here or in annex
@@ -54,7 +56,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
         # options=["-c", "annex.largefiles=exclude=*.txt and exclude=README and (largerthan=100kb or include=*.gz or include=*.zip)"]
         #
         # CRCNS requires authorization, so only README* should go straight under git
-        options=["-c", "annex.largefiles=exclude=README"]
+        options=["-c", "annex.largefiles=exclude=README*"]
     )
 
     crawler = crawl_url(dataset_url)
@@ -62,15 +64,15 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
         annex.switch_branch('incoming'),
         [   # nested pipeline so we could quit it earlier happen we decided that nothing todo in it
             # but then we would still return to 'master' branch
-            [   # README
-                crawler,
-                # Somewhat sucks here since 'url' from above would be passed all the way to annex
-                # So such nodes as extract_readme should cleans the data so only relevant pieces are left
-                a_href_match(".*/data.*sets/.*about.*"),
-                crawler.recurse,
-                extract_readme,
-                annex,
-            ],
+            # [   # README
+            #     crawler,
+            #     # Somewhat sucks here since 'url' from above would be passed all the way to annex
+            #     # So such nodes as extract_readme should cleans the data so only relevant pieces are left
+            #     a_href_match(".*/data.*sets/.*about.*"),
+            #     crawler.recurse,
+            #     extract_readme,
+            #     annex,
+            # ],
             [   # Download from NERSC
                 # don't even bother finding the link (some times only in about, some times also on the main page
                 # just use https://portal.nersc.gov/project/crcns/download/<dataset_id>
@@ -92,7 +94,8 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
                 find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
                     existing='archive-suffix',
-                    strip_leading_dirs=True,  leading_dirs_depth=2,
+                    # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
+                    strip_leading_dirs=False, #   leading_dirs_depth=2,
                     exclude='.*__MACOSX$',  # some junk penetrates
                 ),
             ],
