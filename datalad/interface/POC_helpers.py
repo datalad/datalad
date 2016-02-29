@@ -18,11 +18,17 @@ from os.path import join as opj
 from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError
 
 
-def get_submodules(repo):
-    """
+def get_submodules_dict(repo):
+    """ Get a simple hierarchical representation of the initialized submodules
+    of a git repository.
 
-    :param repo: GitRepo
-    :return: dict
+    Parameter
+    ---------
+    repo: GitRepo
+
+    Returns
+    -------
+    dict
     """
 
     parser = get_module_parser(repo)
@@ -34,11 +40,31 @@ def get_submodules(repo):
         submodules[name]["url"] = parser.get_value(entry, "url")
         try:
             rec_repo = GitRepo(opj(repo.path, submodules[name]["path"]), create=False)
-            submodules[name]["submodules"] = get_submodules(rec_repo)
+            submodules[name]["submodules"] = get_submodules_dict(rec_repo)
         except InvalidGitRepositoryError:
             # non initialized submodule is invalid repo, so no information
             # about further submodules
             submodules[name]["submodules"] = {}
+    return submodules
+
+
+def get_submodules_list(repo):
+    """Get a list of checked out submodules in a git repository.
+
+    Parameter
+    ---------
+    repo: GitRepo
+
+    Returns
+    -------
+    list of str
+    """
+
+    out, err = repo._git_custom_command('', ["git", "submodule", "foreach", "--recursive"])
+    submodules = list()
+    for line in out.splitlines():
+        if line.startswith("Entering"):
+            submodules.append(line.split()[1].strip("'"))
     return submodules
 
 

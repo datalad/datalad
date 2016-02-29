@@ -581,7 +581,7 @@ class GitRepo(object):
         Parameters
         ----------
         files: list of files
-        cmd_str: str
+        cmd_str: str or list
             arbitrary command str. `files` is appended to that string.
 
         Returns

@@ -19,7 +19,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules
+from .POC_helpers import get_submodules_dict
 
 
 class POCRemove(Interface):
