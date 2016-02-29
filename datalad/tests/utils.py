@@ -40,7 +40,6 @@ from nose.tools import \
 from nose import SkipTest
 
 from ..cmd import Runner
-from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files

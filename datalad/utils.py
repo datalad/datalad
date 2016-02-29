@@ -14,6 +14,7 @@ import time
 
 from os.path import curdir, basename, exists, realpath, islink
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
+from six import text_type
 
 import logging
 import shutil
@@ -274,6 +275,20 @@ def file_basename(name, return_ext=False):
     else:
         return fbname
 
+def escape_filename(filename):
+    """Surround filename in "" and escape " in the filename
+    """
+    filename = filename.replace('"', r'\"').replace('`', r'\`')
+    filename = '"%s"' % filename
+    return filename
+
+def encode_filename(filename):
+    """Encode unicode filename
+    """
+    if isinstance(filename, text_type):
+        return filename.encode(sys.getfilesystemencoding())
+    else:
+        return filename
 
 if on_windows:
     def lmtime(filepath, mtime):
