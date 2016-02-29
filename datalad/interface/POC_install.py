@@ -20,7 +20,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmdline.helpers import POC_get_datalad_master
+from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
 from .POC_helpers import get_submodules, is_annex
 from datalad.cmd import CommandError
@@ -48,9 +48,13 @@ class POCInstallHandle(Interface):
             doc="local name of the installed handle. If not provided, it is "
                 "derived from the url. Hierarchical names like 'foo/bar' are "
                 "supported.",
-            constraints=EnsureStr() | EnsureNone()))
+            constraints=EnsureStr() | EnsureNone()),
+        roothandle=Parameter(
+            doc="Roothandle, where to install the handle to. Datalad has a "
+                "default root handle.",
+            constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, url, recursive=False, dest=None, name=None):
+    def __call__(self, url, recursive=False, dest=None, name=None, roothandle=None):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
 
@@ -64,6 +68,9 @@ class POCInstallHandle(Interface):
         use of submodules), except for direct git (annex) calls.
         """
 
+        if dest is not None:
+            raise NotImplementedError("Option --dest yet to be implemented.")
+
         # TODO: Enhance functionality (see Note in docstring):
         # check whether 'path' is a locally known name.
         # if so, get a location to clone from.
@@ -72,7 +79,7 @@ class POCInstallHandle(Interface):
         # this means: if the submodule is there already (locally known name),
         # just checkout.
 
-        master = POC_get_datalad_master()
+        master = POC_get_root_handle(roothandle)
 
         # check if a handle with that name already exists:
         # TODO: Decide whether or not we want to check the optional name before

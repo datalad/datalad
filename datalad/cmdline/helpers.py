@@ -243,8 +243,19 @@ def get_datalad_master():
     )
 
 
-def POC_get_datalad_master():
+def POC_get_root_handle(root_dir=None):
     """Return "master" handle.
+
+    Parameter
+    ---------
+    dir: str
+      path to the root handle. If None, datalad's default is used.
+      The default root handle lives in a sub directory
+      of user_data_dir as returned by appdirs. The default name of this
+      subdirectory is set by datalad.consts.DATALAD_ROOT_HANDLE_NAME.
+      Alternatively, a different default root handle can be set by the
+      environment variable DATALAD_ROOT_HANDLE, which then is expected to
+      contain the full path the desired root handle.
 
     Note
     ----
@@ -252,15 +263,13 @@ def POC_get_datalad_master():
      Not for general use in datalad yet.
     """
 
-    from ..support.gitrepo import GitRepo
-    from ..consts import DATALAD_COLLECTION_NAME
+    from ..consts import DATALAD_ROOT_HANDLE_NAME
+    if root_dir is None:
+        root_dir = os.environ.get('DATALAD_ROOT_HANDLE', None) or \
+                   opj(dirs.user_data_dir, DATALAD_ROOT_HANDLE_NAME)
 
-    # Allow to have "master" collection be specified by environment variable
-    env_path = os.environ.get('DATALAD_COLLECTION_PATH', None)
-    return GitRepo(
-        env_path or opj(dirs.user_data_dir, "POC_" + DATALAD_COLLECTION_NAME),
-        create=True
-    )
+    from ..support.gitrepo import GitRepo
+    return GitRepo(root_dir, create=True)
 
 
 
