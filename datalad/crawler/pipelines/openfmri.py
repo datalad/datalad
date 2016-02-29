@@ -122,4 +122,5 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
             annex.finalize(tag=True),
         ],
         annex.switch_branch('master'),
+        annex.finalize(cleanup=True),
     ]

@@ -26,6 +26,7 @@ from git import Repo
 
 from ...version import __version__
 from ...api import add_archive_content
+from ...api import clean
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
@@ -597,7 +598,8 @@ class Annexificator(object):
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
-            lgr.info("Initiating %(nmerges)d merges of %(branch)s using strategy %(strategy)s", locals())
+            plmerges = "s" if nmerges>1 else ""
+            lgr.info("Initiating %(nmerges)d merge%(plmerges)s of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
 
             for to_merge in all_to_merge:
@@ -907,7 +909,7 @@ class Annexificator(object):
 
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, tag=False, existing_tag=None):
+    def finalize(self, tag=False, existing_tag=None, cleanup=False):
         """Finalize operations -- commit uncommited, prune abandoned? etc
 
         Parameters
@@ -922,6 +924,8 @@ class Annexificator(object):
         existing_tag: None or '+suffix', optional
           What to do if tag already exists, if None -- warning is issued. If `+suffix`
           +0, +1, +2 ... are tried until available one is found.
+        cleanup: bool, optional
+          Either to perform cleanup operations, such as 'git gc' and 'datalad clean'
         """
         def _finalize(data):
             self._precommit()
@@ -966,6 +970,20 @@ class Annexificator(object):
                         else:
                             raise ValueError(existing_tag)
                     self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
+
+            if cleanup:
+                total_stats = stats.get_total()
+                if total_stats.add_git or total_stats.add_annex or total_stats.merges:
+                    if cfg.getboolean('crawl', 'pipeline.housekeeping', default=True):
+                        lgr.info("House keeping: gc, repack and clean")
+                        # gc and repack
+                        self.repo.gc(allow_background=False)
+                        clean(annex=self.repo)
+                    else:
+                        lgr.info("No git house-keeping performed as instructed by config")
+                else:
+                    lgr.info("No git house-keeping performed as no notable changes to git")
+
             self._states = set()
             yield data
         return _finalize
