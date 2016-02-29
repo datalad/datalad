@@ -32,8 +32,8 @@ class POCInstallHandle(Interface):
     """Install a handle."""
 
     _params_ = dict(
-        url=Parameter(
-            doc="url of the handle to install",
+        src=Parameter(
+            doc="url or local path of the handle to install",
             constraints=EnsureStr()),
         recursive=Parameter(
             args=("--recursive", "-r"),
@@ -54,7 +54,7 @@ class POCInstallHandle(Interface):
                 "default root handle.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, url, recursive=False, dest=None, name=None, roothandle=None):
+    def __call__(self, src, recursive=False, dest=None, name=None, roothandle=None):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
 
@@ -72,7 +72,7 @@ class POCInstallHandle(Interface):
             raise NotImplementedError("Option --dest yet to be implemented.")
 
         # TODO: Enhance functionality (see Note in docstring):
-        # check whether 'path' is a locally known name.
+        # check whether 'url' is a locally known name.
         # if so, get a location to clone from.
         # otherwise treat 'path' as an url to clone from
         # if path is None, install to master (checkout the submodule)
@@ -84,17 +84,18 @@ class POCInstallHandle(Interface):
         # check if a handle with that name already exists:
         # TODO: Decide whether or not we want to check the optional name before
         # even calling "git submodule add" or just wait for its feedback.
-        # if name in get_submodules(master):
-        #     raise ValueError("Handle '%s' already installed." % name)
+        # For now, just catch exception from git call.
 
-        if exists(url):
-            url = abspath(expandvars(expanduser(url)))
+        # check, whether 'src' is a local path:
+        if exists(src):
+            src = abspath(expandvars(expanduser(src)))
 
         submodules_pre = get_submodules(master)
 
-        # TODO: rollback on exception during git calls?
+        # TODO: rollback on exception during git calls? At what point there is
+        # anything to roll back?
         try:
-            master._git_custom_command('', ["git", "submodule", "add", url,
+            master._git_custom_command('', ["git", "submodule", "add", src,
                                             name if name is not None else ''])
         except CommandError as e:
             m = e.stderr.strip()
@@ -125,11 +126,6 @@ class POCInstallHandle(Interface):
         else:
             name = submodules_added[0]
 
-        # Note: May be move worktree before init, since init creates the
-        # entries in git/config from gitmodules. So we may need to change the
-        # gitmodules only.
-        # TODO: Test it!
-
         # init and update the submodule(s):
         std_out, std_err = \
             master._git_custom_command('', ["git", "submodule", "update",
@@ -149,8 +145,7 @@ class POCInstallHandle(Interface):
         lgr.debug("Submodule '%s':\n" % name + str(json.dumps(hierarchy,
                                                               indent=4)))
 
-
-        # TODO: move worktree if destination is not default:
+        # TODO: move worktree if destination is not default
 
         # commit the changes to masterhandle:
         commit_msg = "Installed handle '%s'\n" % name
@@ -158,19 +153,17 @@ class POCInstallHandle(Interface):
             commit_msg += "Installed subhandle '%s'\n" % sh
         master.git_commit(commit_msg)
 
-        # init annex if it is an annex:
-        # TODO: Recurse into submodules (This requires a proper representation
-        # of submodule hierarchy, which respects possibly moved working trees)
-
-        if is_annex(opj(master.path, submodules_post[name]["path"])):
-            lgr.debug("Annex detected in submodule '%s'. Calling annex init ..."
-                      % name)
-            # Note: The following call might look strange, since init=False is
-            # followed by a call of annex_init. This is intentional for the POC
-            # implementation.
-            AnnexRepo(opj(master.path, submodules_post[name]["path"]),
-                      create=False,
-                      init=False)._annex_init()
+        # init annex(es), if any:
+        for handle in [name] + subhandles:
+            # TODO: This is not prepared for moved worktrees yet:
+            handle_path = opj(master.path, handle)
+            if is_annex(handle_path):
+                lgr.debug("Annex detected in submodule '%s'. "
+                          "Calling annex init ..." % handle)
+                # Note: The following call might look strange, since init=False
+                # is followed by a call of annex_init. This is intentional for
+                # the POC implementation.
+                AnnexRepo(handle_path, create=False, init=False)._annex_init()
 
         # final user output
         lgr.info("Successfully installed handle '%s' from %s at %s." %
