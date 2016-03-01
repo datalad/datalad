@@ -115,6 +115,25 @@ class POCInstallHandle(Interface):
 
         # TODO: rollback on exception during git calls? At what point there is
         # anything to roll back?
+        # Note: At least the replaced .git-symlink in an annex should be
+        # restored on failure. (See below)
+
+        # Workaround for issue, when 'git submodule add' is executed in a
+        # submodule conataining an annex. Git then gets confused by annexes
+        # .git symlink. Apparently everything is fine, if the .git link is
+        # replaced with the standard .git file during 'submodule add'
+        # Therefore: Replace it, if it's there and call annex-init again after
+        # the submodule was added.
+        from os.path import islink
+        from os import readlink, remove
+        dot_git = opj(target_handle.path, ".git")
+        link_target = None
+        if islink(dot_git):  # TODO: What happens in direct mode?
+            link_target = readlink(dot_git)
+            remove(dot_git)
+            with open(dot_git, 'w') as f:
+                f.write("gitdir: " + link_target)
+
         try:
             target_handle._git_custom_command('', ["git", "submodule", "add",
                                                    src,
@@ -175,11 +194,15 @@ class POCInstallHandle(Interface):
         commit_msg = "Installed handle '%s'\n" % name
         for sh in subhandles:
             commit_msg += "Installed subhandle '%s'\n" % sh
-        target_handle.git_commit(commit_msg)
+        #target_handle.git_commit(commit_msg)
+        #  TODO: Why there is an issue with obtaining lock at .git/index.lock
+        # when calling commit via GitPython?
+        target_handle._git_custom_command('', ["git", "commit", "-m", commit_msg])
 
         if super_handles:
+            super_handles.reverse() # deepest first
             what_to_commit = super_handles[0]  # name of the target handle
-            handles_to_commit = super_handles[1:].reverse()  # target_handle done already; deepest first
+            handles_to_commit = super_handles[1:]  # target_handle done already
             # entry for root handle (root handle path + ''):
             if handles_to_commit:
                 handles_to_commit.append('')
@@ -190,12 +213,20 @@ class POCInstallHandle(Interface):
             from os.path import commonprefix
             for h in handles_to_commit:
                 repo = GitRepo(opj(master.path, h), create=False)
-                rel_name = what_to_commit[len(commonprefix([what_to_commit, h])):]
+                rel_name = what_to_commit[len(commonprefix([what_to_commit, h])):].strip('/')
                 lgr.debug("Calling git add/commit '%s' in %s." %
                           (rel_name, repo.path))
-                repo.git_add(rel_name)
-                repo.git_commit(commit_msg)
+                #repo.git_add(rel_name)
+                #repo.git_commit(commit_msg)
+                # DEBUG: direct calls
+                repo._git_custom_command('', ["git", "add", rel_name])
+                repo._git_custom_command('', ["git", "commit", "-m", commit_msg])
                 what_to_commit = h
+
+        # Workaround: Reinit annex
+        if link_target:
+            target_handle._git_custom_command('', ["git", "annex", "init"])
+
 
         # init annex(es), if any:
         for handle in [name] + subhandles:
