@@ -168,6 +168,11 @@ class POCInstallHandle(Interface):
         else:
             name = submodules_added_1st_level[0]
 
+        # TODO: init not necessary for just installed top-level handle;
+        # recurse into subhandles if --recursive; use git submodule init
+        # directly instead of update, since it doesn't require the URL to be
+        # available.
+
         # init and update the submodule(s):
         std_out, std_err = \
             target_handle._git_custom_command('', ["git", "submodule", "update",
