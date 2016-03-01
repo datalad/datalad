@@ -71,16 +71,32 @@ class POCInstallHandle(Interface):
         if dest is not None:
             raise NotImplementedError("Option --dest yet to be implemented.")
 
-        # TODO: Enhance functionality (see Note in docstring):
-        # check whether 'url' is a locally known name.
-        # if so, get a location to clone from.
-        # otherwise treat 'path' as an url to clone from
-        # if path is None, install to master (checkout the submodule)
-        # this means: if the submodule is there already (locally known name),
-        # just checkout.
-
         master = POC_get_root_handle(roothandle)
         lgr.info("Install using root handle '%s' ..." % master.path)
+
+        # figure out, what to install:
+        # 1. is src an already known handle?
+        installed_super_handles = list()
+        for installed in get_submodules_list(master):
+            if src.startswith(installed):
+                installed_super_handles.append(installed)
+        if installed_super_handles:
+            if name:
+                lgr.warning("option --name currently ignored in case of an "
+                            "already known handle")
+            installed_super_handles.sort(key=len)
+            target = GitRepo(opj(master.path, installed_super_handles[-1]))
+            # extract submodule name:
+            name = src[len(installed_super_handles[-1]) + 1:]
+            # just update and init:
+            target._git_custom_command('', ["git", "submodule", "update",
+                                            "--init", name])
+            return
+
+
+        # check, whether 'src' is a local path:
+        if exists(src):
+            src = abspath(expandvars(expanduser(src)))
 
         # if a hierarchical name is given, check whether to install the handle
         # into an existing handle instead of the root handle:
@@ -106,10 +122,6 @@ class POCInstallHandle(Interface):
         # TODO: Decide whether or not we want to check the optional name before
         # even calling "git submodule add" or just wait for its feedback.
         # For now, just catch exception from git call.
-
-        # check, whether 'src' is a local path:
-        if exists(src):
-            src = abspath(expandvars(expanduser(src)))
 
         submodules_dict_pre = get_submodules_dict(target_handle)
 
