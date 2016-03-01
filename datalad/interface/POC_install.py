@@ -173,11 +173,15 @@ class POCInstallHandle(Interface):
         # directly instead of update, since it doesn't require the URL to be
         # available.
 
-        # init and update the submodule(s):
-        std_out, std_err = \
-            target_handle._git_custom_command('', ["git", "submodule", "update",
-                                            "--init", "--recursive"
-                                            if recursive else '', name])
+        # init and update possible submodule(s):
+        std_out = ""
+        if recursive:
+            just_installed = GitRepo(opj(target_handle.path, name), create=False)
+            std_out, std_err = \
+                just_installed._git_custom_command('', ["git", "submodule",
+                                                        "update", "--init",
+                                                        "--recursive"
+                                                        if recursive else ''])
 
         # get list of updated (and initialized) subhandles from output:
         import re
