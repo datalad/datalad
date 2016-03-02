@@ -50,6 +50,7 @@ from .POC_move import POCMove
 from .POC_remove import POCRemove
 from .POC_update import POCUpdate
 from .POC_uninstall import POCUninstall
+from .POC_publish import POCPublish
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -81,6 +82,7 @@ _group_handle = (
         UpgradeHandle,
         POCUpdate,
         PublishHandle,
+        POCPublish,
     ])
 
 _group_misc = (
