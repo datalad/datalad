@@ -68,8 +68,25 @@ class POCInstallHandle(Interface):
         use of submodules), except for direct git (annex) calls.
         """
 
+        # Note: 'dest' without '--name' currently leads to a clone, that is not
+        # installed as a submodule into any roothandle. Therefore it may be
+        # seen as a root handle.
+        # TODO: doc
         if dest is not None:
-            raise NotImplementedError("Option --dest yet to be implemented.")
+            if name is not None:
+                raise NotImplementedError("Paramaters 'dest' and '--name' "
+                                          "combined are implying the use of "
+                                          "'git worktree'.\n"
+                                          "Not implemented yet.")
+            if exists(dest):
+                # create a root handle
+                target_repo = GitRepo(dest, src, create=True)
+                if is_annex(dest):
+                    target_repo._git_custom_command('', ["git", "annex", "init"])
+                lgr.info("Installation succesfull.")
+                return
+            else:
+                raise ValueError("'%s' does not exist." % dest)
 
         master = POC_get_root_handle(roothandle)
         lgr.info("Install using root handle '%s' ..." % master.path)
