@@ -36,52 +36,67 @@ class POCPublish(Interface):
     """
 
     _params_ = dict(
-        dst=Parameter(
+        remote=Parameter(
             args=('dst',),
-            doc="Address to publish the handle to. It's expected to address "
-                "the server-side base directory for the published handle. The "
-                "published handle repository will be located beneath that "
-                "directory.",
-            # TODO: really? may be direct git address and derive from there?
+            doc="Remote name to publish the handle to. If there is no such "
+                "remote yet, it will be registered(?) using the URL given by "
+                "REMOTE-URL."
+                "If not even the remote repository exists and you want publish "
+                "to create it, use CREATE."
+                "If RECURSIVE is set, the remote names for subhandles will be "
+                "derived by concatenating this remote name, a connecting "
+                "dash and the subhandle's name.",
             constraints=EnsureStr()),
-        src=Parameter(
-            args=('src',),
-            doc="name of or path to the handle to publish",
-            nargs="?",
-            constraints=EnsureStr()),
-        base_url=Parameter(
-            args=('base-url',),
-            doc="Public base url of the published handle. This URL is "
-                "expected to address the base directory given by 'dst', "
-                "meaning that the URL(s) of the published repository(ies) "
-                "follow the same hierarchy as the corresponding server-side "
-                "directories. Default is 'dst'.",
-            # TODO: See above
+        remote_url=Parameter(
+            args=('--remote-url',),
+            doc="The URL of the repository named by REMOTE.",
+            # TODO: What if remote is known, but remote-url is passed?
+            #       Redirect the existing remote or ignore or reject?
+            # TODO: RECURSIVE? => REMOTE-URL/what? depends on tree or list?
+            #       list: hierarchical-subhandle-name (replace / by -)?
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
-        remote_name=Parameter(
-            args=('--remote-name',),
-            doc="name for the remote to add to the local handle",
-            # TODO: default? derived from url
+        # TODO: remote_url_push/remote_url_pull
+        handle=Parameter(
+            args=('--handle',),
+            doc="Name of or path to the handle to publish. Defaults to CWD.",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
-            action="store_true",
-            doc="""If set this also publishes all subhandles of 'src'. Set to
+            doc="""If set, this also publishes all subhandles of HANDLE. Set to
                 'list' to publish subhandles at the same directory level as
-                the handle itself or set to 'tree' to hierarchically publish
-                them.""",
+                the handle itself (hint: github) or set to 'tree' to
+                hierarchically publish them.
+                Note: Since it is not clear in detail yet, what 'tree' means,
+                only 'list' is currently implemented. """,
                 # TODO: Does 'tree' derive from relative URLs of submodules or
                 # from the hierarchy of submodules?
-            constraints=EnsureChoice(["tree", "list"])),
-        rewrite_urls=Parameter(
-            args=("--rewrite-urls", ),
-            doc="",
-            constraints=EnsureChoice({"ask", "never", "all"}),),)
+            constraints=EnsureChoice(["list"]) | EnsureNone()),
+        rewrite_subhandle_urls=Parameter(
+            args=("--rewrite-subhandle-urls", ),
+            doc="When publishing RECURSIVE, rewrite the URLs of superhandles "
+                "linking their subhandles to the URL they were published to.",
+            constraints=EnsureChoice({"ask", "never", "all"}),),
+        create_ssh=Parameter(
+            args=("--create-ssh",),
+            doc="Pass a SSH URL, if you want publish to create the public "
+                "repositories via SSH.",
+            constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, dst, src=curdir, base_url=None, remote_name=None,
-                 recursive="list", rewrite_urls="never"):
+    def __call__(self, remote, remote_url=None, handle=curdir, recursive=None,
+                 rewrite_subhandle_urls="never", create_ssh=None):
+
+
+
+        ########
+
+            # option -create(method) + ssh-url
+            # remote-name as a target
+            # not existent => url
+            # remote names uniform within a tree
+
+        #######
 
         # Maybe enhance what dst is expected to be:
         # detect whether dst is a valid git repo => push?
