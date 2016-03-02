@@ -155,7 +155,7 @@ def check_download_external_url(url, failed_str, success_str, d):
     # TODO -- more and more specific
 
 
-@use_cassette('fixtures/vcr_cassettes/test_authenticate_external_portals.yaml', record_mode='once')
+@use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
     yield check_download_external_url, \
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \
