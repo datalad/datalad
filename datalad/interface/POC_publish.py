@@ -109,14 +109,14 @@ class POCPublish(Interface):
                 "default root handle.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, remote, remote_url=None, remote_url_push=None, handle=curdir, recursive=None,
+    def __call__(self, remote, remote_url=None, remote_url_push=None,
+                 handle=curdir, recursive=None,
                  rewrite_subhandle_urls="never", create_ssh=None,
                  roothandle=None):
+        
         # Note: "Real" implementation should use getpwd()
 
-        # Note: When pushing, check for annex!
-
-        # TODO: check parameter dependencies:
+        # TODO: check parameter dependencies first
 
         # get root handle:
         master = POC_get_root_handle(roothandle)
@@ -140,36 +140,48 @@ class POCPublish(Interface):
 
         if remote not in handle_repo.git_get_remotes():
             if not remote_url:
-                raise ValueError("No remote '%s' found. Provide REMOTE-URL to add it.")
+                raise ValueError("No remote '%s' found. Provide REMOTE-URL to "
+                                 "add it.")
             lgr.info("Remote '%s' doesn't exist yet.")
             if create_ssh:
-                lgr.info("Trying to create a remote repository via %s" % create_ssh)
-                # TODO:
-                pass
+                lgr.info("Trying to create a remote repository via %s" %
+                         create_ssh)
+                # TODO: CREATE!
+                raise NotImplementedError("TODO: Creation of remote "
+                                          "repository not implemented yet.")
+
             handle_repo.git_remote_add(remote, remote_url)
             if remote_url_push:
-                # TODO: add push url
-                pass
-            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." % (remote, remote_url, remote_url_push if remote_url_push else remote_url))
+                handle_repo._git_custom_command('',
+                                                ["git", "remote", "set-url",
+                                                 "--push", remote,
+                                                 remote_url_push])
+            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
+                     (remote, remote_url,
+                      remote_url_push if remote_url_push else remote_url))
         else:
             # known remote: parameters remote-url-* currently invalid.
             # This may change to adapt the existing remote.
             if remote_url:
-                lgr.warning("Remote '%s' already exists. Ignoring remote-url %s." % remote_url)
+                lgr.warning("Remote '%s' already exists. "
+                            "Ignoring remote-url %s." % remote_url)
             if remote_url_push:
-                lgr.warning("Remote '%s' already exists. Ignoring remote-url-push %s." % remote_url_push)
+                lgr.warning("Remote '%s' already exists. "
+                            "Ignoring remote-url-push %s." % remote_url_push)
 
         # Rewriting submodule URLs:
         if rewrite_subhandle_urls != "never":
             # for each submodule:
             if rewrite_subhandle_urls == "ask":
                 # rewrite = ask => True/False = Yes/No
-                pass
+                raise NotImplementedError("TODO: "
+                                          "rewrite_subhandle_urls=\"ask\" "
+                                          "not implemented yet.")
             elif rewrite_subhandle_urls == "all":
                 rewrite = True
             if rewrite:
                 # TODO: Rewrite it and commit
-                pass
+                raise NotImplementedError("TODO: Rewriting URLs.")
 
         # push local state:
         handle_repo.git_push(remote)
