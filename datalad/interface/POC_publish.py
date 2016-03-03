@@ -16,9 +16,11 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, exists
+from os.path import join as opj, abspath, expanduser, expandvars, exists, commonprefix
+
+from six import string_types
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureListOf
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmdline.helpers import POC_get_root_handle
@@ -50,7 +52,7 @@ class POCPublish(Interface):
             args=('--remote-url',),
             doc="The URL of the repository named by REMOTE. This URL has to be "
                 "accessible to anyone, who is supposed to have acces to the "
-                "published handle later on. (Technically: a git pull URL)\n"
+                "published handle later on. (Technically: a git fetch URL)\n"
                 "If you want to publish RECURSIVE, it is expected, that you "
                 "pass a template for building the URLs of all handles to be "
                 "published by using placeholders.\n"
@@ -66,11 +68,6 @@ class POCPublish(Interface):
                 "repository, use this parameter to additionally provide a "
                 "push URL.\n",
             constraints=EnsureStr() | EnsureNone()),
-        # TODO: remote_url_push/remote_url_pull
-        # pull ist public URL, die wir eh bekommen vom User!
-        # push geht immer auch als pull
-
-        # URL: TEMPLATE
         handle=Parameter(
             args=('--handle',),
             doc="Name of or path to the handle to publish. Defaults to CWD.",
@@ -78,43 +75,23 @@ class POCPublish(Interface):
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
-            doc="""If set, this also publishes all subhandles of HANDLE. Set to
-                'list' to publish subhandles at the same directory level as
-                the handle itself (hint: github) or set to 'tree' to
-                hierarchically publish them.
-                Note: Since it is not clear in detail yet, what 'tree' means,
-                only 'list' is currently implemented. """,
-                # TODO: Does 'tree' derive from relative URLs of submodules or
-                # from the hierarchy of submodules?
-
-                # no hierarchy choices, but URL Template!
-
-            constraints=EnsureChoice(["list"]) | EnsureNone()),
-        rewrite_subhandle_urls=Parameter(
-            args=("--rewrite-subhandle-urls", ),
-            doc="When publishing RECURSIVE, rewrite the URLs of superhandles "
-                "linking their subhandles to the URL they were published to.",
-            constraints=EnsureChoice({"ask", "never", "all"}),
-            # TODO: eventually 'ask' probably should lead to a more chatty
-            #       thing, than just yes/no per handle. Allow for editing the
-            #       URL to be written.
-            ),
-        create_ssh=Parameter(
-            args=("--create-ssh",),
-            doc="Pass a SSH URL, if you want datalad to create the public "
-                "repositories via SSH.",
-            constraints=EnsureStr() | EnsureNone()),
+            action="store_true",
+            doc="Recursively publish all subhandles of HANDLE."),
         roothandle=Parameter(
             doc="Roothandle, HANDLE is referring to. Datalad has a "
                 "default root handle.",
-            constraints=EnsureStr() | EnsureNone()),)
+            constraints=EnsureStr() | EnsureNone()),
+        with_data=Parameter(
+            args=("--with-data",),
+            doc="shell pattern",
+            nargs="*",
+            constraints=EnsureListOf(string_types) | EnsureNone()),)
 
     def __call__(self, remote, remote_url=None, remote_url_push=None,
-                 handle=curdir, recursive=None,
-                 rewrite_subhandle_urls="never", create_ssh=None,
-                 roothandle=None):
-        
-        # Note: "Real" implementation should use getpwd()
+                 handle=curdir, recursive=None, roothandle=None,
+                 with_data=None):
+
+        # Note to myself: "Real" implementation should use getpwd()
 
         # TODO: check parameter dependencies first
 
@@ -124,67 +101,66 @@ class POCPublish(Interface):
 
         # figure out, what handle to publish:
         if exists(handle):  # local path?
-            handle_repo = GitRepo(handle, create=False)
+            handles_to_publish = [handle]
         elif handle in get_submodules_list(master):  # valid handle name?
-            handle_repo = GitRepo(opj(master.path, handle), create=False)
+            handles_to_publish = [opj(master.path, handle)]
         else:
             raise ValueError("Unknown handle '%s'." % handle)
 
-        # ########## RECURSIVE ###################
-        # TODO: build a list of handles to publish and there (modified)
-        #       parameters (deepest first)
-        # May be even make __call__ actually recursive?
+        if recursive:
+            handles_to_publish += get_submodules_list(handle_repo)
 
-        # Q: Rewriting locally, commit and push?
-        # => How to commit ignoring the current branch? => don't ignore ;)
+        for handle_path in handles_to_publish:
+            handle_repo = GitRepo(handle_path, create=False)
 
-        if remote not in handle_repo.git_get_remotes():
-            if not remote_url:
-                raise ValueError("No remote '%s' found. Provide REMOTE-URL to "
-                                 "add it.")
-            lgr.info("Remote '%s' doesn't exist yet.")
-            if create_ssh:
-                lgr.info("Trying to create a remote repository via %s" %
-                         create_ssh)
-                # TODO: CREATE!
-                raise NotImplementedError("TODO: Creation of remote "
-                                          "repository not implemented yet.")
+            handle_name = handle_path[len(
+                commonprefix([master.path, handle_path]).strip("/"))+1:]
 
-            handle_repo.git_remote_add(remote, remote_url)
-            if remote_url_push:
+            if remote not in handle_repo.git_get_remotes():
+                if not remote_url:
+                    raise ValueError("No remote '%s' found. Provide REMOTE-URL"
+                                     " to add it.")
+                lgr.info("Remote '%s' doesn't exist yet.")
+
+                # Fill in URL-Template:
+                remote_url = remote_url.replace("$NAME",
+                                                handle_name.replace("/", "-"))
+                # Add remote
+                handle_repo.git_remote_add(remote, remote_url)
+                if remote_url_push:
+                    # Fill in template:
+                    remote_url_push = \
+                        remote_url_push.replace("$NAME",
+                                                handle_name.replace("/", "-"))
+                    # Modify push url:
+                    handle_repo._git_custom_command('',
+                                                    ["git", "remote",
+                                                     "set-url",
+                                                     "--push", remote,
+                                                     remote_url_push])
+
+                lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
+                         (remote, remote_url,
+                          remote_url_push if remote_url_push else remote_url))
+            else:
+                # known remote: parameters remote-url-* currently invalid.
+                # This may change to adapt the existing remote.
+                if remote_url:
+                    lgr.warning("Remote '%s' already exists for handle '%s'. "
+                                "Ignoring remote-url %s." %
+                                (remote, handle_name, remote_url))
+                if remote_url_push:
+                    lgr.warning("Remote '%s' already exists for handle '%s'. "
+                                "Ignoring remote-url-push %s." %
+                                (remote, handle_name, remote_url_push))
+
+            # push local state:
+            handle_repo.git_push(remote)
+            # in case of an annex also push git-annex branch:
+            if is_annex(handle_repo.path):
+                handle_repo.git_push(remote, "+git-annex:git-annex")
+
+            if with_data:
                 handle_repo._git_custom_command('',
-                                                ["git", "remote", "set-url",
-                                                 "--push", remote,
-                                                 remote_url_push])
-            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
-                     (remote, remote_url,
-                      remote_url_push if remote_url_push else remote_url))
-        else:
-            # known remote: parameters remote-url-* currently invalid.
-            # This may change to adapt the existing remote.
-            if remote_url:
-                lgr.warning("Remote '%s' already exists. "
-                            "Ignoring remote-url %s." % remote_url)
-            if remote_url_push:
-                lgr.warning("Remote '%s' already exists. "
-                            "Ignoring remote-url-push %s." % remote_url_push)
-
-        # Rewriting submodule URLs:
-        if rewrite_subhandle_urls != "never":
-            # for each submodule:
-            if rewrite_subhandle_urls == "ask":
-                # rewrite = ask => True/False = Yes/No
-                raise NotImplementedError("TODO: "
-                                          "rewrite_subhandle_urls=\"ask\" "
-                                          "not implemented yet.")
-            elif rewrite_subhandle_urls == "all":
-                rewrite = True
-            if rewrite:
-                # TODO: Rewrite it and commit
-                raise NotImplementedError("TODO: Rewriting URLs.")
-
-        # push local state:
-        handle_repo.git_push(remote)
-        # in case of an annex also push git-annex branch:
-        if is_annex(handle_repo.path):
-            handle_repo.git_push(remote, "+git-annex:git-annex")
+                                                ["git", "annex", "copy"] +
+                                                with_data + ["--to", remote])
