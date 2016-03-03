@@ -125,7 +125,7 @@ class POCUpdate(Interface):
         # merge:
         if merge:
             lgr.info("Applying changes from tracking branch...")
-            handle_repo._git_custom_command('', ["git", "merge", remote if remote else ''])
+            handle_repo._git_custom_command('', ["git", "pull", remote if remote else ''])
             if is_annex(handle_repo.path):
                 # annex-apply:
                 lgr.info("Updating annex ...")
