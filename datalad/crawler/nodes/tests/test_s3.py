@@ -117,7 +117,6 @@ def test_crawl_s3_commit_versions(path):
     eq_(out[0]['datalad_stats'].get_total(), ActivityStats(skipped=17))  # Really nothing was done
 
 
-# theoretically reusing the same cassette should have worked but doesn't
 @use_cassette('test_crawl_s3_commit_versions_one_at_a_time')
 @with_tempfile
 def test_crawl_s3_commit_versions_one_at_a_time(path):
@@ -161,5 +160,39 @@ def test_crawl_s3_commit_versions_one_at_a_time(path):
     eq_(total_stats_all,
         # Deletions come as 'files' as well atm
         ActivityStats(files=17, skipped=72, overwritten=3, downloaded=14, urls=14, add_annex=14, removed=3, downloaded_size=112))
+
+
+#
+# Theoretically could be a test without invoking S3 where file gets later renamed into a directory
+# and the other way around.  annex should handle that.  So this one serves more as integration
+# test
+#
+@use_cassette('test_crawl_s3_file_to_directory')
+@with_tempfile
+def test_crawl_s3_file_to_directory(path):
+    annex = _annex(path)
+
+    # with auto_finalize (default), Annexificator will finalize whenever it runs into a conflict
+    pipeline = [
+        crawl_s3('datalad-test1-dirs-versioned', repo=annex.repo),
+    #    annex
+        switch('datalad_action',
+               {
+                   'commit': annex.finalize(tag=True),
+                   'remove': annex.remove,
+                   'annex':  annex,
+               })
+    ]
+    with externals_use_cassette('test_crawl_s3_file_to_directory-pipeline1'):
+        with swallow_logs() as cml:
+            out = run_pipeline(pipeline)
+    assert(annex.repo.dirty)
+    list(annex.finalize()(out[0]))
+    # things are committed and thus stats are empty
+    eq_(out, [{'datalad_stats': ActivityStats()}])
+    total_stats_all = total_stats = out[0]['datalad_stats'].get_total()
+    eq_(total_stats,
+        # Deletions come as 'files' as well atm
+        ActivityStats(files=3, downloaded=3, overwritten=2, urls=3, add_annex=3, downloaded_size=12, versions=['0.0.20160303']))
 
 

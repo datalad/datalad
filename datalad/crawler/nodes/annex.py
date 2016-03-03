@@ -15,6 +15,7 @@ import os
 import time
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
+from os.path import isdir, islink
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
@@ -36,7 +37,7 @@ from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
-from ...support.gitrepo import GitRepo
+from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
 from ...support.handlerepo import HandleRepo
 from ...support.stats import ActivityStats
@@ -217,6 +218,7 @@ class Annexificator(object):
     def __init__(self, path=None, mode='full', options=None,
                  special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
+                 auto_finalize=True,
                  statusdb=None,
                  **kwargs):
         """
@@ -234,6 +236,10 @@ class Annexificator(object):
           List of custom special remotes to initialize and enable by default.
         yield_non_updated : bool, optional
           Either to yield original data (with filepath) if load was not updated in annex
+        auto_finalize : bool, optional
+          In some cases, if e.g. adding a file in place of an existing directory or placing
+          a file under a directory for which there is a file atm, we would 'finalize' before
+          carrying out the operation
         statusdb : {'json', 'fileattr'}, optional
           DB of file statuses which will be used to figure out if remote load has changed.
           If None, no statusdb will be used so Annexificator will process every given url
@@ -268,6 +274,7 @@ class Annexificator(object):
 
         self.mode = mode
         self.options = options or []
+        self.auto_finalize = auto_finalize
         self._states = set()
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
@@ -416,9 +423,16 @@ class Annexificator(object):
 
             if lexists(filepath):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
-                _call(unlink, filepath)
+                if isdir(filepath):
+                    # If directory - tricky, since we would want then to check if no
+                    # staged changes under
+                    _call(self._check_no_staged_changes_under_dir, filepath, stats=stats)
+                    _call(rmtree, filepath)
+                else:
+                    _call(unlink, filepath)
                 _call(stats.increment, 'overwritten')
-
+            else:
+                _call(self._check_non_existing_filepath, filepath, stats=stats)
             # TODO: We need to implement our special remote here since no downloaders used
             if self.mode == 'full' and remote_status and remote_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
@@ -471,6 +485,67 @@ class Annexificator(object):
         # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
         # with subsequent "drop" leaves no record that it ever was here
         yield updated_data  # There might be more to it!
+
+    def _check_no_staged_changes_under_dir(self, dirpath, stats=None):
+        """Helper to verify that we can "safely" remove a directory
+        """
+        dirty_files = self._get_status()
+        dirty_files = sum(dirty_files, [])
+        dirpath_normalized = _normalize_path(self.repo.path, dirpath)
+        for dirty_file in dirty_files:
+            if stats:
+                _call(stats.increment, 'removed')
+            if dirty_file.startswith(dirpath_normalized):
+                if self.auto_finalize:
+                    self.finalize()({'datalad_stats': stats})
+                    return
+                else:
+                    raise RuntimeError(
+                        "We need to save some file instead of directory %(dirpath)s "
+                        "but there are uncommitted changes (%(dirty_file)s) under "
+                        "that directory.  Please commit them first" % locals())
+
+    def _check_non_existing_filepath(self, filepath, stats=None):
+        """Helper to verify that we can safely save into the target path
+
+        For instance we can't save into a file d/file if d is a file, not
+        a directory
+        """
+        # if file doesn't exist we need to verify that there is no conflicts
+        dirpath, name = ops(filepath)
+        if dirpath:
+            # we need to assure that either that directory exists or directories
+            # on the way to it exist and are not a file by some chance
+            while dirpath:
+                if lexists(dirpath):
+                    if not isdir(dirpath):
+                        # we have got a problem
+                        # HANDLE THE SITUATION
+                        # check if given file is not staged for a commit or dirty
+                        dirty_files = self._get_status()
+                        # it was a tuple of 3
+                        dirty_files = sum(dirty_files, [])
+                        dirpath_normalized = _normalize_path(self.repo.path, dirpath)
+                        if dirpath_normalized in dirty_files:
+                            if self.auto_finalize:
+                                self.finalize()({'datalad_stats': stats})
+                            else:
+                                raise RuntimeError(
+                                    "We need to annex file %(filepath)s but there is a file "
+                                    "%(dirpath)s in its path which destiny wasn't yet decided "
+                                    "within git.  Please commit or remove it before trying "
+                                    "to annex this new file" % locals())
+                        lgr.debug("Removing %s as it is in the path of %s" % (dirpath, filepath))
+                        _call(os.unlink, dirpath)
+                        if stats:
+                            _call(stats.increment, 'overwritten')
+                    break  # in any case -- we are done!
+
+                dirpath, _ = ops(dirpath)
+                if not dirpath.startswith(self.repo.path):
+                    # shouldn't happen!
+                    raise RuntimeError("We escaped the border of the repository itself. "
+                                       "path: %s  repo: %s" % (dirpath, self.repo.path))
 
     def _get_fpath(self, data, stats, url=None):
         """Return relative path (fpath) to the file based on information in data or url
@@ -673,7 +748,7 @@ class Annexificator(object):
         #out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
         out, err = self.repo._git_custom_command([], ["git", "status", "--porcelain"])
         assert not err
-        staged, notstaged, untracked = [], [], []
+        staged, notstaged, untracked, deleted = [], [], [], []
         for l in out.split('\n'):
             if not l:
                 continue
@@ -684,11 +759,12 @@ class Annexificator(object):
                  'A ': staged,
                  'M ': staged,
                  ' M': notstaged,
+                 ' D': deleted,
                  }[act].append(fname)
                 # for the purpose of this use we don't even want MM or anything else
             except KeyError:
                 raise RuntimeError("git status %r not yet supported. TODO" % act)
-        return staged, notstaged, untracked
+        return staged, notstaged, untracked, deleted
 
     def commit_versions(self,
                         regex,
@@ -727,11 +803,12 @@ class Annexificator(object):
             #
             # staged = process_diff(repo.index.diff('HEAD'))#repo.head.commit))
             # notstaged = process_diff(repo.index.diff(None))
-            staged, notstaged, untracked = self._get_status()
+            staged, notstaged, untracked, deleted = self._get_status()
 
             # Verify that everything is under control!
             assert(not notstaged)  # not handling atm, although should be safe I guess just needs logic to not unstage them
             assert(not untracked)  # not handling atm
+            assert(not deleted)  # not handling atm
             if not staged:
                 return  # nothing to be done -- so we wash our hands off entirely
 
