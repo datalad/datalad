@@ -163,7 +163,7 @@ class POCPublish(Interface):
                                 (remote, handle_name, remote_url_push))
 
             # push local state:
-            handle_repo.git_push(remote if remote else '')
+            handle_repo.git_push(("%s %s" % (remote, handle_repo.git_get_active_branch())) if remote else '', )
 
             # in case of an annex also push git-annex branch; if no remote
             # given, figure out remote of the tracking branch:
@@ -184,7 +184,7 @@ class POCPublish(Interface):
                     else:
                         raise RuntimeError("Couldn't determine what remote to push git-annex branch to")
 
-                handle_repo.git_push(remote, "+git-annex:git-annex")
+                handle_repo.git_push("%s +git-annex:git-annex" % remote)
 
             if with_data:
                 handle_repo._git_custom_command('',
