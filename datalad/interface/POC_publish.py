@@ -119,6 +119,7 @@ class POCPublish(Interface):
 
             handle_name = handle_repo.path[len(
                 commonprefix([master.path, handle_repo.path]).strip("/"))+1:]
+            set_upstream = False
 
             if remote is not None and remote not in handle_repo.git_get_remotes():
                 if not remote_url:
@@ -147,8 +148,20 @@ class POCPublish(Interface):
                          (remote, remote_url,
                           remote_url_push if remote_url_push else remote_url))
 
-                # TODO: set-upstream? (May be this depends on target setup?)
-                # When to set to what?
+                # upstream branch needed for update (merge) and subsequent push,
+                # in case there is no.
+                try:
+                    # Note: tracking branch actually defined bei entry "merge"
+                    # PLUS entry "remote"
+                    std_out, std_err = \
+                        handle_repo._git_custom_command('',
+                                                        ["git", "config", "--get", "branch.{active_branch}.merge".format(active_branch=handle_repo.git_get_active_branch())])
+                except CommandError as e:
+                    if e.code == 1 and e.stdout == "":
+                        # no tracking branch:
+                        set_upstream = True
+                    else:
+                        raise
 
             else:
                 # known remote: parameters remote-url-* currently invalid.
@@ -163,7 +176,7 @@ class POCPublish(Interface):
                                 (remote, handle_name, remote_url_push))
 
             # push local state:
-            handle_repo.git_push(("%s %s" % (remote, handle_repo.git_get_active_branch())) if remote else '', )
+            handle_repo.git_push(("%s %s %s" % ("--set-upstream" if set_upstream else '', remote, handle_repo.git_get_active_branch())) if remote else '', )
 
             # in case of an annex also push git-annex branch; if no remote
             # given, figure out remote of the tracking branch:
