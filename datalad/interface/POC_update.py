@@ -40,17 +40,27 @@ class POCUpdate(Interface):
             doc="Roothandle, where to install the handle to. Datalad has a "
                 "default root handle.",
             constraints=EnsureStr() | EnsureNone()),
-        apply=Parameter(
-            args=("--apply", "-a"),
+        merge=Parameter(
+            args=("--merge",),
             action="store_true",
-            doc="Merge changes from remote.",),
+            doc="Merge changes from remote branch, configured to be the "
+                "tracking branch.",),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
             doc="""If set this updates all possibly existing subhandles,
-             too."""),)
+             too."""),
+        all=Parameter(
+            args=("--all",),
+            action="store_true",
+            doc="Fetch updates from all remotes.",),
+        reobtain_data=Parameter(
+            args=("--reobtain-data",),
+            action="store_true",
+            doc="TODO"),)
 
-    def __call__(self, handle=curdir, roothandle=None, apply=False, recursive=False):
+    def __call__(self, handle=curdir, roothandle=None, merge=False,
+                 recursive=False, all=False, reobtain_data=False):
         """
 
         :param handle:
@@ -62,6 +72,9 @@ class POCUpdate(Interface):
 
         if recursive:
             raise NotImplementedError("Option '--recursive' not implemented yet.")
+
+        if reobtain_data:
+            raise NotImplementedError("Option '--reobtain-data' not implemented yet.")
 
         master = POC_get_root_handle(roothandle)
         lgr.info("Update using root handle '%s' ..." % master.path)
@@ -80,19 +93,21 @@ class POCUpdate(Interface):
         handle_remotes = handle_repo.git_get_remotes()
 
         # Currently '--apply' works for single remote only:
-        if len(handle_remotes) > 1 and apply:
+        if len(handle_remotes) > 1 and merge:
             lgr.debug("Found multiple remotes:\n%s" % handle_remotes)
             raise NotImplementedError("No merge strategy for multiple remotes "
                                       "implemented yet.")
 
         lgr.info("Updating handle '%s' ..." % handle_repo.path)
 
-        # fetch all remote:
-        lgr.info("Fetching remotes ...")
-        handle_repo.git_fetch('', "--all")
+        # fetch remote(s):
+        lgr.info("Fetching remote(s) ...")
+        handle_repo.git_fetch('', "--all" if all else '')
+        # TODO: annex branch?
+        # Note: Figure out tracking branch => remote => remote/git-annex
 
-        # apply:
-        if apply:
+        # merge:
+        if merge:
             lgr.info("Applying changes from tracking branch...")
             handle_repo._git_custom_command('', ["git", "merge"])
             if is_annex(handle_repo.path):
