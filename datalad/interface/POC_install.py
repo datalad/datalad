@@ -35,15 +35,17 @@ class POCInstallHandle(Interface):
         src=Parameter(
             doc="url or local path of the handle to install",
             constraints=EnsureStr()),
+        dest=Parameter(
+            args=("dest",),
+            doc="Path where to install the handle. By default this is "
+                "path/to/my/datalad/masterhandle/name.",
+            nargs='?',
+            constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
             doc="""If set this installs all possibly existing subhandles,
              too."""),
-        dest=Parameter(
-            doc="Path where to install the handle. By default this is "
-                "path/to/my/datalad/masterhandle/name.",
-            constraints=EnsureStr() | EnsureNone()),
         name=Parameter(
             doc="local name of the installed handle. If not provided, it is "
                 "derived from the url. Hierarchical names like 'foo/bar' are "
@@ -54,7 +56,7 @@ class POCInstallHandle(Interface):
                 "default root handle.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, src, recursive=False, dest=None, name=None, roothandle=None):
+    def __call__(self, src, dest=None, recursive=False, name=None, roothandle=None):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
 
