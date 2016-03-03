@@ -34,6 +34,7 @@ class POCUpdate(Interface):
     _params_ = dict(
         remote=Parameter(
             args=("remote",),
+            doc="",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         handle=Parameter(
