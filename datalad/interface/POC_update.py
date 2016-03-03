@@ -20,6 +20,7 @@ from os.path import join as opj
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
+from datalad.support.exceptions import CommandError
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
 from .POC_helpers import get_submodules_list, is_annex
@@ -103,8 +104,23 @@ class POCUpdate(Interface):
         # fetch remote(s):
         lgr.info("Fetching remote(s) ...")
         handle_repo.git_fetch('', "--all" if all else '')
-        # TODO: annex branch?
-        # Note: Figure out tracking branch => remote => remote/git-annex
+
+        # if it is an annex and there is a tracking branch, and we didn't fetch
+        # the entire remote anyway, fetch explicitly git-annex branch:
+        if is_annex(handle_repo.path) and not all:
+            # check for tracking branch's remote:
+            try:
+                std_out, std_err = \
+                    handle_repo._git_custom_command('',
+                                                    ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=handle_repo.git_get_active_branch())])
+            except CommandError as e:
+                if e.code == 1 and e.stdout == "":
+                    std_out = None
+                else:
+                    raise
+
+            if std_out:  # we have a "tracking remote"
+                handle_repo.git_fetch(std_out.strip(), "git-annex")
 
         # merge:
         if merge:
