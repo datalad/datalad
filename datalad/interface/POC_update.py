@@ -32,9 +32,12 @@ class POCUpdate(Interface):
     """Update a handle."""
 
     _params_ = dict(
+        remote=Parameter(
+            args=("remote",),
+            nargs="?",
+            constraints=EnsureStr() | EnsureNone()),
         handle=Parameter(
-            args=('handle',),
-            nargs='?',
+            args=('--handle',),
             doc="name of or path to the handle to be updated",
             constraints=EnsureStr() | EnsureNone()),
         roothandle=Parameter(
@@ -60,10 +63,12 @@ class POCUpdate(Interface):
             action="store_true",
             doc="TODO"),)
 
-    def __call__(self, handle=curdir, roothandle=None, merge=False,
+    def __call__(self, remote=None, handle=curdir, roothandle=None, merge=False,
                  recursive=False, all=False, reobtain_data=False):
         """
         """
+
+
 
         if recursive:
             raise NotImplementedError("Option '--recursive' not implemented yet.")
@@ -97,7 +102,7 @@ class POCUpdate(Interface):
 
         # fetch remote(s):
         lgr.info("Fetching remote(s) ...")
-        handle_repo.git_fetch('', "--all" if all else '')
+        handle_repo.git_fetch(remote if remote else '', "--all" if all else '')
 
         # if it is an annex and there is a tracking branch, and we didn't fetch
         # the entire remote anyway, fetch explicitly git-annex branch:
