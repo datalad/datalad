@@ -47,6 +47,7 @@ class POCPublish(Interface):
                 "to create it, use CREATE.\n"
                 "If RECURSIVE is set, the same name will be used to address "
                 "the subhandles' remotes.",
+            nargs="?",
             constraints=EnsureStr()),
         remote_url=Parameter(
             args=('--remote-url',),
@@ -119,10 +120,10 @@ class POCPublish(Interface):
             handle_name = handle_repo.path[len(
                 commonprefix([master.path, handle_repo.path]).strip("/"))+1:]
 
-            if remote not in handle_repo.git_get_remotes():
+            if remote is not None and remote not in handle_repo.git_get_remotes():
                 if not remote_url:
                     raise ValueError("No remote '%s' found. Provide REMOTE-URL"
-                                     " to add it.")
+                                     " to add it." % remote)
                 lgr.info("Remote '%s' doesn't exist yet.")
 
                 # Fill in URL-Template:
@@ -145,6 +146,10 @@ class POCPublish(Interface):
                 lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
                          (remote, remote_url,
                           remote_url_push if remote_url_push else remote_url))
+
+                # TODO: set-upstream? (May be this depends on target setup?)
+                # When to set to what?
+
             else:
                 # known remote: parameters remote-url-* currently invalid.
                 # This may change to adapt the existing remote.
@@ -158,9 +163,27 @@ class POCPublish(Interface):
                                 (remote, handle_name, remote_url_push))
 
             # push local state:
-            handle_repo.git_push(remote)
-            # in case of an annex also push git-annex branch:
+            handle_repo.git_push(remote if remote else '')
+
+            # in case of an annex also push git-annex branch; if no remote
+            # given, figure out remote of the tracking branch:
             if is_annex(handle_repo.path):
+                if remote is None:
+                    # check for tracking branch's remote:
+                    try:
+                        std_out, std_err = \
+                            handle_repo._git_custom_command('',
+                                                            ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=handle_repo.git_get_active_branch())])
+                    except CommandError as e:
+                        if e.code == 1 and e.stdout == "":
+                            std_out = None
+                        else:
+                            raise
+                    if std_out:
+                        remote = std_out.strip()
+                    else:
+                        raise RuntimeError("Couldn't determine what remote to push git-annex branch to")
+
                 handle_repo.git_push(remote, "+git-annex:git-annex")
 
             if with_data:
