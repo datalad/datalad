@@ -63,12 +63,6 @@ class POCUpdate(Interface):
     def __call__(self, handle=curdir, roothandle=None, merge=False,
                  recursive=False, all=False, reobtain_data=False):
         """
-
-        :param handle:
-        :param roothandle:
-        :param apply:
-        :param recursive:
-        :return:
         """
 
         if recursive:
@@ -120,7 +114,7 @@ class POCUpdate(Interface):
                     raise
 
             if std_out:  # we have a "tracking remote"
-                handle_repo.git_fetch(std_out.strip(), "git-annex")
+                handle_repo.git_fetch("%s git-annex" % std_out.strip())
 
         # merge:
         if merge:
