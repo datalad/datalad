@@ -23,6 +23,7 @@ from ..support.protocol import DryRunProtocol, DryRunExternalsProtocol, \
 from ..support.gitrepo import GitRepo
 from ..cmd import Runner
 from .utils import with_tempfile
+from .utils import swallow_logs
 
 
 @with_tempfile
@@ -79,7 +80,8 @@ def test_ExecutionTimeProtocol(path1, path2):
 
     # now with exception, since path2 doesn't exist yet:
     try:
-        runner.run(cmd, cwd=path2)
+        with swallow_logs() as cml:
+            runner.run(cmd, cwd=path2)
     except Exception as e:
         catched_exception = e
     finally:
@@ -103,7 +105,7 @@ def test_ExecutionTimeProtocol(path1, path2):
     extracted_path = timer_protocol[2]['command'][1].split(',')[0][7:-1]
     assert_equal(normpath(extracted_path), normpath(path2))
 
-    assert_in("kwargs={}", timer_protocol[2]['command'][2])
+    assert_in("kwargs={'odbt': <class 'git.db.GitCmdObjectDB'>}", timer_protocol[2]['command'][2])
     ok_(timer_protocol[2]['end'] >= timer_protocol[2]['start'])
     ok_(timer_protocol[2]['duration'] >= 0)
 
@@ -127,7 +129,8 @@ def test_ExecutionTimeExternalsProtocol(path1, path2):
 
     # now with exception, since path2 doesn't exist yet:
     try:
-        runner.run(cmd, cwd=path2)
+        with swallow_logs() as cml:
+            runner.run(cmd, cwd=path2)
     except Exception as e:
         catched_exception = e
     finally:
@@ -152,7 +155,8 @@ def test_DryRunProtocol(path):
 
     # path doesn't exist, so an actual run would raise Exception,
     # but a dry run wouldn't:
-    assert_raises(AssertionError, assert_raises, Exception, runner.run, cmd)
+    with swallow_logs() as cml:
+        assert_raises(AssertionError, assert_raises, Exception, runner.run, cmd)
     assert_equal(len(protocol), 1)
 
     # callable is also not executed, but recorded in the protocol:
