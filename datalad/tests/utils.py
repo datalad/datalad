@@ -167,8 +167,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
     If relative path provided, then test from current directory
     """
     annex, file_repo_path, filename, path, repo = _prep_file_under_git(path, filename)
-
-    assert(file_repo_path in repo.get_indexed_files())  # file is known to Git
+    assert_in(file_repo_path, repo.get_indexed_files())  # file is known to Git
 
     if annex:
         try:
