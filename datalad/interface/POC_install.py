@@ -56,6 +56,8 @@ class POCInstallHandle(Interface):
                 "default root handle.",
             constraints=EnsureStr() | EnsureNone()),)
 
+    # TODO: --create
+
     def __call__(self, src, dest=None, recursive=False, name=None, roothandle=None):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
@@ -95,10 +97,19 @@ class POCInstallHandle(Interface):
 
         # figure out, what to install:
         # 1. is src an already known handle?
+
         installed_super_handles = list()
         for installed in get_submodules_list(master):
             if src.startswith(installed):
                 installed_super_handles.append(installed)
+
+        # # TODO: not installed handle but registered in master?
+        # std_out, std_err = master._git_custom_command('', ["git", "submodule", "status"])
+        # uninstalled_toplevel_handles = list()
+        # if std_out:
+        #     uninstalled_toplevel_handles = \
+        #         [line.split()[1] for line in std_out.splitlines() if line.startswith("-")]
+
         if installed_super_handles:
             if name:
                 lgr.warning("option --name currently ignored in case of an "
@@ -110,8 +121,14 @@ class POCInstallHandle(Interface):
             # just update and init:
             target._git_custom_command('', ["git", "submodule", "update",
                                             "--init", name])
+            if is_annex(opj(target.path, name)):
+                lgr.debug("Annex detected in submodule '%s'. "
+                          "Calling annex init ..." % name)
+                # Note: The following call might look strange, since init=False
+                # is followed by a call of annex_init. This is intentional for
+                # the POC implementation.
+                AnnexRepo(opj(target.path, name), create=False, init=False)._annex_init()
             return
-
 
         # check, whether 'src' is a local path:
         if exists(src):
