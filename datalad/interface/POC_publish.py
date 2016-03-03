@@ -101,20 +101,23 @@ class POCPublish(Interface):
 
         # figure out, what handle to publish:
         if exists(handle):  # local path?
-            handles_to_publish = [handle]
+            top_repo = GitRepo(handle, create=False)
         elif handle in get_submodules_list(master):  # valid handle name?
-            handles_to_publish = [opj(master.path, handle)]
+            top_repo = GitRepo(opj(master.path, handle), create=False)
         else:
             raise ValueError("Unknown handle '%s'." % handle)
+        handles_to_publish = [top_repo]
 
         if recursive:
-            handles_to_publish += get_submodules_list(handle_repo)
+            handles_to_publish += [GitRepo(opj(master.path, handle, subhandle),
+                                           create=False)
+                                   for subhandle in
+                                   get_submodules_list(top_repo)]
 
-        for handle_path in handles_to_publish:
-            handle_repo = GitRepo(handle_path, create=False)
+        for handle_repo in handles_to_publish:
 
-            handle_name = handle_path[len(
-                commonprefix([master.path, handle_path]).strip("/"))+1:]
+            handle_name = handle_repo.path[len(
+                commonprefix([master.path, handle_repo.path]).strip("/"))+1:]
 
             if remote not in handle_repo.git_get_remotes():
                 if not remote_url:
