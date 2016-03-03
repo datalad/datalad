@@ -55,14 +55,14 @@ class Ls(Interface):
             action="store_true",
             doc="Recurse into subdirectories",
         ),
-        all_=Parameter(
+        all=Parameter(
             args=("-a", "--all"),
             action="store_true",
             doc="List all entries, not e.g. only latest entries",
         ),
     )
 
-    def __call__(self, url, config_file=None, list_content=False, recursive=False, all_=False):
+    def __call__(self, url, config_file=None, list_content=False, recursive=False, all=False):
 
         if url.startswith('s3://'):
             bucket_prefix = url[5:]
@@ -137,7 +137,7 @@ class Ls(Interface):
                 continue
             ui.message(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), cr=' ')
             if isinstance(e, Key):
-                if not (e.is_latest or all_):
+                if not (e.is_latest or all):
                     # Skip this one
                     continue
                 url = get_key_url(e, schema='http')
@@ -176,7 +176,7 @@ class Ls(Interface):
 
                 ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
             else:
-                if all_:
+                if all:
                     ui.message("del")
 
 
