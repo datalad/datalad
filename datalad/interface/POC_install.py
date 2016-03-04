@@ -20,9 +20,10 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.cmd import Runner
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex
+from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex, get_all_submodules_dict
 from datalad.cmd import CommandError
 
 lgr = logging.getLogger('datalad.interface.POC_install')
@@ -58,7 +59,8 @@ class POCInstallHandle(Interface):
 
     # TODO: --create
 
-    def __call__(self, src, dest=None, recursive=False, name=None, roothandle=None):
+    def __call__(self, src, dest=None, recursive=False, name=None,
+                 roothandle=None):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
 
@@ -71,6 +73,9 @@ class POCInstallHandle(Interface):
         current GitRepo/AnnexRepo implementation (which aren't prepared for the
         use of submodules), except for direct git (annex) calls.
         """
+
+        # TODO: Allow for passing customized Runners/protocols
+        runner = Runner()
 
         # Note: 'dest' without '--name' currently leads to a clone, that is not
         # installed as a submodule into any roothandle. Therefore it may be
@@ -97,40 +102,52 @@ class POCInstallHandle(Interface):
 
         # figure out, what to install:
         # 1. is src an already known handle?
+        src_as_name = src.rstrip('/')
+        # Note: To strip os.sep instead of '/' seems to not be reasonable,
+        # since we are trying to treat src as a (datalad defined) name, that
+        # allows for '/' only. If there is os.sep like '\', src obviously is a
+        # path not a name!
 
-        installed_super_handles = list()
-        for installed in get_submodules_list(master):
-            if src.startswith(installed):
-                installed_super_handles.append(installed)
+        known_handles = get_all_submodules_dict(master.path)
+        if src_as_name in known_handles:
+            # already installed?
+            if known_handles[src_as_name]["initialized"]:
+                raise ValueError("Handle '%s' already installed." % src_as_name)
+            
+            # get its super handle:
+            candidates = [h for h in known_handles
+                          if src_as_name.startswith(h) and h != src_as_name]
+            # if there is none, the only super handle is the roothandle,
+            # otherwise the longest prefix is the interesting one:
+            if len(candidates) > 0:
+                candidates.sort(key=len)
+                rel_src_name = src_as_name[len(candidates[-1]):]
+                super_handle_path = opj(master.path, candidates[-1])
+            else:
+                rel_src_name = src_as_name
+                super_handle_path = master.path
 
-        # # TODO: not installed handle but registered in master?
-        # std_out, std_err = master._git_custom_command('', ["git", "submodule", "status"])
-        # uninstalled_toplevel_handles = list()
-        # if std_out:
-        #     uninstalled_toplevel_handles = \
-        #         [line.split()[1] for line in std_out.splitlines() if line.startswith("-")]
-
-        if installed_super_handles:
             if name:
                 lgr.warning("option --name currently ignored in case of an "
                             "already known handle")
-            installed_super_handles.sort(key=len)
-            target = GitRepo(opj(master.path, installed_super_handles[-1]))
-            # extract submodule name:
-            name = src[len(installed_super_handles[-1]) + 1:]
-            # just update and init:
-            target._git_custom_command('', ["git", "submodule", "update",
-                                            "--init", name])
-            if is_annex(opj(target.path, name)):
+
+            # install it:
+            cmd_list = ["git", "submodule", "update", "--init"]
+            if recursive:
+                cmd_list.append("--recursive")
+            cmd_list.append(rel_src_name)
+            runner.run(cmd_list, cwd=super_handle_path)
+
+            # TODO: annex init recursively! => Move to bottom; that's post
+            # install stuff!
+            if is_annex(opj(super_handle_path, rel_src_name)):
                 lgr.debug("Annex detected in submodule '%s'. "
                           "Calling annex init ..." % name)
-                # Note: The following call might look strange, since init=False
-                # is followed by a call of annex_init. This is intentional for
-                # the POC implementation.
-                AnnexRepo(opj(target.path, name), create=False, init=False)._annex_init()
+                cmd_list = ["git", "annex", "init"]
+                runner.run(cmd_list, cwd=super_handle_path)
             return
 
-        # check, whether 'src' is a local path:
+        # 2. check, whether 'src' is a local path:
         if exists(src):
             src = abspath(expandvars(expanduser(src)))
 

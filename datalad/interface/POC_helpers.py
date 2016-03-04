@@ -14,8 +14,30 @@ these commands.
 __docformat__ = 'restructuredtext'
 
 
-from os.path import join as opj
+from os.path import join as opj, abspath, expanduser, expandvars
 from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError
+from datalad.cmd import Runner
+
+
+def get_all_submodules_dict(path, runner=None):
+
+    if runner is None:
+        runner = Runner()
+
+    submodules = dict()
+
+    cmd_list = ["git", "submodule", "status", "--recursive"]
+    out, err = runner.run(cmd_list, cwd=abspath(expanduser(expandvars(path))))
+    lines = [line.split() for line in out.splitlines()]
+    for line in lines:
+        submodules[line[1]] = dict()
+        submodules[line[1]]["initialized"] = not line[0].startswith('-')
+        submodules[line[1]]["modified"] = line[0].startswith('+')
+        submodules[line[1]]["conflict"] = line[0].startswith('U')
+
+    # TODO: recurse .gitmodules to read URLs?
+
+    return submodules
 
 
 def get_submodules_dict(repo):
@@ -71,7 +93,11 @@ def get_submodules_list(repo):
 def get_module_parser(repo):
 
     from git import GitConfigParser
-    parser = GitConfigParser(opj(repo.path, ".gitmodules"))
+    from os.path import exists
+    gitmodule_path = opj(repo.path, ".gitmodules")
+    # TODO: What does constructor of GitConfigParser, in case file doesn't exist?
+    #if exists(gitmodule_path):
+    parser = GitConfigParser(gitmodule_path)
     parser.read()
     return parser
 
