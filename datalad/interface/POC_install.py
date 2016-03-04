@@ -25,6 +25,7 @@ from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
 from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex, get_all_submodules_dict
 from datalad.cmd import CommandError
+from datalad.utils import assure_dir
 
 lgr = logging.getLogger('datalad.interface.POC_install')
 
@@ -55,12 +56,14 @@ class POCInstallHandle(Interface):
         roothandle=Parameter(
             doc="Roothandle, where to install the handle to. Datalad has a "
                 "default root handle.",
-            constraints=EnsureStr() | EnsureNone()),)
-
-    # TODO: --create
+            constraints=EnsureStr() | EnsureNone()),
+        create=Parameter(
+            args=("--create",),
+            doc="Create a handle.",
+            action="store_true",),)
 
     def __call__(self, src, dest=None, recursive=False, name=None,
-                 roothandle=None):
+                 roothandle=None, create=False):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
 
@@ -76,6 +79,13 @@ class POCInstallHandle(Interface):
 
         # TODO: Allow for passing customized Runners/protocols
         runner = Runner()
+
+        # TODO: Use 'dest' internally in order to prepare the code for whatever
+        # kind of implementation of moved worktrees or similar independency of
+        # name and path of a submodule.
+
+        # TODO: Adapt path manipulation and translation name <-> path
+        # (cross-platform)"
 
         # Note: 'dest' without '--name' currently leads to a clone, that is not
         # installed as a submodule into any roothandle. Therefore it may be
@@ -98,22 +108,74 @@ class POCInstallHandle(Interface):
                 raise ValueError("'%s' does not exist." % dest)
 
         master = POC_get_root_handle(roothandle)
+        known_handles = get_all_submodules_dict(master.path)
         lgr.info("Install using root handle '%s' ..." % master.path)
 
-        # figure out, what to install:
-        # 1. is src an already known handle?
         src_as_name = src.rstrip('/')
+        if name is not None:
+            name = name.rstrip('/')
         # Note: To strip os.sep instead of '/' seems to not be reasonable,
         # since we are trying to treat src as a (datalad defined) name, that
         # allows for '/' only. If there is os.sep like '\', src obviously is a
         # path not a name!
 
-        known_handles = get_all_submodules_dict(master.path)
-        if src_as_name in known_handles:
+        # Note: For now, "create" is separate thing. Should eventually be
+        # melted in.
+        if create:
+
+            if name is None:
+                raise ValueError("--name is required with --create.")
+            if name in known_handles:
+                raise ValueError("Handle '%s' already exists." % name)
+
+            raise NotImplementedError("--create only partly implemented by now.")
+
+            # figure out, where to install it (what's the superhandle to add
+            # it as a submodule to?):
+            install_path = opj(master.path, name)
+
+            # TODO: what to do if install_path exists already? No 'official'
+            # decision yet.
+            # Currently: just let git init decide.
+            # TODO: create the dir in case it doesn't exist yet?
+            # Currently: yes.
+            assure_dir(install_path)
+
+            candidates = [h for h in known_handles
+                          if name.startswith(h) and h != name]
+            # if there is none, the only super handle is the roothandle,
+            # otherwise the longest prefix is the interesting one:
+            if len(candidates) > 0:
+                candidates.sort(key=len)
+                rel_src_name = src_as_name[len(candidates[-1]):]
+                super_handle_path = opj(master.path, candidates[-1])
+            else:
+                rel_src_name = src_as_name
+                super_handle_path = master.path
+
+            # create the repo:
+            cmd_list = ["git", "init"]
+            runner.run(cmd_list, cwd=install_path)
+
+            # add it as a submodule to its superhandle:
+            cmd_list = ["git", "submodule", "add", "./" + rel_src_name]
+            runner.run(cmd_list, cwd=super_handle_path)
+
+            # TODO: Besides commit, there was more to it => something to move around?
+
+            return
+
+
+        # figure out, what to install:
+        # 1. is src an already known handle?
+        elif src_as_name in known_handles:
             # already installed?
             if known_handles[src_as_name]["initialized"]:
                 raise ValueError("Handle '%s' already installed." % src_as_name)
-            
+
+            # TODO: Currently options like 'name', 'create' or 'dest' are
+            # ignored in this case. Decide how to treat them.
+
             # get its super handle:
             candidates = [h for h in known_handles
                           if src_as_name.startswith(h) and h != src_as_name]
@@ -148,178 +210,181 @@ class POCInstallHandle(Interface):
             return
 
         # 2. check, whether 'src' is a local path:
-        if exists(src):
+        elif exists(src):
             src = abspath(expandvars(expanduser(src)))
 
-        # if a hierarchical name is given, check whether to install the handle
-        # into an existing handle instead of the root handle:
-        target_handle = master
-        super_handles = list()
-        if name is not None and "/" in name:
-            for ihandle in get_submodules_list(master):
-                if name.startswith(ihandle):
-                    super_handles.append(ihandle)
+            # if a hierarchical name is given, check whether to install the handle
+            # into an existing handle instead of the root handle:
+            target_handle = master
+            super_handles = list()
+            if name is not None and "/" in name:
+                for ihandle in get_submodules_list(master):
+                    if name.startswith(ihandle):
+                        super_handles.append(ihandle)
 
-            super_handles.sort(key=len)
-            if super_handles:
-                # Note: The following call, again, is neither prepared for
-                # moved worktrees nor platform independent. Just a POC
-                # implementation. ;)
-                # TODO: provide something like super_handles[-1].path
-                target_handle = GitRepo(opj(master.path, super_handles[-1]))
-                # strip prefix from name:
-                name = name[len(super_handles[-1]) + 1:]
-                lgr.info("Installing into handle '%s' ..." % super_handles[-1])
+                super_handles.sort(key=len)
+                if super_handles:
+                    # Note: The following call, again, is neither prepared for
+                    # moved worktrees nor platform independent. Just a POC
+                    # implementation. ;)
+                    # TODO: provide something like super_handles[-1].path
+                    target_handle = GitRepo(opj(master.path, super_handles[-1]))
+                    # strip prefix from name:
+                    name = name[len(super_handles[-1]) + 1:]
+                    lgr.info("Installing into handle '%s' ..." % super_handles[-1])
 
-        # check if a handle with that name already exists:
-        # TODO: Decide whether or not we want to check the optional name before
-        # even calling "git submodule add" or just wait for its feedback.
-        # For now, just catch exception from git call.
+            # check if a handle with that name already exists:
+            # TODO: Decide whether or not we want to check the optional name before
+            # even calling "git submodule add" or just wait for its feedback.
+            # For now, just catch exception from git call.
 
-        submodules_dict_pre = get_submodules_dict(target_handle)
+            submodules_dict_pre = get_submodules_dict(target_handle)
 
-        # TODO: rollback on exception during git calls? At what point there is
-        # anything to roll back?
-        # Note: At least the replaced .git-symlink in an annex should be
-        # restored on failure. (See below)
+            # TODO: rollback on exception during git calls? At what point there is
+            # anything to roll back?
+            # Note: At least the replaced .git-symlink in an annex should be
+            # restored on failure. (See below)
 
-        # Workaround for issue, when 'git submodule add' is executed in a
-        # submodule conataining an annex. Git then gets confused by annexes
-        # .git symlink. Apparently everything is fine, if the .git link is
-        # replaced with the standard .git file during 'submodule add'
-        # Therefore: Replace it, if it's there and call annex-init again after
-        # the submodule was added.
-        from os.path import islink
-        from os import readlink, remove
-        dot_git = opj(target_handle.path, ".git")
-        link_target = None
-        if islink(dot_git):  # TODO: What happens in direct mode?
-            link_target = readlink(dot_git)
-            remove(dot_git)
-            with open(dot_git, 'w') as f:
-                f.write("gitdir: " + link_target)
+            # Workaround for issue, when 'git submodule add' is executed in a
+            # submodule conataining an annex. Git then gets confused by annexes
+            # .git symlink. Apparently everything is fine, if the .git link is
+            # replaced with the standard .git file during 'submodule add'
+            # Therefore: Replace it, if it's there and call annex-init again after
+            # the submodule was added.
+            from os.path import islink
+            from os import readlink, remove
+            dot_git = opj(target_handle.path, ".git")
+            link_target = None
+            if islink(dot_git):  # TODO: What happens in direct mode?
+                link_target = readlink(dot_git)
+                remove(dot_git)
+                with open(dot_git, 'w') as f:
+                    f.write("gitdir: " + link_target)
 
-        try:
-            target_handle._git_custom_command('', ["git", "submodule", "add",
-                                                   src,
-                                                   name if name is not None
-                                                   else ''])
-        except CommandError as e:
-            m = e.stderr.strip()
-            # TODO: Is there a better way to evaluate git's message?
-            # These strings may change from time to time.
-            if m.endswith("' already exists in the index") \
-                    and m.startswith("'"):
-                raise ValueError("Handle %s already installed." % m[0:-28])
+            try:
+                target_handle._git_custom_command('', ["git", "submodule", "add",
+                                                       src,
+                                                       name if name is not None
+                                                       else ''])
+            except CommandError as e:
+                m = e.stderr.strip()
+                # TODO: Is there a better way to evaluate git's message?
+                # These strings may change from time to time.
+                if m.endswith("' already exists in the index") \
+                        and m.startswith("'"):
+                    raise ValueError("Handle %s already installed." % m[0:-28])
+                else:
+                    raise
+
+            submodules_dict_post = get_submodules_dict(target_handle)
+
+            # check what git added:
+            submodules_added_1st_level = [sm for sm in submodules_dict_post
+                                          if sm not in submodules_dict_pre]
+            dbg_msg = ""
+            for sm in submodules_added_1st_level:
+                dbg_msg += "Added submodule:\nname: %s\npath: %s\nurl: %s\n" \
+                           % (sm, submodules_dict_post[sm]["path"],
+                              submodules_dict_post[sm]["url"])
+            lgr.debug(dbg_msg)
+            assert len(submodules_added_1st_level) == 1
+
+            # evaluate name of added submodule:
+            if name is not None:
+                assert submodules_added_1st_level[0] == name
             else:
-                raise
+                name = submodules_added_1st_level[0]
 
-        submodules_dict_post = get_submodules_dict(target_handle)
+            # TODO: init not necessary for just installed top-level handle;
+            # recurse into subhandles if --recursive; use git submodule init
+            # directly instead of update, since it doesn't require the URL to be
+            # available.
 
-        # check what git added:
-        submodules_added_1st_level = [sm for sm in submodules_dict_post
-                                      if sm not in submodules_dict_pre]
-        dbg_msg = ""
-        for sm in submodules_added_1st_level:
-            dbg_msg += "Added submodule:\nname: %s\npath: %s\nurl: %s\n" \
-                       % (sm, submodules_dict_post[sm]["path"],
-                          submodules_dict_post[sm]["url"])
-        lgr.debug(dbg_msg)
-        assert len(submodules_added_1st_level) == 1
+            # init and update possible submodule(s):
+            std_out = ""
+            if recursive:
+                just_installed = GitRepo(opj(target_handle.path, name), create=False)
+                std_out, std_err = \
+                    just_installed._git_custom_command('', ["git", "submodule",
+                                                            "update", "--init",
+                                                            "--recursive"
+                                                            if recursive else ''])
 
-        # evaluate name of added submodule:
-        if name is not None:
-            assert submodules_added_1st_level[0] == name
-        else:
-            name = submodules_added_1st_level[0]
+            # get list of updated (and initialized) subhandles from output:
+            import re
+            subhandles = re.findall("Submodule path '(.+?)'", std_out)
+            # and sort by length, which gives us simple hierarchy information
+            subhandles.sort(key=len)
 
-        # TODO: init not necessary for just installed top-level handle;
-        # recurse into subhandles if --recursive; use git submodule init
-        # directly instead of update, since it doesn't require the URL to be
-        # available.
+            # get created hierarchy of submodules of root handle including paths
+            # and urls as a nested dict for debug:
+            hierarchy = get_submodules_dict(master)
+            import json
+            lgr.debug("Submodule '%s':\n" % name + str(json.dumps(hierarchy,
+                                                                  indent=4)))
 
-        # init and update possible submodule(s):
-        std_out = ""
-        if recursive:
-            just_installed = GitRepo(opj(target_handle.path, name), create=False)
-            std_out, std_err = \
-                just_installed._git_custom_command('', ["git", "submodule",
-                                                        "update", "--init",
-                                                        "--recursive"
-                                                        if recursive else ''])
+            # TODO: move worktree if destination is not default
 
-        # get list of updated (and initialized) subhandles from output:
-        import re
-        subhandles = re.findall("Submodule path '(.+?)'", std_out)
-        # and sort by length, which gives us simple hierarchy information
-        subhandles.sort(key=len)
-
-        # get created hierarchy of submodules of root handle including paths
-        # and urls as a nested dict for debug:
-        hierarchy = get_submodules_dict(master)
-        import json
-        lgr.debug("Submodule '%s':\n" % name + str(json.dumps(hierarchy,
-                                                              indent=4)))
-
-        # TODO: move worktree if destination is not default
-
-        # commit the changes to target handle (and possibly to further
-        # super handles):
-        commit_msg = "Installed handle '%s'\n" % name
-        for sh in subhandles:
-            commit_msg += "Installed subhandle '%s'\n" % sh
-        #target_handle.git_commit(commit_msg)
-        #  TODO: Why there is an issue with obtaining lock at .git/index.lock
-        # when calling commit via GitPython?
-        target_handle._git_custom_command('', ["git", "commit", "-m", commit_msg])
-
-        if super_handles:
-            super_handles.reverse() # deepest first
-            what_to_commit = super_handles[0]  # name of the target handle
-            handles_to_commit = super_handles[1:]  # target_handle done already
-            # entry for root handle (root handle path + ''):
-            if handles_to_commit:
-                handles_to_commit.append('')
-            else:
-                handles_to_commit = ['']
-
-            lgr.debug("Handles to commit: %s" % handles_to_commit)
-            from os.path import commonprefix
-            for h in handles_to_commit:
-                repo = GitRepo(opj(master.path, h), create=False)
-                rel_name = what_to_commit[len(commonprefix([what_to_commit, h])):].strip('/')
-                lgr.debug("Calling git add/commit '%s' in %s." %
-                          (rel_name, repo.path))
-                #repo.git_add(rel_name)
-                #repo.git_commit(commit_msg)
-                # DEBUG: direct calls
-                repo._git_custom_command('', ["git", "add", rel_name])
-                repo._git_custom_command('', ["git", "commit", "-m", commit_msg])
-                what_to_commit = h
-
-        # Workaround: Reinit annex
-        if link_target:
-            target_handle._git_custom_command('', ["git", "annex", "init"])
-
-
-        # init annex(es), if any:
-        for handle in [name] + subhandles:
-            # TODO: This is not prepared for moved worktrees yet:
-            handle_path = opj(target_handle.path, handle)
-            if is_annex(handle_path):
-                lgr.debug("Annex detected in submodule '%s'. "
-                          "Calling annex init ..." % handle)
-                # Note: The following call might look strange, since init=False
-                # is followed by a call of annex_init. This is intentional for
-                # the POC implementation.
-                AnnexRepo(handle_path, create=False, init=False)._annex_init()
-
-        # final user output
-        lgr.info("Successfully installed handle '%s' from %s at %s." %
-                 (name, submodules_dict_post[name]["url"],
-                  opj(target_handle.path, submodules_dict_post[name]["path"])))
-        if subhandles:
-            msg = "Included Subhandles:\n"
+            # commit the changes to target handle (and possibly to further
+            # super handles):
+            commit_msg = "Installed handle '%s'\n" % name
             for sh in subhandles:
-                msg += sh + "\n"
-            lgr.info(msg)
+                commit_msg += "Installed subhandle '%s'\n" % sh
+            #target_handle.git_commit(commit_msg)
+            #  TODO: Why there is an issue with obtaining lock at .git/index.lock
+            # when calling commit via GitPython?
+            target_handle._git_custom_command('', ["git", "commit", "-m", commit_msg])
+
+            if super_handles:
+                super_handles.reverse() # deepest first
+                what_to_commit = super_handles[0]  # name of the target handle
+                handles_to_commit = super_handles[1:]  # target_handle done already
+                # entry for root handle (root handle path + ''):
+                if handles_to_commit:
+                    handles_to_commit.append('')
+                else:
+                    handles_to_commit = ['']
+
+                lgr.debug("Handles to commit: %s" % handles_to_commit)
+                from os.path import commonprefix
+                for h in handles_to_commit:
+                    repo = GitRepo(opj(master.path, h), create=False)
+                    rel_name = what_to_commit[len(commonprefix([what_to_commit, h])):].strip('/')
+                    lgr.debug("Calling git add/commit '%s' in %s." %
+                              (rel_name, repo.path))
+                    #repo.git_add(rel_name)
+                    #repo.git_commit(commit_msg)
+                    # DEBUG: direct calls
+                    repo._git_custom_command('', ["git", "add", rel_name])
+                    repo._git_custom_command('', ["git", "commit", "-m", commit_msg])
+                    what_to_commit = h
+
+            # Workaround: Reinit annex
+            if link_target:
+                target_handle._git_custom_command('', ["git", "annex", "init"])
+
+
+            # init annex(es), if any:
+            for handle in [name] + subhandles:
+                # TODO: This is not prepared for moved worktrees yet:
+                handle_path = opj(target_handle.path, handle)
+                if is_annex(handle_path):
+                    lgr.debug("Annex detected in submodule '%s'. "
+                              "Calling annex init ..." % handle)
+                    # Note: The following call might look strange, since init=False
+                    # is followed by a call of annex_init. This is intentional for
+                    # the POC implementation.
+                    AnnexRepo(handle_path, create=False, init=False)._annex_init()
+
+            # final user output
+            lgr.info("Successfully installed handle '%s' from %s at %s." %
+                     (name, submodules_dict_post[name]["url"],
+                      opj(target_handle.path, submodules_dict_post[name]["path"])))
+            if subhandles:
+                msg = "Included Subhandles:\n"
+                for sh in subhandles:
+                    msg += sh + "\n"
+                lgr.info(msg)
+
+        else:
+            raise ValueError("Unknown source for installation: %s" % src)
