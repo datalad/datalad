@@ -64,15 +64,10 @@ class POCUpdate(Interface):
             action="store_true",
             doc="TODO"),)
 
-    def __call__(self, remote=None, handle=curdir, roothandle=None, merge=False,
-                 recursive=False, all=False, reobtain_data=False):
+    def __call__(self, remote=None, handle=curdir, roothandle=None,
+                 merge=False, recursive=False, all=False, reobtain_data=False):
         """
         """
-
-
-
-        if recursive:
-            raise NotImplementedError("Option '--recursive' not implemented yet.")
 
         if reobtain_data:
             raise NotImplementedError("Option '--reobtain-data' not implemented yet.")
@@ -86,50 +81,56 @@ class POCUpdate(Interface):
                 raise ValueError("Handle '%s' is not installed in "
                                  "root handle %s" % (handle, master.path))
             else:
-                handle_repo = GitRepo(opj(master.path, handle), create=False)
+                top_handle_repo = GitRepo(opj(master.path, handle), create=False)
         else:
-            handle_repo = GitRepo(handle, create=False)
+            top_handle_repo = GitRepo(handle, create=False)
 
-        # get all remotes:
-        handle_remotes = handle_repo.git_get_remotes()
+        handles_to_update = [top_handle_repo]
+        if recursive:
+            handles_to_update += [GitRepo(opj(top_handle_repo.path, sub_path))
+                                  for sub_path in get_submodules_list(top_handle_repo)]
 
-        # Currently '--apply' works for single remote only:
-        if len(handle_remotes) > 1 and merge:
-            lgr.debug("Found multiple remotes:\n%s" % handle_remotes)
-            raise NotImplementedError("No merge strategy for multiple remotes "
-                                      "implemented yet.")
+        for handle_repo in handles_to_update:
+            # get all remotes:
+            handle_remotes = handle_repo.git_get_remotes()
 
-        lgr.info("Updating handle '%s' ..." % handle_repo.path)
+            # Currently '--apply' works for single remote only:
+            if len(handle_remotes) > 1 and merge:
+                lgr.debug("Found multiple remotes:\n%s" % handle_remotes)
+                raise NotImplementedError("No merge strategy for multiple remotes "
+                                          "implemented yet.")
 
-        # fetch remote(s):
-        lgr.info("Fetching remote(s) ...")
-        handle_repo.git_fetch(remote if remote else '', "--all" if all else '')
+            lgr.info("Updating handle '%s' ..." % handle_repo.path)
 
-        # if it is an annex and there is a tracking branch, and we didn't fetch
-        # the entire remote anyway, fetch explicitly git-annex branch:
-        if is_annex(handle_repo.path) and not all:
-            # check for tracking branch's remote:
-            try:
-                std_out, std_err = \
-                    handle_repo._git_custom_command('',
-                                                    ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=handle_repo.git_get_active_branch())])
-            except CommandError as e:
-                if e.code == 1 and e.stdout == "":
-                    std_out = None
-                else:
-                    raise
+            # fetch remote(s):
+            lgr.info("Fetching remote(s) ...")
+            handle_repo.git_fetch(remote if remote else '', "--all" if all else '')
 
-            if std_out:  # we have a "tracking remote"
-                handle_repo.git_fetch("%s git-annex" % std_out.strip())
+            # if it is an annex and there is a tracking branch, and we didn't fetch
+            # the entire remote anyway, fetch explicitly git-annex branch:
+            if is_annex(handle_repo.path) and not all:
+                # check for tracking branch's remote:
+                try:
+                    std_out, std_err = \
+                        handle_repo._git_custom_command('',
+                                                        ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=handle_repo.git_get_active_branch())])
+                except CommandError as e:
+                    if e.code == 1 and e.stdout == "":
+                        std_out = None
+                    else:
+                        raise
 
-        # merge:
-        if merge:
-            lgr.info("Applying changes from tracking branch...")
-            cmd_list = ["git", "pull"]
-            if remote:
-                cmd_list.append(remote)
-            handle_repo._git_custom_command('', cmd_list)
-            if is_annex(handle_repo.path):
-                # annex-apply:
-                lgr.info("Updating annex ...")
-                handle_repo._git_custom_command('', ["git", "annex", "merge"])
+                if std_out:  # we have a "tracking remote"
+                    handle_repo.git_fetch("%s git-annex" % std_out.strip())
+
+            # merge:
+            if merge:
+                lgr.info("Applying changes from tracking branch...")
+                cmd_list = ["git", "pull"]
+                if remote:
+                    cmd_list.append(remote)
+                handle_repo._git_custom_command('', cmd_list)
+                if is_annex(handle_repo.path):
+                    # annex-apply:
+                    lgr.info("Updating annex ...")
+                    handle_repo._git_custom_command('', ["git", "annex", "merge"])
