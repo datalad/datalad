@@ -86,7 +86,7 @@ class BaseDownloader(object):
         authenticator = self.authenticator
         needs_authentication = authenticator and authenticator.requires_authentication
 
-        attempt = 0
+        attempt, incomplete_attempt = 0, 0
         while True:
             attempt += 1
             if attempt > 20:
@@ -106,6 +106,13 @@ class BaseDownloader(object):
             except AccessDeniedError as e:
                 lgr.debug("Access was denied: %s", exc_str(e))
                 access_denied = True
+            except IncompleteDownloadError as e:
+                incomplete_attempt += 1
+                if incomplete_attempt > 5:
+                    # give up
+                    raise
+                lgr.debug("Failed to download fully, will try again: %s", exc_str(e))
+                # TODO: may be fail ealier than after 20 attempts in such a case?
             except DownloadError:
                 # TODO Handle some known ones, possibly allow for a few retries, otherwise just let it go!
                 raise
@@ -195,9 +202,8 @@ class BaseDownloader(object):
                 content, "Download of the url %s has failed: " % url)
 
         if target_size and target_size != downloaded_size:
-            lgr.error("Downloaded file size %d differs from originally announced %d",
-                      downloaded_size, target_size)
-            raise DownloadError("Downloaded size %d differs from original %d" % (downloaded_size, target_size))
+            raise IncompleteDownloadError("Downloaded size %d differs from originally announced %d"
+                                          % (downloaded_size, target_size))
 
 
     def _download(self, url, path=None, overwrite=False, size=None, stats=None):
@@ -279,7 +285,7 @@ class BaseDownloader(object):
                 stats.overwritten += int(existed)
                 stats.downloaded_size += downloaded_size
                 stats.downloaded_time += downloaded_time
-        except AccessDeniedError as e:
+        except (AccessDeniedError, IncompleteDownloadError) as e:
             raise
         except Exception as e:
             e_str = exc_str(e, limit=5)
@@ -391,7 +397,7 @@ class BaseDownloader(object):
 
             self._verify_download(url, downloaded_size, target_size, None, content=content)
 
-        except AccessDeniedError as e:
+        except (AccessDeniedError, IncompleteDownloadError) as e:
             raise
         except Exception as e:
             e_str = exc_str(e, limit=5)
@@ -480,6 +486,9 @@ class BaseDownloader(object):
 # Exceptions.  might migrate elsewhere
 
 class DownloadError(Exception):
+    pass
+
+class IncompleteDownloadError(DownloadError):
     pass
 
 class TargetFileAbsent(DownloadError):

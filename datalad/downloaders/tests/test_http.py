@@ -18,6 +18,8 @@ from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
 from ..base import DownloadError
+from ..base import IncompleteDownloadError
+from ..base import BaseDownloader
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ..providers import Credential  # to test against crcns
@@ -99,6 +101,29 @@ def test_HTTPDownloader_basic(toppath, topurl):
     with swallow_logs(), \
          patch.object(__builtin__, 'open', fake_open(write_=_raise_IOError)):
         assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
+
+    # incomplete download scenario - should have 3 tries
+    def _fail_verify_download(try_to_fail):
+        try_ = [0]
+        _orig_verify_download = BaseDownloader._verify_download
+        def _verify_download(self, *args, **kwargs):
+            try_[0] += 1
+            if try_[0] >= try_to_fail:
+                return _orig_verify_download(self, *args, **kwargs)
+            raise IncompleteDownloadError()
+        return _verify_download
+
+    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(6)), \
+        swallow_logs():
+            # how was before the "fix":
+            #assert_raises(DownloadError, downloader.fetch, furl)
+            #assert_raises(DownloadError, downloader.fetch, furl)
+            # now should download just fine
+            assert_equal(downloader.fetch(furl), 'abc')
+    # but should fail if keeps failing all 5 times and then on 11th should raise DownloadError
+    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(7)), \
+        swallow_logs():
+            assert_raises(DownloadError, downloader.fetch, furl)
 
     # TODO: access denied scenario
     # TODO: access denied detection
