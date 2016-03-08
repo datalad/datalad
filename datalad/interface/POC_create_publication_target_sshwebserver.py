@@ -188,7 +188,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 path = target_dir.replace("$NAME",
                                           handle_name.replace("/", "-"))
 
-                cmd = ssh_cmd + ["sh", "mkdir", path]
+                cmd = ssh_cmd + ["mkdir", path]
                 try:
                     runner.run(cmd)
                 except CommandError as e:
@@ -198,7 +198,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             else:
                 path = "."
 
-            cmd = ssh_cmd + ["sh", "git", "-C", path, "init"]
+            cmd = ssh_cmd + ["git", "-C", path, "init"]
             try:
                 runner.run(cmd)
             except CommandError as e:
@@ -213,7 +213,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 remote_url_push.replace("$NAME", handle_name.replace("/", "-"))
             cmd = ["git", "remote", "add", remote, handle_remote_url]
             runner.run(cmd, cwd=handle_repo.path)
-            cmd = ["git", "remote", "set-url", "--push",
+            cmd = ["git", "remote", "set-url", "--push", remote,
                    handle_remote_url_push]
             runner.run(cmd, cwd=handle_repo.path)
 
