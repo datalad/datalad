@@ -14,6 +14,7 @@ from os.path import join
 # file names for metadata of collections and handles:
 REPO_STD_META_FILE = 'datalad.ttl'
 REPO_CONFIG_FILE = 'config.ttl'
+POC_STD_META_FILE = 'metadata'
 
 # directory containing prepared metadata of a handle repository:
 HANDLE_META_DIR = ".datalad"

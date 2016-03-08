@@ -23,9 +23,10 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex, get_all_submodules_dict
+from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex, get_all_submodules_dict, get_git_dir
 from datalad.cmd import CommandError
 from datalad.utils import assure_dir
+from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
 
 lgr = logging.getLogger('datalad.interface.POC_install')
 
@@ -62,7 +63,7 @@ class POCInstallHandle(Interface):
             doc="Create a handle.",
             action="store_true",),)
 
-    def __call__(self, src, dest=None, recursive=False, name=None,
+    def __call__(self, src=None, dest=None, recursive=False, name=None,
                  roothandle=None, create=False):
         """ Simple proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
@@ -111,7 +112,8 @@ class POCInstallHandle(Interface):
         known_handles = get_all_submodules_dict(master.path)
         lgr.info("Install using root handle '%s' ..." % master.path)
 
-        src_as_name = src.rstrip('/')
+        if src is not None:
+            src_as_name = src.rstrip('/')
         if name is not None:
             name = name.rstrip('/')
         # Note: To strip os.sep instead of '/' seems to not be reasonable,
@@ -127,8 +129,6 @@ class POCInstallHandle(Interface):
                 raise ValueError("--name is required with --create.")
             if name in known_handles:
                 raise ValueError("Handle '%s' already exists." % name)
-
-            raise NotImplementedError("--create only partly implemented by now.")
 
             # figure out, where to install it (what's the superhandle to add
             # it as a submodule to?):
@@ -147,24 +147,55 @@ class POCInstallHandle(Interface):
             # otherwise the longest prefix is the interesting one:
             if len(candidates) > 0:
                 candidates.sort(key=len)
-                rel_src_name = src_as_name[len(candidates[-1]):]
+                rel_src_name = name[len(candidates[-1]):]
                 super_handle_path = opj(master.path, candidates[-1])
             else:
-                rel_src_name = src_as_name
+                rel_src_name = name
                 super_handle_path = master.path
 
             # create the repo:
             cmd_list = ["git", "init"]
             runner.run(cmd_list, cwd=install_path)
 
+            # create initial commit:
+            assure_dir(opj(install_path, HANDLE_META_DIR))
+            with open(opj(install_path, HANDLE_META_DIR, "metadata"), "w") as f:
+                f.write("\n")
+            cmd_list = ["git", "add", opj(".", HANDLE_META_DIR, POC_STD_META_FILE)]
+            runner.run(cmd_list, cwd=install_path)
+            cmd_list = ["git", "commit", "-m", "\"Initial commit.\""]
+            runner.run(cmd_list, cwd=install_path)
+
             # add it as a submodule to its superhandle:
             cmd_list = ["git", "submodule", "add", "./" + rel_src_name]
             runner.run(cmd_list, cwd=super_handle_path)
 
-            # TODO: Besides commit, there was more to it => something to move around?
+            # move .git to superrepo's .git/modules, remove .git, create
+            # .git-file
+            installed_handle_git_dir = opj(install_path, ".git")
+            super_handle_git_dir = get_git_dir(super_handle_path)
+            moved_git_dir = opj(super_handle_path, super_handle_git_dir,
+                                "modules", rel_src_name)
+            assure_dir(moved_git_dir)
+            from os import rename, listdir, rmdir
+            for dot_git_entry in listdir(installed_handle_git_dir):
+                rename(opj(installed_handle_git_dir, dot_git_entry),
+                       opj(moved_git_dir, dot_git_entry))
+            assert not listdir(installed_handle_git_dir)
+            rmdir(installed_handle_git_dir)
+
+            with open(opj(install_path, ".git"), "w") as f:
+                f.write("gitdir: {moved}\n".format(moved=moved_git_dir))
+
+            # commit submodule addition (recurse upwards)
+            cmd_list = ["git", "commit", "-m", "Added handle %s" % rel_src_name]
+            if super_handle_path != master.path:
+                for i in range(1, len(candidates)):
+                    runner.run(cmd_list, cwd=opj(master.path, candidates[-i]))
+            else:
+                runner.run(cmd_list, cwd=super_handle_path)
 
             return
-
 
         # figure out, what to install:
         # 1. is src an already known handle?

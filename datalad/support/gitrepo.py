@@ -13,7 +13,7 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os import linesep
-from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir
+from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir, abspath
 from os.path import dirname, basename
 import logging
 import shlex
@@ -270,7 +270,7 @@ class GitRepo(object):
           or doesn't contain a git repository.
         """
 
-        self.path = normpath(path)
+        self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or Runner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
         #       Includes: What to do in gitrepo class?
@@ -312,7 +312,7 @@ class GitRepo(object):
             except (GitCommandError,
                     NoSuchPathError,
                     InvalidGitRepositoryError) as e:
-                lgr.error(str(e))
+                lgr.error("%s: %s" % (type(e), str(e)))
                 raise
 
     def __repr__(self):

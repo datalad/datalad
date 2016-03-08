@@ -107,3 +107,36 @@ def is_annex(path):
     repo = GitRepo(path, create=False)
     return "origin/git-annex" in repo.git_get_remote_branches() or "git-annex" in repo.git_get_branches()
 
+
+def get_git_dir(path):
+    """figure out a repo's gitdir
+
+    '.git' might be a  directory, a symlink or a file
+
+    Parameter
+    ---------
+    path: str
+      currently expected to be the repos base dir
+
+    Returns
+    -------
+    str
+      relative path to the repo's git dir; So, default would be ".git"
+    """
+
+    from os.path import exists, islink, isdir, isfile
+    from os import readlink
+
+    dot_git = opj(path, ".git")
+    if not exists(dot_git):
+        raise RuntimeError("Missing .git in %s." % path)
+    elif islink(dot_git):
+        git_dir = readlink(dot_git)
+    elif isdir(dot_git):
+        git_dir = ".git"
+    elif isfile(dot_git):
+        with open(dot_git) as f:
+            git_dir = f.readline().lstrip("gitdir:").strip()
+
+    return git_dir
+
