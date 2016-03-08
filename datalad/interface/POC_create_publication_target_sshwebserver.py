@@ -40,8 +40,9 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
     push to."""
 
     _params_ = dict(
-        ssh_url=Parameter(
-            args=("ssh-url",),
+        # TODO: Somehow the replacement of '_' and '-' is buggy on positional arguments
+        sshurl=Parameter(
+            args=("sshurl",),
             doc="SSH URL to use to create the target repository.",
             constraints=EnsureStr()),
         remote=Parameter(
@@ -105,7 +106,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 "instead of a path. Datalad has a default root handle.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, ssh_url, remote, remote_url=None, remote_url_push=None,
+    def __call__(self, sshurl, remote, remote_url=None, remote_url_push=None,
                  target_dir=None, handle=curdir, recursive=False,
                  roothandle=None):
 
@@ -126,7 +127,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
 
         # check parameters:
         if remote_url is None:
-            remote_url = ssh_url
+            remote_url = sshurl
         if remote_url_push is None:
             remote_url_push = remote_url
         if remote in get_remotes(top_handle_repo, all=True):
@@ -139,7 +140,8 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             if not target_dir:
                 raise
             handles_to_use += [GitRepo(opj(top_handle_repo.path, sub_path))
-                                  for sub_path in get_submodules_list(top_handle_repo)]
+                               for sub_path in
+                               get_submodules_list(top_handle_repo)]
 
         # get setup scripts:
         # from pkg_resources import resource_filename
@@ -153,7 +155,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
 
         # setup SSH Connection:
         # TODO: Make the entire setup a helper to use it when pushing via publish?
-        parsed_target = urlparse(ssh_url)
+        parsed_target = urlparse(sshurl)
         host_name = parsed_target.netloc
 
         # - build control master:
@@ -180,28 +182,28 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
 
             # create remote repository
             handle_name = handle_repo.path[len(
-                commonprefix([master.path, handle_repo.path]).strip("/"))+1:]
-            if target_dir:
-                path = parsed_target.path + "/" + \
-                       target_dir.replace("$NAME",
-                                          handle_name.replace("/", "-"))
-            else:
-                path = parsed_target.path
+                commonprefix([master.path, handle_repo.path]).strip("/"))+1:].strip("/")
 
-            cmd = ssh_cmd + ["sh", "mkdir", path]
-            try:
-                runner.run(cmd)
-            except CommandError as e:
-                lgr.error("Remotely creating target directory failed at %s.\n"
-                          "Error: %s" % (path, str(e)))
-                continue
+            if target_dir:
+                path = target_dir.replace("$NAME",
+                                          handle_name.replace("/", "-"))
+
+                cmd = ssh_cmd + ["sh", "mkdir", path]
+                try:
+                    runner.run(cmd)
+                except CommandError as e:
+                    lgr.error("Remotely creating target directory failed at "
+                              "%s.\nError: %s" % (path, str(e)))
+                    continue
+            else:
+                path = "."
 
             cmd = ssh_cmd + ["sh", "git", "-C", path, "init"]
             try:
                 runner.run(cmd)
             except CommandError as e:
-                lgr.error("Remotely initializing git repository failed at %s.\n"
-                          "Error: %s" % (path, str(e)))
+                lgr.error("Remotely initializing git repository failed at %s."
+                          "\nError: %s" % (path, str(e)))
                 continue
 
             # add remote
