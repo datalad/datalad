@@ -23,7 +23,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import CommandError
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules_list, is_annex
+from .POC_helpers import get_submodules_list, is_annex, get_remotes
 
 lgr = logging.getLogger('datalad.interface.POC_update')
 
@@ -92,7 +92,7 @@ class POCUpdate(Interface):
 
         for handle_repo in handles_to_update:
             # get all remotes:
-            handle_remotes = handle_repo.git_get_remotes()
+            handle_remotes = get_remotes(handle_repo)
 
             # Currently '--apply' works for single remote only:
             if len(handle_remotes) > 1 and merge:

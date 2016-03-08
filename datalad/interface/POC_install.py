@@ -36,13 +36,15 @@ class POCInstallHandle(Interface):
 
     _params_ = dict(
         src=Parameter(
+            args=("src",),
             doc="url or local path of the handle to install",
-            constraints=EnsureStr()),
+            nargs="?",
+            constraints=EnsureStr() | EnsureNone()),
         dest=Parameter(
             args=("dest",),
             doc="Path where to install the handle. By default this is "
                 "path/to/my/datalad/masterhandle/name.",
-            nargs='?',
+            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
@@ -92,6 +94,10 @@ class POCInstallHandle(Interface):
         # installed as a submodule into any roothandle. Therefore it may be
         # seen as a root handle.
         # TODO: doc
+        lgr.debug("Options:\nsrc: {s}\ndest: {d}\nrecursive: {r}\nname: {n}\n"
+                  "roothandle:{rt}\ncreate: {c}".format(s=src, d=dest,
+                                                        r=recursive, n=name,
+                                                        rt=roothandle, c=create))
         if dest is not None:
             if name is not None:
                 raise NotImplementedError("Paramaters 'dest' and '--name' "
@@ -214,7 +220,7 @@ class POCInstallHandle(Interface):
             # otherwise the longest prefix is the interesting one:
             if len(candidates) > 0:
                 candidates.sort(key=len)
-                rel_src_name = src_as_name[len(candidates[-1]):]
+                rel_src_name = src_as_name[len(candidates[-1]):].strip("/")
                 super_handle_path = opj(master.path, candidates[-1])
             else:
                 rel_src_name = src_as_name
@@ -240,9 +246,11 @@ class POCInstallHandle(Interface):
                 runner.run(cmd_list, cwd=super_handle_path)
             return
 
-        # 2. check, whether 'src' is a local path:
-        elif exists(src):
-            src = abspath(expandvars(expanduser(src)))
+        # 2. check, whether 'src' is a local path or valid url:
+        # Currently just assume it's one of both. Check implicit.
+        else:
+            if exists(src):
+                src = abspath(expandvars(expanduser(src)))
 
             # if a hierarchical name is given, check whether to install the handle
             # into an existing handle instead of the root handle:
@@ -417,5 +425,6 @@ class POCInstallHandle(Interface):
                     msg += sh + "\n"
                 lgr.info(msg)
 
-        else:
-            raise ValueError("Unknown source for installation: %s" % src)
+        # else:
+        #
+        #     raise ValueError("Unknown source for installation: %s" % src)
