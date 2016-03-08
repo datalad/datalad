@@ -58,7 +58,7 @@ class POCPublish(Interface):
                 "pass a template for building the URLs of all handles to be "
                 "published by using placeholders.\n"
                 "List of currently available placeholders:\n"
-                "$NAME-DASH\tthe name of the handle, where slashes are replaced by dashes.",
+                "$NAME\tthe name of the handle, where slashes are replaced by dashes.",
             # TODO: What if remote is known, but remote-url is passed?
             #       Redirect the existing remote or ignore or reject?
             nargs="?",

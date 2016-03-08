@@ -51,6 +51,8 @@ from .POC_remove import POCRemove
 from .POC_update import POCUpdate
 from .POC_uninstall import POCUninstall
 from .POC_publish import POCPublish
+from .POC_create_publication_target_sshwebserver import \
+    POCCreatePublicationTargetSSHWebserver
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -83,6 +85,7 @@ _group_handle = (
         POCUpdate,
         PublishHandle,
         POCPublish,
+        POCCreatePublicationTargetSSHWebserver,
     ])
 
 _group_misc = (
