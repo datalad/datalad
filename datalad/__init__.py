@@ -36,6 +36,12 @@ setup_exceptionhook()
 
 def setup_package():
     import os
+
+    # To overcome pybuild overriding HOME but us possibly wanting our
+    # own HOME where we pre-setup git for testing (name, email)
+    if 'GIT_HOME' in os.environ:
+        os.environ['HOME'] = os.environ['GIT_HOME']
+
     # To overcome pybuild by default defining http{,s}_proxy we would need
     # to define them to e.g. empty value so it wouldn't bother touching them.
     # But then haskell libraries do not digest empty value nicely, so we just

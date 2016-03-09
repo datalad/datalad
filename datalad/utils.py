@@ -14,6 +14,7 @@ import time
 
 from os.path import curdir, basename, exists, realpath, islink
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
+from six import text_type
 
 import logging
 import shutil
@@ -46,6 +47,15 @@ except:  # pragma: no cover
 #
 # Little helpers
 #
+
+
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
 
 def not_supported_on_windows(msg=None):
     """A little helper to be invoked to consistently fail whenever functionality is
@@ -117,7 +127,7 @@ def sorted_files(dout):
                        if not '.git' in r], []))
 
 from os.path import sep as dirsep
-_VCS_REGEX = '%s\.(git|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
 
 def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
     """Generator to find files matching regex
@@ -265,6 +275,20 @@ def file_basename(name, return_ext=False):
     else:
         return fbname
 
+def escape_filename(filename):
+    """Surround filename in "" and escape " in the filename
+    """
+    filename = filename.replace('"', r'\"').replace('`', r'\`')
+    filename = '"%s"' % filename
+    return filename
+
+def encode_filename(filename):
+    """Encode unicode filename
+    """
+    if isinstance(filename, text_type):
+        return filename.encode(sys.getfilesystemencoding())
+    else:
+        return filename
 
 if on_windows:
     def lmtime(filepath, mtime):

@@ -23,15 +23,6 @@ from .nodes.matches import *
 lgr = getLogger('datalad.crawler')
 
 
-def _assure_listuple(obj):
-    """Given an object, wrap into a tuple if not list or tuple
-    """
-    if isinstance(obj, list) or isinstance(obj, tuple):
-        return obj
-    return (obj,)
-
-
-
 def initiate_handle(directory, template, **params):
     if exists(directory):
         lgr.info("Skipping %s since already exists" % directory)
