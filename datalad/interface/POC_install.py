@@ -115,6 +115,8 @@ class POCInstallHandle(Interface):
                 raise ValueError("'%s' does not exist." % dest)
 
         master = POC_get_root_handle(roothandle)
+        # XXX this implies git submodule status --recursive and can get slow
+        # even with 100 subhandles.
         known_handles = get_all_submodules_dict(master.path)
         lgr.info("Install using root handle '%s' ..." % master.path)
 
@@ -148,7 +150,7 @@ class POCInstallHandle(Interface):
             assure_dir(install_path)
 
             candidates = [h for h in known_handles
-                          if name.startswith(h) and h != name]
+                          if name.startswith('%s/' % h) and h != name]
             # if there is none, the only super handle is the roothandle,
             # otherwise the longest prefix is the interesting one:
             if len(candidates) > 0:
