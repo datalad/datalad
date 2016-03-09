@@ -130,8 +130,9 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             remote_url = sshurl
         if remote_url_push is None:
             remote_url_push = remote_url
-        if remote in get_remotes(top_handle_repo, all=True):
-            raise ValueError("Remote '%s' already exists." % remote)
+        # we want to be able to redeploy to a configured remote
+        #if remote in get_remotes(top_handle_repo, all=True):
+        #    raise ValueError("Remote '%s' already exists." % remote)
 
         handles_to_use = [top_handle_repo]
         if recursive:
@@ -178,25 +179,35 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
         runner = Runner()
         ssh_cmd = ["ssh", "-S", control_path, host_name]
 
+        if parsed_target.path:
+            if target_dir:
+                # XXX if we support publishing to windows, this could fail
+                # from a unix machine
+                target_dir = opj(parsed_target.path, target_dir)
+            else:
+                target_dir = parsed_target.path
+        else:
+            # XXX do we want to go with the user's home dir at all?
+            target_dir = '.'
+
         for handle_repo in handles_to_use:
 
             # create remote repository
             handle_name = handle_repo.path[len(
                 commonprefix([master.path, handle_repo.path]).strip("/"))+1:].strip("/")
 
-            if target_dir:
-                path = target_dir.replace("$NAME",
-                                          handle_name.replace("/", "-"))
+            path = target_dir.replace("$NAME",
+                                      handle_name.replace("/", "-"))
 
-                cmd = ssh_cmd + ["mkdir", path]
+            if path != '.':
+                # TODO check if target exists, and if not --force is given, fail here
+                cmd = ssh_cmd + ["mkdir", "-p", path]
                 try:
                     runner.run(cmd)
                 except CommandError as e:
                     lgr.error("Remotely creating target directory failed at "
                               "%s.\nError: %s" % (path, str(e)))
                     continue
-            else:
-                path = "."
 
             cmd = ssh_cmd + ["git", "-C", path, "init"]
             try:
@@ -211,11 +222,18 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 remote_url.replace("$NAME", handle_name.replace("/", "-"))
             handle_remote_url_push = \
                 remote_url_push.replace("$NAME", handle_name.replace("/", "-"))
-            cmd = ["git", "remote", "add", remote, handle_remote_url]
-            runner.run(cmd, cwd=handle_repo.path)
-            cmd = ["git", "remote", "set-url", "--push", remote,
-                   handle_remote_url_push]
-            runner.run(cmd, cwd=handle_repo.path)
+            if not remote in handle_repo.git_get_remotes():
+                cmd = ["git", "remote", "add", remote, handle_remote_url]
+                runner.run(cmd, cwd=handle_repo.path)
+                cmd = ["git", "remote", "set-url", "--push", remote,
+                       handle_remote_url_push]
+                runner.run(cmd, cwd=handle_repo.path)
+            else:
+                cmd = ["git", "remote", "get-url", "--push", remote]
+                out, err = runner.run(cmd, cwd=handle_repo.path)
+                if handle_remote_url_push != out.strip():
+                    lgr.error("Remote {1} is already configured with a different URL".format(remote))
+                    continue
 
 
 
