@@ -20,7 +20,7 @@ from os.path import join as opj, abspath, expanduser, expandvars, exists, isdir,
 from six.moves.urllib.parse import urlparse
 
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
@@ -104,11 +104,15 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
         roothandle=Parameter(
             doc="Roothandle, HANDLE is referring to in case you gave a name "
                 "instead of a path. Datalad has a default root handle.",
-            constraints=EnsureStr() | EnsureNone()),)
+            constraints=EnsureStr() | EnsureNone()),
+        force=Parameter(
+            args=("--force", "-f",),
+            doc="If target directory exists already, force to (re-)init git.",
+            constraints=EnsureBool(),),)
 
     def __call__(self, sshurl, remote, remote_url=None, remote_url_push=None,
                  target_dir=None, handle=curdir, recursive=False,
-                 roothandle=None):
+                 roothandle=None, force=False):
 
         master = POC_get_root_handle(roothandle)
         lgr.info("Using root handle '%s' ..." % master.path)
@@ -131,7 +135,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
         if remote_url_push is None:
             remote_url_push = remote_url
         # we want to be able to redeploy to a configured remote
-        #if remote in get_remotes(top_handle_repo, all=True):
+        # if remote in get_remotes(top_handle_repo, all=True):
         #    raise ValueError("Remote '%s' already exists." % remote)
 
         handles_to_use = [top_handle_repo]
@@ -143,16 +147,6 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             handles_to_use += [GitRepo(opj(top_handle_repo.path, sub_path))
                                for sub_path in
                                get_submodules_list(top_handle_repo)]
-
-        # get setup scripts:
-        # from pkg_resources import resource_filename
-        # prepare_script_path = \
-        #     resource_filename('datalad',
-        #                       'resources/sshserver_prepare_for_publish.sh')
-        # cleanup_script_path = \
-        #     resource_filename('datalad',
-        #                       'resources/sshserver_cleanup_after_publish.sh')
-
 
         # setup SSH Connection:
         # TODO: Make the entire setup a helper to use it when pushing via publish?
@@ -179,6 +173,8 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
         runner = Runner()
         ssh_cmd = ["ssh", "-S", control_path, host_name]
 
+        # TODO: parsed_target.path may have to be stripped off of leading "/".
+
         if parsed_target.path:
             if target_dir:
                 # XXX if we support publishing to windows, this could fail
@@ -188,7 +184,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 target_dir = parsed_target.path
         else:
             # XXX do we want to go with the user's home dir at all?
-            target_dir = '.'
+            target_dir = target_dir if target_dir else '.'
 
         for handle_repo in handles_to_use:
 
@@ -200,7 +196,23 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                                       handle_name.replace("/", "-"))
 
             if path != '.':
-                # TODO check if target exists, and if not --force is given, fail here
+                # check if target exists, and if not --force is given,
+                # fail here
+                # TODO: Is this condition valid for != '.' only?
+                path_exists = True
+                cmd = ssh_cmd + ["ls", path]
+                try:
+                    out, err = runner.run(cmd)
+                except CommandError as e:
+                    if "%s: No such file or directory" % path in e.stderr:
+                        path_exists = False
+                    else:
+                        raise # It's an unexpected failure here
+
+                if path_exists and not force:
+                    raise RuntimeError("Target directory %s already exists." %
+                                       path)
+
                 cmd = ssh_cmd + ["mkdir", "-p", path]
                 try:
                     runner.run(cmd)
@@ -209,6 +221,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                               "%s.\nError: %s" % (path, str(e)))
                     continue
 
+            # init git repo
             cmd = ssh_cmd + ["git", "-C", path, "init"]
             try:
                 runner.run(cmd)
@@ -217,12 +230,22 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                           "\nError: %s" % (path, str(e)))
                 continue
 
+            # allow for pushing to checked out branch
+            cmd = ssh_cmd + ["git", "-C", path, "config",
+                             "receive.denyCurrentBranch",
+                             "updateInstead"]
+            try:
+                runner.run(cmd)
+            except CommandError as e:
+                lgr.warning("git config failed at remote location %s.\n"
+                            "Skipped." % path)
+
             # add remote
             handle_remote_url = \
                 remote_url.replace("$NAME", handle_name.replace("/", "-"))
             handle_remote_url_push = \
                 remote_url_push.replace("$NAME", handle_name.replace("/", "-"))
-            if not remote in handle_repo.git_get_remotes():
+            if remote not in handle_repo.git_get_remotes():
                 cmd = ["git", "remote", "add", remote, handle_remote_url]
                 runner.run(cmd, cwd=handle_repo.path)
                 cmd = ["git", "remote", "set-url", "--push", remote,
@@ -232,14 +255,9 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 cmd = ["git", "remote", "get-url", "--push", remote]
                 out, err = runner.run(cmd, cwd=handle_repo.path)
                 if handle_remote_url_push != out.strip():
-                    lgr.error("Remote {1} is already configured with a different URL".format(remote))
+                    lgr.error("Remote {1} is already configured with a "
+                              "different URL".format(remote))
                     continue
-
-
-
-
-            # TODO: git config push to checkout!
-            # Existing target: -f => reinit, otherwise don't
 
 
 
