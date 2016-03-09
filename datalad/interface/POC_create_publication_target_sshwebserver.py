@@ -219,3 +219,9 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
 
 
 
+
+            # TODO: git config push to checkout!
+            # Existing target: -f => reinit, otherwise don't
+
+
+

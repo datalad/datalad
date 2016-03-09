@@ -44,10 +44,7 @@ from .download_url import DownloadURL
 from .ls import Ls
 from .clean import Clean
 from .POC_install import POCInstallHandle
-from .POC_add import POCAdd
-from .POC_create import POCCreate
 from .POC_move import POCMove
-from .POC_remove import POCRemove
 from .POC_update import POCUpdate
 from .POC_uninstall import POCUninstall
 from .POC_publish import POCPublish
@@ -69,10 +66,7 @@ _group_handle = (
     'Commands for handle operations',
     [
         CreateHandle,
-        POCCreate,
         AddHandle,
-        POCAdd,
-        POCRemove,
         InstallHandle,
         POCInstallHandle,
         UninstallHandle,
