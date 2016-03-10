@@ -20,7 +20,8 @@ from os.path import join as opj, abspath, expanduser, expandvars, exists, isdir,
 from six.moves.urllib.parse import urlparse
 
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool, \
+    EnsureHandleAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
@@ -95,16 +96,12 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             args=('--handle',),
             doc="Name of or path to the handle to publish. Defaults to CWD.",
             nargs="?",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureHandleAbsolutePath()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
             doc="Recursively create target repositories for all subhandles of "
                 "HANDLE."),
-        roothandle=Parameter(
-            doc="Roothandle, HANDLE is referring to in case you gave a name "
-                "instead of a path. Datalad has a default root handle.",
-            constraints=EnsureStr() | EnsureNone()),
         force=Parameter(
             args=("--force", "-f",),
             doc="If target directory exists already, force to (re-)init git.",
@@ -112,22 +109,10 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
 
     def __call__(self, sshurl, remote, remote_url=None, remote_url_push=None,
                  target_dir=None, handle=curdir, recursive=False,
-                 roothandle=None, force=False):
+                 force=False):
 
-        master = POC_get_root_handle(roothandle)
-        lgr.info("Using root handle '%s' ..." % master.path)
-
-        # figure out, what handle this is about:
-        if handle != curdir:
-            if handle not in get_submodules_list(master):
-                if exists(handle) and isdir(handle):
-                    top_handle_repo = GitRepo(handle, create=False)
-                else:
-                    raise ValueError("Unknown handle '%s'." % handle)
-            else:
-                top_handle_repo = GitRepo(opj(master.path, handle), create=False)
-        else:
-            top_handle_repo = GitRepo(handle, create=False)
+        # TODO: Exception handling:
+        top_handle_repo = GitRepo(handle, create=False)
 
         # check parameters:
         if remote_url is None:
@@ -190,10 +175,9 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
 
             # create remote repository
             handle_name = handle_repo.path[len(
-                commonprefix([master.path, handle_repo.path]).strip("/"))+1:].strip("/")
-
-            path = target_dir.replace("$NAME",
-                                      handle_name.replace("/", "-"))
+                commonprefix([top_handle_repo.path,
+                              handle_repo.path])):].strip("/")
+            path = target_dir.replace("$NAME", handle_name.replace("/", "-"))
 
             if path != '.':
                 # check if target exists, and if not --force is given,

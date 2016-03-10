@@ -305,7 +305,7 @@ def get_datalad_master():
     )
 
 
-def POC_get_root_handle(root_dir=None):
+def POC_get_root_handle(root_dir=None, path_only=False):
     """Return "master" handle.
 
     Parameter
@@ -329,6 +329,8 @@ def POC_get_root_handle(root_dir=None):
     if root_dir is None:
         root_dir = os.environ.get('DATALAD_ROOT_HANDLE', None) or \
                    opj(dirs.user_data_dir, DATALAD_ROOT_HANDLE_NAME)
+    if path_only:
+        return root_dir
 
     from ..support.gitrepo import GitRepo
     return GitRepo(root_dir, create=True)

@@ -20,7 +20,8 @@ from os.path import join as opj, abspath, expanduser, expandvars, exists, common
 
 from six import string_types
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureListOf
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf, \
+    EnsureHandleAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmdline.helpers import POC_get_root_handle
@@ -73,15 +74,11 @@ class POCPublish(Interface):
             args=('--handle',),
             doc="Name of or path to the handle to publish. Defaults to CWD.",
             nargs="?",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureHandleAbsolutePath()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
             doc="Recursively publish all subhandles of HANDLE."),
-        roothandle=Parameter(
-            doc="Roothandle, HANDLE is referring to. Datalad has a "
-                "default root handle.",
-            constraints=EnsureStr() | EnsureNone()),
         with_data=Parameter(
             args=("--with-data",),
             doc="shell pattern",
@@ -89,28 +86,19 @@ class POCPublish(Interface):
             constraints=EnsureListOf(string_types) | EnsureNone()),)
 
     def __call__(self, remote, remote_url=None, remote_url_push=None,
-                 handle=curdir, recursive=None, roothandle=None,
-                 with_data=None):
+                 handle=curdir, recursive=None, with_data=None):
 
         # Note to myself: "Real" implementation should use getpwd()
 
         # TODO: check parameter dependencies first
 
-        # get root handle:
-        master = POC_get_root_handle(roothandle)
-        lgr.info("Using root handle '%s' ..." % master.path)
+        # TODO: Exception handling:
+        top_repo = GitRepo(handle, create=False)
 
-        # figure out, what handle to publish:
-        if exists(handle):  # local path?
-            top_repo = GitRepo(handle, create=False)
-        elif handle in get_submodules_list(master):  # valid handle name?
-            top_repo = GitRepo(opj(master.path, handle), create=False)
-        else:
-            raise ValueError("Unknown handle '%s'." % handle)
         handles_to_publish = [top_repo]
 
         if recursive:
-            handles_to_publish += [GitRepo(opj(master.path, handle, subhandle),
+            handles_to_publish += [GitRepo(opj(top_repo.path, subhandle),
                                            create=False)
                                    for subhandle in
                                    get_submodules_list(top_repo)]
@@ -118,7 +106,7 @@ class POCPublish(Interface):
         for handle_repo in handles_to_publish:
 
             handle_name = handle_repo.path[len(
-                commonprefix([master.path, handle_repo.path]).strip("/"))+1:]
+                commonprefix([top_repo.path, handle_repo.path])):].strip("/")
             set_upstream = False
 
             if remote is not None and remote not in handle_repo.git_get_remotes():

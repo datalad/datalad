@@ -18,7 +18,8 @@ import logging
 from os import curdir
 from os.path import join as opj
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr, EnsureNone, \
+    EnsureHandleAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import CommandError
 from datalad.cmdline.helpers import POC_get_root_handle
@@ -40,11 +41,7 @@ class POCUpdate(Interface):
         handle=Parameter(
             args=('--handle',),
             doc="name of or path to the handle to be updated",
-            constraints=EnsureStr() | EnsureNone()),
-        roothandle=Parameter(
-            doc="Roothandle, where to install the handle to. Datalad has a "
-                "default root handle.",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureHandleAbsolutePath()),
         merge=Parameter(
             args=("--merge",),
             action="store_true",
@@ -64,31 +61,22 @@ class POCUpdate(Interface):
             action="store_true",
             doc="TODO"),)
 
-    def __call__(self, remote=None, handle=curdir, roothandle=None,
+    # TODO: For cmdline handle=curdir works. But How about Python API?
+    # Should this be abspath(getpwd()) or is there a way to invoke the
+    # constraints when using python API?
+    def __call__(self, remote=None, handle=curdir,
                  merge=False, recursive=False, all=False, reobtain_data=False):
         """
         """
 
-        if reobtain_data:
-            raise NotImplementedError("Option '--reobtain-data' not implemented yet.")
-
-        master = POC_get_root_handle(roothandle)
-        lgr.info("Update using root handle '%s' ..." % master.path)
-
-        # figure out, what handle to update:
-        if handle != curdir:
-            if handle not in get_submodules_list(master):
-                raise ValueError("Handle '%s' is not installed in "
-                                 "root handle %s" % (handle, master.path))
-            else:
-                top_handle_repo = GitRepo(opj(master.path, handle), create=False)
-        else:
-            top_handle_repo = GitRepo(handle, create=False)
+        # TODO: Exception handling:
+        top_handle_repo = GitRepo(handle, create=False)
 
         handles_to_update = [top_handle_repo]
         if recursive:
             handles_to_update += [GitRepo(opj(top_handle_repo.path, sub_path))
-                                  for sub_path in get_submodules_list(top_handle_repo)]
+                                  for sub_path in
+                                  get_submodules_list(top_handle_repo)]
 
         for handle_repo in handles_to_update:
             # get all remotes:
