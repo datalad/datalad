@@ -409,3 +409,56 @@ def expand_contraint_spec(spec):
             return constraint_spec_map[spec]
         except KeyError:
             raise ValueError("unsupport constraint specification '%r'" % (spec,))
+
+from datalad.cmdline.helpers import POC_get_root_handle
+from datalad.utils import getpwd
+from datalad.support.gitrepo import GitRepo
+from os.path import join as opj, isabs, normpath, abspath
+
+
+class EnsureHandleAbsolutePath(Constraint):
+    """Ensure an input path is an absolute path by resolving a given path
+    according to the API convention for handle identification.
+    """
+    def __init__(self):
+        self._default_root_dir = POC_get_root_handle(path_only=True)
+
+    def __call__(self, path):
+
+        # accept '/' notation even if this is not a path on this platform
+        from os import sep, curdir
+        if sep != '/':
+            path = path.replace('/', sep)
+            # TODO: Correct transformation or are there conditions on when a
+            # '/' should not be converted?
+
+        if isabs(path):
+            # we have an absolute path given, so there's nothing to do
+            pass
+        else:
+            # we have a relative path given
+            self._cwd = getpwd()
+            if path.startswith(curdir):
+                # whenever a relative path starts with '.', we don't resolve
+                # anything. It's meant to be relative to cwd.
+                path = abspath(normpath(opj(self._cwd, path)))
+            else:
+                self._cur_repo_base_dir = GitRepo.get_toppath(self._cwd)
+                if not self._cur_repo_base_dir:
+                    # we are not within a git repo, so 'path' is interpreted
+                    # relative to the default root handle
+                    path = abspath(normpath(opj(self._default_root_dir, path)))
+                else:
+                    # otherwise it's just a relative path:
+                    path = abspath(normpath(opj(self._cwd, path)))
+
+        return path
+
+    # TODO: Proper description
+    def short_description(self):
+        pass
+
+    def long_description(self):
+        return "Some handle name resolving description"
+
+
