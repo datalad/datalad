@@ -69,6 +69,9 @@ class POCUpdate(Interface):
         """
         """
 
+        if reobtain_data:
+            raise NotImplementedError("Option '--reobtain-data' not implemented yet.")
+        
         # TODO: Exception handling:
         top_handle_repo = GitRepo(handle, create=False)
 

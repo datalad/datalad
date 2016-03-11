@@ -229,15 +229,15 @@ def test_handleabsolutepath(repo_dir, non_repo_dir):
     c = ct.EnsureHandleAbsolutePath()
     pwd = getpwd()
 
-    # TODO: Are we sure to treat any relative path equally?
-    #       "./my/path" vs. "my/path"
-    my_rel_path = opj(os.curdir, "my", "path")
+    my_rel_path = opj("my", "path")
+    my_rel_path_dot = opj(os.curdir, "my", "path")
     my_abs_path = abspath(my_rel_path)
 
     # absolute path unchanged:
     eq_(c(my_abs_path), my_abs_path)
     # relative path becomes an absolute one:
     ok_(isabs(c(my_rel_path)))
+    ok_(isabs(c(my_rel_path_dot)))
 
     # accept slashes on windows:
     if on_windows:
@@ -248,10 +248,14 @@ def test_handleabsolutepath(repo_dir, non_repo_dir):
     chpwd(non_repo_dir)
     eq_(c(my_rel_path), abspath(normpath(opj(root, my_rel_path))))
     eq_(c(my_abs_path), my_abs_path)
+    # except it starts with '.':
+    eq_(c(my_rel_path_dot),
+        abspath(normpath(opj(non_repo_dir, my_rel_path_dot))))
 
     # now we are within a repo => just rel. path
     chpwd(repo_dir)
     eq_(c(my_rel_path), abspath(normpath(opj(repo_dir, my_rel_path))))
+    eq_(c(my_rel_path_dot), abspath(normpath(opj(repo_dir, my_rel_path_dot))))
     eq_(c(my_abs_path), my_abs_path)
     # TODO: deeper within a repo
 

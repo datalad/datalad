@@ -59,7 +59,7 @@ class POCPublish(Interface):
                 "pass a template for building the URLs of all handles to be "
                 "published by using placeholders.\n"
                 "List of currently available placeholders:\n"
-                "$NAME\tthe name of the handle, where slashes are replaced by dashes.",
+                "%NAME\tthe name of the handle, where slashes are replaced by dashes.",
             # TODO: What if remote is known, but remote-url is passed?
             #       Redirect the existing remote or ignore or reject?
             nargs="?",
@@ -116,14 +116,14 @@ class POCPublish(Interface):
                 lgr.info("Remote '%s' doesn't exist yet.")
 
                 # Fill in URL-Template:
-                remote_url = remote_url.replace("$NAME",
+                remote_url = remote_url.replace("%NAME",
                                                 handle_name.replace("/", "-"))
                 # Add remote
                 handle_repo.git_remote_add(remote, remote_url)
                 if remote_url_push:
                     # Fill in template:
                     remote_url_push = \
-                        remote_url_push.replace("$NAME",
+                        remote_url_push.replace("%NAME",
                                                 handle_name.replace("/", "-"))
                     # Modify push url:
                     handle_repo._git_custom_command('',

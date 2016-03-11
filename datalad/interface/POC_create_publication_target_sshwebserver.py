@@ -61,7 +61,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 "pass a template for building the URLs of all handles to be "
                 "published by using placeholders.\n"
                 "List of currently available placeholders:\n"
-                "$NAME-DASH\tthe name of the handle, where slashes are "
+                "%NAME\tthe name of the handle, where slashes are "
                 "replaced by dashes.\n"
                 "If no URL is given, SSH-URL is used. This is probably not want "
                 "you want.",
@@ -77,7 +77,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 "pass a template for building the URLs of all handles to be "
                 "published by using placeholders.\n"
                 "List of currently available placeholders:\n"
-                "$NAME\tthe name of the handle, where slashes are "
+                "%NAME\tthe name of the handle, where slashes are "
                 "replaced by dashes.\n",
             constraints=EnsureStr() | EnsureNone()),
         target_dir=Parameter(
@@ -89,7 +89,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
                 "pass a template for building the URLs of all handles to be "
                 "published by using placeholders.\n"
                 "List of currently available placeholders:\n"
-                "$NAME\tthe name of the handle, where slashes are "
+                "%NAME\tthe name of the handle, where slashes are "
                 "replaced by dashes.\n",
             constraints=EnsureStr() | EnsureNone()),
         handle=Parameter(
@@ -177,7 +177,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             handle_name = handle_repo.path[len(
                 commonprefix([top_handle_repo.path,
                               handle_repo.path])):].strip("/")
-            path = target_dir.replace("$NAME", handle_name.replace("/", "-"))
+            path = target_dir.replace("%NAME", handle_name.replace("/", "-"))
 
             if path != '.':
                 # check if target exists, and if not --force is given,
@@ -226,9 +226,9 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
 
             # add remote
             handle_remote_url = \
-                remote_url.replace("$NAME", handle_name.replace("/", "-"))
+                remote_url.replace("%NAME", handle_name.replace("/", "-"))
             handle_remote_url_push = \
-                remote_url_push.replace("$NAME", handle_name.replace("/", "-"))
+                remote_url_push.replace("%NAME", handle_name.replace("/", "-"))
             if remote not in handle_repo.git_get_remotes():
                 cmd = ["git", "remote", "add", remote, handle_remote_url]
                 runner.run(cmd, cwd=handle_repo.path)
