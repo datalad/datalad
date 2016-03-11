@@ -41,7 +41,7 @@ class POCModifySubhandleURLs(Interface):
             args=("url",),
             doc="A template for building the URLs of the subhandles."
                 "List of currently available placeholders:\n"
-                "%NAME\tthe name of the handle, where slashes are replaced by "
+                "%%NAME\tthe name of the handle, where slashes are replaced by "
                 "dashes.",
             constraints=EnsureStr()),
         handle=Parameter(
@@ -63,7 +63,7 @@ class POCModifySubhandleURLs(Interface):
     #     doc="",
     #     constraints=EnsureChoice(["all", "ask"]),)
 
-    def __call__(self, url=None, handle=curdir, recursive=False):
+    def __call__(self, url, handle=curdir, recursive=False):
 
         # TODO: Exception handling:
         top_handle_repo = GitRepo(handle, create=False)
@@ -79,7 +79,7 @@ class POCModifySubhandleURLs(Interface):
             for submodule_section in parser.sections():
                 submodule_name = submodule_section[11:-1]
                 parser.set_value(submodule_section, "url",
-                                 url.replace("%NAME",
+                                 url.replace("%%NAME",
                                              submodule_name.replace("/", "-")))
 
         return
