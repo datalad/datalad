@@ -15,7 +15,7 @@ import logging
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, evaluate_constraints
-from datalad.support.dataset import EnsureDataSet
+from datalad.support.dataset import EnsureDataSet, datasetmethod
 
 lgr = logging.getLogger('datalad.interface.api-concept-demo')
 
@@ -49,6 +49,7 @@ class APIConceptDemo(Interface):
     # So, may be there is a way to apply the decorator, when loading the
     # callable into the API and circumnavigate the inspection.
 
+    @datasetmethod(name="some_method")
     #@evaluate_constraints
     def __call__(self, path):
         print "Type received: %s" % type(path)

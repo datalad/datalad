@@ -14,6 +14,7 @@ import logging
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, \
     EnsureHandleAbsolutePath, evaluate_constraints, Constraint
+from datalad.utils import optional_args
 
 
 lgr = logging.getLogger('datalad.dataset')
@@ -164,6 +165,15 @@ class DataSet(object):
         raise NotImplementedError("TODO")
 
 
+@optional_args
+def datasetmethod(f, name=None):
+    """Decorator to bind functions to DataSet class.
+    """
+    if not name:
+        name = f.func_name
+    setattr(DataSet, name, f)
+    return f
+
 # Note: Cannot be defined with constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
@@ -181,3 +191,4 @@ class EnsureDataSet(Constraint):
 
     def long_description(self):
         return "Some handle creation description"
+
