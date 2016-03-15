@@ -14,7 +14,6 @@ import logging
 
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, evaluate_constraints
 from datalad.support.dataset import EnsureDataSet, datasetmethod
 
 lgr = logging.getLogger('datalad.interface.api-concept-demo')
@@ -34,24 +33,13 @@ class APIConceptDemo(Interface):
             doc="some path to generate a DataSet instance for.",
             constraints=EnsureDataSet()))
 
-    # TODO:
-    # Decorator doesn't work here yet. Class Interface uses inspect to get
-    # signature of __call__, which is obscured by the decorator.
-    # Tried to use functools.wraps/update_wrapper to assign func_code and
-    # func_defaults to the wrapper function (these two are apparently used by
-    # getargspec). But didn't work yet. update_wrapper calls setattr, which
-    # then raises a ValueError, complaining, that the code object has 0 free
-    # vars, where at least one is expected. Not clear yet, who exactly is
-    # expecting this and why.
-    #
-    # May be we don't the decorator here at all. Command line interface doesn't
-    # need it, only python API does.
-    # So, may be there is a way to apply the decorator, when loading the
-    # callable into the API and circumnavigate the inspection.
-
     @datasetmethod(name="some_method")
-    #@evaluate_constraints
     def __call__(self, path):
+        # Note: We can either call constraints directly or use the ones defined
+        # in _params_ for commandline interface. In the latter case, we can't
+        # use 'self', due to the binding to the DataSet class.
+        path = APIConceptDemo._params_['path'].constraints(path)
+
         print "Type received: %s" % type(path)
         print "To string: %s" % path
         try:

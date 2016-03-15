@@ -438,8 +438,8 @@ class EnsureHandleAbsolutePath(Constraint):
         else:
             # we have a relative path given
             self._cwd = getpwd()
-            if path.startswith(curdir):
-                # whenever a relative path starts with '.', we don't resolve
+            if path.startswith(curdir + sep):
+                # whenever a relative path starts with './', we don't resolve
                 # anything. It's meant to be relative to cwd.
                 path = abspath(normpath(opj(self._cwd, path)))
             else:
@@ -460,17 +460,3 @@ class EnsureHandleAbsolutePath(Constraint):
 
     def long_description(self):
         return "Some handle name resolving description"
-
-from functools import wraps
-def evaluate_constraints(f, **kwargs):
-    """Decorator to evaluate constraints for interface functions' parameters
-    """
-
-    @wraps(f)
-    def newfunc(self, **kwargs):
-        for arg in kwargs:
-            kwargs[arg] = self._params_[arg].constraints(kwargs[arg])
-
-        return f(self, **kwargs)
-
-    return newfunc

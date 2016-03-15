@@ -11,6 +11,8 @@
 
 import logging
 
+from six import string_types
+
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, \
     EnsureHandleAbsolutePath, evaluate_constraints, Constraint
@@ -22,21 +24,10 @@ lgr = logging.getLogger('datalad.dataset')
 
 class DataSet(object):
 
-    _params_ = dict(
-        path=Parameter(
-            doc="",
-            constraints=EnsureHandleAbsolutePath() | EnsureNone()
-        ),
-        source=Parameter(
-            doc="",
-            constraints=EnsureStr() | EnsureNone()
-        ),
-    )
-
-    @evaluate_constraints
     def __init__(self, path=None, source=None):
-        self._path = path
-        self._src = source
+        self._path = (EnsureHandleAbsolutePath() | EnsureNone())(path)
+        self._src = (EnsureStr() | EnsureNone())(source)
+
         print self._path
 
     def get_path(self):
@@ -174,6 +165,7 @@ def datasetmethod(f, name=None):
     setattr(DataSet, name, f)
     return f
 
+
 # Note: Cannot be defined with constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
@@ -182,8 +174,13 @@ class EnsureDataSet(Constraint):
     def __init__(self):
         self._name_resolver = EnsureHandleAbsolutePath()
 
-    def __call__(self, path):
-        return DataSet(path=self._name_resolver(path))
+    def __call__(self, value):
+        if isinstance(value, DataSet):
+            return value
+        elif isinstance(value, string_types):
+            return DataSet(path=self._name_resolver(value))
+        else:
+            raise ValueError("Can't create DataSet from %s." % type(value))
 
     # TODO: Proper description
     def short_description(self):
