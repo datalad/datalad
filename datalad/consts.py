@@ -31,3 +31,6 @@ ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
 
 ARCHIVES_TEMP_DIR = join('.git', 'datalad', 'tmp', 'archives')
+
+# POC-branch:
+DATALAD_ROOT_HANDLE_NAME = "POC-datalad-root"  # replaces DATALAD_COLLECTION_NAME

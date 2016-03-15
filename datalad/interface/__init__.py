@@ -43,6 +43,7 @@ from .add_archive_content import AddArchiveContent
 from .download_url import DownloadURL
 from .ls import Ls
 from .clean import Clean
+from .api_concept_demo import APIConceptDemo
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -87,4 +88,5 @@ _group_misc = (
         DownloadURL,
         Ls,
         Clean,
+        APIConceptDemo,
     ])
