@@ -10,7 +10,7 @@
 """
 
 import logging
-from os.path import exists
+from os.path import exists, join as opj
 from six import string_types
 
 from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError
@@ -27,6 +27,9 @@ class DataSet(object):
     def __init__(self, path=None, source=None):
         self._path = (EnsureHandleAbsolutePath() | EnsureNone())(path)
         self._src = (EnsureStr() | EnsureNone())(source)
+
+    def __repr__(self):
+        return "<DataSet path=%s>" % self.get_path()
 
     def get_path(self):
         """Query the path to the location of a dataset in the filesystem.
@@ -53,13 +56,26 @@ class DataSet(object):
         publish_url
         verify
           None | "dataset" | "sibling"
-
-        Returns
-        -------
-
         """
+        repo = self.get_vcs()
 
-        raise NotImplementedError("TODO")
+        if verify is not None:
+            raise NotImplementedError("TODO: verify not implemented yet")
+
+        if name not in repo.git_get_remotes():
+            # Add remote
+            repo.git_remote_add(name, url)
+            if publish_url is not None:
+                # set push url:
+                repo._git_custom_command('', ["git", "remote",
+                                              "set-url",
+                                              "--push", name,
+                                              publish_url])
+            lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
+                     (name, url, publish_url if publish_url else url))
+        else:
+            lgr.warning("Remote '%s' already exists. Ignore.")
+            raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     def get_dataset_handles(self, pattern=None, fulfilled=None):
         """Get paths to all known dataset_handles (subdatasets),
@@ -79,7 +95,21 @@ class DataSet(object):
         list of str
           (paths)
         """
-        raise NotImplementedError("TODO")
+        repo = self.get_vcs()
+        if repo is not None:
+            out, err = repo._git_custom_command('', ["git", "submodule",
+                                                     "status", "--recursive"])
+            lines = [line.split() for line in out.splitlines()]
+            if fulfilled is None:
+                submodules = [line[1] for line in lines]
+            elif not fulfilled:
+                submodules = [line[1] for line in lines if line[0].startswith('-')]
+            else:
+                submodules = [line[1] for line in lines if not line[0].startswith('-')]
+
+            return [opj(self._path, submodule) for submodule in submodules]
+        else:
+            return None
 
     def get_file_handles(self, pattern=None, fulfilled=None):
         """Get paths to all known file_handles, optionally matching a specific
