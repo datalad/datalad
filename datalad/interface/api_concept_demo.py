@@ -40,10 +40,10 @@ class APIConceptDemo(Interface):
         # use 'self', due to the binding to the DataSet class.
         path = APIConceptDemo._params_['path'].constraints(path)
 
-        print "Type received: %s" % type(path)
-        print "To string: %s" % path
+        print("Type received: %s" % type(path))
+        print("To string: %s" % path)
         try:
-            print "Path received: %s" % path._path
+            print("Path received: %s" % path._path)
         except AttributeError:
             pass
 

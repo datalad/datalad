@@ -205,6 +205,9 @@ class POCInstallHandle(Interface):
 
             return
 
+        elif src is None:
+            lgr.warning("No source provided. Nothing to install.")
+            return
         # figure out, what to install:
         # 1. is src an already known handle?
         elif src_as_name in known_handles:
