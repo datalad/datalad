@@ -454,9 +454,11 @@ class EnsureHandleAbsolutePath(Constraint):
 
         return path
 
-    # TODO: Proper description
+    # TODO: Proper description. What to ensure by this constraint, doesn't make
+    # sense to state for commandline doc (where description is used). What's
+    # relevant there is, what the user has to pass!
     def short_description(self):
-        pass
+        return "DataSet identifier"
 
     def long_description(self):
-        return "Some handle name resolving description"
+        return "Some dataset name resolving description"

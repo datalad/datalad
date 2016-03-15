@@ -192,10 +192,11 @@ class EnsureDataSet(Constraint):
         else:
             raise ValueError("Can't create DataSet from %s." % type(value))
 
-    # TODO: Proper description
+    # TODO: Proper description? Mentioning DataSet class doesn't make sense for
+    # commandline doc!
     def short_description(self):
-        pass
+        return "DataSet"
 
     def long_description(self):
-        return "Some handle creation description"
+        return "Value must be a DataSet or a valid identifier of a DataSet."
 
