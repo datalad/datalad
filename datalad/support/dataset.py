@@ -10,12 +10,12 @@
 """
 
 import logging
-
+from os.path import exists
 from six import string_types
 
-from datalad.support.param import Parameter
+from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError
 from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureHandleAbsolutePath, evaluate_constraints, Constraint
+    EnsureHandleAbsolutePath, Constraint
 from datalad.utils import optional_args
 
 
@@ -28,13 +28,12 @@ class DataSet(object):
         self._path = (EnsureHandleAbsolutePath() | EnsureNone())(path)
         self._src = (EnsureStr() | EnsureNone())(source)
 
-        print self._path
-
     def get_path(self):
         """Query the path to the location of a dataset in the filesystem.
         If there is nothing in the filesystem (yet), None is returned.
         """
-        raise NotImplementedError("TODO")
+        # TODO: Do we care for whether or not there is a vcs already?
+        return self._path if exists(self._path) else None
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -136,7 +135,13 @@ class DataSet(object):
         -------
         GitRepo
         """
-        raise NotImplementedError("TODO")
+        if self._vcs is None:
+            try:
+                self._vcs = GitRepo(self._path, create=False)
+            except InvalidGitRepositoryError:
+                return None
+
+        return self._vcs
 
     def is_installed(self, ensure="complete"):
         """Returns whether a dataset is installed.
@@ -153,7 +158,12 @@ class DataSet(object):
         -------
         bool
         """
-        raise NotImplementedError("TODO")
+        # TODO: Define what exactly to test for, when different flavors are
+        # used.
+        if self.get_path() is not None and self.get_vcs() is not None:
+            return True
+        else:
+            return False
 
 
 @optional_args
