@@ -289,6 +289,7 @@ from os.path import join as opj
 
 dirs = AppDirs("datalad", "datalad.org")
 
+
 def get_datalad_master():
     """Return "master" collection on which all collection operations will be done
     """
@@ -320,8 +321,9 @@ def POC_get_root_handle(root_dir=None, path_only=False):
 
     Note
     ----
-    This is a temporary version of the above get_datalad_master, marked by the prefix POC.
-     Not for general use in datalad yet.
+    This is a temporary version of the above get_datalad_master, marked by the
+    prefix POC.
+    Not for general use in datalad yet.
     """
 
     from ..consts import DATALAD_ROOT_HANDLE_NAME
@@ -334,39 +336,3 @@ def POC_get_root_handle(root_dir=None, path_only=False):
     from ..support.gitrepo import GitRepo
     return GitRepo(root_dir, create=True)
 
-# Notes:
-# ------
-# collection:
-# handle at 'path'? => return Handle/HandleRepo
-#
-# is 'handle' in collection?, get Handle/HandleRepo
-#
-# same for collections
-#   - is_registered?
-#   - get the instance
-#   - get the path/url
-#   - get registered Collections
-#
-# register collection? (remote add (check for duplicates); fetch)
-#
-# "register" handle? (and add metadata to master) => integrate the latter into
-# add_handle (CollectionRepo)
-#
-# get handle's path; list of handles paths => could be done via
-# Handle instances.
-#
-#
-# what to do about addressing the local master itself via its name?
-#  - when is it needed?
-#  - when it should be showed, when it shouldn't?
-#
-#
-# check whether 'handle' is a key ("{collection}/{handle}")
-# or a local path or an url
-
-# Tasks:
-# ------
-#
-# - get a handle by its name or path or url => different type of return value?
-# - (un)register a collection
-# - check what type of repo is at path and return it (see get_repo_instance)

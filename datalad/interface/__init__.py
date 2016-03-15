@@ -43,7 +43,16 @@ from .add_archive_content import AddArchiveContent
 from .download_url import DownloadURL
 from .ls import Ls
 from .clean import Clean
+from .POC_install import POCInstallHandle
+from .POC_move import POCMove
+from .POC_update import POCUpdate
+from .POC_uninstall import POCUninstall
+from .POC_publish import POCPublish
+from .POC_create_publication_target_sshwebserver import \
+    POCCreatePublicationTargetSSHWebserver
+from .POC_modify_subhandle_urls import POCModifySubhandleURLs
 from .api_concept_demo import APIConceptDemo
+
 
 # all interfaces should be associated with (at least) one of the groups below
 _group_collection = (
@@ -62,12 +71,19 @@ _group_handle = (
         CreateHandle,
         AddHandle,
         InstallHandle,
+        POCInstallHandle,
         UninstallHandle,
+        POCUninstall,
+        POCMove,
         ListHandles,
         Get,
         Drop,
         UpgradeHandle,
+        POCUpdate,
         PublishHandle,
+        POCPublish,
+        POCCreatePublicationTargetSSHWebserver,
+        POCModifySubhandleURLs,
     ])
 
 _group_misc = (
