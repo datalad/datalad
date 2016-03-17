@@ -30,15 +30,18 @@ class Dataset(object):
         self._vcs = None
 
     def __repr__(self):
-        return "<Dataset path=%s>" % self.get_path()
+        return "<Dataset path=%s>" % self.path
 
-    # TODO: turn into property, prevent any path change, other than replacing `None`
-    def get_path(self):
-        """Query the path to the location of a dataset in the filesystem.
-        If there is nothing in the filesystem (yet), None is returned.
-        """
-        # TODO: Do we care for whether or not there is a vcs already?
-        return self._path if exists(self._path) else None
+    @property
+    def path(self):
+        """path to the dataset"""
+        return self._path
+
+    @path.setter
+    def path(self, path):
+        if self._path is not None:
+            raise RuntimeError("cannot change the path of a dataset after it was set once")
+        self._path = path
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -175,6 +178,7 @@ class Dataset(object):
         """
         if self._vcs is None:
             try:
+                # TODO: Return AnnexRepo instead if there is one
                 self._vcs = GitRepo(self._path, create=False)
             except (InvalidGitRepositoryError, NoSuchPathError):
                 pass
