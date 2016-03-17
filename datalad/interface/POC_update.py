@@ -19,7 +19,7 @@ from os import curdir
 from os.path import join as opj
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureHandleAbsolutePath
+    EnsureDatasetAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import CommandError
 from datalad.cmdline.helpers import POC_get_root_handle
@@ -41,7 +41,7 @@ class POCUpdate(Interface):
         handle=Parameter(
             args=('--handle',),
             doc="name of or path to the handle to be updated",
-            constraints=EnsureHandleAbsolutePath()),
+            constraints=EnsureDatasetAbsolutePath()),
         merge=Parameter(
             args=("--merge",),
             action="store_true",
