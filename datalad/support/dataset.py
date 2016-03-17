@@ -13,9 +13,10 @@ import logging
 from os.path import exists, join as opj
 from six import string_types
 
-from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError, NoSuchPathError
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureHandleAbsolutePath, Constraint
+    EnsureDatasetAbsolutePath, Constraint
 from datalad.utils import optional_args
 
 
@@ -25,9 +26,13 @@ lgr = logging.getLogger('datalad.dataset')
 class Dataset(object):
 
     def __init__(self, path=None, source=None):
-        self._path = (EnsureHandleAbsolutePath() | EnsureNone())(path)
+        self._path = None
+        # and now with constraints...
+        self.path = path
         self._src = (EnsureStr() | EnsureNone())(source)
         self._vcs = None
+
+    #TODO source can also be read from an underlying VCS
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -39,9 +44,11 @@ class Dataset(object):
 
     @path.setter
     def path(self, path):
+        if path == self.path:
+            return
         if self._path is not None:
             raise RuntimeError("cannot change the path of a dataset after it was set once")
-        self._path = path
+        self._path = EnsureDatasetAbsolutePath()(path)
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -179,7 +186,7 @@ class Dataset(object):
         if self._vcs is None:
             try:
                 # TODO: Return AnnexRepo instead if there is one
-                self._vcs = GitRepo(self._path, create=False)
+                self._vcs = AnnexRepo(self._path, create=False, init=False)
             except (InvalidGitRepositoryError, NoSuchPathError):
                 pass
 
@@ -224,7 +231,7 @@ def datasetmethod(f, name=None):
 class EnsureDataset(Constraint):
 
     def __init__(self):
-        self._name_resolver = EnsureHandleAbsolutePath()
+        self._name_resolver = EnsureDatasetAbsolutePath()
 
     def __call__(self, value):
         if isinstance(value, Dataset):
@@ -241,4 +248,3 @@ class EnsureDataset(Constraint):
 
     def long_description(self):
         return "Value must be a Dataset or a valid identifier of a Dataset."
-
