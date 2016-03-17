@@ -13,7 +13,7 @@ import logging
 from os.path import exists, join as opj
 from six import string_types
 
-from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError
+from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import EnsureStr, EnsureNone, \
     EnsureHandleAbsolutePath, Constraint
 from datalad.utils import optional_args
@@ -27,10 +27,12 @@ class Dataset(object):
     def __init__(self, path=None, source=None):
         self._path = (EnsureHandleAbsolutePath() | EnsureNone())(path)
         self._src = (EnsureStr() | EnsureNone())(source)
+        self._vcs = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.get_path()
 
+    # TODO: turn into property, prevent any path change, other than replacing `None`
     def get_path(self):
         """Query the path to the location of a dataset in the filesystem.
         If there is nothing in the filesystem (yet), None is returned.
@@ -77,8 +79,9 @@ class Dataset(object):
             lgr.warning("Remote '%s' already exists. Ignore.")
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
-    def get_dataset_handles(self, pattern=None, fulfilled=None):
-        """Get paths to all known dataset_handles (subdatasets),
+    def get_dataset_handles(self, pattern=None, fulfilled=None, absolute=False,
+            recursive=False):
+        """Get names/paths of all known dataset_handles (subdatasets),
         optionally matching a specific name pattern.
 
         If fulfilled is True, only paths to fullfiled handles are returned,
@@ -96,39 +99,44 @@ class Dataset(object):
           (paths)
         """
         repo = self.get_vcs()
-        if repo is not None:
-            out, err = repo._git_custom_command('', ["git", "submodule",
-                                                     "status", "--recursive"])
-            lines = [line.split() for line in out.splitlines()]
-            if fulfilled is None:
-                submodules = [line[1] for line in lines]
-            elif not fulfilled:
-                submodules = [line[1] for line in lines if line[0].startswith('-')]
-            else:
-                submodules = [line[1] for line in lines if not line[0].startswith('-')]
+        if repo is None:
+            return
 
+        out, err = repo._git_custom_command(
+            '',
+            ["git", "submodule", "status", "--recursive" if recursive else ''])
+
+        lines = [line.split() for line in out.splitlines()]
+        if fulfilled is None:
+            submodules = [line[1] for line in lines]
+        elif not fulfilled:
+            submodules = [line[1] for line in lines if line[0].startswith('-')]
+        else:
+            submodules = [line[1] for line in lines if not line[0].startswith('-')]
+
+        if absolute:
             return [opj(self._path, submodule) for submodule in submodules]
         else:
-            return None
+            return submodules
 
-    def get_file_handles(self, pattern=None, fulfilled=None):
-        """Get paths to all known file_handles, optionally matching a specific
-        name pattern.
-
-        If fulfilled is True, only paths to fullfiled handles are returned,
-        if False, only paths to unfulfilled handles are returned.
-
-        Parameters
-        ----------
-        pattern: str
-        fulfilled: bool
-
-        Returns
-        -------
-        list of str
-          (paths)
-        """
-        raise NotImplementedError("TODO")
+#    def get_file_handles(self, pattern=None, fulfilled=None):
+#        """Get paths to all known file_handles, optionally matching a specific
+#        name pattern.
+#
+#        If fulfilled is True, only paths to fullfiled handles are returned,
+#        if False, only paths to unfulfilled handles are returned.
+#
+#        Parameters
+#        ----------
+#        pattern: str
+#        fulfilled: bool
+#
+#        Returns
+#        -------
+#        list of str
+#          (paths)
+#        """
+#        raise NotImplementedError("TODO")
 
     def record_state(self, auto_add_changes=True, message=str,
                      update_superdataset=False, version=None):
@@ -168,8 +176,8 @@ class Dataset(object):
         if self._vcs is None:
             try:
                 self._vcs = GitRepo(self._path, create=False)
-            except InvalidGitRepositoryError:
-                return None
+            except (InvalidGitRepositoryError, NoSuchPathError):
+                pass
 
         return self._vcs
 
