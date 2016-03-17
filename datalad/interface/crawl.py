@@ -98,3 +98,5 @@ class Crawl(Interface):
                 # probably ask via ui which action should be performed unless
                 # explicitly specified
                 raise
+
+            # TODO:  Move gc/clean over here!

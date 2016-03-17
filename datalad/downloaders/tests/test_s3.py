@@ -37,9 +37,7 @@ url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversion
 url_2versions_nonversioned1_ver1 = url_2versions_nonversioned1 + '?versionId=null'
 url_2versions_nonversioned1_ver2 = url_2versions_nonversioned1 + '?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
 
-# TODO: I think record_mode='all' must not be necessary here but something makes interaction
-# different across runs
-@use_cassette('fixtures/vcr_cassettes/test_s3_download_basic.yaml', record_mode='all')
+@use_cassette('test_s3_download_basic')
 def test_s3_download_basic():
 
     for url, success_str, failed_str in [
