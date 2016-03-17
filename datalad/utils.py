@@ -591,6 +591,11 @@ def swallow_logs(new_level=None):
         adapter.cleanup()
 
 
+def _get_cassette_path(path):
+    if not isabs(path):  # so it was given as a name
+        return "fixtures/vcr_cassettes/%s.yaml" % path
+    return path
+
 try:
     # TEMP: Just to overcome problem with testing on jessie with older requests
     # https://github.com/kevin1024/vcrpy/issues/215
@@ -613,8 +618,7 @@ try:
         path : str
           If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
         """
-        if not isabs(path):  # so it was given as a name
-            path = "fixtures/vcr_cassettes/%s.yaml" % path
+        path = _get_cassette_path(path)
         lgr.debug("Using cassette %s" % path)
         if return_body is not None:
             my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
@@ -638,14 +642,14 @@ except Exception as exc:
 
 
 @contextmanager
-def externals_use_cassette(path):
+def externals_use_cassette(name):
     """Helper to pass instruction via env variables to use specified cassette
 
     For instance whenever we are testing custom special remotes invoked by the annex
     but want to minimize their network traffic by using vcr.py
     """
     from mock import patch
-    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(path)}):
+    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(_get_cassette_path(name))}):
         yield
 
 
