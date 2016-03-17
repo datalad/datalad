@@ -9,7 +9,7 @@
 """Tests for customremotes archives providing dl+archive URLs handling"""
 
 from ..archives import ArchiveAnnexCustomRemote
-from ...support.handlerepo import HandleRepo
+from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from ...tests.utils import *
 
@@ -34,16 +34,16 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
           (fn_extracted_obscure, '123')))
 @with_tempfile()
 def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
-    handle = HandleRepo(d, runner=_get_custom_runner(d), direct=direct)
-    handle.annex_initremote(
+    annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
+    annex.annex_initremote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
          'autoenable=true'
          ])
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
-    handle.add_to_annex(fn_archive, "Added tarball")
-    handle.add_to_annex(fn_extracted, "Added the load file")
+    annex.add_to_annex(fn_archive, "Added tarball")
+    annex.add_to_annex(fn_extracted, "Added the load file")
 
     # Operations with archive remote URL
     annexcr = ArchiveAnnexCustomRemote(path=d)
@@ -59,39 +59,39 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
         archive_file=fn_archive,
         file=fn_archive.replace('.tar.gz', '') + '/d/'+fn_inarchive_obscure)
 
-    handle.annex_addurl_to_file(fn_extracted, file_url, ['--relaxed'])
-    handle.annex_drop(fn_extracted)
+    annex.annex_addurl_to_file(fn_extracted, file_url, ['--relaxed'])
+    annex.annex_drop(fn_extracted)
 
-    list_of_remotes = handle.annex_whereis(fn_extracted, output='descriptions')
+    list_of_remotes = annex.annex_whereis(fn_extracted, output='descriptions')
     in_('[%s]' % ARCHIVES_SPECIAL_REMOTE, list_of_remotes)
 
-    assert_false(handle.file_has_content(fn_extracted))
-    handle.get(fn_extracted)
-    assert_true(handle.file_has_content(fn_extracted))
+    assert_false(annex.file_has_content(fn_extracted))
+    annex.get(fn_extracted)
+    assert_true(annex.file_has_content(fn_extracted))
 
-    handle.annex_rmurl(fn_extracted, file_url)
+    annex.annex_rmurl(fn_extracted, file_url)
     with swallow_logs() as cm:
-        assert_raises(RuntimeError, handle.annex_drop, fn_extracted)
+        assert_raises(RuntimeError, annex.annex_drop, fn_extracted)
         in_("git-annex: drop: 1 failed", cm.out)
 
-    handle.annex_addurl_to_file(fn_extracted, file_url)
-    handle.annex_drop(fn_extracted)
-    handle.get(fn_extracted)
-    handle.annex_drop(fn_extracted)  # so we don't get from this one next
+    annex.annex_addurl_to_file(fn_extracted, file_url)
+    annex.annex_drop(fn_extracted)
+    annex.get(fn_extracted)
+    annex.annex_drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
-    cloned_handle = HandleRepo(d2, d,
+    cloned_annex = AnnexRepo(d2, d,
                            runner=_get_custom_runner(d2),
                            direct=direct)
     # we still need to enable manually atm that special remote for archives
-    # cloned_handle.annex_enableremote('annexed-archives')
+    # cloned_annex.annex_enableremote('annexed-archives')
 
-    assert_false(cloned_handle.file_has_content(fn_archive))
-    assert_false(cloned_handle.file_has_content(fn_extracted))
-    cloned_handle.get(fn_extracted)
-    assert_true(cloned_handle.file_has_content(fn_extracted))
+    assert_false(cloned_annex.file_has_content(fn_archive))
+    assert_false(cloned_annex.file_has_content(fn_extracted))
+    cloned_annex.get(fn_extracted)
+    assert_true(cloned_annex.file_has_content(fn_extracted))
     # as a result it would also fetch tarball
-    assert_true(cloned_handle.file_has_content(fn_archive))
+    assert_true(cloned_annex.file_has_content(fn_archive))
 
     # verify that we can drop if original archive gets dropped but available online:
     #  -- done as part of the test_add_archive_content.py

@@ -39,7 +39,6 @@ from ...downloaders.providers import Providers
 from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
-from ...support.handlerepo import HandleRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
@@ -119,12 +118,12 @@ class initiate_handle(object):
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creater"
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
-        repo = HandleRepo(
-            path,
-            direct=cfg.getboolean('crawl', 'init direct', default=False),
-            name=name,
-            backend=backend,
-            create=True)
+        repo = AnnexRepo(
+             path,
+             direct=cfg.getboolean('crawl', 'init direct', default=False),
+             #  name=name,
+             backend=backend,
+             create=True)
         # TODO: centralize
         if backend:
             put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
