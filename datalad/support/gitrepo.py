@@ -526,8 +526,15 @@ class GitRepo(object):
         # For some reason, this is three times faster than the version below:
         remote_branches = list()
         for remote in self.repo.remotes:
-            for ref in remote.refs:
-                remote_branches.append(ref.name)
+            try:
+                for ref in remote.refs:
+                    remote_branches.append(ref.name)
+            except AssertionError as e:
+                if e.message.endswith("did not have any references"):
+                    # this will happen with git annex special remotes
+                    pass
+                else:
+                    raise e
         return remote_branches
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
