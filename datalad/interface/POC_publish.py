@@ -21,7 +21,7 @@ from os.path import join as opj, abspath, expanduser, expandvars, exists, common
 from six import string_types
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf, \
-    EnsureHandleAbsolutePath
+    EnsureDatasetAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmdline.helpers import POC_get_root_handle
@@ -74,7 +74,7 @@ class POCPublish(Interface):
             args=('--handle',),
             doc="Name of or path to the handle to publish. Defaults to CWD.",
             nargs="?",
-            constraints=EnsureHandleAbsolutePath()),
+            constraints=EnsureDatasetAbsolutePath()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",

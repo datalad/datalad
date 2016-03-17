@@ -21,7 +21,7 @@ from six.moves.urllib.parse import urlparse
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool, \
-    EnsureHandleAbsolutePath
+    EnsureDatasetAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
@@ -96,7 +96,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             args=('--handle',),
             doc="Name of or path to the handle to publish. Defaults to CWD.",
             nargs="?",
-            constraints=EnsureHandleAbsolutePath()),
+            constraints=EnsureDatasetAbsolutePath()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",

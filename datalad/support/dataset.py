@@ -6,37 +6,49 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Implements class DataSet
+"""Implements class Dataset
 """
 
 import logging
 from os.path import exists, join as opj
 from six import string_types
 
-from datalad.support.gitrepo import GitRepo, InvalidGitRepositoryError
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureHandleAbsolutePath, Constraint
+    EnsureDatasetAbsolutePath, Constraint
 from datalad.utils import optional_args
 
 
 lgr = logging.getLogger('datalad.dataset')
 
 
-class DataSet(object):
+class Dataset(object):
 
     def __init__(self, path=None, source=None):
-        self._path = (EnsureHandleAbsolutePath() | EnsureNone())(path)
+        self._path = None
+        # and now with constraints...
+        self.path = path
         self._src = (EnsureStr() | EnsureNone())(source)
+        self._vcs = None
+
+    #TODO source can also be read from an underlying VCS
 
     def __repr__(self):
-        return "<DataSet path=%s>" % self.get_path()
+        return "<Dataset path=%s>" % self.path
 
-    def get_path(self):
-        """Query the path to the location of a dataset in the filesystem.
-        If there is nothing in the filesystem (yet), None is returned.
-        """
-        # TODO: Do we care for whether or not there is a vcs already?
-        return self._path if exists(self._path) else None
+    @property
+    def path(self):
+        """path to the dataset"""
+        return self._path
+
+    @path.setter
+    def path(self, path):
+        if path == self.path:
+            return
+        if self._path is not None:
+            raise RuntimeError("cannot change the path of a dataset after it was set once")
+        self._path = EnsureDatasetAbsolutePath()(path)
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -77,8 +89,9 @@ class DataSet(object):
             lgr.warning("Remote '%s' already exists. Ignore.")
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
-    def get_dataset_handles(self, pattern=None, fulfilled=None):
-        """Get paths to all known dataset_handles (subdatasets),
+    def get_dataset_handles(self, pattern=None, fulfilled=None, absolute=False,
+            recursive=False):
+        """Get names/paths of all known dataset_handles (subdatasets),
         optionally matching a specific name pattern.
 
         If fulfilled is True, only paths to fullfiled handles are returned,
@@ -96,39 +109,44 @@ class DataSet(object):
           (paths)
         """
         repo = self.get_vcs()
-        if repo is not None:
-            out, err = repo._git_custom_command('', ["git", "submodule",
-                                                     "status", "--recursive"])
-            lines = [line.split() for line in out.splitlines()]
-            if fulfilled is None:
-                submodules = [line[1] for line in lines]
-            elif not fulfilled:
-                submodules = [line[1] for line in lines if line[0].startswith('-')]
-            else:
-                submodules = [line[1] for line in lines if not line[0].startswith('-')]
+        if repo is None:
+            return
 
+        out, err = repo._git_custom_command(
+            '',
+            ["git", "submodule", "status", "--recursive" if recursive else ''])
+
+        lines = [line.split() for line in out.splitlines()]
+        if fulfilled is None:
+            submodules = [line[1] for line in lines]
+        elif not fulfilled:
+            submodules = [line[1] for line in lines if line[0].startswith('-')]
+        else:
+            submodules = [line[1] for line in lines if not line[0].startswith('-')]
+
+        if absolute:
             return [opj(self._path, submodule) for submodule in submodules]
         else:
-            return None
+            return submodules
 
-    def get_file_handles(self, pattern=None, fulfilled=None):
-        """Get paths to all known file_handles, optionally matching a specific
-        name pattern.
-
-        If fulfilled is True, only paths to fullfiled handles are returned,
-        if False, only paths to unfulfilled handles are returned.
-
-        Parameters
-        ----------
-        pattern: str
-        fulfilled: bool
-
-        Returns
-        -------
-        list of str
-          (paths)
-        """
-        raise NotImplementedError("TODO")
+#    def get_file_handles(self, pattern=None, fulfilled=None):
+#        """Get paths to all known file_handles, optionally matching a specific
+#        name pattern.
+#
+#        If fulfilled is True, only paths to fullfiled handles are returned,
+#        if False, only paths to unfulfilled handles are returned.
+#
+#        Parameters
+#        ----------
+#        pattern: str
+#        fulfilled: bool
+#
+#        Returns
+#        -------
+#        list of str
+#          (paths)
+#        """
+#        raise NotImplementedError("TODO")
 
     def record_state(self, auto_add_changes=True, message=str,
                      update_superdataset=False, version=None):
@@ -167,9 +185,10 @@ class DataSet(object):
         """
         if self._vcs is None:
             try:
-                self._vcs = GitRepo(self._path, create=False)
-            except InvalidGitRepositoryError:
-                return None
+                # TODO: Return AnnexRepo instead if there is one
+                self._vcs = AnnexRepo(self._path, create=False, init=False)
+            except (InvalidGitRepositoryError, NoSuchPathError):
+                pass
 
         return self._vcs
 
@@ -198,35 +217,34 @@ class DataSet(object):
 
 @optional_args
 def datasetmethod(f, name=None):
-    """Decorator to bind functions to DataSet class.
+    """Decorator to bind functions to Dataset class.
     """
     if not name:
         name = f.func_name
-    setattr(DataSet, name, f)
+    setattr(Dataset, name, f)
     return f
 
 
 # Note: Cannot be defined with constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
-class EnsureDataSet(Constraint):
+class EnsureDataset(Constraint):
 
     def __init__(self):
-        self._name_resolver = EnsureHandleAbsolutePath()
+        self._name_resolver = EnsureDatasetAbsolutePath()
 
     def __call__(self, value):
-        if isinstance(value, DataSet):
+        if isinstance(value, Dataset):
             return value
         elif isinstance(value, string_types):
-            return DataSet(path=self._name_resolver(value))
+            return Dataset(path=self._name_resolver(value))
         else:
-            raise ValueError("Can't create DataSet from %s." % type(value))
+            raise ValueError("Can't create Dataset from %s." % type(value))
 
-    # TODO: Proper description? Mentioning DataSet class doesn't make sense for
+    # TODO: Proper description? Mentioning Dataset class doesn't make sense for
     # commandline doc!
     def short_description(self):
-        return "DataSet"
+        return "Dataset"
 
     def long_description(self):
-        return "Value must be a DataSet or a valid identifier of a DataSet."
-
+        return "Value must be a Dataset or a valid identifier of a Dataset."

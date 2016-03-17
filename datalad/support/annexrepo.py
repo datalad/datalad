@@ -148,6 +148,7 @@ class AnnexRepo(GitRepo):
             self.annex_fsck()
 
         # Check whether an annex already exists at destination
+        # XXX this doesn't work for a submodule!
         if not exists(opj(self.path, '.git', 'annex')):
             # so either it is not annex at all or just was not yet initialized
             if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())):
@@ -428,6 +429,7 @@ class AnnexRepo(GitRepo):
             if e.code == 1:
                 if not exists(opj(self.path, file_)):
                     raise IOError(e.code, "File not found.", file_)
+                # XXX you don't like me because I can be real slow!
                 elif file_ in self.get_indexed_files():
                     # if we got here, the file is present and in git,
                     # but not in the annex

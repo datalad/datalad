@@ -416,9 +416,9 @@ from datalad.support.gitrepo import GitRepo
 from os.path import join as opj, isabs, normpath, abspath
 
 
-class EnsureHandleAbsolutePath(Constraint):
+class EnsureDatasetAbsolutePath(Constraint):
     """Ensure an input path is an absolute path by resolving a given path
-    according to the API convention for handle identification.
+    according to the API convention for dataset identification.
     """
     def __init__(self):
         self._default_root_dir = POC_get_root_handle(path_only=True)
@@ -458,7 +458,7 @@ class EnsureHandleAbsolutePath(Constraint):
     # sense to state for commandline doc (where description is used). What's
     # relevant there is, what the user has to pass!
     def short_description(self):
-        return "DataSet identifier"
+        return "Dataset identifier"
 
     def long_description(self):
         return "Some dataset name resolving description"

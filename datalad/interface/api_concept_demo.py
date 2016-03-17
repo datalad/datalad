@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Temporary demo command. Its purpose is to demonstrate how the class DataSet,
+"""Temporary demo command. Its purpose is to demonstrate how the class Dataset,
 interface callables and constraints work together.
 """
 
@@ -14,7 +14,7 @@ import logging
 
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.dataset import EnsureDataSet, datasetmethod
+from datalad.support.dataset import EnsureDataset, datasetmethod
 
 lgr = logging.getLogger('datalad.interface.api-concept-demo')
 
@@ -30,14 +30,14 @@ class APIConceptDemo(Interface):
     """
     _params_ = dict(
         path=Parameter(
-            doc="some path to generate a DataSet instance for.",
-            constraints=EnsureDataSet()))
+            doc="some path to generate a Dataset instance for.",
+            constraints=EnsureDataset()))
 
     @datasetmethod(name="some_method")
     def __call__(self, path):
         # Note: We can either call constraints directly or use the ones defined
         # in _params_ for commandline interface. In the latter case, we can't
-        # use 'self', due to the binding to the DataSet class.
+        # use 'self', due to the binding to the Dataset class.
         path = APIConceptDemo._params_['path'].constraints(path)
 
         print("Type received: %s" % type(path))
