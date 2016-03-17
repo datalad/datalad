@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Implements class DataSet
+"""Implements class Dataset
 """
 
 import logging
@@ -22,14 +22,14 @@ from datalad.utils import optional_args
 lgr = logging.getLogger('datalad.dataset')
 
 
-class DataSet(object):
+class Dataset(object):
 
     def __init__(self, path=None, source=None):
         self._path = (EnsureHandleAbsolutePath() | EnsureNone())(path)
         self._src = (EnsureStr() | EnsureNone())(source)
 
     def __repr__(self):
-        return "<DataSet path=%s>" % self.get_path()
+        return "<Dataset path=%s>" % self.get_path()
 
     def get_path(self):
         """Query the path to the location of a dataset in the filesystem.
@@ -198,35 +198,35 @@ class DataSet(object):
 
 @optional_args
 def datasetmethod(f, name=None):
-    """Decorator to bind functions to DataSet class.
+    """Decorator to bind functions to Dataset class.
     """
     if not name:
         name = f.func_name
-    setattr(DataSet, name, f)
+    setattr(Dataset, name, f)
     return f
 
 
 # Note: Cannot be defined with constraints.py, since then dataset.py needs to
 # be imported from constraints.py, which needs to be imported from dataset.py
 # for another constraint
-class EnsureDataSet(Constraint):
+class EnsureDataset(Constraint):
 
     def __init__(self):
         self._name_resolver = EnsureHandleAbsolutePath()
 
     def __call__(self, value):
-        if isinstance(value, DataSet):
+        if isinstance(value, Dataset):
             return value
         elif isinstance(value, string_types):
-            return DataSet(path=self._name_resolver(value))
+            return Dataset(path=self._name_resolver(value))
         else:
-            raise ValueError("Can't create DataSet from %s." % type(value))
+            raise ValueError("Can't create Dataset from %s." % type(value))
 
-    # TODO: Proper description? Mentioning DataSet class doesn't make sense for
+    # TODO: Proper description? Mentioning Dataset class doesn't make sense for
     # commandline doc!
     def short_description(self):
-        return "DataSet"
+        return "Dataset"
 
     def long_description(self):
-        return "Value must be a DataSet or a valid identifier of a DataSet."
+        return "Value must be a Dataset or a valid identifier of a Dataset."
 

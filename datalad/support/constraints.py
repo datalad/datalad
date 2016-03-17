@@ -458,7 +458,7 @@ class EnsureHandleAbsolutePath(Constraint):
     # sense to state for commandline doc (where description is used). What's
     # relevant there is, what the user has to pass!
     def short_description(self):
-        return "DataSet identifier"
+        return "Dataset identifier"
 
     def long_description(self):
         return "Some dataset name resolving description"
