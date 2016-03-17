@@ -16,6 +16,7 @@ from .interface.base import dedent_docstring as _dedent_docstring
 # etc.  Ideally all the bindings/docstrings should be generated upon the first
 # access to them from within api module
 from . import interface as _interfaces
+from .support.dataset import Dataset
 
 # auto detect all available interfaces and generate a function-based
 # API from them
