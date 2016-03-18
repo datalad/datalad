@@ -46,7 +46,8 @@ class SearchHandle(Interface):
             doc="a string to search for",
             constraints=EnsureStr()))
 
-    def __call__(self, search):
+    @staticmethod
+    def __call__(search):
         """
         Returns
         -------
@@ -87,12 +88,12 @@ class SearchHandle(Interface):
             # TODO:
             #   - needs to have remote collection name/ prefix
             #   - Python API shouldn't bomb -- we should have a test
-            if self.cmdline:
-                width = max(len(h) for h in handles)
-                for h, l in zip(handles, locations):
-                    print("%s\t%s" % (h.ljust(width), l))
-            else:
-                return [CollectionRepoHandleBackend(local_master, handle)
-                        for handle in handles]
+            #if self.cmdline:
+            #    width = max(len(h) for h in handles)
+            #    for h, l in zip(handles, locations):
+            #        print("%s\t%s" % (h.ljust(width), l))
+            #else:
+            return [CollectionRepoHandleBackend(local_master, handle)
+                    for handle in handles]
         else:
             return []

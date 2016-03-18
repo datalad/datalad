@@ -64,7 +64,8 @@ class POCUpdate(Interface):
     # TODO: For cmdline handle=curdir works. But How about Python API?
     # Should this be abspath(getpwd()) or is there a way to invoke the
     # constraints when using python API?
-    def __call__(self, remote=None, handle=curdir,
+    @staticmethod
+    def __call__(remote=None, handle=curdir,
                  merge=False, recursive=False, all=False, reobtain_data=False):
         """
         """

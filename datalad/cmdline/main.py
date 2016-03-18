@@ -110,7 +110,7 @@ def setup_parser():
         cmd_short_descriptions = []
 
         for _intfcls in _interfaces:
-            _intf = _intfcls(cmdline=True)
+            _intf = _intfcls
 
             cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
             # deal with optional parser args

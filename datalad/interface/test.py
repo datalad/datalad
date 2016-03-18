@@ -21,5 +21,6 @@ class Test(Interface):
 
     This can be used to verify correct operation on the system
     """
-    def __call__(self):
+    @staticmethod
+    def __call__():
         datalad.test()

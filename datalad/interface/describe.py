@@ -86,7 +86,8 @@ class Describe(Interface):
             doc="description of the subject",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, subject=None, author=None, author_orcid=None,
+    @staticmethod
+    def __call__(subject=None, author=None, author_orcid=None,
                  author_email=None, author_page=None, license=None,
                  description=None):
         """
@@ -224,9 +225,8 @@ class Describe(Interface):
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
 
-        if not self.cmdline:
-            if isinstance(repo, CollectionRepo):
-                return CollectionRepoBackend(repo)
-            elif isinstance(repo, HandleRepo):
-                return HandleRepoBackend(repo)
+        if isinstance(repo, CollectionRepo):
+            return CollectionRepoBackend(repo)
+        elif isinstance(repo, HandleRepo):
+            return HandleRepoBackend(repo)
 

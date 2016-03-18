@@ -46,7 +46,8 @@ class UpgradeHandle(Interface):
             doc="upgrade the actual data",
             action="store_true"))
 
-    def __call__(self, handle=curdir, upgrade_data=False):
+    @staticmethod
+    def __call__(handle=curdir, upgrade_data=False):
         """
         Returns
         -------
@@ -88,5 +89,4 @@ class UpgradeHandle(Interface):
             # upgrade content:
             repo.get(files_to_upgrade)
 
-        if not self.cmdline:
-            return HandleRepoBackend(repo)
+        return HandleRepoBackend(repo)

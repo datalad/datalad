@@ -63,7 +63,8 @@ class POCModifySubhandleURLs(Interface):
     #     doc="",
     #     constraints=EnsureChoice(["all", "ask"]),)
 
-    def __call__(self, url, handle=curdir, recursive=False):
+    @staticmethod
+    def __call__(url, handle=curdir, recursive=False):
 
         # TODO: Exception handling:
         top_handle_repo = GitRepo(handle, create=False)

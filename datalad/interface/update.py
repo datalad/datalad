@@ -55,7 +55,8 @@ class Update(Interface):
             doc="name of or path to the repository to be updated",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, key=curdir):
+    @staticmethod
+    def __call__(key=curdir):
 
         # TODO: use name of local master, instead of --all option!
 

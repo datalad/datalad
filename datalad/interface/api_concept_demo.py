@@ -33,8 +33,9 @@ class APIConceptDemo(Interface):
             doc="some path to generate a Dataset instance for.",
             constraints=EnsureDataset()))
 
+    @staticmethod
     @datasetmethod(name="some_method")
-    def __call__(self, path):
+    def __call__(path):
         # Note: We can either call constraints directly or use the ones defined
         # in _params_ for commandline interface. In the latter case, we can't
         # use 'self', due to the binding to the Dataset class.

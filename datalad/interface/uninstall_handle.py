@@ -44,7 +44,8 @@ class UninstallHandle(Interface):
             doc="name of the handle to uninstall",
             constraints=EnsureStr()))
 
-    def __call__(self, handle):
+    @staticmethod
+    def __call__(handle):
 
         # TODO: unifying: also accept path to handle
 

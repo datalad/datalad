@@ -85,7 +85,8 @@ class POCPublish(Interface):
             nargs="*",
             constraints=EnsureListOf(string_types) | EnsureNone()),)
 
-    def __call__(self, remote, remote_url=None, remote_url_push=None,
+    @staticmethod
+    def __call__(remote, remote_url=None, remote_url_push=None,
                  handle=curdir, recursive=None, with_data=None):
 
         # Note to myself: "Real" implementation should use getpwd()

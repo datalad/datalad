@@ -53,7 +53,8 @@ class RegisterCollection(Interface):
                 "the name is derived from the url.",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, url, name=None):
+    @staticmethod
+    def __call__(url, name=None):
         # TODO: After publishing new demo collection, adapt doctest
         """
         Examples
@@ -124,5 +125,4 @@ class RegisterCollection(Interface):
         local_master.git_remote_add(name, url)
         local_master.git_fetch(name)
 
-        if not self.cmdline:
-            return CollectionRepoBackend(local_master, name + "/master")
+        return CollectionRepoBackend(local_master, name + "/master")

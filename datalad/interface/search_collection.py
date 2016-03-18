@@ -62,7 +62,8 @@ class SearchCollection(Interface):
             constraints=EnsureStr())
     )
 
-    def __call__(self, search, output='names'):
+    @staticmethod
+    def __call__(search, output='names'):
         """
         Returns
         -------
@@ -115,23 +116,22 @@ class SearchCollection(Interface):
 
         printed_collections = set()
         if collections:
-            if not self.cmdline:
-                return [CollectionRepoBackend(local_master, col + "/master")
-                        for col in collections]
-            else:
-                #width = max(len(c) for c in collections)
-                for c, l in zip(collections, locations):
-                    if output in {'names', 'locations'} and c in printed_collections:
-                        continue
-                    printed_collections.add(c)
-                    if output == 'names':
-                        out = c
-                    elif output == 'locations':
-                        out = l
-                    elif output == 'full':
-                        raise NotImplementedError()
-                    #print("%s\t%s" % (c.ljust(width), l))
-                    print(out)
+            return [CollectionRepoBackend(local_master, col + "/master")
+                    for col in collections]
+            #else:
+            #    #width = max(len(c) for c in collections)
+            #    for c, l in zip(collections, locations):
+            #        if output in {'names', 'locations'} and c in printed_collections:
+            #            continue
+            #        printed_collections.add(c)
+            #        if output == 'names':
+            #            out = c
+            #        elif output == 'locations':
+            #            out = l
+            #        elif output == 'full':
+            #            raise NotImplementedError()
+            #        #print("%s\t%s" % (c.ljust(width), l))
+            #        print(out)
 
         else:
             return []

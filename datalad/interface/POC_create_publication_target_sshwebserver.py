@@ -107,7 +107,8 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             doc="If target directory exists already, force to (re-)init git.",
             constraints=EnsureBool(),),)
 
-    def __call__(self, sshurl, remote, remote_url=None, remote_url_push=None,
+    @staticmethod
+    def __call__(sshurl, remote, remote_url=None, remote_url_push=None,
                  target_dir=None, handle=curdir, recursive=False,
                  force=False):
 

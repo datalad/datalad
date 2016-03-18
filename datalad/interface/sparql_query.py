@@ -39,7 +39,8 @@ class SPARQLQuery(Interface):
                 "performed on all known collections",
             constraints=EnsureListOf(string_types) | EnsureNone()))
 
-    def __call__(self, query, collections=None):
+    @staticmethod
+    def __call__(query, collections=None):
         """
         Returns
         -------
@@ -86,5 +87,4 @@ class SPARQLQuery(Interface):
             out.lstrip('\t')
             print(out)
 
-        if not self.cmdline:
-            return results
+        return results

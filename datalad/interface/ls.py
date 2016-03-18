@@ -52,7 +52,8 @@ class Ls(Interface):
         )
     )
 
-    def __call__(self, url, config_file=None, list_content=False):
+    @staticmethod
+    def __call__(url, config_file=None, list_content=False):
 
         if url.startswith('s3://'):
             bucket_prefix = url[5:]

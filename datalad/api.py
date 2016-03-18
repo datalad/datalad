@@ -23,10 +23,12 @@ from .support.dataset import Dataset
 
 for _grp_name, _grp_descr, _interfaces in _get_interface_groups():
     for _intfcls in _interfaces:
-        _intf = _intfcls()
+        _intf = _intfcls
         _spec = getattr(_intf, '_params_', dict())
+
+        # FIXME no longer using an interface class instance
         # convert the parameter SPEC into a docstring for the function
-        _update_docstring(_intf.__call__.__func__, _spec,
+        _update_docstring(_intf.__call__, _spec,
                           prefix=_dedent_docstring(_intfcls.__doc__),
                           suffix=_dedent_docstring(_intfcls.__call__.__doc__))
         # register the function in the namespace, using the name of the
