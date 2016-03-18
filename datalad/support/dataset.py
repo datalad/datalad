@@ -25,14 +25,9 @@ lgr = logging.getLogger('datalad.dataset')
 
 class Dataset(object):
 
-    def __init__(self, path=None, source=None):
-        self._path = None
-        # and now with constraints...
-        self.path = path
-        self._src = (EnsureStr() | EnsureNone())(source)
+    def __init__(self, path=None):
+        self._path = (EnsureDatasetAbsolutePath() | EnsureNone())(path)
         self._vcs = None
-
-    #TODO source can also be read from an underlying VCS
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -41,14 +36,6 @@ class Dataset(object):
     def path(self):
         """path to the dataset"""
         return self._path
-
-    @path.setter
-    def path(self, path):
-        if path == self.path:
-            return
-        if self._path is not None:
-            raise RuntimeError("cannot change the path of a dataset after it was set once")
-        self._path = EnsureDatasetAbsolutePath()(path)
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
