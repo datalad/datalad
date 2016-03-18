@@ -293,7 +293,9 @@ class GitRepo(object):
         #       should be a single instance collecting everything or more
         #       fine grained.
 
-        if url is not None:
+        # TODO: somehow do more extensive checks that url and path don't point to the
+        # same location
+        if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
