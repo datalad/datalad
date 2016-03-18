@@ -720,7 +720,7 @@ class chpwd(object):
     If used as a context manager it allows to temporarily change directory
     to the given path
     """
-    def __init__(self, path, mkdir=False):
+    def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
             pwd = getpwd()
@@ -736,7 +736,7 @@ class chpwd(object):
             os.mkdir(path)
         else:
             self._mkdir = False
-
+        lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
         os.environ['PWD'] = path
 
@@ -746,5 +746,5 @@ class chpwd(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._prev_pwd:
-            chpwd(self._prev_pwd)
+            chpwd(self._prev_pwd, logsuffix="(coming back)")
 
