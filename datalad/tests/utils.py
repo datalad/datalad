@@ -172,7 +172,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
     if annex:
         try:
             # operates on relative to curdir path
-            repo.get_file_key(opj(path, filename))
+            repo.get_file_key(file_repo_path)
             in_annex = True
         except FileNotInAnnexError as e:
             in_annex = False
@@ -187,16 +187,16 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     annex, file_repo_path, filename, path, repo = _prep_file_under_git(path, filename)
     if content is None:
         content = ""
-    with open(opj(path, filename), 'w') as f_:
+    with open(opj(repo.path, file_repo_path), 'w') as f_:
         f_.write(content)
 
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add_to_annex(filename)
+        repo.add_to_annex(file_repo_path)
     else:
-        repo.git_add(filename)
-    ok_file_under_git(path, filename, annexed)
+        repo.git_add(file_repo_path)
+    ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 
 def _prep_file_under_git(path, filename):
