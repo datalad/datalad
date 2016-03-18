@@ -22,17 +22,20 @@ from humanize import naturalsize
 from six import iteritems
 from six import string_types
 from distutils.version import LooseVersion
+from functools import partial
 
 from git import Repo
 
 from ...version import __version__
 from ...api import add_archive_content
 from ...api import clean
+from ...api import POC_install
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
+from ...utils import getpwd
 from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
@@ -63,7 +66,7 @@ _run = _runner.run
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
-    def __init__(self, template, handle_name=None, collection_name=None,
+    def __init__(self, template, handle_name=None,  # collection_name=None,
                  path=None, branch=None, backend=None,
                  data_fields=[], add_fields={}, existing=None):
         """
@@ -98,7 +101,7 @@ class initiate_handle(object):
         # configurations for e.g. "basic" template
         self.template = template
         self.handle_name = handle_name
-        self.collection_name = collection_name
+        ## self.collection_name = collection_name
         self.data_fields = data_fields
         self.add_fields = add_fields
         self.existing = existing
@@ -137,6 +140,7 @@ class initiate_handle(object):
             lgr.log(2, "Creating %s", crawl_config_dir)
             makedirs(crawl_config_dir)
 
+        crawl_config_repo_path = opj(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
         crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
         cfg = SafeConfigParserWithIncludes()
         cfg.add_section(CRAWLER_PIPELINE_SECTION)
@@ -158,7 +162,7 @@ class initiate_handle(object):
             secset(k, v)
         with open(crawl_config, 'w') as f:
             cfg.write(f)
-        repo.git_add(crawl_config)
+        repo.git_add(crawl_config_repo_path)
         if repo.dirty:
             repo.git_commit("Initialized crawling configuration to use template %s" % self.template)
         else:
@@ -167,17 +171,19 @@ class initiate_handle(object):
 
     def __call__(self, data={}):
         # figure out directory where create such a handle
-        handle_name = self.handle_name or data['handle_name']
+        handle_name = self.handle_name or data.get('handle_name', None)
         if self.path is None:
-            crawl_toppath = cfg.get('crawl', 'collectionspath',
-                                    default=opj(expanduser('~'), 'datalad', 'crawl'))
-            handle_path = opj(crawl_toppath,
-                              self.collection_name or self.template,
-                              handle_name)
+            #crawl_toppath = cfg.get('crawl', 'collectionspath',
+            #                        default=opj(expanduser('~'), 'datalad', 'crawl'))
+            #handle_path = opj(crawl_toppath,
+            #                  self.collection_name or self.template,
+            #                  handle_name)
+            # Just under current subdirectory
+            handle_path = opj(os.curdir, handle_name)
         else:
             handle_path = self.path
 
-        lgr.debug("Request to initialize a handle at %s", handle_path)
+        lgr.debug("Request to initialize a handle %s at %s", handle_name, handle_path)
         init = True
         if exists(handle_path):
             # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
@@ -1101,3 +1107,20 @@ class Annexificator(object):
             _call(stats.increment, 'removed')
         _call(self.repo.git_remove, filename)
         yield data
+
+    def initiate_handle(self, *args, **kwargs):
+        """Thin proxy to initiate_handle node which initiates handle as a subhandle to current annexificator
+        """
+        def _initiate_handle(data):
+            for data_ in initiate_handle(*args, **kwargs)(data):
+                # Also "register" as a sub-handle
+                out = POC_install(src=data_['handle_path'],  # dest=data_['handle_path'],
+                                  # POC_install doesn't like having both dest and name specified
+                                  # since it implies "git worktree" use case
+                                  name=data_['handle_name'],
+                                  roothandle=self.repo.path,  # as a sub-handle
+                                  create=False  # it must be created already and we don't want to override
+                                  )
+                assert out is None, "TODO: whenever it returns anything we might reconsider adding smth to data_ to be yielded"
+                yield data_
+        return _initiate_handle
