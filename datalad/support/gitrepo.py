@@ -15,6 +15,11 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 from os import linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir, abspath
 from os.path import dirname, basename
+from os.path import curdir, pardir, sep
+# shortcuts
+_curdirsep = curdir + sep
+_pardirsep = pardir + sep
+
 import logging
 import shlex
 from six import string_types
@@ -50,7 +55,7 @@ default_git_odbt = git.GitCmdObjectDB
 def _normalize_path(base_dir, path):
     """Helper to check paths passed to methods of this class.
 
-    Checks whether `path` is beneath `base_dir` and normalize it.
+    Checks whether `path` is beneath `base_dir` and normalizes it.
     Additionally paths are converted into relative paths with respect to
     `base_dir`, considering PWD in case of relative paths. This
     is intended to be used in repository classes, which means that
@@ -86,10 +91,16 @@ def _normalize_path(base_dir, path):
                                                % path, filename=path)
         else:
             pass
-
-    elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
-        # If we are inside repository, rebuilt relative paths.
-        path = opj(realpath(getpwd()), path)
+    # Executive decision was made to not do this kind of magic!
+    #
+    # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
+    #     # If we are inside repository, rebuilt relative paths.
+    #     path = opj(realpath(getpwd()), path)
+    #
+    # BUT with relative curdir/pardir start it would assume relative to curdir
+    #
+    elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
+         path = opj(realpath(getpwd()), path)
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
