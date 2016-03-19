@@ -11,26 +11,15 @@
 
 import logging
 import os
-from os.path import isabs, abspath, join as opj
+from os.path import isabs, abspath, join as opj, expanduser, expandvars
 from six import string_types
 
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
-from datalad.utils import optional_args
+from datalad.utils import optional_args, expandpath, is_explicit_path
 
 lgr = logging.getLogger('datalad.dataset')
-
-
-def is_explicit_path(path):
-    """Return whether a path explicitly points to a location
-
-    Any absolute path, or relative path starting with either '../' or
-    './' is assumed to indicate a location on the filesystem. Any other
-    path format is not considered explicit."""
-    return isabs(path) \
-        or path.startswith(os.curdir + os.sep) \
-        or path.startswith(os.pardir + os.sep)
 
 
 def resolve_path(path, ds=None):
@@ -47,6 +36,7 @@ def resolve_path(path, ds=None):
     -------
     Absolute path
     """
+    path = expandpath(path, force_absolute=False)
     if is_explicit_path(path):
         return abspath(path)
     if ds is None:
@@ -154,9 +144,10 @@ class Dataset(object):
         if repo is None:
             return
 
-        out, err = repo._git_custom_command(
-            '',
-            ["git", "submodule", "status", "--recursive" if recursive else ''])
+        cmd = ["git", "submodule", "status"]
+        if recursive:
+            cmd.append("--recursive")
+        out, err = repo._git_custom_command('', cmd)
 
         lines = [line.split() for line in out.splitlines()]
         if fulfilled is None:
