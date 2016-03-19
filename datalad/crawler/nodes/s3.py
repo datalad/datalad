@@ -187,6 +187,9 @@ class crawl_s3(object):
                     break  # we are done
             staged.add(filename)
             if isinstance(e, Key):
+                if e.name.endswith('/'):
+                    # signals a directory for which we don't care explicitly (git doesn't -- we don't! ;) )
+                    continue
                 url = get_key_url(e, schema=self.url_schema)
                 # generate and pass along the status right away since we can
                 yield updated(
