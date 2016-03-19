@@ -10,13 +10,13 @@
 """
 
 import logging
-from os.path import exists, join as opj
+import os
+from os.path import join as opj
 from six import string_types
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
-from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureDatasetAbsolutePath, Constraint
+from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError, GitRepo
+from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
 from datalad.utils import optional_args
 
 
@@ -24,9 +24,14 @@ lgr = logging.getLogger('datalad.dataset')
 
 
 class Dataset(object):
+    __slots__ = ['_path', '_vcs']
 
     def __init__(self, path=None):
-        self._path = (EnsureDatasetAbsolutePath() | EnsureNone())(path)
+        if path is None:
+            # no idea, try from CWD
+            path = os.curdir
+        # resolve possible parent Git repo, returns None if there is none
+        self._path = GitRepo.get_toppath(os.path.abspath(path))
         self._vcs = None
 
     def __repr__(self):
@@ -77,7 +82,7 @@ class Dataset(object):
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     def get_dataset_handles(self, pattern=None, fulfilled=None, absolute=False,
-            recursive=False):
+                            recursive=False):
         """Get names/paths of all known dataset_handles (subdatasets),
         optionally matching a specific name pattern.
 
@@ -135,10 +140,9 @@ class Dataset(object):
 #        """
 #        raise NotImplementedError("TODO")
 
-    def record_state(self, auto_add_changes=True, message=str,
-                     update_superdataset=False, version=None):
+    def remember_state(self, auto_add_changes=True, message=str,
+                       version=None):
         """
-
         Parameters
         ----------
         auto_add_changes: bool
@@ -148,7 +152,7 @@ class Dataset(object):
         """
         raise NotImplementedError("TODO")
 
-    def set_state(self, whereto):
+    def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
         (tag, commit) to "undo" a change or switch to a otherwise desired
         previous state.
