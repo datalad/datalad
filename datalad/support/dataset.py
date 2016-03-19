@@ -11,7 +11,7 @@
 
 import logging
 import os
-from os.path import join as opj
+from os.path import isabs, abspath, join as opj
 from six import string_types
 
 from datalad.support.annexrepo import AnnexRepo
@@ -19,20 +19,35 @@ from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError, 
 from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
 from datalad.utils import optional_args
 
-
 lgr = logging.getLogger('datalad.dataset')
 
 
+
+
+def is_explicit_path(path):
+    """Return whether a path explicitly points to a location
+
+    Any absolute path, or relative path starting with either '../' or
+    './' is assumed to indicate a location on the filesystem. Any other
+    path format is not considered explicit."""
+    return isabs(path) \
+        or path.startswith(os.curdir + os.sep) \
+        or path.startswith(os.pardir + os.sep)
+
+
 class Dataset(object):
-    __slots__ = ['_path', '_vcs']
+    __slots__ = ['_path', '_repo']
 
     def __init__(self, path=None):
         if path is None:
             # no idea, try from CWD
             path = os.curdir
-        # resolve possible parent Git repo, returns None if there is none
-        self._path = GitRepo.get_toppath(os.path.abspath(path))
-        self._vcs = None
+        if is_explicit_path(path):
+            self._path = abspath(path)
+        else:
+            # resolve possible parent Git repo, returns None if there is none
+            self._path = GitRepo.get_toppath(abspath(path))
+        self._repo = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -41,6 +56,28 @@ class Dataset(object):
     def path(self):
         """path to the dataset"""
         return self._path
+
+    @property
+    def repo(self):
+        """Get an instance of the version control system/repo for this dataset,
+        or None if there is none yet.
+
+        If creating an instance of GitRepo is guaranteed to be really cheap
+        this could also serve as a test whether a repo is present.
+
+        Returns
+        -------
+        GitRepo
+        """
+        if self._repo is None:
+            try:
+                # TODO: Return AnnexRepo instead if there is one
+                self._repo = AnnexRepo(self._path, create=False, init=False)
+            except (InvalidGitRepositoryError, NoSuchPathError):
+                pass
+
+        return self._repo
+
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -61,7 +98,7 @@ class Dataset(object):
         verify
           None | "dataset" | "sibling"
         """
-        repo = self.get_vcs()
+        repo = self.repo
 
         if verify is not None:
             raise NotImplementedError("TODO: verify not implemented yet")
@@ -100,7 +137,7 @@ class Dataset(object):
         list of str
           (paths)
         """
-        repo = self.get_vcs()
+        repo = self.repo
         if repo is None:
             return
 
@@ -163,26 +200,6 @@ class Dataset(object):
         """
         raise NotImplementedError("TODO")
 
-    def get_vcs(self):
-        """Get an instance of the version control system/repo for this dataset,
-        or None if there is none yet.
-
-        If creating an instance of GitRepo is guaranteed to be really cheap
-        this could also serve as a test whether a repo is present.
-
-        Returns
-        -------
-        GitRepo
-        """
-        if self._vcs is None:
-            try:
-                # TODO: Return AnnexRepo instead if there is one
-                self._vcs = AnnexRepo(self._path, create=False, init=False)
-            except (InvalidGitRepositoryError, NoSuchPathError):
-                pass
-
-        return self._vcs
-
     def is_installed(self, ensure="complete"):
         """Returns whether a dataset is installed.
 
@@ -200,7 +217,7 @@ class Dataset(object):
         """
         # TODO: Define what exactly to test for, when different flavors are
         # used.
-        if self.get_path() is not None and self.get_vcs() is not None:
+        if self.get_path() is not None and self.repo is not None:
             return True
         else:
             return False
