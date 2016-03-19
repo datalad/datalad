@@ -15,13 +15,11 @@ from os.path import isabs, abspath, join as opj
 from six import string_types
 
 from datalad.support.annexrepo import AnnexRepo
-from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError, GitRepo
+from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
 from datalad.utils import optional_args
 
 lgr = logging.getLogger('datalad.dataset')
-
-
 
 
 def is_explicit_path(path):
@@ -35,18 +33,34 @@ def is_explicit_path(path):
         or path.startswith(os.pardir + os.sep)
 
 
+def resolve_path(path, ds=None):
+    """Resolve a path specification (against a Dataset location)
+
+    Any explicit path (absolute or relative) is return as an absolute path.
+    In case of an explicit relative path, the current working directory is
+    used as a reference. Any non-explicit relative path is resolved against
+    as dataset location, i.e. considered relative to the location of the
+    dataset. If no dataset is provided, the current working directory is
+    used.
+
+    Returns
+    -------
+    Absolute path
+    """
+    if is_explicit_path(path):
+        return abspath(path)
+    if ds is None:
+        # no dataset given, use CWD as reference
+        return abspath(path)
+    else:
+        return opj(ds.path, path)
+
+
 class Dataset(object):
     __slots__ = ['_path', '_repo']
 
-    def __init__(self, path=None):
-        if path is None:
-            # no idea, try from CWD
-            path = os.curdir
-        if is_explicit_path(path):
-            self._path = abspath(path)
-        else:
-            # resolve possible parent Git repo, returns None if there is none
-            self._path = GitRepo.get_toppath(abspath(path))
+    def __init__(self, path):
+        self._path = abspath(path)
         self._repo = None
 
     def __repr__(self):
@@ -77,7 +91,6 @@ class Dataset(object):
                 pass
 
         return self._repo
-
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
