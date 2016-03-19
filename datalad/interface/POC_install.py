@@ -15,12 +15,13 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os.path import join as opj, abspath, expanduser, expandvars, exists
-from datalad.support.dataset import datasetmethod
+import os
+from os.path import join as opj, abspath, expanduser, expandvars, relpath, isfile, pardir, isabs
+from datalad.support.dataset import Dataset, datasetmethod
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureBool, EnsureDatasetAbsolutePath
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureBool
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import AnnexRepo, FileInGitError, FileNotInAnnexError
 from datalad.cmd import Runner
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
@@ -32,10 +33,34 @@ from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
 lgr = logging.getLogger('datalad.interface.POC_install')
 
 
+def get_containing_subdataset(ds, path):
+    """Given a base dataset and a relative path get containing subdataset
+
+    Parameters
+    ----------
+    ds : Dataset
+      Reference or base dataset
+    path : str
+      Path relative to the reference dataset
+
+    Returns
+    -------
+    Dataset
+    """
+    for subds in ds.get_dataset_handles():
+        common = os.path.commonprefix((subds, path))
+        if common and os.path.isdir(opj(ds.path, common)):
+            return Dataset(path=common)
+    return ds
+
+
 class POCInstallHandle(Interface):
     """Install a handle."""
 
     _params_ = dict(
+        ds=Parameter(
+            args=("ds",),
+            doc="WE DONT KNOW WHETHER THIS STAYS"),
         path=Parameter(
             args=("path",),
             doc="path/name of the installation target",
@@ -57,8 +82,9 @@ class POCInstallHandle(Interface):
             action="store_true",
             constraints=EnsureBool() | EnsureNone()))
 
+    @staticmethod
     @datasetmethod(name='install')
-    def __call__(self, path=None, source=None, recursive=False, force=False):
+    def __call__(ds=None, path=None, source=None, recursive=False):
         """ Proof-of-concept implementation for submodule approach.
         Uses just plain git calls.
 
@@ -71,81 +97,40 @@ class POCInstallHandle(Interface):
         current GitRepo/AnnexRepo implementation (which aren't prepared for the
         use of submodules), except for direct git (annex) calls.
         """
+        # this could happen when this function is called via datalad.api
+        if ds is None:
+            # try to find a dataset at or above the installation target
+            ds = Dataset(GitRepo.get_toppath(abspath(path)))
 
-
-        # TODO: Allow for passing customized Runners/protocols
-        #runner = Runner()
-
-        # TODO: Use 'dest' internally in order to prepare the code for whatever
-        # kind of implementation of moved worktrees or similar independency of
-        # name and path of a submodule.
-
-        # TODO: Adapt path manipulation and translation name <-> path
-        # (cross-platform)"
-
-        # Note: 'dest' without '--name' currently leads to a clone, that is not
-        # installed as a submodule into any roothandle. Therefore it may be
-        # seen as a root handle.
-        # TODO: doc
-        #lgr.debug("Options:\nsrc: {s}\ndest: {d}\nrecursive: {r}\nname: {n}\n"
-        #          "roothandle:{rt}\ncreate: {c}".format(s=src, d=dest,
-        #                                                r=recursive, n=name,
-        #                                                rt=roothandle, c=create))
-        #if dest is not None:
-        #    if name is not None:
-        #        raise NotImplementedError("Paramaters 'dest' and '--name' "
-        #                                  "combined are implying the use of "
-        #                                  "'git worktree'.\n"
-        #                                  "Not implemented yet.")
-        #    if exists(dest):
-        #        # create a root handle
-        #        target_repo = GitRepo(dest, src, create=True)
-        #        if is_annex(dest):
-        #            target_repo._git_custom_command('', ["git", "annex", "init"])
-        #        lgr.info("Installation succesfull.")
-        #        return
-        #    else:
-        #        raise ValueError("'%s' does not exist." % dest)
-
-        #master = POC_get_root_handle(roothandle)
-        # XXX this implies git submodule status --recursive and can get slow
-        # even with 100 subhandles.
-        #known_handles = get_all_submodules_dict(master.path)
-        #lgr.info("Install using root handle '%s' ..." % master.path)
-
-        #if src is not None:
-        #    src_as_name = src.rstrip('/')
-        #if name is not None:
-        #    name = name.rstrip('/')
-        # Note: To strip os.sep instead of '/' seems to not be reasonable,
-        # since we are trying to treat src as a (datalad defined) name, that
-        # allows for '/' only. If there is os.sep like '\', src obviously is a
-        # path not a name!
-
-        # Note: For now, "create" is separate thing. Should eventually be
-        # melted in.
-
-        if self.path is None:
-            # this dataset doesn't know where it belongs (yet)
+        if ds.path is None:
+            # we couldn't find a parent dataset
             if path is None:
                 raise ValueError("I have no fucking clue")
-            # the path we got must be the one for the entire dataset
-            self.path = EnsureDatasetAbsolutePath()(path)
-        assert(self.path is not None)
+            if isabs(path) \
+                    or path.startswith(os.curdir + os.sep) \
+                    or path.startswith(pardir + os.sep):
+                # we have been given an absolute or explicitly relative path,
+                # use that!
+                ds = Dataset(path)
+            else:
+                # nothing that points to any specific location, and no parent
+                # dataset -> get default dataset
+                ds = Dataset(POC_get_root_handle(path_only=True))
+        assert(ds.path is not None)
 
-        vcs = self.get_vcs()
+        vcs = ds.get_vcs()
         if vcs is None:
             # this yield a VCS under all circumstances (regardless of `create`)
             # XXX maybe replace later with _create_dataset
             # XXX maybe add condition create=True
-            # TODO check that a "self.path" actually points to a TOPDIR
-            AnnexRepo(self.path, url=source, create=True)
-            vcs = self.get_vcs()
-        assert(self.get_vcs())
+            # TODO check that a "ds.path" actually points to a TOPDIR
+            AnnexRepo(ds.path, url=source, create=True)
+            vcs = ds.get_vcs()
+        assert(ds.get_vcs())
 
-        if path is None or path == self.path:
+        if path is None or path == ds.path:
             # if the goal was to install this dataset, we are done
-            return self
+            return ds
 
         # at this point this dataset is "installed", now we can test whether to install something
         # into the dataset
@@ -154,115 +139,129 @@ class POCInstallHandle(Interface):
 
         # express the destination path relative to the root of this dataset
         # (in case the CWD and the root are not the same)
-        path = os.path.relpath(path, start=self.path)
+        # TODO: This needs to check whether the CWD is in this dataset
+        # if not, we cannot do this, but have to treat this `path` literally
+        # as relative to the root of this dataset
+        path = relpath(path, start=ds.path)
+        if path.startswith(pardir):
+            raise ValueError("installation path outside dataset")
+        print 'BANG', path, ds.path
+        absolutepath = opj(ds.path, path)
 
-        if source is None:
-            # this dataset must already know everything necessary
-            try:
-                # it is simplest to let annex tell us what we are dealing with
-                if vcs.get_file_key(path):
-                    # this is an annex'ed file
-                    vcs.annex_get(path)
-                    # return the absolute path to the installed file
-                    return opj(self.path, path)
-            except FileInGitError:
-                # file is checked into git directly -> nothing to do
-                # OR this is a submodule of this dataset
-                subpath = opj(self.path, path)
-                if not os.path.isdir(subpath):
-                    return subpath
+        # this dataset must already know everything necessary
+        try:
+            # it is simplest to let annex tell us what we are dealing with
+            if vcs.get_file_key(path):
+                # this is an annex'ed file
+                # TODO implement `copy --from` using `source`
+                vcs.annex_get(path)
+                # return the absolute path to the installed file
+                return opj(ds.path, path)
+        except FileInGitError:
+            # file is checked into git directly -> nothing to do
+            # OR this is a submodule of this dataset
+            if not os.path.isdir(absolutepath):
+                return absolutepath
 
-                # it is a submodule
-                # checkout the submodule
-                cmd_list = ["git", "submodule", "update", "--init"]
-                if recursive:
-                    cmd_list.append("--recursive")
-                cmd_list.append(path)
-                runner.run(cmd_list, cwd=self.path)
+            # it is a submodule
+            # checkout the submodule
+            cmd_list = ["git", "submodule", "update", "--init"]
+            if recursive:
+                cmd_list.append("--recursive")
+            cmd_list.append(path)
+            runner.run(cmd_list, cwd=ds.path)
 
-                # TODO: annex init recursively! => Move to bottom; that's post
-                # install stuff!
-                if is_annex(subpath):
-                    lgr.debug("Annex detected in submodule '%s'. "
-                              "Calling annex init ..." % name)
-                    cmd_list = ["git", "annex", "init"]
-                    runner.run(cmd_list, cwd=self.path)
-                return Dataset(path=subpath)
+            # TODO: annex init recursively! => Move to bottom; that's post
+            # install stuff!
+            if is_annex(absolutepath):
+                lgr.debug("Annex detected in submodule '%s'. "
+                          "Calling annex init ..." % name)
+                cmd_list = ["git", "annex", "init"]
+                runner.run(cmd_list, cwd=ds.path)
+            return Dataset(path=absolutepath)
 
-            except FileNotInAnnexError:
-                # either an untracked file in this dataset, or something that also actually exists
-                # in the file system but could be part of a subdataset
-                for subds in self.get_dataset_handles():
-                    common = os.path.commonprefix((subds, path))
-                    if common and os.path.isdir(opj(self.path, common)):
-                        # dive in -- hope to come back...
-                        return Dataset(path=common).install(
-                            path=os.path.relpath(path, start=common),
-                            source=source,
-                            recursive=recursive,
-                            force=force)
-                # do a blunt `annex add`
-                added_files = vcs.annex_add(path)
-                if len(added_files):
-                    # XXX think about what to return
-                    return added_files
+        except FileNotInAnnexError:
+            # either an untracked file in this dataset, or something that
+            # also actually exists in the file system but could be part of
+            # a subdataset
+            subds = get_containing_subdataset(ds, path)
+            if ds.path != subds.path:
+                return subds.install(
+                    path=os.path.relpath(path, start=common),
+                    source=source,
+                    recursive=recursive)
 
-            except IOError as e:
-                # there is no source, and nothing at the destination, not even a handle -> BOOM!
-                # and NO, we do not try to install subdatasets along the way with the chance of
-                # finding nothing
+            # do a blunt `annex add`
+            # XXX can have `source` any meaning here?
+            added_files = vcs.annex_add(path)
+            if len(added_files):
+                # XXX think about what to return
+                return added_files
+
+        except IOError as e:
+            if source is None:
+                # there is no source, and nothing at the destination, not even
+                # a handle -> BOOM!
+                # and NO, we do not try to install subdatasets along the way
+                # with the chance of finding nothing
                 raise e
+            else:
+                if isfile(source):
+                    vcs.annex_addurl_to_file(
+                        path, url='file://%s' % source,
+                        options=['--pathdepth', '-1'])
+                else:
+                    print 'FUCK', absolutepath
 
-        else: # we have a source!
-            # if we have a `source`, it could be that we want a 
-            # - git submodule add (remember case of inplace submodule add)
-            # - git annex addurl
-            # - cp/ln a local file or directory + git annex add
-
-
-            # let's first check if we are replacing thin air
-            subpath = opj(self.path, path)
-            if not os.path.exists(subpath):
-                # TODO turn the following into a function
-                # if the installation target matches a submodule, hand it over to a better/closer
-                # dataset
-                for subds in self.get_dataset_handles():
-                    common = os.path.commonprefix((subds, path))
-                    if common and os.path.isdir(opj(self.path, common)):
-                        # dive in -- hope to come back...
-                        return Dataset(path=common).install(
-                            path=os.path.relpath(path, start=common),
-                            source=source,
-                            recursive=recursive,
-                            force=force)
-
-            # case 1: known and tracked file
-            try:
-                if vcs.get_file_key(path):
-                    # this is an annex'ed file
-                    # TODO support `source` to specify a particular source, or to trigger an `addurl`
-                    vcs.annex_get(path)
-            except FileInGitError:
-                # file is checked into git directly
-            except FileNotInAnnexError:
-            except IOError:
-
-
-            # case 2: desired one is a subdataset
-            if path in self.get_dataset_handles():
-                # direct hit
-                return POCInstallHandle._install_dataset(self)
-
-            
-            # case 3: untracked content
-            # - 
-
-
+#        else: # we have a source!
+#            # if we have a `source`, it could be that we want a 
+#            # - git submodule add (remember case of inplace submodule add)
+#            # - git annex addurl
+#            # - cp/ln a local file or directory + git annex add
+#
+#
+#            # let's first check if we are replacing thin air
+#            subpath = opj(ds.path, path)
+#            if not os.path.exists(subpath):
+#                # TODO turn the following into a function
+#                # if the installation target matches a submodule, hand it over to a better/closer
+#                # dataset
+#                subds = get_containing_dataset(ds, path)
+#                if ds.path != subds.path:
+#                    # dive in -- hope to come back...
+#                    return subds.install(
+#                        path=os.path.relpath(path, start=common),
+#                        source=source,
+#                        recursive=recursive,
+#                        force=force)
+#
+#            # case 1: known and tracked file
+#            try:
+#                if vcs.get_file_key(path):
+#                    # this is an annex'ed file
+#                    # TODO support `source` to specify a particular source, or to trigger an `addurl`
+#                    vcs.annex_get(path)
+#            except FileInGitError:
+#                # file is checked into git directly
+#            except FileNotInAnnexError:
+#            except IOError:
+#
+#
+#            # case 2: desired one is a subdataset
+#            if path in ds.get_dataset_handles():
+#                # direct hit
+#                return POCInstallHandle._install_dataset(ds)
+#
+#            
+#            # case 3: untracked content
+#            # - 
+#
+#
 
 #
 #
 #
-#            # TODO check if self.get_path is not None
+#            # TODO check if ds.get_path is not None
 #
 #        elif source is None:
 #        elif src_as_name in known_handles:
@@ -270,7 +269,7 @@ class POCInstallHandle(Interface):
 #
 ##        Add type=guess|file|dataset argument
 ##
-##        - If self.path=None -> operates on the entire dataset
+##        - If ds.path=None -> operates on the entire dataset
 ##          -> install(path=some) installs the dataset into that path
 ##
 ##        - Install anything known from inside the Dataset
