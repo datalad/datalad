@@ -12,7 +12,7 @@ import re
 import six.moves.builtins as __builtin__
 import time
 
-from os.path import curdir, basename, exists, realpath, islink
+from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
 from six import text_type
 
@@ -26,7 +26,6 @@ import platform
 import gc
 
 from functools import wraps
-from os.path import exists, join as opj, isabs, normpath
 from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
@@ -181,6 +180,28 @@ def get_url_path(url):
     """Given a file:// url, return the path itself"""
 
     return urlunquote(urlsplit(url).path)
+
+def expandpath(path, force_absolute=True):
+    """Expand all variables and user handles in a path.
+
+    By default return an absolute path
+    """
+    path = expandvars(expanduser(path))
+    if force_absolute:
+        path = abspath(path)
+    return path
+
+
+def is_explicit_path(path):
+    """Return whether a path explicitly points to a location
+
+    Any absolute path, or relative path starting with either '../' or
+    './' is assumed to indicate a location on the filesystem. Any other
+    path format is not considered explicit."""
+    path = expandpath(path, force_absolute=False)
+    return isabs(path) \
+        or path.startswith(os.curdir + os.sep) \
+        or path.startswith(os.pardir + os.sep)
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable

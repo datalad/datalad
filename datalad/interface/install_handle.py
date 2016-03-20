@@ -66,7 +66,8 @@ class InstallHandle(Interface):
                 "of the installation directory will be used.",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, handle, path=None, name=None):
+    @staticmethod
+    def __call__(handle, path=None, name=None):
         """
         Examples
         --------
@@ -209,5 +210,4 @@ class InstallHandle(Interface):
                                                    key=local_name,
                                                    data=metadata)
 
-        if not self.cmdline:
-            return HandleRepoBackend(installed_handle)
+        return HandleRepoBackend(installed_handle)

@@ -34,7 +34,8 @@ class ListHandles(Interface):
             doc="""Flag if to list remote handles (not local)"""),
     )
 
-    def __call__(self, remote=False):
+    @staticmethod
+    def __call__(remote=False):
         """
         Parameters
         ----------
@@ -66,6 +67,5 @@ class ListHandles(Interface):
                     CollectionRepoHandleBackend(local_master, handle))
                 print(handle)
 
-        if not self.cmdline:
-            return handle_list
+        return handle_list
 

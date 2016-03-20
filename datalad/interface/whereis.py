@@ -38,7 +38,8 @@ class Whereis(Interface):
             doc="name of the handle or collection to look for",
             constraints=EnsureStr()))
 
-    def __call__(self, key):
+    @staticmethod
+    def __call__(key):
         """
         Returns
         -------
@@ -56,5 +57,4 @@ class Whereis(Interface):
 
         result = urlparse(location).path
         print(result)
-        if not self.cmdline:
-            return result
+        return result

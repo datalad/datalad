@@ -63,7 +63,8 @@ class DownloadURL(Interface):
             constraints=EnsureStr() | EnsureNone())
     )
 
-    def __call__(self, urls, path=None, overwrite=False, stop_on_failure=False):
+    @staticmethod
+    def __call__(urls, path=None, overwrite=False, stop_on_failure=False):
         """
         Returns
         -------

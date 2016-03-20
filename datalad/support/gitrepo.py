@@ -358,7 +358,7 @@ class GitRepo(object):
 
         If path has symlinks -- they get resolved.
 
-        Returns None if not under git
+        Return None if no parent directory contains a git repository.
         """
         try:
             toppath, err = Runner().run(
@@ -369,6 +369,8 @@ class GitRepo(object):
             return toppath.rstrip('\n\r')
         except CommandError:
             return None
+        except OSError:
+            return GitRepo.get_toppath(dirname(path))
 
     @normalize_paths
     def git_add(self, files):

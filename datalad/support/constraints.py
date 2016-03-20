@@ -11,13 +11,14 @@
 __docformat__ = 'restructuredtext'
 
 import re
-from six import string_types
 from six.moves import map as map
+
 
 def _strip_typerepr(s):
     """Strip away <class '...'> and <type '...'> decorations for docstrings
     """
     return re.sub("<(class|type) '(\S+)'>", r'\2', s)
+
 
 def _type_str(t):
     """Get string human-readable representation of a data type
@@ -29,6 +30,7 @@ def _type_str(t):
         s = ' or '.join(map(_type_str, t))
         return ("(%s)" % s) if len(t) > 1 else s
     return _strip_typerepr(str(t))
+
 
 class Constraint(object):
     """Base class for input value conversion/validation.
@@ -416,9 +418,9 @@ from datalad.support.gitrepo import GitRepo
 from os.path import join as opj, isabs, normpath, abspath
 
 
-class EnsureHandleAbsolutePath(Constraint):
+class EnsureDatasetAbsolutePath(Constraint):
     """Ensure an input path is an absolute path by resolving a given path
-    according to the API convention for handle identification.
+    according to the API convention for dataset identification.
     """
     def __init__(self):
         self._default_root_dir = POC_get_root_handle(path_only=True)
@@ -426,7 +428,7 @@ class EnsureHandleAbsolutePath(Constraint):
     def __call__(self, path):
 
         # accept '/' notation even if this is not a path on this platform
-        from os import sep, curdir
+        from os import sep, curdir, pardir
         if sep != '/':
             path = path.replace('/', sep)
             # TODO: Correct transformation or are there conditions on when a
@@ -434,31 +436,33 @@ class EnsureHandleAbsolutePath(Constraint):
 
         if isabs(path):
             # we have an absolute path given, so there's nothing to do
-            pass
+            return path
+
+        # we have a relative path or None given
+        self._cwd = getpwd()
+        # TODO: support "../"
+        if path.startswith(curdir + sep) or path.startswith(pardir + sep):
+            # whenever a path is explicitly relative, we don't resolve
+            # anything. It's meant to be relative to cwd.
+            path = abspath(normpath(opj(self._cwd, path)))
         else:
-            # we have a relative path given
-            self._cwd = getpwd()
-            if path.startswith(curdir):
-                # whenever a relative path starts with '.', we don't resolve
-                # anything. It's meant to be relative to cwd.
-                path = abspath(normpath(opj(self._cwd, path)))
+            self._cur_repo_base_dir = GitRepo.get_toppath(self._cwd)
+            if not self._cur_repo_base_dir:
+                # we are not within a git repo, so 'path' is interpreted
+                # relative to the default root handle
+                # XXX not sure if this can stay
+                path = abspath(normpath(opj(self._default_root_dir, path)))
             else:
-                self._cur_repo_base_dir = GitRepo.get_toppath(self._cwd)
-                if not self._cur_repo_base_dir:
-                    # we are not within a git repo, so 'path' is interpreted
-                    # relative to the default root handle
-                    path = abspath(normpath(opj(self._default_root_dir, path)))
-                else:
-                    # otherwise it's just a relative path:
-                    path = abspath(normpath(opj(self._cwd, path)))
+                # otherwise it's just a relative path:
+                path = abspath(normpath(opj(self._cwd, path)))
 
         return path
 
-    # TODO: Proper description
+    # TODO: Proper description. What to ensure by this constraint, doesn't make
+    # sense to state for commandline doc (where description is used). What's
+    # relevant there is, what the user has to pass!
     def short_description(self):
-        pass
+        return "Dataset identifier"
 
     def long_description(self):
-        return "Some handle name resolving description"
-
-
+        return "Some dataset name resolving description"

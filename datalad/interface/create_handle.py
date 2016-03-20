@@ -49,7 +49,8 @@ class CreateHandle(Interface):
                 "destination directory is used.",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, path=curdir, name=None):
+    @staticmethod
+    def __call__(path=curdir, name=None):
         """
         Returns
         -------
@@ -64,5 +65,4 @@ class CreateHandle(Interface):
         # TODO: get metadata, in case there is some already.
         # This implicates the option to use create-handle on an existing annex.
 
-        if not self.cmdline:
-            return HandleRepoBackend(new_handle)
+        return HandleRepoBackend(new_handle)

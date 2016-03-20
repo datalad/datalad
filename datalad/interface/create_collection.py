@@ -45,7 +45,8 @@ class CreateCollection(Interface):
                 "destination directory is used.",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, path=curdir, name=None):
+    @staticmethod
+    def __call__(path=curdir, name=None):
         # TODO: Collection => graph => lazy
         """
         Returns
@@ -70,5 +71,4 @@ class CreateCollection(Interface):
         local_master.git_remote_add(new_collection.name, new_collection.path)
         local_master.git_fetch(new_collection.name)
 
-        if not self.cmdline:
-            return CollectionRepoBackend(new_collection)
+        return CollectionRepoBackend(new_collection)

@@ -226,7 +226,7 @@ def test_type_str():
 @with_tempfile(mkdir=True)
 def test_handleabsolutepath(repo_dir, non_repo_dir):
 
-    c = ct.EnsureHandleAbsolutePath()
+    c = ct.EnsureDatasetAbsolutePath()
 
     my_rel_path = opj("my", "path")
     my_rel_path_dot = opj(os.curdir, "my", "path")

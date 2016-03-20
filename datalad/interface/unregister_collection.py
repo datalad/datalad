@@ -34,7 +34,8 @@ class UnregisterCollection(Interface):
             doc="name of the collection to unregister",
             constraints=EnsureStr()))
 
-    def __call__(self, name):
+    @staticmethod
+    def __call__(name):
 
         local_master = get_datalad_master()
         local_master.git_remote_remove(name)

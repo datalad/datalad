@@ -26,7 +26,8 @@ from datalad.cmdline.helpers import get_datalad_master
 class ListCollection(Interface):
     """List all collections known to datalad."""
 
-    def __call__(self):
+    @staticmethod
+    def __call__():
         """
         Returns
         -------
@@ -37,6 +38,5 @@ class ListCollection(Interface):
         for collection in local_master.git_get_remotes():
             print(collection)
 
-        if not self.cmdline:
-            return [CollectionRepoBackend(local_master, branch=remote + "/master")
-                    for remote in local_master.git_get_remotes()]
+        return [CollectionRepoBackend(local_master, branch=remote + "/master")
+                for remote in local_master.git_get_remotes()]

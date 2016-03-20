@@ -66,7 +66,8 @@ class PublishHandle(Interface):
             constraints=EnsureStr() | EnsureNone())
         )
 
-    def __call__(self, target, handle=curdir, url=None, remote=None,
+    @staticmethod
+    def __call__(target, handle=curdir, url=None, remote=None,
                  ssh_options=None):
         """
         Returns
@@ -163,5 +164,4 @@ class PublishHandle(Interface):
         # finally:
         local_handle_repo.git_checkout("master")
 
-        if not self.cmdline:
-            return HandleRepoBackend(local_handle_repo, remote + "/master")
+        return HandleRepoBackend(local_handle_repo, remote + "/master")

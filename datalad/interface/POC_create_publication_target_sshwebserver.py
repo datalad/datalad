@@ -21,7 +21,7 @@ from six.moves.urllib.parse import urlparse
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool, \
-    EnsureHandleAbsolutePath
+    EnsureDatasetAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
@@ -96,7 +96,7 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             args=('--handle',),
             doc="Name of or path to the handle to publish. Defaults to CWD.",
             nargs="?",
-            constraints=EnsureHandleAbsolutePath()),
+            constraints=EnsureDatasetAbsolutePath()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
@@ -107,7 +107,8 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             doc="If target directory exists already, force to (re-)init git.",
             constraints=EnsureBool(),),)
 
-    def __call__(self, sshurl, remote, remote_url=None, remote_url_push=None,
+    @staticmethod
+    def __call__(sshurl, remote, remote_url=None, remote_url_push=None,
                  target_dir=None, handle=curdir, recursive=False,
                  force=False):
 

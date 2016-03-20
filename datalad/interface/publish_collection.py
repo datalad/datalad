@@ -61,6 +61,36 @@ def parse_script_output(out, err):
     return results
 
 
+def run_script_on_remote_host(script_path, remote_host, script_options,
+                              control_path, runner, ssh_cmd):
+    """Run specified script on the remote_host.
+
+    Script first gets scp'ed to the remote host
+    """
+    # TODO: ideally should request remote mktemp -u
+    import random
+    remote_script_path = '/tmp/%s-%d' % (basename(script_path), random.randint(0, 10000))
+    lgr.debug("Deploying %s on a remote host as %s", script_path, remote_script_path)
+    runner.run(['scp', '-o', 'ControlPath=%s' % control_path,
+                script_path, '%s:%s' % (remote_host, remote_script_path)],
+                expect_stderr=True  # Might complaint about existing socket
+               )
+    try:
+        lgr.debug("Running %s on a remote host %s", remote_script_path, remote_host)
+        out, err = runner.run(ssh_cmd + ['sh', remote_script_path] + script_options)
+    except CommandError as e:
+        # Don't drag -- just fail!
+        raise
+        lgr.error("Preparation script failed: %s" % exc_str(e))
+        out = e.stdout
+        err = e.stderr
+    finally:
+        lgr.debug("Removing %s from the remote host", remote_script_path)
+        runner.run(ssh_cmd + ['rm', '-f', remote_script_path])
+
+    return err, out
+
+
 class PublishCollection(Interface):
     """publish a collection.
 
@@ -91,7 +121,8 @@ class PublishCollection(Interface):
             constraints=EnsureStr() | EnsureNone())
         )
 
-    def __call__(self, target, collection=curdir, baseurl=None,
+    @staticmethod
+    def __call__(target, collection=curdir, baseurl=None,
                  remote_name=None):
         """
         Returns
@@ -173,7 +204,7 @@ class PublishCollection(Interface):
                 script_options += [key]
 
             ssh_cmd = ["ssh", "-S", control_path, host_name]
-            err, out = self.run_script_on_remote_host(prepare_script_path, host_name, script_options, control_path, runner, ssh_cmd)# set GIT-SSH:
+            err, out = run_script_on_remote_host(prepare_script_path, host_name, script_options, control_path, runner, ssh_cmd)# set GIT-SSH:
 
             # yoh: THIS COSTED ME 2 HOURS TO ARRIVE HERE TO DEBUG WTF is going on
             # Please do not change global environ.  Provide custom one to commands!!!!!
@@ -341,7 +372,7 @@ class PublishCollection(Interface):
         if parsed_target.scheme == 'ssh':
             ssh_cmd = ["ssh", "-S", control_path, host_name]
             try:
-                err, out = self.run_script_on_remote_host(
+                err, out = run_script_on_remote_host(
                     cleanup_script_path, host_name, script_options, control_path, runner, ssh_cmd)
             except CommandError as e:
                 lgr.error("Clean-up script failed: %s" % exc_str(e))
@@ -370,36 +401,5 @@ class PublishCollection(Interface):
         local_collection_repo._git_custom_command('', 'git branch -D %s'
                                                   % p_branch)
 
-        if not self.cmdline:
-            return CollectionRepoBackend(local_collection_repo,
-                                         remote_name + "/master")
-
-    def run_script_on_remote_host(self, script_path, remote_host, script_options,
-                                  control_path, runner, ssh_cmd):
-        """Run specified script on the remote_host.
-
-        Script first gets scp'ed to the remote host
-        """
-        # TODO: ideally should request remote mktemp -u
-        import random
-        remote_script_path = '/tmp/%s-%d' % (basename(script_path), random.randint(0, 10000))
-        lgr.debug("Deploying %s on a remote host as %s", script_path, remote_script_path)
-        runner.run(['scp', '-o', 'ControlPath=%s' % control_path,
-                    script_path, '%s:%s' % (remote_host, remote_script_path)],
-                    expect_stderr=True  # Might complaint about existing socket
-                   )
-        try:
-            lgr.debug("Running %s on a remote host %s", remote_script_path, remote_host)
-            out, err = runner.run(ssh_cmd + ['sh', remote_script_path] + script_options)
-        except CommandError as e:
-            # Don't drag -- just fail!
-            raise
-            lgr.error("Preparation script failed: %s" % exc_str(e))
-            out = e.stdout
-            err = e.stderr
-        finally:
-            lgr.debug("Removing %s from the remote host", remote_script_path)
-            runner.run(ssh_cmd + ['rm', '-f', remote_script_path])
-
-        return err, out
-
+        return CollectionRepoBackend(local_collection_repo,
+                                     remote_name + "/master")

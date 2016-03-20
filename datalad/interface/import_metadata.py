@@ -85,7 +85,8 @@ class ImportMetadata(Interface):
                 "level metadata.",
             constraints=EnsureStr() | EnsureNone()),)
 
-    def __call__(self, format, path, subject=None, handle=None):
+    @staticmethod
+    def __call__(format, path, subject=None, handle=None):
         """
         Returns
         -------
@@ -136,8 +137,7 @@ class ImportMetadata(Interface):
         # TODO: What to do in case of a handle, if it is part of another
         # locally available collection than just the master?
 
-        if not self.cmdline:
-            if isinstance(repo, CollectionRepo):
-                return CollectionRepoBackend(repo)
-            elif isinstance(repo, HandleRepo):
-                return HandleRepoBackend(repo)
+        if isinstance(repo, CollectionRepo):
+            return CollectionRepoBackend(repo)
+        elif isinstance(repo, HandleRepo):
+            return HandleRepoBackend(repo)

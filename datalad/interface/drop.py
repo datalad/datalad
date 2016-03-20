@@ -36,7 +36,8 @@ class Drop(Interface):
             metavar='file',
             nargs='+'))
 
-    def __call__(self, paths):
+    @staticmethod
+    def __call__(paths):
 
         handle = get_repo_instance(class_=AnnexRepo)
 

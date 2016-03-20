@@ -57,8 +57,8 @@ class AddHandle(Interface):
             doc="name of the handle in the collection. If no name is given, "
                 "the handle's default name is used.",
             constraints=EnsureStr() | EnsureNone()))
-
-    def __call__(self, handle, collection, name=None):
+    @staticmethod
+    def __call__(handle, collection, name=None):
         """
         Returns
         -------
@@ -111,7 +111,6 @@ class AddHandle(Interface):
         # Might be a different name than collection_repo.name or not at all.
         local_master.git_fetch(collection_repo.name)
 
-        if not self.cmdline:
-            return CollectionRepoHandleBackend(collection_repo,
-                                               name if name is not None
-                                               else handle_repo.name)
+        return CollectionRepoHandleBackend(collection_repo,
+                                           name if name is not None
+                                           else handle_repo.name)
