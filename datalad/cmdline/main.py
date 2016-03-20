@@ -136,8 +136,12 @@ def setup_parser():
             # logger for command
 
             # configure 'run' function for this command
-            subparser.set_defaults(func=_intf.call_from_parser,
-                                   logger=logging.getLogger(_intf.__module__))
+            plumbing_args = dict(
+                func=_intf.call_from_parser,
+                logger=logging.getLogger(_intf.__module__))
+            if hasattr(_intf, 'result_renderer_cmdline'):
+                plumbing_args['result_renderer'] = _intf.result_renderer_cmdline
+            subparser.set_defaults(**plumbing_args)
             # store short description for later
             sdescr = getattr(_intf, 'short_description',
                              parser_args['description'].split('\n')[0])
@@ -198,6 +202,7 @@ def main(args=None):
         for path in cmdlineargs.change_path:
             chpwd(path)
 
+    ret = None
     if cmdlineargs.pbs_runner:
         from .helpers import run_via_pbs
         from .helpers import strip_arg_from_argv
@@ -208,14 +213,14 @@ def main(args=None):
     elif cmdlineargs.common_debug:
         # So we could see/stop clearly at the point of failure
         setup_exceptionhook()
-        cmdlineargs.func(cmdlineargs)
+        ret = cmdlineargs.func(cmdlineargs)
     else:
         # Otherwise - guard and only log the summary. Postmortem is not
         # as convenient if being caught in this ultimate except
         try:
-            cmdlineargs.func(cmdlineargs)
+            ret = cmdlineargs.func(cmdlineargs)
         except Exception as exc:
             lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
             sys.exit(1)
-
-
+    if hasattr(cmdlineargs, 'result_renderer'):
+        cmdlineargs.result_renderer(ret)

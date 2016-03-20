@@ -319,3 +319,20 @@ class Install(Interface):
                 # probably not a repo, likely a simple file
                 vcs.annex_addurl_to_file(relativepath, source)
                 return path
+
+    @staticmethod
+    def result_renderer_cmdline(res):
+        from datalad.ui import ui
+        if res is None:
+            res = []
+        if not isinstance(res, list):
+            res = [res]
+        if not len(res):
+            ui.message("Nothing was installed")
+            return
+        items= '\n'.join(map(str, res))
+        msg = "{n} installed {obj} available at\n{items}".format(
+            obj='items are' if len(res) > 1 else 'item is',
+            n=len(res),
+            items=items)
+        ui.message(msg)
