@@ -11,6 +11,8 @@
 
 __docformat__ = 'restructuredtext'
 
+from os.path import exists, lexists, join as opj
+
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
 
@@ -24,18 +26,30 @@ from logging import getLogger
 lgr = getLogger('datalad.api.ls')
 
 class Ls(Interface):
-    """Magical helper to list content of various things (ATM only S3 buckets)
+    """Magical helper to list content of various things (ATM only S3 buckets and datasets)
 
-    Examples:
+    Examples
+    --------
 
-      $ datalad ls s3://openfmri/tarballs/ds202
+      $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
+      $ datalad ls .                             # to list current dataset
     """
 
     _params_ = dict(
-        url=Parameter(
+        loc=Parameter(
             doc="URL to list, e.g. s3:// url",
             constraints=EnsureStr(),
             #nargs='+'
+        ),
+        recursive=Parameter(
+            args=("-r", "--recursive"),
+            action="store_true",
+            doc="Recurse into subdirectories",
+        ),
+        all=Parameter(
+            args=("-a", "--all"),
+            action="store_true",
+            doc="List all entries, not e.g. only latest entries in case of S3",
         ),
         config_file=Parameter(
             doc="""Path to config file which could help the 'ls'.  E.g. for s3://
@@ -50,24 +64,34 @@ class Ls(Interface):
             you know what you are after""",
             default=None
         ),
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            action="store_true",
-            doc="Recurse into subdirectories",
-        ),
-        all=Parameter(
-            args=("-a", "--all"),
-            action="store_true",
-            doc="List all entries, not e.g. only latest entries",
-        ),
     )
 
-    def __call__(self, url, config_file=None, list_content=False, recursive=False, all=False):
 
-        if url.startswith('s3://'):
-            bucket_prefix = url[5:]
+    def __call__(self, loc, recursive=False, all=False, config_file=None, list_content=False):
+
+        # TODO: do some clever handling of kwargs as to remember what were defaults
+        # and what any particular implementation actually needs, and then issuing
+        # warning if some custom value/option was specified which doesn't apply to the
+        # given url
+        if loc.startswith('s3://'):
+            return self._ls_s3(loc, recursive=recursive, all=all, config_file=config_file, list_content=list_content)
+        elif lexists(loc) and lexists(opj(loc, '.git')):
+            # TODO: use some helper like is_dataset_path ??
+            return self._ls_dataset(loc, recursive=recursive)
         else:
-            raise ValueError("ATM supporting only s3:// URLs")
+            raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
+
+
+    def _ls_dataset(self, loc, recursive=False):
+        raise NotImplementedError()
+
+
+    def _ls_s3(self, loc, recursive=False, all=False, config_file=None, list_content=False):
+        """List S3 bucket content"""
+        if loc.startswith('s3://'):
+            bucket_prefix = loc[5:]
+        else:
+            raise ValueError("passed location should be an s3:// url")
 
         import boto
         from hashlib import md5
@@ -105,7 +129,7 @@ class Ls(Interface):
             # We don't need any provider here really but only credentials
             from datalad.downloaders.providers import Providers
             providers = Providers.from_config_files()
-            provider = providers.get_provider(url)
+            provider = providers.get_provider(loc)
             if not provider:
                 raise ValueError("don't know how to deal with this url %s -- no downloader defined.  Specify just s3cmd config file instead")
             bucket = provider.authenticator.authenticate(bucket_name, provider.credential)
