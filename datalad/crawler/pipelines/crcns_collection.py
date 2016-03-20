@@ -12,6 +12,7 @@
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import a_href_match
 from ..nodes.annex import initiate_handle
+from ..nodes.annex import Annexificator
 from ..nodes.misc import assign
 
 from logging import getLogger
@@ -22,6 +23,7 @@ def pipeline(**kwargs):
     lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
     # Should return a list representing a pipeline
     # TODO: get to 'incoming branch'
+    annex = Annexificator()
     return [
         crawl_url("http://crcns.org/data-sets",
             matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
@@ -33,7 +35,7 @@ def pipeline(**kwargs):
         a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
         # https://openfmri.org/dataset/ds000001/
         assign({'handle_name': '%(dataset)s'}, interpolate=True),
-        initiate_handle(
+        annex.initiate_handle(
             template="crcns",
             data_fields=['dataset_category', 'dataset'],
             # branch='incoming',  # there will be archives etc

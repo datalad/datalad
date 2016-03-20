@@ -227,7 +227,6 @@ def test_type_str():
 def test_handleabsolutepath(repo_dir, non_repo_dir):
 
     c = ct.EnsureHandleAbsolutePath()
-    pwd = getpwd()
 
     my_rel_path = opj("my", "path")
     my_rel_path_dot = opj(os.curdir, "my", "path")
@@ -239,24 +238,22 @@ def test_handleabsolutepath(repo_dir, non_repo_dir):
     ok_(isabs(c(my_rel_path)))
     ok_(isabs(c(my_rel_path_dot)))
 
-    # accept slashes on windows:
+    # accept slashes on windows:x
     if on_windows:
         eq_(c("my\path"), c("my/path"))
 
     # we are not within a repo => rel. to root handle
     root = POC_get_root_handle(path_only=True)
-    chpwd(non_repo_dir)
-    eq_(c(my_rel_path), abspath(normpath(opj(root, my_rel_path))))
-    eq_(c(my_abs_path), my_abs_path)
-    # except it starts with '.':
-    eq_(c(my_rel_path_dot),
-        abspath(normpath(opj(non_repo_dir, my_rel_path_dot))))
+    with chpwd(non_repo_dir):
+        eq_(c(my_rel_path), abspath(normpath(opj(root, my_rel_path))))
+        eq_(c(my_abs_path), my_abs_path)
+        # except it starts with '.':
+        eq_(c(my_rel_path_dot),
+            abspath(normpath(opj(non_repo_dir, my_rel_path_dot))))
 
     # now we are within a repo => just rel. path
-    chpwd(repo_dir)
-    eq_(c(my_rel_path), abspath(normpath(opj(repo_dir, my_rel_path))))
-    eq_(c(my_rel_path_dot), abspath(normpath(opj(repo_dir, my_rel_path_dot))))
-    eq_(c(my_abs_path), my_abs_path)
-    # TODO: deeper within a repo
-
-    chpwd(pwd)
+    with chpwd(repo_dir):
+        eq_(c(my_rel_path), abspath(normpath(opj(repo_dir, my_rel_path))))
+        eq_(c(my_rel_path_dot), abspath(normpath(opj(repo_dir, my_rel_path_dot))))
+        eq_(c(my_abs_path), my_abs_path)
+        # TODO: deeper within a repo

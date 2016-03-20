@@ -396,15 +396,16 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_equal(set(info2), {testfile, testfile3})
     assert_equal(info2[testfile3]['size'], 10)
 
-    # which would work even if we cd to that subdir
+    # which would work even if we cd to that subdir, but then we should use explicit curdir
     with chpwd(subdir):
-        assert_equal(set(ar.annex_whereis('sub.txt')), {ar.WEB_UUID, non_web_remote})
-        assert_equal(set(ar.annex_whereis('sub.txt', output='full').keys()), {ar.WEB_UUID, non_web_remote})
-        testfiles = ['sub.txt', opj(pardir, testfile)]
+        cur_subfile = opj(curdir, 'sub.txt')
+        assert_equal(set(ar.annex_whereis(cur_subfile)), {ar.WEB_UUID, non_web_remote})
+        assert_equal(set(ar.annex_whereis(cur_subfile, output='full').keys()), {ar.WEB_UUID, non_web_remote})
+        testfiles = [cur_subfile, opj(pardir, testfile)]
         info2_ = ar.annex_info(testfiles)
         # Should maintain original relative file names
         assert_equal(set(info2_), set(testfiles))
-        assert_equal(info2_['sub.txt']['size'], 10)
+        assert_equal(info2_[cur_subfile]['size'], 10)
 
 
 
