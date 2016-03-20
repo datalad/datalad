@@ -14,6 +14,7 @@ import os
 from os.path import isabs, abspath, join as opj, expanduser, expandvars
 from six import string_types
 
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
@@ -75,11 +76,18 @@ class Dataset(object):
         """
         if self._repo is None:
             try:
-                # TODO: Return AnnexRepo instead if there is one
                 self._repo = AnnexRepo(self._path, create=False, init=False)
-            except (InvalidGitRepositoryError, NoSuchPathError):
-                pass
-
+            except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError):
+                try:
+                    self._repo = GitRepo(self._path, create=False)
+                except (InvalidGitRepositoryError, NoSuchPathError):
+                    pass
+        elif not isinstance(self._repo, AnnexRepo):
+            # repo was initially set to be self._repo but might become AnnexRepo
+            # at a later moment, so check if it didn't happen
+            if 'git-annex' in self._repo.git_get_branches():
+                # we acquired git-annex branch
+                self._repo = AnnexRepo(self._repo.path, create=False)
         return self._repo
 
     def register_sibling(self, name, url, publish_url=None, verify=None):

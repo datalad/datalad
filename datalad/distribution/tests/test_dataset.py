@@ -12,6 +12,8 @@
 import os
 from ..dataset import Dataset
 from datalad.utils import chpwd
+from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
 from datalad.tests.utils import with_tempfile, assert_in, with_tree
@@ -41,4 +43,22 @@ def test_dataset_contructor(path):
         eq_(dsrel.path, dsabs.path)
         # no repo either, despite directory existing now
         eq_(dsrel.repo, None)
-        
+
+
+@with_tempfile(mkdir=True)
+def test_repo_cache(path):
+    ds = Dataset(path)
+    # none by default
+    eq_(ds.repo, None)
+    # make Git repo manually
+    git = GitRepo(path=path, create=True)
+    repo = ds.repo
+    # got one
+    assert_false(repo is None)
+    # stays that one
+    assert_true(ds.repo is repo)
+    # now turn into an annex
+    annex = AnnexRepo(path=path, create=True)
+    # repo instance must change
+    assert_false(ds.repo is repo)
+    assert_true(isinstance(ds.repo, AnnexRepo))
