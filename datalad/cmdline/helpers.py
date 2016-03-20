@@ -215,13 +215,14 @@ def get_repo_instance(path=curdir, class_=None):
     from os.path import join as opj, ismount, exists, abspath, expanduser, \
         expandvars, normpath, isabs
     from git.exc import InvalidGitRepositoryError
+    from ..utils import expandpath
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo
     from ..support.handlerepo import HandleRepo
     from ..support.collectionrepo import CollectionRepo
     from ..support.exceptions import CollectionBrokenError
 
-    dir_ = abspath(expandvars(expanduser(path)))
+    dir_ = expandpath(path)
     abspath_ = path if isabs(path) else dir_
     if class_ is not None:
         if class_ == CollectionRepo:
