@@ -1120,6 +1120,6 @@ class Annexificator(object):
                         path=data_['handle_path'],
                         source=data_['handle_path'],
                         )
-                assert out is None, "TODO: whenever it returns anything we might reconsider adding smth to data_ to be yielded"
+                # TODO: reconsider adding smth to data_ to be yielded"
                 yield data_
         return _initiate_handle

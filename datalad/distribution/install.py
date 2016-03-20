@@ -25,7 +25,9 @@ from datalad.support.annexrepo import AnnexRepo, FileInGitError, FileNotInAnnexE
 from datalad.interface.base import Interface
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
-from datalad.utils import expandpath, knows_annex
+from datalad.utils import expandpath, knows_annex, assure_dir
+from datalad.interface.POC_helpers import get_git_dir
+
 
 lgr = logging.getLogger('datalad.interface.POC_install')
 
@@ -96,7 +98,7 @@ class Install(Interface):
                     "insufficient information for installation (needs at "
                     "least a dataset or an installation path")
         elif isinstance(path, list):
-            return [POCInstallHandle.__call__(
+            return [Install.__call__(
                     dataset=ds,
                     path=p,
                     source=source,
@@ -204,10 +206,27 @@ class Install(Interface):
             # - a directory
             # - an entire repository
             if exists(opj(path, '.git')):
-                # this is a repo and should be turned into a submodule
+                # this is a repo and must be turned into a submodule
                 # of this dataset
-                # TODO
-                raise NotImplementedError
+                cmd_list = ["git", "submodule", "add", source,
+                            relativepath]
+                runner.run(cmd_list, cwd=ds.path)
+                # move .git to superrepo's .git/modules, remove .git, create
+                # .git-file
+                subds_git_dir = opj(path, ".git")
+                ds_git_dir = get_git_dir(ds.path)
+                moved_git_dir = opj(ds.path, ds_git_dir,
+                                    "modules", relativepath)
+                assure_dir(moved_git_dir)
+                from os import rename, listdir, rmdir
+                for dot_git_entry in listdir(subds_git_dir):
+                    rename(opj(subds_git_dir, dot_git_entry),
+                           opj(moved_git_dir, dot_git_entry))
+                assert not listdir(subds_git_dir)
+                rmdir(subds_git_dir)
+
+                with open(opj(path, ".git"), "w") as f:
+                    f.write("gitdir: {moved}\n".format(moved=moved_git_dir))
                 # return newly added submodule as a dataset
                 return Dataset(path)
 
@@ -251,7 +270,6 @@ class Install(Interface):
                 raise ValueError(
                     "nothing found at {0} and no `source` specified".format(
                         path))
-
 
             if source and exists(expandpath(source)):
                 source = expandpath(source)
