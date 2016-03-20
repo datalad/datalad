@@ -366,3 +366,9 @@ def test_expandpath():
     assert_true(isabs(expandpath('some')))
     # this may have to go because of platform issues
     eq_(expandpath("$HOME"), expanduser('~'))
+
+
+def test_is_explicit_path():
+    # by default expanded paths are absolute, hence explicit
+    assert_true(is_explicit_path(expandpath('~')))
+    assert_false(is_explicit_path("here"))
