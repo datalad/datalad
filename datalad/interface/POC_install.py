@@ -17,7 +17,7 @@ import logging
 
 import os
 from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, exists, islink
-from datalad.support.dataset import Dataset, datasetmethod, resolve_path
+from datalad.support.dataset import Dataset, datasetmethod, resolve_path, EnsureDataset
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureBool
 from datalad.support.gitrepo import GitRepo
@@ -53,58 +53,58 @@ def get_containing_subdataset(ds, path):
 
 
 class POCInstallHandle(Interface):
-    """Install a handle."""
+    """Install a dataset component or entire datasets.
+
+    This command can make arbitrary content available in a dataset. This
+    includes the fulfillment of exisiting dataset handles or file handles
+    in a dataset, as well as the adding such handles for content available
+    locally or remotely.
+    """
 
     _params_ = dict(
-        ds=Parameter(
-            args=("ds",),
-            doc="EXPLAIN"),
+        dataset=Parameter(
+            args=("--dataset", "-d",),
+            doc="""specify the dataset to perform the install operation on. If
+            no dataset is given, an attempt is made to identify the dataset
+            based on the current working directory and/or the `path` given""",
+            constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             doc="path/name of the installation target",
-            nargs="?",
+            nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
-            args=("source",),
+            args=("-s", "--source",),
             doc="url or local path of the installation source",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
-            doc="""If set this installs all possibly existing subhandles,
-             too."""),
-        create=Parameter(
-            args=("--create",),
-            doc="create dataset if it doesn't exist",
-            action="store_true",
-            constraints=EnsureBool() | EnsureNone()))
+            doc="""If set, all content is installed recursively, including
+            content of any subdatasets."""))
 
     # TODO: decorator to accept an iterable for `path`
     @staticmethod
     @datasetmethod(name='install')
-    def __call__(ds=None, path=None, source=None, recursive=False):
-        """ Proof-of-concept implementation for submodule approach.
-        Uses just plain git calls.
-
-        Note
-        ----
-        First implementation just accepts an url and a name and installs
-        within master.
-
-        For the proof of concept this implementation avoids the use of
-        current GitRepo/AnnexRepo implementation (which aren't prepared for the
-        use of submodules), except for direct git (annex) calls.
-        """
+    def __call__(dataset=None, path=None, source=None, recursive=False):
+        # shortcut
+        ds = dataset
         if path is None:
             if ds is None:
                 # no dataset, no target location, nothing to do
                 raise ValueError(
                     "insufficient information for installation (needs at "
                     "least a dataset or an installation path")
-        else:
-            # resolve the target location against the provided dataset
-            path = resolve_path(path, ds)
+        elif isinstance(path, list):
+            return [POCInstallHandle.__call__(
+                    dataset=ds,
+                    path=p,
+                    source=source,
+                    recursive=recursive) for p in path]
+
+        # resolve the target location against the provided dataset
+        path = resolve_path(path, ds)
 
         lgr.debug("Resolved installation target: {0}".format(path))
 
@@ -144,6 +144,10 @@ class POCInstallHandle(Interface):
         relativepath = relpath(path, start=ds.path)
         if path.startswith(pardir):
             raise ValueError("installation path outside dataset")
+
+        lgr.debug(
+            "Resolved installation target relative to dataset {0}: {1}".format(
+                ds, relativepath))
 
         runner = Runner()
 

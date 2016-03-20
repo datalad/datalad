@@ -242,14 +242,11 @@ def datasetmethod(f, name=None):
 # for another constraint
 class EnsureDataset(Constraint):
 
-    def __init__(self):
-        self._name_resolver = EnsureDatasetAbsolutePath()
-
     def __call__(self, value):
         if isinstance(value, Dataset):
             return value
         elif isinstance(value, string_types):
-            return Dataset(path=self._name_resolver(value))
+            return Dataset(path=value)
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
@@ -259,4 +256,5 @@ class EnsureDataset(Constraint):
         return "Dataset"
 
     def long_description(self):
-        return "Value must be a Dataset or a valid identifier of a Dataset."
+        return """Value must be a Dataset or a valid identifier of a Dataset
+        (e.g. a path)"""
