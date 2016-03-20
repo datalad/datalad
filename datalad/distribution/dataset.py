@@ -19,6 +19,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
 from datalad.utils import optional_args, expandpath, is_explicit_path
+from datalad.utils import swallow_logs
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -75,13 +76,14 @@ class Dataset(object):
         GitRepo
         """
         if self._repo is None:
-            try:
-                self._repo = AnnexRepo(self._path, create=False, init=False)
-            except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError):
+            with swallow_logs():
                 try:
-                    self._repo = GitRepo(self._path, create=False)
-                except (InvalidGitRepositoryError, NoSuchPathError):
-                    pass
+                    self._repo = AnnexRepo(self._path, create=False, init=False)
+                except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError):
+                    try:
+                        self._repo = GitRepo(self._path, create=False)
+                    except (InvalidGitRepositoryError, NoSuchPathError):
+                        pass
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
