@@ -26,8 +26,9 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex
+from .POC_helpers import get_submodules_dict, get_submodules_list
 from datalad.cmd import CommandError
+from datalad.utils import knows_annex
 
 lgr = logging.getLogger('datalad.interface.POC_publish')
 
@@ -169,7 +170,7 @@ class POCPublish(Interface):
 
             # in case of an annex also push git-annex branch; if no remote
             # given, figure out remote of the tracking branch:
-            if is_annex(handle_repo.path):
+            if knows_annex(handle_repo.path):
                 if remote is None:
                     # check for tracking branch's remote:
                     try:

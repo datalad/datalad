@@ -34,6 +34,7 @@ from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
+from ..utils import knows_annex
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -372,3 +373,16 @@ def test_is_explicit_path():
     # by default expanded paths are absolute, hence explicit
     assert_true(is_explicit_path(expandpath('~')))
     assert_false(is_explicit_path("here"))
+
+
+@with_tempfile
+@with_tempfile
+def test_knows_annex(here, there):
+    from datalad.support.gitrepo import GitRepo
+    from datalad.support.annexrepo import AnnexRepo
+    git = GitRepo(path=here, create=True)
+    assert_false(knows_annex(here))
+    annex = AnnexRepo(path=here, create=True)
+    assert_true(knows_annex(here))
+    gitclone = GitRepo(path=there, url=here, create=True)
+    assert_true(knows_annex(there))

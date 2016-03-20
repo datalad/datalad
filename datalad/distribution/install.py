@@ -23,10 +23,9 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, Ens
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, FileNotInAnnexError
 from datalad.interface.base import Interface
-from datalad.interface.POC_helpers import is_annex
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
-from datalad.utils import expandpath
+from datalad.utils import expandpath, knows_annex
 
 lgr = logging.getLogger('datalad.interface.POC_install')
 
@@ -178,7 +177,7 @@ class Install(Interface):
             runner.run(cmd_list, cwd=ds.path)
 
             # TODO: annex init recursively!
-            if is_annex(path):
+            if knows_annex(path):
                 lgr.debug("Annex detected in submodule '%s'. "
                           "Calling annex init ..." % relativepath)
                 cmd_list = ["git", "annex", "init"]
