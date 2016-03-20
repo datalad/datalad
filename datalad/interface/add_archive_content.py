@@ -18,7 +18,8 @@ import re
 import os
 import shlex
 
-from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename
+from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename, abspath
+from os.path import commonprefix
 from os.path import sep as opsep
 from os.path import islink
 from os.path import isabs
@@ -169,6 +170,9 @@ class AddArchiveContent(Interface):
         archive_path = archive
         if annex is None:
             annex = get_repo_instance(class_=AnnexRepo)
+            if not isabs(archive):
+                # if not absolute -- relative to curdir and thus
+                archive_path = relpath(abspath(archive), annex.path)
         elif not isabs(archive):
             # if we are given an annex, then assume that given path is within annex, not
             # relative to PWD
@@ -179,17 +183,20 @@ class AddArchiveContent(Interface):
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
-        # are we in a subdirectory?
-        # get the path relative to the top
-        reltop = relpath(annex.path, getpwd())
+        # are we in a subdirectory of the repository? then we should add content under that
+        # subdirectory,
+        # get the path relative to the repo top
+        extract_relpath = relpath(getpwd(), annex.path) \
+            if commonprefix([realpath(getpwd()), annex.path]) == annex.path \
+            else None
 
         if not key:
             # we were given a file which must exist
-            if not exists(archive_path):
+            if not exists(opj(annex.path, archive_path)):
                 raise ValueError("Archive {} does not exist".format(archive))
             # TODO: support adding archives content from outside the annex/repo
             origin = archive
-            key = annex.get_file_key(archive)
+            key = annex.get_file_key(archive_path)
         else:
             origin = key
 
@@ -332,9 +339,12 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
                           target_file, url, annex_options)
 
-                out_json = annex.annex_addurl_to_file(target_file, url, options=annex_options, batch=True)
+                out_json = annex.annex_addurl_to_file(
+                    opj(extract_relpath, target_file) if extract_relpath else target_file,
+                    url, options=annex_options,
+                    batch=True)
 
-                if 'key' in out_json: # annex.is_under_annex(target_file, batch=True):
+                if 'key' in out_json:  # annex.is_under_annex(target_file, batch=True):
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))
@@ -358,7 +368,7 @@ class AddArchiveContent(Interface):
             if delete and archive:
                 lgr.debug("Removing the original archive {}".format(archive))
                 # force=True since some times might still be staged and fail
-                annex.remove(archive, force=True)
+                annex.remove(archive_path, force=True)
 
             lgr.info("Finished adding %s: %s" % (archive, stats.as_str(mode='line')))
 
