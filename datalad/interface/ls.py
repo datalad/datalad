@@ -49,11 +49,21 @@ class Ls(Interface):
             transfer and dump binary output to your screen.  Do not enable unless
             you know what you are after""",
             default=None
-        )
+        ),
+        recursive=Parameter(
+            args=("-r", "--recursive"),
+            action="store_true",
+            doc="Recurse into subdirectories",
+        ),
+        all=Parameter(
+            args=("-a", "--all"),
+            action="store_true",
+            doc="List all entries, not e.g. only latest entries",
+        ),
     )
 
     @staticmethod
-    def __call__(url, config_file=None, list_content=False):
+    def __call__(url, config_file=None, list_content=False, recursive=False, all=False):
 
         if url.startswith('s3://'):
             bucket_prefix = url[5:]
@@ -63,6 +73,7 @@ class Ls(Interface):
         import boto
         from hashlib import md5
         from boto.s3.key import Key
+        from boto.s3.prefix import Prefix
         from boto.exception import S3ResponseError
         from ..support.configparserinc import SafeConfigParser  # provides PY2,3 imports
 
@@ -114,15 +125,22 @@ class Ls(Interface):
             info.append(" {iname}: {ival}".format(**locals()))
         ui.message("Bucket info:\n %s" % '\n '.join(info))
 
-        prefix_all_versions = list(bucket.list_versions(prefix))
+        kwargs = {} if recursive else {'delimiter': '/'}
+        prefix_all_versions = list(bucket.list_versions(prefix, **kwargs))
 
         if not prefix_all_versions:
             ui.error("No output was provided for prefix %r" % prefix)
         else:
             max_length = max((len(e.name) for e in prefix_all_versions))
         for e in prefix_all_versions:
+            if isinstance(e, Prefix):
+                ui.message("%s" % (e.name, ),)
+                continue
             ui.message(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), cr=' ')
             if isinstance(e, Key):
+                if not (e.is_latest or all):
+                    # Skip this one
+                    continue
                 url = get_key_url(e, schema='http')
                 try:
                     _ = urlopen(Request(url))
@@ -159,6 +177,7 @@ class Ls(Interface):
 
                 ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
             else:
-                ui.message("del")
+                if all:
+                    ui.message("del")
 
 

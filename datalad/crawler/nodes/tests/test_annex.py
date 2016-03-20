@@ -186,6 +186,49 @@ def test_add_archive_content_tar():
     for direct in (True, False):
         yield _test_add_archive_content_tar, direct
 
+@assert_cwd_unchanged()
+@with_tempfile(mkdir=True)
+@with_tree(tree={'file': 'load'})
+@serve_path_via_http
+def test_add_dir_file(repo_path, p, topurl):
+    # test whenever file becomes a directory and then back a file.  Should all work!
+    annex = Annexificator(path=repo_path, auto_finalize=False)
+    url = "%s/file" % topurl
+
+    path1 = opj(repo_path, 'd')
+    data1 = {'filename': 'd', 'url': url}
+    out1 = list(annex(data1))
+
+    # becomes a directory which carries a file
+    data2 = {'filename': 'f', 'url': url, 'path': 'd'}
+    # but since we didn't commit previous file yet -- should puke!
+    assert_raises(RuntimeError, list, annex(data2))
+    list(annex.finalize()({}))  # so it gets committed
+    ok_file_under_git(path1, annexed=True)
+
+    # and after that it should proceed normally
+    #import pdb; pdb.set_trace()
+    out2 = list(annex(data2))
+    path2 = opj(repo_path, 'd', 'f')
+    ok_(exists(path2))
+
+    # tricky one -- becomes back a file... what if repo was dirty and files under dir were staged? TODO
+    assert_raises(RuntimeError, list, annex(data1))
+    list(annex.finalize()({}))  # so it gets committed
+    ok_file_under_git(path2, annexed=True)
+
+    list(annex(data1))
+    list(annex.finalize()({}))  # so it gets committed
+    ok_file_under_git(path1, annexed=True)
+
+    # with auto_finalize (default) it should go smoother ;)
+    annex = Annexificator(path=repo_path)
+    list(annex(data2))
+    # wouldn't happen without explicit finalize to commit whatever new is staged
+    # ok_file_under_git(path2, annexed=True)
+    list(annex(data1))
+    list(annex.finalize()({}))  # so it gets committed
+    ok_file_under_git(path1, annexed=True)
 
 def test_commit_versions():
     raise SkipTest("TODO: is tested only as a part of test_openfmri.py")

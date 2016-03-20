@@ -6,7 +6,12 @@
 #   copyright and license terms.
 #
 ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##g
-"""Variety of helpers to deal with AWS S3"""
+"""Variety of helpers to deal with AWS S3
+
+Use as a script to generate test buckets via e.g.
+
+    python -m datalad.support.s3 generate test1_dirs
+"""
 
 __docformat__ = 'restructuredtext'
 
@@ -38,14 +43,17 @@ S3_ADMIN_CREDENTIAL = "datalad-datalad-admin-s3"
 S3_TEST_CREDENTIAL = "datalad-datalad-test-s3"
 
 
-def get_bucket_connection(credential):
+def _get_bucket_connection(credential):
     # eventually we should be able to have multiple credentials associated
     # with different resources. Thus for now just making an option which
     # one to use
-    return boto.connect_s3(
-        keyring.get_password(credential, "key_id"),
-        keyring.get_password(credential, "secret_id")
-    )
+    # do full shebang with entering credentials
+    from ..downloaders.providers import Credential
+    credential = Credential(credential, "aws-s3", None)
+    if not credential.is_known:
+        credential.enter_new()
+    creds = credential()
+    return boto.connect_s3(creds["key_id"], creds["secret_id"])
 
 class VersionedFilesPool(object):
     """Just a helper which would help to create versioned files in the bucket"""
@@ -53,7 +61,11 @@ class VersionedFilesPool(object):
         self._versions = {}
         self._bucket = bucket
 
-    def __call__(self, filename, prefix=''):
+    @property
+    def bucket(self):
+        return self._bucket
+
+    def __call__(self, filename, prefix='', load=None):
         self._versions[filename] = version = self._versions.get(filename, 0) + 1
         version_str = "version%d" % version
         # if we are to upload fresh content
@@ -61,15 +73,16 @@ class VersionedFilesPool(object):
         k.key = filename
         #k.set_contents_from_filename('/home/yoh/.emacs')
         base, ext = splitext(filename)
-        load = prefix
         content_type = None
         mtype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
         headers = {'Content-Type': mtype}
 
-        if ext == 'html':
-            load += '<html><body>%s</body></html>' % version_str
-        else:
-            load += version_str
+        if load is None:
+            load = prefix
+            if ext == 'html':
+                load += '<html><body>%s</body></html>' % version_str
+            else:
+                load += version_str
 
         k.set_contents_from_string(load, headers=headers)
         return k
@@ -114,7 +127,7 @@ def set_bucket_public_access_policy(bucket):
     }""" % bucket.name)
 
 def gen_test_bucket(bucket_name):
-    conn = get_bucket_connection(S3_ADMIN_CREDENTIAL)
+    conn = _get_bucket_connection(S3_ADMIN_CREDENTIAL)
     # assure we have none
     try:
         bucket = conn.get_bucket(bucket_name)
@@ -173,6 +186,24 @@ def gen_bucket_test0_versioned():
 
 def gen_bucket_test0_nonversioned():
     return _gen_bucket_test0('datalad-test0-nonversioned', versioned=False)
+
+def gen_bucket_test1_dirs():
+    bucket_name = 'datalad-test1-dirs-versioned'
+    bucket = gen_test_bucket(bucket_name)
+    bucket.configure_versioning(True)
+
+    # Enable web access to that bucket to everyone
+    bucket.configure_website('index.html')
+    set_bucket_public_access_policy(bucket)
+
+    files = VersionedFilesPool(bucket)
+
+    files("d1", load="")  # creating an empty file
+    # then we would like to remove that d1 as a file and make a directory out of it
+    files("d1/file1.txt")
+    # and then delete it and place it back
+    files("d1", load="smth")
+
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, urlencode
@@ -233,7 +264,7 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             providers = Providers.from_config_files()
             s3url = "s3://%s/" % s3_bucket
             s3provider = providers.get_provider(s3url)
-            bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or get_bucket_connection(S3_TEST_CREDENTIAL)
+            bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
         else:
             bucket = s3conn.get_bucket(s3_bucket)
         supports_versioning = True  # assume that it does
@@ -285,7 +316,9 @@ if __name__ == '__main__':
     import sys
     lgr.setLevel(logging.INFO)
     # TODO: proper cmdline
-    if len(sys.argv)>1 and sys.argv[1] == "generate":
+    if len(sys.argv) > 1 and sys.argv[1] == "generate":
+        if len(sys.argv) < 3:
+            raise ValueError("Say 'all' to regenerate all, or give a generators name")
         name = sys.argv[2]
         if name.lower() == 'all':
             for f in locals().keys():
