@@ -31,7 +31,7 @@ from .utils import skip_if_no_network
 from .utils import assert_re_in
 from .utils import ok_
 from .utils import SkipTest
-from .utils_testrepos import BasicHandleTestRepo
+from .utils_testrepos import BasicAnnexTestRepo
 
 
 @assert_cwd_unchanged
@@ -480,7 +480,7 @@ def test_GitRepo_get_toppath(repo, tempdir):
     eq_(GitRepo.get_toppath(tempdir), None)
 
 def test_GitRepo_dirty():
-    trepo = BasicHandleTestRepo()
+    trepo = BasicAnnexTestRepo()
     repo = trepo.repo
     # empty at this point -- should not be dirty as well. TODO
     assert_false(repo.dirty)

@@ -47,7 +47,7 @@ class HelpAction(argparse.Action):
         # better for help2man
         # For main command -- should be different sections. And since we are in
         # heavy output massaging mode...
-        if "commands for collection" in helpstr.lower():
+        if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
             # tune up usage -- default one is way too heavy
@@ -218,18 +218,11 @@ def get_repo_instance(path=curdir, class_=None):
     from ..utils import expandpath
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo
-    from ..support.handlerepo import HandleRepo
-    from ..support.collectionrepo import CollectionRepo
-    from ..support.exceptions import CollectionBrokenError
 
     dir_ = expandpath(path)
     abspath_ = path if isabs(path) else dir_
     if class_ is not None:
-        if class_ == CollectionRepo:
-            type_ = "collection"
-        elif class_ == HandleRepo:
-            type_ = "handle"
-        elif class_ == AnnexRepo:
+        if class_ == AnnexRepo:
             type_ = "annex"
         elif class_ == GitRepo:
             type_ = "git"
@@ -242,16 +235,8 @@ def get_repo_instance(path=curdir, class_=None):
             if class_ is None:
                 # detect repo type:
                 try:
-                    return HandleRepo(dir_, create=False)
-                except RuntimeError as e:
-                    pass
-                try:
                     return AnnexRepo(dir_, create=False)
                 except RuntimeError as e:
-                    pass
-                try:
-                    return CollectionRepo(dir_, create=False)
-                except CollectionBrokenError as e:
                     pass
                 try:
                     return GitRepo(dir_, create=False)
@@ -289,21 +274,6 @@ from appdirs import AppDirs
 from os.path import join as opj
 
 dirs = AppDirs("datalad", "datalad.org")
-
-
-def get_datalad_master():
-    """Return "master" collection on which all collection operations will be done
-    """
-    # Delay imports to not load rdflib until necessary
-    from ..support.collectionrepo import CollectionRepo
-    from ..consts import DATALAD_COLLECTION_NAME
-
-    # Allow to have "master" collection be specified by environment variable
-    env_path = os.environ.get('DATALAD_COLLECTION_PATH', None)
-    return CollectionRepo(
-        env_path or opj(dirs.user_data_dir, DATALAD_COLLECTION_NAME),
-        create=True
-    )
 
 
 def POC_get_root_handle(root_dir=None, path_only=False):
