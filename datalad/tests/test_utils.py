@@ -24,9 +24,9 @@ from collections import OrderedDict
 from ..dochelpers import exc_str
 from ..utils import updated
 from ..utils import get_local_file_url
-from os.path import join as opj, isabs, abspath, exists
+from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
-from ..utils import get_local_file_url, get_url_path
+from ..utils import get_url_path
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
@@ -36,7 +36,7 @@ from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal, assert_true
+from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
@@ -119,7 +119,7 @@ def _check_setup_exceptionhook(interactive):
             # swallows all Exceptions and hook never gets executed
             try:
                 raise RuntimeError
-            except Exception as e: #RuntimeError:
+            except Exception as e:  # RuntimeError:
                 type_, value_, tb_ = sys.exc_info()
             our_exceptionhook(type_, value_, tb_)
             if PY3:
@@ -140,6 +140,7 @@ def _check_setup_exceptionhook(interactive):
 def test_setup_exceptionhook():
     for tval in [True, False]:
         yield _check_setup_exceptionhook, tval
+
 
 def test_md5sum():
     # just a smoke (encoding/decoding) test for md5sum
