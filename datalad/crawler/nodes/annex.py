@@ -29,7 +29,7 @@ from git import Repo
 from ...version import __version__
 from ...api import add_archive_content
 from ...api import clean
-from ...api import POC_install
+from ...api import install
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
