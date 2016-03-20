@@ -18,6 +18,7 @@ from mock import patch
 from six import PY3
 
 from os.path import dirname, normpath, pardir, basename
+from os.path import isabs, expandvars, expanduser
 from collections import OrderedDict
 
 from ..dochelpers import exc_str
@@ -32,9 +33,10 @@ from ..utils import find_files
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
+from ..utils import expandpath, is_explicit_path
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
+from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal, assert_true
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
@@ -355,3 +357,11 @@ def test_file_basename():
     eq_(file_basename('/tmp/1.longish.gz'), '1.longish')
     eq_(file_basename('1_R1.1.1.tar.gz'), '1_R1.1.1')
     eq_(file_basename('ds202_R1.1.1.tgz'), 'ds202_R1.1.1')
+
+
+def test_expandpath():
+    eq_(expandpath("some", False), expanduser('some'))
+    eq_(expandpath("some", False), expandvars('some'))
+    assert_true(isabs(expandpath('some')))
+    # this may have to go because of platform issues
+    eq_(expandpath("$HOME"), expanduser('~'))
