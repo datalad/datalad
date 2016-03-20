@@ -43,7 +43,7 @@ from .add_archive_content import AddArchiveContent
 from .download_url import DownloadURL
 from .ls import Ls
 from .clean import Clean
-from .POC_install import POCInstallHandle
+from ..distribution.install import Install
 from .POC_move import POCMove
 from .POC_update import POCUpdate
 from .POC_uninstall import POCUninstall
@@ -71,7 +71,7 @@ _group_handle = (
         CreateHandle,
         AddHandle,
         InstallHandle,
-        POCInstallHandle,
+        Install,
         UninstallHandle,
         POCUninstall,
         POCMove,

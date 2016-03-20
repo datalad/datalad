@@ -22,8 +22,8 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureBool
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, FileNotInAnnexError
-from .base import Interface
-from .POC_helpers import is_annex
+from datalad.interface.base import Interface
+from datalad.interface.POC_helpers import is_annex
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.utils import expandpath
@@ -52,7 +52,7 @@ def get_containing_subdataset(ds, path):
     return ds
 
 
-class POCInstallHandle(Interface):
+class Install(Interface):
     """Install a dataset component or entire datasets.
 
     This command can make arbitrary content available in a dataset. This
