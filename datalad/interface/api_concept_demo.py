@@ -14,7 +14,7 @@ import logging
 
 from .base import Interface
 from datalad.support.param import Parameter
-from datalad.support.dataset import EnsureDataset, datasetmethod
+from datalad.distribution.dataset import EnsureDataset, datasetmethod
 
 lgr = logging.getLogger('datalad.interface.api-concept-demo')
 

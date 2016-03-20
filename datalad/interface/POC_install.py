@@ -17,7 +17,7 @@ import logging
 
 import os
 from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, exists, islink
-from datalad.support.dataset import Dataset, datasetmethod, resolve_path, EnsureDataset
+from datalad.distribution.dataset import Dataset, datasetmethod, resolve_path, EnsureDataset
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureBool
 from datalad.support.gitrepo import GitRepo
