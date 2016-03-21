@@ -218,27 +218,16 @@ class Dataset(object):
         """
         raise NotImplementedError("TODO")
 
-    def is_installed(self, ensure="complete"):
+    def is_installed(self):
         """Returns whether a dataset is installed.
 
-        Several flavors of "installed" can be tested. By default, a dataset is
-        installed if a worktree and a VCS repository are present. Alternative
-        to "complete" is "vcs".
-
-        Parameters
-        ----------
-        ensure: str
+        A dataset is installed when a repository for it exists on the filesystem.
 
         Returns
         -------
         bool
         """
-        # TODO: Define what exactly to test for, when different flavors are
-        # used.
-        if self.get_path() is not None and self.repo is not None:
-            return True
-        else:
-            return False
+        return self.path is not None and self.repo is not None
 
 
 @optional_args

@@ -69,16 +69,20 @@ def test_subdatasets(path):
     from datalad.api import install
     # from scratch
     ds = Dataset(path)
+    assert_false(ds.is_installed())
     eq_(ds.get_dataset_handles(), None)
     ds = ds.install()
+    assert_true(ds.is_installed())
     eq_(ds.get_dataset_handles(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
     ds.install(path='test')
+    assert_true(ds.is_installed())
     # TODO change to remember_state()
     ds.repo.commit("Hello!")
     # add a subdataset
     subds = ds.install('subds', source=path)
+    assert_true(subds.is_installed())
     subdss = ds.get_dataset_handles()
     eq_(len(subdss), 1)
     eq_(os.path.join(path, subdss[0]), subds.path)
