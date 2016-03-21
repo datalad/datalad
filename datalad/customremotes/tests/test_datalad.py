@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for the universal datalad's annex customremote"""
 
-from ...support.handlerepo import HandleRepo
+from ...support.annexrepo import AnnexRepo
 from ...consts import DATALAD_SPECIAL_REMOTE
 from ...tests.utils import *
 
@@ -20,8 +20,8 @@ from ...downloaders.tests.utils import get_test_providers
 @with_tempfile()
 @skip_if_no_network
 def check_basic_scenario(direct, d):
-    handle = HandleRepo(d, runner=_get_custom_runner(d), direct=direct)
-    handle.annex_initremote(
+    annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
+    annex.annex_initremote(
         DATALAD_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % DATALAD_SPECIAL_REMOTE,
          'autoenable=true'])
@@ -31,7 +31,7 @@ def check_basic_scenario(direct, d):
 
     # Let's try to add some file which we should have access to
     with swallow_outputs() as cmo:
-        handle.annex_addurls(['s3://datalad-test0-versioned/3versions-allversioned.txt'])
+        annex.annex_addurls(['s3://datalad-test0-versioned/3versions-allversioned.txt'])
         if PY2:
             assert_in('100%', cmo.err)  # we do provide our progress indicator
         else:
@@ -40,7 +40,7 @@ def check_basic_scenario(direct, d):
     # if we provide some bogus address which we can't access, we shouldn't pollute output
     with swallow_outputs() as cmo, swallow_logs() as cml:
         with assert_raises(CommandError) as cme:
-            handle.annex_addurls(['s3://datalad-test0-versioned/3versions-allversioned.txt_bogus'])
+            annex.annex_addurls(['s3://datalad-test0-versioned/3versions-allversioned.txt_bogus'])
         # assert_equal(cml.out, '')
         err, out = cmo.err, cmo.out
     assert_equal(out, '')

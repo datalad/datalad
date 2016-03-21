@@ -41,7 +41,8 @@ class Push(Interface):
             nargs='?',
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, remote='origin', branch=None):
+    @staticmethod
+    def __call__(remote='origin', branch=None):
 
         repo = get_repo_instance()
         repo.git_push(remote + (' ' + branch if branch is not None else ''))

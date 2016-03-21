@@ -11,13 +11,14 @@
 __docformat__ = 'restructuredtext'
 
 import re
-from six import string_types
 from six.moves import map as map
+
 
 def _strip_typerepr(s):
     """Strip away <class '...'> and <type '...'> decorations for docstrings
     """
     return re.sub("<(class|type) '(\S+)'>", r'\2', s)
+
 
 def _type_str(t):
     """Get string human-readable representation of a data type
@@ -29,6 +30,7 @@ def _type_str(t):
         s = ' or '.join(map(_type_str, t))
         return ("(%s)" % s) if len(t) > 1 else s
     return _strip_typerepr(str(t))
+
 
 class Constraint(object):
     """Base class for input value conversion/validation.
@@ -426,7 +428,7 @@ class EnsureDatasetAbsolutePath(Constraint):
     def __call__(self, path):
 
         # accept '/' notation even if this is not a path on this platform
-        from os import sep, curdir
+        from os import sep, curdir, pardir
         if sep != '/':
             path = path.replace('/', sep)
             # TODO: Correct transformation or are there conditions on when a
@@ -434,23 +436,25 @@ class EnsureDatasetAbsolutePath(Constraint):
 
         if isabs(path):
             # we have an absolute path given, so there's nothing to do
-            pass
+            return path
+
+        # we have a relative path or None given
+        self._cwd = getpwd()
+        # TODO: support "../"
+        if path.startswith(curdir + sep) or path.startswith(pardir + sep):
+            # whenever a path is explicitly relative, we don't resolve
+            # anything. It's meant to be relative to cwd.
+            path = abspath(normpath(opj(self._cwd, path)))
         else:
-            # we have a relative path given
-            self._cwd = getpwd()
-            if path.startswith(curdir + sep):
-                # whenever a relative path starts with './', we don't resolve
-                # anything. It's meant to be relative to cwd.
-                path = abspath(normpath(opj(self._cwd, path)))
+            self._cur_repo_base_dir = GitRepo.get_toppath(self._cwd)
+            if not self._cur_repo_base_dir:
+                # we are not within a git repo, so 'path' is interpreted
+                # relative to the default root handle
+                # XXX not sure if this can stay
+                path = abspath(normpath(opj(self._default_root_dir, path)))
             else:
-                self._cur_repo_base_dir = GitRepo.get_toppath(self._cwd)
-                if not self._cur_repo_base_dir:
-                    # we are not within a git repo, so 'path' is interpreted
-                    # relative to the default root handle
-                    path = abspath(normpath(opj(self._default_root_dir, path)))
-                else:
-                    # otherwise it's just a relative path:
-                    path = abspath(normpath(opj(self._cwd, path)))
+                # otherwise it's just a relative path:
+                path = abspath(normpath(opj(self._cwd, path)))
 
         return path
 
@@ -462,4 +466,3 @@ class EnsureDatasetAbsolutePath(Constraint):
 
     def long_description(self):
         return "Some dataset name resolving description"
-

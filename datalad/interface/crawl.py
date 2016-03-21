@@ -51,7 +51,8 @@ class Crawl(Interface):
                 of a handle on which to perform crawling using its standard crawling specification"""),
     )
 
-    def __call__(self, path=None, dry_run=False, is_pipeline=False, chdir=None):
+    @staticmethod
+    def __call__(path=None, dry_run=False, is_pipeline=False, chdir=None):
         from datalad.crawler.pipeline import (
             load_pipeline_from_config, load_pipeline_from_script,
             get_repo_pipeline_config_path, get_repo_pipeline_script_path
@@ -98,3 +99,5 @@ class Crawl(Interface):
                 # probably ask via ui which action should be performed unless
                 # explicitly specified
                 raise
+
+            # TODO:  Move gc/clean over here!

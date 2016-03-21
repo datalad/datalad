@@ -93,7 +93,6 @@ def get_submodules_list(repo):
 def get_module_parser(repo):
 
     from git import GitConfigParser
-    from os.path import exists
     gitmodule_path = opj(repo.path, ".gitmodules")
     # TODO: What does constructor of GitConfigParser, in case file doesn't exist?
     #if exists(gitmodule_path):
@@ -105,21 +104,11 @@ def get_module_parser(repo):
 def get_config_parser(repo):
 
     from git import GitConfigParser
-    from os.path import exists
     git_config_path = opj(repo.path, get_git_dir(repo.path), "config")
     # TODO: What does constructor of GitConfigParser, in case file doesn't exist?
     parser = GitConfigParser(git_config_path)
     parser.read()
     return parser
-
-
-def is_annex(path):
-    from os.path import exists
-    if not exists(path):
-        return False
-    from datalad.support.gitrepo import GitRepo
-    repo = GitRepo(path, create=False)
-    return "origin/git-annex" in repo.git_get_remote_branches() or "git-annex" in repo.git_get_branches()
 
 
 def get_git_dir(path):

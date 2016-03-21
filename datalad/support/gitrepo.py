@@ -15,6 +15,11 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 from os import linesep
 from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir, abspath
 from os.path import dirname, basename
+from os.path import curdir, pardir, sep
+# shortcuts
+_curdirsep = curdir + sep
+_pardirsep = pardir + sep
+
 import logging
 import shlex
 from six import string_types
@@ -29,6 +34,7 @@ from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
 from ..utils import optional_args, on_windows, getpwd
+from ..utils import swallow_logs
 from ..utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
@@ -50,7 +56,7 @@ default_git_odbt = git.GitCmdObjectDB
 def _normalize_path(base_dir, path):
     """Helper to check paths passed to methods of this class.
 
-    Checks whether `path` is beneath `base_dir` and normalize it.
+    Checks whether `path` is beneath `base_dir` and normalizes it.
     Additionally paths are converted into relative paths with respect to
     `base_dir`, considering PWD in case of relative paths. This
     is intended to be used in repository classes, which means that
@@ -86,10 +92,16 @@ def _normalize_path(base_dir, path):
                                                % path, filename=path)
         else:
             pass
-
-    elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
-        # If we are inside repository, rebuilt relative paths.
-        path = opj(realpath(getpwd()), path)
+    # Executive decision was made to not do this kind of magic!
+    #
+    # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
+    #     # If we are inside repository, rebuilt relative paths.
+    #     path = opj(realpath(getpwd()), path)
+    #
+    # BUT with relative curdir/pardir start it would assume relative to curdir
+    #
+    elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
+         path = opj(realpath(getpwd()), path)
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -293,7 +305,9 @@ class GitRepo(object):
         #       should be a single instance collecting everything or more
         #       fine grained.
 
-        if url is not None:
+        # TODO: somehow do more extensive checks that url and path don't point to the
+        # same location
+        if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
@@ -345,17 +359,20 @@ class GitRepo(object):
 
         If path has symlinks -- they get resolved.
 
-        Returns None if not under git
+        Return None if no parent directory contains a git repository.
         """
         try:
-            toppath, err = Runner().run(
-                ["git", "rev-parse", "--show-toplevel"],
-                cwd=path,
-                log_stdout=True, log_stderr=True,
-                expect_fail=True, expect_stderr=True)
-            return toppath.rstrip('\n\r')
+            with swallow_logs():
+                toppath, err = Runner().run(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    cwd=path,
+                    log_stdout=True, log_stderr=True,
+                    expect_fail=True, expect_stderr=True)
+                return toppath.rstrip('\n\r')
         except CommandError:
             return None
+        except OSError:
+            return GitRepo.get_toppath(dirname(path))
 
     @normalize_paths
     def git_add(self, files):

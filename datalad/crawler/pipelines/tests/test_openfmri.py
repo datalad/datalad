@@ -222,8 +222,8 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     eq_(len(commits_l['incoming']), 2)
     eq_(len(commits['incoming-processed']), 4)
     eq_(len(commits_l['incoming-processed']), 3)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 8)  # all commits out there
-    eq_(len(commits_l['master']), 4)
+    eq_(len(commits['master']), 7)  # all commits out there -- init + 2*(incoming, processed, merge)
+    eq_(len(commits_l['master']), 3)
 
     # Check tags for the versions
     eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
@@ -256,7 +256,9 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     ok_file_under_git(t1w_fpath, annexed=True)
 
     target_files = {
-        './.datalad/config.ttl', './.datalad/crawl/crawl.cfg', './.datalad/datalad.ttl',
+        './.datalad/crawl/crawl.cfg',
+        # no more!
+        # './.datalad/config.ttl', './.datalad/datalad.ttl',
         './.datalad/crawl/statuses/incoming.json',
         './.datalad/crawl/versions/incoming.json',
         './README.txt', './changelog.txt', './sub-1/anat/sub-1_T1w.dat', './sub-1/beh/responses.tsv'}
@@ -404,8 +406,8 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     eq_(len(commits_l['incoming']), 1)
     eq_(len(commits['incoming-processed']), 2)
     eq_(len(commits_l['incoming-processed']), 2)  # because original merge has only 1 parent - incoming
-    eq_(len(commits['master']), 5)  # all commits out there
-    eq_(len(commits_l['master']), 3)
+    eq_(len(commits['master']), 4)  # all commits out there, init, incoming, incoming-processed, merge
+    eq_(len(commits_l['master']), 2)  #  init, merge
 
     # rerun pipeline -- make sure we are on the same in all branches!
     with chpwd(outd):

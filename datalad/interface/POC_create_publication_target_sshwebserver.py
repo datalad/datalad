@@ -27,7 +27,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex, get_all_submodules_dict, get_git_dir, get_remotes
+from .POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_remotes
 from datalad.cmd import CommandError
 from datalad.utils import assure_dir, not_supported_on_windows
 from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
@@ -107,7 +107,8 @@ class POCCreatePublicationTargetSSHWebserver(Interface):
             doc="If target directory exists already, force to (re-)init git.",
             constraints=EnsureBool(),),)
 
-    def __call__(self, sshurl, remote, remote_url=None, remote_url_push=None,
+    @staticmethod
+    def __call__(sshurl, remote, remote_url=None, remote_url_push=None,
                  target_dir=None, handle=curdir, recursive=False,
                  force=False):
 

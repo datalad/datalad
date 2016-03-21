@@ -10,29 +10,50 @@
 """
 
 import logging
-from os.path import exists, join as opj
+import os
+from os.path import isabs, abspath, join as opj, expanduser, expandvars
 from six import string_types
 
+from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
-from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureDatasetAbsolutePath, Constraint
-from datalad.utils import optional_args
-
+from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
+from datalad.utils import optional_args, expandpath, is_explicit_path
+from datalad.utils import swallow_logs
 
 lgr = logging.getLogger('datalad.dataset')
 
 
+def resolve_path(path, ds=None):
+    """Resolve a path specification (against a Dataset location)
+
+    Any explicit path (absolute or relative) is return as an absolute path.
+    In case of an explicit relative path, the current working directory is
+    used as a reference. Any non-explicit relative path is resolved against
+    as dataset location, i.e. considered relative to the location of the
+    dataset. If no dataset is provided, the current working directory is
+    used.
+
+    Returns
+    -------
+    Absolute path
+    """
+    path = expandpath(path, force_absolute=False)
+    if is_explicit_path(path):
+        return abspath(path)
+    if ds is None:
+        # no dataset given, use CWD as reference
+        return abspath(path)
+    else:
+        return opj(ds.path, path)
+
+
 class Dataset(object):
+    __slots__ = ['_path', '_repo']
 
-    def __init__(self, path=None, source=None):
-        self._path = None
-        # and now with constraints...
-        self.path = path
-        self._src = (EnsureStr() | EnsureNone())(source)
-        self._vcs = None
-
-    #TODO source can also be read from an underlying VCS
+    def __init__(self, path):
+        self._path = abspath(path)
+        self._repo = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -42,13 +63,34 @@ class Dataset(object):
         """path to the dataset"""
         return self._path
 
-    @path.setter
-    def path(self, path):
-        if path == self.path:
-            return
-        if self._path is not None:
-            raise RuntimeError("cannot change the path of a dataset after it was set once")
-        self._path = EnsureDatasetAbsolutePath()(path)
+    @property
+    def repo(self):
+        """Get an instance of the version control system/repo for this dataset,
+        or None if there is none yet.
+
+        If creating an instance of GitRepo is guaranteed to be really cheap
+        this could also serve as a test whether a repo is present.
+
+        Returns
+        -------
+        GitRepo
+        """
+        if self._repo is None:
+            with swallow_logs():
+                try:
+                    self._repo = AnnexRepo(self._path, create=False, init=False)
+                except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError):
+                    try:
+                        self._repo = GitRepo(self._path, create=False)
+                    except (InvalidGitRepositoryError, NoSuchPathError):
+                        pass
+        elif not isinstance(self._repo, AnnexRepo):
+            # repo was initially set to be self._repo but might become AnnexRepo
+            # at a later moment, so check if it didn't happen
+            if 'git-annex' in self._repo.git_get_branches():
+                # we acquired git-annex branch
+                self._repo = AnnexRepo(self._repo.path, create=False)
+        return self._repo
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -69,7 +111,7 @@ class Dataset(object):
         verify
           None | "dataset" | "sibling"
         """
-        repo = self.get_vcs()
+        repo = self.repo
 
         if verify is not None:
             raise NotImplementedError("TODO: verify not implemented yet")
@@ -90,7 +132,7 @@ class Dataset(object):
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     def get_dataset_handles(self, pattern=None, fulfilled=None, absolute=False,
-            recursive=False):
+                            recursive=False):
         """Get names/paths of all known dataset_handles (subdatasets),
         optionally matching a specific name pattern.
 
@@ -108,13 +150,14 @@ class Dataset(object):
         list of str
           (paths)
         """
-        repo = self.get_vcs()
+        repo = self.repo
         if repo is None:
             return
 
-        out, err = repo._git_custom_command(
-            '',
-            ["git", "submodule", "status", "--recursive" if recursive else ''])
+        cmd = ["git", "submodule", "status"]
+        if recursive:
+            cmd.append("--recursive")
+        out, err = repo._git_custom_command('', cmd)
 
         lines = [line.split() for line in out.splitlines()]
         if fulfilled is None:
@@ -148,10 +191,9 @@ class Dataset(object):
 #        """
 #        raise NotImplementedError("TODO")
 
-    def record_state(self, auto_add_changes=True, message=str,
-                     update_superdataset=False, version=None):
+    def remember_state(self, auto_add_changes=True, message=str,
+                       version=None):
         """
-
         Parameters
         ----------
         auto_add_changes: bool
@@ -161,7 +203,7 @@ class Dataset(object):
         """
         raise NotImplementedError("TODO")
 
-    def set_state(self, whereto):
+    def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
         (tag, commit) to "undo" a change or switch to a otherwise desired
         previous state.
@@ -171,26 +213,6 @@ class Dataset(object):
         whereto: str
         """
         raise NotImplementedError("TODO")
-
-    def get_vcs(self):
-        """Get an instance of the version control system/repo for this dataset,
-        or None if there is none yet.
-
-        If creating an instance of GitRepo is guaranteed to be really cheap
-        this could also serve as a test whether a repo is present.
-
-        Returns
-        -------
-        GitRepo
-        """
-        if self._vcs is None:
-            try:
-                # TODO: Return AnnexRepo instead if there is one
-                self._vcs = AnnexRepo(self._path, create=False, init=False)
-            except (InvalidGitRepositoryError, NoSuchPathError):
-                pass
-
-        return self._vcs
 
     def is_installed(self, ensure="complete"):
         """Returns whether a dataset is installed.
@@ -209,7 +231,7 @@ class Dataset(object):
         """
         # TODO: Define what exactly to test for, when different flavors are
         # used.
-        if self.get_path() is not None and self.get_vcs() is not None:
+        if self.get_path() is not None and self.repo is not None:
             return True
         else:
             return False
@@ -230,14 +252,11 @@ def datasetmethod(f, name=None):
 # for another constraint
 class EnsureDataset(Constraint):
 
-    def __init__(self):
-        self._name_resolver = EnsureDatasetAbsolutePath()
-
     def __call__(self, value):
         if isinstance(value, Dataset):
             return value
         elif isinstance(value, string_types):
-            return Dataset(path=self._name_resolver(value))
+            return Dataset(path=value)
         else:
             raise ValueError("Can't create Dataset from %s." % type(value))
 
@@ -247,4 +266,5 @@ class EnsureDataset(Constraint):
         return "Dataset"
 
     def long_description(self):
-        return "Value must be a Dataset or a valid identifier of a Dataset."
+        return """Value must be a Dataset or a valid identifier of a Dataset
+        (e.g. a path)"""

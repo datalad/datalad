@@ -44,7 +44,8 @@ class Clean(Interface):
         ),
     )
 
-    def __call__(self, annex=None):
+    @staticmethod
+    def __call__(annex=None):
         if annex is None:
             annex = get_repo_instance(class_=AnnexRepo)
         topdir = opj(annex.path, ARCHIVES_TEMP_DIR)

@@ -32,6 +32,7 @@ class POCMove(Interface):
             doc="name of or path to the handle to be updated",
             constraints=EnsureStr() | EnsureNone()))
 
-    def __call__(self, handle=curdir):
+    @staticmethod
+    def __call__(handle=curdir):
 
         raise NotImplementedError("TODO")
