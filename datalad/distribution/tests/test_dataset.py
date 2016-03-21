@@ -91,3 +91,8 @@ def test_subdatasets(path):
     eq_(subdss, ds.get_dataset_handles(fulfilled=True))
     # don't have that right now
     assert_raises(NotImplementedError, ds.get_dataset_handles, pattern='sub*')
+    ds.remember_state("with subds", version=2)
+    ds.recall_state(1)
+    assert_true(ds.is_installed())
+    eq_(ds.get_dataset_handles(), [])
+    # TODO actual submodule checkout is still there

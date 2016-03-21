@@ -205,10 +205,10 @@ class Dataset(object):
         update_superdataset: bool
         version: str
         """
-        repo = self.repo
-        if not repo:
+        if not self.is_installed():
             raise RuntimeError(
-                "cannot commit without a repository being available")
+                "cannot remember a state when a dataset is not yet installed")
+        repo = self.repo
         if auto_add_changes:
             repo.annex_add('.')
         repo.commit(message)
@@ -224,7 +224,10 @@ class Dataset(object):
         ----------
         whereto: str
         """
-        raise NotImplementedError("TODO")
+        if not self.is_installed():
+            raise RuntimeError(
+                "cannot remember a state when a dataset is not yet installed")
+        self.repo.git_checkout(whereto)
 
     def is_installed(self):
         """Returns whether a dataset is installed.
