@@ -79,7 +79,7 @@ def test_subdatasets(path):
     ds.install(path='test')
     assert_true(ds.is_installed())
     # TODO change to remember_state()
-    ds.repo.commit("Hello!")
+    ds.remember_state("Hello!", version=1)
     # add a subdataset
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())

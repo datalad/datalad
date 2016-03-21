@@ -195,8 +195,8 @@ class Dataset(object):
 #        """
 #        raise NotImplementedError("TODO")
 
-    def remember_state(self, auto_add_changes=True, message=str,
-                       version=None):
+    # TODO maybe needs to get its own interface
+    def remember_state(self, message, auto_add_changes=True, version=None):
         """
         Parameters
         ----------
@@ -205,7 +205,15 @@ class Dataset(object):
         update_superdataset: bool
         version: str
         """
-        raise NotImplementedError("TODO")
+        repo = self.repo
+        if not repo:
+            raise RuntimeError(
+                "cannot commit without a repository being available")
+        if auto_add_changes:
+            repo.annex_add('.')
+        repo.commit(message)
+        if version:
+            repo._git_custom_command('', 'git tag "{0}"'.format(version))
 
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
