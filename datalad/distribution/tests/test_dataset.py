@@ -62,3 +62,28 @@ def test_repo_cache(path):
     # repo instance must change
     assert_false(ds.repo is repo)
     assert_true(isinstance(ds.repo, AnnexRepo))
+
+
+@with_tempfile(mkdir=True)
+def test_subdatasets(path):
+    from datalad.api import install
+    # from scratch
+    ds = Dataset(path)
+    eq_(ds.get_dataset_handles(), None)
+    ds = ds.install()
+    eq_(ds.get_dataset_handles(), [])
+    # create some file and commit it
+    open(os.path.join(ds.path, 'test'), 'w').write('some')
+    ds.install(path='test')
+    # TODO change to remember_state()
+    ds.repo.commit("Hello!")
+    # add a subdataset
+    subds = ds.install('subds', source=path)
+    subdss = ds.get_dataset_handles()
+    eq_(len(subdss), 1)
+    eq_(os.path.join(path, subdss[0]), subds.path)
+    eq_(subds.path, ds.get_dataset_handles(absolute=True)[0])
+    eq_(subdss, ds.get_dataset_handles(recursive=True))
+    eq_(subdss, ds.get_dataset_handles(fulfilled=True))
+    # don't have that right now
+    assert_raises(NotImplementedError, ds.get_dataset_handles, pattern='sub*')

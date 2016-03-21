@@ -147,9 +147,13 @@ class Dataset(object):
 
         Returns
         -------
-        list of str
-          (paths)
+        list(Dataset) or None
+          None is return if there is not repository instance yet. For an
+          existing repository with no subdatasets an empty list is returned.
         """
+        if pattern is not None:
+                raise NotImplementedError
+
         repo = self.repo
         if repo is None:
             return
