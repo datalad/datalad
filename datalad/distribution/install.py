@@ -91,6 +91,10 @@ class Install(Interface):
     def __call__(dataset=None, path=None, source=None, recursive=False):
         # shortcut
         ds = dataset
+
+        if ds is not None and not isinstance(ds, Dataset):
+            ds = Dataset(ds)
+
         if path is None:
             if ds is None:
                 # no dataset, no target location, nothing to do
@@ -242,8 +246,12 @@ class Install(Interface):
                     "installation target already exists, but `source` point to "
                     "another location")
             added_files = vcs.annex_add(relativepath)
-            if len(added_files):
-                # XXX think about what to return
+            # return just the paths of the installed components
+            if isinstance(added_files, list):
+                added_files = [resolve_path(i['file'], ds) for i in added_files]
+            else:
+                added_files = resolve_path(added_files['file'], ds)
+            if added_files:
                 return added_files
             else:
                 return None

@@ -10,6 +10,7 @@
 """
 
 import os
+from os.path import join as opj
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.utils import chpwd
@@ -31,6 +32,20 @@ from datalad.tests.utils import skip_if_no_module
 @with_tempfile
 def test_create(path):
     # only needs a path
-    ds = install(None, path)
+    ds = install(path)
     assert_true(ds.is_installed())
 
+
+@with_tree(tree={'test.txt': 'some',
+                 'dir': {'testindir': 'someother',
+                         'testindir2': 'none'}})
+def test_install_files(path):
+    ds = install(path)
+    # install a single file
+    eq_(ds.install('test.txt'), opj(path, 'test.txt'))
+    # install it again, should given same result
+    eq_(ds.install('test.txt'), opj(path, 'test.txt'))
+    # install multiple files in a dir
+    eq_(ds.install('dir', recursive=True),
+        [opj(path, 'dir', 'testindir'),
+         opj(path, 'dir', 'testindir2')])
