@@ -147,9 +147,13 @@ class Dataset(object):
 
         Returns
         -------
-        list of str
-          (paths)
+        list(Dataset) or None
+          None is return if there is not repository instance yet. For an
+          existing repository with no subdatasets an empty list is returned.
         """
+        if pattern is not None:
+                raise NotImplementedError
+
         repo = self.repo
         if repo is None:
             return
@@ -191,8 +195,8 @@ class Dataset(object):
 #        """
 #        raise NotImplementedError("TODO")
 
-    def remember_state(self, auto_add_changes=True, message=str,
-                       version=None):
+    # TODO maybe needs to get its own interface
+    def remember_state(self, message, auto_add_changes=True, version=None):
         """
         Parameters
         ----------
@@ -201,7 +205,15 @@ class Dataset(object):
         update_superdataset: bool
         version: str
         """
-        raise NotImplementedError("TODO")
+        if not self.is_installed():
+            raise RuntimeError(
+                "cannot remember a state when a dataset is not yet installed")
+        repo = self.repo
+        if auto_add_changes:
+            repo.annex_add('.')
+        repo.commit(message)
+        if version:
+            repo._git_custom_command('', 'git tag "{0}"'.format(version))
 
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
@@ -212,29 +224,21 @@ class Dataset(object):
         ----------
         whereto: str
         """
-        raise NotImplementedError("TODO")
+        if not self.is_installed():
+            raise RuntimeError(
+                "cannot remember a state when a dataset is not yet installed")
+        self.repo.git_checkout(whereto)
 
-    def is_installed(self, ensure="complete"):
+    def is_installed(self):
         """Returns whether a dataset is installed.
 
-        Several flavors of "installed" can be tested. By default, a dataset is
-        installed if a worktree and a VCS repository are present. Alternative
-        to "complete" is "vcs".
-
-        Parameters
-        ----------
-        ensure: str
+        A dataset is installed when a repository for it exists on the filesystem.
 
         Returns
         -------
         bool
         """
-        # TODO: Define what exactly to test for, when different flavors are
-        # used.
-        if self.get_path() is not None and self.repo is not None:
-            return True
-        else:
-            return False
+        return self.path is not None and self.repo is not None
 
 
 @optional_args
