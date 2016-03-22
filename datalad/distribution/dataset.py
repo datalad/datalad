@@ -43,6 +43,8 @@ def resolve_path(path, ds=None):
         return abspath(path)
     if ds is None:
         # no dataset given, use CWD as reference
+        # TODO: Check whether we should use PWD instead of CWD here. Is it done
+        # by abspath?
         return abspath(path)
     else:
         return opj(ds.path, path)

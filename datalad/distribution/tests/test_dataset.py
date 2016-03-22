@@ -10,8 +10,9 @@
 """
 
 import os
-from ..dataset import Dataset
-from datalad.utils import chpwd
+from os.path import join as opj, abspath, normpath
+from ..dataset import Dataset, EnsureDataset, resolve_path
+from datalad.utils import chpwd, getpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -25,6 +26,70 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
+
+
+def test_EnsureDataset():
+
+    c = EnsureDataset()
+
+    # fails with anything else than a string or an Dataset:
+    assert_raises(ValueError, c, 1)
+    assert_raises(ValueError, c, ['a', 'list'])
+    assert_raises(ValueError, c, (1, 2, 3))
+    assert_raises(ValueError, c, {"what": "ever"})
+
+    # returns Dataset, when string or Dataset passed
+    res = c(opj("some", "path"))
+    ok_(isinstance(res, Dataset))
+    ok_(isinstance(c(res), Dataset))
+    ok_(c(res) is res)
+
+    # Note: Ensuring that string is valid path is not
+    # part of the constraint itself, so not explicitly tested here.
+
+
+@assert_cwd_unchanged
+@with_tempfile(mkdir=True)
+def test_resolve_path(somedir):
+
+    abs_path = abspath(somedir)  # just to be sure
+    rel_path = "some"
+    expl_path_cur = opj(os.curdir, rel_path)
+    expl_path_par = opj(os.pardir, rel_path)
+
+    eq_(resolve_path(abs_path), abs_path)
+
+    current = getpwd()
+    # no Dataset => resolve using cwd:
+    eq_(resolve_path(abs_path), abs_path)
+    eq_(resolve_path(rel_path), opj(current, rel_path))
+    eq_(resolve_path(expl_path_cur), normpath(opj(current, expl_path_cur)))
+    eq_(resolve_path(expl_path_par), normpath(opj(current, expl_path_par)))
+
+    # now use a Dataset as reference:
+    ds = Dataset(abs_path)
+    eq_(resolve_path(abs_path, ds), abs_path)
+    eq_(resolve_path(rel_path, ds), opj(abs_path, rel_path))
+    eq_(resolve_path(expl_path_cur, ds), normpath(opj(current, expl_path_cur)))
+    eq_(resolve_path(expl_path_par, ds), normpath(opj(current, expl_path_par)))
+
+
+# TODO: test remember/recall more extensive?
+# TODO: proper testrepos needed!
+def register_sibling():
+    # Validation!
+    raise SkipTest("TODO")
+
+
+def test_get_dataset_handles():
+    # Flavors!
+    raise SkipTest("TODO")
+
+
+def test_is_installed():
+    # different platforms, direct mode, etc.
+    raise SkipTest("TODO")
+
 
 @with_tempfile(mkdir=True)
 def test_dataset_contructor(path):

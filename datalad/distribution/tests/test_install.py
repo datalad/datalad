@@ -18,7 +18,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
-from datalad.tests.utils import with_tempfile, assert_in, with_tree
+from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
@@ -35,6 +35,8 @@ def test_create(path):
     ds = install(path)
     assert_true(ds.is_installed())
 
+    # TODO: create within another ds
+
 
 @with_tree(tree={'test.txt': 'some',
                  'dir': {'testindir': 'someother',
@@ -49,3 +51,21 @@ def test_install_files(path):
     eq_(ds.install('dir', recursive=True),
         [opj(path, 'dir', 'testindir'),
          opj(path, 'dir', 'testindir2')])
+    # TODO: check git
+
+
+@with_testrepos(flavors=['local-url', 'network'])  # + 'local'?
+def test_install_dataset_from(url):
+    raise SkipTest("TODO")
+
+
+def test_install_subdataset():
+    raise SkipTest("TODO")
+
+
+def test_install_into_dataset():
+    raise SkipTest("TODO")
+
+
+# TODO: Is there a way to test result renderer?
+
