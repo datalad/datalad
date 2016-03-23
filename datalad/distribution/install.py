@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for handle installation
+"""High-level interface for dataset (component) installation
 
 """
 
@@ -33,7 +33,7 @@ from datalad.utils import expandpath, knows_annex, assure_dir, is_explicit_path
 from datalad.interface.POC_helpers import get_git_dir
 
 
-lgr = logging.getLogger('datalad.interface.POC_install')
+lgr = logging.getLogger('datalad.distribution.install')
 
 
 def get_containing_subdataset(ds, path):
@@ -87,13 +87,13 @@ class Install(Interface):
             doc="url or local path of the installation source",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
+        # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(
             args=("--recursive", "-r"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
             doc="""If set, all content is installed recursively, including
             content of any subdatasets."""))
 
-    # TODO: decorator to accept an iterable for `path`
     @staticmethod
     @datasetmethod(name='install')
     def __call__(dataset=None, path=None, source=None, recursive=False):
