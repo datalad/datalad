@@ -25,8 +25,9 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf, \
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmdline.helpers import POC_get_root_handle
-from .base import Interface
-from .POC_helpers import get_submodules_dict, get_submodules_list
+from datalad.interface.base import Interface
+from datalad.interface.POC_helpers import get_submodules_dict, get_submodules_list
+from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.cmd import CommandError
 from datalad.utils import knows_annex
 

@@ -281,15 +281,14 @@ class Install(Interface):
 
             elif source is None:
                 # there is no source, and nothing at the destination, not even
-                # a handle -> BOOM!
-                # and NO, we do not try to install subdatasets along the way
-                # with the chance of finding nothing
-                # TODO: Probably we should instead create an empty one in this
-                # case. So, figure out, whether or not path points inside a not
-                # yet installed subhandle. In case it does fail, create otherwise.
-                raise ValueError(
-                    "nothing found at {0} and no `source` specified".format(
-                        path))
+                # a handle -> create a new dataset!
+                subds = get_containing_subdataset(ds, relativepath)
+                AnnexRepo(path, create=True)
+                return subds.install(path=relpath(path, start=subds.path),
+                                     source=path)
+                # TODO: This is actually almost the same thing we do above,
+                # isn't it?
+                # Think again, too tired currently.
 
             if source and exists(expandpath(source)):
                 source = expandpath(source)

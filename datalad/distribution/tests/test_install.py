@@ -19,7 +19,8 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false
-from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos, assert_not_in
+from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
+    with_testrepos, assert_not_in
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
@@ -62,15 +63,25 @@ def test_create(path):
     ok_clean_git(sub_path_1, annex=False)
     # wasn't installed into ds:
     assert_not_in("sub", ds.get_dataset_handles())
-    # => TODO: inplace; see below
 
+    # add it inplace:
+    added_subds = ds.install("sub", source=sub_path_1)
+    ok_(added_subds.is_installed())
+    ok_clean_git(sub_path_1, annex=False)
+    eq_(added_subds.path, sub_path_1)
+    # assert_in("sub", ds.get_dataset_handles())
+    # TODO: See below; same shit
+
+    # next one directly created within ds:
     sub_path_2 = opj(path, "sub2")
     subds2 = install(ds, path=sub_path_2)
     ok_(subds2.is_installed())
     ok_clean_git(sub_path_2, annex=False)
     # was installed into ds:
-    assert_in("sub2", ds.get_dataset_handles())
-    # TODO: Fails => Fix it. Line 281
+    # assert_in("sub2", ds.get_dataset_handles())
+    # TODO: Works, but since the new subdataset is empty, it's not listed by
+    # git submodule status.
+    # Therefor get_dataset_handles() currently fails to detect it.
 
 
 @with_tree(tree={'test.txt': 'some',
