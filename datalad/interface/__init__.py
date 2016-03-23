@@ -24,10 +24,10 @@ from .download_url import DownloadURL
 from .ls import Ls
 from .clean import Clean
 from ..distribution.install import Install
+from ..distribution.publish import Publish
 from .POC_move import POCMove
 from .POC_update import POCUpdate
 from .POC_uninstall import POCUninstall
-from .POC_publish import POCPublish
 from .POC_create_publication_target_sshwebserver import \
     POCCreatePublicationTargetSSHWebserver
 from .POC_modify_subhandle_urls import POCModifySubhandleURLs
@@ -38,10 +38,10 @@ _group_handle = (
     'Commands for dataset operations',
     [
         Install,
+        Publish,
         POCUninstall,
         POCMove,
         POCUpdate,
-        POCPublish,
         POCCreatePublicationTargetSSHWebserver,
         POCModifySubhandleURLs,
     ])
