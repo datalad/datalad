@@ -16,16 +16,20 @@ __docformat__ = 'restructuredtext'
 import logging
 
 import os
-from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, exists, islink
-from datalad.distribution.dataset import Dataset, datasetmethod, resolve_path, EnsureDataset
+from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
+    exists, islink
+from datalad.distribution.dataset import Dataset, datasetmethod, \
+    resolve_path, EnsureDataset
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureBool
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
+    EnsureBool
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, FileNotInAnnexError
+from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
+    FileNotInAnnexError
 from datalad.interface.base import Interface
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
-from datalad.utils import expandpath, knows_annex, assure_dir
+from datalad.utils import expandpath, knows_annex, assure_dir, is_explicit_path
 from datalad.interface.POC_helpers import get_git_dir
 
 
@@ -46,6 +50,10 @@ def get_containing_subdataset(ds, path):
     -------
     Dataset
     """
+
+    if is_explicit_path(path) and not path.startswith(ds.path):
+        raise ValueError("path {0} not in dataset.".format(path))
+
     for subds in ds.get_dataset_handles():
         common = os.path.commonprefix((subds, path))
         if common and isdir(opj(ds.path, common)):
@@ -276,6 +284,9 @@ class Install(Interface):
                 # a handle -> BOOM!
                 # and NO, we do not try to install subdatasets along the way
                 # with the chance of finding nothing
+                # TODO: Probably we should instead create an empty one in this
+                # case. So, figure out, whether or not path points inside a not
+                # yet installed subhandle. In case it does fail, create otherwise.
                 raise ValueError(
                     "nothing found at {0} and no `source` specified".format(
                         path))
