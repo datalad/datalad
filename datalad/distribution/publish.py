@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for handle publishing
+"""High-level interface for dataset (component) publishing
 
 """
 
@@ -30,66 +30,69 @@ from .POC_helpers import get_submodules_dict, get_submodules_list
 from datalad.cmd import CommandError
 from datalad.utils import knows_annex
 
-lgr = logging.getLogger('datalad.interface.POC_publish')
+lgr = logging.getLogger('datalad.distribution.publish')
 
 
-class POCPublish(Interface):
+class Publish(Interface):
     """publish a handle.
 
     This is basic implementation for testing purposes
     """
 
     _params_ = dict(
-        remote=Parameter(
-            args=('remote',),
-            doc="Remote name to publish the handle to. If there is no such "
-                "remote yet, it will be registered(?) using the URL given by "
-                "REMOTE_URL.\n"
-                "If not even the remote repository exists and you want datalad "
-                "to create it, use CREATE.\n"
-                "If RECURSIVE is set, the same name will be used to address "
-                "the subhandles' remotes.",
-            nargs="?",
-            constraints=EnsureStr()),
-        remote_url=Parameter(
-            args=('--remote-url',),
-            doc="The URL of the repository named by REMOTE. This URL has to be "
-                "accessible to anyone, who is supposed to have acces to the "
-                "published handle later on. (Technically: a git fetch URL)\n"
-                "If you want to publish RECURSIVE, it is expected, that you "
-                "pass a template for building the URLs of all handles to be "
-                "published by using placeholders.\n"
-                "List of currently available placeholders:\n"
-                "%%NAME\tthe name of the handle, where slashes are replaced by dashes.",
-            # TODO: What if remote is known, but remote-url is passed?
-            #       Redirect the existing remote or ignore or reject?
+        dataset=Parameter(
+            args=("--dataset", "-d",),
+            doc="""specify the dataset to perform the publish operation on. If
+            no dataset is given, an attempt is made to identify the dataset
+            based on the current working directory and/or the `path` given""",
+            constraints=EnsureDataset() | EnsureNone()),
+        dest=Parameter(
+            args=("dest",),
+            doc="""url, local path, or sibling name identifying the publication
+            target""",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
-        remote_url_push=Parameter(
-            args=('--remote-url-push',),
-            doc="In case the REMOTE_URL cannot be used to push to the remote "
-                "repository, use this parameter to additionally provide a "
-                "push URL.\n",
+        path=Parameter(
+            args=("path",),
+            doc="path/name of the dataset component to publish",
+            nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        handle=Parameter(
-            args=('--handle',),
-            doc="Name of or path to the handle to publish. Defaults to CWD.",
+        dest_url=Parameter(
+            args=('--dest-url',),
+            doc="""The URL of the dataset sibling named by `dest`. This URL has
+            to be accessible to anyone, who is supposed to have acces to the
+            published dataset later on.\n
+            If you want to publish with `recursive`, it is expected, that you
+            pass a template for building the URLs of all (sub)datasets to be
+            published by using placeholders.\n
+            List of currently available placeholders:\n
+            %%NAME\tthe name of the dataset, where slashes are replaced by
+            dashes. This option is ignore if there is already a configured
+            sibling dataset under the name given by `dest`.""",
             nargs="?",
-            constraints=EnsureDatasetAbsolutePath()),
+            constraints=EnsureStr() | EnsureNone()),
+        dest_pushurl=Parameter(
+            args=('--dest-pushurl',),
+            doc="""In case the `dest_url` cannot be used to publish to the
+            dataset sibling, this option specifies a URL to be used for the
+            actual publication operation.""",
+            constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
-            doc="Recursively publish all subhandles of HANDLE."),
+            doc="Recursively publish all components of the dataset."),
         with_data=Parameter(
             args=("--with-data",),
             doc="shell pattern",
-            nargs="*",
-            constraints=EnsureListOf(string_types) | EnsureNone()),)
+            action="store_true",
+            constraintsszpfgjwpjg=EnsureListOf(string_types) | EnsureNone()),)
 
     @staticmethod
-    def __call__(remote, remote_url=None, remote_url_push=None,
-                 handle=curdir, recursive=None, with_data=None):
+    @datasetmethod(name='publish')
+    def __call__(dataset=None, dest=None, path=None, dest_url=None,
+            dest_pushurl=None, with_data=None, recursive=None):
 
+        raise FuckedUp
         # Note to myself: "Real" implementation should use getpwd()
 
         # TODO: check parameter dependencies first
