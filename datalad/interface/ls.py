@@ -142,6 +142,8 @@ class DsModel(object):
 
     @property
     def type(self):
+        if not exists(self.ds.path):
+            return None
         return {False: 'git', True: 'annex'}[isinstance(self.repo, AnnexRepo)]
 
     @property
@@ -191,20 +193,22 @@ class LsFormatter(string.Formatter):
                 # return "%s✖%s" % (self.RED, self.RESET)
                 return "%s✗%s" % (self.RED, self.RESET)
             return value
-        elif conversion == 'B':
-            return "%s%s%s" % (self.BLUE, value, self.RESET)
+        elif conversion in {'B', 'R'}:
+            return "%s%s%s" % ({'B': self.BLUE, 'R': self.RED}[conversion], value, self.RESET)
 
         return super(LsFormatter, self).convert_field(value, conversion)
 
 
-def format_ds_model(formatter, ds_model, format_str):
+def format_ds_model(formatter, ds_model, format_str, format_exc):
     try:
         #print("WORKING ON %s" % ds_model.path)
+        if not exists(ds_model.ds.path):
+            return formatter.format(format_exc, ds=ds_model, msg="not installed")
         ds_formatted = formatter.format(format_str, ds=ds_model)
         #print("FINISHED ON %s" % ds_model.path)
         return ds_formatted
     except Exception as exc:
-        return "%s\t%s" % (ds_model.path, "Failed with %s" % exc_str(exc))
+        return formatter.format(format_exc, ds=ds_model, msg=exc_str(exc))
 
 from joblib import Parallel, delayed
 
@@ -228,15 +232,15 @@ def _ls_dataset(loc, recursive=False, all=False):
         ds_model.path = path
 
     maxpath = max(len(ds_model.path) for ds_model in dss)
-    format_str = "{ds.path!B:<%d}  [{ds.type}]  {ds.branch!N}  {ds.describe!N}  {ds.clean!X}" \
-                 % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    path_fmt = "{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    format_str = path_fmt + "  [{ds.type}]  {ds.branch!N}  {ds.describe!N}  {ds.clean!X}"
     if all:
         format_str += "  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
 
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
     for out in Parallel(n_jobs=1)(
-            delayed(format_ds_model)(formatter, dsm, format_str)
+            delayed(format_ds_model)(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}")
             for dsm in dss
         ):
         print(out)

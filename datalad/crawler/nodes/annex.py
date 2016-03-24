@@ -183,6 +183,8 @@ class initiate_handle(object):
         else:
             handle_path = self.path
 
+        data_updated = updated(data, {'handle_path': handle_path,
+                                      'handle_name': handle_name})
         lgr.debug("Request to initialize a handle %s at %s", handle_name, handle_path)
         init = True
         if exists(handle_path):
@@ -191,7 +193,7 @@ class initiate_handle(object):
             existing = self.existing or 'skip'
             if existing == 'skip':
                 lgr.info("Skipping handle %s since already exists" % handle_name)
-                yield data
+                yield data_updated
                 return
             elif existing == 'raise':
                 raise RuntimeError("%s already exists" % handle_path)
@@ -206,9 +208,7 @@ class initiate_handle(object):
             _call(self._initiate_handle, handle_path, handle_name)
         _call(self._save_crawl_config, handle_path, handle_name, data)
 
-
-        yield updated(data, {'handle_path': handle_path,
-                             'handle_name': handle_name})
+        yield data_updated
 
 
 class Annexificator(object):
