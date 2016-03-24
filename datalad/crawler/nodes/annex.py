@@ -29,7 +29,6 @@ from git import Repo
 from ...version import __version__
 from ...api import add_archive_content
 from ...api import clean
-from ...api import POC_install
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
@@ -39,6 +38,8 @@ from ...utils import getpwd
 from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
+from ...distribution.dataset import Dataset
+from ...api import install
 from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
@@ -1114,13 +1115,11 @@ class Annexificator(object):
         def _initiate_handle(data):
             for data_ in initiate_handle(*args, **kwargs)(data):
                 # Also "register" as a sub-handle
-                out = POC_install(src=data_['handle_path'],  # dest=data_['handle_path'],
-                                  # POC_install doesn't like having both dest and name specified
-                                  # since it implies "git worktree" use case
-                                  name=data_['handle_name'],
-                                  roothandle=self.repo.path,  # as a sub-handle
-                                  create=False  # it must be created already and we don't want to override
-                                  )
-                assert out is None, "TODO: whenever it returns anything we might reconsider adding smth to data_ to be yielded"
+                out = install(
+                        dataset=Dataset(self.repo.path),
+                        path=data_['handle_path'],
+                        source=data_['handle_path'],
+                        )
+                # TODO: reconsider adding smth to data_ to be yielded"
                 yield data_
         return _initiate_handle

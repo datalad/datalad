@@ -24,7 +24,8 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.exceptions import CommandError
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules_list, is_annex, get_remotes
+from .POC_helpers import get_submodules_list, get_remotes
+from datalad.utils import knows_annex
 
 lgr = logging.getLogger('datalad.interface.POC_update')
 
@@ -100,7 +101,7 @@ class POCUpdate(Interface):
 
             # if it is an annex and there is a tracking branch, and we didn't fetch
             # the entire remote anyway, fetch explicitly git-annex branch:
-            if is_annex(handle_repo.path) and not all:
+            if knows_annex(handle_repo.path) and not all:
                 # check for tracking branch's remote:
                 try:
                     std_out, std_err = \
@@ -122,7 +123,7 @@ class POCUpdate(Interface):
                 if remote:
                     cmd_list.append(remote)
                 handle_repo._git_custom_command('', cmd_list)
-                if is_annex(handle_repo.path):
+                if knows_annex(handle_repo.path):
                     # annex-apply:
                     lgr.info("Updating annex ...")
                     handle_repo._git_custom_command('', ["git", "annex", "merge"])

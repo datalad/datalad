@@ -769,3 +769,17 @@ class chpwd(object):
         if self._prev_pwd:
             chpwd(self._prev_pwd, logsuffix="(coming back)")
 
+
+def knows_annex(path):
+    """Returns whether at a given path there is information about an annex
+
+    This includes actually present annexes, but also uninitialized ones, or
+    even the presence of a remote annex branch.
+    """
+    from os.path import exists
+    if not exists(path):
+        return False
+    from datalad.support.gitrepo import GitRepo
+    repo = GitRepo(path, create=False)
+    return "origin/git-annex" in repo.git_get_remote_branches() \
+           or "git-annex" in repo.git_get_branches()

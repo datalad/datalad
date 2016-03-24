@@ -111,15 +111,6 @@ def get_config_parser(repo):
     return parser
 
 
-def is_annex(path):
-    from os.path import exists
-    if not exists(path):
-        return False
-    from datalad.support.gitrepo import GitRepo
-    repo = GitRepo(path, create=False)
-    return "origin/git-annex" in repo.git_get_remote_branches() or "git-annex" in repo.git_get_branches()
-
-
 def get_git_dir(path):
     """figure out a repo's gitdir
 

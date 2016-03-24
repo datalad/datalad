@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for handle installation
+"""High-level interface for dataset (component) installation
 
 """
 
@@ -16,19 +16,24 @@ __docformat__ = 'restructuredtext'
 import logging
 
 import os
-from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, exists, islink
-from datalad.support.dataset import Dataset, datasetmethod, resolve_path, EnsureDataset
+from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
+    exists, islink
+from datalad.distribution.dataset import Dataset, datasetmethod, \
+    resolve_path, EnsureDataset
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, EnsureBool
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
+    EnsureBool
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, FileNotInAnnexError
-from .base import Interface
-from .POC_helpers import is_annex
+from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
+    FileNotInAnnexError
+from datalad.interface.base import Interface
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
-from datalad.utils import expandpath
+from datalad.utils import expandpath, knows_annex, assure_dir, is_explicit_path
+from datalad.interface.POC_helpers import get_git_dir
 
-lgr = logging.getLogger('datalad.interface.POC_install')
+
+lgr = logging.getLogger('datalad.distribution.install')
 
 
 def get_containing_subdataset(ds, path):
@@ -45,6 +50,10 @@ def get_containing_subdataset(ds, path):
     -------
     Dataset
     """
+
+    if is_explicit_path(path) and not path.startswith(ds.path):
+        raise ValueError("path {0} not in dataset.".format(path))
+
     for subds in ds.get_dataset_handles():
         common = os.path.commonprefix((subds, path))
         if common and isdir(opj(ds.path, common)):
@@ -52,7 +61,7 @@ def get_containing_subdataset(ds, path):
     return ds
 
 
-class POCInstallHandle(Interface):
+class Install(Interface):
     """Install a dataset component or entire datasets.
 
     This command can make arbitrary content available in a dataset. This
@@ -78,18 +87,22 @@ class POCInstallHandle(Interface):
             doc="url or local path of the installation source",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
+        # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(
             args=("--recursive", "-r"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
             doc="""If set, all content is installed recursively, including
             content of any subdatasets."""))
 
-    # TODO: decorator to accept an iterable for `path`
     @staticmethod
     @datasetmethod(name='install')
     def __call__(dataset=None, path=None, source=None, recursive=False):
         # shortcut
         ds = dataset
+
+        if ds is not None and not isinstance(ds, Dataset):
+            ds = Dataset(ds)
+
         if path is None:
             if ds is None:
                 # no dataset, no target location, nothing to do
@@ -97,14 +110,15 @@ class POCInstallHandle(Interface):
                     "insufficient information for installation (needs at "
                     "least a dataset or an installation path")
         elif isinstance(path, list):
-            return [POCInstallHandle.__call__(
+            return [Install.__call__(
                     dataset=ds,
                     path=p,
                     source=source,
                     recursive=recursive) for p in path]
 
         # resolve the target location against the provided dataset
-        path = resolve_path(path, ds)
+        if path is not None:
+            path = resolve_path(path, ds)
 
         lgr.debug("Resolved installation target: {0}".format(path))
 
@@ -178,7 +192,7 @@ class POCInstallHandle(Interface):
             runner.run(cmd_list, cwd=ds.path)
 
             # TODO: annex init recursively!
-            if is_annex(path):
+            if knows_annex(path):
                 lgr.debug("Annex detected in submodule '%s'. "
                           "Calling annex init ..." % relativepath)
                 cmd_list = ["git", "annex", "init"]
@@ -205,10 +219,27 @@ class POCInstallHandle(Interface):
             # - a directory
             # - an entire repository
             if exists(opj(path, '.git')):
-                # this is a repo and should be turned into a submodule
+                # this is a repo and must be turned into a submodule
                 # of this dataset
-                # TODO
-                raise NotImplementedError
+                cmd_list = ["git", "submodule", "add", source,
+                            relativepath]
+                runner.run(cmd_list, cwd=ds.path)
+                # move .git to superrepo's .git/modules, remove .git, create
+                # .git-file
+                subds_git_dir = opj(path, ".git")
+                ds_git_dir = get_git_dir(ds.path)
+                moved_git_dir = opj(ds.path, ds_git_dir,
+                                    "modules", relativepath)
+                assure_dir(moved_git_dir)
+                from os import rename, listdir, rmdir
+                for dot_git_entry in listdir(subds_git_dir):
+                    rename(opj(subds_git_dir, dot_git_entry),
+                           opj(moved_git_dir, dot_git_entry))
+                assert not listdir(subds_git_dir)
+                rmdir(subds_git_dir)
+
+                with open(opj(path, ".git"), "w") as f:
+                    f.write("gitdir: {moved}\n".format(moved=moved_git_dir))
                 # return newly added submodule as a dataset
                 return Dataset(path)
 
@@ -218,13 +249,17 @@ class POCInstallHandle(Interface):
                     "installation of a directory requires the `recursive` flag")
 
             # do a blunt `annex add`
-            if abspath(source) != path:
+            if source and abspath(source) != path:
                 raise ValueError(
                     "installation target already exists, but `source` point to "
                     "another location")
             added_files = vcs.annex_add(relativepath)
-            if len(added_files):
-                # XXX think about what to return
+            # return just the paths of the installed components
+            if isinstance(added_files, list):
+                added_files = [resolve_path(i['file'], ds) for i in added_files]
+            else:
+                added_files = resolve_path(added_files['file'], ds)
+            if added_files:
                 return added_files
             else:
                 return None
@@ -246,13 +281,14 @@ class POCInstallHandle(Interface):
 
             elif source is None:
                 # there is no source, and nothing at the destination, not even
-                # a handle -> BOOM!
-                # and NO, we do not try to install subdatasets along the way
-                # with the chance of finding nothing
-                raise ValueError(
-                    "nothing found at {0} and no `source` specified".format(
-                        path))
-
+                # a handle -> create a new dataset!
+                subds = get_containing_subdataset(ds, relativepath)
+                AnnexRepo(path, create=True)
+                return subds.install(path=relpath(path, start=subds.path),
+                                     source=path)
+                # TODO: This is actually almost the same thing we do above,
+                # isn't it?
+                # Think again, too tired currently.
 
             if source and exists(expandpath(source)):
                 source = expandpath(source)
@@ -264,7 +300,7 @@ class POCInstallHandle(Interface):
                     # add it as a submodule to its superhandle:
                     cmd_list = ["git", "submodule", "add", source,
                                 relativepath]
-                    runner.run(cmd_list, cwd=ds.path)
+                    runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
                     return Dataset(path)
 
                 raise ValueError(
@@ -302,3 +338,20 @@ class POCInstallHandle(Interface):
                 # probably not a repo, likely a simple file
                 vcs.annex_addurl_to_file(relativepath, source)
                 return path
+
+    @staticmethod
+    def result_renderer_cmdline(res):
+        from datalad.ui import ui
+        if res is None:
+            res = []
+        if not isinstance(res, list):
+            res = [res]
+        if not len(res):
+            ui.message("Nothing was installed")
+            return
+        items= '\n'.join(map(str, res))
+        msg = "{n} installed {obj} available at\n{items}".format(
+            obj='items are' if len(res) > 1 else 'item is',
+            n=len(res),
+            items=items)
+        ui.message(msg)

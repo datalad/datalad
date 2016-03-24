@@ -14,8 +14,6 @@ from os.path import dirname, join as pathjoin, exists, pardir, realpath
 
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
-from ..support.handlerepo import HandleRepo
-from ..support.collectionrepo import CollectionRepo
 from ..cmd import Runner
 from ..utils import get_local_file_url
 from ..utils import swallow_outputs
@@ -23,9 +21,6 @@ from ..utils import swallow_logs
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
-
-# TODO: Probably move automatic "git commit" vs. "git annex proxy -- git commit"
-# to AnnexRepo instead of HandleRepo and make use of it herein.
 
 
 class TestRepo(object):
@@ -125,63 +120,3 @@ class BasicGitTestRepo(TestRepo):
                          "datalad: %s\n"
                          % (git_version, __version__),
                          annex=False)
-
-
-class BasicHandleTestRepo(BasicAnnexTestRepo):
-    """Creates a basic test handle repository.
-
-    Technically this is just an annex with additional content in a ".datalad"
-    subdirectory.
-    """
-
-    REPO_CLASS = HandleRepo
-    # Everything necessary to distinguish from BasicAnnexTestRepo currently is
-    # done by the constructor of HandleRepo class.
-
-
-class MetadataPTHandleTestRepo(BasicHandleTestRepo):
-    """Creates a test handle repository, which provides metadata
-    in plaintext format.
-    """
-
-    REPO_CLASS = HandleRepo
-
-    def populate(self):
-        super(MetadataPTHandleTestRepo, self).populate()
-        self.create_file('README',
-                         'This is a handle description\nwith multiple lines.\n',
-                         annex=False)
-        self.create_file('LICENSE',
-                         'A license, allowing for several things to do with\n'
-                         'the content, provided by this handle.',
-                         annex=False)
-        self.create_file('AUTHORS',
-                         'Benjamin Poldrack <benjaminpoldrack@gmail.com>\n'
-                         '# This is a comment\n'
-                         '\n'
-                         '<justanemail@address.tl>\n'
-                         'someone else\n'
-                         'digital native <https://www.myfancypage.com/digital>\n',
-                         annex=False)
-        self.repo.commit("Metadata files created.")
-
-
-class BasicCollectionTestRepo(BasicGitTestRepo):
-    """Creates an empty collection repository"""
-
-    REPO_CLASS = CollectionRepo
-
-
-class CollectionTestRepo(BasicCollectionTestRepo):
-    """Creates a collection repository with two handles."""
-
-    REPO_CLASS = CollectionRepo
-
-    def populate(self):
-        super(CollectionTestRepo, self).populate()
-        basic_handle = BasicHandleTestRepo()
-        basic_handle.create()
-        md_handle = MetadataPTHandleTestRepo()
-        md_handle.create()
-        self.repo.add_handle(basic_handle.repo, "BasicHandle")
-        self.repo.add_handle(md_handle.repo, "MetadataHandle")

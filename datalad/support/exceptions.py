@@ -61,16 +61,3 @@ class FileInGitError(FileNotInAnnexError):
 class FileNotInRepositoryError(FileNotInAnnexError):
     """Thrown if a file is not in the repository at all.
     """
-
-
-class CollectionBrokenError(Exception):
-    """Thrown if a collection repository is somehow invalid
-    """
-    pass
-
-
-class ReadOnlyBackendError(Exception):
-    """Thrown if a Collection or Handle is trying to write to a read-only
-    backend.
-    """
-    pass
