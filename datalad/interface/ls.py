@@ -1,4 +1,4 @@
-# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil; coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -11,13 +11,17 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import exists, lexists, join as opj
+from os.path import exists, lexists, join as opj, abspath, isabs
+from os.path import curdir
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
 
+from ..utils import auto_repr
 from .base import Interface
 from ..ui import ui
+from ..utils import swallow_logs
+from ..dochelpers import exc_str
 from ..support.s3 import get_key_url
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
@@ -39,8 +43,8 @@ class Ls(Interface):
     _params_ = dict(
         loc=Parameter(
             doc="URL to list, e.g. s3:// url",
-            constraints=EnsureStr(),
-            #nargs='+'
+            nargs="+",
+            constraints=EnsureStr() | EnsureNone(),
         ),
         recursive=Parameter(
             args=("-r", "--recursive"),
@@ -70,6 +74,10 @@ class Ls(Interface):
     @staticmethod
     def __call__(loc, recursive=False, all=False, config_file=None, list_content=False):
 
+        if isinstance(loc, list):
+            return [Ls.__call__(loc_, recursive=recursive, all=all, config_file=config_file, list_content=list_content)
+                    for loc_ in loc]
+
         # TODO: do some clever handling of kwargs as to remember what were defaults
         # and what any particular implementation actually needs, and then issuing
         # warning if some custom value/option was specified which doesn't apply to the
@@ -78,14 +86,165 @@ class Ls(Interface):
             return _ls_s3(loc, recursive=recursive, all=all, config_file=config_file, list_content=list_content)
         elif lexists(loc) and lexists(opj(loc, '.git')):
             # TODO: use some helper like is_dataset_path ??
-            return _ls_dataset(loc, recursive=recursive)
+            return _ls_dataset(loc, recursive=recursive, all=all)
         else:
             raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
 
 
-def _ls_dataset(loc, recursive=False):
-    raise NotImplementedError()
+#
+# Dataset listing
+#
 
+from datalad.support.annexrepo import AnnexRepo
+
+
+@auto_repr
+class DsModel(object):
+
+    __slots__ = ['ds', '_info', '_path']
+
+    def __init__(self, ds):
+        self.ds = ds
+        self._info = None
+        self._path = None  # can be overriden
+
+    @property
+    def path(self):
+        return self.ds.path if self._path is None else self._path
+
+    @path.setter
+    def path(self, v):
+        self._path = v
+
+    @property
+    def repo(self):
+        return self.ds.repo
+
+    @property
+    def describe(self):
+        try:
+            with swallow_logs():
+                describe, outerr = self.repo._git_custom_command([], ['git', 'describe', '--tags'])
+            return describe.strip()
+        except:
+            return None
+
+    @property
+    def clean(self):
+        return not self.repo.dirty
+
+    @property
+    def branch(self):
+        try:
+            return self.repo.git_get_active_branch()
+        except:
+            return None
+
+    @property
+    def type(self):
+        return {False: 'git', True: 'annex'}[isinstance(self.repo, AnnexRepo)]
+
+    @property
+    def info(self):
+        if self._info is None and isinstance(self.repo, AnnexRepo):
+            self._info = self.repo.annex_repo_info()
+        return self._info
+
+    @property
+    def annex_worktree_size(self):
+        info = self.info
+        return info['size of annexed files in working tree'] if info else None
+
+    @property
+    def annex_local_size(self):
+        info = self.info
+        return info['local annex size'] if info else None
+
+import string
+import humanize
+from datalad.log import ColorFormatter
+from datalad.utils import is_interactive
+
+class LsFormatter(string.Formatter):
+    # condition by interactive
+    if is_interactive():
+        BLUE = ColorFormatter.COLOR_SEQ % (ColorFormatter.BLUE + 30)
+        RED = ColorFormatter.COLOR_SEQ % (ColorFormatter.RED + 30)
+        GREEN = ColorFormatter.COLOR_SEQ % (ColorFormatter.GREEN + 30)
+        RESET = ColorFormatter.RESET_SEQ
+    else:
+        BLUE = RED = GREEN = RESET = ""
+
+    def convert_field(self, value, conversion):
+        #print("%r->%r" % (value, conversion))
+        if conversion == 'S':  # Human size
+            #return value
+            if value is not None:
+                return str(humanize.naturalsize(value))
+            else:
+                return '-'
+        elif conversion == 'X':  # colored bool
+            chr, col = ("✓", self.GREEN) if value else ("✗", self.RED)
+            return "%s%s%s" % (col, chr, self.RESET)
+        elif conversion == 'N':  # colored Red - if None
+            if value is None:
+                # return "%s✖%s" % (self.RED, self.RESET)
+                return "%s✗%s" % (self.RED, self.RESET)
+            return value
+        elif conversion == 'B':
+            return "%s%s%s" % (self.BLUE, value, self.RESET)
+
+        return super(LsFormatter, self).convert_field(value, conversion)
+
+
+def format_ds_model(formatter, ds_model, format_str):
+    try:
+        #print("WORKING ON %s" % ds_model.path)
+        ds_formatted = formatter.format(format_str, ds=ds_model)
+        #print("FINISHED ON %s" % ds_model.path)
+        return ds_formatted
+    except Exception as exc:
+        return "%s\t%s" % (ds_model.path, "Failed with %s" % exc_str(exc))
+
+from joblib import Parallel, delayed
+
+def _ls_dataset(loc, recursive=False, all=False):
+    from ..support.dataset import Dataset
+    isabs_loc = isabs(loc)
+    topdir = '' if isabs_loc else abspath(curdir)
+
+    topds = Dataset(loc)
+    dss = map(DsModel,
+              [topds] + ([Dataset(opj(loc, sm))
+                          for sm in topds.get_dataset_handles(recursive=recursive)]
+                         if recursive else [])
+              )
+
+    # adjust path strings
+    for ds_model in dss:
+        path = ds_model.path[len(topdir) + 1 if topdir else 0:]
+        if not path:
+            path = '.'
+        ds_model.path = path
+
+    maxpath = max(len(ds_model.path) for ds_model in dss)
+    format_str = "{ds.path!B:<%d}  [{ds.type}]  {ds.branch!N}  {ds.describe!N}  {ds.clean!X}" \
+                 % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    if all:
+        format_str += "  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
+
+    formatter = LsFormatter()
+    # weird problems happen in the parallel run -- TODO - figure it out
+    for out in Parallel(n_jobs=1)(
+            delayed(format_ds_model)(formatter, dsm, format_str)
+            for dsm in dss
+        ):
+        print(out)
+
+
+#
+# S3 listing
+#
 
 def _ls_s3(loc, recursive=False, all=False, config_file=None, list_content=False):
     """List S3 bucket content"""
@@ -182,7 +341,7 @@ def _ls_s3(loc, recursive=False, all=False, config_file=None, list_content=False
                 # IO intensive, make an option finally!
                 try:
                     # _ = e.next()[:5]  if we are able to fetch the content
-                    kwargs = dict(version_id = e.version_id)
+                    kwargs = dict(version_id=e.version_id)
                     if list_content in {'full', 'first10'}:
                         if list_content in 'first10':
                             kwargs['headers'] = {'Range': 'bytes=0-9'}
