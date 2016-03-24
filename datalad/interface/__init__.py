@@ -24,7 +24,8 @@ from .download_url import DownloadURL
 from .ls import Ls
 from .clean import Clean
 from ..distribution.install import Install
-from ..distribution.publish import Publish
+# Needs to be fixed first to not ruin the rest
+# from ..distribution.publish import Publish
 from .POC_move import POCMove
 from .POC_update import POCUpdate
 from .POC_uninstall import POCUninstall
@@ -38,7 +39,8 @@ _group_handle = (
     'Commands for dataset operations',
     [
         Install,
-        Publish,
+        # Re-enable after fixing
+        # Publish,
         POCUninstall,
         POCMove,
         POCUpdate,
