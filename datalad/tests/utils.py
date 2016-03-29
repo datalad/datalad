@@ -521,7 +521,8 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo
+from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+    SubmoduleDataset, NestedDataset, InnerSubmodule
 
 _TESTREPOS = None
 
@@ -532,18 +533,38 @@ def _get_testrepos_uris(regex, flavors):
     if not _TESTREPOS:
         _basic_annex_test_repo = BasicAnnexTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
+        _submodule_annex_test_repo = SubmoduleDataset()
+        _nested_submodule_annex_test_repo = NestedDataset()
+        _inner_submodule_annex_test_repo = InnerSubmodule()
         _TESTREPOS = {'basic_annex':
                         {'network': 'git://github.com/datalad/testrepo--basic--r1',
                          'local': _basic_annex_test_repo.path,
                          'local-url': _basic_annex_test_repo.url},
                       'basic_git':
                         {'local': _basic_git_test_repo.path,
-                         'local-url': _basic_git_test_repo.url}}
+                         'local-url': _basic_git_test_repo.url},
+                      'submodule_annex':
+                        {'local': _submodule_annex_test_repo.path,
+                         'local-url': _submodule_annex_test_repo.url},
+                      'nested_submodule_annex':
+                        {'local': _nested_submodule_annex_test_repo.path,
+                         'local-url': _nested_submodule_annex_test_repo.url},
+                      # TODO: append 'annex' to the name:
+                      # Currently doesn't work with some annex tests, despite
+                      # working manually. So, figure out how the tests' setup
+                      # messes things up with this one.
+                      'inner_submodule':
+                        {'local': _inner_submodule_annex_test_repo.path,
+                         'local-url': _inner_submodule_annex_test_repo.url}
+                      }
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
         if not on_windows:
             _basic_annex_test_repo.create()
             _basic_git_test_repo.create()
+            _submodule_annex_test_repo.create()
+            _nested_submodule_annex_test_repo.create()
+            _inner_submodule_annex_test_repo.create()
     uris = []
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
