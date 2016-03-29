@@ -210,7 +210,7 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
     except Exception as exc:
         return formatter.format(format_exc, ds=ds_model, msg=exc_str(exc))
 
-from joblib import Parallel, delayed
+# from joblib import Parallel, delayed
 
 def _ls_dataset(loc, recursive=False, all=False):
     from ..support.dataset import Dataset
@@ -239,12 +239,12 @@ def _ls_dataset(loc, recursive=False, all=False):
 
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
-    for out in Parallel(n_jobs=1)(
-            delayed(format_ds_model)(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}")
-            for dsm in dss
-        ):
-        print(out)
-
+    # for out in Parallel(n_jobs=1)(
+    #         delayed(format_ds_model)(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}")
+    #         for dsm in dss):
+    #     print(out)
+    for dsm in dss:
+        print(format_ds_model(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}"))
 
 #
 # S3 listing
