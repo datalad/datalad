@@ -132,14 +132,11 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         annex.create()
         from datalad.cmd import Runner
         runner = Runner()
-        runner.run(['git', 'submodule', 'add', annex.url, 'sub1'],
-                   cwd=self.path)
-        runner.run(['git', 'submodule', 'add', annex.url, 'sub2'],
-                   cwd=self.path)
-        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'],
-                   cwd=self.path)
-        runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
-                   cwd=self.path)
+        kw = dict(cwd=self.path, expect_stderr=True)
+        runner.run(['git', 'submodule', 'add', annex.url, 'sub1'], **kw)
+        runner.run(['git', 'submodule', 'add', annex.url, 'sub2'], **kw)
+        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'], **kw)
+        runner.run(['git', 'submodule', 'update', '--init', '--recursive'], **kw)
 
 
 class NestedDataset(SubmoduleDataset):
@@ -150,16 +147,17 @@ class NestedDataset(SubmoduleDataset):
         ds.create()
         from datalad.cmd import Runner
         runner = Runner()
+        kw = dict(expect_stderr=True)
         runner.run(['git', 'submodule', 'add', ds.url, 'sub1'],
-                   cwd=opj(self.path, 'sub1'))
+                   cwd=opj(self.path, 'sub1'), **kw)
         runner.run(['git', 'submodule', 'add', ds.url, 'sub2'],
-                   cwd=opj(self.path, 'sub1'))
+                   cwd=opj(self.path, 'sub1'), **kw)
         runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'],
-                   cwd=opj(self.path, 'sub1'))
+                   cwd=opj(self.path, 'sub1'), **kw)
         runner.run(['git', 'commit', '-a', '-m', 'Added subsubmodules.'],
-                   cwd=self.path)
+                   cwd=self.path, **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
-                   cwd=self.path)
+                   cwd=self.path, **kw)
 
 
 class InnerSubmodule(object):
