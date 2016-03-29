@@ -68,24 +68,6 @@ def test_AnnexRepo_instance_brand_new(path):
     assert_true(os.path.exists(os.path.join(path, '.git')))
 
 
-@ignore_nose_capturing_stdout
-@assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=['local', 'network'])
-@with_tempfile
-def test_AnnexRepo_get(src, dst):
-
-    ar = AnnexRepo(dst, src)
-    assert_is_instance(ar, AnnexRepo, "AnnexRepo was not created.")
-    testfile = 'test-annex.dat'
-    testfile_abs = os.path.join(dst, testfile)
-    assert_false(ar.file_has_content("test-annex.dat"))
-    ok_annex_get(ar, testfile)
-
-    f = open(testfile_abs, 'r')
-    assert_equal(f.readlines(), ['123\n'],
-                 "test-annex.dat's content doesn't match.")
-
-
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*')
 @with_tempfile
