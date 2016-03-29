@@ -17,7 +17,7 @@ import logging
 
 import os
 from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
-    exists, islink
+    exists, islink, sep
 from datalad.distribution.dataset import Dataset, datasetmethod, \
     resolve_path, EnsureDataset
 from datalad.support.param import Parameter
@@ -35,6 +35,9 @@ from datalad.interface.POC_helpers import get_git_dir
 
 lgr = logging.getLogger('datalad.distribution.install')
 
+def _with_sep(path):
+    """Little helper to guarantee that path ends with /"""
+    return path + sep if not path.endswith(sep) else path
 
 def get_containing_subdataset(ds, path):
     """Given a base dataset and a relative path get containing subdataset
@@ -55,8 +58,8 @@ def get_containing_subdataset(ds, path):
         raise ValueError("path {0} not in dataset.".format(path))
 
     for subds in ds.get_dataset_handles():
-        common = os.path.commonprefix((subds, path))
-        if common and isdir(opj(ds.path, common)):
+        common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
+        if common.endswith(sep) and isdir(opj(ds.path, common)):
             return Dataset(path=opj(ds.path, common))
     return ds
 

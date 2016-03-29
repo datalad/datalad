@@ -151,7 +151,9 @@ class AnnexRepo(GitRepo):
         # XXX this doesn't work for a submodule!
         if not exists(opj(self.path, '.git', 'annex')):
             # so either it is not annex at all or just was not yet initialized
-            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())):
+            # TODO: unify/reuse code somewhere else on detecting being annex
+            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())) or \
+                any((b == 'git-annex' for b in self.git_get_branches())):
                 # it is an annex repository which was not initialized yet
                 if create or init:
                     lgr.debug('Annex repository was not yet initialized at %s.'
