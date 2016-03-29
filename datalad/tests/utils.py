@@ -521,9 +521,8 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
-    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo, \
-    CollectionTestRepo
+from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+    SubmoduleDataset, NestedDataset, InnerSubmodule
 
 _TESTREPOS = None
 
@@ -533,39 +532,39 @@ def _get_testrepos_uris(regex, flavors):
     # TODO: just absorb all this lazy construction within some class
     if not _TESTREPOS:
         _basic_annex_test_repo = BasicAnnexTestRepo()
-        _basic_handle_test_repo = BasicHandleTestRepo()
-        _basic_collection_test_repo = BasicCollectionTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
-        _md_pt_handle_test_repo = MetadataPTHandleTestRepo()
-        _collection_test_repo = CollectionTestRepo()
+        _submodule_annex_test_repo = SubmoduleDataset()
+        _nested_submodule_annex_test_repo = NestedDataset()
+        _inner_submodule_annex_test_repo = InnerSubmodule()
         _TESTREPOS = {'basic_annex':
                         {'network': 'git://github.com/datalad/testrepo--basic--r1',
                          'local': _basic_annex_test_repo.path,
                          'local-url': _basic_annex_test_repo.url},
-                      'basic_annex_handle':
-                        {'local': _basic_handle_test_repo.path,
-                         'local-url': _basic_handle_test_repo.url},
                       'basic_git':
                         {'local': _basic_git_test_repo.path,
                          'local-url': _basic_git_test_repo.url},
-                      'basic_git_collection':
-                        {'local': _basic_collection_test_repo.path,
-                         'local-url': _basic_collection_test_repo.url},
-                      'meta_pt_annex_handle':
-                        {'local': _md_pt_handle_test_repo.path,
-                         'local-url': _md_pt_handle_test_repo.url},
-                      'collection':
-                        {'local': _collection_test_repo.path,
-                         'local-url': _collection_test_repo.url}}
+                      'submodule_annex':
+                        {'local': _submodule_annex_test_repo.path,
+                         'local-url': _submodule_annex_test_repo.url},
+                      'nested_submodule_annex':
+                        {'local': _nested_submodule_annex_test_repo.path,
+                         'local-url': _nested_submodule_annex_test_repo.url},
+                      # TODO: append 'annex' to the name:
+                      # Currently doesn't work with some annex tests, despite
+                      # working manually. So, figure out how the tests' setup
+                      # messes things up with this one.
+                      'inner_submodule':
+                        {'local': _inner_submodule_annex_test_repo.path,
+                         'local-url': _inner_submodule_annex_test_repo.url}
+                      }
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
         if not on_windows:
             _basic_annex_test_repo.create()
-            _basic_handle_test_repo.create()
-            _basic_collection_test_repo.create()
             _basic_git_test_repo.create()
-            _md_pt_handle_test_repo.create()
-            _collection_test_repo.create()
+            _submodule_annex_test_repo.create()
+            _nested_submodule_annex_test_repo.create()
+            _inner_submodule_annex_test_repo.create()
     uris = []
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
