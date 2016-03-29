@@ -10,7 +10,7 @@
 import tempfile
 
 from abc import ABCMeta, abstractmethod
-from os.path import dirname, join as pathjoin, exists, pardir, realpath
+from os.path import dirname, join as opj, exists, pardir, realpath
 
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
@@ -52,7 +52,7 @@ class TestRepo(object):
         return get_local_file_url(self.path)
 
     def create_file(self, name, content, add=True, annex=False):
-        filename = pathjoin(self.path, name)
+        filename = opj(self.path, name)
         with open(filename, 'wb') as f:
             f.write(content.encode())
         if add:
@@ -82,7 +82,7 @@ class BasicAnnexTestRepo(TestRepo):
         self.repo.git_commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
         from .utils import on_windows
-        fileurl = get_local_file_url(realpath(pathjoin(self.path, 'test.dat'))) \
+        fileurl = get_local_file_url(realpath(opj(self.path, 'test.dat'))) \
                   if not on_windows \
                   else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
         self.repo.annex_addurl_to_file("test-annex.dat", fileurl)
@@ -120,3 +120,58 @@ class BasicGitTestRepo(TestRepo):
                          "datalad: %s\n"
                          % (git_version, __version__),
                          annex=False)
+
+
+class SubmoduleDataset(BasicAnnexTestRepo):
+
+    def populate(self):
+
+        super(SubmoduleDataset, self).populate()
+        # add submodules
+        annex = BasicAnnexTestRepo()
+        annex.create()
+        from datalad.cmd import Runner
+        runner = Runner()
+        kw = dict(cwd=self.path, expect_stderr=True)
+        runner.run(['git', 'submodule', 'add', annex.url, 'sub1'], **kw)
+        runner.run(['git', 'submodule', 'add', annex.url, 'sub2'], **kw)
+        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'], **kw)
+        runner.run(['git', 'submodule', 'update', '--init', '--recursive'], **kw)
+
+
+class NestedDataset(SubmoduleDataset):
+
+    def populate(self):
+        super(NestedDataset, self).populate()
+        ds = SubmoduleDataset()
+        ds.create()
+        from datalad.cmd import Runner
+        runner = Runner()
+        kw = dict(expect_stderr=True)
+        runner.run(['git', 'submodule', 'add', ds.url, 'sub1'],
+                   cwd=opj(self.path, 'sub1'), **kw)
+        runner.run(['git', 'submodule', 'add', ds.url, 'sub2'],
+                   cwd=opj(self.path, 'sub1'), **kw)
+        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'],
+                   cwd=opj(self.path, 'sub1'), **kw)
+        runner.run(['git', 'commit', '-a', '-m', 'Added subsubmodules.'],
+                   cwd=self.path, **kw)
+        runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
+                   cwd=self.path, **kw)
+
+
+class InnerSubmodule(object):
+
+    def __init__(self):
+        self._ds = NestedDataset()
+
+    @property
+    def path(self):
+        return opj(self._ds.path, 'sub1', 'sub1')
+
+    @property
+    def url(self):
+        return get_local_file_url(self.path)
+
+    def create(self):
+        self._ds.create()
