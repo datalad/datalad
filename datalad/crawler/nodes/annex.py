@@ -1114,12 +1114,14 @@ class Annexificator(object):
         """
         def _initiate_handle(data):
             for data_ in initiate_handle(*args, **kwargs)(data):
-                # Also "register" as a sub-handle
-                out = install(
-                        dataset=Dataset(self.repo.path),
-                        path=data_['handle_path'],
-                        source=data_['handle_path'],
-                        )
-                # TODO: reconsider adding smth to data_ to be yielded"
+                # Also "register" as a sub-handle if not yet registered
+                ds = Dataset(self.repo.path)
+                if data['handle_name'] not in ds.get_dataset_handles():
+                    out = install(
+                            dataset=ds,
+                            path=data_['handle_path'],
+                            source=data_['handle_path'],
+                            )
+                    # TODO: reconsider adding smth to data_ to be yielded"
                 yield data_
         return _initiate_handle
