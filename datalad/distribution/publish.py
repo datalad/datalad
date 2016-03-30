@@ -16,7 +16,7 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, exists, commonprefix, relpath
+from os.path import join as opj, abspath, expanduser, expandvars, exists, commonprefix, relpath, basename
 
 from six import string_types
 from datalad.support.param import Parameter
@@ -129,42 +129,13 @@ class Publish(Interface):
                 # no top-level dataset found, use path as such
                 dspath = path
             ds = Dataset(dspath)
-        assert(ds is not None)
         lgr.debug("Resolved dataset for publication: {0}".format(ds))
+        assert(ds is not None)
 
-        # TODO: we cannot publish anything from a not installed dataset, can we?
-        # But may be just the existence of ds.repo is important here.
-        if not ds.is_installed():
-            raise ValueError("No installed dataset found at {0}.".format(ds.path))
-        assert(ds.repo is not None)
-
-        # TODO: For now we can deal with a sibling(remote) name given by `dest`
-        # only. Figure out, when to allow for passing a local path or URL
-        # directly and what to do in that case.
-
-        # TODO: The following is misplaced here. Remote is relevant only, if we
-        # need to actually operate on this dataset. And it needs to be checked
-        # for all datasets invloved (recursive).
-        # is destination a known remote?
-        # TODO: in case of dest is None, check for tracking branch right here?
-        if dest is not None and dest not in ds.repo.git_get_remotes():
-            # unknown remote
-            if dest_url is None:
-                raise ValueError("Cannot register %s without an URL." % dest)
-
-            lgr.info("%s unknown. Registering ...")
-            # TODO: create it
-            pass
-
-        # Figure out, what to publish
-        if path is None or path == ds.path:
-            # TODO: publish the dataset itself
-            pass
-            # return ds
-        elif exists(path):
-            relativepath = relpath(path, start=ds.path)
-            subds = get_containing_subdataset(ds, relativepath)
-            if subds.path != ds.path:
+        # it might still be about a subdataset of ds:
+        relativepath = relpath(path, start=ds.path)
+        subds = get_containing_subdataset(ds, relativepath)
+        if subds.path != ds.path:
                 # path belongs to a subdataset; hand it over
                 lgr.debug("Hand over to submodule %s" % subds.path)
                 return subds.publish(dest=dest,
@@ -174,6 +145,146 @@ class Publish(Interface):
                                      with_data=with_data,
                                      recursive=recursive)
 
+        # now, we know, we have to operate on ds. So, ds needs to be installed,
+        # since we cannot publish anything from a not installed dataset, can we?
+        # (But may be just the existence of ds.repo is important here.)
+        if not ds.is_installed():
+            raise ValueError("No installed dataset found at {0}.".format(ds.path))
+        assert(ds.repo is not None)
+
+        # TODO: For now we can deal with a sibling(remote) name given by `dest`
+        # only. Figure out, when to allow for passing a local path or URL
+        # directly and what to do in that case.
+
+        # Note: we need an upstream remote, if there's none given. We could
+        # wait for git push to complain, but we need to explicitly figure it
+        # out for pushing annex branch anyway and we might as well fail right
+        # here.
+
+        # keep original dest in case it's None for passing to recursive calls:
+        dest_resolved = dest
+        if dest is None:
+            # check for tracking branch's remote:
+            try:
+                std_out, std_err = \
+                    ds.repo._git_custom_command('',
+                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.git_get_active_branch())])
+            except CommandError as e:
+                if e.code == 1 and e.stdout == "":
+                    std_out = None
+                else:
+                    raise
+            if std_out:
+                dest_resolved = std_out.strip()
+            else:
+                # we have no remote given and no upstream => fail
+                raise RuntimeError("No known default target for "
+                                   "publication and none given.")
+
+        # upstream branch needed for update (merge) and subsequent push,
+        # in case there is no.
+        set_upstream = False
+        try:
+            # Note: tracking branch actually defined bei entry "merge"
+            # PLUS entry "remote"
+            std_out, std_err = \
+                ds.repo._git_custom_command('',
+                    ["git", "config", "--get",
+                     "branch.{active_branch}.merge".format(
+                         active_branch=ds.repo.git_get_active_branch())])
+        except CommandError as e:
+            if e.code == 1 and e.stdout == "":
+                # no tracking branch yet:
+                set_upstream = True
+            else:
+                raise
+
+        # is `dest` an already known remote?
+        if dest_resolved not in ds.repo.git_get_remotes():
+            # unknown remote
+            if dest_url is None:
+                raise ValueError("No sibling '%s' found. Provide `dest-url`"
+                                 " to register it." % dest_resolved)
+            lgr.info("Sibling %s unknown. Registering ...")
+
+            # Fill in URL-Template:
+            remote_url = dest_url.replace("%%NAME", basename(ds.path))
+            # TODO: handle_name.replace("/", "-")) instead of basename()
+            #       - figure it out ;)
+            #       - either a datasets needs to discover superdatasets in
+            #         order to get it's relative path to provide a name
+            #       - or: We need a different approach on the templates
+
+            # Add the remote
+            ds.repo.git_remote_add(dest_resolved, remote_url)
+            if dest_pushurl:
+                # Fill in template:
+                remote_url_push = \
+                    dest_pushurl.replace("%%NAME", basename(ds.path))
+                # TODO: Different way of replacing %NAME; See above
+
+                # Modify push url:
+                ds.repo._git_custom_command('',
+                                            ["git", "remote",
+                                             "set-url",
+                                             "--push", dest_resolved,
+                                             remote_url_push])
+            lgr.info("Added sibling '%s'." % dest)
+            lgr.debug("Added remote '%s':\n %s (fetch)\n%s (push)." %
+                      (dest_resolved, remote_url,
+                       remote_url_push if remote_url_push else remote_url))
+        else:
+            # known remote: parameters dest-url-* currently invalid.
+            # This may change to adapt the existing remote.
+            if dest_url:
+                lgr.warning("Sibling '%s' already exists for dataset '%s'. "
+                            "Ignoring dest-url %s." %
+                            (dest_resolved, ds.path, dest_url))
+            if dest_pushurl:
+                lgr.warning("Sibling '%s' already exists for dataset '%s'. "
+                            "Ignoring dest-pushurl %s." %
+                            (dest_resolved, ds.path, dest_pushurl))
+
+        # Figure out, what to publish
+        if path is None or path == ds.path:
+            # => publish the dataset itself
+            # push local state:
+            # TODO: Rework git_push in GitRepo
+            cmd = ['git', 'push']
+            if set_upstream:
+                # no upstream branch yet
+                cmd.append("--set-upstream")
+            cmd += [dest_resolved, ds.repo.git_get_active_branch()]
+            ds.repo._git_custom_command('',cmd)
+            # push annex branch:
+            if isinstance(ds.repo, AnnexRepo):
+                ds.repo.git_push("%s +git-annex:git-annex" % dest)
+
+            # TODO: if with_data is a shell pattern, we get a list, when called
+            # from shell, right?
+            # => adapt the following and check constraints to allow for that
+            if with_data:
+                ds.repo._git_custom_command('', ["git", "annex", "copy"] +
+                                            with_data + ["--to", dest_resolved])
+
+            if recursive:
+                results = [ds]
+                for subds in ds.get_dataset_handles():
+                    results.append(Dataset(opj(ds.path,
+                                              subds)).publish(
+                        dest=dest,
+                        # Note: use `dest` instead of `dest_resolved` in case
+                        # dest was None, so subdatasets would use their default
+                        # as well
+                        dest_url=dest_url,
+                        dest_pushurl=dest_pushurl,
+                        with_data=with_data,
+                        recursive=recursive))
+                return results
+
+            return ds
+
+        elif exists(path):
             # At this point `path` is not referencing a (sub)dataset.
             # An annexed file is the only thing left, that `path` might be
             # validly pointing to. Anything else we can't handle currently.
@@ -184,7 +295,7 @@ class Publish(Interface):
                         # TODO: annex copy to
                         # return path
                         pass
-                except FileInGitError, FileNotInAnnexError:
+                except (FileInGitError, FileNotInAnnexError):
                     pass
             # `path` can't be published
             lgr.warning("Don't know how to publish %s." % path)
@@ -194,103 +305,3 @@ class Publish(Interface):
             # nothing to publish found
             lgr.warning("Nothing to publish found at %s." % path)
             return None
-
-
-        # TODO: Remainings from old one; to be moved upwards:
-        #
-        # handles_to_publish = [top_repo]
-        #
-        # if recursive:
-        #     handles_to_publish += [GitRepo(opj(top_repo.path, subhandle),
-        #                                    create=False)
-        #                            for subhandle in
-        #                            get_submodules_list(top_repo)]
-        #
-        # for handle_repo in handles_to_publish:
-        #
-        #     handle_name = handle_repo.path[len(
-        #         commonprefix([top_repo.path, handle_repo.path])):].strip("/")
-        #     set_upstream = False
-        #
-        #     if remote is not None and remote not in handle_repo.git_get_remotes():
-        #         if not remote_url:
-        #             raise ValueError("No remote '%s' found. Provide REMOTE-URL"
-        #                              " to add it." % remote)
-        #         lgr.info("Remote '%s' doesn't exist yet.")
-        #
-        #         # Fill in URL-Template:
-        #         remote_url = remote_url.replace("%%NAME",
-        #                                         handle_name.replace("/", "-"))
-        #         # Add remote
-        #         handle_repo.git_remote_add(remote, remote_url)
-        #         if remote_url_push:
-        #             # Fill in template:
-        #             remote_url_push = \
-        #                 remote_url_push.replace("%%NAME",
-        #                                         handle_name.replace("/", "-"))
-        #             # Modify push url:
-        #             handle_repo._git_custom_command('',
-        #                                             ["git", "remote",
-        #                                              "set-url",
-        #                                              "--push", remote,
-        #                                              remote_url_push])
-        #
-        #         lgr.info("Added remote '%s':\n %s (pull)\n%s (push)." %
-        #                  (remote, remote_url,
-        #                   remote_url_push if remote_url_push else remote_url))
-        #
-        #     else:
-        #         # known remote: parameters remote-url-* currently invalid.
-        #         # This may change to adapt the existing remote.
-        #         if remote_url:
-        #             lgr.warning("Remote '%s' already exists for handle '%s'. "
-        #                         "Ignoring remote-url %s." %
-        #                         (remote, handle_name, remote_url))
-        #         if remote_url_push:
-        #             lgr.warning("Remote '%s' already exists for handle '%s'. "
-        #                         "Ignoring remote-url-push %s." %
-        #                         (remote, handle_name, remote_url_push))
-        #
-        #     # upstream branch needed for update (merge) and subsequent push,
-        #     # in case there is no.
-        #     try:
-        #         # Note: tracking branch actually defined bei entry "merge"
-        #         # PLUS entry "remote"
-        #         std_out, std_err = \
-        #             handle_repo._git_custom_command('',
-        #                                             ["git", "config", "--get", "branch.{active_branch}.merge".format(active_branch=handle_repo.git_get_active_branch())])
-        #     except CommandError as e:
-        #         if e.code == 1 and e.stdout == "":
-        #             # no tracking branch:
-        #             set_upstream = True
-        #         else:
-        #             raise
-        #
-        #     # push local state:
-        #     handle_repo.git_push(("%s %s %s" % ("--set-upstream" if set_upstream else '', remote, handle_repo.git_get_active_branch())) if remote else '', )
-        #
-        #     # in case of an annex also push git-annex branch; if no remote
-        #     # given, figure out remote of the tracking branch:
-        #     if knows_annex(handle_repo.path):
-        #         if remote is None:
-        #             # check for tracking branch's remote:
-        #             try:
-        #                 std_out, std_err = \
-        #                     handle_repo._git_custom_command('',
-        #                                                     ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=handle_repo.git_get_active_branch())])
-        #             except CommandError as e:
-        #                 if e.code == 1 and e.stdout == "":
-        #                     std_out = None
-        #                 else:
-        #                     raise
-        #             if std_out:
-        #                 remote = std_out.strip()
-        #             else:
-        #                 raise RuntimeError("Couldn't determine what remote to push git-annex branch to")
-        #
-        #         handle_repo.git_push("%s +git-annex:git-annex" % remote)
-        #
-        #     if with_data:
-        #         handle_repo._git_custom_command('',
-        #                                         ["git", "annex", "copy"] +
-        #                                         with_data + ["--to", remote])
