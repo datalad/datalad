@@ -150,7 +150,8 @@ class AddArchiveContent(Interface):
         #         #exclude="license.*",  # regexp
         #     ),
 
-    def __call__(self, archive, annex=None, strip_leading_dirs=False, leading_dirs_depth=None,
+    @staticmethod
+    def __call__(archive, annex=None, strip_leading_dirs=False, leading_dirs_depth=None,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None):

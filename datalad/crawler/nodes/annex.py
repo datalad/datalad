@@ -29,7 +29,6 @@ from git import Repo
 from ...version import __version__
 from ...api import add_archive_content
 from ...api import clean
-from ...api import POC_install
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
@@ -39,6 +38,8 @@ from ...utils import getpwd
 from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
+from ...distribution.dataset import Dataset
+from ...api import install
 from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
@@ -183,6 +184,8 @@ class initiate_handle(object):
         else:
             handle_path = self.path
 
+        data_updated = updated(data, {'handle_path': handle_path,
+                                      'handle_name': handle_name})
         lgr.debug("Request to initialize a handle %s at %s", handle_name, handle_path)
         init = True
         if exists(handle_path):
@@ -191,7 +194,7 @@ class initiate_handle(object):
             existing = self.existing or 'skip'
             if existing == 'skip':
                 lgr.info("Skipping handle %s since already exists" % handle_name)
-                yield data
+                yield data_updated
                 return
             elif existing == 'raise':
                 raise RuntimeError("%s already exists" % handle_path)
@@ -206,9 +209,7 @@ class initiate_handle(object):
             _call(self._initiate_handle, handle_path, handle_name)
         _call(self._save_crawl_config, handle_path, handle_name, data)
 
-
-        yield updated(data, {'handle_path': handle_path,
-                             'handle_name': handle_name})
+        yield data_updated
 
 
 class Annexificator(object):
@@ -1113,14 +1114,14 @@ class Annexificator(object):
         """
         def _initiate_handle(data):
             for data_ in initiate_handle(*args, **kwargs)(data):
-                # Also "register" as a sub-handle
-                out = POC_install(src=data_['handle_path'],  # dest=data_['handle_path'],
-                                  # POC_install doesn't like having both dest and name specified
-                                  # since it implies "git worktree" use case
-                                  name=data_['handle_name'],
-                                  roothandle=self.repo.path,  # as a sub-handle
-                                  create=False  # it must be created already and we don't want to override
-                                  )
-                assert out is None, "TODO: whenever it returns anything we might reconsider adding smth to data_ to be yielded"
+                # Also "register" as a sub-handle if not yet registered
+                ds = Dataset(self.repo.path)
+                if data['handle_name'] not in ds.get_dataset_handles():
+                    out = install(
+                            dataset=ds,
+                            path=data_['handle_path'],
+                            source=data_['handle_path'],
+                            )
+                    # TODO: reconsider adding smth to data_ to be yielded"
                 yield data_
         return _initiate_handle

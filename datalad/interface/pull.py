@@ -35,7 +35,8 @@ class Pull(Interface):
             constraints=EnsureStr(),
             nargs='?'))
 
-    def __call__(self, remote='origin'):
+    @staticmethod
+    def __call__(remote='origin'):
 
         repo = get_repo_instance()
         repo.git_pull()

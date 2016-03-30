@@ -19,13 +19,13 @@ from os import curdir
 from os.path import join as opj, abspath, expanduser, expandvars, exists
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureHandleAbsolutePath
+    EnsureDatasetAbsolutePath
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.cmdline.helpers import POC_get_root_handle
 from .base import Interface
-from .POC_helpers import get_submodules_dict, get_submodules_list, is_annex, get_all_submodules_dict, get_git_dir, get_module_parser
+from .POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_module_parser
 from datalad.cmd import CommandError
 from datalad.utils import assure_dir
 from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
@@ -49,7 +49,7 @@ class POCModifySubhandleURLs(Interface):
             doc="Name of or path to the handle, whose subhandle URLs to modify. "
                 "Defaults to CWD.",
             nargs="?",
-            constraints=EnsureHandleAbsolutePath()),
+            constraints=EnsureDatasetAbsolutePath()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
@@ -63,7 +63,8 @@ class POCModifySubhandleURLs(Interface):
     #     doc="",
     #     constraints=EnsureChoice(["all", "ask"]),)
 
-    def __call__(self, url, handle=curdir, recursive=False):
+    @staticmethod
+    def __call__(url, handle=curdir, recursive=False):
 
         # TODO: Exception handling:
         top_handle_repo = GitRepo(handle, create=False)

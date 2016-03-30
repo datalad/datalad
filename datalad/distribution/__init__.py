@@ -6,21 +6,8 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Run internal DataLad (unit)tests to verify correct operation on the system"""
+"""Datalad distribution components: dataset, metadata handling, ...
 
+"""
 
 __docformat__ = 'restructuredtext'
-
-
-import datalad
-from .base import Interface
-
-
-class Test(Interface):
-    """Run internal DataLad (unit)tests.
-
-    This can be used to verify correct operation on the system
-    """
-    @staticmethod
-    def __call__():
-        datalad.test()

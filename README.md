@@ -41,7 +41,7 @@ since we use it to provide backports of recent fixed external modules we depend 
 
 ```sh
 apt-get install -y -q git git-annex-standalone
-apt-get install -y -q patool python-scrapy python-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,rdflib,setuptools,six,sparqlwrapper}
+apt-get install -y -q patool python-scrapy python-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,setuptools,six}
 ```
 
 or additionally, if you would like to develop and run our tests battery as

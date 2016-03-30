@@ -34,6 +34,7 @@ from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
 from ..utils import optional_args, on_windows, getpwd
+from ..utils import swallow_logs
 from ..utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
@@ -358,17 +359,20 @@ class GitRepo(object):
 
         If path has symlinks -- they get resolved.
 
-        Returns None if not under git
+        Return None if no parent directory contains a git repository.
         """
         try:
-            toppath, err = Runner().run(
-                ["git", "rev-parse", "--show-toplevel"],
-                cwd=path,
-                log_stdout=True, log_stderr=True,
-                expect_fail=True, expect_stderr=True)
-            return toppath.rstrip('\n\r')
+            with swallow_logs():
+                toppath, err = Runner().run(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    cwd=path,
+                    log_stdout=True, log_stderr=True,
+                    expect_fail=True, expect_stderr=True)
+                return toppath.rstrip('\n\r')
         except CommandError:
             return None
+        except OSError:
+            return GitRepo.get_toppath(dirname(path))
 
     @normalize_paths
     def git_add(self, files):

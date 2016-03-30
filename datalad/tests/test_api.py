@@ -17,7 +17,7 @@ def test_basic_setup():
     # constraints
     from datalad import api
     # random pick of something that should be there
-    assert_true(hasattr(api, 'create_collection'))
+    assert_true(hasattr(api, 'install'))
     assert_true(hasattr(api, 'test'))
     assert_true(hasattr(api, 'crawl'))
     # make sure all helper utilities do not pollute the namespace
