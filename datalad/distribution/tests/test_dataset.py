@@ -17,7 +17,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
-from datalad.tests.utils import with_tempfile, assert_in, with_tree
+from datalad.tests.utils import with_tempfile, assert_in, with_tree, with_testrepos
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
@@ -32,7 +32,7 @@ def test_EnsureDataset():
 
     c = EnsureDataset()
 
-    # fails with anything else than a string or an Dataset:
+    # fails with anything else than a string or a Dataset:
     assert_raises(ValueError, c, 1)
     assert_raises(ValueError, c, ['a', 'list'])
     assert_raises(ValueError, c, (1, 2, 3))
@@ -75,20 +75,54 @@ def test_resolve_path(somedir):
 
 
 # TODO: test remember/recall more extensive?
-# TODO: proper testrepos needed!
-def register_sibling():
-    # Validation!
-    raise SkipTest("TODO")
+
+@with_testrepos(flavors=['local', 'local-url'])
+@with_tempfile(mkdir=True)
+def test_register_sibling(remote, path):
+    AnnexRepo(path)
+    ds = Dataset(path)
+    ds.register_sibling('my_sibling', remote)
+    assert_in('my_sibling', ds.repo.git_get_remotes())
+    eq_(ds.repo.git_get_remote_url('my_sibling'), remote)
 
 
-def test_get_dataset_handles():
-    # Flavors!
-    raise SkipTest("TODO")
+    ds.register_sibling('my_other_sibling', remote,
+                        publish_url='http://fake.pushurl.com')
+    assert_in('my_other_sibling', ds.repo.git_get_remotes())
+    eq_(ds.repo.git_get_remote_url('my_other_sibling'), remote)
+    # TODO: GitRepo method for push-url!
+
+    # TODO: Validation!
 
 
-def test_is_installed():
-    # different platforms, direct mode, etc.
-    raise SkipTest("TODO")
+@with_testrepos('.*nested_submodule.*', flavors=['local'])
+def test_get_dataset_handles(path):
+    ds = Dataset(path)
+    eq_(set(ds.get_dataset_handles()), {'sub1', 'sub2'})
+    eq_(set(ds.get_dataset_handles(recursive=True)),
+        {'sub1', 'sub2', 'sub1/sub1', 'sub1/sub2',
+         'sub1/sub2/sub1', 'sub1/sub2/sub2', 'sub1/sub1/sub1',
+         'sub1/sub1/sub2'})
+    # TODO:  More Flavors!
+
+
+# TODO: There's something wrong with the nested testrepo!
+@with_testrepos('submodule_annex')
+@with_tempfile(mkdir=True)
+def test_is_installed(src, path):
+    ds = Dataset(path)
+    assert_false(ds.is_installed())
+
+    # get a clone:
+    AnnexRepo(path, src)
+    ok_(ds.is_installed())
+    # submodule still not installed:
+    subds = Dataset(opj(path, 'sub1'))
+    assert_false(subds.is_installed())
+    # get the submodule
+    from datalad.cmd import Runner
+    Runner().run(['git', 'submodule', 'update', '--init', 'sub1'], cwd=path)
+    ok_(subds.is_installed())
 
 
 @with_tempfile(mkdir=True)
