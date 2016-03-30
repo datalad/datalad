@@ -151,7 +151,9 @@ class AnnexRepo(GitRepo):
         # XXX this doesn't work for a submodule!
         if not exists(opj(self.path, '.git', 'annex')):
             # so either it is not annex at all or just was not yet initialized
-            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())):
+            # TODO: unify/reuse code somewhere else on detecting being annex
+            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())) or \
+                any((b == 'git-annex' for b in self.git_get_branches())):
                 # it is an annex repository which was not initialized yet
                 if create or init:
                     lgr.debug('Annex repository was not yet initialized at %s.'
@@ -860,6 +862,28 @@ class AnnexRepo(GitRepo):
                 j.pop("command")
             out[f] = j
         return out
+
+    def annex_repo_info(self):
+        """Provide annex info for the entire repository.
+
+        Returns
+        -------
+        dict
+          Info for the repository, with keys matching the ones retuned by annex
+        """
+
+        json_records = list(self._run_annex_command_json('info', args=['--bytes']))
+        assert(len(json_records) == 1)
+
+        # TODO: we need to abstract/centralize conversion from annex fields
+        # For now just tune up few for immediate usability
+        info = json_records[0]
+        for k in info:
+            if k.endswith(' size') or k.endswith(' disk space') or k.startswith('size of '):
+                info[k] = int(info[k].split()[0])
+        assert(info.pop('success'))
+        assert(info.pop('command') == 'info')
+        return info  # just as is for now
 
     def get_annexed_files(self):
         """Get a list of files in annex
