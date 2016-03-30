@@ -140,6 +140,7 @@ class Install(Interface):
         if vcs is None:
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
+            lgr.info("Creating a new annex repo at %s", ds.path)
             AnnexRepo(ds.path, url=source, create=True)
             vcs = ds.repo
         assert(ds.repo)
@@ -176,6 +177,11 @@ class Install(Interface):
         # this dataset must already know everything necessary
         try:
             # it is simplest to let annex tell us what we are dealing with
+            lgr.debug("Trying to fetch file %s using annex", relativepath)
+            if not isinstance(vcs, AnnexRepo):
+                raise FileNotInAnnexError("We don't have yet annex repo here")
+                # TODO: relativepath might be in git, then we should have thrown
+                # FileInGitError.  Figure it all out! ;)
             if vcs.get_file_key(relativepath):
                 # this is an annex'ed file
                 # TODO implement `copy --from` using `source`
