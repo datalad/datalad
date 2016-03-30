@@ -144,8 +144,18 @@ class Install(Interface):
             vcs = ds.repo
         assert(ds.repo)
 
+        runner = Runner()
+
         if path is None or path == ds.path:
-            # if the goal was to install this dataset, we are done
+            # if the goal was to install this dataset, we are done,
+            # except for 'recursive'.
+
+            # TODO: For now 'recursive' means just submodules.
+            # See --with-data vs. -- recursive and figure it out
+            if recursive:
+                cmd_list = ["git", "submodule", "update", "--init",
+                            "--recursive"]
+                runner.run(cmd_list, cwd=ds.path)
             return ds
 
         # at this point this dataset is "installed", now we can test whether to
@@ -162,8 +172,6 @@ class Install(Interface):
         lgr.debug(
             "Resolved installation target relative to dataset {0}: {1}".format(
                 ds, relativepath))
-
-        runner = Runner()
 
         # this dataset must already know everything necessary
         try:
