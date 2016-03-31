@@ -133,17 +133,18 @@ class Publish(Interface):
         assert(ds is not None)
 
         # it might still be about a subdataset of ds:
-        relativepath = relpath(path, start=ds.path)
-        subds = get_containing_subdataset(ds, relativepath)
-        if subds.path != ds.path:
-                # path belongs to a subdataset; hand it over
-                lgr.debug("Hand over to submodule %s" % subds.path)
-                return subds.publish(dest=dest,
-                                     path=relpath(path, start=subds.path),
-                                     dest_url=dest_url,
-                                     dest_pushurl=dest_pushurl,
-                                     with_data=with_data,
-                                     recursive=recursive)
+        if path is not None:
+            relativepath = relpath(path, start=ds.path)
+            subds = get_containing_subdataset(ds, relativepath)
+            if subds.path != ds.path:
+                    # path belongs to a subdataset; hand it over
+                    lgr.debug("Hand over to submodule %s" % subds.path)
+                    return subds.publish(dest=dest,
+                                         path=relpath(path, start=subds.path),
+                                         dest_url=dest_url,
+                                         dest_pushurl=dest_pushurl,
+                                         with_data=with_data,
+                                         recursive=recursive)
 
         # now, we know, we have to operate on ds. So, ds needs to be installed,
         # since we cannot publish anything from a not installed dataset, can we?
@@ -168,7 +169,8 @@ class Publish(Interface):
             try:
                 std_out, std_err = \
                     ds.repo._git_custom_command('',
-                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.git_get_active_branch())])
+                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.git_get_active_branch())],
+                                                expect_fail=True)
             except CommandError as e:
                 if e.code == 1 and e.stdout == "":
                     std_out = None
@@ -189,9 +191,8 @@ class Publish(Interface):
             # PLUS entry "remote"
             std_out, std_err = \
                 ds.repo._git_custom_command('',
-                    ["git", "config", "--get",
-                     "branch.{active_branch}.merge".format(
-                         active_branch=ds.repo.git_get_active_branch())])
+                                            ["git", "config", "--get", "branch.{active_branch}.merge".format(active_branch=ds.repo.git_get_active_branch())],
+                                            expect_fail=True)
         except CommandError as e:
             if e.code == 1 and e.stdout == "":
                 # no tracking branch yet:
