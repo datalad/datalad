@@ -14,6 +14,8 @@ from os.path import lexists, dirname, join as opj
 # Hard coded version, to be done by release process
 __version__ = '0.1.dev0'
 
+# NOTE: might cause problems with "python setup.py develop" deployments
+#  so I have even changed buildbot to use  pip install -e .
 if lexists(opj(dirname(dirname(__file__)), '.git')):
     # If under git -- attempt to deduce a better "dynamic" version following git
     try:
