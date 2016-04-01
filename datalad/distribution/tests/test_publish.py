@@ -18,7 +18,7 @@ from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false
+from nose.tools import ok_, eq_, assert_false, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
     with_testrepos, assert_not_in
 from datalad.tests.utils import SkipTest
@@ -52,7 +52,8 @@ def test_publish_simple(origin, src_path, dst_path):
     target.git_checkout("TMP", "-b")
     source.repo.git_remote_add("target", dst_path)
 
-    publish(dataset=source, dest="target")
+    res = publish(dataset=source, dest="target")
+    eq_(res, source)
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
@@ -60,7 +61,8 @@ def test_publish_simple(origin, src_path, dst_path):
         list(source.repo.git_get_branch_commits("master")))
 
     # don't fail when doing it again
-    publish(dataset=source, dest="target")
+    res = publish(dataset=source, dest="target")
+    eq_(res, source)
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
@@ -79,7 +81,8 @@ def test_publish_simple(origin, src_path, dst_path):
     source.repo.git_commit("Modified.")
     ok_clean_git(src_path, annex=False)
 
-    publish(dataset=source)
+    res = publish(dataset=source)
+    eq_(res, source)
 
     ok_clean_git(dst_path, annex=False)
     eq_(list(target.git_get_branch_commits("master")),
@@ -123,7 +126,16 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub2.git_remote_add("target", sub2_pub)
 
     # publish recursively
-    publish(dataset=source, dest="target", recursive=True)
+    res = publish(dataset=source, dest="target", recursive=True)
+
+    # testing result list
+    # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
+    assert_is_instance(res, list)
+    for item in res:
+        assert_is_instance(item, Dataset)
+    eq_(res[0].path, src_path)
+    eq_(res[1].path, sub1.path)
+    eq_(res[2].path, sub2.path)
 
     eq_(list(target.git_get_branch_commits("master")),
         list(source.repo.git_get_branch_commits("master")))
@@ -158,7 +170,9 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     target.git_checkout("TMP", "-b")
     source_sub.repo.git_remote_add("target", target_1)
 
-    publish(dataset=source_super, dest="target", path="sub1")
+    res = publish(dataset=source_super, dest="target", path="sub1")
+    assert_is_instance(res, Dataset)
+    eq_(res.path, source_sub.path)
 
     eq_(list(GitRepo(target_1, create=False).git_get_branch_commits("master")),
         list(source_sub.repo.git_get_branch_commits("master")))
@@ -170,7 +184,8 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     target.git_checkout("TMP", "-b")
     source_sub.repo.git_remote_add("target2", target_2)
 
-    publish(dataset=source_sub, dest="target2")
+    res = publish(dataset=source_sub, dest="target2")
+    eq_(res, source_sub)
 
     eq_(list(GitRepo(target_2, create=False).git_get_branch_commits("master")),
         list(source_sub.repo.git_get_branch_commits("master")))
@@ -196,7 +211,8 @@ def test_publish_with_data(origin, src_path, dst_path):
     target.git_checkout("TMP", "-b")
     source.repo.git_remote_add("target", dst_path)
 
-    publish(dataset=source, dest="target", with_data=['test-annex.dat'])
+    res = publish(dataset=source, dest="target", with_data=['test-annex.dat'])
+    eq_(res, source)
 
     eq_(list(target.git_get_branch_commits("master")),
         list(source.repo.git_get_branch_commits("master")))
@@ -231,7 +247,8 @@ def test_publish_file_handle(origin, src_path, dst_path):
     source.repo.git_remote_add("target", dst_path)
 
     # directly publish a file handle, not the dataset itself:
-    publish(dataset=source, dest="target", path="test-annex.dat")
+    res = publish(dataset=source, dest="target", path="test-annex.dat")
+    eq_(res, opj(source.path, 'test-annex.dat'))
 
     # only file was published, not the dataset itself:
     assert_not_in("master", target.git_get_branches())
@@ -252,7 +269,6 @@ def test_publish_file_handle(origin, src_path, dst_path):
     # source, target's annex doesn't know about the file.
     # Figure out, whether this should behave differently and how ...
     # eq_(target.file_has_content(['test-annex.dat']), [True])
-
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -284,9 +300,19 @@ def test_publish_add_remote(origin, src_path, dst_path):
 
     url_template = dst_path + os.path.sep + '%NAME'
 
-    publish(dataset=source, dest="target",
+    res = publish(dataset=source, dest="target",
             dest_url=url_template,
             recursive=True)
+
+    # testing result list
+    # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
+    assert_is_instance(res, list)
+    for item in res:
+        assert_is_instance(item, Dataset)
+    eq_(res[0].path, src_path)
+    eq_(res[1].path, sub1.path)
+    eq_(res[2].path, sub2.path)
+
 
     eq_(list(super_target.git_get_branch_commits("master")),
         list(source.repo.git_get_branch_commits("master")))

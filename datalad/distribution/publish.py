@@ -269,7 +269,7 @@ class Publish(Interface):
                 ds.repo._git_custom_command('', ["git", "annex", "copy"] +
                                             with_data + ["--to", dest_resolved])
 
-            if recursive:
+            if recursive and ds.get_dataset_handles() != []:
                 results = [ds]
                 # modify URL templates:
                 if dest_url:
