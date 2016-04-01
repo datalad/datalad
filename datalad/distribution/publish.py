@@ -191,7 +191,8 @@ class Publish(Interface):
             # PLUS entry "remote"
             std_out, std_err = \
                 ds.repo._git_custom_command('',
-                                            ["git", "config", "--get", "branch.{active_branch}.merge".format(active_branch=ds.repo.git_get_active_branch())],
+                                            ["git", "config", "--get",
+                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.git_get_active_branch())],
                                             expect_fail=True)
         except CommandError as e:
             if e.code == 1 and e.stdout == "":
@@ -207,7 +208,6 @@ class Publish(Interface):
                 raise ValueError("No sibling '%s' found. Provide `dest-url`"
                                  " to register it." % dest_resolved)
             lgr.info("Sibling %s unknown. Registering ...")
-
 
             # Fill in URL-Template:
             remote_url = dest_url.replace("%NAME", basename(ds.path))
@@ -257,10 +257,10 @@ class Publish(Interface):
                 # no upstream branch yet
                 cmd.append("--set-upstream")
             cmd += [dest_resolved, ds.repo.git_get_active_branch()]
-            ds.repo._git_custom_command('',cmd)
+            ds.repo._git_custom_command('', cmd)
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.git_push("%s +git-annex:git-annex" % dest)
+                ds.repo.git_push("%s +git-annex:git-annex" % dest_resolved)
 
             # TODO: if with_data is a shell pattern, we get a list, when called
             # from shell, right?
@@ -298,10 +298,11 @@ class Publish(Interface):
             if isinstance(ds.repo, AnnexRepo):
                 try:
                     if ds.repo.get_file_key(relativepath):
-                        # file in annex
-                        # TODO: annex copy to
-                        # return path
-                        pass
+                        # file is in annex, publish it
+                        ds.repo._run_annex_command('copy',
+                                                   annex_options=[path,
+                                                                  '--to=%s' % dest_resolved])
+                        return path
                 except (FileInGitError, FileNotInAnnexError):
                     pass
             # `path` can't be published

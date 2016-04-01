@@ -43,6 +43,9 @@ def test_publish_simple(origin, src_path, dst_path):
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+    # forget we cloned it (provide no 'origin' anymore), which should lead to
+    # setting tracking branch to target:
+    source.repo.git_remote_remove("origin")
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -60,6 +63,24 @@ def test_publish_simple(origin, src_path, dst_path):
     publish(dataset=source, dest="target")
 
     ok_clean_git(src_path, annex=False)
+    ok_clean_git(dst_path, annex=False)
+    eq_(list(target.git_get_branch_commits("master")),
+        list(source.repo.git_get_branch_commits("master")))
+    eq_(list(target.git_get_branch_commits("git-annex")),
+        list(source.repo.git_get_branch_commits("git-annex")))
+
+    # 'target/master' should be tracking branch at this point, so
+    # try publishing without `dest`:
+
+    # some modification:
+    with open(opj(src_path, 'test_mod_file'), "w") as f:
+        f.write("Some additional stuff.")
+    source.repo.git_add(opj(src_path, 'test_mod_file'))
+    source.repo.git_commit("Modified.")
+    ok_clean_git(src_path, annex=False)
+
+    publish(dataset=source)
+
     ok_clean_git(dst_path, annex=False)
     eq_(list(target.git_get_branch_commits("master")),
         list(source.repo.git_get_branch_commits("master")))
@@ -148,6 +169,7 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     target = GitRepo(target_2, create=True)
     target.git_checkout("TMP", "-b")
     source_sub.repo.git_remote_add("target2", target_2)
+
     publish(dataset=source_sub, dest="target2")
 
     eq_(list(GitRepo(target_2, create=False).git_get_branch_commits("master")),
@@ -156,12 +178,81 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
         list(source_sub.repo.git_get_branch_commits("git-annex")))
 
 
-def test_publish_with_data():
-    raise SkipTest("TODO")
+@with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_publish_with_data(origin, src_path, dst_path):
+
+    # prepare src
+    source = install(path=src_path, source=origin, recursive=True)
+    # TODO: For now, circumnavigate the detached head issue.
+    # Figure out, what to do.
+    for subds in source.get_dataset_handles(recursive=True):
+        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+    source.repo.get('test-annex.dat')
+
+    # create plain git at target:
+    target = AnnexRepo(dst_path, create=True)
+    target.git_checkout("TMP", "-b")
+    source.repo.git_remote_add("target", dst_path)
+
+    publish(dataset=source, dest="target", with_data=['test-annex.dat'])
+
+    eq_(list(target.git_get_branch_commits("master")),
+        list(source.repo.git_get_branch_commits("master")))
+    # TODO: last commit in git-annex branch differs. Probably fine,
+    # but figure out, when exactly to expect this for proper testing:
+    eq_(list(target.git_get_branch_commits("git-annex"))[1:],
+        list(source.repo.git_get_branch_commits("git-annex"))[1:])
+
+    # we need compare target/master:
+    target.git_checkout("master")
+    eq_(target.file_has_content(['test-annex.dat']), [True])
 
 
-def test_publish_default_target():
-    raise SkipTest("TODO")
+@with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_publish_file_handle(origin, src_path, dst_path):
+
+    # prepare src
+    source = install(path=src_path, source=origin, recursive=True)
+    # TODO: For now, circumnavigate the detached head issue.
+    # Figure out, what to do.
+    for subds in source.get_dataset_handles(recursive=True):
+        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+    source.repo.get('test-annex.dat')
+
+    # create plain git at target:
+    target = AnnexRepo(dst_path, create=True)
+    # actually not needed for this test, but provide same setup as
+    # everywhere else:
+    target.git_checkout("TMP", "-b")
+    source.repo.git_remote_add("target", dst_path)
+
+    # directly publish a file handle, not the dataset itself:
+    publish(dataset=source, dest="target", path="test-annex.dat")
+
+    # only file was published, not the dataset itself:
+    assert_not_in("master", target.git_get_branches())
+    eq_(Dataset(dst_path).get_dataset_handles(), [])
+    assert_not_in("test.dat", target.git_get_files())
+
+    # content is now available from 'target':
+    assert_in("target",
+              source.repo.annex_whereis('test-annex.dat',
+                                        output="descriptions"))
+    source.repo.annex_drop('test-annex.dat')
+    eq_(source.repo.file_has_content(['test-annex.dat']), [False])
+    source.repo._run_annex_command('get', annex_options=['test-annex.dat',
+                                                         '--from=target'])
+    eq_(source.repo.file_has_content(['test-annex.dat']), [True])
+
+    # TODO: While content appears to be available from 'target' if requested by
+    # source, target's annex doesn't know about the file.
+    # Figure out, whether this should behave differently and how ...
+    # eq_(target.file_has_content(['test-annex.dat']), [True])
+
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
