@@ -208,8 +208,9 @@ class Publish(Interface):
                                  " to register it." % dest_resolved)
             lgr.info("Sibling %s unknown. Registering ...")
 
+
             # Fill in URL-Template:
-            remote_url = dest_url.replace("%%NAME", basename(ds.path))
+            remote_url = dest_url.replace("%NAME", basename(ds.path))
             # TODO: handle_name.replace("/", "-")) instead of basename()
             #       - figure it out ;)
             #       - either a datasets needs to discover superdatasets in
@@ -221,7 +222,7 @@ class Publish(Interface):
             if dest_pushurl:
                 # Fill in template:
                 remote_url_push = \
-                    dest_pushurl.replace("%%NAME", basename(ds.path))
+                    dest_pushurl.replace("%NAME", basename(ds.path))
                 # TODO: Different way of replacing %NAME; See above
 
                 # Modify push url:
@@ -233,7 +234,7 @@ class Publish(Interface):
             lgr.info("Added sibling '%s'." % dest)
             lgr.debug("Added remote '%s':\n %s (fetch)\n%s (push)." %
                       (dest_resolved, remote_url,
-                       remote_url_push if remote_url_push else remote_url))
+                       remote_url_push if dest_pushurl else remote_url))
         else:
             # known remote: parameters dest-url-* currently invalid.
             # This may change to adapt the existing remote.
@@ -270,6 +271,11 @@ class Publish(Interface):
 
             if recursive:
                 results = [ds]
+                # modify URL templates:
+                if dest_url:
+                    dest_url = dest_url.replace('%NAME', basename(ds.path) + '-%NAME')
+                if dest_pushurl:
+                    dest_pushurl = dest_pushurl.replace('%NAME', basename(ds.path) + '-%NAME')
                 for subds in ds.get_dataset_handles():
                     results.append(Dataset(opj(ds.path,
                                               subds)).publish(

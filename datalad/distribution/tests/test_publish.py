@@ -10,7 +10,7 @@
 """
 
 import os
-from os.path import join as opj, abspath
+from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import publish, install
 from datalad.distribution.install import get_containing_subdataset
@@ -96,9 +96,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub1_target.git_checkout("TMP", "-b")
     sub2_target = GitRepo(sub2_pub, create=True)
     sub2_target.git_checkout("TMP", "-b")
-    # TODO: Currently, annex init is necessary, due to improper testrepos
-    sub1 = AnnexRepo(opj(src_path, 'sub1'), init=True, create=False)
-    sub2 = AnnexRepo(opj(src_path, 'sub2'), init=True, create=False)
+    sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
+    sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
     sub1.git_remote_add("target", sub1_pub)
     sub2.git_remote_add("target", sub2_pub)
 
@@ -165,6 +164,50 @@ def test_publish_default_target():
     raise SkipTest("TODO")
 
 
-def test_publish_add_remote():
-    raise SkipTest("TODO")
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_publish_add_remote(origin, src_path, dst_path):
 
+    # prepare src
+    source = install(path=src_path, source=origin, recursive=True)
+    # TODO: For now, circumnavigate the detached head issue.
+    # Figure out, what to do.
+    for subds in source.get_dataset_handles(recursive=True):
+        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+    sub1 = GitRepo(opj(src_path, 'sub1'))
+    sub2 = GitRepo(opj(src_path, 'sub2'))
+
+    # create plain git at target locations:
+    # we want to test URL-template, so create the desired list in FS at
+    # destination:
+    pub_path_super = opj(dst_path, basename(src_path))
+    pub_path_sub1 = opj(dst_path, basename(src_path) + '-sub1')
+    pub_path_sub2 = opj(dst_path, basename(src_path) + '-sub2')
+    super_target = GitRepo(pub_path_super, create=True)
+    super_target.git_checkout("TMP", "-b")
+    sub1_target = GitRepo(pub_path_sub1, create=True)
+    sub1_target.git_checkout("TMP", "-b")
+    sub2_target = GitRepo(pub_path_sub2, create=True)
+    sub2_target.git_checkout("TMP", "-b")
+
+    url_template = dst_path + os.path.sep + '%NAME'
+
+    publish(dataset=source, dest="target",
+            dest_url=url_template,
+            recursive=True)
+
+    eq_(list(super_target.git_get_branch_commits("master")),
+        list(source.repo.git_get_branch_commits("master")))
+    eq_(list(super_target.git_get_branch_commits("git-annex")),
+        list(source.repo.git_get_branch_commits("git-annex")))
+
+    eq_(list(sub1_target.git_get_branch_commits("master")),
+        list(sub1.git_get_branch_commits("master")))
+    eq_(list(sub1_target.git_get_branch_commits("git-annex")),
+        list(sub1.git_get_branch_commits("git-annex")))
+
+    eq_(list(sub2_target.git_get_branch_commits("master")),
+        list(sub2.git_get_branch_commits("master")))
+    eq_(list(sub2_target.git_get_branch_commits("git-annex")),
+        list(sub2.git_get_branch_commits("git-annex")))
