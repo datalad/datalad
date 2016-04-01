@@ -21,11 +21,14 @@ if lexists(opj(dirname(dirname(__file__)), '.git')):
     try:
         import sys
         from subprocess import Popen, PIPE
+        from os.path import dirname
         git = Popen(['git', 'describe', '--abbrev=4', '--dirty', '--match', '[0-9]*\.*'],
-                    stdout=PIPE, stderr=sys.stderr)
+                    stdout=PIPE, stderr=PIPE,
+                    cwd=dirname(dirname(__file__)))
         if git.wait() != 0:
             raise OSError
         line = git.stdout.readlines()[0]
+        _ = git.stderr.readlines()
         # Just take describe and replace initial '-' with .dev to be more "pythonish"
         __version__ = line.strip().decode('ascii').replace('-', '.dev', 1)
     except:
