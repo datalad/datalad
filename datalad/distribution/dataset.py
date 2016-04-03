@@ -11,7 +11,8 @@
 
 import logging
 import os
-from os.path import isabs, abspath, join as opj, expanduser, expandvars
+from os.path import isabs, abspath, join as opj, expanduser, expandvars, \
+    normpath
 from six import string_types
 
 from datalad.support.gitrepo import GitRepo
@@ -47,7 +48,7 @@ def resolve_path(path, ds=None):
         # by abspath?
         return abspath(path)
     else:
-        return opj(ds.path, path)
+        return normpath(opj(ds.path, path))
 
 
 class Dataset(object):

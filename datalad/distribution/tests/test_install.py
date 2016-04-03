@@ -122,9 +122,20 @@ def test_install_into_dataset(source, top_path):
     assert_in("sub", ds.get_dataset_handles())
 
 
-def test_install_subdataset():
-    # needs nested dataset installed non-recursively
-    raise SkipTest("TODO")
+@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
+@with_tempfile(mkdir=True)
+def test_install_subdataset(src, path):
+    # get the superdataset:
+    ds = install(path=path, source=src)
+
+    # subdataset not installed:
+    subds = Dataset(opj(path, 'sub1'))
+    assert_false(subds.is_installed())
+
+    # install it:
+    ds.install('sub1')
+
+    ok_(subds.is_installed())
 
 
 def test_install_list():
@@ -135,9 +146,13 @@ def test_install_missing_arguments():
     raise SkipTest("TODO")
 
 
-def test_install_recursive():
-    raise SkipTest("TODO")
-
+@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
+@with_tempfile(mkdir=True)
+def test_install_recursive(src, path):
+    ds = install(path=path, source=src, recursive=True)
+    ok_(ds.is_installed())
+    for sub in ds.get_dataset_handles(recursive=True):
+        ok_(Dataset(opj(path, sub)).is_installed(), "Not installed: %s" % opj(path, sub))
 
 # TODO: Is there a way to test result renderer?
 

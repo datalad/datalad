@@ -978,7 +978,7 @@ class AnnexRepo(GitRepo):
     def _annex_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, cwd=None, env=None,
-                           shell=None):
+                           shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git-annex
@@ -1000,8 +1000,7 @@ class AnnexRepo(GitRepo):
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell)
-
+                                  env=env, shell=shell, expect_fail=expect_fail)
 
     @normalize_paths
     def migrate_backend(self, files, backend=None):

@@ -608,7 +608,7 @@ class GitRepo(object):
     def _git_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=True, cwd=None, env=None,
-                           shell=None):
+                           shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -633,7 +633,7 @@ class GitRepo(object):
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell)
+                                  env=env, shell=shell, expect_fail=expect_fail)
 
 # TODO: --------------------------------------------------------------------
 
@@ -774,3 +774,8 @@ class GitRepo(object):
         if auto:
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
+
+
+# TODO add_submodule
+# remove submodule
+# status?
