@@ -56,11 +56,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
             doc="""Sibling name to create for this publication target.
                 If RECURSIVE is set, the same name will be used to address
                 the subdatasets' siblings""",
-            constraints=EnsureStr()),
+            constraints=EnsureStr() | EnsureNone()),
         sshurl=Parameter(
             args=("sshurl",),
             doc="""SSH URL to use to create the target sibling(s)""",
-            constraints=EnsureStr()),
+            constraints=EnsureStr() | EnsureNone()),
         target_dir=Parameter(
             args=('--target-dir',),
             doc="""Directory on the server where to create the repository and
@@ -134,6 +134,21 @@ class CreatePublicationTargetSSHWebserver(Interface):
             raise ValueError("""Dataset {0} is not installed yet.""".format(ds))
         assert(ds.repo is not None)
 
+        # determine target parameters:
+        parsed_target = urlparse(sshurl)
+        host_name = parsed_target.netloc
+
+        if parsed_target.path:
+            if target_dir:
+                # TODO: if we support publishing to windows, this could fail
+                # from a unix machine
+                target_dir = opj(parsed_target.path, target_dir)
+            else:
+                target_dir = parsed_target.path
+        else:
+            # XXX do we want to go with the user's home dir at all?
+            target_dir = target_dir if target_dir else '.'
+
         # set default urls:
         # TODO: Allow for templates in sshurl directly?
         # TODO: Check whether template leads to conflicting urls if recursive
@@ -155,8 +170,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         # setup SSH Connection:
         # TODO: Make the entire setup a helper to use it when pushing via
         # publish?
-        parsed_target = urlparse(sshurl)
-        host_name = parsed_target.netloc
+
 
         # - build control master:
         from datalad.utils import assure_dir
@@ -177,17 +191,6 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         runner = Runner()
         ssh_cmd = ["ssh", "-S", control_path, host_name]
-
-        if parsed_target.path:
-            if target_dir:
-                # TODO: if we support publishing to windows, this could fail
-                # from a unix machine
-                target_dir = opj(parsed_target.path, target_dir)
-            else:
-                target_dir = parsed_target.path
-        else:
-            # XXX do we want to go with the user's home dir at all?
-            target_dir = target_dir if target_dir else '.'
 
         for repo in repos:
 
