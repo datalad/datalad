@@ -138,7 +138,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         # TODO: Allow for templates in sshurl directly?
         # TODO: Check whether template leads to conflicting urls if recursive
         if target_url is None:
-            target_url = sshurl
+            target_url = sshurl + target_dir
         if target_pushurl is None:
             target_pushurl = target_url  # TODO: or sshurl as default?
 
@@ -216,12 +216,13 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 path_exists = True
                 cmd = ssh_cmd + ["ls", path]
                 try:
-                    out, err = runner.run(cmd)
+                    out, err = runner.run(cmd, expect_fail=True,
+                                          expect_stderr=True)
                 except CommandError as e:
                     if "%s: No such file or directory" % path in e.stderr:
                         path_exists = False
                     else:
-                        raise # It's an unexpected failure here
+                        raise  # It's an unexpected failure here
 
                 if path_exists and not force:
                     raise RuntimeError("Target directory %s already exists." %
@@ -259,6 +260,6 @@ class CreatePublicationTargetSSHWebserver(Interface):
                    target_url.replace("%NAME", REPO_NAME)]
             runner.run(cmd, cwd=repos[repo].path)
             cmd = ["git", "remote", "set-url", "--push", target,
-                   target_pushurl.replace("%%NAME", REPO_NAME)]
+                   target_pushurl.replace("%NAME", REPO_NAME)]
             runner.run(cmd, cwd=repos[repo].path)
 
