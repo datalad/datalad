@@ -56,11 +56,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
             doc="""Sibling name to create for this publication target.
                 If RECURSIVE is set, the same name will be used to address
                 the subdatasets' siblings""",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureStr()),
         sshurl=Parameter(
             args=("sshurl",),
             doc="""SSH URL to use to create the target sibling(s)""",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureStr()),
         target_dir=Parameter(
             args=('--target-dir',),
             doc="""Directory on the server where to create the repository and
@@ -125,7 +125,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             dspath = GitRepo.get_toppath(abspath(getpwd()))
             if dspath is None:
                 raise ValueError("""No dataset found
-                                 at or above {0).""".format(getpwd()))
+                                 at or above {0}.""".format(getpwd()))
             ds = Dataset(dspath)
             lgr.debug("Resolved dataset for target creation: {0}".format(ds))
         assert(ds is not None and target is not None and sshurl is not None)
