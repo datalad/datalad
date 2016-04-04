@@ -30,7 +30,7 @@ from ..interface.base import Interface
 from ..interface.POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_remotes
 from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod, resolve_path
 from datalad.cmd import CommandError
-from datalad.utils import assure_dir, not_supported_on_windows
+from datalad.utils import assure_dir, not_supported_on_windows, getpwd
 from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
 
 
@@ -111,33 +111,50 @@ class CreatePublicationTargetSSHWebserver(Interface):
     def __call__(dataset=None, target=None, sshurl=None, target_dir=None,
                  target_url=None, target_pushurl=None, recursive=False,
                  force=False):
+        # shortcut
+        ds = dataset
 
-        raise NotImplementedError
+        if target is None or sshurl is None:
+            raise ValueError("""insufficient information for target creation
+                (needs at least a dataset, a target name and a SSH URL.""")
 
-        # TODO: Exception handling:
-        top_handle_repo = GitRepo(handle, create=False)
+        if ds is not None and not isinstance(ds, Dataset):
+            ds = Dataset(ds)
+        if ds is None:
+            # try to find a dataset at or above CWD
+            dspath = GitRepo.get_toppath(abspath(getpwd()))
+            if dspath is None:
+                raise ValueError("""No dataset found
+                                 at or above {0).""".format(getpwd()))
+            ds = Dataset(dspath)
+            lgr.debug("Resolved dataset for target creation: {0}".format(ds))
+        assert(ds is not None and target is not None and sshurl is not None)
 
-        # check parameters:
-        if remote_url is None:
-            remote_url = sshurl
-        if remote_url_push is None:
-            remote_url_push = remote_url
-        # we want to be able to redeploy to a configured remote
-        # if remote in get_remotes(top_handle_repo, all=True):
-        #    raise ValueError("Remote '%s' already exists." % remote)
+        if not ds.is_installed():
+            raise ValueError("""Dataset {0} is not installed yet.""".format(ds))
+        assert(ds.repo is not None)
 
-        handles_to_use = [top_handle_repo]
+        # set default urls:
+        # TODO: Allow for templates in sshurl directly?
+        # TODO: Check whether template leads to conflicting urls if recursive
+        if target_url is None:
+            target_url = sshurl
+        if target_pushurl is None:
+            target_pushurl = target_url  # TODO: or sshurl as default?
+
+        # create dict: dataset.name => dataset.repo
+        # TODO: with these names, do checks for urls. See above.
+        repos = dict()
+        repos[basename(ds.path)] = ds.repo
         if recursive:
-            if not remote_url:
-                raise
-            if not target_dir:
-                raise
-            handles_to_use += [GitRepo(opj(top_handle_repo.path, sub_path))
-                               for sub_path in
-                               get_submodules_list(top_handle_repo)]
+            for subds in ds.get_dataset_handles(recursive=True):
+                sub_path = opj(ds.path, subds)
+                repos[basename(ds.path) + '/' + subds] = \
+                    GitRepo(sub_path, create=False)
 
         # setup SSH Connection:
-        # TODO: Make the entire setup a helper to use it when pushing via publish?
+        # TODO: Make the entire setup a helper to use it when pushing via
+        # publish?
         parsed_target = urlparse(sshurl)
         host_name = parsed_target.netloc
 
@@ -161,11 +178,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
         runner = Runner()
         ssh_cmd = ["ssh", "-S", control_path, host_name]
 
-        # TODO: parsed_target.path may have to be stripped off of leading "/".
-
         if parsed_target.path:
             if target_dir:
-                # XXX if we support publishing to windows, this could fail
+                # TODO: if we support publishing to windows, this could fail
                 # from a unix machine
                 target_dir = opj(parsed_target.path, target_dir)
             else:
@@ -174,13 +189,25 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # XXX do we want to go with the user's home dir at all?
             target_dir = target_dir if target_dir else '.'
 
-        for handle_repo in handles_to_use:
+        for repo in repos:
+
+            if target in repos[repo].git_get_remotes():
+                # TODO: skip or raise? If raise, do it before looping, in order
+                # to fail without messing up things by partially doing the shit
+                # - what about just adding new push url to that remote?
+                # - if url(s) fit, then still try to create target?
+
+                # cmd = ["git", "remote", "get-url", "--push", remote]
+                # out, err = runner.run(cmd, cwd=handle_repo.path)
+                # if handle_remote_url_push != out.strip():
+                lgr.warning("Sibling {0} already exists. Skipping".format(target))
+                continue
+
+            # %NAME
+            REPO_NAME = repo.replace("/", "-")
 
             # create remote repository
-            handle_name = handle_repo.path[len(
-                commonprefix([top_handle_repo.path,
-                              handle_repo.path])):].strip("/")
-            path = target_dir.replace("%%NAME", handle_name.replace("/", "-"))
+            path = target_dir.replace("%NAME", REPO_NAME)
 
             if path != '.':
                 # check if target exists, and if not --force is given,
@@ -227,24 +254,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 lgr.warning("git config failed at remote location %s.\n"
                             "Skipped." % path)
 
-            # add remote
-            handle_remote_url = \
-                remote_url.replace("%%NAME", handle_name.replace("/", "-"))
-            handle_remote_url_push = \
-                remote_url_push.replace("%%NAME", handle_name.replace("/", "-"))
-            if remote not in handle_repo.git_get_remotes():
-                cmd = ["git", "remote", "add", remote, handle_remote_url]
-                runner.run(cmd, cwd=handle_repo.path)
-                cmd = ["git", "remote", "set-url", "--push", remote,
-                       handle_remote_url_push]
-                runner.run(cmd, cwd=handle_repo.path)
-            else:
-                cmd = ["git", "remote", "get-url", "--push", remote]
-                out, err = runner.run(cmd, cwd=handle_repo.path)
-                if handle_remote_url_push != out.strip():
-                    lgr.error("Remote {1} is already configured with a "
-                              "different URL".format(remote))
-                    continue
-
-
+            # add the remote
+            cmd = ["git", "remote", "add", target,
+                   target_url.replace("%NAME", REPO_NAME)]
+            runner.run(cmd, cwd=repos[repo].path)
+            cmd = ["git", "remote", "set-url", "--push", target,
+                   target_pushurl.replace("%%NAME", REPO_NAME)]
+            runner.run(cmd, cwd=repos[repo].path)
 
