@@ -75,9 +75,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
             constraints=EnsureStr() | EnsureNone()),
         target_url=Parameter(
             args=('--target-url',),
-            doc="""The URL of the dataset sibling named by `target`. This URL
-                has to be accessible to anyone, who is supposed to have access
-                to the published dataset later on.\n
+            doc="""The URL of the dataset sibling named by `target`. Defaults
+                to `sshurl`. This URL has to be accessible to anyone, who is
+                supposed to have access to the published dataset later on.\n
                 If you want to publish with `recursive`, it is expected, that
                 you pass a template for building the URLs of all (sub)datasets
                 to be published by using placeholders.\n
@@ -89,11 +89,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
             constraints=EnsureStr() | EnsureNone()),
         target_pushurl=Parameter(
             args=('--target-pushurl',),
-            doc="""In case the `target_url` cannot be used to publish to the
-                dataset sibling, this option specifies a URL to be used for the
-                actual publication operation.\nThis option is ignored if there
-                is already a configured sibling dataset under the name given by
-                `target`""",
+            doc="""Defaults to `sshurl`. In case the `target_url` cannot be
+                used to publish to the dataset sibling, this option specifies a
+                URL to be used for the actual publication operation.\n
+                This option is ignored if there is already a configured sibling
+                dataset under the name given by `target`""",
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
@@ -138,6 +138,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
         parsed_target = urlparse(sshurl)
         host_name = parsed_target.netloc
 
+        if not parsed_target.netloc:
+            raise ValueError("Malformed URL: {0}".format(sshurl))
+
         if parsed_target.path:
             if target_dir:
                 # TODO: if we support publishing to windows, this could fail
@@ -155,7 +158,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         if target_url is None:
             target_url = sshurl + target_dir
         if target_pushurl is None:
-            target_pushurl = target_url  # TODO: or sshurl as default?
+            target_pushurl = sshurl + target_dir
 
         # create dict: dataset.name => dataset.repo
         # TODO: with these names, do checks for urls. See above.
@@ -170,7 +173,6 @@ class CreatePublicationTargetSSHWebserver(Interface):
         # setup SSH Connection:
         # TODO: Make the entire setup a helper to use it when pushing via
         # publish?
-
 
         # - build control master:
         from datalad.utils import assure_dir
