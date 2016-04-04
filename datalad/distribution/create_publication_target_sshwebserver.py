@@ -26,91 +26,93 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from datalad.cmdline.helpers import POC_get_root_handle
-from .base import Interface
-from .POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_remotes
+from ..interface.base import Interface
+from ..interface.POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_remotes
+from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod, resolve_path
 from datalad.cmd import CommandError
 from datalad.utils import assure_dir, not_supported_on_windows
 from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
 
 
-lgr = logging.getLogger('datalad.interface.POC_create_publication_target_sshwebserver')
+lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
 
-class POCCreatePublicationTargetSSHWebserver(Interface):
+class CreatePublicationTargetSSHWebserver(Interface):
     """Create a target repository for publish and add it as a remote to
     push to."""
 
     _params_ = dict(
-        # TODO: Somehow the replacement of '_' and '-' is buggy on positional arguments
+        # TODO: Somehow the replacement of '_' and '-' is buggy on
+        # positional arguments
+        # TODO: Figure out, whether (and when) to use `sshurl` as push url
+        dataset=Parameter(
+            args=("--dataset", "-d",),
+            doc="""specify the dataset to create the publication target for. If
+                no dataset is given, an attempt is made to identify the dataset
+                based on the current working directory""",
+            constraints=EnsureDataset() | EnsureNone()),
+        target=Parameter(
+            args=('target',),
+            doc="""Sibling name to create for this publication target.
+                If RECURSIVE is set, the same name will be used to address
+                the subdatasets' siblings""",
+            constraints=EnsureStr() | EnsureNone()),
         sshurl=Parameter(
             args=("sshurl",),
-            doc="SSH URL to use to create the target repository.",
-            constraints=EnsureStr()),
-        remote=Parameter(
-            args=('remote',),
-            doc="Remote name to create for this publication target."
-                "If RECURSIVE is set, the same name will be used to address "
-                "the subhandles' remotes.",
-            constraints=EnsureStr()),
-        remote_url=Parameter(
-            args=('--remote-url',),
-            doc="The URL of the repository named by REMOTE. This URL has to be "
-                "accessible to anyone, who is supposed to have access to the "
-                "published handle later on. (Technically: a git fetch URL)\n"
-                "If you want to publish RECURSIVE, it is expected, that you "
-                "pass a template for building the URLs of all handles to be "
-                "published by using placeholders.\n"
-                "List of currently available placeholders:\n"
-                "%%NAME\tthe name of the handle, where slashes are "
-                "replaced by dashes.\n"
-                "If no URL is given, SSH-URL is used. This is probably not want "
-                "you want.",
-            nargs="?",
-            constraints=EnsureStr() | EnsureNone()),
-        remote_url_push=Parameter(
-            args=('--remote-url-push',),
-            doc="In case the REMOTE_URL cannot be used to push to the remote "
-                "repository, use this parameter to additionally provide a "
-                "push URL.\n"
-                "By default the REMOTE-URL is used (which defaults to the SSH-URL)."
-                "If you want to publish RECURSIVE, it is expected, that you "
-                "pass a template for building the URLs of all handles to be "
-                "published by using placeholders.\n"
-                "List of currently available placeholders:\n"
-                "%%NAME\tthe name of the handle, where slashes are "
-                "replaced by dashes.\n",
+            doc="""SSH URL to use to create the target sibling(s)""",
             constraints=EnsureStr() | EnsureNone()),
         target_dir=Parameter(
             args=('--target-dir',),
-            doc="Directory on the server where to create the repository and "
-                "that will be accessible via REMOTE-URL. By "
-                "default it's wherever SSH-URL points to."
-                "If you want to publish RECURSIVE, it is expected, that you "
-                "pass a template for building the URLs of all handles to be "
-                "published by using placeholders.\n"
-                "List of currently available placeholders:\n"
-                "%%NAME\tthe name of the handle, where slashes are "
-                "replaced by dashes.\n",
+            doc="""Directory on the server where to create the repository and
+                that will be accessible via `target_url`. By
+                default it's wherever `sshurl` points to.
+                If you want to publish recursively, it is expected, that you
+                pass a template for building the URLs of all (sub)datasets to
+                be published by using placeholders.\n
+                List of currently available placeholders:\n
+                %%NAME\tthe name of the handle, where slashes are
+                replaced by dashes.\n""",
             constraints=EnsureStr() | EnsureNone()),
-        handle=Parameter(
-            args=('--handle',),
-            doc="Name of or path to the handle to publish. Defaults to CWD.",
+        target_url=Parameter(
+            args=('--target-url',),
+            doc="""The URL of the dataset sibling named by `target`. This URL
+                has to be accessible to anyone, who is supposed to have access
+                to the published dataset later on.\n
+                If you want to publish with `recursive`, it is expected, that
+                you pass a template for building the URLs of all (sub)datasets
+                to be published by using placeholders.\n
+                List of currently available placeholders:\n
+                %%NAME\tthe name of the dataset, where slashes are replaced by
+                dashes.\nThis option is ignored if there is already a
+                configured sibling dataset under the name given by `target`""",
             nargs="?",
-            constraints=EnsureDatasetAbsolutePath()),
+            constraints=EnsureStr() | EnsureNone()),
+        target_pushurl=Parameter(
+            args=('--target-pushurl',),
+            doc="""In case the `target_url` cannot be used to publish to the
+                dataset sibling, this option specifies a URL to be used for the
+                actual publication operation.\nThis option is ignored if there
+                is already a configured sibling dataset under the name given by
+                `target`""",
+            constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
-            doc="Recursively create target repositories for all subhandles of "
-                "HANDLE."),
+            doc="""Recursively create the publication target for all
+                subdatasets of `dataset`""",),
         force=Parameter(
             args=("--force", "-f",),
-            doc="If target directory exists already, force to (re-)init git.",
-            constraints=EnsureBool(),),)
+            action="store_true",
+            doc="""If target directory exists already, force to (re-)init
+                git""",),)
 
     @staticmethod
-    def __call__(sshurl, remote, remote_url=None, remote_url_push=None,
-                 target_dir=None, handle=curdir, recursive=False,
+    @datasetmethod(name='create_publication_target_sshwebserver')
+    def __call__(dataset=None, target=None, sshurl=None, target_dir=None,
+                 target_url=None, target_pushurl=None, recursive=False,
                  force=False):
+
+        raise NotImplementedError
 
         # TODO: Exception handling:
         top_handle_repo = GitRepo(handle, create=False)
