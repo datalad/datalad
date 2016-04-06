@@ -679,9 +679,15 @@ class GitRepo(object):
         requested
         """
 
-        out, err = self._git_custom_command(
-            '', 'git config --get remote.%s.%s' % (name,
-                                                   'pushurl' if push else 'url'))
+        try:
+            out, err = self._git_custom_command(
+                '', 'git config --get remote.%s.%s' % (name,
+                                                       'pushurl' if push else 'url'),
+                expect_fail=True)
+        except CommandError as e:
+            if e.code == 1 and not e.stdout and not e.stderr:
+                return None
+            raise
         return out.rstrip(linesep)
 
     def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):

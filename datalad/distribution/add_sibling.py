@@ -134,9 +134,9 @@ class AddSibling(Interface):
                     conflicting.append(repo)
 
         if not force and conflicting:
-            raise RuntimeError("""Sibling '{0}' already exists with conflicting
-                               URL for {1} dataset(s). {2}""".format(
-                sibling, len(conflicting), conflicting))
+            raise RuntimeError("Sibling '{0}' already exists with conflicting"
+                               " URL for {1} dataset(s). {2}".format(
+                                   sibling, len(conflicting), conflicting))
 
         runner = Runner()
         successfully_added = list()
