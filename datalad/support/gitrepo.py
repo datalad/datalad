@@ -674,13 +674,14 @@ class GitRepo(object):
         self._git_custom_command('', 'git fetch %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_get_remote_url(self, name):
+    def git_get_remote_url(self, name, push=False):
         """We need to know, where to clone from, if a remote is
         requested
         """
 
         out, err = self._git_custom_command(
-            '', 'git config --get remote.%s.url' % name)
+            '', 'git config --get remote.%s.%s' % (name,
+                                                   'pushurl' if push else 'url'))
         return out.rstrip(linesep)
 
     def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):

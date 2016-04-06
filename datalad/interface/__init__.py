@@ -30,6 +30,7 @@ from .POC_update import POCUpdate
 from .POC_uninstall import POCUninstall
 from ..distribution.create_publication_target_sshwebserver import \
     CreatePublicationTargetSSHWebserver
+from ..distribution.add_sibling import AddSibling
 from .POC_modify_subhandle_urls import POCModifySubhandleURLs
 
 
@@ -43,6 +44,7 @@ _group_handle = (
         POCMove,
         POCUpdate,
         CreatePublicationTargetSSHWebserver,
+        AddSibling,
         POCModifySubhandleURLs,
     ])
 
