@@ -129,10 +129,14 @@ class AddSibling(Interface):
                 already_existing.append(repo)
                 lgr.debug("""Remote '{0}' already exists
                           in '{1}'.""".format(sibling, repo))
-                if REPO_URL != repos[repo].git_get_remote_url(sibling) or \
-                    (pushurl and
-                        REPO_PUSHURL != repos[repo].git_get_remote_url(
-                                sibling, push=True)):
+                url_existing = repos[repo].git_get_remote_url(sibling)
+                pushurl_existing = repos[repo].git_get_remote_url(sibling,
+                                                                  push=True)
+                if REPO_URL.rstrip('/') != url_existing.rstrip('/') \
+                        or (pushurl and pushurl_existing and
+                            REPO_PUSHURL.rstrip('/') !=
+                                    pushurl_existing.rstrip('/')) \
+                        or (pushurl and not pushurl_existing):
                     conflicting.append(repo)
 
         if not force and conflicting:
