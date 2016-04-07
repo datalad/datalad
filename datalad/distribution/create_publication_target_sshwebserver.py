@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, exists, isdir, basename, commonprefix, relpath
+from os.path import join as opj, abspath, expanduser, expandvars, exists, isdir, basename, commonprefix, relpath, normpath
 
 from six.moves.urllib.parse import urlparse
 
@@ -148,7 +148,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                  at or above {0}.""".format(getpwd()))
             ds = Dataset(dspath)
             lgr.debug("Resolved dataset for target creation: {0}".format(ds))
-        assert(ds is not None and target is not None and sshurl is not None)
+        assert(ds is not None and sshurl is not None)
 
         if not ds.is_installed():
             raise ValueError("""Dataset {0} is not installed yet.""".format(ds))
@@ -170,7 +170,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # TODO: centralize and generalize template symbol handling
         replicate_local_structure = False
-        if "%%NAME" not in target_dir:
+        if "%NAME" not in target_dir:
             replicate_local_structure = True
 
         # collect datasets to use:
@@ -221,8 +221,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 # check how to deal with it. Does windows ssh server accept
                 # posix paths? vice versa? Should planned SSH class provide
                 # tools for this issue?
-                path = opj(target_dir, relpath(datasets[current_dataset].path,
-                                               start=ds.path))
+                path = normpath(opj(target_dir,
+                                    relpath(datasets[current_dataset].path,
+                                            start=ds.path)))
 
             if path != '.':
                 # check if target exists, and if not --force is given,
