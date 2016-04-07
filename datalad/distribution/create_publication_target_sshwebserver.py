@@ -113,13 +113,18 @@ class CreatePublicationTargetSSHWebserver(Interface):
             action="store_true",
             doc="""If target directory exists already, force to (re-)init
                 git. Also forces to (re-)configure sibling `target`
-                (i.e. its URL(s)) in case it already exists.""",),)
+                (i.e. its URL(s)) in case it already exists.""",),
+        shared=Parameter(
+            args=("--shared",),
+            doc="""passed to git-init. TODO: Figure out how to communicate what
+                this is about""",
+            constraints=EnsureStr() | EnsureBool()),)
 
     @staticmethod
     @datasetmethod(name='create_publication_target_sshwebserver')
     def __call__(dataset=None, sshurl=None, target=None, target_dir=None,
                  target_url=None, target_pushurl=None, recursive=False,
-                 force=False):
+                 force=False, shared=False):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -243,6 +248,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
             # init git repo
             cmd = ssh_cmd + ["git", "-C", path, "init"]
+            if shared:
+                cmd.append("--shared=%" % shared)
             try:
                 runner.run(cmd)
             except CommandError as e:
