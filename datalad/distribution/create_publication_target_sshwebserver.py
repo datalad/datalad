@@ -130,6 +130,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
             raise ValueError("""insufficient information for target creation
             (needs at least a dataset and a SSH URL).""")
 
+        if target is None and (target_url is not None
+                               or target_pushurl is not None):
+            raise ValueError("""insufficient information for adding the target
+            as a sibling (needs at least a name)""")
+
         # shortcut
         ds = dataset
 
@@ -277,6 +282,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 target_url = sshurl
             if target_pushurl is None:
                 target_pushurl = sshurl
-            AddSibling()(dataset=ds, sibling=target, url=target_url,
-                         pushurl=target_pushurl, recursive=recursive,
-                         force=force)
+            result_adding = AddSibling()(dataset=ds,
+                                         sibling=target,
+                                         url=target_url,
+                                         pushurl=target_pushurl,
+                                         recursive=recursive,
+                                         force=force)
+
+        # TODO: Return value!?
