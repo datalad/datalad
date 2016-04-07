@@ -97,7 +97,8 @@ class Publish(Interface):
 
         if ds is not None and not isinstance(ds, Dataset):
             ds = Dataset(ds)
-        if path is None:
+        if not path:
+            path = curdir
             if ds is None:
                 # no dataset, no component to publish, nothing to do
                 raise ValueError(
