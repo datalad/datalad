@@ -44,6 +44,8 @@ class AddSibling(Interface):
             doc="""Name of the sibling to be added. If RECURSIVE is set, the
                 same name will be used to address the subdatasets' siblings""",
             constraints=EnsureStr() | EnsureNone()),
+        # TODO: Probably url shouldn't be mandatory; If pushurl is given,
+        # it's ok to not give a fetch url
         url=Parameter(
             args=('url',),
             doc="""The URL of or path to the dataset sibling named by
