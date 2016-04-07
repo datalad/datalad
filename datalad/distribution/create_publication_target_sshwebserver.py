@@ -259,8 +259,24 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 runner.run(cmd)
             except CommandError as e:
                 lgr.error("Remotely initializing git repository failed at %s."
-                          "\nError: %s" % (path, str(e)))
+                          "\nError: %s\nSkipping ..." % (path, str(e)))
                 continue
+
+            # check git version on remote end:
+            cmd = ssh_cmd + ["git", "version"]
+            try:
+                out, err = runner.run(cmd)
+                git_version = out.lstrip("git version").strip()
+                lgr.debug("Detected git version on server: %s" % git_version)
+                if git_version < "2.4":
+                    lgr.error("Git version >= 2.4 needed to configure remote."
+                              " Version detected on server: %s\nSkipping ..."
+                              % git_version)
+                    continue
+
+            except CommandError as e:
+                lgr.warning("Failed to determine git version on remote.\n"
+                            "Error: {0}\nTrying to configure anyway ...")
 
             # allow for pushing to checked out branch
             cmd = ssh_cmd + ["git", "-C", path, "config",
@@ -270,7 +286,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 runner.run(cmd)
             except CommandError as e:
                 lgr.warning("git config failed at remote location %s.\n"
-                            "Skipped." % path)
+                            "You will not be able to push to checked out "
+                            "branch." % path)
 
         # stop controlmaster (close ssh connection):
         cmd = ["ssh", "-O", "stop", "-S", control_path, host_name]
