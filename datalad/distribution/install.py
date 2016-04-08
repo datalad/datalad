@@ -29,7 +29,8 @@ from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
 from datalad.interface.base import Interface
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
-from datalad.utils import expandpath, knows_annex, assure_dir, is_explicit_path
+from datalad.utils import expandpath, knows_annex, assure_dir, \
+    is_explicit_path, on_windows
 from datalad.interface.POC_helpers import get_git_dir
 
 
@@ -255,8 +256,18 @@ class Install(Interface):
                 assert not listdir(subds_git_dir)
                 rmdir(subds_git_dir)
 
-                with open(opj(path, ".git"), "w") as f:
-                    f.write("gitdir: {moved}\n".format(moved=relpath(moved_git_dir, start=path)))
+                # TODO: symlink or whatever annex does, since annexes beneath
+                #       might break
+                #       - figure out, what annex does in direct mode
+                #         and/or on windows
+                #       - for now use .git file on windows and symlink otherwise
+                if not on_windows:
+                    os.symlink(relpath(moved_git_dir, start=path),
+                               opj(path, ".git"))
+                else:
+                    with open(opj(path, ".git"), "w") as f:
+                        f.write("gitdir: {moved}\n".format(moved=relpath(moved_git_dir, start=path)))
+
                 # return newly added submodule as a dataset
                 return Dataset(path)
 
