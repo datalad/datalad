@@ -580,7 +580,7 @@ class Annexificator(object):
 
         return fpath
 
-    def switch_branch(self, branch, parent=None):
+    def switch_branch(self, branch, parent=None, must_exist=None):
         """Node generator to switch branch, returns actual node
 
         Parameters
@@ -590,6 +590,9 @@ class Annexificator(object):
         parent : str or None, optional
           If parent is provided, it will serve as a parent of the branch. If None,
           detached new branch will be created
+        must_exist : bool or None, optional
+          If None, doesn't matter.  If True, would fail if branch does not exist.  If
+          False, would fail if branch already exists
         """
         def switch_branch(data):
             """Switches to the branch %s""" % branch
@@ -598,6 +601,8 @@ class Annexificator(object):
             # statusdb is valid only within the same branch
             self._statusdb = None
             existing_branches = self.repo.git_get_branches()
+            if must_exist is not None:
+                assert must_exist == (branch in existing_branches)
             if branch not in existing_branches:
                 # TODO: this should be a part of the gitrepo logic
                 if parent is None:
