@@ -86,7 +86,8 @@ class Publish(Interface):
         with_data=Parameter(
             args=("--with-data",),
             doc="shell pattern",
-            constraints=EnsureListOf(string_types) | EnsureNone()),)
+            constraints=EnsureListOf(string_types) | EnsureNone(),
+            nargs='*'),)
 
     @staticmethod
     @datasetmethod(name='publish')

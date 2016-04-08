@@ -107,7 +107,7 @@ class Install(Interface):
         if ds is not None and not isinstance(ds, Dataset):
             ds = Dataset(ds)
 
-        if path is None:
+        if not path:
             if ds is None:
                 # no dataset, no target location, nothing to do
                 raise ValueError(
