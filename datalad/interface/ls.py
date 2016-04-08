@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import time
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir
 
@@ -51,6 +52,11 @@ class Ls(Interface):
             action="store_true",
             doc="Recurse into subdirectories",
         ),
+        fast=Parameter(
+            args=("-F", "--fast"),
+            action="store_true",
+            doc="Only perform fast operations. Would be overrident by --all",
+        ),
         all=Parameter(
             args=("-a", "--all"),
             action="store_true",
@@ -72,21 +78,23 @@ class Ls(Interface):
     )
 
     @staticmethod
-    def __call__(loc, recursive=False, all=False, config_file=None, list_content=False):
+    def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False):
 
+        kw = dict(fast=fast, recursive=recursive, all=all)
         if isinstance(loc, list):
-            return [Ls.__call__(loc_, recursive=recursive, all=all, config_file=config_file, list_content=list_content)
+            return [Ls.__call__(loc_, config_file=config_file, list_content=list_content, **kw)
                     for loc_ in loc]
 
         # TODO: do some clever handling of kwargs as to remember what were defaults
         # and what any particular implementation actually needs, and then issuing
         # warning if some custom value/option was specified which doesn't apply to the
         # given url
+
         if loc.startswith('s3://'):
-            return _ls_s3(loc, recursive=recursive, all=all, config_file=config_file, list_content=list_content)
+            return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
         elif lexists(loc) and lexists(opj(loc, '.git')):
             # TODO: use some helper like is_dataset_path ??
-            return _ls_dataset(loc, recursive=recursive, all=all)
+            return _ls_dataset(loc, **kw)
         else:
             raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
 
@@ -101,12 +109,13 @@ from datalad.support.annexrepo import AnnexRepo
 @auto_repr
 class DsModel(object):
 
-    __slots__ = ['ds', '_info', '_path']
+    __slots__ = ['ds', '_info', '_path', '_branch']
 
     def __init__(self, ds):
         self.ds = ds
         self._info = None
         self._path = None  # can be overriden
+        self._branch = None
 
     @property
     def path(self):
@@ -130,15 +139,27 @@ class DsModel(object):
             return None
 
     @property
+    def date(self):
+        """Date of the last commit
+        """
+        try:
+            commit = next(self.ds.repo.git_get_branch_commits(self.branch))
+        except:
+            return None
+        return commit.committed_date
+
+    @property
     def clean(self):
         return not self.repo.dirty
 
     @property
     def branch(self):
-        try:
-            return self.repo.git_get_active_branch()
-        except:
-            return None
+        if self._branch is None:
+            try:
+                self._branch = self.repo.git_get_active_branch()
+            except:
+                return None
+        return self._branch
 
     @property
     def type(self):
@@ -179,7 +200,12 @@ class LsFormatter(string.Formatter):
 
     def convert_field(self, value, conversion):
         #print("%r->%r" % (value, conversion))
-        if conversion == 'S':  # Human size
+        if conversion == 'D':  # Date
+            if value is not None:
+                return time.strftime("%Y-%m-%d/%H:%M:%S", time.localtime(value))
+            else:
+                return '-'
+        elif conversion == 'S':  # Human size
             #return value
             if value is not None:
                 return str(humanize.naturalsize(value))
@@ -212,7 +238,7 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
 
 # from joblib import Parallel, delayed
 
-def _ls_dataset(loc, recursive=False, all=False):
+def _ls_dataset(loc, fast=False, recursive=False, all=False):
     from ..support.dataset import Dataset
     isabs_loc = isabs(loc)
     topdir = '' if isabs_loc else abspath(curdir)
@@ -233,7 +259,9 @@ def _ls_dataset(loc, recursive=False, all=False):
 
     maxpath = max(len(ds_model.path) for ds_model in dss)
     path_fmt = "{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
-    format_str = path_fmt + "  [{ds.type}]  {ds.branch!N}  {ds.describe!N}  {ds.clean!X}"
+    format_str = path_fmt + "  [{ds.type}]  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
+    if (not fast) or all:
+        format_str += "  {ds.clean!X}"
     if all:
         format_str += "  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
 
@@ -250,7 +278,7 @@ def _ls_dataset(loc, recursive=False, all=False):
 # S3 listing
 #
 
-def _ls_s3(loc, recursive=False, all=False, config_file=None, list_content=False):
+def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_content=False):
     """List S3 bucket content"""
     if loc.startswith('s3://'):
         bucket_prefix = loc[5:]

@@ -255,7 +255,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # init git repo
             cmd = ssh_cmd + ["git", "-C", path, "init"]
             if shared:
-                cmd.append("--shared=%" % shared)
+                cmd.append("--shared=%s" % shared)
             try:
                 runner.run(cmd)
             except CommandError as e:
