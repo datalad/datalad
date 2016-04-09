@@ -95,8 +95,10 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
                 annex.add_archive_content(
                     existing='archive-suffix',
                     # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
-                    strip_leading_dirs=False, #   leading_dirs_depth=2,
-                    exclude='.*__MACOSX$',  # some junk penetrates
+                    strip_leading_dirs=True,
+                    leading_dirs_consider=['crcns.*', dataset],
+                    leading_dirs_depth=2,
+                    exclude='.*__MACOSX.*',  # some junk penetrates
                 ),
             ],
         ],
