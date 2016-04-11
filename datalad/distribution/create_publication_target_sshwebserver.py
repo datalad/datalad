@@ -235,7 +235,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     out, err = runner.run(cmd, expect_fail=True,
                                           expect_stderr=True)
                 except CommandError as e:
-                    if "'%s': No such file or directory" % path in e.stderr:
+                    if "No such file or directory" in e.stderr and \
+                                    path in e.stderr:
                         path_exists = False
                     else:
                         raise  # It's an unexpected failure here
@@ -292,7 +293,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # stop controlmaster (close ssh connection):
         cmd = ["ssh", "-O", "stop", "-S", control_path, host_name]
-        out, err = runner.run(cmd)
+        out, err = runner.run(cmd, expect_stderr=True)
 
         if target:
             # add the sibling(s):
