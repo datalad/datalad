@@ -110,11 +110,7 @@ class Publish(Interface):
             ds = Dataset(ds)
         if not path:
             path = curdir
-            if ds is None:
-                # no dataset, no component to publish, nothing to do
-                raise ValueError(
-                    "insufficient information for publication (needs at "
-                    "least a dataset or a path")
+
         elif isinstance(path, list):
             return [Publish.__call__(
                     dataset=ds,
