@@ -235,7 +235,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     out, err = runner.run(cmd, expect_fail=True,
                                           expect_stderr=True)
                 except CommandError as e:
-                    if "%s: No such file or directory" % path in e.stderr:
+                    if "'%s': No such file or directory" % path in e.stderr:
                         path_exists = False
                     else:
                         raise  # It's an unexpected failure here
@@ -301,7 +301,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             if target_pushurl is None:
                 target_pushurl = sshurl
             result_adding = AddSibling()(dataset=ds,
-                                         sibling=target,
+                                         name=target,
                                          url=target_url,
                                          pushurl=target_pushurl,
                                          recursive=recursive,
