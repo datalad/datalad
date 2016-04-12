@@ -157,3 +157,5 @@ class Update(Interface):
                     # annex-apply:
                     lgr.info("Updating annex ...")
                     repo._git_custom_command('', ["git", "annex", "merge"])
+
+            # TODO: return value?
