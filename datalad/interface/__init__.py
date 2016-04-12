@@ -15,37 +15,36 @@ __docformat__ = 'restructuredtext'
 # the following should be series of imports of interface implementations
 # the shall be exposed in the Python API and the cmdline interface
 #from .sparql_query import SPARQLQuery
-from .test import Test
-from .crawl import Crawl
-from .pull import Pull
-from .push import Push
+from datalad.distribution.modify_subhandle_urls import ModifySubhandleURLs
+from datalad.distribution.move import Move
+from datalad.distribution.uninstall import Uninstall
+from datalad.distribution.update import Update
 from .add_archive_content import AddArchiveContent
+from .clean import Clean
+from .crawl import Crawl
 from .download_url import DownloadURL
 from .ls import Ls
-from .clean import Clean
-from ..distribution.install import Install
-from ..distribution.publish import Publish
-from .POC_move import POCMove
-from .POC_update import POCUpdate
-from .POC_uninstall import POCUninstall
+from .pull import Pull
+from .push import Push
+from .test import Test
+from ..distribution.add_sibling import AddSibling
 from ..distribution.create_publication_target_sshwebserver import \
     CreatePublicationTargetSSHWebserver
-from ..distribution.add_sibling import AddSibling
-from .POC_modify_subhandle_urls import POCModifySubhandleURLs
-
+from ..distribution.install import Install
+from ..distribution.publish import Publish
 
 # all interfaces should be associated with (at least) one of the groups below
-_group_handle = (
+_group_dataset = (
     'Commands for dataset operations',
     [
         Install,
         Publish,
-        POCUninstall,
-        POCMove,
-        POCUpdate,
+        Uninstall,
+        Move,
+        Update,
         CreatePublicationTargetSSHWebserver,
         AddSibling,
-        POCModifySubhandleURLs,
+        ModifySubhandleURLs,
     ])
 
 _group_misc = (
