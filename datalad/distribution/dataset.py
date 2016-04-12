@@ -13,7 +13,8 @@ import logging
 import os
 from os.path import isabs, abspath, join as opj, expanduser, expandvars, \
     normpath
-from six import string_types
+from six import string_types, PY2
+from functools import wraps
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -247,10 +248,52 @@ class Dataset(object):
 @optional_args
 def datasetmethod(f, name=None):
     """Decorator to bind functions to Dataset class.
+
+    The decorated function is still directly callable and additionally serves
+    as method `name` of class Dataset.
+    To achieve this, the first positional argument is redirected to original
+    keyword argument 'dataset'. All other arguments stay in order (and keep
+    their names, of course). That means, that the signature of the bound
+    function is name(self, a, b) if the original signature is
+    name(a, dataset, b) for example.
+
+    The decorator has no effect on the actual function decorated with it.
     """
     if not name:
-        name = f.func_name
-    setattr(Dataset, name, f)
+        name = f.func_name if PY2 else f.__name__
+
+    @wraps(f)
+    def apply_func(*args, **kwargs):
+        """Wrapper function to assign arguments of the bound function to
+        original function.
+
+        Note
+        ----
+        This wrapper is NOT returned by the decorator, but only used to bind
+        the function `f` to the Dataset class.
+        """
+        kwargs = kwargs.copy()
+        from inspect import getargspec
+        orig_pos = getargspec(f).args
+
+        # If bound function is used with wrong signature (especially by
+        # explicitly passing a dataset, let's raise a proper exception instead
+        # of a 'list index out of range', that is not very telling to the user.
+        if len(args) > len(orig_pos) or 'dataset' in kwargs:
+            raise TypeError("{0}() takes at most {1} arguments ({2} given):"
+                            " {3}".format(name, len(orig_pos), len(args),
+                                          ['self'] + [a for a in orig_pos
+                                                      if a != 'dataset']))
+        kwargs['dataset'] = args[0]
+        ds_index = orig_pos.index('dataset')
+        for i in range(1, len(args)):
+            if i <= ds_index:
+                kwargs[orig_pos[i-1]] = args[i]
+            elif i > ds_index:
+                kwargs[orig_pos[i]] = args[i]
+        return f(**kwargs)
+
+    setattr(Dataset, name, apply_func)
     return f
 
 
