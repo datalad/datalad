@@ -66,7 +66,8 @@ class Update(Interface):
     @staticmethod
     @datasetmethod(name='update')
     def __call__(name=None, dataset=None,
-                 merge=False, recursive=False, fetch_all=False, reobtain_data=False):
+                 merge=False, recursive=False, fetch_all=False,
+                 reobtain_data=False):
         """
         """
         # TODO: Is there an 'update filehandle' similar to install and publish?
@@ -152,10 +153,12 @@ class Update(Interface):
                 cmd_list = ["git", "pull"]
                 if name:
                     cmd_list.append(name)
-                repo._git_custom_command('', cmd_list)
+                out, err = repo._git_custom_command('', cmd_list)
+                lgr.info(out)
                 if knows_annex(repo.path):
                     # annex-apply:
                     lgr.info("Updating annex ...")
-                    repo._git_custom_command('', ["git", "annex", "merge"])
+                    out, err = repo._git_custom_command('', ["git", "annex", "merge"])
+                    lgr.info(out)
 
             # TODO: return value?
