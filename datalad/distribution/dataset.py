@@ -10,16 +10,14 @@
 """
 
 import logging
-import os
-from os.path import isabs, abspath, join as opj, expanduser, expandvars, \
-    normpath
+from os.path import abspath, join as opj, normpath
 from six import string_types, PY2
 from functools import wraps
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
-from datalad.support.constraints import EnsureDatasetAbsolutePath, Constraint
+from datalad.support.constraints import Constraint
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 

@@ -16,21 +16,19 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, exists, commonprefix, relpath, basename
+from os.path import join as opj, abspath, exists, relpath
 
 from six import string_types
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf, \
-    EnsureDatasetAbsolutePath
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, FileNotInAnnexError
-from datalad.cmdline.helpers import POC_get_root_handle
+from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
+    FileNotInAnnexError
 from datalad.interface.base import Interface
-from datalad.interface.POC_helpers import get_submodules_dict, get_submodules_list
-from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod, resolve_path
+from datalad.distribution.dataset import EnsureDataset, Dataset, \
+    datasetmethod, resolve_path
 from datalad.distribution.install import get_containing_subdataset
 from datalad.cmd import CommandError
-from datalad.utils import knows_annex
 
 lgr = logging.getLogger('datalad.distribution.publish')
 

@@ -14,24 +14,18 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, exists, isdir, basename, commonprefix, relpath, normpath
+from os.path import join as opj, abspath, basename, relpath, normpath
 
 from six.moves.urllib.parse import urlparse
 
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool, \
-    EnsureDatasetAbsolutePath
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
-from datalad.cmdline.helpers import POC_get_root_handle
 from ..interface.base import Interface
-from ..interface.POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_remotes
-from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod, resolve_path
+from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.cmd import CommandError
-from datalad.utils import assure_dir, not_supported_on_windows, getpwd
-from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
+from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')

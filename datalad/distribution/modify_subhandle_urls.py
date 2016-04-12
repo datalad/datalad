@@ -15,21 +15,13 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, exists
+from os.path import join as opj
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, \
-    EnsureDatasetAbsolutePath
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import Runner
-from datalad.cmdline.helpers import POC_get_root_handle
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
-from datalad.interface.POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_module_parser
-from datalad.cmd import CommandError
-from datalad.utils import assure_dir
-from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
+from datalad.interface.POC_helpers import get_module_parser
 
 lgr = logging.getLogger('datalad.distribution.modify_subhandle_urls')
 
