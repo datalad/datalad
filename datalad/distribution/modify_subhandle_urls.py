@@ -22,6 +22,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
 from datalad.interface.POC_helpers import get_module_parser
+from datalad.utils import getpwd
 
 lgr = logging.getLogger('datalad.distribution.modify_subhandle_urls')
 

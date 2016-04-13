@@ -52,7 +52,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 used to add the target as a sibling to `dataset` and as a
                 default for the directory on the server, where to create the
                 dataset.""",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureStr()),
         target=Parameter(
             args=('target',),
             doc="""Sibling name to create for this publication target.
@@ -116,8 +116,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
     @staticmethod
     @datasetmethod(name='create_publication_target_sshwebserver')
-    def __call__(dataset=None, sshurl=None, target=None, target_dir=None,
-                 target_url=None, target_pushurl=None, recursive=False,
+    def __call__(sshurl, target=None, target_dir=None,
+                 target_url=None, target_pushurl=None,
+                 dataset=None, recursive=False,
                  force=False, shared=False):
 
         if sshurl is None:
