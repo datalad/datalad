@@ -66,14 +66,12 @@ class Uninstall(Interface):
         data_only=Parameter(
             args=("--data-only",),
             doc="If set, only data is uninstalled, but the handles are kept.",
-            action="store_true",
-            constraints=EnsureBool()),
+            action="store_true"),
         recursive=Parameter(
             args=("--recursive", "-r"),
             doc="""If set, uninstall recursively, including all subdatasets.
             The value of `data` is used for recursive uninstallation, too.""",
-            action="store_true",
-            constraints=EnsureBool(),))
+            action="store_true"))
 
     @staticmethod
     @datasetmethod(name='uninstall')
@@ -93,6 +91,7 @@ class Uninstall(Interface):
                     "insufficient information for uninstallation (needs at "
                     "least a dataset or a path")
         elif isinstance(path, list):
+            # TODO: not sure. might be possible to deal with that list directly
             return [Uninstall.__call__(
                     dataset=ds,
                     path=p,
@@ -125,6 +124,8 @@ class Uninstall(Interface):
                 # installed => nothing to do
                 # TODO: consider `data` option! is_installed currently only
                 # checks for a repository
+                lgr.info("Dataset {0} not installed. Nothing to "
+                         "do.".format(ds.path))
                 return
             else:
                 # we want to uninstall something from a not installed dataset
@@ -162,6 +163,7 @@ class Uninstall(Interface):
 
         if relativepath in ds.get_dataset_handles(recursive=True):
             # it's a submodule
+            # --recursive required or implied?
             raise NotImplementedError("TODO: uninstall submodule %s from "
                                       "dataset %s" % (relativepath, ds.path))
 
@@ -178,52 +180,53 @@ class Uninstall(Interface):
                 ds.repo.get_file_key(relativepath)
             except FileInGitError:
                 # file directly in git
-                raise NotImplementedError("TODO: uninstall file %s (git) from "
-                                          "dataset %s" % (path, ds.path))
+                _file_in_git = True
+
             except FileNotInAnnexError:
                 # either an untracked file in this dataset, or something that
                 # also actually exists in the file system but could be part of
                 # a subdataset
-                subds = get_containing_subdataset(ds, relativepath)
-                if ds.path != subds.path:
-                    # target path belongs to a subdataset, hand uninstallation
-                    # over to it
-                    return subds.uninstall(
-                        path=relpath(path, start=subds.path),
-                        data_only=data_only,
-                        recursive=recursive)
-
-                # this must be an untracked/existing something
-                # it wasn't installed, so we cannot uninstall it
-                raise ValueError("Cannot uninstall %s" % path)
+                _untracked_or_within_submodule = True
 
             # it's an annexed file
-            raise NotImplementedError("TODO: uninstall file %s (annex) from "
-                                      "dataset %s" % (path, ds.path))
-
+            if data_only:
+                ds.repo.annex_drop([path])
+                return path
+            else:
+                raise NotImplementedError("TODO: fully uninstall file %s "
+                                          "(annex) from dataset %s" %
+                                          (path, ds.path))
         else:
             # plain git repo
             if relativepath in ds.repo.get_indexed_files():
                 # file directly in git
-                raise NotImplementedError("TODO: uninstall file %s (git) from "
-                                          "dataset %s" % (path, ds.path))
+                _file_in_git = True
             else:
                 # either an untracked file in this dataset, or something that
                 # also actually exists in the file system but could be part of
                 # a subdataset
-                subds = get_containing_subdataset(ds, relativepath)
-                if ds.path != subds.path:
-                    # target path belongs to a subdataset, hand uninstallation
-                    # over to it
-                    return subds.uninstall(
-                        path=relpath(path, start=subds.path),
-                        data_only=data_only,
-                        recursive=recursive)
-
-                # this must be an untracked/existing something
-                # it wasn't installed, so we cannot uninstall it
-                raise ValueError("Cannot uninstall %s" % path)
+                _untracked_or_within_submodule = True
 
 
+        if _file_in_git:
+            if data_only:
+                raise ValueError("%s is not a file handle. Removing its "
+                                 "data only doesn't make sense." % path)
+            else:
+                return ds.repo.git_remove([relativepath])
+
+        elif _untracked_or_within_submodule:
+            subds = get_containing_subdataset(ds, relativepath)
+            if ds.path != subds.path:
+                # target path belongs to a subdataset, hand uninstallation
+                # over to it
+                return subds.uninstall(
+                    path=relpath(path, start=subds.path),
+                    data_only=data_only,
+                    recursive=recursive)
+
+            # this must be an untracked/existing something
+            # it wasn't installed, so we cannot uninstall it
+            raise ValueError("Cannot uninstall %s" % path)
 
 
