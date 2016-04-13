@@ -100,7 +100,6 @@ class Update(Interface):
         assert(ds.repo is not None)
 
         repos_to_update = [ds.repo]
-
         if recursive:
             repos_to_update += [GitRepo(opj(ds.path, sub_path))
                                 for sub_path in
@@ -115,7 +114,12 @@ class Update(Interface):
                 continue
 
             # Currently '--merge' works for single remote only:
-            if len(remotes) > 1 and merge:
+            # TODO: - condition still incomplete
+            #       - We can merge if a remote was given or there is a
+            #         tracking branch
+            #       - we also can fetch all remotes independently on whether or
+            #         not we merge a certain remote
+            if not name and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple remotes:\n%s" % remotes)
                 raise NotImplementedError("No merge strategy for multiple "
                                           "remotes implemented yet.")
@@ -123,7 +127,7 @@ class Update(Interface):
 
             # fetch remote(s):
             repo.git_fetch(name if name else '',
-                           "--fetch_all" if fetch_all else '')
+                           "--all" if fetch_all else '')
 
             # if it is an annex and there is a tracking branch, and we didn't
             # fetch the entire remote anyway, explicitly fetch git-annex
@@ -153,6 +157,14 @@ class Update(Interface):
                 cmd_list = ["git", "pull"]
                 if name:
                     cmd_list.append(name)
+                    # branch needed, if not default remote
+                    # => TODO: use default remote/tracking branch to compare
+                    #          (see above, where git-annex is fetched)
+                    # => TODO: allow for passing a branch
+                    # (or more general refspec?)
+                    # For now, just use the same name
+                    cmd_list.append(repo.git_get_active_branch())
+
                 out, err = repo._git_custom_command('', cmd_list)
                 lgr.info(out)
                 if knows_annex(repo.path):

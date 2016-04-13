@@ -161,6 +161,7 @@ class Install(Interface):
                 cmd_list = ["git", "submodule", "update", "--init",
                             "--recursive"]
                 runner.run(cmd_list, cwd=ds.path)
+                # TODO: annex init them!
             return ds
 
         # at this point this dataset is "installed", now we can test whether to
