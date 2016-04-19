@@ -271,60 +271,62 @@ def test_publish_file_handle(origin, src_path, dst_path):
     # eq_(target.file_has_content(['test-annex.dat']), [True])
 
 
-@with_testrepos('submodule_annex', flavors=['local'])
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_publish_add_remote(origin, src_path, dst_path):
-
-    # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
-    sub1 = GitRepo(opj(src_path, 'sub1'))
-    sub2 = GitRepo(opj(src_path, 'sub2'))
-
-    # create plain git at target locations:
-    # we want to test URL-template, so create the desired list in FS at
-    # destination:
-    pub_path_super = opj(dst_path, basename(src_path))
-    pub_path_sub1 = opj(dst_path, basename(src_path) + '-sub1')
-    pub_path_sub2 = opj(dst_path, basename(src_path) + '-sub2')
-    super_target = GitRepo(pub_path_super, create=True)
-    super_target.git_checkout("TMP", "-b")
-    sub1_target = GitRepo(pub_path_sub1, create=True)
-    sub1_target.git_checkout("TMP", "-b")
-    sub2_target = GitRepo(pub_path_sub2, create=True)
-    sub2_target.git_checkout("TMP", "-b")
-
-    url_template = dst_path + os.path.sep + '%NAME'
-
-    res = publish(dataset=source, dest="target",
-            dest_url=url_template,
-            recursive=True)
-
-    # testing result list
-    # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
-    assert_is_instance(res, list)
-    for item in res:
-        assert_is_instance(item, Dataset)
-    eq_(res[0].path, src_path)
-    eq_(res[1].path, sub1.path)
-    eq_(res[2].path, sub2.path)
-
-
-    eq_(list(super_target.git_get_branch_commits("master")),
-        list(source.repo.git_get_branch_commits("master")))
-    eq_(list(super_target.git_get_branch_commits("git-annex")),
-        list(source.repo.git_get_branch_commits("git-annex")))
-
-    eq_(list(sub1_target.git_get_branch_commits("master")),
-        list(sub1.git_get_branch_commits("master")))
-    eq_(list(sub1_target.git_get_branch_commits("git-annex")),
-        list(sub1.git_get_branch_commits("git-annex")))
-
-    eq_(list(sub2_target.git_get_branch_commits("master")),
-        list(sub2.git_get_branch_commits("master")))
-    eq_(list(sub2_target.git_get_branch_commits("git-annex")),
-        list(sub2.git_get_branch_commits("git-annex")))
+# Note: add remote currently disabled in publish
+#
+# @with_testrepos('submodule_annex', flavors=['local'])
+# @with_tempfile(mkdir=True)
+# @with_tempfile(mkdir=True)
+# def test_publish_add_remote(origin, src_path, dst_path):
+#
+#     # prepare src
+#     source = install(path=src_path, source=origin, recursive=True)
+#     # TODO: For now, circumnavigate the detached head issue.
+#     # Figure out, what to do.
+#     for subds in source.get_dataset_handles(recursive=True):
+#         AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+#     sub1 = GitRepo(opj(src_path, 'sub1'))
+#     sub2 = GitRepo(opj(src_path, 'sub2'))
+#
+#     # create plain git at target locations:
+#     # we want to test URL-template, so create the desired list in FS at
+#     # destination:
+#     pub_path_super = opj(dst_path, basename(src_path))
+#     pub_path_sub1 = opj(dst_path, basename(src_path) + '-sub1')
+#     pub_path_sub2 = opj(dst_path, basename(src_path) + '-sub2')
+#     super_target = GitRepo(pub_path_super, create=True)
+#     super_target.git_checkout("TMP", "-b")
+#     sub1_target = GitRepo(pub_path_sub1, create=True)
+#     sub1_target.git_checkout("TMP", "-b")
+#     sub2_target = GitRepo(pub_path_sub2, create=True)
+#     sub2_target.git_checkout("TMP", "-b")
+#
+#     url_template = dst_path + os.path.sep + '%NAME'
+#
+#     res = publish(dataset=source, dest="target",
+#             dest_url=url_template,
+#             recursive=True)
+#
+#     # testing result list
+#     # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
+#     assert_is_instance(res, list)
+#     for item in res:
+#         assert_is_instance(item, Dataset)
+#     eq_(res[0].path, src_path)
+#     eq_(res[1].path, sub1.path)
+#     eq_(res[2].path, sub2.path)
+#
+#
+#     eq_(list(super_target.git_get_branch_commits("master")),
+#         list(source.repo.git_get_branch_commits("master")))
+#     eq_(list(super_target.git_get_branch_commits("git-annex")),
+#         list(source.repo.git_get_branch_commits("git-annex")))
+#
+#     eq_(list(sub1_target.git_get_branch_commits("master")),
+#         list(sub1.git_get_branch_commits("master")))
+#     eq_(list(sub1_target.git_get_branch_commits("git-annex")),
+#         list(sub1.git_get_branch_commits("git-annex")))
+#
+#     eq_(list(sub2_target.git_get_branch_commits("master")),
+#         list(sub2.git_get_branch_commits("master")))
+#     eq_(list(sub2_target.git_get_branch_commits("git-annex")),
+#         list(sub2.git_get_branch_commits("git-annex")))

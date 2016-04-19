@@ -44,7 +44,7 @@ def test_add_sibling(origin, repo_path):
         AnnexRepo(opj(repo_path, subds), init=True,
                   create=False).git_checkout("master")
 
-    res = add_sibling(dataset=source, sibling="test-remote",
+    res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location")
     eq_(res, [basename(source.path)])
     assert_in("test-remote", source.repo.git_get_remotes())
@@ -52,7 +52,7 @@ def test_add_sibling(origin, repo_path):
         source.repo.git_get_remote_url("test-remote"))
 
     # doing it again doesn't do anything
-    res = add_sibling(dataset=source, sibling="test-remote",
+    res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location")
     eq_(res, [])
     assert_in("test-remote", source.repo.git_get_remotes())
@@ -61,13 +61,13 @@ def test_add_sibling(origin, repo_path):
 
     # fail with conflicting url:
     with assert_raises(RuntimeError) as cm:
-        add_sibling(dataset=source, sibling="test-remote",
+        add_sibling(dataset=source, name="test-remote",
                     url="http://some.remo.te/location/elsewhere")
     assert_in("""'test-remote' already exists with conflicting URL""",
               str(cm.exception))
 
     # don't fail with conflicting url, when using force:
-    res = add_sibling(dataset=source, sibling="test-remote",
+    res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location/elsewhere", force=True)
     eq_(res, [basename(source.path)])
     eq_("http://some.remo.te/location/elsewhere",
@@ -76,14 +76,14 @@ def test_add_sibling(origin, repo_path):
     # add a push url without force fails, since in a way the fetch url is the
     # configured push url, too, in that case:
     with assert_raises(RuntimeError) as cm:
-        add_sibling(dataset=source, sibling="test-remote",
+        add_sibling(dataset=source, name="test-remote",
                     url="http://some.remo.te/location/elsewhere",
                     pushurl="ssh://push.it", force=False)
     assert_in("""'test-remote' already exists with conflicting URL""",
               str(cm.exception))
 
     # add push url (force):
-    res = add_sibling(dataset=source, sibling="test-remote",
+    res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location/elsewhere",
                       pushurl="ssh://push.it", force=True)
     eq_(res, [basename(source.path)])
@@ -93,7 +93,7 @@ def test_add_sibling(origin, repo_path):
         source.repo.git_get_remote_url("test-remote", push=True))
 
     # recursively:
-    res = add_sibling(dataset=source, sibling="test-remote",
+    res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location/%NAME",
                       pushurl="ssh://push.it/%NAME", recursive=True,
                       force=True)
@@ -112,4 +112,24 @@ def test_add_sibling(origin, repo_path):
         ok_(pushurl.startswith("ssh://push.it/" + basename(source.path)))
         ok_(pushurl.endswith(basename(repo.path)))
 
+    # recursively without template:
+    res = add_sibling(dataset=source, name="test-remote-2",
+                      url="http://some.remo.te/location",
+                      pushurl="ssh://push.it/",
+                      recursive=True,
+                      force=True)
+    eq_(set(res), {basename(source.path),
+                   opj(basename(source.path), "sub1"),
+                   opj(basename(source.path), "sub2")})
 
+    for repo in [source.repo,
+                 GitRepo(opj(source.path, "sub1")),
+                 GitRepo(opj(source.path, "sub2"))]:
+        assert_in("test-remote-2", repo.git_get_remotes())
+        url = repo.git_get_remote_url("test-remote-2")
+        pushurl = repo.git_get_remote_url("test-remote-2", push=True)
+        ok_(url.startswith("http://some.remo.te/location"))
+        ok_(pushurl.startswith("ssh://push.it/"))
+        if repo != source.repo:
+            ok_(url.endswith('/' + basename(repo.path)))
+            ok_(pushurl.endswith(basename(repo.path)))

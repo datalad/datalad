@@ -14,24 +14,18 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os import curdir
-from os.path import join as opj, abspath, expanduser, expandvars, exists, isdir, basename, commonprefix, relpath, normpath
+from os.path import join as opj, abspath, basename, relpath, normpath
 
 from six.moves.urllib.parse import urlparse
 
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool, \
-    EnsureDatasetAbsolutePath
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
-from datalad.cmdline.helpers import POC_get_root_handle
 from ..interface.base import Interface
-from ..interface.POC_helpers import get_submodules_dict, get_submodules_list, get_all_submodules_dict, get_git_dir, get_remotes
-from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod, resolve_path
+from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.cmd import CommandError
-from datalad.utils import assure_dir, not_supported_on_windows, getpwd
-from datalad.consts import HANDLE_META_DIR, POC_STD_META_FILE
+from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
@@ -58,7 +52,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 used to add the target as a sibling to `dataset` and as a
                 default for the directory on the server, where to create the
                 dataset.""",
-            constraints=EnsureStr() | EnsureNone()),
+            constraints=EnsureStr()),
         target=Parameter(
             args=('target',),
             doc="""Sibling name to create for this publication target.
@@ -122,8 +116,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
     @staticmethod
     @datasetmethod(name='create_publication_target_sshwebserver')
-    def __call__(dataset=None, sshurl=None, target=None, target_dir=None,
-                 target_url=None, target_pushurl=None, recursive=False,
+    def __call__(sshurl, target=None, target_dir=None,
+                 target_url=None, target_pushurl=None,
+                 dataset=None, recursive=False,
                  force=False, shared=False):
 
         if sshurl is None:
@@ -235,7 +230,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     out, err = runner.run(cmd, expect_fail=True,
                                           expect_stderr=True)
                 except CommandError as e:
-                    if "%s: No such file or directory" % path in e.stderr:
+                    if "No such file or directory" in e.stderr and \
+                                    path in e.stderr:
                         path_exists = False
                     else:
                         raise  # It's an unexpected failure here
@@ -292,7 +288,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # stop controlmaster (close ssh connection):
         cmd = ["ssh", "-O", "stop", "-S", control_path, host_name]
-        out, err = runner.run(cmd)
+        out, err = runner.run(cmd, expect_stderr=True)
 
         if target:
             # add the sibling(s):
@@ -301,7 +297,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             if target_pushurl is None:
                 target_pushurl = sshurl
             result_adding = AddSibling()(dataset=ds,
-                                         sibling=target,
+                                         name=target,
                                          url=target_url,
                                          pushurl=target_pushurl,
                                          recursive=recursive,

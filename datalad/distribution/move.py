@@ -18,11 +18,11 @@ from os.path import join as opj, abspath, expanduser, expandvars, exists
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.cmdline.helpers import POC_get_root_handle
-from .base import Interface
-from .POC_helpers import get_submodules_dict
+from datalad.interface.base import Interface
+from datalad.interface.POC_helpers import get_submodules_dict
 
 
-class POCMove(Interface):
+class Move(Interface):
     """Move a handle."""
 
     _params_ = dict(
