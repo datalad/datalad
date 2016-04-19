@@ -98,26 +98,28 @@ class AddSibling(Interface):
             # try to find a dataset at or above CWD
             dspath = GitRepo.get_toppath(abspath(getpwd()))
             if dspath is None:
-                raise ValueError("""No dataset found
-                                 at or above {0}.""".format(getpwd()))
+                raise ValueError(
+                        "No dataset found at or above {0}.".format(getpwd()))
             ds = Dataset(dspath)
             lgr.debug("Resolved dataset for target creation: {0}".format(ds))
 
         assert(ds is not None and name is not None and url is not None)
 
         if not ds.is_installed():
-            raise ValueError("""Dataset {0} is not installed yet.""".format(ds))
+            raise ValueError("Dataset {0} is not installed yet.".format(ds))
         assert(ds.repo is not None)
 
-        repos = dict()
-        repos[basename(ds.path)] = dict()
-        repos[basename(ds.path)]['repo'] = ds.repo
+        ds_basename = basename(ds.path)
+        repos = {
+            ds_basename: {'repo': ds.repo}
+        }
         if recursive:
             for subds in ds.get_dataset_handles(recursive=True):
                 sub_path = opj(ds.path, subds)
-                repos[basename(ds.path) + '/' + subds] = dict()
-                repos[basename(ds.path) + '/' + subds]['repo'] = \
-                    GitRepo(sub_path, create=False)
+#                repos[ds_basename + '/' + subds] = {
+                repos[subds] = {
+                    'repo': GitRepo(sub_path, create=False)
+                }
 
         # Note: This is copied from create_publication_target_sshwebserver
         # as it is the same logic as for its target_dir.
@@ -140,12 +142,12 @@ class AddSibling(Interface):
             else:
                 repos[repo]['url'] = url
                 if pushurl:
-                        repos[repo]['pushurl'] = pushurl
+                    repos[repo]['pushurl'] = pushurl
 
-                if repo != basename(ds.path):
-                    repos[repo]['url'] += '/' + repo
+                if repo != ds_basename:
+                    repos[repo]['url'] = _urljoin(repos[repo]['url'], repo)
                     if pushurl:
-                        repos[repo]['pushurl'] += '/' + repo
+                        repos[repo]['pushurl'] = _urljoin(repos[repo]['pushurl'], repo)
 
         # collect existing remotes:
         already_existing = list()
@@ -206,7 +208,12 @@ class AddSibling(Interface):
             return
         items= '\n'.join(map(str, res))
         msg = "Added sibling to {ds}:\n{items}".format(
-            ds='{n} datasets'.format(len(res))
-            if len(res) > 1 else 'one dataset',
+            ds='{} datasets'.format(len(res))
+            if len(res) > 1
+            else 'one dataset',
             items=items)
         ui.message(msg)
+
+# TODO: RF nicely, test, make clear how different from urljoin etc
+def _urljoin(base, url):
+    return base + url if (base.endswith('/') or url.startswith('/')) else base + '/' + url
