@@ -35,9 +35,11 @@ from ..utils import not_supported_on_windows
 from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
+from ..utils import any_re_search
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
@@ -273,6 +275,14 @@ def test_assure_dict_from_str():
     assert_equal(assure_dict_from_str(
         dict(__ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in')), dict(
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
+
+
+def test_any_re_search():
+    assert_true(any_re_search('a', 'a'))
+    assert_true(any_re_search('a', 'bab'))
+    assert_false(any_re_search('^a', 'bab'))
+    assert_true(any_re_search(['b', '.ab'], 'bab'))
+    assert_false(any_re_search(['^b', 'bab'], 'ab'))
 
 
 def test_find_files():

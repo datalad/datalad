@@ -25,6 +25,7 @@ from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
 from ..utils import getpwd
+from ..utils import any_re_search
 
 import logging
 lgr = logging.getLogger('datalad.files')
@@ -402,7 +403,7 @@ class ExtractedArchive(object):
             for name in files:
                 yield opj(root, name)[path_len:]
 
-    def get_leading_directory(self, depth=None, exclude=None):
+    def get_leading_directory(self, depth=None, consider=None, exclude=None):
         """Return leading directory of the content within archive
 
         Parameters
@@ -410,6 +411,9 @@ class ExtractedArchive(object):
         depth: int or None, optional
           Maximal depth of leading directories to consider.  If None - no upper
           limit
+        consider : list of str, optional
+          Regular expressions for file/directory names to be considered (before
+          exclude). Applied to the entire relative path to the file as in the archive
         exclude: list of str, optional
           Regular expressions for file/directory names to be excluded from consideration.
           Applied to the entire relative path to the file as in the archive
@@ -422,13 +426,11 @@ class ExtractedArchive(object):
         leading = None
         # returns only files, so no need to check if a dir or not
         for fpath in self.get_extracted_files():
-            if exclude:
-                try:  # since we need to skip outside loop from inside loop
-                    for regexp in exclude:
-                        if re.search(regexp, fpath):
-                            raise StopIteration
-                except StopIteration:
-                    continue
+            if consider and not any_re_search(consider, fpath):
+                continue
+            if exclude and any_re_search(exclude, fpath):
+                continue
+
             lpath = fpath.split(opsep)
             dpath = lpath[:-1]  # directory path components
             if leading is None:
