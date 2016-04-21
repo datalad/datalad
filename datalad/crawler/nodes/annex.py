@@ -1121,6 +1121,7 @@ class Annexificator(object):
             for data_ in initiate_handle(*args, **kwargs)(data):
                 # Also "register" as a sub-handle if not yet registered
                 ds = Dataset(self.repo.path)
+                # TODO:  rename handle_  into dataset_
                 if data['handle_name'] not in ds.get_dataset_handles():
                     out = install(
                             dataset=ds,
