@@ -168,6 +168,8 @@ def test_get_leading_directory():
     yield _test_get_leading_directory, ea, ['file.txt'], None
     yield _test_get_leading_directory, ea, ['file.txt', opj('d', 'f')], None
     yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d', 'f2')], 'd'
+    yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d', 'f2')], 'd', {'consider': 'd'}
+    yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d', 'f2')], None, {'consider': 'dd'}
     yield _test_get_leading_directory, ea, [opj('d', 'f'), opj('d2', 'f2')], None
     yield _test_get_leading_directory, ea, [opj('d', 'd2', 'f'), opj('d', 'd2', 'f2')], opj('d', 'd2')
     yield _test_get_leading_directory, ea, [opj('d', 'd2', 'f'), opj('d', 'd2', 'f2')], 'd', {'depth': 1}
