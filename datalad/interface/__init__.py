@@ -33,6 +33,9 @@ from ..distribution.create_publication_target_sshwebserver import \
 from ..distribution.install import Install
 from ..distribution.publish import Publish
 
+# very optional ones
+from ..distribution.tests.create_test_dataset import CreateTestDataset
+
 # all interfaces should be associated with (at least) one of the groups below
 _group_dataset = (
     'Commands for dataset operations',
@@ -61,4 +64,5 @@ _group_misc = (
         DownloadURL,
         Ls,
         Clean,
+        CreateTestDataset,
     ])

@@ -54,8 +54,11 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
         # all .txt and .json in root directory (only) go into git!
         options=["-c",
                  "annex.largefiles="
-                 "exclude=CHANGES* and exclude=README* and exclude=*.[mc] and exclude=dataset*.json"
-                 " and (exclude=*.txt or include=*/*.txt) "
+                 # ISSUES LICENSE Makefile
+                 "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
+                 " and exclude=CHANGES* and exclude=README*"
+                 " and exclude=*.[mc] and exclude=dataset*.json"
+                 " and (exclude=*.txt or include=*/*.txt)"
                  " and (exclude=*.json or include=*/*.json)"
                  " and (exclude=*.tsv or include=*/*.tsv)"
                  ])
