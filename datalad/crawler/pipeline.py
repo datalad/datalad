@@ -44,7 +44,6 @@ provide informative logging.
 
 import sys
 from glob import glob
-from six import iteritems
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
 
 from .. import cfg
@@ -55,11 +54,11 @@ from ..support.gitrepo import GitRepo
 from ..support.stats import ActivityStats
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
-# Name of the section in the config file which would define pipeline parameters
-CRAWLER_PIPELINE_SECTION = 'crawler'
-
 from logging import getLogger
 lgr = getLogger('datalad.crawl.pipeline')
+
+# Name of the section in the config file which would define pipeline parameters
+CRAWLER_PIPELINE_SECTION = 'crawler'
 
 
 class FinishPipeline(Exception):
@@ -79,8 +78,11 @@ PIPELINE_OPTS = dict(
 # which data types depict object being a pipeline
 PIPELINE_TYPES = (list, tuple)
 
+
 def reset_pipeline(pipeline):
-    """Given a pipeline, traverses its nodes and calls .reset on them if they have such an attribute
+    """Given a pipeline, traverse its nodes and call .reset on them
+
+    Note: it doesn't try to call reset if a node doesn't have it
     """
     if pipeline:
         for node in pipeline:
@@ -90,6 +92,7 @@ def reset_pipeline(pipeline):
                 lgr.log(2, "Resetting node %s" % node)
                 node.reset()
 
+
 def run_pipeline(*args, **kwargs):
     """Run pipeline and assemble results into a list
 
@@ -98,7 +101,6 @@ def run_pipeline(*args, **kwargs):
     items, a `[{}]` will be provided as output
     """
     output = list(xrun_pipeline(*args, **kwargs))
-    stats = None
     if output:
         if 'datalad_stats' in output[-1]:
             stats = output[-1]['datalad_stats'].get_total()
@@ -206,7 +208,7 @@ def xrun_pipeline(pipeline, data=None, stats=None, reset=True):
     # Input should be yielded last since otherwise it might ruin the flow for typical
     # pipelines which do not expect anything beyond going step by step
     # We should yeild input data even if it was empty
-    if ('input' in output):
+    if 'input' in output:
         _log("finally yielding input data as instructed")
         yield data
 
@@ -295,7 +297,7 @@ def _compare_dicts(d1, d2):
         elif k not in d2:
             removed.append(k)
         else:
-            if (d1[k] is d2[k]):
+            if d1[k] is d2[k]:
                 continue
             else:
                 try:
@@ -335,7 +337,7 @@ def _find_pipeline(name):
     """
     def candidates(name):
         if not name.endswith('.py'):
-            name = name + '.py'
+            name += '.py'
 
         # first -- current directory
         repo_path = GitRepo.get_toppath(curdir)
@@ -369,7 +371,7 @@ def load_pipeline_from_template(name, opts={}):
         Options for the pipeline, passed as **kwargs into the pipeline call
     """
 
-    if (isabs(name) or exists(name)):
+    if isabs(name) or exists(name):
         raise NotImplementedError("Don't know how to import straight path %s yet" % name)
 
     # explicit isabs since might not exist
@@ -385,26 +387,27 @@ def load_pipeline_from_template(name, opts={}):
 
     return load_pipeline_from_script(filename, **opts)
 
+
 # TODO: we might need to find present .datalad/crawl in another branch if not
 # present currently
+
 
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
     """
-
-    cfg = SafeConfigParserWithIncludes()
-    cfg.read([path])
-    if cfg.has_section(CRAWLER_PIPELINE_SECTION):
-        opts = cfg.options(CRAWLER_PIPELINE_SECTION)
+    cfg_ = SafeConfigParserWithIncludes()
+    cfg_.read([path])
+    if cfg_.has_section(CRAWLER_PIPELINE_SECTION):
+        opts = cfg_.options(CRAWLER_PIPELINE_SECTION)
         # must have template
         if 'template' not in opts:
             raise IOError("%s lacks %r field within %s section"
                           % (path, 'template', CRAWLER_PIPELINE_SECTION))
         opts.pop(opts.index('template'))
-        template = cfg.get(CRAWLER_PIPELINE_SECTION, 'template')
+        template = cfg_.get(CRAWLER_PIPELINE_SECTION, 'template')
         pipeline = load_pipeline_from_template(
             template,
-            {o: cfg.get(CRAWLER_PIPELINE_SECTION, o) for o in opts})
+            {o: cfg_.get(CRAWLER_PIPELINE_SECTION, o) for o in opts})
     else:
         raise IOError("Did not find section %r within %s" % (CRAWLER_PIPELINE_SECTION, path))
     return pipeline
