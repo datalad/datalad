@@ -116,8 +116,8 @@ class AddSibling(Interface):
         if recursive:
             for subds in ds.get_dataset_handles(recursive=True):
                 sub_path = opj(ds.path, subds)
-#                repos[ds_basename + '/' + subds] = {
-                repos[subds] = {
+                repos[ds_basename + '/' + subds] = {
+#                repos[subds] = {
                     'repo': GitRepo(sub_path, create=False)
                 }
 
@@ -145,9 +145,9 @@ class AddSibling(Interface):
                     repos[repo]['pushurl'] = pushurl
 
                 if repo != ds_basename:
-                    repos[repo]['url'] = _urljoin(repos[repo]['url'], repo)
+                    repos[repo]['url'] = _urljoin(repos[repo]['url'], repo[len(ds_basename)+1:])
                     if pushurl:
-                        repos[repo]['pushurl'] = _urljoin(repos[repo]['pushurl'], repo)
+                        repos[repo]['pushurl'] = _urljoin(repos[repo]['pushurl'], repo[len(ds_basename)+1:])
 
         # collect existing remotes:
         already_existing = list()
