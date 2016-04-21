@@ -8,11 +8,17 @@
 # Minimalistic setup.py for now
 
 from glob import glob
-from os.path import sep as pathsep
+from os.path import sep as pathsep, join as opj, dirname
 
 from setuptools import setup, find_packages
 
-import datalad.version
+# This might entail lots of imports which might not yet be available
+# so let's do ad-hoc parsing of the version.py
+#import datalad.version
+with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
+    version_lines = filter(lambda x: x.startswith('__version__'), f)
+assert(len(version_lines) == 1)
+version = version_lines[0].split('=')[1].strip(" '\"\t\n")
 
 # Only recentish versions of find_packages support include
 # datalad_pkgs = find_packages('.', include=['datalad*'])
@@ -54,7 +60,7 @@ setup(
     name="datalad",
     author="DataLad Team and Contributors",
     author_email="team@datalad.org",
-    version=datalad.version.__version__,
+    version=version,
     description="data distribution geared toward scientific datasets",
     packages=datalad_pkgs,
     install_requires=requires['core'] + requires['downloaders'],
