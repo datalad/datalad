@@ -16,7 +16,7 @@ from setuptools import setup, find_packages
 # so let's do ad-hoc parsing of the version.py
 #import datalad.version
 with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
-    version_lines = filter(lambda x: x.startswith('__version__'), f)
+    version_lines = list(filter(lambda x: x.startswith('__version__'), f))
 assert(len(version_lines) == 1)
 version = version_lines[0].split('=')[1].strip(" '\"\t\n")
 
