@@ -272,8 +272,10 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     continue
 
             except CommandError as e:
-                lgr.warning("Failed to determine git version on remote.\n"
-                            "Error: {0}\nTrying to configure anyway ...")
+                lgr.warning(
+                    "Failed to determine git version on remote.\n"
+                    "Error: {0}\nTrying to configure anyway "
+                    "...".format(e.message))
 
             # allow for pushing to checked out branch
             cmd = ssh_cmd + ["git", "-C", path, "config",
@@ -285,6 +287,23 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 lgr.warning("git config failed at remote location %s.\n"
                             "You will not be able to push to checked out "
                             "branch." % path)
+
+            # enable post-update hook:
+            cmd = ssh_cmd + ["mv", opj(path, ".git/hooks/post-update.sample"),
+                             opj(path, ".git/hooks/post-update")]
+            try:
+                runner.run(cmd)
+            except CommandError as e:
+                lgr.error("Failed to enable post update hook.\n"
+                          "Error: %s" % e.message)
+
+            # initially update server info "manually":
+            cmd = ssh_cmd + ["git", "-C", path, "update-server-info"]
+            try:
+                runner.run(cmd)
+            except CommandError as e:
+                lgr.error("Failed to update server info.\n"
+                          "Error: %s" % e.message)
 
         # stop controlmaster (close ssh connection):
         cmd = ["ssh", "-O", "stop", "-S", control_path, host_name]
