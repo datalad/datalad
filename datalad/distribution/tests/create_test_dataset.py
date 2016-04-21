@@ -82,13 +82,17 @@ def _makeds(path, levels, ds=None):
     repo.git_add(fn)
     repo.git_commit("Added %s" % fn)
     if ds:
-        #import pdb; pdb.set_trace()
-        rpath = './' + os.path.relpath(path, ds.path)
+        rpath = os.path.relpath(path, ds.path)
         out = install(
             dataset=ds,
-            path=os.path.relpath(path, ds.path),
-            source=rpath,
+            path=rpath,
+            source='./' + rpath,
         )
+        # TODO: The following is to be adapted when refactoring AnnexRepo/GitRepo to make it uniform
+        if isinstance(ds.repo, AnnexRepo):
+            ds.repo.commit("subdataset %s installed." % rpath)
+        else:
+            ds.repo.git_commit("subdataset %s installed." % rpath)
 
     if not levels:
         return
