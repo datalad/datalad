@@ -38,6 +38,7 @@ from datalad.interface.POC_helpers import get_git_dir
 
 lgr = logging.getLogger('datalad.distribution.tests')
 
+
 def _parse_spec(spec):
     out = []   # will return a list of tuples (min, max) for each layer
     for ilevel, level in enumerate(spec.split('/')):
@@ -81,11 +82,11 @@ def _makeds(path, levels, ds=None):
     repo.git_add(fn)
     repo.git_commit("Added %s" % fn)
     if ds:
-        import pdb; pdb.set_trace()
+        #import pdb; pdb.set_trace()
         rpath = './' + os.path.relpath(path, ds.path)
         out = install(
             dataset=ds,
-            path=rpath,
+            path=os.path.relpath(path, ds.path),
             source=rpath,
         )
 
@@ -104,6 +105,7 @@ def _makeds(path, levels, ds=None):
         # and all under
         for d in _makeds(subds_fpath, levels_, ds=ds_):
             yield d
+
 
 class CreateTestDataset(Interface):
     """Create test (meta-)dataset.
@@ -150,7 +152,6 @@ class CreateTestDataset(Interface):
 
         # now we should just make it happen and return list of all the datasets
         return list(_makeds(path, levels))
-
 
     @staticmethod
     def result_renderer_cmdline(res):
