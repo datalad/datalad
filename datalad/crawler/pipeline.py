@@ -58,8 +58,8 @@ from logging import getLogger
 lgr = getLogger('datalad.crawl.pipeline')
 
 # Name of the section in the config file which would define pipeline parameters
-CRAWLER_PIPELINE_SECTION = 'crawler'
-
+CRAWLER_PIPELINE_SECTION = 'crawler:pipeline'
+CRAWLER_PIPELINE_SECTION_DEPRECATED = 'crawler'
 
 class FinishPipeline(Exception):
     """Exception to use to signal that any given pipeline should be stopped
@@ -397,18 +397,25 @@ def load_pipeline_from_config(path):
     """
     cfg_ = SafeConfigParserWithIncludes()
     cfg_.read([path])
-    if cfg_.has_section(CRAWLER_PIPELINE_SECTION):
-        opts = cfg_.options(CRAWLER_PIPELINE_SECTION)
+    pipeline = None
+    for sec in (CRAWLER_PIPELINE_SECTION, CRAWLER_PIPELINE_SECTION_DEPRECATED):
+        if not cfg_.has_section(sec):
+            continue
+        if sec == CRAWLER_PIPELINE_SECTION_DEPRECATED:
+            lgr.warning("Crawler section was renamed from %s to %s please adjust",
+                        CRAWLER_PIPELINE_SECTION_DEPRECATED, CRAWLER_PIPELINE_SECTION)
+        opts = cfg_.options(sec)
         # must have template
         if 'template' not in opts:
             raise IOError("%s lacks %r field within %s section"
-                          % (path, 'template', CRAWLER_PIPELINE_SECTION))
+                          % (path, 'template', sec))
         opts.pop(opts.index('template'))
-        template = cfg_.get(CRAWLER_PIPELINE_SECTION, 'template')
+        template = cfg_.get(sec, 'template')
         pipeline = load_pipeline_from_template(
             template,
-            {o: cfg_.get(CRAWLER_PIPELINE_SECTION, o) for o in opts})
-    else:
+            {o: cfg_.get(sec, o) for o in opts})
+        break
+    if pipeline is None:
         raise IOError("Did not find section %r within %s" % (CRAWLER_PIPELINE_SECTION, path))
     return pipeline
 
