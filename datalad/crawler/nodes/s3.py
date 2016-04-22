@@ -58,6 +58,7 @@ class crawl_s3(object):
                  versionfx=get_version_for_key,
                  repo=None,
                  ncommits=None,
+                 recursive=False,
                  ):
         """
 
@@ -80,6 +81,8 @@ class crawl_s3(object):
           If specified, used as max number of commits to perform.
           ??? In principle the same effect could be achieved by a node
           raising FinishPipeline after n'th commit
+        recursive: bool, optional
+          Either to traverse recursively or just list elements at that level
         """
         self.bucket = bucket
         self.prefix = prefix
@@ -89,6 +92,7 @@ class crawl_s3(object):
         self.versionfx = versionfx
         self.repo = repo
         self.ncommits = ncommits
+        self.recursive = recursive
 
     def __call__(self, data):
 
@@ -116,8 +120,8 @@ class crawl_s3(object):
 
         # TODO:  we could probably use headers to limit from previously crawled last-modified
         # for now will be inefficient -- fetch all, sort, proceed
-        from operator import attrgetter
-        all_versions = bucket.list_versions(self.prefix)
+        kwargs = {} if self.recursive else {'delimiter': '/'}
+        all_versions = bucket.list_versions(self.prefix, **kwargs)
         # Comparison becomes tricky whenever as if in our test bucket we have a collection
         # of rapid changes within the same ms, so they couldn't be sorted by last_modified, so we resolve based
         # on them being marked latest, or not being null (as could happen originally), and placing Delete after creation
@@ -165,6 +169,7 @@ class crawl_s3(object):
             if force or True:
                 versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
         for e in versions_sorted + [None]:
+            print e
             filename = e.name if e is not None else None
             if filename in staged or e is None:
                 # We should finish this one and commit

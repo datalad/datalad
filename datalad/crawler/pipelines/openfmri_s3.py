@@ -22,6 +22,31 @@ from ...consts import DATALAD_SPECIAL_REMOTE
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.openfmri")
 
+
+def collection_pipeline(prefix=None):
+    """Pipeline to crawl/annex an entire openfmri bucket"""
+
+    lgr.info("Creating a pipeline for the openfmri bucket")
+    annex = Annexificator(
+        create=False,  # must be already initialized etc
+        special_remotes=[DATALAD_SPECIAL_REMOTE],
+        backend='MD5E'
+        # Primary purpose of this one is registration of all URLs with our
+        # upcoming "ultimate DB" so we don't get to git anything
+        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+    )
+
+    return [
+        crawl_s3('openfmri', prefix=prefix, recursive=False, strategy='commit-versions', repo=annex.repo),
+        switch('datalad_action',
+               {  # TODO: we should actually deal with subdirs primarily
+                   'commit': annex.finalize(tag=True),
+                   'remove': annex.remove,
+                   'annex':  annex,
+               })
+    ]
+
+
 def pipeline(prefix=None):
     """Pipeline to crawl/annex an entire openfmri bucket"""
 
