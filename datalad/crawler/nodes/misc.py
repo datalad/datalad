@@ -94,7 +94,7 @@ class rename(object):
 @auto_repr
 class sub(object):
     """Apply re.sub regular expression substitutions to specified items"""
-    def __init__(self, subs):
+    def __init__(self, subs, ok_missing=False):
         """
 
         Parameters
@@ -102,11 +102,14 @@ class sub(object):
         subs: dict of key -> dict of pattern -> replacement
         """
         self.subs = subs
+        self.ok_missing = ok_missing
 
     def __call__(self, data):
         data = data.copy()
         for key, subs in self.subs.items():
             for from_, to_ in subs.items():
+                if key not in data and self.ok_missing:
+                    continue
                 data[key] = re.sub(from_, to_, data[key])
         yield data
 

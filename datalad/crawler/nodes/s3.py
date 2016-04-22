@@ -19,6 +19,7 @@ from os.path import lexists
 from os.path import join as opj
 
 from boto.s3.key import Key
+from boto.s3.prefix import Prefix
 from boto.s3.deletemarker import DeleteMarker
 import time
 
@@ -126,14 +127,22 @@ class crawl_s3(object):
         # of rapid changes within the same ms, so they couldn't be sorted by last_modified, so we resolve based
         # on them being marked latest, or not being null (as could happen originally), and placing Delete after creation
         # In real life last_modified should be enough, but life can be as tough as we made it for 'testing'
-        cmp = lambda k: (k.last_modified, k.name, k.is_latest, k.version_id != 'null', isinstance(k, DeleteMarker))
+        def kf(k, f):
+            """Some elements, such as Prefix wouldn't have any of attributes to sort by"""
+            return getattr(k, f, None)
+        # So ATM it would sort Prefixes first, but that is not necessarily correct...
+        # Theoretically the only way to sort Prefix'es with the rest is traverse that Prefix
+        # and take latest last_modified there but it is expensive, so -- big TODO if ever ;)
+        # ACTUALLY -- may be there is an API call to return sorted by last_modified, then we
+        # would need only a single entry in result to determine the last_modified for the Prefix, thus TODO
+        cmp = lambda k: (kf(k, 'last_modified'), k.name, kf(k, 'is_latest'), kf(k, 'version_id') != 'null', isinstance(k, DeleteMarker))
         versions_sorted = sorted(all_versions, key=cmp)  # attrgetter('last_modified'))
         # print '\n'.join(map(str, [cmp(k) for k in versions_sorted]))
 
         version_fields = ['last-modified', 'name', 'version-id']
         def get_version_cmp(k):
             # this one will return action version_id so we could uniquely identify
-            return k.last_modified, k.name, k.version_id
+            return kf(k, 'last_modified'), k.name, kf(k, 'version_id')
 
         if prev_version:
             last_modified_, name_, version_id_ = [prev_version[f] for f in version_fields]
@@ -169,7 +178,6 @@ class crawl_s3(object):
             if force or True:
                 versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
         for e in versions_sorted + [None]:
-            print e
             filename = e.name if e is not None else None
             if filename in staged or e is None:
                 # We should finish this one and commit
@@ -215,6 +223,17 @@ class crawl_s3(object):
                 if strategy == 'commit-versions':
                     yield updated(data, {'filename': filename, 'datalad_action': 'remove'})
                 update_versiondb(e)
+            elif isinstance(e, Prefix):
+                # so  we were provided a directory (in non-recursive traversal)
+                assert(not self.recursive)
+                yield updated(
+                    data,
+                    {
+                        'url': url,
+                        'filename': filename.rstrip('/'),
+                        'datalad_action': 'directory',
+                    }
+                )
             else:
                 raise ValueError("Don't know how to treat %s" % e)
             e_prev = e

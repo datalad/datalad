@@ -706,6 +706,11 @@ class Annexificator(object):
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
         # and apparently not actively developed
+        msg = str(msg).strip()
+        if not msg:
+            # we need to provide some commit msg, could may be deduced from current status
+            # TODO
+            msg = "a commit"
         if msg is not None:
             options = options + ["-m", msg]
         self._precommit()  # so that all batched annexes stop
@@ -1089,6 +1094,8 @@ class Annexificator(object):
         """Thin proxy to initiate_handle node which initiates handle as a subhandle to current annexificator
         """
         def _initiate_handle(data):
+            # TODO: actually ATM is not that thin and forces to us to use Annexificator
+            # which forces meta-dataset to become an annex, not pure git repo...
             for data_ in initiate_handle(*args, **kwargs)(data):
                 # Also "register" as a sub-handle if not yet registered
                 ds = Dataset(self.repo.path)
