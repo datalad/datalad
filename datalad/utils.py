@@ -184,10 +184,24 @@ def get_local_file_url(fname):
         furl = "file://%s" % urlquote(fname)
     return furl
 
+
 def get_url_path(url):
     """Given a file:// url, return the path itself"""
 
     return urlunquote(urlsplit(url).path)
+
+
+def parse_url_opts(url):
+    """Given a string with url-style options, split into content before # and options as dict"""
+    if '#' in url:
+        url_, attrs_str = url.split('#', 1)
+        opts = dict(x.split('=', 1) for x in attrs_str.split('&'))
+        if 'size' in opts:
+            opts['size'] = int(opts['size'])
+    else:
+        url_, opts = url, {}
+    return url_, opts
+
 
 def expandpath(path, force_absolute=True):
     """Expand all variables and user handles in a path.

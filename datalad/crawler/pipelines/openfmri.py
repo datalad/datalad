@@ -20,13 +20,35 @@ from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
-from ...utils import updated
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.openfmri")
+
+TOPURL = "https://openfmri.org/dataset/"
+
+
+# define a pipeline factory function accepting necessary keyword arguments
+# Should have no strictly positional arguments
+def collection_pipeline(url=TOPURL, **kwargs):
+    annex = Annexificator()
+    lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
+    return [
+        crawl_url(url),
+        a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9a-z]*)))/*$"),
+        # https://openfmri.org/dataset/ds000001/
+        assign({'handle_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_handle(
+            template="openfmri",
+            data_fields=['dataset'],
+            # let's all specs and modifications reside in master
+            # branch='incoming',  # there will be archives etc
+            existing='skip'
+            # further any additional options
+        )
+    ]
 
 
 def extract_readme(data):
@@ -42,7 +64,7 @@ def extract_readme(data):
            }
 
 
-def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/"):
+def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
     """Pipeline to crawl/annex an openfmri dataset"""
 
     dataset_url = '%s%s' % (topurl, dataset)

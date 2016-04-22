@@ -15,7 +15,7 @@ from ..pipeline import run_pipeline, FinishPipeline
 
 from ..nodes.misc import Sink, assign, range_node, interrupt_if
 from ..nodes.annex import Annexificator, initiate_handle
-from ..pipeline import load_pipeline_from_script
+from ..pipeline import load_pipeline_from_module
 
 from ...support.stats import ActivityStats
 
@@ -55,9 +55,9 @@ class AssertOrder(object):
     'pipeline2.py': 'pipeline = lambda x: [2*x]',
 })
 def test_load_pipeline_from_script(d):
-    eq_(load_pipeline_from_script(opj(d, 'pipeline.py')), [1])
-    eq_(load_pipeline_from_script(opj(d, 'pipeline2.py'), x=2), [4])
-    assert_raises(RuntimeError, load_pipeline_from_script, opj(d, 'unlikelytobethere.py'))
+    eq_(load_pipeline_from_module(opj(d, 'pipeline.py')), [1])
+    eq_(load_pipeline_from_module(opj(d, 'pipeline2.py'), kwargs=dict(x=2)), [4])
+    assert_raises(RuntimeError, load_pipeline_from_module, opj(d, 'unlikelytobethere.py'))
 
 
 DEFAULT_OUTPUT = [{'datalad_stats': ActivityStats()}]

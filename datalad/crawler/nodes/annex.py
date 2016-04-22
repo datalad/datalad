@@ -51,6 +51,7 @@ from ... import cfg
 from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
+from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
 
@@ -69,12 +70,15 @@ class initiate_handle(object):
     """
     def __init__(self, template, handle_name=None,  # collection_name=None,
                  path=None, branch=None, backend=None,
+                 template_func=None,
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
         ----------
         template : str
-          Which template (probably matching the collection name) to use
+          Which template (probably matching the collection name) to use.
+          TODO: refer to specs of template that it might understand some
+          arguments encoded, such as #func=custom_pipeline
         handle_name : str
           Name of the handle. If None, reacts on 'handle_name' in data
         collection_name : str, optional
@@ -95,7 +99,7 @@ class initiate_handle(object):
         add_fields : dict, optional
           Dictionary of additional fields to store in the crawler configuration
           to be passed into the template
-        existing : ('skip', 'raise', 'replace', crawl'), optional
+        existing : ('skip', 'raise', 'adjust', 'replace', 'crawl'), optional
           Behavior if encountering existing handle
         """
         # TODO: add_fields might not be flexible enough for storing more elaborate
@@ -133,56 +137,23 @@ class initiate_handle(object):
             put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
         return repo
 
-    def _save_crawl_config(self, handle_path, name, data):
-        lgr.debug("Creating handle configuration for %s" % name)
-        repo = GitRepo(handle_path)
-        crawl_config_dir = opj(handle_path, CRAWLER_META_DIR)
-        if not exists(crawl_config_dir):
-            lgr.log(2, "Creating %s", crawl_config_dir)
-            makedirs(crawl_config_dir)
-
-        crawl_config_repo_path = opj(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
-        crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
-        cfg = SafeConfigParserWithIncludes()
-        cfg.add_section(CRAWLER_PIPELINE_SECTION)
-        def secset(k, v):
-            cfg.set(CRAWLER_PIPELINE_SECTION, k, str(v))
-        secset('template', self.template)
-        # TODO: why should we set all this information into a handle?
-        # handle should be independent of a collection, and if necessary
-        # we should be able to track it back to collection(s) of which
-        # it belongs to
-        #if self.collection_name:
-        #    secset('collection', self.collection_name)
-        #secset('name', name)
-        # additional options to be obtained from the data
-        for f in self.data_fields:
-            secset(f, data[f])
+    def _save_crawl_config(self, handle_path, data):
+        kwargs = {f: data[f] for f in self.data_fields}
         # additional options given as a dictionary
-        for k, v in self.add_fields:
-            secset(k, v)
-        with open(crawl_config, 'w') as f:
-            cfg.write(f)
-        repo.git_add(crawl_config_repo_path)
-        if repo.dirty:
-            repo.git_commit("Initialized crawling configuration to use template %s" % self.template)
-        else:
-            lgr.debug("Repository is not dirty -- not committing")
-
+        kwargs.update(self.add_fields)
+        return initiate_pipeline_config(
+            template=self.template,
+            path=handle_path,
+            kwargs=kwargs,
+            commit=True
+        )
 
     def __call__(self, data={}):
         # figure out directory where create such a handle
         handle_name = self.handle_name or data.get('handle_name', None)
-        if self.path is None:
-            #crawl_toppath = cfg.get('crawl', 'collectionspath',
-            #                        default=opj(expanduser('~'), 'datalad', 'crawl'))
-            #handle_path = opj(crawl_toppath,
-            #                  self.collection_name or self.template,
-            #                  handle_name)
-            # Just under current subdirectory
-            handle_path = opj(os.curdir, handle_name)
-        else:
-            handle_path = self.path
+        handle_path = opj(os.curdir, handle_name) \
+            if self.path is None \
+            else self.path
 
         data_updated = updated(data, {'handle_path': handle_path,
                                       'handle_name': handle_name})
@@ -207,7 +178,7 @@ class initiate_handle(object):
                 raise ValueError(self.existing)
         if init:
             _call(self._initiate_handle, handle_path, handle_name)
-        _call(self._save_crawl_config, handle_path, handle_name, data)
+        _call(self._save_crawl_config, handle_path, data)
 
         yield data_updated
 
