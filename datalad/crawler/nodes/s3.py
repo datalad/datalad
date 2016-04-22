@@ -71,6 +71,11 @@ class crawl_s3(object):
           If not None, to define a version from the last processed key
         repo: GitRepo, optional
           Under which to store information about latest scraped version
+        strategy: {'naive', 'commit-versions'}, optional
+          With `naive` strategy no commits are made if there is a deletion,
+          or update event, so a single run should result in a single commit
+          even though interim different "load" could be added to annex under
+          the same filename
         ncommits: int or None, optional
           If specified, used as max number of commits to perform.
           ??? In principle the same effect could be achieved by a node
