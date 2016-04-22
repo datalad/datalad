@@ -74,6 +74,12 @@ class AddArchiveContent(Interface):
             action="store",
             type=int,
             doc="""Maximal depth to strip leading directories to. If not specified (None), no limit"""),
+        leading_dirs_consider=Parameter(
+            args=("--leading-dirs-consider",),
+            action="append",
+            doc="""Regular expression(s) for directories to consider to strip away""",
+            constraints=EnsureStr() | EnsureNone(),
+        ),
         # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
@@ -151,7 +157,8 @@ class AddArchiveContent(Interface):
         #     ),
 
     @staticmethod
-    def __call__(archive, annex=None, strip_leading_dirs=False, leading_dirs_depth=None,
+    def __call__(archive, annex=None,
+                 strip_leading_dirs=False, leading_dirs_depth=None, leading_dirs_consider=None,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None):
@@ -243,7 +250,8 @@ class AddArchiveContent(Interface):
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
-            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth, exclude=exclude) if strip_leading_dirs else None
+            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
+                if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
 
             # dedicated stats which would be added to passed in (if any)

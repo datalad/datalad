@@ -608,7 +608,7 @@ class GitRepo(object):
     def _git_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=True, cwd=None, env=None,
-                           shell=None):
+                           shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -633,7 +633,7 @@ class GitRepo(object):
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell)
+                                  env=env, shell=shell, expect_fail=expect_fail)
 
 # TODO: --------------------------------------------------------------------
 
@@ -674,13 +674,20 @@ class GitRepo(object):
         self._git_custom_command('', 'git fetch %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_get_remote_url(self, name):
+    def git_get_remote_url(self, name, push=False):
         """We need to know, where to clone from, if a remote is
         requested
         """
 
-        out, err = self._git_custom_command(
-            '', 'git config --get remote.%s.url' % name)
+        try:
+            out, err = self._git_custom_command(
+                '', 'git config --get remote.%s.%s' % (name,
+                                                       'pushurl' if push else 'url'),
+                expect_fail=True)
+        except CommandError as e:
+            if e.code == 1 and not e.stdout and not e.stderr:
+                return None
+            raise
         return out.rstrip(linesep)
 
     def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
@@ -774,3 +781,8 @@ class GitRepo(object):
         if auto:
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
+
+
+# TODO add_submodule
+# remove submodule
+# status?

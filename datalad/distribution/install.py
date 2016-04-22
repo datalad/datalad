@@ -29,7 +29,8 @@ from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
 from datalad.interface.base import Interface
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
-from datalad.utils import expandpath, knows_annex, assure_dir, is_explicit_path
+from datalad.utils import expandpath, knows_annex, assure_dir, \
+    is_explicit_path, on_windows
 from datalad.interface.POC_helpers import get_git_dir
 
 
@@ -59,7 +60,8 @@ def get_containing_subdataset(ds, path):
 
     for subds in ds.get_dataset_handles():
         common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
-        if common.endswith(sep) and isdir(opj(ds.path, common)):
+        # TODO: Rethink these conditions. Last one needed? What about uninitialized submodules?
+        if common.endswith(sep) and common == _with_sep(subds) and isdir(opj(ds.path, common)):
             return Dataset(path=opj(ds.path, common))
     return ds
 
@@ -106,7 +108,7 @@ class Install(Interface):
         if ds is not None and not isinstance(ds, Dataset):
             ds = Dataset(ds)
 
-        if path is None:
+        if not path:
             if ds is None:
                 # no dataset, no target location, nothing to do
                 raise ValueError(
@@ -160,6 +162,7 @@ class Install(Interface):
                 cmd_list = ["git", "submodule", "update", "--init",
                             "--recursive"]
                 runner.run(cmd_list, cwd=ds.path)
+                # TODO: annex init them!
             return ds
 
         # at this point this dataset is "installed", now we can test whether to
@@ -255,8 +258,18 @@ class Install(Interface):
                 assert not listdir(subds_git_dir)
                 rmdir(subds_git_dir)
 
-                with open(opj(path, ".git"), "w") as f:
-                    f.write("gitdir: {moved}\n".format(moved=moved_git_dir))
+                # TODO: symlink or whatever annex does, since annexes beneath
+                #       might break
+                #       - figure out, what annex does in direct mode
+                #         and/or on windows
+                #       - for now use .git file on windows and symlink otherwise
+                if not on_windows:
+                    os.symlink(relpath(moved_git_dir, start=path),
+                               opj(path, ".git"))
+                else:
+                    with open(opj(path, ".git"), "w") as f:
+                        f.write("gitdir: {moved}\n".format(moved=relpath(moved_git_dir, start=path)))
+
                 # return newly added submodule as a dataset
                 return Dataset(path)
 

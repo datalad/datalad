@@ -56,6 +56,14 @@ def assure_tuple_or_list(obj):
     return (obj,)
 
 
+def any_re_search(regexes, value):
+    """Return if any of regexes (list or str) searches succesfully for value"""
+    for regex in assure_tuple_or_list(regexes):
+        if re.search(regex, value):
+            return True
+    return False
+
+
 def not_supported_on_windows(msg=None):
     """A little helper to be invoked to consistently fail whenever functionality is
     not supported (yet) on Windows
