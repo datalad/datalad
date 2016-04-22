@@ -47,7 +47,7 @@ requires = {
     'downloaders': [
         'boto',
         'msgpack-python',
-        'requests',
+        'requests>=1.2',
     ] + keyring_requires,
     'crawl': [
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
