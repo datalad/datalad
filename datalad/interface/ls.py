@@ -239,7 +239,7 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
 # from joblib import Parallel, delayed
 
 def _ls_dataset(loc, fast=False, recursive=False, all=False):
-    from ..support.dataset import Dataset
+    from ..distribution.dataset import Dataset
     isabs_loc = isabs(loc)
     topdir = '' if isabs_loc else abspath(curdir)
 
