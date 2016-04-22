@@ -46,7 +46,7 @@ requires = {
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
     ],
     'tests': [
-        'bs4',  # VERY weak requirement, still used in one of the tests
+        'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
         'httpretty>=0.8.14',
         'mock',
         'nose>=1.3.4',
