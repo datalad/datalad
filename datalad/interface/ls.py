@@ -304,6 +304,7 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         access_key = config.get('default', 'access_key')
         secret_key = config.get('default', 'secret_key')
 
+        # TODO: remove duplication -- reuse logic within downloaders/s3.py to get connected
         conn = boto.connect_s3(access_key, secret_key)
         try:
             bucket = conn.get_bucket(bucket_name)
@@ -325,7 +326,6 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         if not provider:
             raise ValueError("don't know how to deal with this url %s -- no downloader defined.  Specify just s3cmd config file instead")
         bucket = provider.authenticator.authenticate(bucket_name, provider.credential)
-
 
     info = []
     for iname, imeth in [
