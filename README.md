@@ -29,7 +29,26 @@ internals and/or contributing to the project.
 
 * [![Documentation](https://readthedocs.org/projects/datalad/badge/?version=latest)](http://datalad.rtfd.org)
 
-# Dependencies
+# Installation
+
+## Debian-based systems
+
+On Debian-based systems we recommend to enable [NeuroDebian](http://neuro.debian.net)
+from which we provide recent releases of DataLad.
+
+**TODO**: describe few flavors of packages we would provide (I guess
+datalad-core, datalad-crawler, datalad; primary difference is dependencies)
+
+## Other Linux'es, OSX (Windows yet TODO) via pip
+
+**TODO**: upload to PyPi and describe installation 'schemes' (crawler,
+tests, full).  Ideally we should unify the schemes with Debian packages
+
+For installation through `pip` you would need some external dependencies
+not shipped from it (e.g. `git-annex`, etc.) for which please refer to
+the next section.
+
+## Dependencies
 
 Although we now support Python 3 (>= 3.3), primarily we still use Python 2.7
 and thus instructions below are for python 2.7 deployments.  Replace `python-{` 
