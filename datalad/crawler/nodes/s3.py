@@ -175,7 +175,7 @@ class crawl_s3(object):
         def update_versiondb(e, force=False):
             # This way we could recover easier after a crash
             # TODO: config crawl.crawl_s3.versiondb.saveaftereach=True
-            if force or True:
+            if e is not None and (force or True):
                 versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
         for e in versions_sorted + [None]:
             filename = e.name if e is not None else None
