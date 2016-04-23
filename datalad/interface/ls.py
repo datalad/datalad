@@ -244,20 +244,20 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     topdir = '' if isabs_loc else abspath(curdir)
 
     topds = Dataset(loc)
-    dss = map(DsModel,
-              [topds] + ([Dataset(opj(loc, sm))
-                          for sm in topds.get_dataset_handles(recursive=recursive)]
-                         if recursive else [])
-              )
+    dss = [topds] + (
+        [Dataset(opj(loc, sm))
+         for sm in topds.get_dataset_handles(recursive=recursive)]
+         if recursive else [])
+    dsms = list(map(DsModel, dss))
 
     # adjust path strings
-    for ds_model in dss:
+    for ds_model in dsms:
         path = ds_model.path[len(topdir) + 1 if topdir else 0:]
         if not path:
             path = '.'
         ds_model.path = path
 
-    maxpath = max(len(ds_model.path) for ds_model in dss)
+    maxpath = max(len(ds_model.path) for ds_model in dsms)
     path_fmt = "{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
     format_str = path_fmt + "  [{ds.type}]  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
     if (not fast) or all:
@@ -269,9 +269,9 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     # weird problems happen in the parallel run -- TODO - figure it out
     # for out in Parallel(n_jobs=1)(
     #         delayed(format_ds_model)(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}")
-    #         for dsm in dss):
+    #         for dsm in dsms):
     #     print(out)
-    for dsm in dss:
+    for dsm in dsms:
         print(format_ds_model(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}"))
 
 #
