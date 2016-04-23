@@ -46,6 +46,9 @@ def get_version_for_key(k, fmt='0.0.%Y%m%d'):
     # format it
     return time.strftime(fmt, time.gmtime(t))
 
+def _strip_prefix(s, prefix):
+    return s[len(prefix):] if s and s.startswith(prefix) else s
+
 
 class crawl_s3(object):
     """Given a source bucket and optional prefix, generate s3:// urls for the content
@@ -54,6 +57,7 @@ class crawl_s3(object):
     def __init__(self,
                  bucket,
                  prefix=None,
+                 strip_prefix=True,  # either to strip leading prefix if provided
                  url_schema='s3',
                  strategy='naive',
                  versionfx=get_version_for_key,
@@ -69,6 +73,8 @@ class crawl_s3(object):
         bucket: str
         prefix: str, optional
           Either to remember redirects for subsequent invocations
+        strip_prefix: bool, optional
+          Either to strip the prefix (if given) off the target paths
         versionfx: function, optional
           If not None, to define a version from the last processed key
         repo: GitRepo, optional
@@ -86,7 +92,11 @@ class crawl_s3(object):
           Either to traverse recursively or just list elements at that level
         """
         self.bucket = bucket
+        if prefix and not prefix.endswith('/'):
+            lgr.warning("ATM we assume prefixes to correspond only to directories, adding /")
+            prefix += "/"
         self.prefix = prefix
+        self.strip_prefix = strip_prefix
         self.url_schema = url_schema
         assert(strategy in {'naive', 'commit-versions'})
         self.strategy = strategy
@@ -179,6 +189,9 @@ class crawl_s3(object):
                 versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
         for e in versions_sorted + [None]:
             filename = e.name if e is not None else None
+            if (self.strip_prefix and self.prefix):
+                 filename = _strip_prefix(filename, self.prefix)
+
             if filename in staged or e is None:
                 # We should finish this one and commit
                 if staged:

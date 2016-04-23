@@ -56,7 +56,7 @@ def collection_pipeline(prefix=None):
                    'annex':  annex,
                    'directory': [
                        # for initiate_handle we should replicate filename as handle_name, prefix
-                       assign({'prefix': '%(filename)s', 'handle_name': '%(filename)s'}, interpolate=True),
+                       assign({'prefix': '%(filename)s/', 'handle_name': '%(filename)s'}, interpolate=True),
                        annex.initiate_handle(
                            template='openfmri_s3',
                            data_fields=['prefix'],
@@ -67,6 +67,8 @@ def collection_pipeline(prefix=None):
               )
     ]
 
+
+# TODO: make a unittest for all of this on a simple bucket
 
 def pipeline(prefix=None):
     """Pipeline to crawl/annex an entire openfmri bucket"""
