@@ -37,7 +37,7 @@ keyring_requires = ['keyring<8.0'] \
 requires = {
     'core': [
         'appdirs',
-        'GitPython',  # ATM needs a mater 'git://github.com/gitpython-developers/GitPython'
+        'GitPython>=2.0',
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',

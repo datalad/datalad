@@ -1,17 +1,8 @@
-# ---- Main dependencies
-#GitPython>=1.0.3
-https://github.com/gitpython-developers/GitPython/archive/master.zip
-
 # ---- Downloaders
 # progressbar > 2.3 for python3 support
 # but upstream seems to be dead and fixes are not merged
 # https://github.com/niltonvolpato/python-progressbar/archive/master.zip
 https://github.com/datalad/python-progressbar/archive/master.zip
-
-# ---- Scraping
-# scrapy>=1.1.0rc1
-#https://github.com/scrapy/scrapy/archive/master.zip
-#https://github.com/scrapy/scrapy/archive/1.1.tar.gz
 
 # Now everything setup says by default for everything
 # Theoretically we don't want -e here but ATM pip would puke if just .[full] is provided
