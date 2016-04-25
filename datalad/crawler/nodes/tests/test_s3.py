@@ -174,7 +174,7 @@ def test_crawl_s3_file_to_directory(path):
 
     # with auto_finalize (default), Annexificator will finalize whenever it runs into a conflict
     pipeline = [
-        crawl_s3('datalad-test1-dirs-versioned', repo=annex.repo),
+        crawl_s3('datalad-test1-dirs-versioned', repo=annex.repo, recursive=True),
     #    annex
         switch('datalad_action',
                {
