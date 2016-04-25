@@ -16,6 +16,7 @@ import logging
 import sys
 import os
 import textwrap
+from importlib import import_module
 
 import datalad
 from datalad.log import lgr
@@ -109,10 +110,14 @@ def setup_parser():
         # for all subcommand modules it can find
         cmd_short_descriptions = []
 
-        for _intfcls in _interfaces:
-            _intf = _intfcls
-
-            cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
+        for _intfspec in _interfaces:
+            # turn the interface spec into an instance
+            _mod = import_module(_intfspec[0], package='datalad')
+            _intf = getattr(_mod, _intfspec[1])
+            if len(_intfspec) > 2:
+                cmd_name = _intfspec[2]
+            else:
+                cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
