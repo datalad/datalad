@@ -329,7 +329,7 @@ def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
 
     cfg_.set(CRAWLER_PIPELINE_SECTION, 'template', template)
     for k, v in (kwargs or {}).items():
-        cfg_.set(CRAWLER_PIPELINE_SECTION, k, str(v))
+        cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
 
     with open(crawl_config, 'w') as f:
         cfg_.write(f)
@@ -451,6 +451,22 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
 
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
+
+    Typical example description
+
+        [crawl:pipeline]
+        pipeline = standard
+        func = pipeline1
+        _kwarg1 = 1
+
+    which would instantial pipeline from standard.py module by calling
+    `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
+
+        [crawl:pipeline]
+        pipeline = standard?func=pipeline1&_kwarg1=1
+
+    so that theoretically we could specify basic pipelines completely within
+    a URL
     """
     cfg_ = SafeConfigParserWithIncludes()
     cfg_.read([path])
@@ -459,22 +475,27 @@ def load_pipeline_from_config(path):
         if not cfg_.has_section(sec):
             continue
         if sec == CRAWLER_PIPELINE_SECTION_DEPRECATED:
-            lgr.warning("Crawler section was renamed from %s to %s please adjust",
+            lgr.warning("Crawler section was renamed from %s to %s and format has changed"
+                        " please adjust",
                         CRAWLER_PIPELINE_SECTION_DEPRECATED, CRAWLER_PIPELINE_SECTION)
         opts = cfg_.options(sec)
         # must have template
         if 'template' not in opts:
-            raise IOError("%s lacks %r field within %s section"
-                          % (path, 'template', sec))
+            raise IOError("%s lacks %r field within %s section" % (path, '_template', sec))
         template = cfg_.get(sec, 'template')
-        opts.pop(opts.index('template'))
         # parse template spec
-        template_name, template_opts = parse_url_opts(template)
-        assert not set(template_opts).difference({'func'}), "ATM we understand only 'func'"
+        template_name, url_opts = parse_url_opts(template)
+
+        # so we will allow to specify options in the url and then also in the section definitions
+        all_opts = updated(url_opts, {o: cfg_.get(sec, o) for o in opts})
+        template_opts = {k: v for k, v in all_opts.items() if not k.startswith('_')}
+        pipeline_opts = {k[1:]: v for k, v in all_opts.items() if k.startswith('_')}
+        assert not set(template_opts).difference({'template', 'func'}), "ATM we understand only 'func'"
+
         pipeline = load_pipeline_from_template(
             template_name,
             func=template_opts.get('func', None),
-            kwargs={o: cfg_.get(sec, o) for o in opts})
+            kwargs=pipeline_opts)
         break
     if pipeline is None:
         raise IOError("Did not find section %r within %s" % (CRAWLER_PIPELINE_SECTION, path))
