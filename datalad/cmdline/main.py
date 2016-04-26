@@ -22,6 +22,7 @@ import datalad
 from datalad.log import lgr
 
 from datalad.cmdline import helpers
+from datalad.support.exceptions import InsufficientArgumentsError
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
@@ -143,7 +144,8 @@ def setup_parser():
             # configure 'run' function for this command
             plumbing_args = dict(
                 func=_intf.call_from_parser,
-                logger=logging.getLogger(_intf.__module__))
+                logger=logging.getLogger(_intf.__module__),
+                subparser=subparser)
             if hasattr(_intf, 'result_renderer_cmdline'):
                 plumbing_args['result_renderer'] = _intf.result_renderer_cmdline
             subparser.set_defaults(**plumbing_args)
@@ -224,6 +226,11 @@ def main(args=None):
         # as convenient if being caught in this ultimate except
         try:
             ret = cmdlineargs.func(cmdlineargs)
+        except InsufficientArgumentsError as exc:
+            # if the func reports inappropriate usage, give help output
+            lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
+            cmdlineargs.subparser.print_usage()
+            sys.exit(1)
         except Exception as exc:
             lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
             sys.exit(1)

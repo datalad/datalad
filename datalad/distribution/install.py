@@ -23,6 +23,7 @@ from datalad.distribution.dataset import Dataset, datasetmethod, \
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
     EnsureBool
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
@@ -111,7 +112,7 @@ class Install(Interface):
         if not path:
             if ds is None:
                 # no dataset, no target location, nothing to do
-                raise ValueError(
+                raise InsufficientArgumentsError(
                     "insufficient information for installation (needs at "
                     "least a dataset or an installation path")
         elif isinstance(path, list):

@@ -82,3 +82,8 @@ def test_help_np():
                   'Miscellaneous commands',
                   'General information',
                   'Global options'})
+
+
+def test_usage_on_insufficient_args():
+    stdout, stderr = run_main(['install'], exit_code=1)
+    ok_startswith(stdout, 'usage:')
