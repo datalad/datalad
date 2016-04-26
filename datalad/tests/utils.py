@@ -84,6 +84,7 @@ def create_tree(path, tree, archives_leading_dir=True):
     if load is a tuple itself -- that would create either a subtree or an archive
     with that content and place it into the tree if name ends with .tar.gz
     """
+    lgr.log(5, "Creating a tree under %s", path)
     if not exists(path):
         os.makedirs(path)
 
@@ -326,7 +327,7 @@ def ok_file_has_content(path, content):
 #
 
 @optional_args
-def with_tree(t, tree=None, archives_leading_dir=True, **tkwargs):
+def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
@@ -336,7 +337,8 @@ def with_tree(t, tree=None, archives_leading_dir=True, **tkwargs):
         try:
             return t(*(arg + (d,)), **kw)
         finally:
-            rmtemp(d)
+            if delete:
+                rmtemp(d)
     return newfunc
 
 
