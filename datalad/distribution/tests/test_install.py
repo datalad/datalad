@@ -15,6 +15,7 @@ from ..dataset import Dataset
 from datalad.api import install
 from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
@@ -30,6 +31,10 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
+
+
+def test_insufficient_args():
+    assert_raises(InsufficientArgumentsError, install)
 
 
 @with_tree(tree={'test.txt': 'whatever'})
