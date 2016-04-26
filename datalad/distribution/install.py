@@ -146,7 +146,15 @@ class Install(Interface):
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
             lgr.info("Creating a new annex repo at %s", ds.path)
-            AnnexRepo(ds.path, url=source, create=True)
+            if source is None:
+                # always come with annex when created from scratch
+                AnnexRepo(ds.path, url=source, create=True)
+            else:
+                # when obtained from remote, try with plain Git
+                GitRepo(ds.path, url=source, create=True)
+                if knows_annex(ds.path):
+                    # init annex when traces of a remote annex can be detected
+                    AnnexRepo(ds.path, init=True)
             vcs = ds.repo
         assert(ds.repo)
 
@@ -281,7 +289,7 @@ class Install(Interface):
             # do a blunt `annex add`
             if source and abspath(source) != path:
                 raise ValueError(
-                    "installation target already exists, but `source` point to "
+                    "installation target already exists, but `source` points to "
                     "another location")
             added_files = vcs.annex_add(relativepath)
             # return just the paths of the installed components
