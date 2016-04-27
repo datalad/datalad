@@ -31,9 +31,6 @@ except ImportError:
 # Following fixtures are necessary at the top level __init__ for fixtures which
 # would cover all **/tests and not just datalad/tests/
 
-from .utils import setup_exceptionhook
-setup_exceptionhook()
-
 def setup_package():
     import os
 
