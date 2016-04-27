@@ -45,21 +45,24 @@ provide informative logging.
 import sys
 from glob import glob
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
+from os import makedirs
 
 from .. import cfg
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
+from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
+from ..utils import parse_url_opts
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
 from ..support.stats import ActivityStats
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 from logging import getLogger
-lgr = getLogger('datalad.crawl.pipeline')
+lgr = getLogger('datalad.crawler.pipeline')
 
 # Name of the section in the config file which would define pipeline parameters
-CRAWLER_PIPELINE_SECTION = 'crawler'
-
+CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
+CRAWLER_PIPELINE_SECTION_DEPRECATED = 'crawler'
 
 class FinishPipeline(Exception):
     """Exception to use to signal that any given pipeline should be stopped
@@ -308,22 +311,74 @@ def _compare_dicts(d1, d2):
     return added, changed, removed, maybe_changed
 
 
-def load_pipeline_from_script(filename, **opts):
-    # mod = __import__('datalad.crawler.pipelines.%s' % filename, fromlist=['datalad.crawler.pipelines'])
-    dirname_ = dirname(filename)
-    assert(filename.endswith('.py'))
+def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
+    """
+    TODO
+    """
+    lgr.debug("Creating crawler configuration for template %s under %s",
+              template, path)
+    crawl_config_dir = opj(path, CRAWLER_META_DIR)
+    if not exists(crawl_config_dir):
+        lgr.log(2, "Creating %s", crawl_config_dir)
+        makedirs(crawl_config_dir)
+
+    crawl_config_repo_path = opj(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
+    crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
+    cfg_ = SafeConfigParserWithIncludes()
+    cfg_.add_section(CRAWLER_PIPELINE_SECTION)
+
+    cfg_.set(CRAWLER_PIPELINE_SECTION, 'template', template)
+    for k, v in (kwargs or {}).items():
+        cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
+
+    with open(crawl_config, 'w') as f:
+        cfg_.write(f)
+
+    if commit:
+        repo = GitRepo(path)
+        repo.git_add(crawl_config_repo_path)
+        if repo.dirty:
+            repo.git_commit("Initialized crawling configuration to use template %s" % template)
+        else:
+            lgr.debug("Repository is not dirty -- not committing")
+
+    return crawl_config
+
+
+def load_pipeline_from_module(module, func=None, args=None, kwargs=None):
+    """Load pipeline from a Python module
+
+    Parameters
+    ----------
+    module: str
+      Module name or filename of the module from which to load the pipeline
+    func: str, optional
+      Function within the module to use.  Default: `pipeline`
+    args: list or tuple, optional
+      Positional arguments to provide to the function.
+    kwargs: dict, optional
+      Keyword arguments to provide to the function.
+    """
+
+    func = func or 'pipeline'
+    args = args or tuple()
+    kwargs = kwargs or {}
+
+    # mod = __import__('datalad.crawler.pipelines.%s' % module, fromlist=['datalad.crawler.pipelines'])
+    dirname_ = dirname(module)
+    assert(module.endswith('.py'))
     try:
         sys.path.insert(0, dirname_)
-        modname = basename(filename)[:-3]
+        modname = basename(module)[:-3]
         # To allow for relative imports within "stock" pipelines
         if dirname_ == opj(dirname(__file__), 'pipelines'):
             mod = __import__('datalad.crawler.pipelines.%s' % modname,
                              fromlist=['datalad.crawler.pipelines'])
         else:
             mod = __import__(modname, level=0)
-        return mod.pipeline(**opts)
+        return getattr(mod, func)(*args, **kwargs)
     except Exception as e:
-        raise RuntimeError("Failed to import pipeline from %s: %s" % (filename, exc_str(e)))
+        raise RuntimeError("Failed to import pipeline from %s: %s" % (module, exc_str(e)))
     finally:
         if dirname_ in sys.path:
             path = sys.path.pop(0)
@@ -358,7 +413,7 @@ def _find_pipeline(name):
     return None
 
 
-def load_pipeline_from_template(name, opts={}):
+def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
     """Given a name, loads that pipeline from datalad.crawler.pipelines
 
     and later from other locations
@@ -367,8 +422,10 @@ def load_pipeline_from_template(name, opts={}):
     ----------
     name: str
         Name of the pipeline defining the filename. Or full path to it (TODO)
-    opts: dict, optional
-        Options for the pipeline, passed as **kwargs into the pipeline call
+    args: dict, optional
+        Positional args for the pipeline, passed as *args into the pipeline call
+    kwargs: dict, optional
+        Keyword args for the pipeline, passed as **kwargs into the pipeline call
     """
 
     if isabs(name) or exists(name):
@@ -385,7 +442,7 @@ def load_pipeline_from_template(name, opts={}):
     else:
         raise ValueError("could not find pipeline for %s" % name)
 
-    return load_pipeline_from_script(filename, **opts)
+    return load_pipeline_from_module(filename, func=func, args=args, kwargs=kwargs)
 
 
 # TODO: we might need to find present .datalad/crawl in another branch if not
@@ -394,21 +451,53 @@ def load_pipeline_from_template(name, opts={}):
 
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
+
+    Typical example description
+
+        [crawl:pipeline]
+        pipeline = standard
+        func = pipeline1
+        _kwarg1 = 1
+
+    which would instantial pipeline from standard.py module by calling
+    `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
+
+        [crawl:pipeline]
+        pipeline = standard?func=pipeline1&_kwarg1=1
+
+    so that theoretically we could specify basic pipelines completely within
+    a URL
     """
     cfg_ = SafeConfigParserWithIncludes()
     cfg_.read([path])
-    if cfg_.has_section(CRAWLER_PIPELINE_SECTION):
-        opts = cfg_.options(CRAWLER_PIPELINE_SECTION)
+    pipeline = None
+    for sec in (CRAWLER_PIPELINE_SECTION, CRAWLER_PIPELINE_SECTION_DEPRECATED):
+        if not cfg_.has_section(sec):
+            continue
+        if sec == CRAWLER_PIPELINE_SECTION_DEPRECATED:
+            lgr.warning("Crawler section was renamed from %s to %s and format has changed"
+                        " please adjust",
+                        CRAWLER_PIPELINE_SECTION_DEPRECATED, CRAWLER_PIPELINE_SECTION)
+        opts = cfg_.options(sec)
         # must have template
         if 'template' not in opts:
-            raise IOError("%s lacks %r field within %s section"
-                          % (path, 'template', CRAWLER_PIPELINE_SECTION))
-        opts.pop(opts.index('template'))
-        template = cfg_.get(CRAWLER_PIPELINE_SECTION, 'template')
+            raise IOError("%s lacks %r field within %s section" % (path, '_template', sec))
+        template = cfg_.get(sec, 'template')
+        # parse template spec
+        template_name, url_opts = parse_url_opts(template)
+
+        # so we will allow to specify options in the url and then also in the section definitions
+        all_opts = updated(url_opts, {o: cfg_.get(sec, o) for o in opts})
+        template_opts = {k: v for k, v in all_opts.items() if not k.startswith('_')}
+        pipeline_opts = {k[1:]: v for k, v in all_opts.items() if k.startswith('_')}
+        assert not set(template_opts).difference({'template', 'func'}), "ATM we understand only 'func'"
+
         pipeline = load_pipeline_from_template(
-            template,
-            {o: cfg_.get(CRAWLER_PIPELINE_SECTION, o) for o in opts})
-    else:
+            template_name,
+            func=template_opts.get('func', None),
+            kwargs=pipeline_opts)
+        break
+    if pipeline is None:
         raise IOError("Did not find section %r within %s" % (CRAWLER_PIPELINE_SECTION, path))
     return pipeline
 

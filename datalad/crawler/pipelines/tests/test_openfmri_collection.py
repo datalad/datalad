@@ -11,24 +11,15 @@ import os
 from glob import glob
 from os.path import join as opj, exists
 
-from ...nodes.crawl_url import crawl_url
-from ...nodes.matches import *
 from ...pipeline import run_pipeline, FinishPipeline
 
-from ...nodes.misc import Sink, assign, range_node, interrupt_if
 from ...nodes.annex import Annexificator, initiate_handle
-from ...pipeline import load_pipeline_from_script
 
 from ....support.stats import ActivityStats
-from ....support.annexrepo import AnnexRepo
 from ....support.gitrepo import GitRepo
 
-from ....api import clean
 from ....utils import chpwd
-from ....utils import find_files
-from ....utils import swallow_logs
 from ....tests.utils import with_tree
-from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
 from ....tests.utils import assert_in, assert_not_in
 from ....tests.utils import skip_if_no_module
@@ -41,13 +32,14 @@ from ....tests.utils import ok_file_under_git
 from ....interface.POC_helpers import get_submodules_list
 from ....consts import CRAWLER_META_CONFIG_PATH
 
-from ..openfmri_collection import pipeline as ofcpipeline
+from ..openfmri import collection_pipeline as ofcpipeline
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
 
 # if we decide to emulate change (e.g. new dataset added)
 _PLUG_HERE = '<!-- PLUG HERE -->'
+
 
 @with_tree(tree={
     'index.html': """<html><body>
