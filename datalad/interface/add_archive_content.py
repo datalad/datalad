@@ -17,6 +17,7 @@ __docformat__ = 'restructuredtext'
 import re
 import os
 import shlex
+import tempfile
 
 from os.path import join as opj, realpath, split as ops, curdir, pardir, exists, lexists, relpath, basename, abspath
 from os.path import commonprefix
@@ -41,6 +42,7 @@ from six.moves.urllib.parse import urlparse
 
 from ..log import logging
 lgr = logging.getLogger('datalad.interfaces.add_archive_content')
+
 
 # TODO: may be we could enable separate logging or add a flag to enable
 # all but by default to print only the one associated with this given action
@@ -138,6 +140,17 @@ class AddArchiveContent(Interface):
             action="store_false",
             dest="commit",
             doc="""Flag to not commit upon completion."""),
+        drop_after=Parameter(
+            args=("--drop-after",),
+            action="store_true",
+            doc="""Drop extracted files after adding to annex.""",
+        ),
+        delete_after=Parameter(
+            args=("--remove-after",),
+            action="store_true",
+            doc="""Extract under a temporary directory, git-annex add, and remove after.
+         To be used to "index" files within annex without actually creating corresponding
+         files under git.  Note that `annex dropunused` would later remove that load."""),
 
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
@@ -161,7 +174,7 @@ class AddArchiveContent(Interface):
                  strip_leading_dirs=False, leading_dirs_depth=None, leading_dirs_consider=None,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
-                 stats=None):
+                 stats=None, drop_after=False, delete_after=False):
         """
         Returns
         -------
@@ -245,14 +258,22 @@ class AddArchiveContent(Interface):
         try:
             old_always_commit = annex.always_commit
             annex.always_commit = False
+            keys_to_drop = []
 
             if annex_options:
                 if isinstance(annex_options, string_types):
                     annex_options = shlex.split(annex_options)
 
-            leading_dir = earchive.get_leading_directory(depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
+            leading_dir = earchive.get_leading_directory(
+                    depth=leading_dirs_depth, exclude=exclude, consider=leading_dirs_consider) \
                 if strip_leading_dirs else None
             leading_dir_len = len(leading_dir) + len(opsep) if leading_dir else 0
+
+            # we need to create a temporary directory at the top level which would later be
+            # removed
+            prefix_dir = basename(tempfile.mkdtemp(prefix=".datalad", dir=annex.path)) \
+                if delete_after \
+                else None
 
             # dedicated stats which would be added to passed in (if any)
             outside_stats = stats
@@ -287,6 +308,9 @@ class AddArchiveContent(Interface):
                                 raise StopIteration
                     except StopIteration:
                         continue
+
+                if prefix_dir:
+                    target_file = opj(prefix_dir, target_file)
 
                 url = annexarchive.get_file_url(archive_key=key, file=extracted_file, size=os.stat(extracted_path).st_size)
 
@@ -347,16 +371,26 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
                           target_file, url, annex_options)
 
+                target_file_gitpath = opj(extract_relpath, target_file) if extract_relpath else target_file
                 out_json = annex.annex_addurl_to_file(
-                    opj(extract_relpath, target_file) if extract_relpath else target_file,
+                    target_file_gitpath,
                     url, options=annex_options,
                     batch=True)
 
                 if 'key' in out_json:  # annex.is_under_annex(target_file, batch=True):
+                    # due to http://git-annex.branchable.com/bugs/annex_drop_is_not___34__in_effect__34___for_load_which_was___34__addurl_--batch__34__ed_but_not_yet_committed/?updated
+                    # we need to maintain a list of those to be dropped files
+                    if drop_after:
+                        keys_to_drop.append(out_json['key'])
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))
                     stats.add_git += 1
+
+                if delete_after:
+                    # forcing since it is only staged, not yet committed
+                    annex.remove(target_file_gitpath, force=True)  # TODO: batch!
+                    stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
                 # annex.annex_add(target_path, options=annex_options)
@@ -390,7 +424,21 @@ class AddArchiveContent(Interface):
                 commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
+            if delete_after:
+                prefix_path = opj(annex.path, prefix_dir)
+                if exists(prefix_path):  # probably would always be there
+                    lgr.info("Removing temporary directory under which extracted files were annexed: %s",
+                             prefix_path)
+                    rmtree(prefix_path)
+
             annex.precommit()
+            if keys_to_drop:
+                # since we know that keys should be retrievable, we --force since no batching
+                # atm and it would be expensive
+                annex.annex_drop(keys_to_drop, options=['--force'], key=True)
+                stats.dropped += len(keys_to_drop)
+                annex.precommit()  # might need clean up etc again
+
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure
             earchive.clean(force=True)
