@@ -715,8 +715,9 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
+    # TODO: dropkey with batch mode
     @normalize_paths
-    def annex_drop(self, files, options=None):
+    def annex_drop(self, files, options=None, key=False):
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -728,7 +729,14 @@ class AnnexRepo(GitRepo):
         """
         options = options[:] if options else []
 
-        self._run_annex_command('drop', annex_options=options + files)
+        if key:
+            # we can't drop multiple in 1 line, and there is no --batch yet, so
+            # one at a time
+            options = options + ['--key']
+            for k in files:
+                self._run_annex_command('drop', annex_options=options + [k])
+        else:
+            self._run_annex_command('drop', annex_options=options + files)
 
 
     # TODO: a dedicated unit-test
@@ -767,7 +775,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def annex_whereis(self, files, output='uuids'):
+    def annex_whereis(self, files, output='uuids', key=False):
         """Lists repositories that have actual content of file(s).
 
         Parameters
@@ -778,6 +786,8 @@ class AnnexRepo(GitRepo):
             If 'descriptions', a list of remotes descriptions returned is per
             each file. If 'full', per each file a dictionary of all fields
             is returned as returned by annex
+        key: bool, optional
+            Either provided files are actually annex keys
 
         Returns
         -------
@@ -800,8 +810,9 @@ class AnnexRepo(GitRepo):
                   'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
                 }}
         """
+        options = ["--key"] if key else []
 
-        json_objects = self._run_annex_command_json('whereis', args=files)
+        json_objects = self._run_annex_command_json('whereis', args=options + files)
 
         if output in {'descriptions', 'uuids'}:
             return [
@@ -811,7 +822,7 @@ class AnnexRepo(GitRepo):
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
-            return {j['file']: self._whereis_json_to_dict(j)
+            return {j['key' if key else 'file']: self._whereis_json_to_dict(j)
                     for j in json_objects}
         else:
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
@@ -1225,7 +1236,8 @@ class BatchedAnnex(object):
         """Close communication and wait for process to terminate"""
         if self._process:
             process = self._process
-            lgr.debug("Closing stdin of %s and waiting process to finish" % process)
+            lgr.debug("Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.wait()
             self._process = None
+            lgr.debug("Process %s has finished", process)
