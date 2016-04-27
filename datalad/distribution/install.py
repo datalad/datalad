@@ -98,11 +98,19 @@ class Install(Interface):
             args=("--recursive", "-r"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
             doc="""If set, all content is installed recursively, including
-            content of any subdatasets."""))
+            content of any subdatasets."""),
+        add_data_to_git=Parameter(
+            args=("--add-data-to-git",),
+            constraints=EnsureBool(),
+            doc="""Flag whether to add data directly to Git, instead of
+            tracking data identity only. Usually this is not desired,
+            as it inflates dataset sizes and impacts flexibility of data
+            transport."""))
 
     @staticmethod
     @datasetmethod(name='install')
-    def __call__(dataset=None, path=None, source=None, recursive=False):
+    def __call__(dataset=None, path=None, source=None, recursive=False,
+            add_data_to_git=False):
         # shortcut
         ds = dataset
 
@@ -146,8 +154,18 @@ class Install(Interface):
         if vcs is None:
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
-            lgr.info("Creating a new annex repo at %s", ds.path)
-            AnnexRepo(ds.path, url=source, create=True)
+            if source is None:
+                # always come with annex when created from scratch
+                lgr.info("Creating a new annex repo at %s", ds.path)
+                AnnexRepo(ds.path, url=source, create=True)
+            else:
+                # when obtained from remote, try with plain Git
+                lgr.info("Creating a new git repo at %s", ds.path)
+                GitRepo(ds.path, url=source, create=True)
+                if knows_annex(ds.path):
+                    # init annex when traces of a remote annex can be detected
+                    lgr.info("Initializing annex repo at %s", ds.path)
+                    AnnexRepo(ds.path, init=True)
             vcs = ds.repo
         assert(ds.repo)
 
@@ -282,14 +300,25 @@ class Install(Interface):
             # do a blunt `annex add`
             if source and abspath(source) != path:
                 raise ValueError(
-                    "installation target already exists, but `source` point to "
-                    "another location")
-            added_files = vcs.annex_add(relativepath)
-            # return just the paths of the installed components
-            if isinstance(added_files, list):
-                added_files = [resolve_path(i['file'], ds) for i in added_files]
+                    "installation target already exists, but `source` points to "
+                    "another location (target: '{0}', source: '{0}'".format(
+                        source, path))
+
+            if not add_data_to_git and not (isinstance(vcs, AnnexRepo)):
+                raise RuntimeError("Trying to install file(s) into a dataset "
+                    "with a plain Git repository. First initialize annex, or "
+                    "provide override flag.")
+
+            if add_data_to_git:
+                vcs.git_add(relativepath)
+                added_files = resolve_path(relativepath, ds)
             else:
-                added_files = resolve_path(added_files['file'], ds)
+                added_files = vcs.annex_add(relativepath)
+                # return just the paths of the installed components
+                if isinstance(added_files, list):
+                    added_files = [resolve_path(i['file'], ds) for i in added_files]
+                else:
+                    added_files = resolve_path(added_files['file'], ds)
             if added_files:
                 return added_files
             else:
