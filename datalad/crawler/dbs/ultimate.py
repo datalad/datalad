@@ -122,3 +122,166 @@ Probably best positioned outside of the DB...?
     Upon regular end of crawling we would want to use URLsUpdater to extend/update known
     information
 """
+
+from sqlalchemy.ext.declarative import declarative_base
+
+DBTable = declarative_base()
+
+from datalad.utils import auto_repr
+
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Binary
+# only from upcoming 1.1
+#from sqlalchemy.types import JSON
+from sqlalchemy import Enum
+from sqlalchemy import ForeignKey
+from sqlalchemy.orm import relationship
+
+INVALID_REASONS = ['NA', 'removed', 'changed', 'denied']
+
+# XXX not sure when penalty comes due to our many-to-many relationships
+# which might be an additional query etc... depending how/when it is done
+# (e.g. if at the request of .files attribute value), we might want to exclude
+# those from @auto_repr
+@auto_repr
+class File(DBTable):
+    """
+    Binds together information about the file content -- common digests and size
+    """
+    __tablename__ = 'file'
+
+    id = Column(Integer, primary_key=True)
+    size = Column(Integer)  # in Bytes
+    # Digests
+    md5 = Column(Binary(32), index=True)  # we will more frequently query by md5 and sha256 (Default) so indexing them
+    sha1 = Column(Binary(40))
+    sha256 = Column(Binary(64), index=True, unique=True)  # if we hit collision at this digest -- wooo
+    sha512 = Column(Binary(128), unique=True)
+
+
+@auto_repr
+class URL(DBTable):
+    """Information about URLs from which a file could be downloaded
+
+    So it is the urls which could be associated with keys in annex.
+    For git repositories serving .git/annex/objects via http (so theoretically there
+    is a URL per each key), just use  `SpecialRemote(location=url, type='git')`
+    """
+    __tablename__ = 'url'
+
+    id = Column(Integer, primary_key=True)
+    url = Column(String)  # TODO: limit size?  probably not since even standard doesn't really... browsers usually handle up to 2048
+
+    # just checked to be accessible
+    first_checked = Column(DateTime)
+    last_checked = Column(DateTime)
+
+    # checked to contain the target load
+    first_verified = Column(DateTime)
+    last_verified = Column(DateTime)
+
+    valid = Column(Boolean)
+    last_invalid = Column(DateTime)
+    invalid_reason = Column(Enum(*INVALID_REASONS))  #  XXX we might want to use fancy Enum class backported to 2.x?
+
+    file_id = Column(Integer, ForeignKey('file.id'))
+    # link back to the file and also allocate 1-to-many .urls in File
+    file = relationship("File", backref="urls")
+
+
+# Later tables establish tracking over repositories available locally or remotely
+# E.g. a remote git-annex repository containing annex load would be listed as a
+# SpecialRemote type=git with location pointing to e.g. http:// url from where
+# annex load could be fetched if necessary.
+
+from sqlalchemy import Table
+
+files_to_repos = Table(
+    'files_to_repos', DBTable.metadata,
+    Column('file_id', Integer, ForeignKey('file.id')),
+    Column('repo_id', Integer, ForeignKey('repo.id'))
+)
+
+
+@auto_repr
+class Repo(DBTable):
+    """
+    Local annex repositories
+    """
+    __tablename__ = 'repo'
+
+    id = Column(Integer, primary_key=True)
+    location = Column(String)
+    uuid = Column(Binary(36))
+    bare = Column(Boolean())
+
+    last_checked = Column(DateTime)
+
+    valid = Column(Boolean)
+    last_invalid = Column(DateTime)
+    invalid_reason = Column(Enum(*INVALID_REASONS))  #  XXX we might want to use fancy Enum class backported to 2.x?
+
+    files = relationship("File",
+                         secondary=files_to_repos,
+                         backref="repos")
+
+files_to_specialremotes = Table(
+    'files_to_specialremotes', DBTable.metadata,
+    Column('file_id', Integer, ForeignKey('file.id')),
+    Column('specialremote_id', Integer, ForeignKey('specialremote.id'))
+)
+
+
+@auto_repr
+class SpecialRemote(DBTable):
+    """
+    Special annex remotes
+    """
+    __tablename__ = 'specialremote'
+
+    id = Column(Integer, primary_key=True)
+    location = Column(String)
+    name = Column(String)
+    uuid = Column(Binary(36))
+    type = Column(String(256))  # unlikely to be longer:  s3, git,
+    # ??? could options differ among repos for the same special remote?
+    options = Column(String())  # actually a dict, so ideally we could use JSON which will be avail in 1.1
+                                # for now will encode using ... smth
+
+    last_checked = Column(DateTime)
+
+    valid = Column(Boolean)
+    last_invalid = Column(DateTime)
+    invalid_reason = Column(Enum(*INVALID_REASONS))  #  XXX we might want to use fancy Enum class backported to 2.x?
+
+    files = relationship("File",
+                         secondary=files_to_specialremotes,
+                         backref="specialremotes")
+
+
+# TODO?  some kind of "transactions" DB which we possibly purge from time to time???
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+
+engine = create_engine('sqlite:///:memory:', echo=True)
+def _initiate_tables(engine):
+    return DBTable.metadata.create_all(engine)
+
+
+file = File(md5="a1b23")  # woohoo autorepr works!!!
+url = URL(url="http://example.com", file=file)
+
+_initiate_tables(engine)
+session = Session(bind=engine)
+session.add(url)
+session.flush()
+
+print file.id
+print repr(file.md5), file, file.urls
+
+print url, url.id
+session.query(File).filter_by(md5='a1b23').one().urls
+session.query(File).filter(or_(File.sha1==None, File.md5==None)).one()
+# import q; q.d()
