@@ -715,7 +715,6 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
-    # TODO: dropkey with batch mode
     @normalize_paths
     def annex_drop(self, files, options=None, key=False):
         """Drops the content of annexed files from this repository.
@@ -737,6 +736,32 @@ class AnnexRepo(GitRepo):
                 self._run_annex_command('drop', annex_options=options + [k])
         else:
             self._run_annex_command('drop', annex_options=options + files)
+
+
+    def annex_dropkey(self, keys, options=None, batch=False):
+        """Drops the content of annexed files from this repository referenced by keys
+
+        Dangerous: it drops without checking for required minimal number of
+        available copies.
+
+        Parameters
+        ----------
+        keys: list of str, str
+
+        batch: bool, optional
+            initiate or continue with a batched run of annex dropkey, instead of just
+            calling a single git annex dropkey command
+        """
+        keys = [keys] if isinstance(keys, string_types) else keys
+
+        options = options[:] if options else []
+        options += ['--force']
+        if not batch:
+            json_objects = self._run_annex_command_json('dropkey', args=options + keys, expect_stderr=True)
+        else:
+            json_objects = self._batched.get('dropkey', annex_options=options, json=True, path=self.path)(keys)
+        for j in json_objects:
+            assert j.get('success', True)
 
 
     # TODO: a dedicated unit-test
@@ -922,7 +947,7 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()
         if self.is_direct_mode():
-            self.annex_proxy('git commit -m "%s"' % msg)
+            self.annex_proxy('git commit -m "%s"' % msg, expect_stderr=True)
         else:
             self.git_commit(msg)
 
