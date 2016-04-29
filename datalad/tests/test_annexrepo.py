@@ -200,9 +200,10 @@ def test_AnnexRepo_file_has_content(src, annex_path):
 
 
 # 1 is enough to test
+@with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def _test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
+def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     ar = AnnexRepo(annex_path, src, direct=direct)
 
     with open(opj(annex_path, 'not-committed.txt'), 'w') as f:
@@ -223,12 +224,6 @@ def _test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
 
     assert_false(ar.is_under_annex("bogus.txt", batch=batch))
     assert_true(ar.is_under_annex("test-annex.dat", batch=batch))
-
-
-def test_AnnexRepo_is_under_annex():
-    for batch in (False, True):
-        for direct in (False, True):
-            yield _test_AnnexRepo_is_under_annex, batch, direct
 
 
 def test_AnnexRepo_options_decorator():
@@ -460,8 +455,9 @@ def __test_get_md5s(path):
     print({f: annex.get_file_key(f) for f in files})
 
 
+@with_batch_direct
 @with_tree(**tree1args)
-def _test_dropkey(batch, direct, path):
+def test_dropkey(batch, direct, path):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E', direct=direct)
     files = list(tree1_md5e_keys)
@@ -475,11 +471,6 @@ def _test_dropkey(batch, direct, path):
     annex.annex_dropkey(tree1_md5e_keys[files[0]], **kw)
     # and a mix with already dropped or not
     annex.annex_dropkey(list(tree1_md5e_keys.values()), **kw)
-
-def test_dropkey():
-    for batch in (False, True):
-        for direct in (False, True):
-            yield _test_dropkey, batch, direct
 
 
 @with_tree(**tree1args)
