@@ -224,6 +224,7 @@ def _test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     assert_false(ar.is_under_annex("bogus.txt", batch=batch))
     assert_true(ar.is_under_annex("test-annex.dat", batch=batch))
 
+
 def test_AnnexRepo_is_under_annex():
     for batch in (False, True):
         for direct in (False, True):
@@ -441,6 +442,45 @@ tree1args = dict(
         ('faraway', 'incredibly remote')),
 )
 
+# keys for files if above tree is generated and added to annex with MD5E backend
+tree1_md5e_keys = {
+    'firstfile': 'MD5E-s8--008c5926ca861023c1d2a36653fd88e2',
+    'faraway': 'MD5E-s17--5b849ed02f914d3bbb5038fe4e3fead9',
+    'secondfile': 'MD5E-s14--6c7ba9c5a141421e1c03cb9807c97c74',
+    'remotefile': 'MD5E-s21--bf7654b3de20d5926d407ea7d913deb0'
+}
+
+
+@with_tree(**tree1args)
+def __test_get_md5s(path):
+    # was used just to generate above dict
+    annex = AnnexRepo(path, init=True, backend='MD5E')
+    files = [basename(f) for f in find_files('.*', path)]
+    annex.add_to_annex(files)
+    print({f: annex.get_file_key(f) for f in files})
+
+
+@with_tree(**tree1args)
+def _test_dropkey(batch, direct, path):
+    kw = {'batch': batch}
+    annex = AnnexRepo(path, init=True, backend='MD5E', direct=direct)
+    files = list(tree1_md5e_keys)
+    annex.add_to_annex(files)
+    # drop one key
+    annex.annex_dropkey(tree1_md5e_keys[files[0]], **kw)
+    # drop multiple
+    annex.annex_dropkey([tree1_md5e_keys[f] for f in files[1:3]], **kw)
+    # drop already dropped -- should work as well atm
+    # https://git-annex.branchable.com/bugs/dropkey_--batch_--json_--force_is_always_succesfull
+    annex.annex_dropkey(tree1_md5e_keys[files[0]], **kw)
+    # and a mix with already dropped or not
+    annex.annex_dropkey(list(tree1_md5e_keys.values()), **kw)
+
+def test_dropkey():
+    for batch in (False, True):
+        for direct in (False, True):
+            yield _test_dropkey, batch, direct
+
 
 @with_tree(**tree1args)
 @serve_path_via_http()
@@ -463,6 +503,7 @@ def test_AnnexRepo_backend_option(path, url):
     # For now, workaround:
     assert_true(ar.get_file_backend(f) == 'SHA1'
                 for f in ar.get_indexed_files() if 'faraway' in f)
+
 
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
