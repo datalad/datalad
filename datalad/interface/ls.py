@@ -92,11 +92,16 @@ class Ls(Interface):
 
         if loc.startswith('s3://'):
             return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
-        elif lexists(loc) and lexists(opj(loc, '.git')):
+        elif lexists(loc):  # and lexists(opj(loc, '.git')):
             # TODO: use some helper like is_dataset_path ??
             return _ls_dataset(loc, **kw)
         else:
-            raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
+            #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
+            # TODO: unify all the output here -- _ls functions should just return something
+            # to be displayed
+            ui.message(
+                "%s%s%s  %sunknown%s"
+                % (LsFormatter.BLUE, loc, LsFormatter.RESET, LsFormatter.RED, LsFormatter.RESET))
 
 
 #
@@ -230,7 +235,6 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
         #print("WORKING ON %s" % ds_model.path)
         if not exists(ds_model.ds.path) or not ds_model.ds.repo:
             return formatter.format(format_exc, ds=ds_model, msg="not installed")
-        ds_formatted = formatter.format(format_str, ds=ds_model)
         ds_formatted = formatter.format(format_str, ds=ds_model)
         #print("FINISHED ON %s" % ds_model.path)
         return ds_formatted
