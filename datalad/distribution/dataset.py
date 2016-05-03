@@ -154,7 +154,7 @@ class Dataset(object):
           existing repository with no subdatasets an empty list is returned.
         """
         if pattern is not None:
-                raise NotImplementedError
+            raise NotImplementedError
 
         repo = self.repo
         if repo is None:
