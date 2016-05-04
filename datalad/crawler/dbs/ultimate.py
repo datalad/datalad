@@ -10,7 +10,33 @@
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
+from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy import or_
+
 from ...support.digests import Digester
+
+import logging
+from logging import getLogger
+lgr = getLogger('datalad.crawler.dbs.ultimate')
+
+LEN_TO_DIGEST = {
+    32: 'md5',
+    40: 'sha1',
+    64: 'sha256',
+    128: 'sha512'
+}
+KNOWN_DIGESTS = set(LEN_TO_DIGEST.values())
+DEFAULT_DIGEST = "sha256"
+
+
+class HashCollisionError(ValueError):
+    """Exception to "celebrate" -- we ran into a hash collision.  World should skip a bit"""
+    pass
+
 
 class UltimateDB(object):
     """Database collating urls for the content across all handles
@@ -63,17 +89,104 @@ class UltimateDB(object):
     __metaclass__ = ABCMeta
 
     def __init__(self, digester=None):
-        self.digester = digester or Digester()
+        self._digester = digester or Digester(list(KNOWN_DIGESTS))
+        self._session = None
+        self.connect()
 
-    @abstractmethod
+    def connect(self):
+        # TODO: config.crawler.db stuff
+        engine = create_engine('sqlite:///:memory:')
+        # set logging.... for some reason not in effect at all
+        if lgr.getEffectiveLevel() <= 5:
+            lgr.debug("Raising logging level for sqlalchemy and making it use our logger")
+            getLogger('sqlalchemy').setLevel(logging.INFO)
+            getLogger('sqlalchemy').handlers = lgr.handlers
+
+        # check if we have tables initiated already in the DB
+        inspector = Inspector.from_engine(engine)
+        if not inspector.get_table_names():
+            self._initiate_db(engine)
+
+        self._session = Session(bind=engine)
+
+    @staticmethod
+    def _initiate_db(engine):
+        lgr.info("Initiating Ultimate DB tables")
+        return DBTable.metadata.create_all(engine)
+
     def __contains__(self, url):
-        """Return True if DB knows about this URL """
-        pass
+        return self.knows_file_url(url)
 
-    @abstractmethod
-    def __getitem__(self, checksum=None, verified_only=True):  #, md5=None, sha256=None):
-        """Given a checksum, return URLs where it is available from"""
-        pass
+    def knows_file_url(self, url):
+        """Return True if DB knows about this URL (as associated with a file)"""
+        return self._session.query(URL).filter_by(url=url).first() is not None
+
+    def has_file_with_digests(self, **digests):
+        assert set(digests) == KNOWN_DIGESTS, "Provide all digests for a file of interest"
+        # search by default one
+        try:
+            digest = {DEFAULT_DIGEST: digests[DEFAULT_DIGEST]}
+            file = self._session.query(File).filter_by(**digest).one()
+        except NoResultFound:
+            return False
+        except MultipleResultsFound:
+            raise HashCollisionError("??? multiple entries for %s" % str(digest))
+
+        # otherwise check if other digests correspond
+        for algo, checksum in digests.items():
+            if getattr(file, algo) != checksum:
+                raise HashCollisionError(
+                    "%s %s != %s.  Full entries: %s, %s"
+                    % (algo, getattr(file, algo), checksum, digests, file)
+                )
+        return True
+
+    #@abstractmethod
+    def __getitem__(self, checksum=None):
+        return self.get_urls_for_digest(checksum)
+
+    def get_urls_for_digest(self, checksum=None, valid_only=True, **digest):
+        """Given a checksum, return URLs where it is available from
+
+        Parameters
+        ----------
+        checksum: str
+          Arbitrary checksum -- we will figure out which one
+        **digest:
+          Should include only one of the checksums, e.g.
+          md5='...'
+        """
+        digest = self._get_digest_value(checksum, **digest)
+        try:
+            file_ = self._session.query(File).filter_by(**digest).one()
+        except NoResultFound:
+            return None
+        # if .one fails since multiple -- we have a collision!  would be interesting to see
+        # so please report if you run into one ;)
+        if not file_:
+            raise ValueError("No file found in DB having %s=%s" % (algo, checksum))
+        urls = file_.urls
+        if valid_only:
+            urls = [x for x in urls if x.verified]
+        return urls
+
+    @staticmethod
+    def _get_digest_value(checksum=None, **digest):
+        """Just a helper so we could simply provide a value or specify which algorithm"""
+        if digest:
+            if len(digest) > 1 or (digest.keys()[0] not in KNOWN_DIGESTS) or checksum:
+                raise ValueError(
+                    "You must either specify checksum= or explicitly "
+                    "one of known digests %s" % KNOWN_DIGESTS)
+        else:
+            try:
+                digest = {LEN_TO_DIGEST[len(checksum)]: checksum}
+            except:
+                raise ValueError("Checksum %s of len %d has no known digest algorithm"
+                                 % (checksum, len(checksum)))
+                # may be at some point we would like to find one based on the leading
+                # few characters of the checksum but not atm
+        return digest
 
     def touch_url(self, entry, url, checked=False, verified=False): #last_checked=None, last_verified=None):
         """Set entry for a URL associated with an entry as checked and/or verified
@@ -84,6 +197,7 @@ class UltimateDB(object):
         # TODO
         pass
 
+
     def process_file(self, fpath, urls, checked=False, verified=False):
         """For a given file compute its checksums and record that information in DB
 
@@ -91,6 +205,8 @@ class UltimateDB(object):
         ----------
         fpath: str
           Relative or full path to the file
+        urls: str or list of str
+          URLs to associate with this file
         """
         digests = self.get_digests(fpath)
         # TODO: check if we have entry known already if not, record in DB
@@ -157,6 +273,12 @@ class File(DBTable):
     sha1 = Column(Binary(40))
     sha256 = Column(Binary(64), index=True, unique=True)  # if we hit collision at this digest -- wooo
     sha512 = Column(Binary(128), unique=True)
+    # Additional info from output of file
+    content_type = Column(Binary(256))
+    content_charset = Column(Binary(64))
+    # running file -z
+    content_type_extracted = Column(Binary(256))
+    content_charset_extracted = Column(Binary(64))
 
 
 @auto_repr
@@ -171,6 +293,10 @@ class URL(DBTable):
 
     id = Column(Integer, primary_key=True)
     url = Column(String)  # TODO: limit size?  probably not since even standard doesn't really... browsers usually handle up to 2048
+    filename = Column(String)  # could differ from the one in URL due to content-disposition etc
+
+    last_modified = Column(DateTime)
+    content_type = Column(Binary(256))  # 127/127   RFC 6838   server might provide different one
 
     # just checked to be accessible
     first_checked = Column(DateTime)
@@ -261,10 +387,8 @@ class SpecialRemote(DBTable):
 
 # TODO?  some kind of "transactions" DB which we possibly purge from time to time???
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
 
+"""
 engine = create_engine('sqlite:///:memory:', echo=True)
 def _initiate_tables(engine):
     return DBTable.metadata.create_all(engine)
@@ -284,4 +408,5 @@ print repr(file.md5), file, file.urls
 print url, url.id
 session.query(File).filter_by(md5='a1b23').one().urls
 session.query(File).filter(or_(File.sha1==None, File.md5==None)).one()
-# import q; q.d()
+import q; q.d()
+"""

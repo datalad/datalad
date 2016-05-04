@@ -10,3 +10,25 @@
 
 # pick ideas from
 # http://alextechrants.blogspot.com/2013/08/unit-testing-sqlalchemy-apps.html
+
+from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_false
+
+from ..ultimate import UltimateDB
+
+class Test1():
+    def setup(self):
+        self.udb = UltimateDB()
+
+        pass
+    def teardown(self):
+        pass
+
+    def test_ultimate1(self):
+        udb = self.udb
+        with assert_raises(ValueError):
+            udb["123"]
+        assert_false(udb.get_urls_for_digest(md5="123"))  # there is no check on len with explicit md5 spec
+
+        # sugarings
+        assert_false("http://example.com" in udb)
