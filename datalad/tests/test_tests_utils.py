@@ -46,6 +46,7 @@ from .utils import skip_if_no_network
 from .utils import run_under_dir
 from .utils import use_cassette
 from .utils import skip_if
+from .utils import ok_file_has_content
 
 #
 # Test with_tempfile, especially nested invocations
@@ -79,7 +80,7 @@ def test_nested_with_tempfile_basic(f1, f2):
 @with_tree((('f1.txt', 'load'),))
 @with_tempfile(suffix='.cfg')
 @with_tempfile(suffix='.cfg.old')
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos(flavors=local_testrepo_flavors, count=1)
 def check_nested_with_tempfile_parametrized_surrounded(
         param, f0, tree, f1, f2, repo):
     eq_(param, "param1")
@@ -89,11 +90,23 @@ def check_nested_with_tempfile_parametrized_surrounded(
     ok_(f1 != f2)
     ok_(f1.endswith('.cfg'), msg="got %s" % f1)
     ok_(f2.endswith('.cfg.old'), msg="got %s" % f2)
-    ok_(repo) # got some repo -- local or url
+    ok_(repo)  # got some repo -- local or url
 
 
 def test_nested_with_tempfile_parametrized_surrounded():
     yield check_nested_with_tempfile_parametrized_surrounded, "param1"
+
+
+@with_tempfile(content="testtest")
+def test_with_tempfile_content(f):
+    ok_file_has_content(f, "testtest")
+
+
+def test_with_tempfile_content_raises_on_mkdir():
+    with assert_raises(ValueError):
+        @with_tempfile(content="test", mkdir=True)
+        def t():
+            pass
 
 
 def test_with_testrepos():
