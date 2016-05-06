@@ -138,19 +138,22 @@ class Dataset(object):
         """Get names/paths of all known dataset_handles (subdatasets),
         optionally matching a specific name pattern.
 
-        If fulfilled is True, only paths to fullfiled handles are returned,
-        if False, only paths to unfulfilled handles are returned.
-
 
         Parameters
         ----------
-        pattern
+        pattern : None
+          Not implemented
         fulfilled : None or bool
           If not None, return either only present or absent datasets.
+        absolute : bool
+          If True, absolute paths will be returned.
+        recursive : bool
+          If True, recurse into all subdatasets and report their dataset
+          handles too.
 
         Returns
         -------
-        list(Dataset) or None
+        list(Dataset paths) or None
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
