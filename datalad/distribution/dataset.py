@@ -164,15 +164,8 @@ class Dataset(object):
         if repo is None:
             return
 
-        # get to GitPython object
-        repo = repo.repo
-
-        # check whether we have anything in the repo. if not go home early
-        if not repo.head.is_valid():
-            return []
-
         # start with the list of direct submodules of this dataset
-        submodules = repo.submodules
+        submodules = repo.get_submodules()
 
         # filter if desired
         if fulfilled is None:

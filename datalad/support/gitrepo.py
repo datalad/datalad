@@ -782,6 +782,12 @@ class GitRepo(object):
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
 
+    def get_submodules(self):
+        """Return a list of git.Submodule instances for all submodules"""
+        # check whether we have anything in the repo. if not go home early
+        if not self.repo.head.is_valid():
+            return []
+        return self.repo.submodules
 
 # TODO add_submodule
 # remove submodule

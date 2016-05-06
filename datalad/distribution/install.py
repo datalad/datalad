@@ -222,12 +222,10 @@ class Install(Interface):
                                      % (path, source))
             # file is checked into git directly -> nothing to do
             # OR this is a submodule of this dataset
-            if not isdir(path):
-                # RF: this is not enough. The mountpoint of a submodule could
-                # simply be absent. The actual test is to look for a submodule
-                # registered for this path
-
-                # file in Git, just return its path
+            submodules = [sm for sm in ds.repo.get_submodules()
+                          if sm.path == relativepath]
+            if not len(submodules):
+                # this is a file in Git and no submodule, just return its path
                 return path
 
             # we are dealing with a known submodule (i.e. `source`
