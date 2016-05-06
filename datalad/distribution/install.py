@@ -169,10 +169,14 @@ class Install(Interface):
             # TODO: For now 'recursive' means just submodules.
             # See --with-data vs. -- recursive and figure it out
             if recursive:
+                # RF: turn this into a loop over all registered submodules
+                #     and call `install` for each of them explicitly to get
+                #     uniform results and minimize the special nature of a
+                #     submodule wrt to a standalone dataset
                 cmd_list = ["git", "submodule", "update", "--init",
                             "--recursive"]
-                runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
-                # TODO: annex init them!
+                runner.run(cmd_list, cwd=ds.path)
+                # TODO: annex init them! With RF above this is not needed anymore
             return ds
 
         # at this point this dataset is "installed", now we can test whether to
@@ -219,12 +223,19 @@ class Install(Interface):
             # file is checked into git directly -> nothing to do
             # OR this is a submodule of this dataset
             if not isdir(path):
+                # RF: this is not enough. The mountpoint of a submodule could
+                # simply be absent. The actual test is to look for a submodule
+                # registered for this path
+
                 # file in Git, just return its path
                 return path
 
             # we are dealing with a known submodule (i.e. `source`
             # doesn't matter)
             # check it out
+            # RF: modify this to call `install` on the submodule's mountpoint
+            #     using an appropriate source URL. See
+            #     https://github.com/datalad/datalad/issues/424 for a discussion
             cmd_list = ["git", "submodule", "update", "--init"]
             if recursive:
                 cmd_list.append("--recursive")
@@ -232,12 +243,17 @@ class Install(Interface):
             runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
 
             # TODO: annex init recursively!
+            # RF: with suggested RF this goes away
             if knows_annex(path):
                 lgr.debug("Annex detected in submodule '%s'. "
                           "Calling annex init ..." % relativepath)
                 # TODO!? please !!!! AnnexRepo(ds.path, init=True, create=False)
                 cmd_list = ["git", "annex", "init"]
-                runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
+                runner.run(cmd_list, cwd=ds.path)
+
+            # RF: once installed as a standalone dataset, we still need to init
+            #     it as a submodule in the parent.
+
             # submodule install done, return Dataset instance pointing
             # to the submodule
             return Dataset(path=path)
@@ -251,6 +267,7 @@ class Install(Interface):
             if ds.path != subds.path:
                 # target path belongs to a subdataset, hand installation
                 # over to it
+                # RF: update for changes in the signature of `install`
                 return subds.install(
                     path=relpath(path, start=subds.path),
                     source=source,
@@ -285,6 +302,8 @@ class Install(Interface):
                 #       - figure out, what annex does in direct mode
                 #         and/or on windows
                 #       - for now use .git file on windows and symlink otherwise
+                # RF: factor this one out, and re-use after having installed a
+                #     submodule like a standalone dataset some 50 lines above
                 if not on_windows:
                     os.symlink(relpath(moved_git_dir, start=path),
                                opj(path, ".git"))
@@ -339,6 +358,7 @@ class Install(Interface):
                 if ds.path != subds.path:
                     # target path belongs to a subdataset, hand installation
                     # over to it
+                    # RF: update for changes in the signature of `install`
                     return subds.install(
                         path=relpath(path, start=subds.path),
                         source=source,
@@ -362,12 +382,17 @@ class Install(Interface):
                 else:
                     # Create a new one!
                     AnnexRepo(path, create=True)
+                    # RF: update for changes in the signature of `install`
                     return subds.install(path=relpath(path, start=subds.path),
                                          source=path)
                 # TODO: This is actually almost the same thing we do above,
                 # isn't it?
                 # Think again, too tired currently.
+                # RF: merge the two if branches and run unconditionally -- they
+                #     do the same
 
+            # RF: critically check remainder of the function. Chances are this
+            # can be deleted when the proposed RF is implemented.
             if source and exists(expandpath(source)):
                 source = expandpath(source)
                 # this could be
