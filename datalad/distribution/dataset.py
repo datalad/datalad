@@ -161,21 +161,39 @@ class Dataset(object):
         if repo is None:
             return
 
-        cmd = ["git", "submodule", "status"]
-        if recursive:
-            cmd.append("--recursive")
-        out, err = repo._git_custom_command('', cmd)
+        # get to GitPython object
+        repo = repo.repo
 
-        lines = [line.split() for line in out.splitlines()]
+        # check whether we have anything in the repo. if not go home early
+        if not repo.head.is_valid():
+            return []
+
+        # start with the list of direct submodules of this dataset
+        submodules = repo.submodules
+
+        # filter if desired
         if fulfilled is None:
-            submodules = [line[1] for line in lines]
-        elif not fulfilled:
-            submodules = [line[1] for line in lines if line[0].startswith('-')]
+            submodules = [sm.path for sm in submodules]
         else:
-            submodules = [line[1] for line in lines if not line[0].startswith('-')]
+            submodules = [sm.path for sm in submodules
+                          if sm.module_exists() == fulfilled]
+
+        # expand list with child submodules. keep all paths relative to parent
+        # and convert jointly at the end
+        if recursive:
+            rsm = []
+            for sm in submodules:
+                rsm.append(sm)
+                sdspath = opj(self._path, sm)
+                rsm.extend(
+                    [opj(sm, sdsh)
+                     for sdsh in Dataset(sdspath).get_dataset_handles(
+                         pattern=pattern, fulfilled=fulfilled, absolute=False,
+                         recursive=recursive)])
+            submodules = rsm
 
         if absolute:
-            return [opj(self._path, submodule) for submodule in submodules]
+            return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
 
