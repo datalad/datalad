@@ -145,7 +145,8 @@ class Dataset(object):
         Parameters
         ----------
         pattern
-        fulfilled
+        fulfilled : None or bool
+          If not None, return either only present or absent datasets.
 
         Returns
         -------
