@@ -823,6 +823,20 @@ def skip_httpretty_on_problematic_pythons(func):
     return newfunc
 
 
+@optional_args
+def with_batch_direct(t):
+    """Helper to run parametric test with possible combinations of batch and direct
+    """
+    @wraps(t)
+    def newfunc():
+        for batch in (False, True):
+            for direct in (False, True) if not on_windows else (True,):
+                yield t, batch, direct
+
+    return newfunc
+
+
+
 # List of most obscure filenames which might or not be supported by different
 # filesystems across different OSs.  Start with the most obscure
 OBSCURE_FILENAMES = (

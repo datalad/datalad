@@ -37,9 +37,11 @@ from datalad.interface.POC_helpers import get_git_dir
 
 lgr = logging.getLogger('datalad.distribution.install')
 
+
 def _with_sep(path):
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
+
 
 def get_containing_subdataset(ds, path):
     """Given a base dataset and a relative path get containing subdataset
@@ -118,6 +120,7 @@ class Install(Interface):
             ds = Dataset(ds)
 
         if not path:
+            # TODO:  should probably assess if cwd is the dataset
             if ds is None:
                 # no dataset, no target location, nothing to do
                 raise InsufficientArgumentsError(
@@ -154,20 +157,8 @@ class Install(Interface):
         if vcs is None:
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
-            if source is None:
-                # always come with annex when created from scratch
-                lgr.info("Creating a new annex repo at %s", ds.path)
-                AnnexRepo(ds.path, url=source, create=True)
-            else:
-                # when obtained from remote, try with plain Git
-                lgr.info("Creating a new git repo at %s", ds.path)
-                GitRepo(ds.path, url=source, create=True)
-                if knows_annex(ds.path):
-                    # init annex when traces of a remote annex can be detected
-                    lgr.info("Initializing annex repo at %s", ds.path)
-                    AnnexRepo(ds.path, init=True)
-            vcs = ds.repo
-        assert(ds.repo)
+            vcs = Install._get_new_vcs(ds, source, vcs)
+        assert(ds.repo)  # is automagically re-evaluated in the .repo property
 
         runner = Runner()
 
@@ -180,7 +171,7 @@ class Install(Interface):
             if recursive:
                 cmd_list = ["git", "submodule", "update", "--init",
                             "--recursive"]
-                runner.run(cmd_list, cwd=ds.path)
+                runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
                 # TODO: annex init them!
             return ds
 
@@ -204,7 +195,13 @@ class Install(Interface):
             # it is simplest to let annex tell us what we are dealing with
             lgr.debug("Trying to fetch file %s using annex", relativepath)
             if not isinstance(vcs, AnnexRepo):
-                raise FileNotInAnnexError("We don't have yet annex repo here")
+                assert(isinstance(vcs, GitRepo))
+                if not exists(path):
+                    raise IOError("path doesn't exist yet, might need special handling")
+                elif relativepath in vcs.get_indexed_files():
+                    raise FileInGitError("We need to handle it as known to git")
+                else:
+                    raise FileNotInAnnexError("We don't have yet annex repo here")
                 # TODO: relativepath might be in git, then we should have thrown
                 # FileInGitError.  Figure it all out! ;)
             if vcs.get_file_key(relativepath):
@@ -215,6 +212,10 @@ class Install(Interface):
                 # return the absolute path to the installed file
                 return path
         except FileInGitError:
+            lgr.log(5, "FileInGitError logic")
+            if source is not None:
+                raise FileInGitError("File %s is already in git. Specifying source (%s) makes no sense"
+                                     % (path, source))
             # file is checked into git directly -> nothing to do
             # OR this is a submodule of this dataset
             if not isdir(path):
@@ -228,19 +229,21 @@ class Install(Interface):
             if recursive:
                 cmd_list.append("--recursive")
             cmd_list.append(relativepath)
-            runner.run(cmd_list, cwd=ds.path)
+            runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
 
             # TODO: annex init recursively!
             if knows_annex(path):
                 lgr.debug("Annex detected in submodule '%s'. "
                           "Calling annex init ..." % relativepath)
+                # TODO!? please !!!! AnnexRepo(ds.path, init=True, create=False)
                 cmd_list = ["git", "annex", "init"]
-                runner.run(cmd_list, cwd=ds.path)
+                runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
             # submodule install done, return Dataset instance pointing
             # to the submodule
             return Dataset(path=path)
 
         except FileNotInAnnexError:
+            lgr.log(5, "FileNotInAnnexError logic")
             # either an untracked file in this dataset, or something that
             # also actually exists in the file system but could be part of
             # a subdataset
@@ -262,7 +265,7 @@ class Install(Interface):
                 # of this dataset
                 cmd_list = ["git", "submodule", "add", source,
                             relativepath]
-                runner.run(cmd_list, cwd=ds.path)
+                runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
                 # move .git to superrepo's .git/modules, remove .git, create
                 # .git-file
                 subds_git_dir = opj(path, ".git")
@@ -325,6 +328,10 @@ class Install(Interface):
                 return None
 
         except IOError:
+            lgr.log(5, "IOError logic")
+            # we can end up here in two cases ATM
+            # 1. trying to install a file/subrepo in not initialized subrepo
+            # 2. point to non existing file within a repo
             if exists(path) or islink(path):
                 # this happens when we have an unfulfilled handle in a
                 # subdataset -> hand it over to downstairs
@@ -343,9 +350,20 @@ class Install(Interface):
                 # there is no source, and nothing at the destination, not even
                 # a handle -> create a new dataset!
                 subds = get_containing_subdataset(ds, relativepath)
-                AnnexRepo(path, create=True)
-                return subds.install(path=relpath(path, start=subds.path),
-                                     source=path)
+                if not subds.is_installed():
+                    assert(subds.path != ds.path)
+                    # we are dealing with targetting smth within a subdataset
+                    # which is not yet installed
+                    ds.install(subds.path)
+                    return subds.install(
+                        path=relpath(path, start=subds.path),
+                        source=source,
+                        recursive=recursive)
+                else:
+                    # Create a new one!
+                    AnnexRepo(path, create=True)
+                    return subds.install(path=relpath(path, start=subds.path),
+                                         source=path)
                 # TODO: This is actually almost the same thing we do above,
                 # isn't it?
                 # Think again, too tired currently.
@@ -392,12 +410,28 @@ class Install(Interface):
                 # XXX copied from above -> make function
                 cmd_list = ["git", "submodule", "add", source,
                             relativepath]
-                runner.run(cmd_list, cwd=ds.path)
+                runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
                 return Dataset(path)
             except CommandError:
                 # probably not a repo, likely a simple file
                 vcs.annex_addurl_to_file(relativepath, source)
                 return path
+
+    @staticmethod
+    def _get_new_vcs(ds, source, vcs):
+        if source is None:
+            # always come with annex when created from scratch
+            lgr.info("Creating a new annex repo at %s", ds.path)
+            vcs = AnnexRepo(ds.path, url=source, create=True)
+        else:
+            # when obtained from remote, try with plain Git
+            lgr.info("Creating a new git repo at %s", ds.path)
+            vcs = GitRepo(ds.path, url=source, create=True)
+            if knows_annex(ds.path):
+                # init annex when traces of a remote annex can be detected
+                lgr.info("Initializing annex repo at %s", ds.path)
+                vcs = AnnexRepo(ds.path, init=True)
+        return vcs
 
     @staticmethod
     def result_renderer_cmdline(res):

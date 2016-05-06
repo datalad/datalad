@@ -11,17 +11,19 @@
 
 import os
 from os.path import join as opj, abspath
+
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import FileInGitError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_not_in
+    with_testrepos, assert_equal
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
@@ -31,6 +33,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import swallow_outputs
 
 
 def test_insufficient_args():
@@ -168,6 +171,21 @@ def test_install_subdataset(src, path):
     ds.install('sub1')
 
     ok_(subds.is_installed())
+    # Verify that it is the correct submodule installed and not
+    # new repository initiated
+    assert_equal(set(subds.repo.get_indexed_files()),
+                 {'test.dat', 'INFO.txt', 'test-annex.dat'})
+
+    # Now the obnoxious install an annex file within not yet
+    # initialized repository!
+    with swallow_outputs():  # progress bar
+        ds.install(opj('sub2', 'test-annex.dat'))
+    subds2 = Dataset(opj(path, 'sub2'))
+    assert(subds2.is_installed())
+    assert(subds2.repo.file_has_content('test-annex.dat'))
+    # we shouldn't be able silently ignore attempt to provide source while
+    # "installing" file under git
+    assert_raises(FileInGitError, ds.install, opj('sub2', 'INFO.txt'), source="http://bogusbogus")
 
 
 def test_install_list():

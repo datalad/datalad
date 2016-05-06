@@ -92,11 +92,16 @@ class Ls(Interface):
 
         if loc.startswith('s3://'):
             return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
-        elif lexists(loc) and lexists(opj(loc, '.git')):
+        elif lexists(loc):  # and lexists(opj(loc, '.git')):
             # TODO: use some helper like is_dataset_path ??
             return _ls_dataset(loc, **kw)
         else:
-            raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
+            #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
+            # TODO: unify all the output here -- _ls functions should just return something
+            # to be displayed
+            ui.message(
+                "%s%s%s  %sunknown%s"
+                % (LsFormatter.BLUE, loc, LsFormatter.RESET, LsFormatter.RED, LsFormatter.RESET))
 
 
 #
@@ -228,7 +233,7 @@ class LsFormatter(string.Formatter):
 def format_ds_model(formatter, ds_model, format_str, format_exc):
     try:
         #print("WORKING ON %s" % ds_model.path)
-        if not exists(ds_model.ds.path):
+        if not exists(ds_model.ds.path) or not ds_model.ds.repo:
             return formatter.format(format_exc, ds=ds_model, msg="not installed")
         ds_formatted = formatter.format(format_str, ds=ds_model)
         #print("FINISHED ON %s" % ds_model.path)
@@ -239,40 +244,41 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
 # from joblib import Parallel, delayed
 
 def _ls_dataset(loc, fast=False, recursive=False, all=False):
-    from ..support.dataset import Dataset
+    from ..distribution.dataset import Dataset
     isabs_loc = isabs(loc)
     topdir = '' if isabs_loc else abspath(curdir)
 
     topds = Dataset(loc)
-    dss = map(DsModel,
-              [topds] + ([Dataset(opj(loc, sm))
-                          for sm in topds.get_dataset_handles(recursive=recursive)]
-                         if recursive else [])
-              )
+    dss = [topds] + (
+        [Dataset(opj(loc, sm))
+         for sm in topds.get_dataset_handles(recursive=recursive)]
+         if recursive else [])
+    dsms = list(map(DsModel, dss))
 
     # adjust path strings
-    for ds_model in dss:
+    for ds_model in dsms:
         path = ds_model.path[len(topdir) + 1 if topdir else 0:]
         if not path:
             path = '.'
         ds_model.path = path
 
-    maxpath = max(len(ds_model.path) for ds_model in dss)
+    maxpath = max(len(ds_model.path) for ds_model in dsms)
     path_fmt = "{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
-    format_str = path_fmt + "  [{ds.type}]  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
+    pathtype_fmt = path_fmt + "  [{ds.type}]"
+    full_fmt = pathtype_fmt + "  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
     if (not fast) or all:
-        format_str += "  {ds.clean!X}"
+        full_fmt += "  {ds.clean!X}"
     if all:
-        format_str += "  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
+        full_fmt += "  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
 
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
     # for out in Parallel(n_jobs=1)(
-    #         delayed(format_ds_model)(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}")
+    #         delayed(format_ds_model)(formatter, dsm, full_fmt, format_exc=path_fmt + "  {msg!R}")
     #         for dsm in dss):
     #     print(out)
-    for dsm in dss:
-        print(format_ds_model(formatter, dsm, format_str, format_exc=path_fmt + "  {msg!R}"))
+    for dsm in dsms:
+        print(format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + "  {msg!R}"))
 
 #
 # S3 listing
