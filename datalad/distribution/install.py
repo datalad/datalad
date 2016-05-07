@@ -24,7 +24,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
     EnsureBool
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
 from datalad.interface.base import Interface
@@ -82,12 +82,13 @@ def _install_subds_from_flexible_source(ds, submodule, recursive):
             subds = Install.__call__(
                 dataset=subds, path=None, source=clone_url,
                 recursive=recursive, add_data_to_git=False)
-        except ValueError:
+        except GitCommandError:
             continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
         # XXX next line should be enough, but isn't -> workaround via Git call
         #submodule.update(init=True)
-        ds.repo._git_custom_command('', ['git', 'submodule', 'update', '--init', 'sub2'])
+        ds.repo._git_custom_command(
+            '', ['git', 'submodule', 'update', '--init', submodule.path])
         return subds
 
 
@@ -269,6 +270,7 @@ class Install(Interface):
                           if sm.path == relativepath]
             if not len(submodule):
                 # this is a file in Git and no submodule, just return its path
+                lgr.debug("Don't act, data already present in Git")
                 return path
             elif len(submodule) > 1:
                 raise RuntimeError(
@@ -277,6 +279,7 @@ class Install(Interface):
 
             # we are dealing with a known submodule (i.e. `source`
             # doesn't matter) -> check it out
+            lgr.debug("Install subdataset at: {0}".format(submodule.path))
             subds = _install_subds_from_flexible_source(ds, submodule,
                 recursive=recursive)
             return subds
