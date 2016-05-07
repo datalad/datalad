@@ -43,6 +43,54 @@ def _with_sep(path):
     return path + sep if not path.endswith(sep) else path
 
 
+def _install_subds_from_flexible_source(ds, submodule, recursive):
+    """Tries to obtain a given subdataset from several meaningful locations"""
+    # shortcut
+    vcs = ds.repo
+    repo = vcs.repo
+    # compose a list of candidate clone URL
+    clone_urls = []
+    # name of the default remote for the active branch
+    remote_name = repo.active_branch.tracking_branch().remote_name
+    remote_url = vcs.git_get_remote_url(remote_name, push=False)
+    # remember suffix
+    url_suffix = ''
+    if remote_url.endswith('/.git'):
+        url_suffix = '/.git'
+        remote_url = remote_url[:-5]
+    # attempt: submodule checkout at parent remote URL
+    clone_urls.append('{0}/{1}{2}'.format(
+        remote_url, submodule.path, url_suffix))
+    # attempt: configured submodule URL
+    # need to resolve relative URL
+    remote_url_l = remote_url.split('/')
+    sm_url_l = submodule.url.split('/')
+    for i, c in enumerate(sm_url_l):
+        if c == '..':
+            remote_url_l = remote_url_l[:-1]
+        else:
+            clone_urls.append('{0}/{1}{2}'.format(
+                '/'.join(remote_url_l),
+                '/'.join(sm_url_l[i:]),
+                url_suffix))
+            break
+    # now loop over all candidates and try to clone
+    subds = Dataset(opj(ds.path, submodule.path))
+    for clone_url in clone_urls:
+        lgr.debug("Attempt clone of subdataset from: {0}".format(clone_url))
+        try:
+            subds = Install.__call__(
+                dataset=subds, path=None, source=clone_url,
+                recursive=recursive, add_data_to_git=False)
+        except ValueError:
+            continue
+        lgr.debug("Update cloned subdataset {0} in parent".format(subds))
+        # XXX next line should be enough, but isn't -> workaround via Git call
+        #submodule.update(init=True)
+        ds.repo._git_custom_command('', ['git', 'submodule', 'update', '--init', 'sub2'])
+        return subds
+
+
 def get_containing_subdataset(ds, path):
     """Given a base dataset and a relative path get containing subdataset
 
@@ -169,14 +217,9 @@ class Install(Interface):
             # TODO: For now 'recursive' means just submodules.
             # See --with-data vs. -- recursive and figure it out
             if recursive:
-                # RF: turn this into a loop over all registered submodules
-                #     and call `install` for each of them explicitly to get
-                #     uniform results and minimize the special nature of a
-                #     submodule wrt to a standalone dataset
-                cmd_list = ["git", "submodule", "update", "--init",
-                            "--recursive"]
-                runner.run(cmd_list, cwd=ds.path)
-                # TODO: annex init them! With RF above this is not needed anymore
+                for sm in ds.repo.get_submodules():
+                    _install_subds_from_flexible_source(
+                        ds, sm, recursive=recursive)
             return ds
 
         # at this point this dataset is "installed", now we can test whether to
@@ -222,39 +265,21 @@ class Install(Interface):
                                      % (path, source))
             # file is checked into git directly -> nothing to do
             # OR this is a submodule of this dataset
-            submodules = [sm for sm in ds.repo.get_submodules()
+            submodule = [sm for sm in ds.repo.get_submodules()
                           if sm.path == relativepath]
-            if not len(submodules):
+            if not len(submodule):
                 # this is a file in Git and no submodule, just return its path
                 return path
+            elif len(submodule) > 1:
+                raise RuntimeError(
+                    "more than one submodule registered at the same path?")
+            submodule = submodule[0]
 
             # we are dealing with a known submodule (i.e. `source`
-            # doesn't matter)
-            # check it out
-            # RF: modify this to call `install` on the submodule's mountpoint
-            #     using an appropriate source URL. See
-            #     https://github.com/datalad/datalad/issues/424 for a discussion
-            cmd_list = ["git", "submodule", "update", "--init"]
-            if recursive:
-                cmd_list.append("--recursive")
-            cmd_list.append(relativepath)
-            runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
-
-            # TODO: annex init recursively!
-            # RF: with suggested RF this goes away
-            if knows_annex(path):
-                lgr.debug("Annex detected in submodule '%s'. "
-                          "Calling annex init ..." % relativepath)
-                # TODO!? please !!!! AnnexRepo(ds.path, init=True, create=False)
-                cmd_list = ["git", "annex", "init"]
-                runner.run(cmd_list, cwd=ds.path)
-
-            # RF: once installed as a standalone dataset, we still need to init
-            #     it as a submodule in the parent.
-
-            # submodule install done, return Dataset instance pointing
-            # to the submodule
-            return Dataset(path=path)
+            # doesn't matter) -> check it out
+            subds = _install_subds_from_flexible_source(ds, submodule,
+                recursive=recursive)
+            return subds
 
         except FileNotInAnnexError:
             lgr.log(5, "FileNotInAnnexError logic")
@@ -265,11 +290,11 @@ class Install(Interface):
             if ds.path != subds.path:
                 # target path belongs to a subdataset, hand installation
                 # over to it
-                # RF: update for changes in the signature of `install`
                 return subds.install(
                     path=relpath(path, start=subds.path),
                     source=source,
-                    recursive=recursive)
+                    recursive=recursive,
+                    add_data_to_git=add_data_to_git)
 
             # this must be an untracked/existing something, so either
             # - a file
@@ -300,8 +325,7 @@ class Install(Interface):
                 #       - figure out, what annex does in direct mode
                 #         and/or on windows
                 #       - for now use .git file on windows and symlink otherwise
-                # RF: factor this one out, and re-use after having installed a
-                #     submodule like a standalone dataset some 50 lines above
+                # RF: move below handling into _install_subds_from_flexible_source
                 if not on_windows:
                     os.symlink(relpath(moved_git_dir, start=path),
                                opj(path, ".git"))
@@ -360,7 +384,8 @@ class Install(Interface):
                     return subds.install(
                         path=relpath(path, start=subds.path),
                         source=source,
-                        recursive=recursive)
+                        recursive=recursive,
+                        add_data_to_git=add_data_to_git)
                 else:
                     raise RuntimeError("%s, %s, %s" % (path, ds, subds))
 
