@@ -679,16 +679,9 @@ class GitRepo(object):
         requested
         """
 
-        try:
-            out, err = self._git_custom_command(
-                '', 'git config --get remote.%s.%s' % (name,
-                                                       'pushurl' if push else 'url'),
-                expect_fail=True)
-        except CommandError as e:
-            if e.code == 1 and not e.stdout and not e.stderr:
-                return None
-            raise
-        return out.rstrip(linesep)
+        remote = self.repo.remote(name)
+        return remote.config_reader.get(
+            'pushurl' if push and remote.config_reader.has_option('pushurl') else 'url')
 
     def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
