@@ -62,18 +62,23 @@ def _install_subds_from_flexible_source(ds, submodule, recursive):
     clone_urls.append('{0}/{1}{2}'.format(
         remote_url, submodule.path, url_suffix))
     # attempt: configured submodule URL
-    # need to resolve relative URL
-    remote_url_l = remote_url.split('/')
-    sm_url_l = submodule.url.split('/')
-    for i, c in enumerate(sm_url_l):
-        if c == '..':
-            remote_url_l = remote_url_l[:-1]
-        else:
-            clone_urls.append('{0}/{1}{2}'.format(
-                '/'.join(remote_url_l),
-                '/'.join(sm_url_l[i:]),
-                url_suffix))
-            break
+    if submodule.url.startswith('/') \
+            or submodule.url.split('://')[0] in ('http', 'ssh', 'file'):
+        # this seems to be an absolute location -> take as is
+        clone_urls.append(submodule.url)
+    else:
+        # need to resolve relative URL
+        remote_url_l = remote_url.split('/')
+        sm_url_l = submodule.url.split('/')
+        for i, c in enumerate(sm_url_l):
+            if c == '..':
+                remote_url_l = remote_url_l[:-1]
+            else:
+                clone_urls.append('{0}/{1}{2}'.format(
+                    '/'.join(remote_url_l),
+                    '/'.join(sm_url_l[i:]),
+                    url_suffix))
+                break
     # now loop over all candidates and try to clone
     subds = Dataset(opj(ds.path, submodule.path))
     for clone_url in clone_urls:
