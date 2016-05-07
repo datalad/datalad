@@ -42,7 +42,7 @@ def test_add_sibling(origin, repo_path):
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
         AnnexRepo(opj(repo_path, subds), init=True,
-                  create=False).git_checkout("master")
+                  create=True).git_checkout("master")
 
     res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location")

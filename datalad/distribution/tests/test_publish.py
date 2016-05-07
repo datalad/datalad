@@ -42,7 +42,7 @@ def test_publish_simple(origin, src_path, dst_path):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.git_remote_remove("origin")
@@ -103,7 +103,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
@@ -161,7 +161,7 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
 
     # first, try publishing from super dataset using `path`
     source_super = source
@@ -203,7 +203,7 @@ def test_publish_with_data(origin, src_path, dst_path):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
@@ -236,7 +236,7 @@ def test_publish_file_handle(origin, src_path, dst_path):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
@@ -283,7 +283,7 @@ def test_publish_file_handle(origin, src_path, dst_path):
 #     # TODO: For now, circumnavigate the detached head issue.
 #     # Figure out, what to do.
 #     for subds in source.get_dataset_handles(recursive=True):
-#         AnnexRepo(opj(src_path, subds), init=True, create=False).git_checkout("master")
+#         AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
 #     sub1 = GitRepo(opj(src_path, 'sub1'))
 #     sub2 = GitRepo(opj(src_path, 'sub2'))
 #

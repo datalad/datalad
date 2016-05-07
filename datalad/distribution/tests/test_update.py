@@ -43,7 +43,7 @@ def test_update_simple(origin, src_path, dst_path):
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True,
-                  create=False).git_checkout("master")
+                  create=True).git_checkout("master")
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
     source.repo.git_remote_remove("origin")
@@ -54,7 +54,7 @@ def test_update_simple(origin, src_path, dst_path):
     # Figure out, what to do.
     for subds in dest.get_dataset_handles(recursive=True):
         AnnexRepo(opj(dst_path, subds), init=True,
-                  create=False).git_checkout("master")
+                  create=True).git_checkout("master")
     # test setup done;
     # assert all fine
     ok_clean_git(dst_path)
