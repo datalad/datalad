@@ -800,6 +800,7 @@ def knows_annex(path):
     """
     from os.path import exists
     if not exists(path):
+        lgr.debug("No annex: test path doesn't exist")
         return False
     from datalad.support.gitrepo import GitRepo
     repo = GitRepo(path, create=False)
