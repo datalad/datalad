@@ -137,6 +137,10 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         runner.run(['git', 'submodule', 'add', annex.url, 'sub2'], **kw)
         runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'], **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'], **kw)
+        # init annex in subdatasets
+        for s in ('sub1', 'sub2'):
+            runner.run(['git', 'annex', 'init'],
+                       cwd=opj(self.path, s), expect_stderr=True)
 
 
 class NestedDataset(SubmoduleDataset):
