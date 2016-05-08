@@ -312,7 +312,9 @@ class GitRepo(object):
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
             try:
+                lgr.debug("Git clone from {0} to {1}".format(url, path))
                 self.cmd_call_wrapper(git.Repo.clone_from, url, path)
+                lgr.debug("Git clone completed")
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
@@ -329,6 +331,7 @@ class GitRepo(object):
 
         if create and not exists(opj(path, '.git')):
             try:
+                lgr.debug("Initialize empty Git repository at {0}".format(path))
                 self.repo = self.cmd_call_wrapper(git.Repo.init, path, True, odbt=default_git_odbt)
             except GitCommandError as e:
                 lgr.error(str(e))
@@ -336,6 +339,7 @@ class GitRepo(object):
         else:
             try:
                 self.repo = self.cmd_call_wrapper(Repo, path)
+                lgr.debug("Using existing Git repository at {0}".format(path))
             except (GitCommandError,
                     NoSuchPathError,
                     InvalidGitRepositoryError) as e:
