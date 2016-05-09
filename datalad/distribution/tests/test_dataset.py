@@ -98,11 +98,11 @@ def test_register_sibling(remote, path):
 @with_testrepos('.*nested_submodule.*', flavors=['local'])
 def test_get_dataset_handles(path):
     ds = Dataset(path)
-    eq_(set(ds.get_dataset_handles()), {'sub1', 'sub2'})
+    eq_(set(ds.get_dataset_handles()), {'subdataset'})
     eq_(set(ds.get_dataset_handles(recursive=True)),
-        {'sub1', 'sub2', 'sub1/sub1', 'sub1/sub2',
-         'sub1/sub2/sub1', 'sub1/sub2/sub2', 'sub1/sub1/sub1',
-         'sub1/sub1/sub2'})
+        {'subdataset/subsubdataset', 'subdataset/subsubdataset/sub1',
+         'subdataset/subsubdataset/sub2', 'subdataset/sub1',
+         'subdataset/sub2', 'subdataset'})
     # TODO:  More Flavors!
 
 

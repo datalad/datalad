@@ -143,7 +143,7 @@ class SubmoduleDataset(BasicAnnexTestRepo):
                        cwd=opj(self.path, s), expect_stderr=True)
 
 
-class NestedDataset(BasicGitTestRepo):
+class NestedDataset(BasicAnnexTestRepo):
 
     def populate(self):
         super(NestedDataset, self).populate()
@@ -162,6 +162,10 @@ class NestedDataset(BasicGitTestRepo):
                    cwd=self.path, **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
                    cwd=self.path, **kw)
+        # init all annexes
+        for s in ('', 'subdataset', opj('subdataset', 'subsubdataset')):
+            runner.run(['git', 'annex', 'init'],
+                       cwd=opj(self.path, s), expect_stderr=True)
 
 
 class InnerSubmodule(object):
@@ -171,7 +175,7 @@ class InnerSubmodule(object):
 
     @property
     def path(self):
-        return opj(self._ds.path, 'sub1', 'sub1')
+        return opj(self._ds.path, 'subdataset', 'sub1')
 
     @property
     def url(self):
