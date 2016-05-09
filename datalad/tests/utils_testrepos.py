@@ -143,7 +143,7 @@ class SubmoduleDataset(BasicAnnexTestRepo):
                        cwd=opj(self.path, s), expect_stderr=True)
 
 
-class NestedDataset(SubmoduleDataset):
+class NestedDataset(BasicGitTestRepo):
 
     def populate(self):
         super(NestedDataset, self).populate()
@@ -152,13 +152,13 @@ class NestedDataset(SubmoduleDataset):
         from datalad.cmd import Runner
         runner = Runner()
         kw = dict(expect_stderr=True)
-        runner.run(['git', 'submodule', 'add', ds.url, 'sub1'],
-                   cwd=opj(self.path, 'sub1'), **kw)
-        runner.run(['git', 'submodule', 'add', ds.url, 'sub2'],
-                   cwd=opj(self.path, 'sub1'), **kw)
-        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'],
-                   cwd=opj(self.path, 'sub1'), **kw)
-        runner.run(['git', 'commit', '-a', '-m', 'Added subsubmodules.'],
+        runner.run(['git', 'submodule', 'add', ds.url, 'subdataset'],
+                   cwd=self.path, **kw)
+        runner.run(['git', 'submodule', 'add', ds.url, 'subsubdataset'],
+                   cwd=opj(self.path, 'subdataset'), **kw)
+        runner.run(['git', 'commit', '-m', 'Added subdataset.'],
+                   cwd=opj(self.path, 'subdataset'), **kw)
+        runner.run(['git', 'commit', '-a', '-m', 'Added subdatasets.'],
                    cwd=self.path, **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
                    cwd=self.path, **kw)
