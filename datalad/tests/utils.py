@@ -21,6 +21,7 @@ import logging
 import random
 import socket
 from six import PY2, text_type, iteritems
+from six import binary_type
 from fnmatch import fnmatch
 import time
 
@@ -408,14 +409,15 @@ def serve_path_via_http(tfunc, *targs):
 
 
 @optional_args
-def with_tempfile(t, *targs, **tkwargs):
+def with_tempfile(t, content=None, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end
 
     Parameters
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    `*targs`:
+    content : str or bytes, optional
+        Content to be stored in the file created
     `**tkwargs`:
         All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
@@ -445,12 +447,15 @@ def with_tempfile(t, *targs, **tkwargs):
         mkdir = tkwargs_.pop('mkdir', False)
 
         filename = {False: tempfile.mktemp,
-                    True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
+                    True: tempfile.mkdtemp}[mkdir](**tkwargs_)
         filename = realpath(filename)
 
+        if content:
+            with open(filename, 'w' + 'b' if isinstance(content, binary_type) else '') as f:
+                f.write(content)
         if __debug__:
-            lgr.debug('Running %s with temporary filename %s'
-                      % (t.__name__, filename))
+            lgr.debug('Running %s with temporary filename %s',
+                      t.__name__, filename)
         try:
             return t(*(arg + (filename,)), **kw)
         finally:
@@ -470,6 +475,10 @@ def with_tempfile(t, *targs, **tkwargs):
                     rmtemp(f)
                 except OSError:
                     pass
+
+    if tkwargs.get('mkdir', None) and content is not None:
+        raise ValueError("mkdir=True while providing content makes no sense")
+
     return newfunc
 
 

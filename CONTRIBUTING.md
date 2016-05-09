@@ -257,3 +257,7 @@ Various hints for developers
 
 - to monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
   just plug it in the middle of your pipe
+
+- for remote debugging epdb could be used (avail in pip) by using
+  `import epdb; epdb.serve()` in Python code and then connecting to it with
+  `python - c "import epdb; epdb.connect()"`
