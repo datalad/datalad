@@ -18,6 +18,8 @@ from os.path import join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
 from ..base import DownloadError
+from ..base import IncompleteDownloadError
+from ..base import BaseDownloader
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ..providers import Credential  # to test against crcns
@@ -25,13 +27,15 @@ from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
-if PY3:
+try:
+    if PY3:
+        raise ImportError("Not yet ready apparently: https://travis-ci.org/datalad/datalad/jobs/111659666")
+    import httpretty
+except ImportError:
     class NoHTTPPretty(object):
        __bool__ = __nonzero__ = lambda s: False
        activate = lambda s, t: t
     httpretty = NoHTTPPretty()
-else:
-    import httpretty
 
 from mock import patch
 from ...tests.utils import assert_in
@@ -98,6 +102,29 @@ def test_HTTPDownloader_basic(toppath, topurl):
          patch.object(__builtin__, 'open', fake_open(write_=_raise_IOError)):
         assert_raises(DownloadError, download, furl, tfpath, overwrite=True)
 
+    # incomplete download scenario - should have 3 tries
+    def _fail_verify_download(try_to_fail):
+        try_ = [0]
+        _orig_verify_download = BaseDownloader._verify_download
+        def _verify_download(self, *args, **kwargs):
+            try_[0] += 1
+            if try_[0] >= try_to_fail:
+                return _orig_verify_download(self, *args, **kwargs)
+            raise IncompleteDownloadError()
+        return _verify_download
+
+    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(6)), \
+        swallow_logs():
+            # how was before the "fix":
+            #assert_raises(DownloadError, downloader.fetch, furl)
+            #assert_raises(DownloadError, downloader.fetch, furl)
+            # now should download just fine
+            assert_equal(downloader.fetch(furl), 'abc')
+    # but should fail if keeps failing all 5 times and then on 11th should raise DownloadError
+    with patch.object(BaseDownloader, '_verify_download', _fail_verify_download(7)), \
+        swallow_logs():
+            assert_raises(DownloadError, downloader.fetch, furl)
+
     # TODO: access denied scenario
     # TODO: access denied detection
 
@@ -153,7 +180,7 @@ def check_download_external_url(url, failed_str, success_str, d):
     # TODO -- more and more specific
 
 
-@use_cassette('fixtures/vcr_cassettes/test_authenticate_external_portals.yaml', record_mode='once')
+@use_cassette('test_authenticate_external_portals', record_mode='once')
 def test_authenticate_external_portals():
     yield check_download_external_url, \
           "https://portal.nersc.gov/project/crcns/download/alm-1/checksums.md5", \

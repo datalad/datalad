@@ -40,7 +40,6 @@ from nose.tools import \
 from nose import SkipTest
 
 from ..cmd import Runner
-from ..support.repos import AnnexRepoOld
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
@@ -167,10 +166,47 @@ def ok_file_under_git(path, filename=None, annexed=False):
 
     If relative path provided, then test from current directory
     """
+    annex, file_repo_path, filename, path, repo = _prep_file_under_git(path, filename)
+    assert_in(file_repo_path, repo.get_indexed_files())  # file is known to Git
+
+    if annex:
+        try:
+            # operates on relative to curdir path
+            repo.get_file_key(opj(path, filename))
+            in_annex = True
+        except FileNotInAnnexError as e:
+            in_annex = False
+    else:
+        in_annex = False
+
+    assert(annexed == in_annex)
+
+def put_file_under_git(path, filename=None, content=None, annexed=False):
+    """Place file under git/annex and return used Repo
+    """
+    annex, file_repo_path, filename, path, repo = _prep_file_under_git(path, filename)
+    if content is None:
+        content = ""
+    with open(opj(path, filename), 'w') as f_:
+        f_.write(content)
+
+    if annexed:
+        if not isinstance(repo, AnnexRepo):
+            repo = AnnexRepo(repo.path)
+        repo.add_to_annex(filename)
+    else:
+        repo.git_add(filename)
+    ok_file_under_git(path, filename, annexed)
+    return repo
+
+def _prep_file_under_git(path, filename):
+    """Get instance of the repository for the given filename
+
+    Helper to be used by few functions
+    """
     if filename is None:
         # path provides the path and the name
         path, filename = pathsplit(path)
-
     try:
         # if succeeds when must not (not `annexed`) -- fail
         repo = get_repo_instance(path, class_=AnnexRepo)
@@ -186,19 +222,8 @@ def ok_file_under_git(path, filename=None, annexed=False):
     # path to the file within the repository
     file_repo_dir = os.path.relpath(path, repo.path)
     file_repo_path = filename if file_repo_dir == curdir else opj(file_repo_dir, filename)
-    assert(file_repo_path in repo.get_indexed_files())  # file is known to Git
+    return annex, file_repo_path, filename, path, repo
 
-    if annex:
-        try:
-            # operates on relative to curdir path
-            repo.get_file_key(opj(path, filename))
-            in_annex = True
-        except FileNotInAnnexError as e:
-            in_annex = False
-    else:
-        in_annex = False
-
-    assert(annexed == in_annex)
 
 #
 # Helpers to test symlinks

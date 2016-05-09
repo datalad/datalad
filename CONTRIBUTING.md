@@ -119,6 +119,11 @@ we outline the workflow used by the developers:
 (If any of the above seems like magic to you, then look up the
 [Git documentation](http://git-scm.com/documentation) on the web.)
 
+Development environment
+-----------------------
+
+See [README.md:Dependencies](README.md#Dependencies).
+
 Additional Hints
 ----------------
 
@@ -182,6 +187,9 @@ deactivate
 Alternatively, or complimentary to that, you can use `tox` -- there is a `tox.ini`
 file which sets up a few virtual environments for testing locally, which you can
 later reuse like any other regular virtualenv for troubleshooting.
+Additionally, [tools/testing/test_README_in_docker](tools/testing/test_README_in_docker) script can
+be used to establish a clean docker environment (based on any NeuroDebian-supported
+release of Debian or Ubuntu) with all dependencies listed in README.md pre-installed.
 
 
 ### Coverage
@@ -236,3 +244,16 @@ tracker.  Resolving these issues allows you to start contributing to the project
 without much prior knowledge.  Your assistance in this area will be greatly
 appreciated by the more experienced developers as it helps free up their time to
 concentrate on other issues.
+
+Various hints for developers
+----------------------------
+
+### Useful tools
+
+- while performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
+  for quick logging of various health stats in a separate terminal window:
+  
+        dstat -c --top-cpu -d --top-bio --top-latency --net
+
+- to monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
+  just plug it in the middle of your pipe

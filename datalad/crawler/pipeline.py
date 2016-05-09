@@ -46,6 +46,7 @@ import sys
 from glob import glob
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
 
+from .. import cfg
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..utils import updated
 from ..dochelpers import exc_str
@@ -96,9 +97,13 @@ def run_pipeline(*args, **kwargs):
     items, a `[{}]` will be provided as output
     """
     output = list(xrun_pipeline(*args, **kwargs))
+    stats = None
     if output:
-        stats_str = output[-1]['datalad_stats'].get_total().as_str(mode='line') \
-                if 'datalad_stats' in output[-1] else 'no stats collected'
+        if 'datalad_stats' in output[-1]:
+            stats = output[-1]['datalad_stats'].get_total()
+            stats_str = stats.as_str(mode='line')
+        else:
+            stats_str = 'no stats collected'
     else:
         stats_str = "no output"
     lgr.info("Finished running pipeline: %s" % stats_str)

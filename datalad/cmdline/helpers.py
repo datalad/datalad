@@ -16,8 +16,14 @@ import os
 import re
 import sys
 
-from ..log import is_interactive
+from tempfile import NamedTemporaryFile
 
+from ..cmd import Runner
+from ..log import is_interactive
+from ..utils import getpwd
+
+from logging import getLogger
+lgr = getLogger('datalad.cmdline')
 
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -87,6 +93,13 @@ class LogLevelAction(argparse.Action):
         from ..log import LoggerHelper
         LoggerHelper().set_level(level=values)
 
+class PBSAction(argparse.Action):
+    """Action to schedule actual command execution via PBS (e.g. Condor)"""
+    def __call__(self, parser, namespace, values, option_string=None):
+        pbs = values[0]
+        import pdb; pdb.set_trace()
+        i = 1
+
 
 def parser_add_common_args(parser, pos=None, opt=None, **kwargs):
     from . import common_args
@@ -113,6 +126,55 @@ def parser_add_common_opt(parser, opt, names=None, **kwargs):
     else:
         parser.add_argument(*names, **opt_kwargs)
 
+
+def strip_arg_from_argv(args, value, opt_names):
+    """Strip an originally listed option (with its value) from the list cmdline args
+    """
+    # Yarik doesn't know better
+    args = args or sys.argv
+    # remove present pbs-runner option
+    args_clean = []
+    skip = 0
+    for i, arg in enumerate(args):
+        if skip:
+            # we skip only one as instructed
+            skip -= 1
+            continue
+        if not (arg in opt_names and i < len(args)-1 and args[i + 1] == value):
+            args_clean.append(arg)
+        else:
+            # we need to skip this one and next one
+            skip = 1
+    return args_clean
+
+
+def run_via_pbs(args, pbs):
+    assert(pbs in ('condor',))  # for now
+
+    # TODO: RF to support multiple backends, parameters, etc, for now -- just condor, no options
+    f = NamedTemporaryFile('w', prefix='datalad-%s-' % pbs, suffix='.submit', delete=False)
+    try:
+        pwd = getpwd()
+        logs = f.name.replace('.submit', '.log')
+        exe = args[0]
+        # TODO: we might need better way to join them, escaping spaces etc.  There must be a stock helper
+        #exe_args = ' '.join(map(repr, args[1:])) if len(args) > 1 else ''
+        exe_args = ' '.join(args[1:]) if len(args) > 1 else ''
+        f.write("""\
+Executable = %(exe)s
+Initialdir = %(pwd)s
+Output = %(logs)s
+Error = %(logs)s
+getenv = True
+
+arguments = %(exe_args)s
+queue
+""" % locals())
+        f.close()
+        Runner().run(['condor_submit', f.name])
+        lgr.info("Scheduled execution via %s.  Logs will be stored under %s" % (pbs, logs))
+    finally:
+        os.unlink(f.name)
 
 class RegexpType(object):
     """Factory for creating regular expression types for argparse

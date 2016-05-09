@@ -22,7 +22,6 @@ from six import string_types
 from functools import wraps
 
 import git
-from git import Repo
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from git.objects.blob import Blob
 
@@ -33,6 +32,10 @@ from ..utils import optional_args, on_windows, getpwd
 from ..utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
+
+# Override default GitPython's DB backend to talk directly to git so it doesn't interfer with
+# possible operations performed by gc/repack
+default_git_odbt = git.GitCmdObjectDB
 
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
 # Didn't work as expected on a first try. Probably there is a neatier way to
@@ -235,6 +238,12 @@ def _remove_empty_items(list_):
         return list_
     return [file_ for file_ in list_ if file_]
 
+def Repo(*args, **kwargs):
+    """Factory method around git.Repo to consistently initiate with different backend
+    """
+    if 'odbt' not in kwargs:
+        kwargs['odbt'] = default_git_odbt
+    return git.Repo(*args, **kwargs)
 
 class GitRepo(object):
     """Representation of a git repository
@@ -246,7 +255,11 @@ class GitRepo(object):
     """
     __slots__ = ['path', 'repo', 'cmd_call_wrapper']
 
-    _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=false']
+    # Disable automatic garbage and autopacking
+    _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
+    # actually no need with default GitPython db backend not in memory default_git_odbt
+    # but still allows for faster testing etc.  May be eventually we would make it switchable
+    #_GIT_COMMON_OPTIONS = []
 
     def __init__(self, path, url=None, runner=None, create=True):
         """Creates representation of git repository at `path`.
@@ -285,7 +298,7 @@ class GitRepo(object):
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
             try:
-                self.cmd_call_wrapper(Repo.clone_from, url, path)
+                self.cmd_call_wrapper(git.Repo.clone_from, url, path)
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
@@ -302,7 +315,7 @@ class GitRepo(object):
 
         if create and not exists(opj(path, '.git')):
             try:
-                self.repo = self.cmd_call_wrapper(Repo.init, path, True)
+                self.repo = self.cmd_call_wrapper(git.Repo.init, path, True, odbt=default_git_odbt)
             except GitCommandError as e:
                 lgr.error(str(e))
                 raise
@@ -513,8 +526,15 @@ class GitRepo(object):
         # For some reason, this is three times faster than the version below:
         remote_branches = list()
         for remote in self.repo.remotes:
-            for ref in remote.refs:
-                remote_branches.append(ref.name)
+            try:
+                for ref in remote.refs:
+                    remote_branches.append(ref.name)
+            except AssertionError as e:
+                if e.message.endswith("did not have any references"):
+                    # this will happen with git annex special remotes
+                    pass
+                else:
+                    raise e
         return remote_branches
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
@@ -727,3 +747,13 @@ class GitRepo(object):
     def dirty(self):
         """Returns true if there is uncommitted changes or files not known to index"""
         return self.repo.is_dirty(untracked_files=True)
+
+    def gc(self, allow_background=False, auto=False):
+        """Perform house keeping (garbage collection, repacking)"""
+        cmd_options = ['git']
+        if not allow_background:
+            cmd_options += ['-c', 'gc.autodetach=0']
+        cmd_options += ['gc', '--aggressive']
+        if auto:
+            cmd_options += ['--auto']
+        self._git_custom_command('', cmd_options)

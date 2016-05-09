@@ -323,6 +323,12 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     assert_equal(ar.annex_info('nonexistent', batch=False), None)
     assert_equal(ar.annex_info('nonexistent', batch=True), None)
 
+    # annex repo info
+    repo_info = ar.annex_repo_info()
+    assert_equal(repo_info['local annex size'], 14)
+    assert_equal(repo_info['backend usage'], {'SHA256E': 1})
+    #import pprint; pprint.pprint(repo_info)
+
     # remove the remote
     ar.annex_rmurl(testfile, testurl)
     l = ar.annex_whereis(testfile)
@@ -779,3 +785,18 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
     raise SkipTest("TODO: more, e.g. add with a custom backend")
     # TODO: also with different modes (relaxed, fast)
     # TODO: verify that file is added with that backend and that we got a new batched process
+
+
+@with_tempfile(mkdir=True)
+def test_annex_backends(path):
+    repo = AnnexRepo(path)
+    eq_(repo.default_backends, None)
+
+    rmtree(path)
+
+    repo = AnnexRepo(path, backend='MD5E')
+    eq_(repo.default_backends, ['MD5E'])
+
+    # persists
+    repo = AnnexRepo(path)
+    eq_(repo.default_backends, ['MD5E'])

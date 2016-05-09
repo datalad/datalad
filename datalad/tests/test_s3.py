@@ -10,7 +10,8 @@
 
 """
 
-from ..support.s3 import get_versioned_url, S3_TEST_CREDENTIAL
+from ..support.s3 import get_versioned_url
+from ..downloaders.tests.utils import get_test_providers
 
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
@@ -22,13 +23,7 @@ from .utils import use_cassette
 
 @use_cassette('s3_test0')
 def test_version_url():
-    try: # TODO:  with RFing of keyring 8.0 to have keyrings.alt on wheezy get_password throws RuntimeError
-        pw = keyring.get_password(S3_TEST_CREDENTIAL, 'secret_id')
-    except RuntimeError:
-        pw = None
-    if not pw:
-        # will skip under tox as well -- some environ variable(s) must be passed
-        raise SkipTest("Do not have access to S3 key/secret.  Test skipped")
+    get_test_providers('s3://openfmri/tarballs')  # to verify having credentials to access openfmri via S3
     for url_pref in ('http://openfmri.s3.amazonaws.com', 'https://s3.amazonaws.com/openfmri'):
         eq_(get_versioned_url(url_pref + "/tarballs/ds001_raw.tgz"),
             url_pref + "/tarballs/ds001_raw.tgz?versionId=null")

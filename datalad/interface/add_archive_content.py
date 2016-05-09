@@ -33,6 +33,7 @@ from ..support.stats import ActivityStats
 from ..cmdline.helpers import get_repo_instance
 from ..utils import getpwd, rmtree, file_basename
 from ..utils import md5sum
+from ..utils import assure_tuple_or_list
 
 from six import string_types
 from six.moves.urllib.parse import urlparse
@@ -157,6 +158,10 @@ class AddArchiveContent(Interface):
         -------
         annex
         """
+        if exclude:
+            exclude = assure_tuple_or_list(exclude)
+        if rename:
+            rename = assure_tuple_or_list(rename)
 
         # TODO: actually I see possibly us asking user either he wants to convert
         # his git repo into annex

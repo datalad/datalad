@@ -24,8 +24,6 @@ from six.moves.urllib.error import URLError
 # TODO not sure what needs to use `six` here yet
 import requests
 
-from bs4 import BeautifulSoup
-
 import logging
 lgr = logging.getLogger('datalad.network')
 
