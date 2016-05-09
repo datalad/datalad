@@ -164,8 +164,17 @@ class Dataset(object):
         if repo is None:
             return
 
-        # start with the list of direct submodules of this dataset
-        submodules = repo.get_submodules()
+        # check whether we have anything in the repo. if not go home early
+        if not repo.repo.head.is_valid():
+            return []
+
+        try:
+            submodules = repo.get_submodules()
+        except InvalidGitRepositoryError:
+            # this happens when we access a repository with a submodule that
+            # has no commits, hence doesn't appear in the index and
+            # 'git submodule status' also doesn't list it
+            return []
 
         # filter if desired
         if fulfilled is None:

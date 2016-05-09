@@ -80,19 +80,29 @@ def test_create(path):
     ok_(added_subds.is_installed())
     ok_clean_git(sub_path_1, annex=False)
     eq_(added_subds.path, sub_path_1)
-    # assert_in("sub", ds.get_dataset_handles())
-    # TODO: See below; same shit
+    # will not list it unless committed
+    assert_not_in("sub", ds.get_dataset_handles())
+    ds.remember_state("added submodule")
+    # will still not list it, because without a single commit, it doesn't enter
+    # the index
+    assert_not_in("sub", ds.get_dataset_handles())
+    # now for reals
+    open(opj(added_subds.path, 'somecontent'), 'w').write('stupid')
+    # next one will auto-annex the new file
+    added_subds.remember_state('initial commit')
+    # as the submodule never entered the index, even this one won't work
+    ds.remember_state('submodule with content')
+    assert_not_in("sub", ds.get_dataset_handles())
+    # we need to install the submodule again in the parent
+    # an actual final commit is not required
+    added_subds = ds.install("sub", source=sub_path_1)
+    assert_in("sub", ds.get_dataset_handles())
 
     # next one directly created within ds:
     sub_path_2 = opj(path, "sub2")
-    subds2 = install(ds, path=sub_path_2)
-    ok_(subds2.is_installed())
-    ok_clean_git(sub_path_2, annex=False)
-    # was installed into ds:
-    # assert_in("sub2", ds.get_dataset_handles())
-    # TODO: Works, but since the new subdataset is empty, it's not listed by
-    # git submodule status.
-    # Therefor get_dataset_handles() currently fails to detect it.
+    # installing something without a source into a dataset at a path
+    # that has no present content should not work
+    assert_raises(InsufficientArgumentsError, install, ds, path=sub_path_2)
 
 
 @with_tree(tree={'test.txt': 'some', 'test2.txt': 'other'})
