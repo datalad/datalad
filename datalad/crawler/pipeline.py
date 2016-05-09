@@ -44,7 +44,6 @@ provide informative logging.
 
 import sys
 from glob import glob
-from six import iteritems
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
 
 from .. import cfg
