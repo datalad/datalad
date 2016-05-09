@@ -53,6 +53,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     # if we have a remote, let's check the location of that remote
     # for the presence of the desired submodule
     tracking_branch = repo.active_branch.tracking_branch()
+    remote_url = ''
     if tracking_branch:
         # name of the default remote for the active branch
         remote_name = repo.active_branch.tracking_branch().remote_name
@@ -72,6 +73,10 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         clone_urls.append(sm_url)
     else:
         # need to resolve relative URL
+        if not remote_url:
+            # we have no remote URL, hence we need to go with the
+            # local path
+            remote_url = ds.path
         remote_url_l = remote_url.split('/')
         sm_url_l = sm_url.split('/')
         for i, c in enumerate(sm_url_l):
