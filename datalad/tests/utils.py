@@ -21,6 +21,7 @@ import logging
 import random
 import socket
 from six import PY2, text_type, iteritems
+from six import binary_type
 from fnmatch import fnmatch
 import time
 
@@ -415,7 +416,7 @@ def with_tempfile(t, content=None, **tkwargs):
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    content : str, optional
+    content : str or bytes, optional
         Content to be stored in the file created
     `**tkwargs`:
         All other arguments are passed into the call to tempfile.mk{,d}temp(),
@@ -450,7 +451,7 @@ def with_tempfile(t, content=None, **tkwargs):
         filename = realpath(filename)
 
         if content:
-            with open(filename, 'w') as f:
+            with open(filename, 'w' + 'b' if isinstance(content, binary_type) else '') as f:
                 f.write(content)
         if __debug__:
             lgr.debug('Running %s with temporary filename %s',
