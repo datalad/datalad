@@ -451,7 +451,7 @@ def with_tempfile(t, content=None, **tkwargs):
         filename = realpath(filename)
 
         if content:
-            with open(filename, 'w' + 'b' if isinstance(content, binary_type) else '') as f:
+            with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
                 f.write(content)
         if __debug__:
             lgr.debug('Running %s with temporary filename %s',
