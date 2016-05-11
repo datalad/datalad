@@ -42,6 +42,24 @@ def _with_sep(path):
     return path + sep if not path.endswith(sep) else path
 
 
+def _installationpath_from_url(url):
+    """Returns a relative path derived from the trailing end of a URL
+
+    This can be used to determine an installation path of a Dataset
+    from a URL, analog to what `git clone` does.
+    """
+    path = url.rstrip('/')
+    if '/' in path:
+        path = path.split('/')
+        if path[-1] == '.git':
+            path = path[-2]
+        else:
+            path = path[-1]
+    if path.endswith('.git'):
+        path = path[:-4]
+    return path
+
+
 def get_git_dir(path):
     """figure out a repo's gitdir
 
@@ -324,14 +342,7 @@ class Install(Interface):
                 "Assuming installation of a remote dataset. "
                 "Deriving destination path from given source {0}".format(
                     source))
-            dspath = source.rstrip('/').split('/')
-            if dspath[-1] == '.git':
-                dspath = dspath[-2]
-            else:
-                dspath = dspath[-1]
-            if dspath.endswith('.git'):
-                dspath = dspath[:-4]
-            ds = Dataset(dspath)
+            ds = Dataset(_installationpath_from_url(source))
 
         if not path and ds is None:
             # no dataset, no target location, nothing to do
