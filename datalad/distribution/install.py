@@ -334,10 +334,10 @@ class Install(Interface):
             ds = Dataset(dspath)
 
         if not path and ds is None:
-                # no dataset, no target location, nothing to do
-                raise InsufficientArgumentsError(
-                    "insufficient information for installation (needs at "
-                    "least a dataset or an installation path")
+            # no dataset, no target location, nothing to do
+            raise InsufficientArgumentsError(
+                "insufficient information for installation (needs at "
+                "least a dataset or an installation path")
 
         assert(ds is not None)
 
