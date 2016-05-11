@@ -23,6 +23,7 @@ from ..cmd import link_file_load, Runner
 from ..support.exceptions import CommandError
 from ..support.archives import ArchivesCache
 from ..utils import getpwd
+from ..utils import parse_url_opts
 from .base import AnnexCustomRemote
 from .base import URI_PREFIX
 
@@ -95,13 +96,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         url_prefix = self.URL_PREFIX
         assert(url[:len(url_prefix)] == url_prefix)
         key, file_attrs = url[len(url_prefix):].split('/', 1)
-        if '#' in file_attrs:
-            file_, attrs_str = file_attrs.split('#', 1)
-            attrs = dict(x.split('=', 1) for x in attrs_str.split('&'))
-            if 'size' in attrs:
-                attrs['size'] = int(attrs['size'])
-        else:
-            file_, attrs = file_attrs, {}
+        file_, attrs = parse_url_opts(file_attrs)
         return key, file_, attrs
 
     #

@@ -12,8 +12,7 @@
 from os.path import join
 
 # file names for metadata of collections and handles:
-REPO_STD_META_FILE = 'datalad.ttl'
-REPO_CONFIG_FILE = 'config.ttl'
+POC_STD_META_FILE = 'metadata'
 
 # directory containing prepared metadata of a handle repository:
 HANDLE_META_DIR = ".datalad"
@@ -24,10 +23,10 @@ CRAWLER_META_VERSIONS_DIR = join(CRAWLER_META_DIR, 'versions')
 # TODO: RENAME THIS UGLINESS?
 CRAWLER_META_STATUSES_DIR = join(CRAWLER_META_DIR, 'statuses')
 
-# name of local master collection:
-DATALAD_COLLECTION_NAME = "datalad-local"
-
 ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
 
 ARCHIVES_TEMP_DIR = join('.git', 'datalad', 'tmp', 'archives')
+
+# POC-branch:
+DATALAD_ROOT_HANDLE_NAME = "POC-datalad-root"  # replaces DATALAD_COLLECTION_NAME

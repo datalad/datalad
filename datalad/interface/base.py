@@ -92,29 +92,21 @@ def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
 class Interface(object):
     """Base class for interface implementations"""
 
-    def __init__(self, cmdline=False):
-        """
-        Parameters
-        ----------
-        cmdline: bool, optional
-          Either this interface instance is working within command line invocation
-        """
-        self.cmdline = cmdline
-
-    def setup_parser(self, parser):
+    @classmethod
+    def setup_parser(cls, parser):
         # XXX needs safety check for name collisions
         # XXX allow for parser kwargs customization
         parser_kwargs = {}
         from inspect import getargspec
         # get the signature
         ndefaults = 0
-        args, varargs, varkw, defaults = getargspec(self.__call__)
+        args, varargs, varkw, defaults = getargspec(cls.__call__)
         if not defaults is None:
             ndefaults = len(defaults)
         for i, arg in enumerate(args):
             if arg == 'self':
                 continue
-            param = self._params_[arg]
+            param = cls._params_[arg]
             defaults_idx = ndefaults - len(args) + i
             cmd_args = param.cmd_args
             if cmd_args is None:
@@ -151,13 +143,14 @@ class Interface(object):
             parser.add_argument(*parser_args, help=help,
                                 **parser_kwargs)
 
-    def call_from_parser(self, args):
+    @classmethod
+    def call_from_parser(cls, args):
         # XXX needs safety check for name collisions
         from inspect import getargspec
-        argnames = getargspec(self.__call__)[0]
+        argnames = getargspec(cls.__call__)[0]
         kwargs = {k: getattr(args, k) for k in argnames if k != 'self'}
         try:
-            return self(**kwargs)
+            return cls.__call__(**kwargs)
         except KeyboardInterrupt:
             ui.error("\nInterrupted by user while doing magic")
             sys.exit(1)

@@ -13,21 +13,42 @@ import os
 from ..nodes.crawl_url import crawl_url
 from ..nodes.crawl_url import parse_checksums
 from ..nodes.matches import css_match, a_href_match
-from ..nodes.matches import a_text_match
 from ..nodes.misc import assign
-from ..nodes.misc import sub
-from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
 from ..nodes.misc import skip_if
 from ..nodes.annex import Annexificator
-from ...support.s3 import get_versioned_url
-from ...utils import updated
 from ...consts import DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.crcns")
+
+
+def collection_pipeline():
+    lgr.info("Creating a CRCNS collection pipeline")
+    # Should return a list representing a pipeline
+    annex = Annexificator()
+    return [
+        crawl_url("http://crcns.org/data-sets",
+            matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
+#                      a_href_match('.*/data-sets/[\S+/\S+'),]),
+        # TODO:  such matchers don't have state so if they get to the same url from multiple
+        # pages they pass that content twice.  Implement state to remember yielded results +
+        # .reset() for nodes with state so we could first get through the pipe elements and reset
+        # them all
+        a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
+        # https://openfmri.org/dataset/ds000001/
+        assign({'handle_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_handle(
+            template="crcns",
+            data_fields=['dataset_category', 'dataset'],
+            # branch='incoming',  # there will be archives etc
+            existing='adjust',
+            # further any additional options
+        )
+    ]
+
 
 def extract_readme(data):
     # TODO - extract data from the page/response  but not into README I guess since majority of datasets
@@ -95,8 +116,10 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
                 annex.add_archive_content(
                     existing='archive-suffix',
                     # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
-                    strip_leading_dirs=False, #   leading_dirs_depth=2,
-                    exclude='.*__MACOSX$',  # some junk penetrates
+                    strip_leading_dirs=True,
+                    leading_dirs_consider=['crcns.*', dataset],
+                    leading_dirs_depth=2,
+                    exclude='.*__MACOSX.*',  # some junk penetrates
                 ),
             ],
         ],

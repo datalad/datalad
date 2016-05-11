@@ -18,7 +18,7 @@ from ..utils import auto_repr
 
 _COUNTS = (
     'files', 'urls',
-    'add_git', 'add_annex',
+    'add_git', 'add_annex', 'dropped',
     'skipped', 'overwritten', 'renamed', 'removed',
     'downloaded', 'downloaded_size', 'downloaded_time'
 )

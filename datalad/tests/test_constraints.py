@@ -10,11 +10,18 @@
 
 
 import sys
+import os
+from os.path import isabs, abspath, join as opj, normpath
 from six import string_types, PY2
 
 from ..support import constraints as ct
+from ..support.gitrepo import GitRepo
+from ..cmdline.helpers import POC_get_root_handle
+from ..utils import getpwd, chpwd
+from ..tests.utils import assert_cwd_unchanged, with_testrepos, with_tempfile, \
+    on_windows
 
-from nose.tools import assert_equal, assert_raises
+from nose.tools import assert_equal, assert_raises, eq_, ok_
 
 
 def test_int():
@@ -212,3 +219,41 @@ def test_both():
 def test_type_str():
     assert_equal(ct._type_str((str,)), 'str')
     assert_equal(ct._type_str(string_types), 'basestring' if PY2 else 'str')
+
+
+@assert_cwd_unchanged()  # should cd back afterwards
+@with_testrepos(flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_handleabsolutepath(repo_dir, non_repo_dir):
+
+    c = ct.EnsureDatasetAbsolutePath()
+
+    my_rel_path = opj("my", "path")
+    my_rel_path_dot = opj(os.curdir, "my", "path")
+    my_abs_path = abspath(my_rel_path)
+
+    # absolute path unchanged:
+    eq_(c(my_abs_path), my_abs_path)
+    # relative path becomes an absolute one:
+    ok_(isabs(c(my_rel_path)))
+    ok_(isabs(c(my_rel_path_dot)))
+
+    # accept slashes on windows:x
+    if on_windows:
+        eq_(c("my\path"), c("my/path"))
+
+    # we are not within a repo => rel. to root handle
+    root = POC_get_root_handle(path_only=True)
+    with chpwd(non_repo_dir):
+        eq_(c(my_rel_path), abspath(normpath(opj(root, my_rel_path))))
+        eq_(c(my_abs_path), my_abs_path)
+        # except it starts with '.':
+        eq_(c(my_rel_path_dot),
+            abspath(normpath(opj(non_repo_dir, my_rel_path_dot))))
+
+    # now we are within a repo => just rel. path
+    with chpwd(repo_dir):
+        eq_(c(my_rel_path), abspath(normpath(opj(repo_dir, my_rel_path))))
+        eq_(c(my_rel_path_dot), abspath(normpath(opj(repo_dir, my_rel_path_dot))))
+        eq_(c(my_abs_path), my_abs_path)
+        # TODO: deeper within a repo
