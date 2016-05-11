@@ -285,7 +285,16 @@ class Install(Interface):
         if vcs is None:
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
-            vcs = Install._get_new_vcs(ds, source, vcs)
+            try:
+                vcs = Install._get_new_vcs(ds, source, vcs)
+            except GitCommandError:
+                # maybe source URL was missing a '/.git'
+                if source and not source.rstrip('/').endswith('/.git'):
+                    source = '{0}/.git'.format(source.rstrip('/'))
+                    vcs = Install._get_new_vcs(ds, source, vcs)
+                else:
+                    raise
+
         assert(ds.repo)  # is automagically re-evaluated in the .repo property
 
         runner = Runner()
