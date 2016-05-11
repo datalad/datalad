@@ -60,7 +60,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         # name of the default remote for the active branch
         remote_name = repo.active_branch.tracking_branch().remote_name
         remote_url = vcs.git_get_remote_url(remote_name, push=False)
-        if remote_url.endswith('/.git'):
+        if remote_url.rstrip('/').endswith('/.git'):
             url_suffix = '/.git'
             remote_url = remote_url[:-5]
         # attempt: submodule checkout at parent remote URL
@@ -80,7 +80,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         remote_url_l = remote_url.split('/')
         sm_url_l = sm_url.split('/')
         for i, c in enumerate(sm_url_l):
-            if c == '..':
+            if c == pardir:
                 remote_url_l = remote_url_l[:-1]
             else:
                 clone_urls.append('{0}/{1}{2}'.format(
@@ -97,6 +97,9 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
                 dataset=subds, path=None, source=clone_url,
                 recursive=recursive, add_data_to_git=False)
         except GitCommandError:
+            # TODO: failed clone might leave something behind that causes the
+            # next attempt to fail as well. Implement safe way to remove clone
+            # attempt left-overs.
             continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
         try:
@@ -104,7 +107,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             #submodule.update(init=True)
             ds.repo._git_custom_command(
                 '', ['git', 'submodule', 'update', '--init', sm_path],
-                expect_stderr=True, expect_fail=True)
+                expect_fail=True)
         except CommandError:
             # if the submodule is brand-new and previously unknown the above
             # will fail -> simply add it\
