@@ -21,10 +21,20 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
-from datalad.interface.POC_helpers import get_module_parser
 from datalad.utils import getpwd
 
 lgr = logging.getLogger('datalad.distribution.modify_subhandle_urls')
+
+
+def get_module_parser(repo):
+
+    from git import GitConfigParser
+    gitmodule_path = opj(repo.path, ".gitmodules")
+    # TODO: What does constructor of GitConfigParser, in case file doesn't exist?
+    #if exists(gitmodule_path):
+    parser = GitConfigParser(gitmodule_path)
+    parser.read()
+    return parser
 
 
 class ModifySubhandleURLs(Interface):

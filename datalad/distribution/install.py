@@ -32,7 +32,6 @@ from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows
-from datalad.interface.POC_helpers import get_git_dir
 
 
 lgr = logging.getLogger('datalad.distribution.install')
@@ -41,6 +40,39 @@ lgr = logging.getLogger('datalad.distribution.install')
 def _with_sep(path):
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
+
+
+def get_git_dir(path):
+    """figure out a repo's gitdir
+
+    '.git' might be a  directory, a symlink or a file
+
+    Parameter
+    ---------
+    path: str
+      currently expected to be the repos base dir
+
+    Returns
+    -------
+    str
+      relative path to the repo's git dir; So, default would be ".git"
+    """
+
+    from os.path import isfile
+    from os import readlink
+
+    dot_git = opj(path, ".git")
+    if not exists(dot_git):
+        raise RuntimeError("Missing .git in %s." % path)
+    elif islink(dot_git):
+        git_dir = readlink(dot_git)
+    elif isdir(dot_git):
+        git_dir = ".git"
+    elif isfile(dot_git):
+        with open(dot_git) as f:
+            git_dir = f.readline().lstrip("gitdir:").strip()
+
+    return git_dir
 
 
 def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):

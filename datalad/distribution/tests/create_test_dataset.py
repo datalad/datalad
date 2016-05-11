@@ -34,7 +34,6 @@ from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows
-from datalad.interface.POC_helpers import get_git_dir
 
 lgr = logging.getLogger('datalad.distribution.tests')
 
