@@ -15,6 +15,7 @@ from os.path import join as opj, abspath
 from ..dataset import Dataset
 from datalad.api import install
 from datalad.distribution.install import get_containing_subdataset
+from datalad.distribution.install import _installationpath_from_url
 from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileInGitError
@@ -38,6 +39,18 @@ from datalad.tests.utils import swallow_outputs
 
 def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install)
+
+
+def test_installationpath_from_url():
+    for p in ('lastbit',
+              'lastbit/',
+              '/lastbit',
+              'lastbit.git',
+              'lastbit.git/',
+              'http://example.com/lastbit',
+              'http://example.com/lastbit.git',
+              ):
+        assert_equal(_installationpath_from_url(p), 'lastbit')
 
 
 @with_tree(tree={'test.txt': 'whatever'})
@@ -153,6 +166,16 @@ def test_install_dataset_from(url, path):
     ok_(ds.is_installed())
     ok_clean_git(path, annex=False)
 
+@with_testrepos(flavors=['local-url', 'network', 'local'])
+@with_tempfile
+def test_install_dataset_from_just_source(url, path):
+
+    with chpwd(path, mkdir=True):
+        ds = install(source=url)
+
+    ok_startswith(ds.path, path)
+    ok_(ds.is_installed())
+    ok_clean_git(ds.path, annex=False)
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile

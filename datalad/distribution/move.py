@@ -17,7 +17,6 @@ from os import curdir
 from os.path import join as opj, abspath, expanduser, expandvars, exists
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.cmdline.helpers import POC_get_root_handle
 from datalad.interface.base import Interface
 
 
