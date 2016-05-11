@@ -153,6 +153,16 @@ def test_install_dataset_from(url, path):
     ok_(ds.is_installed())
     ok_clean_git(path, annex=False)
 
+@with_testrepos(flavors=['local-url', 'network', 'local'])
+@with_tempfile
+def test_install_dataset_from_just_source(url, path):
+
+    with chpwd(path, mkdir=True):
+        ds = install(source=url)
+
+    ok_startswith(ds.path, path)
+    ok_(ds.is_installed())
+    ok_clean_git(ds.path, annex=False)
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile

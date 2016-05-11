@@ -215,7 +215,10 @@ class Install(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
-            doc="path/name of the installation target",
+            doc="""path/name of the installation target. If no `dataset` and
+            `source` are provided, this is interpreted as a `source` URL of
+            a dataset and a destination path will be derived from the URL
+            similar to 'git clone'.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
@@ -241,25 +244,28 @@ class Install(Interface):
     @datasetmethod(name='install')
     def __call__(dataset=None, path=None, source=None, recursive=False,
                  add_data_to_git=False):
+        lgr.debug("Installation attempt started")
         # shortcut
         ds = dataset
 
         if ds is not None and not isinstance(ds, Dataset):
             ds = Dataset(ds)
 
-        if not path:
-            # TODO:  should probably assess if cwd is the dataset
-            if ds is None:
-                # no dataset, no target location, nothing to do
-                raise InsufficientArgumentsError(
-                    "insufficient information for installation (needs at "
-                    "least a dataset or an installation path")
-        elif isinstance(path, list):
-            return [Install.__call__(
-                    dataset=ds,
-                    path=p,
-                    source=source,
-                    recursive=recursive) for p in path]
+        if isinstance(path, list):
+            if not len(path):
+                # normalize value to expected state when nothing was provided
+                path = None
+            elif len(path) == 1:
+                # we can simply continue with the function as called with a
+                # single argument
+                path = path[0]
+            else:
+                lgr.debug("Installation of multiple targets was requested: {0}".format(path))
+                return [Install.__call__(
+                        dataset=ds,
+                        path=p,
+                        source=source,
+                        recursive=recursive) for p in path]
 
         # resolve the target location against the provided dataset
         if path is not None:
@@ -270,13 +276,37 @@ class Install(Interface):
         # if we have no dataset given, figure out which one we need to operate
         # on, based on the resolved target location (that is now guaranteed to
         # be specified
-        if ds is None:
+        if ds is None and path is not None:
             # try to find a dataset at or above the installation target
             dspath = GitRepo.get_toppath(abspath(path))
             if dspath is None:
                 # no top-level dataset found, use path as such
                 dspath = path
             ds = Dataset(dspath)
+
+        if ds is None and path is None and source is not None:
+            # we got nothing but a source. do something similar to git clone
+            # and derive the path from the source and continue
+            lgr.debug(
+                "Neither dataset not target installation path provided. "
+                "Assuming installation of a remote dataset. "
+                "Deriving destination path from given source {0}".format(
+                    source))
+            dspath = source.rstrip('/').split('/')
+            if dspath[-1] == '.git':
+                dspath = dspath[-2]
+            else:
+                dspath = dspath[-1]
+            if dspath.endswith('.git'):
+                dspath = dspath[:-4]
+            ds = Dataset(dspath)
+
+        if not path and ds is None:
+                # no dataset, no target location, nothing to do
+                raise InsufficientArgumentsError(
+                    "insufficient information for installation (needs at "
+                    "least a dataset or an installation path")
+
         assert(ds is not None)
 
         lgr.debug("Resolved target dataset for installation: {0}".format(ds))
@@ -293,6 +323,7 @@ class Install(Interface):
                     source = '{0}/.git'.format(source.rstrip('/'))
                     vcs = Install._get_new_vcs(ds, source, vcs)
                 else:
+                    lgr.debug("Unable to establish repository instance at: {0}".format(ds.path))
                     raise
 
         assert(ds.repo)  # is automagically re-evaluated in the .repo property
