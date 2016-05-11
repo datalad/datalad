@@ -88,7 +88,10 @@ def get_git_dir(path):
         git_dir = ".git"
     elif isfile(dot_git):
         with open(dot_git) as f:
-            git_dir = f.readline().lstrip("gitdir:").strip()
+            git_dir = f.readline()
+            if git_dir.startswith("gitdir:"):
+                git_dir = git_dir[7:]
+            git_dir = git_dir.strip()
 
     return git_dir
 
