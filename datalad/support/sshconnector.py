@@ -16,17 +16,22 @@ git calls to a ssh remote without the need to reauthenticate.
 import logging
 from os import geteuid  # Linux specific import
 from subprocess import Popen
+from shlex import split as sh_split
 
 from six.moves.urllib.parse import urlparse
 
 from datalad.support.gitrepo import GitRepo
 from datalad.utils import not_supported_on_windows
+from datalad.utils import on_windows
 from datalad.utils import assure_dir
+from datalad.utils import auto_repr
 from datalad.cmd import Runner
+from datalad.support.exceptions import CommandError
 
-lgr = logging.getLogger('datalad.sshconnector')
+lgr = logging.getLogger('datalad.ssh')
 
 
+@auto_repr
 class SSHConnector(object):
     """Representation of a ssh connection.
     """
@@ -35,13 +40,26 @@ class SSHConnector(object):
         not_supported_on_windows("TODO: Make SSHConnector an abstraction to "
                                  "interface platform dependent SSH")
         self.runner = Runner()
+        self.host = None
+        self.ctrl_master = None
+        self.pwd = None
 
         if url:
-            self.connect(url)
+            self.open(url)
         if repo:
-            self.use_with_git(repo)
+            self.use_with_repo(repo)
 
-    def connect(self, url=None, dir=None):
+    def open(self, url=None, dir_=None):
+        """
+
+        Parameters
+        ----------
+        url: str
+          URL to connect to
+        dir_:
+          set remote working directory
+        """
+        # TODO: What if already connected? Close and open (url) or just fail?
 
         # parse url:
         parsed_target = urlparse(url)
@@ -50,7 +68,7 @@ class SSHConnector(object):
         self.host = parsed_target.netloc
         if not self.host:
             raise ValueError("Malformed URL (missing host): %s" % url)
-        if dir is None:
+        if dir_ is None:
             self.pwd = parsed_target.path # TODO: Needed here? if parsed_target.path else '.'
 
         # setup SSH Connection:
@@ -68,24 +86,59 @@ class SSHConnector(object):
         proc = Popen(cmd, shell=True)
         proc.communicate(input="\n")  # why the f.. this is necessary?
 
-        # TODO: test for pwd; --force creates it; cd to pwd
+        # TODO: 'force' to create it?
+        if self.pwd:
+            try:
+                self.run_on_remote(['ls', self.pwd])
+            except CommandError as e:
+                if "No such file or directory" in e.stderr \
+                        and self.pwd in e.stderr:
+
+                    raise ValueError("%s doesn't exist on remote.")
+
+                raise  # unexpected error
+
+            self.run_on_remote(['cd', self.pwd])
+
+    def close(self):
+        # stop controlmaster:
+        cmd = ["ssh", "-O", "stop", "-S", self.ctrl_master, self.host]
+        self.runner.run(cmd, expect_stderr=True)
 
     def use_with_repo(self, repo=None):
+        """Let git use this connection for `repo`
+
+        Parameters
+        ----------
+        repo: GitRepo
+
+        """
         if not isinstance(repo, GitRepo):
             raise ValueError("Don't know how to handle repo of type '%s'" %
                              type(repo))
         from pkg_resources import resource_filename
-        repo.cmd_call_wrapper.env["GIT_SSH"] = resource_filename('datalad',
-                                                    'resources/git_ssh.sh')
+        repo.cmd_call_wrapper.env["GIT_SSH"] = \
+            resource_filename('datalad', 'resources/git_ssh.sh')
+
         # TODO: How to deal with gitpython?
-        # TODO: Maybe make it a method of GitRepo instead
+        # TODO: Maybe make it a method of GitRepo instead (GitRepo.use_ssh)
 
     def run_on_remote(self, cmd):
+        """
+
+        Parameters
+        ----------
+        cmd: list or str
+          command to run on the remote
+
+        Returns
+        -------
+        tuple
+          stdout, stderr
+        """
         ssh_cmd = ["ssh", "-S", self.ctrl_master, self.host]
-        if isinstance(cmd, list):
-            command = ssh_cmd + cmd
-        else:
-            # what does shlex correctly handle?
-            pass
-        self.runner.run(command)
+        ssh_cmd += cmd if isinstance(cmd, list) \
+            else sh_split(cmd, posix=not on_windows)
+        # TODO: expect parameters
+        return self.runner.run(ssh_cmd, expect_fail=True, expect_stderr=True)
 
