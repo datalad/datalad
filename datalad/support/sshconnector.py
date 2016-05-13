@@ -20,6 +20,7 @@ from shlex import split as sh_split
 
 from six.moves.urllib.parse import urlparse
 
+from datalad.support.exceptions import CommandError
 from datalad.utils import not_supported_on_windows
 from datalad.utils import on_windows
 from datalad.utils import assure_dir
@@ -42,13 +43,13 @@ class SSHConnection(object):
 
         host: str
         """
-        self.runner = None
+        self._runner = None
 
         # TODO: This may actually also contain "user@host".
         #       So, better name instead of 'host'?
         self.host = host
         self.ctrl_path = ctrl_path
-        self.cmd_prefix = ["ssh", "-S", self.ctrl_master, self.host]
+        self.cmd_prefix = ["ssh", "-S", self.ctrl_path, self.host]
 
     def __del__(self):
         self.close()
@@ -69,9 +70,6 @@ class SSHConnection(object):
         # TODO: Do we need to check for the connection to be open or just rely
         # on possible ssh failing?
 
-        if self.runner is None:
-            self.runner = Runner()
-
         ssh_cmd = self.cmd_prefix
         ssh_cmd += cmd if isinstance(cmd, list) \
             else sh_split(cmd, posix=not on_windows)
@@ -80,6 +78,12 @@ class SSHConnection(object):
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
         return self.runner.run(ssh_cmd, expect_fail=True, expect_stderr=True)
+
+    @property
+    def runner(self):
+        if self._runner is None:
+            self._runner = Runner()
+        return self._runner
 
     def open(self):
         # TODO: What if already opened? Check for ssh behaviour.
@@ -95,8 +99,14 @@ class SSHConnection(object):
     def close(self):
         # stop controlmaster:
         cmd = ["ssh", "-O", "stop", "-S", self.ctrl_path, self.host]
-        self.runner.run(cmd, expect_stderr=True)
-
+        try:
+            self.runner.run(cmd, expect_stderr=True, expect_fail=True)
+        except CommandError as e:
+            if "No such file or directory" in e.stderr:
+                # nothing to clean up
+                pass
+            else:
+                raise
 
 @auto_repr
 class SSHManager(object):
