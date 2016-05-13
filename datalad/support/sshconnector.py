@@ -32,100 +32,31 @@ lgr = logging.getLogger('datalad.ssh')
 
 
 @auto_repr
-class SSHConnector(object):
-    """Representation of a ssh connection.
+class SSHConnection(object):
+    """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, url=None, repo=None):
-        not_supported_on_windows("TODO: Make SSHConnector an abstraction to "
-                                 "interface platform dependent SSH")
-        self.runner = Runner()
-        self.host = None
-        self.ctrl_master = None
-        self.pwd = None
-
-        if url:
-            self.open(url)
-        if repo:
-            self.use_with_repo(repo)
-
-    def open(self, url=None, dir_=None):
+    def __init__(self, ctrl_path, host):
         """
-
         Parameters
         ----------
-        url: str
-          URL to connect to
-        dir_:
-          set remote working directory
+        ctrl_path: str
+
+        host: str
         """
-        # TODO: What if already connected? Close and open (url) or just fail?
+        self.runner = None
 
-        # parse url:
-        parsed_target = urlparse(url)
-        if parsed_target.scheme != 'ssh':
-            raise ValueError("Not an SSH URL: %s" % url)
-        self.host = parsed_target.netloc
-        if not self.host:
-            raise ValueError("Malformed URL (missing host): %s" % url)
-        if dir_ is None:
-            self.pwd = parsed_target.path # TODO: Needed here? if parsed_target.path else '.'
+        # TODO: This may actually also contain "user@host".
+        #       So, better name instead of 'host'?
+        self.host = host
+        self.ctrl_path = ctrl_path
+        self.cmd_prefix = ["ssh", "-S", self.ctrl_master, self.host]
 
-        # setup SSH Connection:
-        # - build control master:
-        socket_dir = "/var/run/user/%s/datalad" % geteuid()
-        assure_dir(socket_dir)
-        self.ctrl_master = "%s/%s" % (socket_dir, self.host)
-        if parsed_target.port:
-            self.ctrl_master += ":%s" % parsed_target.port
+    def __del__(self):
+        self.close()
 
-        # - start control master:
-        cmd = "ssh -o ControlMaster=yes -o \"ControlPath=%s\" " \
-              "-o ControlPersist=yes %s exit" % (self.ctrl_master, self.host)
-        lgr.debug("Try starting control master by calling:\n%s" % cmd)
-        proc = Popen(cmd, shell=True)
-        proc.communicate(input="\n")  # why the f.. this is necessary?
-
-        # TODO: 'force' to create it?
-        if self.pwd:
-            try:
-                self.run_on_remote(['ls', self.pwd])
-            except CommandError as e:
-                if "No such file or directory" in e.stderr \
-                        and self.pwd in e.stderr:
-
-                    raise ValueError("%s doesn't exist on remote.")
-
-                raise  # unexpected error
-
-            self.run_on_remote(['cd', self.pwd])
-
-    def close(self):
-        # stop controlmaster:
-        cmd = ["ssh", "-O", "stop", "-S", self.ctrl_master, self.host]
-        self.runner.run(cmd, expect_stderr=True)
-
-    def use_with_repo(self, repo=None):
-        """Let git use this connection for `repo`
-
-        Parameters
-        ----------
-        repo: GitRepo
-
+    def __call__(self, cmd):
         """
-        if not isinstance(repo, GitRepo):
-            raise ValueError("Don't know how to handle repo of type '%s'" %
-                             type(repo))
-        from pkg_resources import resource_filename
-        repo.cmd_call_wrapper.env["GIT_SSH"] = \
-            resource_filename('datalad', 'resources/git_ssh.sh')
-
-        # TODO: How to deal with gitpython?
-        # TODO: Maybe make it a method of GitRepo instead (GitRepo.use_ssh)
-
-    def run_on_remote(self, cmd):
-        """
-
         Parameters
         ----------
         cmd: list or str
@@ -136,9 +67,87 @@ class SSHConnector(object):
         tuple
           stdout, stderr
         """
-        ssh_cmd = ["ssh", "-S", self.ctrl_master, self.host]
+
+        # TODO: Do we need to check for the connection to be open or just rely
+        # on possible ssh failing?
+
+        if self.runner is None:
+            self.runner = Runner()
+
+        ssh_cmd = self.cmd_prefix
         ssh_cmd += cmd if isinstance(cmd, list) \
             else sh_split(cmd, posix=not on_windows)
-        # TODO: expect parameters
+            # windows check currently not needed, but keep it as a reminder
+
+        # TODO: pass expect parameters from above?
+        # Hard to explain to toplevel users ... So for now, just set True
         return self.runner.run(ssh_cmd, expect_fail=True, expect_stderr=True)
 
+    def open(self):
+        # TODO: What if already opened? Check for ssh behaviour.
+        # start control master:
+        cmd = "ssh -o ControlMaster=yes -o \"ControlPath=%s\" " \
+              "-o ControlPersist=yes %s exit" % (self.ctrl_path, self.host)
+        lgr.debug("Try starting control master by calling:\n%s" % cmd)
+        proc = Popen(cmd, shell=True)
+        proc.communicate(input="\n")  # why the f.. this is necessary?
+
+    # TODO: Probably not needed as an explicit call.
+    # Destructor should be sufficient.
+    def close(self):
+        # stop controlmaster:
+        cmd = ["ssh", "-O", "stop", "-S", self.ctrl_path, self.host]
+        self.runner.run(cmd, expect_stderr=True)
+
+
+@auto_repr
+class SSHManager(object):
+    """Keeps ssh connections to share. Serves singleton representation
+    per connection.
+    """
+
+    def __init__(self):
+        not_supported_on_windows("TODO: Make this an abstraction to "
+                                 "interface platform dependent SSH")
+
+        self._connections = dict()
+        self.socket_dir = "/var/run/user/%s/datalad" % geteuid()
+        assure_dir(self.socket_dir)
+
+    def get_connection(self, url):
+        """
+
+        Parameters
+        ----------
+        url: str
+          ssh url
+
+        Returns
+        -------
+        SSHConnection
+        """
+
+        # parse url:
+        parsed_target = urlparse(url)
+
+        # Note: The following is due to urlparse, not ssh itself!
+        # We probably should find a nice way to deal with anything,
+        # ssh can handle.
+        if parsed_target.scheme != 'ssh':
+            raise ValueError("Not an SSH URL: %s" % url)
+
+        if not parsed_target.netloc:
+            raise ValueError("Malformed URL (missing host): %s" % url)
+
+        # determine control master:
+        ctrl_path = "%s/%s" % (self.socket_dir, parsed_target.netloc)
+        if parsed_target.port:
+            ctrl_path += ":%s" % parsed_target.port
+
+        # do we know it already?
+        if ctrl_path in self._connections:
+            return self._connections[ctrl_path]
+        else:
+            c = SSHConnection(ctrl_path, parsed_target.netloc)
+            self._connections[ctrl_path] = c
+            return c
