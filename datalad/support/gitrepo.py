@@ -250,12 +250,14 @@ def _remove_empty_items(list_):
         return list_
     return [file_ for file_ in list_ if file_]
 
+
 def Repo(*args, **kwargs):
     """Factory method around git.Repo to consistently initiate with different backend
     """
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
     return git.Repo(*args, **kwargs)
+
 
 class GitRepo(object):
     """Representation of a git repository
@@ -355,7 +357,6 @@ class GitRepo(object):
         This is done by comparing the base repository path.
         """
         return self.path == obj.path
-
 
     @classmethod
     def get_toppath(cls, path):
@@ -786,6 +787,46 @@ class GitRepo(object):
             return []
         return self.repo.submodules
 
-# TODO add_submodule
-# remove submodule
-# status?
+    # TODO add_submodule
+    # remove submodule
+    # status?
+
+    def use_ssh_controlmaster(self, stop=False):
+        """Causes the repo to (try to) use existing ssh connection(s).
+
+        This is currently done via env variable GIT_SSH and a wrapper script,
+        that looks for a control master, build the same way as datalad's
+        SSHManager does it. Therefore, it doesn't bind the repo to a specific
+        control master, but just the pattern how to find the fitting one
+        (if it exists). This allows for several connections to different remotes
+        to be used.
+
+        Notes
+        -----
+        The behaviour described above leads to the need to set up the needed
+        connections before. This may turn out to be inconvenient.
+
+        Since git 2.3 there additionally is GIT_SSH_COMMAND, which allows to
+        pass options to ssh executable directly and therefore doesn't need a
+        wrapper script.
+
+        Parameters
+        ----------
+        stop: bool
+          if True, stop (trying to) use existing connection(s).
+        """
+
+        if not stop:
+            from pkg_resources import resource_filename
+            git_ssh_wrapper = resource_filename('datalad',
+                                                'resources/git_ssh.sh')
+            # for direct git calls:
+            self.cmd_call_wrapper.env["GIT_SSH"] = git_ssh_wrapper
+            # git python:
+            self.repo.git.update_environment(GIT_SSH=git_ssh_wrapper)
+        else:
+            # for direct git calls:
+            del self.cmd_call_wrapper.env["GIT_SSH"]
+            # git python:
+            self.repo.git.update_environment(GIT_SSH=None)
+

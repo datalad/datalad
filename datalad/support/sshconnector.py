@@ -20,13 +20,11 @@ from shlex import split as sh_split
 
 from six.moves.urllib.parse import urlparse
 
-from datalad.support.gitrepo import GitRepo
 from datalad.utils import not_supported_on_windows
 from datalad.utils import on_windows
 from datalad.utils import assure_dir
 from datalad.utils import auto_repr
 from datalad.cmd import Runner
-from datalad.support.exceptions import CommandError
 
 lgr = logging.getLogger('datalad.ssh')
 
