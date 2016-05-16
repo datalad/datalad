@@ -27,7 +27,7 @@ from ....support.annexrepo import AnnexRepo
 
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_initialize_handle(path, path2):
+def test_initiate_handle(path, path2):
     handle_path = opj(path, 'test')
     datas = list(initiate_handle('template', 'testhandle', path=handle_path)())
     assert_equal(len(datas), 1)

@@ -47,7 +47,7 @@ class HelpAction(argparse.Action):
         # better for help2man
         # For main command -- should be different sections. And since we are in
         # heavy output massaging mode...
-        if "commands for collection" in helpstr.lower():
+        if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
             # tune up usage -- default one is way too heavy
@@ -215,20 +215,14 @@ def get_repo_instance(path=curdir, class_=None):
     from os.path import join as opj, ismount, exists, abspath, expanduser, \
         expandvars, normpath, isabs
     from git.exc import InvalidGitRepositoryError
+    from ..utils import expandpath
     from ..support.gitrepo import GitRepo
     from ..support.annexrepo import AnnexRepo
-    from ..support.handlerepo import HandleRepo
-    from ..support.collectionrepo import CollectionRepo
-    from ..support.exceptions import CollectionBrokenError
 
-    dir_ = abspath(expandvars(expanduser(path)))
+    dir_ = expandpath(path)
     abspath_ = path if isabs(path) else dir_
     if class_ is not None:
-        if class_ == CollectionRepo:
-            type_ = "collection"
-        elif class_ == HandleRepo:
-            type_ = "handle"
-        elif class_ == AnnexRepo:
+        if class_ == AnnexRepo:
             type_ = "annex"
         elif class_ == GitRepo:
             type_ = "git"
@@ -241,16 +235,8 @@ def get_repo_instance(path=curdir, class_=None):
             if class_ is None:
                 # detect repo type:
                 try:
-                    return HandleRepo(dir_, create=False)
-                except RuntimeError as e:
-                    pass
-                try:
                     return AnnexRepo(dir_, create=False)
                 except RuntimeError as e:
-                    pass
-                try:
-                    return CollectionRepo(dir_, create=False)
-                except CollectionBrokenError as e:
                     pass
                 try:
                     return GitRepo(dir_, create=False)
@@ -288,55 +274,3 @@ from appdirs import AppDirs
 from os.path import join as opj
 
 dirs = AppDirs("datalad", "datalad.org")
-
-def get_datalad_master():
-    """Return "master" collection on which all collection operations will be done
-    """
-    # Delay imports to not load rdflib until necessary
-    from ..support.collectionrepo import CollectionRepo
-    from ..consts import DATALAD_COLLECTION_NAME
-
-    # Allow to have "master" collection be specified by environment variable
-    env_path = os.environ.get('DATALAD_COLLECTION_PATH', None)
-    return CollectionRepo(
-        env_path or opj(dirs.user_data_dir, DATALAD_COLLECTION_NAME),
-        create=True
-    )
-
-
-# Notes:
-# ------
-# collection:
-# handle at 'path'? => return Handle/HandleRepo
-#
-# is 'handle' in collection?, get Handle/HandleRepo
-#
-# same for collections
-#   - is_registered?
-#   - get the instance
-#   - get the path/url
-#   - get registered Collections
-#
-# register collection? (remote add (check for duplicates); fetch)
-#
-# "register" handle? (and add metadata to master) => integrate the latter into
-# add_handle (CollectionRepo)
-#
-# get handle's path; list of handles paths => could be done via
-# Handle instances.
-#
-#
-# what to do about addressing the local master itself via its name?
-#  - when is it needed?
-#  - when it should be showed, when it shouldn't?
-#
-#
-# check whether 'handle' is a key ("{collection}/{handle}")
-# or a local path or an url
-
-# Tasks:
-# ------
-#
-# - get a handle by its name or path or url => different type of return value?
-# - (un)register a collection
-# - check what type of repo is at path and return it (see get_repo_instance)

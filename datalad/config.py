@@ -102,6 +102,8 @@ class ConfigManager(SafeConfigParserWithIncludes, object):
         self._load_default = load_default
 
         # now get the setting
+        # TODO: look into loading/interaction with config being lazy or better more efficient...
+        # could cut on startup time a bit.
         self.reload(filenames)
 
     @property

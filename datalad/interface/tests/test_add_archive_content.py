@@ -25,7 +25,9 @@ from ...tests.utils import SkipTest
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
 from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
-from ...utils import chpwd, getpwd
+from ...tests.utils import swallow_logs
+from ...utils import chpwd, getpwd, rmtemp
+from ...utils import find_files
 
 from ...api import add_archive_content, clean
 
@@ -214,17 +216,48 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 test_add_archive_content.tags = ['integration']
 
 
-@assert_cwd_unchanged()
-@with_tree(tree={'1.tar': {'file.txt': 'load',
-                           '1.dat': 'load2'}})
-def test_add_archive_content_tar(repo_path):
-    # To test that .tar gets removed
-    direct = False  # TODO: test on undirect, but too long ATM
-    annex = AnnexRepo(repo_path, create=True, direct=direct)
-    # Let's add first archive to the annex so we could test
-    annex.annex_add('1.tar')
-    annex.commit(msg="added 1.tar")
-    #print annex.path
-    #import pdb; pdb.set_trace()
-    add_archive_content('1.tar', annex=annex, strip_leading_dirs=True, delete=True)
-    assert_false(lexists(opj(repo_path, '1.tar')))
+class TestAddArchiveOptions():
+
+    # few tests bundled with a common setup/teardown to minimize boiler plate
+    @with_tree(tree={'1.tar': {'file.txt': 'load',
+                               '1.dat': 'load2'}},
+               delete=False)
+    def setup(self, repo_path):
+        self.pwd = getpwd()
+        direct = False  # TODO: test on undirect, but too long ATM
+        self.annex = annex = AnnexRepo(repo_path, create=True, direct=direct)
+        # Let's add first archive to the annex so we could test
+        annex.annex_add('1.tar')
+        annex.commit(msg="added 1.tar")
+
+    def teardown(self):
+        assert_equal(self.pwd, getpwd())
+        rmtemp(self.annex.path)
+
+    def test_add_delete(self):
+        # To test that .tar gets removed
+        add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete=True)
+        assert_false(lexists(opj(self.annex.path, '1.tar')))
+
+    def test_add_delete_after_and_drop(self):
+        # To test that .tar gets removed
+        # but that new stuff was added to annex repo.  We know the key since default
+        # backend and content remain the same
+        key1 = 'SHA256E-s5--16d3ad1974655987dd7801d70659990b89bfe7e931a0a358964e64e901761cc0.dat'
+
+        # previous state of things:
+        prev_files = list(find_files('.*', self.annex.path))
+        with assert_raises(Exception), \
+                swallow_logs():
+            self.annex.annex_whereis(key1, key=True, output='full')
+        add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True)
+        assert_equal(prev_files, list(find_files('.*', self.annex.path)))
+        w = self.annex.annex_whereis(key1, key=True, output='full')
+        assert_equal(len(w), 2)  # in archive, and locally since we didn't drop
+
+        # Let's now do the same but also drop content
+        add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete_after=True,
+                            drop_after=True)
+        assert_equal(prev_files, list(find_files('.*', self.annex.path)))
+        w = self.annex.annex_whereis(key1, key=True, output='full')
+        assert_equal(len(w), 1)  # in archive

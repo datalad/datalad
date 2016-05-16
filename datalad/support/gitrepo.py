@@ -13,8 +13,13 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 """
 
 from os import linesep
-from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir
+from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir, abspath
 from os.path import dirname, basename
+from os.path import curdir, pardir, sep
+# shortcuts
+_curdirsep = curdir + sep
+_pardirsep = pardir + sep
+
 import logging
 import shlex
 from six import string_types
@@ -29,6 +34,7 @@ from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
 from ..utils import optional_args, on_windows, getpwd
+from ..utils import swallow_logs
 from ..utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
@@ -50,7 +56,7 @@ default_git_odbt = git.GitCmdObjectDB
 def _normalize_path(base_dir, path):
     """Helper to check paths passed to methods of this class.
 
-    Checks whether `path` is beneath `base_dir` and normalize it.
+    Checks whether `path` is beneath `base_dir` and normalizes it.
     Additionally paths are converted into relative paths with respect to
     `base_dir`, considering PWD in case of relative paths. This
     is intended to be used in repository classes, which means that
@@ -86,10 +92,16 @@ def _normalize_path(base_dir, path):
                                                % path, filename=path)
         else:
             pass
-
-    elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
-        # If we are inside repository, rebuilt relative paths.
-        path = opj(realpath(getpwd()), path)
+    # Executive decision was made to not do this kind of magic!
+    #
+    # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
+    #     # If we are inside repository, rebuilt relative paths.
+    #     path = opj(realpath(getpwd()), path)
+    #
+    # BUT with relative curdir/pardir start it would assume relative to curdir
+    #
+    elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
+         path = opj(realpath(getpwd()), path)
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
@@ -283,7 +295,7 @@ class GitRepo(object):
           or doesn't contain a git repository.
         """
 
-        self.path = normpath(path)
+        self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or Runner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
         #       Includes: What to do in gitrepo class?
@@ -293,12 +305,16 @@ class GitRepo(object):
         #       should be a single instance collecting everything or more
         #       fine grained.
 
-        if url is not None:
+        # TODO: somehow do more extensive checks that url and path don't point to the
+        # same location
+        if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
             try:
+                lgr.debug("Git clone from {0} to {1}".format(url, path))
                 self.cmd_call_wrapper(git.Repo.clone_from, url, path)
+                lgr.debug("Git clone completed")
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
                 # log here but let caller decide what to do
@@ -315,6 +331,7 @@ class GitRepo(object):
 
         if create and not exists(opj(path, '.git')):
             try:
+                lgr.debug("Initialize empty Git repository at {0}".format(path))
                 self.repo = self.cmd_call_wrapper(git.Repo.init, path, True, odbt=default_git_odbt)
             except GitCommandError as e:
                 lgr.error(str(e))
@@ -322,10 +339,11 @@ class GitRepo(object):
         else:
             try:
                 self.repo = self.cmd_call_wrapper(Repo, path)
+                lgr.debug("Using existing Git repository at {0}".format(path))
             except (GitCommandError,
                     NoSuchPathError,
                     InvalidGitRepositoryError) as e:
-                lgr.error(str(e))
+                lgr.error("%s: %s" % (type(e), str(e)))
                 raise
 
     def __repr__(self):
@@ -345,17 +363,20 @@ class GitRepo(object):
 
         If path has symlinks -- they get resolved.
 
-        Returns None if not under git
+        Return None if no parent directory contains a git repository.
         """
         try:
-            toppath, err = Runner().run(
-                ["git", "rev-parse", "--show-toplevel"],
-                cwd=path,
-                log_stdout=True, log_stderr=True,
-                expect_fail=True, expect_stderr=True)
-            return toppath.rstrip('\n\r')
+            with swallow_logs():
+                toppath, err = Runner().run(
+                    ["git", "rev-parse", "--show-toplevel"],
+                    cwd=path,
+                    log_stdout=True, log_stderr=True,
+                    expect_fail=True, expect_stderr=True)
+                return toppath.rstrip('\n\r')
         except CommandError:
             return None
+        except OSError:
+            return GitRepo.get_toppath(dirname(path))
 
     @normalize_paths
     def git_add(self, files):
@@ -591,7 +612,7 @@ class GitRepo(object):
     def _git_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=True, cwd=None, env=None,
-                           shell=None):
+                           shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git commands
@@ -601,7 +622,7 @@ class GitRepo(object):
         Parameters
         ----------
         files: list of files
-        cmd_str: str
+        cmd_str: str or list
             arbitrary command str. `files` is appended to that string.
 
         Returns
@@ -616,7 +637,7 @@ class GitRepo(object):
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell)
+                                  env=env, shell=shell, expect_fail=expect_fail)
 
 # TODO: --------------------------------------------------------------------
 
@@ -657,14 +678,14 @@ class GitRepo(object):
         self._git_custom_command('', 'git fetch %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_get_remote_url(self, name):
+    def git_get_remote_url(self, name, push=False):
         """We need to know, where to clone from, if a remote is
         requested
         """
 
-        out, err = self._git_custom_command(
-            '', 'git config --get remote.%s.url' % name)
-        return out.rstrip(linesep)
+        remote = self.repo.remote(name)
+        return remote.config_reader.get(
+            'pushurl' if push and remote.config_reader.has_option('pushurl') else 'url')
 
     def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
@@ -757,3 +778,14 @@ class GitRepo(object):
         if auto:
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
+
+    def get_submodules(self):
+        """Return a list of git.Submodule instances for all submodules"""
+        # check whether we have anything in the repo. if not go home early
+        if not self.repo.head.is_valid():
+            return []
+        return self.repo.submodules
+
+# TODO add_submodule
+# remove submodule
+# status?

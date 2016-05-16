@@ -11,7 +11,7 @@
 """
 
 import os
-from os.path import join as opj, exists, realpath
+from os.path import join as opj, exists, realpath, curdir, pardir
 
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     eq_, assert_in, assert_false, assert_not_equal
@@ -31,7 +31,7 @@ from .utils import skip_if_no_network
 from .utils import assert_re_in
 from .utils import ok_
 from .utils import SkipTest
-from .utils_testrepos import BasicHandleTestRepo
+from .utils_testrepos import BasicAnnexTestRepo
 
 
 @assert_cwd_unchanged
@@ -176,7 +176,6 @@ def test_GitRepo_get_indexed_files(src, path):
 @assert_cwd_unchanged(ok_to_chdir=True)
 def test_normalize_path(git_path):
 
-    pwd = getpwd()
     gr = GitRepo(git_path)
 
     # cwd is currently outside the repo, so any relative path
@@ -200,22 +199,31 @@ def test_normalize_path(git_path):
     result = _normalize_path(gr.path, opj(git_path, "testfile"))
     eq_(result, "testfile", "_normalize_path() returned %s" % result)
 
-    # now we are inside, so relative paths are relative to cwd and have
-    # to be converted to be relative to annex_path:
-    chpwd(opj(git_path, 'd1', 'd2'))
+    # now we are inside, so
+    # OLD PHILOSOPHY: relative paths are relative to cwd and have
+    # to be converted to be relative to annex_path
+    # NEW PHILOSOPHY: still relative to repo! unless starts with . (curdir) or .. (pardir)
+    with chpwd(opj(git_path, 'd1', 'd2')):
 
-    result = _normalize_path(gr.path, "testfile")
-    eq_(result, opj('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
+        result = _normalize_path(gr.path, "testfile")
+        eq_(result, 'testfile', "_normalize_path() returned %s" % result)
 
-    result = _normalize_path(gr.path, opj('..', 'testfile'))
-    eq_(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
+        # if not joined as directory name but just a prefix to the filename, should
+        # behave correctly
+        for d in (curdir, pardir):
+            result = _normalize_path(gr.path, d + "testfile")
+            eq_(result, d + 'testfile', "_normalize_path() returned %s" % result)
 
-    assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, opj(git_path, '..', 'outside'))
+        result = _normalize_path(gr.path, opj(curdir, "testfile"))
+        eq_(result, opj('d1', 'd2', 'testfile'), "_normalize_path() returned %s" % result)
 
-    result = _normalize_path(gr.path, opj(git_path, 'd1', 'testfile'))
-    eq_(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
+        result = _normalize_path(gr.path, opj(pardir, 'testfile'))
+        eq_(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
-    chpwd(pwd)
+        assert_raises(FileNotInRepositoryError, _normalize_path, gr.path, opj(git_path, '..', 'outside'))
+
+        result = _normalize_path(gr.path, opj(git_path, 'd1', 'testfile'))
+        eq_(result, opj('d1', 'testfile'), "_normalize_path() returned %s" % result)
 
 
 def test_GitRepo_files_decorator():
@@ -472,7 +480,7 @@ def test_GitRepo_get_toppath(repo, tempdir):
     eq_(GitRepo.get_toppath(tempdir), None)
 
 def test_GitRepo_dirty():
-    trepo = BasicHandleTestRepo()
+    trepo = BasicAnnexTestRepo()
     repo = trepo.repo
     # empty at this point -- should not be dirty as well. TODO
     assert_false(repo.dirty)

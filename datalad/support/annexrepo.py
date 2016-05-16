@@ -148,9 +148,12 @@ class AnnexRepo(GitRepo):
             self.annex_fsck()
 
         # Check whether an annex already exists at destination
+        # XXX this doesn't work for a submodule!
         if not exists(opj(self.path, '.git', 'annex')):
             # so either it is not annex at all or just was not yet initialized
-            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())):
+            # TODO: unify/reuse code somewhere else on detecting being annex
+            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())) or \
+                any((b == 'git-annex' for b in self.git_get_branches())):
                 # it is an annex repository which was not initialized yet
                 if create or init:
                     lgr.debug('Annex repository was not yet initialized at %s.'
@@ -428,6 +431,7 @@ class AnnexRepo(GitRepo):
             if e.code == 1:
                 if not exists(opj(self.path, file_)):
                     raise IOError(e.code, "File not found.", file_)
+                # XXX you don't like me because I can be real slow!
                 elif file_ in self.get_indexed_files():
                     # if we got here, the file is present and in git,
                     # but not in the annex
@@ -712,7 +716,7 @@ class AnnexRepo(GitRepo):
         self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
     @normalize_paths
-    def annex_drop(self, files, options=None):
+    def annex_drop(self, files, options=None, key=False):
         """Drops the content of annexed files from this repository.
 
         Drops only if possible with respect to required minimal number of
@@ -724,7 +728,40 @@ class AnnexRepo(GitRepo):
         """
         options = options[:] if options else []
 
-        self._run_annex_command('drop', annex_options=options + files)
+        if key:
+            # we can't drop multiple in 1 line, and there is no --batch yet, so
+            # one at a time
+            options = options + ['--key']
+            for k in files:
+                self._run_annex_command('drop', annex_options=options + [k])
+        else:
+            self._run_annex_command('drop', annex_options=options + files)
+
+
+    def annex_dropkey(self, keys, options=None, batch=False):
+        """Drops the content of annexed files from this repository referenced by keys
+
+        Dangerous: it drops without checking for required minimal number of
+        available copies.
+
+        Parameters
+        ----------
+        keys: list of str, str
+
+        batch: bool, optional
+            initiate or continue with a batched run of annex dropkey, instead of just
+            calling a single git annex dropkey command
+        """
+        keys = [keys] if isinstance(keys, string_types) else keys
+
+        options = options[:] if options else []
+        options += ['--force']
+        if not batch:
+            json_objects = self._run_annex_command_json('dropkey', args=options + keys, expect_stderr=True)
+        else:
+            json_objects = self._batched.get('dropkey', annex_options=options, json=True, path=self.path)(keys)
+        for j in json_objects:
+            assert j.get('success', True)
 
 
     # TODO: a dedicated unit-test
@@ -763,7 +800,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def annex_whereis(self, files, output='uuids'):
+    def annex_whereis(self, files, output='uuids', key=False):
         """Lists repositories that have actual content of file(s).
 
         Parameters
@@ -774,6 +811,8 @@ class AnnexRepo(GitRepo):
             If 'descriptions', a list of remotes descriptions returned is per
             each file. If 'full', per each file a dictionary of all fields
             is returned as returned by annex
+        key: bool, optional
+            Either provided files are actually annex keys
 
         Returns
         -------
@@ -796,8 +835,9 @@ class AnnexRepo(GitRepo):
                   'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
                 }}
         """
+        options = ["--key"] if key else []
 
-        json_objects = self._run_annex_command_json('whereis', args=files)
+        json_objects = self._run_annex_command_json('whereis', args=options + files)
 
         if output in {'descriptions', 'uuids'}:
             return [
@@ -807,7 +847,7 @@ class AnnexRepo(GitRepo):
         elif output == 'full':
             # TODO: we might want to optimize storage since many remotes entries will be the
             # same so we could just reuse them instead of brewing copies
-            return {j['file']: self._whereis_json_to_dict(j)
+            return {j['key' if key else 'file']: self._whereis_json_to_dict(j)
                     for j in json_objects}
         else:
             raise ValueError("Unknown value output=%r. Known are remotes and full" % output)
@@ -907,7 +947,7 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()
         if self.is_direct_mode():
-            self.annex_proxy('git commit -m "%s"' % msg)
+            self.annex_proxy('git commit -m "%s"' % msg, expect_stderr=True)
         else:
             self.git_commit(msg)
 
@@ -974,7 +1014,7 @@ class AnnexRepo(GitRepo):
     def _annex_custom_command(self, files, cmd_str,
                            log_stdout=True, log_stderr=True, log_online=False,
                            expect_stderr=False, cwd=None, env=None,
-                           shell=None):
+                           shell=None, expect_fail=False):
         """Allows for calling arbitrary commands.
 
         Helper for developing purposes, i.e. to quickly implement git-annex
@@ -996,8 +1036,7 @@ class AnnexRepo(GitRepo):
         return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
                                   log_stdout=log_stdout, log_online=log_online,
                                   expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell)
-
+                                  env=env, shell=shell, expect_fail=expect_fail)
 
     @normalize_paths
     def migrate_backend(self, files, backend=None):
@@ -1222,7 +1261,8 @@ class BatchedAnnex(object):
         """Close communication and wait for process to terminate"""
         if self._process:
             process = self._process
-            lgr.debug("Closing stdin of %s and waiting process to finish" % process)
+            lgr.debug("Closing stdin of %s and waiting process to finish", process)
             process.stdin.close()
             process.wait()
             self._process = None
+            lgr.debug("Process %s has finished", process)

@@ -12,7 +12,7 @@ distribution with the convenience of git-annex repositories as a backend."""
 from .version import __version__
 
 from datalad.log import lgr
-
+lgr.debug("Importing the rest of datalad.__init__")
 from .config import ConfigManager
 cfg = ConfigManager()
 

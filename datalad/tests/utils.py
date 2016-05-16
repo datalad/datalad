@@ -85,6 +85,7 @@ def create_tree(path, tree, archives_leading_dir=True):
     if load is a tuple itself -- that would create either a subtree or an archive
     with that content and place it into the tree if name ends with .tar.gz
     """
+    lgr.log(5, "Creating a tree under %s", path)
     if not exists(path):
         os.makedirs(path)
 
@@ -173,7 +174,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
     if annex:
         try:
             # operates on relative to curdir path
-            repo.get_file_key(opj(path, filename))
+            repo.get_file_key(file_repo_path)
             in_annex = True
         except FileNotInAnnexError as e:
             in_annex = False
@@ -188,16 +189,16 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     annex, file_repo_path, filename, path, repo = _prep_file_under_git(path, filename)
     if content is None:
         content = ""
-    with open(opj(path, filename), 'w') as f_:
+    with open(opj(repo.path, file_repo_path), 'w') as f_:
         f_.write(content)
 
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add_to_annex(filename)
+        repo.add_to_annex(file_repo_path)
     else:
-        repo.git_add(filename)
-    ok_file_under_git(path, filename, annexed)
+        repo.git_add(file_repo_path)
+    ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 
 def _prep_file_under_git(path, filename):
@@ -327,7 +328,7 @@ def ok_file_has_content(path, content):
 #
 
 @optional_args
-def with_tree(t, tree=None, archives_leading_dir=True, **tkwargs):
+def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
@@ -337,7 +338,8 @@ def with_tree(t, tree=None, archives_leading_dir=True, **tkwargs):
         try:
             return t(*(arg + (d,)), **kw)
         finally:
-            rmtemp(d)
+            if delete:
+                rmtemp(d)
     return newfunc
 
 
@@ -451,7 +453,7 @@ def with_tempfile(t, content=None, **tkwargs):
         filename = realpath(filename)
 
         if content:
-            with open(filename, 'w' + 'b' if isinstance(content, binary_type) else '') as f:
+            with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
                 f.write(content)
         if __debug__:
             lgr.debug('Running %s with temporary filename %s',
@@ -530,9 +532,8 @@ if not on_windows:
 else:
     local_testrepo_flavors = ['network-clone']
 
-from .utils_testrepos import BasicAnnexTestRepo, BasicHandleTestRepo, \
-    BasicGitTestRepo, MetadataPTHandleTestRepo, BasicCollectionTestRepo, \
-    CollectionTestRepo
+from .utils_testrepos import BasicAnnexTestRepo, BasicGitTestRepo, \
+    SubmoduleDataset, NestedDataset, InnerSubmodule
 
 _TESTREPOS = None
 
@@ -542,39 +543,39 @@ def _get_testrepos_uris(regex, flavors):
     # TODO: just absorb all this lazy construction within some class
     if not _TESTREPOS:
         _basic_annex_test_repo = BasicAnnexTestRepo()
-        _basic_handle_test_repo = BasicHandleTestRepo()
-        _basic_collection_test_repo = BasicCollectionTestRepo()
         _basic_git_test_repo = BasicGitTestRepo()
-        _md_pt_handle_test_repo = MetadataPTHandleTestRepo()
-        _collection_test_repo = CollectionTestRepo()
+        _submodule_annex_test_repo = SubmoduleDataset()
+        _nested_submodule_annex_test_repo = NestedDataset()
+        _inner_submodule_annex_test_repo = InnerSubmodule()
         _TESTREPOS = {'basic_annex':
                         {'network': 'git://github.com/datalad/testrepo--basic--r1',
                          'local': _basic_annex_test_repo.path,
                          'local-url': _basic_annex_test_repo.url},
-                      'basic_annex_handle':
-                        {'local': _basic_handle_test_repo.path,
-                         'local-url': _basic_handle_test_repo.url},
                       'basic_git':
                         {'local': _basic_git_test_repo.path,
                          'local-url': _basic_git_test_repo.url},
-                      'basic_git_collection':
-                        {'local': _basic_collection_test_repo.path,
-                         'local-url': _basic_collection_test_repo.url},
-                      'meta_pt_annex_handle':
-                        {'local': _md_pt_handle_test_repo.path,
-                         'local-url': _md_pt_handle_test_repo.url},
-                      'collection':
-                        {'local': _collection_test_repo.path,
-                         'local-url': _collection_test_repo.url}}
+                      'submodule_annex':
+                        {'local': _submodule_annex_test_repo.path,
+                         'local-url': _submodule_annex_test_repo.url},
+                      'nested_submodule_annex':
+                        {'local': _nested_submodule_annex_test_repo.path,
+                         'local-url': _nested_submodule_annex_test_repo.url},
+                      # TODO: append 'annex' to the name:
+                      # Currently doesn't work with some annex tests, despite
+                      # working manually. So, figure out how the tests' setup
+                      # messes things up with this one.
+                      'inner_submodule':
+                        {'local': _inner_submodule_annex_test_repo.path,
+                         'local-url': _inner_submodule_annex_test_repo.url}
+                      }
         # assure that now we do have those test repos created -- delayed
         # their creation until actually used
         if not on_windows:
             _basic_annex_test_repo.create()
-            _basic_handle_test_repo.create()
-            _basic_collection_test_repo.create()
             _basic_git_test_repo.create()
-            _md_pt_handle_test_repo.create()
-            _collection_test_repo.create()
+            _submodule_annex_test_repo.create()
+            _nested_submodule_annex_test_repo.create()
+            _inner_submodule_annex_test_repo.create()
     uris = []
     for name, spec in iteritems(_TESTREPOS):
         if not re.match(regex, name):
@@ -821,6 +822,20 @@ def skip_httpretty_on_problematic_pythons(func):
             raise SkipTest("Known to cause trouble due to httpretty bug on this Python")
         return func(*args, **kwargs)
     return newfunc
+
+
+@optional_args
+def with_batch_direct(t):
+    """Helper to run parametric test with possible combinations of batch and direct
+    """
+    @wraps(t)
+    def newfunc():
+        for batch in (False, True):
+            for direct in (False, True) if not on_windows else (True,):
+                yield t, batch, direct
+
+    return newfunc
+
 
 
 # List of most obscure filenames which might or not be supported by different

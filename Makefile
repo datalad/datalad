@@ -42,7 +42,7 @@ manpages: bin
 	# figure out all relevant interface files, fuck yeah Python
 	for api in $$(PYTHONPATH=. python -c "from datalad.interface.base import get_interface_groups; print(' '.join([' '.join([j.__module__.split('.')[-1] for j in i[2]]) for i in get_interface_groups()]))"); do \
 		cmd="$$(echo "$$api" | tr '_' '-')" ; \
-		summary="$$(grep -A 1 'class.*(.*Interface.*)' datalad/interface/$${api}.py | grep -v ':' | grep -v '^--' | sed -e 's/"//g' -e 's/^[ \t]*//;s/[ \t.]*$$//' | tr 'A-Z' 'a-z')" ; \
+		summary="$$(grep -A 1 'class.*(.*Interface.*)' $$(python -c "import inspect; from datalad.api import $${api} as fx; print(inspect.getfile(fx))") | grep -v ':' | grep -v '^--' | sed -e 's/"//g' -e 's/^[ \t]*//;s/[ \t.]*$$//' | tr 'A-Z' 'a-z')" ; \
 		DATALAD_HELP2MAN=1 PYTHONPATH=. help2man --no-discard-stderr \
 			--help-option="--help-np" -N -n "$$summary" \
 				"bin/datalad $${cmd}" > build/man/datalad-$${cmd}.1 ; \
