@@ -16,6 +16,7 @@ import time
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os.path import isdir, islink
+from os.path import basename
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
@@ -442,14 +443,15 @@ class Annexificator(object):
                 # care ATM to register content we can get checksums of
                 # TODO: above without url
                 #  OR  may be we should move all this into annex_addurl_to_file?! and annex_add ?
-                self._ultimatedb.process_file(
-                    filepath,
-                    urls=url,
-                    repos=[self.repo],
-                    special_remotes=None,
-                    checked=True,  # we can get here only if we got the file, so it is checked and valid
-                    valid=True
-                )
+                with self._ultimatedb as db:
+                    file_ = db.process_file(filepath)
+                    file_.add_url(url, filename=basename(fpath),
+                                  # TODO: obtain from the above statusdb?
+                                  #last_modified=,
+                                  #content_type=,
+                                  checked=True, valid=True)
+                # TODO: file_.add_key(out_json['key'])
+                # TODO: file_.add_repo(annex)  # we might even cache/reuse the Annex ORM object here
 
         # file might have been added but really not changed anything (e.g. the same README was generated)
         # TODO:

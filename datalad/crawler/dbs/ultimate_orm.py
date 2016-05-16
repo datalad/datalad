@@ -28,8 +28,6 @@ Probably best positioned outside of the DB...?
 
 from sqlalchemy.ext.declarative import declarative_base
 
-DBTable = declarative_base()
-
 from datalad.utils import auto_repr
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean
@@ -40,7 +38,12 @@ from sqlalchemy import Enum
 from sqlalchemy import ForeignKey
 from sqlalchemy.orm import relationship
 
+from datalad.support.digests import Digester
+
 INVALID_REASONS = ['NA', 'removed', 'changed', 'denied']
+
+
+DBTable = declarative_base()
 
 # XXX not sure when penalty comes due to our many-to-many relationships
 # which might be an additional query etc... depending how/when it is done
@@ -72,6 +75,10 @@ class File(DBTable):
     # running file -z
     content_type_extracted = Column(String(256))
     content_charset_extracted = Column(String(64))
+
+    def get_digests(self):
+        """Return a dictionary with digests stored for this file in the DB"""
+        return {algo: getattr(self, algo) for algo in Digester.DEFAULT_DIGESTS}
 
 
 @auto_repr
@@ -148,18 +155,17 @@ keys_to_repos = Table(
     Column('repo_id', Integer, ForeignKey('repo.id'))
 )
 
-
-@auto_repr
-class Repo(DBTable):
+class AnnexRepo(DBTable):
     """
-    Local annex repositories
+    Base class/structure to track annex repositories -- local or special remotes
     """
     __tablename__ = 'repo'
 
     id = Column(Integer, primary_key=True)
+    type = Column(String(20))
+
     location = Column(String)
     uuid = Column(CHAR(36))
-    bare = Column(Boolean())
 
     last_checked = Column(DateTime)
 
@@ -169,37 +175,49 @@ class Repo(DBTable):
 
     keys = relationship("Key", secondary=keys_to_repos, backref="repos")
 
-
-keys_to_specialremotes = Table(
-    'keys_to_specialremotes', DBTable.metadata,
-    Column('key_id', Integer, ForeignKey('key.id')),
-    Column('specialremote_id', Integer, ForeignKey('specialremote.id'))
-)
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'polymorphic_identity': 'repo',
+        'with_polymorphic': '*'
+    }
 
 
 @auto_repr
-class SpecialRemote(DBTable):
-    """
-    Special annex remotes
-    """
+class LocalRepo(AnnexRepo):
+    """Local annex repositories"""
+
+    __tablename__ = 'localrepo'
+
+    id = Column(Integer, ForeignKey('repo.id'), primary_key=True)
+
+    bare = Column(Boolean())
+
+    __mapper_args__ = {'polymorphic_identity': 'localrepo'}
+
+# keys_to_specialremotes = Table(
+#     'keys_to_specialremotes', DBTable.metadata,
+#     Column('key_id', Integer, ForeignKey('key.id')),
+#     Column('specialremote_id', Integer, ForeignKey('specialremote.id'))
+# )
+
+
+@auto_repr
+class SpecialRemote(AnnexRepo):
+    """Special annex remotes"""
+
     __tablename__ = 'specialremote'
 
-    id = Column(Integer, primary_key=True)
-    location = Column(String)
+    id = Column(Integer, ForeignKey('repo.id'), primary_key=True)
+
     name = Column(String)
-    uuid = Column(CHAR(36))
-    type = Column(String(64))  # unlikely to be longer:  s3, git,
+    remote_type = Column(String(64))  # unlikely to be longer:  s3, git,
     # ??? could options differ among repos for the same special remote?
     options = Column(String())  # actually a dict, so ideally we could use JSON which will be avail in 1.1
                                 # for now will encode using ... smth
 
-    last_checked = Column(DateTime)
+    __mapper_args__ = {'polymorphic_identity': 'specialremote'}
 
-    valid = Column(Boolean)
-    last_invalid = Column(DateTime)
-    invalid_reason = Column(Enum(*INVALID_REASONS))  #  XXX we might want to use fancy Enum class backported to 2.x?
-
-    keys = relationship("Key", secondary=keys_to_specialremotes, backref="specialremotes")
+#    keys = relationship("Key", secondary=keys_to_specialremotes, backref="specialremotes")
 
 
 # TODO?  some kind of "transactions" DB which we possibly purge from time to time???
