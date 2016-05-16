@@ -10,12 +10,10 @@
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.engine.reflection import Inspector
-from sqlalchemy import or_
 
 from ...support.digests import Digester
 
@@ -23,14 +21,21 @@ import logging
 from logging import getLogger
 lgr = getLogger('datalad.crawler.dbs.ultimate')
 
-LEN_TO_DIGEST = {
+# Terminology used through out this module
+#  digest is an  algo: checksum  pair
+#  checked -- checked to exist
+#  valid -- validated to contain promised content.  So 'valid' but 'last_validated' in DB
+
+# Assuming that we are dealing always with hex representations of the digests, which could
+# be more concisely (twice shorter) represented in actual binary
+LEN_TO_ALGO = {
     32: 'md5',
     40: 'sha1',
     64: 'sha256',
     128: 'sha512'
 }
-KNOWN_DIGESTS = set(LEN_TO_DIGEST.values())
-DEFAULT_DIGEST = "sha256"
+KNOWN_ALGO = set(LEN_TO_ALGO.values())
+DEFAULT_ALGO = "sha256"
 
 
 class HashCollisionError(ValueError):
@@ -38,26 +43,34 @@ class HashCollisionError(ValueError):
     pass
 
 
+def _get_digest_value(checksum=None, **digest):
+    """Just a helper so we could simply provide a value or specify which algorithm
+
+    Returns
+    -------
+    dict:
+      1 element dictionary {digest: value}
+    """
+    if digest:
+        if len(digest) > 1 or (digest.keys()[0] not in KNOWN_ALGO) or checksum:
+            raise ValueError(
+                "You must either specify checksum= or explicitly "
+                "one of known digests %s" % KNOWN_ALGO)
+    else:
+        try:
+            digest = {LEN_TO_ALGO[len(checksum)]: checksum}
+        except:
+            raise ValueError("Checksum %s of len %d has no known digest algorithm"
+                             % (checksum, len(checksum)))
+            # may be at some point we would like to find one based on the leading
+            # few characters of the checksum but not atm
+    return digest
+
+
 class UltimateDB(object):
     """Database collating urls for the content across all handles
 
-    Schema: TODO, but needs for sure
-
-
-    - entry: checksums (MD5, SHA1, SHA256, SHA512), size
-    - entry ->> URL (only "public" or internal as for content from archives, or that separate table?)
-      where for each URL store
-        - STR  url
-        - DATE first_checked
-        - DATE first_verified
-        - DATE last_checked (if accessible online)
-        - DATE last_verified (when verified to contain the content according to the checksums)
-        - BOOL valid (if verification fails, mark as not valid, still can have last_verified)
-        - DATE last_invalid (date of last check to remain invalid)
-        - INT8 invalid_reason : removed, changed, forbidden?
-        -? datalad_internal (e.g. for archives) or may be
-        -? url_schema -- then we could easily select out datalad-archives:// later on,
-           but it would duplicate information in url, so consistency burden
+    Schema: below via sqlalchemy
 
         or should there be some kind of separate checking/validation transaction log table(s),
         so we could have full "history"
@@ -86,12 +99,33 @@ class UltimateDB(object):
 
     """
 
-    __metaclass__ = ABCMeta
+    # __metaclass__ = ABCMeta
 
-    def __init__(self, digester=None):
-        self._digester = digester or Digester(list(KNOWN_DIGESTS))
+    # XXX should become a singleton?  so we could access the same DB from e.g.
+    # nodes.Annex and add_archive_content
+
+    def __init__(self, digester=None, auto_connect=False):
+        self._digester = digester or Digester(list(KNOWN_ALGO))
         self._session = None
-        self.connect()
+        if auto_connect:
+            self.connect()
+
+    # XXX or should this be reserved for checksums?
+    #  probably so since __getitem__ operates on checksums -- TODO
+    def __contains__(self, url):
+        return self.has_file_with_url(url)
+
+    #@abstractmethod
+    def __getitem__(self, checksum=None):
+        return self.get_urls_for_digest(checksum)
+
+    @staticmethod
+    def _initiate_db(engine):
+        lgr.info("Initiating Ultimate DB tables")
+        return DBTable.metadata.create_all(engine)
+
+    def _handle_collision(self, digest):
+        raise HashCollisionError("??? multiple entries for %s" % str(digest))
 
     def connect(self):
         # TODO: config.crawler.db stuff
@@ -109,41 +143,40 @@ class UltimateDB(object):
 
         self._session = Session(bind=engine)
 
-    @staticmethod
-    def _initiate_db(engine):
-        lgr.info("Initiating Ultimate DB tables")
-        return DBTable.metadata.create_all(engine)
-
-    def __contains__(self, url):
-        return self.knows_file_url(url)
-
-    def knows_file_url(self, url):
+    def has_file_with_url(self, url):
         """Return True if DB knows about this URL (as associated with a file)"""
-        return self._session.query(URL).filter_by(url=url).first() is not None
+        return self._session.query(URL.id).filter_by(url=url).first() is not None
 
     def has_file_with_digests(self, **digests):
-        assert set(digests) == KNOWN_DIGESTS, "Provide all digests for a file of interest"
+        # XXX may be relax allowing for arbitrary set of digests or just a checksum being provided
+        assert set(digests) == KNOWN_ALGO, "Provide all digests for a file of interest"
         # search by default one
         try:
-            digest = {DEFAULT_DIGEST: digests[DEFAULT_DIGEST]}
-            file = self._session.query(File).filter_by(**digest).one()
+            digest = {DEFAULT_ALGO: digests[DEFAULT_ALGO]}
+            file_ = self._session.query(File).filter_by(**digest).one()
         except NoResultFound:
             return False
         except MultipleResultsFound:
-            raise HashCollisionError("??? multiple entries for %s" % str(digest))
+            return self._handle_collision(digest)
 
         # otherwise check if other digests correspond
         for algo, checksum in digests.items():
-            if getattr(file, algo) != checksum:
+            if getattr(file_, algo) != checksum:
                 raise HashCollisionError(
                     "%s %s != %s.  Full entries: %s, %s"
-                    % (algo, getattr(file, algo), checksum, digests, file)
+                    % (algo, getattr(file_, algo), checksum, digests, file_)
                 )
         return True
 
-    #@abstractmethod
-    def __getitem__(self, checksum=None):
-        return self.get_urls_for_digest(checksum)
+    def has_file_with_digest(self, *args, **kwargs):
+        # cheat/reuse for now
+        try:
+            # underlying function returns
+            return self.get_urls_for_digest(*args, **kwargs) is not None
+        except HashCollisionError:
+            raise  # just reraise for now
+        # except:
+        #     return False
 
     def get_urls_for_digest(self, checksum=None, valid_only=True, **digest):
         """Given a checksum, return URLs where it is available from
@@ -156,49 +189,49 @@ class UltimateDB(object):
           Should include only one of the checksums, e.g.
           md5='...'
         """
-        digest = self._get_digest_value(checksum, **digest)
+        # TODO: this logic probably could be common so worth either a _method
+        # or a decorator to get the file requested into the function
+        digest = _get_digest_value(checksum, **digest)
         try:
-            file_ = self._session.query(File).filter_by(**digest).one()
+            file_ = self._session.query(File.urls).filter_by(**digest).one()
         except NoResultFound:
             return None
+        except MultipleResultsFound:
+            return self._handle_collision(digest)
+
         # if .one fails since multiple -- we have a collision!  would be interesting to see
         # so please report if you run into one ;)
         if not file_:
-            raise ValueError("No file found in DB having %s=%s" % (algo, checksum))
+            raise ValueError("No file found in DB having %s" % str(digest))
         urls = file_.urls
         if valid_only:
-            urls = [x for x in urls if x.verified]
+            urls = [u for u in urls if u.valid]
         return urls
 
-    @staticmethod
-    def _get_digest_value(checksum=None, **digest):
-        """Just a helper so we could simply provide a value or specify which algorithm"""
-        if digest:
-            if len(digest) > 1 or (digest.keys()[0] not in KNOWN_DIGESTS) or checksum:
-                raise ValueError(
-                    "You must either specify checksum= or explicitly "
-                    "one of known digests %s" % KNOWN_DIGESTS)
-        else:
-            try:
-                digest = {LEN_TO_DIGEST[len(checksum)]: checksum}
-            except:
-                raise ValueError("Checksum %s of len %d has no known digest algorithm"
-                                 % (checksum, len(checksum)))
-                # may be at some point we would like to find one based on the leading
-                # few characters of the checksum but not atm
-        return digest
+    # XXX would be somewhat duplicate heavy API of process_file ...
+    # may be could be merged/RFed to share functionality
+    def _touch_file(self, file_id, url, checked=True, valid=False): #last_checked=None, last_validated=None):
+        """Set entry for a URL associated with an entry as checked and optionally as valid
 
-    def touch_url(self, entry, url, checked=False, verified=False): #last_checked=None, last_verified=None):
-        """Set entry for a URL associated with an entry as checked and/or verified
+        By default assumes that url was checked to exist but was not valid to
+        contain exact "entry"
 
-        verified: bool, optional
+        Parameters
+        ----------
+        file_id: ????
+          as in DB
+        url : str
+        checked
+        valid: bool, optional
           If True, means checked=True as well
         """
+        if valid:
+            assert(checked)
         # TODO
         pass
 
 
-    def process_file(self, fpath, urls, checked=False, verified=False):
+    def process_file(self, fpath, urls=None, repos=None, special_remotes=None, checked=False, valid=False):
         """For a given file compute its checksums and record that information in DB
 
         Parameters
@@ -207,206 +240,27 @@ class UltimateDB(object):
           Relative or full path to the file
         urls: str or list of str
           URLs to associate with this file
+        repos: list of ...
+          Repos where this file can be found
+        special_remotes: list of ...
+        checked
         """
-        digests = self.get_digests(fpath)
+        digests = self.get_file_digests(fpath)
         # TODO: check if we have entry known already if not, record in DB
-        entry = None
+        try:
+            file_ = self._session.query(File).filter_by(**digests).one()
+        except NoResultFound:
+            # we need to create a new one!
+            file_ = File(**digests)
+            self._session.add(file_)
+            self._session.commit()
         # TODO: check if urls are known for the entry, update accordingly not forgetting about time stamps
-        for url in urls:
-            self.touch_url(entry, url, checked=checked, verified=verified)
+        for url in urls or []:
+            #self.touch_url(entry, url, checked=checked, valid=valid)
+            pass
         return digests
 
-    def get_digests(self, fpath):
+    def get_file_digests(self, fpath):
         """Return digests for a file
         """
         return self._digester(fpath)
-
-"""
-I foresee functionality which would use UltimateDB to carry out various actions.
-Probably best positioned outside of the DB...?
-
-    URLsVerifier -- to check and/or verify URLs to contain the same load
-      This one might want to use Status information for quick verification, which is
-      stored in other DBs... Should we also store size/mtime in UltimateDB?
-      Probably so -- size for each entry, mtime for each URL.  Some URLs might not provide
-      reliable mtime though.
-      But really to verify 100% we would need a full download
-
-    URLsUpdater -- given an annex and db, go through the keys (all? for some files? ...) and update
-      annex information on urls.
-
-    Upon regular end of crawling we would want to use URLsUpdater to extend/update known
-    information
-"""
-
-from sqlalchemy.ext.declarative import declarative_base
-
-DBTable = declarative_base()
-
-from datalad.utils import auto_repr
-
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
-from sqlalchemy import Binary
-# only from upcoming 1.1
-#from sqlalchemy.types import JSON
-from sqlalchemy import Enum
-from sqlalchemy import ForeignKey
-from sqlalchemy.orm import relationship
-
-INVALID_REASONS = ['NA', 'removed', 'changed', 'denied']
-
-# XXX not sure when penalty comes due to our many-to-many relationships
-# which might be an additional query etc... depending how/when it is done
-# (e.g. if at the request of .files attribute value), we might want to exclude
-# those from @auto_repr
-@auto_repr
-class File(DBTable):
-    """
-    Binds together information about the file content -- common digests and size
-    """
-    __tablename__ = 'file'
-
-    id = Column(Integer, primary_key=True)
-    size = Column(Integer)  # in Bytes
-    # Digests
-    md5 = Column(Binary(32), index=True)  # we will more frequently query by md5 and sha256 (Default) so indexing them
-    sha1 = Column(Binary(40))
-    sha256 = Column(Binary(64), index=True, unique=True)  # if we hit collision at this digest -- wooo
-    sha512 = Column(Binary(128), unique=True)
-    # Additional info from output of file
-    content_type = Column(Binary(256))
-    content_charset = Column(Binary(64))
-    # running file -z
-    content_type_extracted = Column(Binary(256))
-    content_charset_extracted = Column(Binary(64))
-
-
-@auto_repr
-class URL(DBTable):
-    """Information about URLs from which a file could be downloaded
-
-    So it is the urls which could be associated with keys in annex.
-    For git repositories serving .git/annex/objects via http (so theoretically there
-    is a URL per each key), just use  `SpecialRemote(location=url, type='git')`
-    """
-    __tablename__ = 'url'
-
-    id = Column(Integer, primary_key=True)
-    url = Column(String)  # TODO: limit size?  probably not since even standard doesn't really... browsers usually handle up to 2048
-    filename = Column(String)  # could differ from the one in URL due to content-disposition etc
-
-    last_modified = Column(DateTime)
-    content_type = Column(Binary(256))  # 127/127   RFC 6838   server might provide different one
-
-    # just checked to be accessible
-    first_checked = Column(DateTime)
-    last_checked = Column(DateTime)
-
-    # checked to contain the target load
-    first_verified = Column(DateTime)
-    last_verified = Column(DateTime)
-
-    valid = Column(Boolean)
-    last_invalid = Column(DateTime)
-    invalid_reason = Column(Enum(*INVALID_REASONS))  #  XXX we might want to use fancy Enum class backported to 2.x?
-
-    file_id = Column(Integer, ForeignKey('file.id'))
-    # link back to the file and also allocate 1-to-many .urls in File
-    file = relationship("File", backref="urls")
-
-
-# Later tables establish tracking over repositories available locally or remotely
-# E.g. a remote git-annex repository containing annex load would be listed as a
-# SpecialRemote type=git with location pointing to e.g. http:// url from where
-# annex load could be fetched if necessary.
-
-from sqlalchemy import Table
-
-files_to_repos = Table(
-    'files_to_repos', DBTable.metadata,
-    Column('file_id', Integer, ForeignKey('file.id')),
-    Column('repo_id', Integer, ForeignKey('repo.id'))
-)
-
-
-@auto_repr
-class Repo(DBTable):
-    """
-    Local annex repositories
-    """
-    __tablename__ = 'repo'
-
-    id = Column(Integer, primary_key=True)
-    location = Column(String)
-    uuid = Column(Binary(36))
-    bare = Column(Boolean())
-
-    last_checked = Column(DateTime)
-
-    valid = Column(Boolean)
-    last_invalid = Column(DateTime)
-    invalid_reason = Column(Enum(*INVALID_REASONS))  #  XXX we might want to use fancy Enum class backported to 2.x?
-
-    files = relationship("File",
-                         secondary=files_to_repos,
-                         backref="repos")
-
-files_to_specialremotes = Table(
-    'files_to_specialremotes', DBTable.metadata,
-    Column('file_id', Integer, ForeignKey('file.id')),
-    Column('specialremote_id', Integer, ForeignKey('specialremote.id'))
-)
-
-
-@auto_repr
-class SpecialRemote(DBTable):
-    """
-    Special annex remotes
-    """
-    __tablename__ = 'specialremote'
-
-    id = Column(Integer, primary_key=True)
-    location = Column(String)
-    name = Column(String)
-    uuid = Column(Binary(36))
-    type = Column(String(256))  # unlikely to be longer:  s3, git,
-    # ??? could options differ among repos for the same special remote?
-    options = Column(String())  # actually a dict, so ideally we could use JSON which will be avail in 1.1
-                                # for now will encode using ... smth
-
-    last_checked = Column(DateTime)
-
-    valid = Column(Boolean)
-    last_invalid = Column(DateTime)
-    invalid_reason = Column(Enum(*INVALID_REASONS))  #  XXX we might want to use fancy Enum class backported to 2.x?
-
-    files = relationship("File",
-                         secondary=files_to_specialremotes,
-                         backref="specialremotes")
-
-
-# TODO?  some kind of "transactions" DB which we possibly purge from time to time???
-
-
-"""
-engine = create_engine('sqlite:///:memory:', echo=True)
-def _initiate_tables(engine):
-    return DBTable.metadata.create_all(engine)
-
-
-file = File(md5="a1b23")  # woohoo autorepr works!!!
-url = URL(url="http://example.com", file=file)
-
-_initiate_tables(engine)
-session = Session(bind=engine)
-session.add(url)
-session.flush()
-
-print file.id
-print repr(file.md5), file, file.urls
-
-print url, url.id
-session.query(File).filter_by(md5='a1b23').one().urls
-session.query(File).filter(or_(File.sha1==None, File.md5==None)).one()
-import q; q.d()
-"""

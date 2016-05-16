@@ -13,14 +13,18 @@
 
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_false
+from datalad.tests.utils import assert_equal
+from datalad.tests.utils import assert_true
+from datalad.tests.utils import with_tempfile
 
-from ..ultimate import UltimateDB
+from ..ultimate import UltimateDB, File
+
+from datalad.support.tests.test_digests import SAMPLE_DIGESTS
 
 class Test1():
     def setup(self):
-        self.udb = UltimateDB()
+        self.udb = UltimateDB(auto_connect=True)
 
-        pass
     def teardown(self):
         pass
 
@@ -32,3 +36,11 @@ class Test1():
 
         # sugarings
         assert_false("http://example.com" in udb)
+
+    @with_tempfile(content="123")
+    def test_process_file(self, f):
+        digests = SAMPLE_DIGESTS["123"]
+        assert_equal(self.udb.process_file(f), digests)  # outputs all digests atm
+        # This should create all entries in the DB so let's request information
+        assert_true(self.udb.has_file_with_digests(**digests))
+        assert_false(self.udb.has_file_with_digests(**SAMPLE_DIGESTS["__long__"]))

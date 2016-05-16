@@ -220,6 +220,7 @@ class Annexificator(object):
                  allow_dirty=False, yield_non_updated=False,
                  auto_finalize=True,
                  statusdb=None,
+                 ultimatedb=None,
                  **kwargs):
         """
 
@@ -250,6 +251,9 @@ class Annexificator(object):
           Note that statusdb "lives" within branch, so switch_branch would drop existing DB (which
           should get committed within the branch) and would create a new one if db is requested
           again.
+        ultimatedb : bool or UltimateDB, optional
+          Ultimate DB to interact with to register content/repos/urls.  If boolean, instructs either
+          to use "centrally configured", None -- consults config.
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -286,6 +290,17 @@ class Annexificator(object):
         self.statusdb = statusdb
         self._statusdb = None  # actual DB to be instantiated later
 
+        if ultimatedb is None:
+            ultimatedb = True  # TODO config crawl.annex.ultimatedb = True/False
+        if isinstance(ultimatedb, bool) and ultimatedb:
+            # so we don't require sqlalchemy for lightweight deployments??? XXX
+            from ..dbs.ultimate import UltimateDB
+            ultimatedb = UltimateDB()
+        self._ultimatedb = ultimatedb
+
+    @property
+    def ultimatedb(self):
+        return self._ultimatedb
 
     # def add(self, filename, url=None):
     #     # TODO: modes
@@ -444,6 +459,20 @@ class Annexificator(object):
                 # we need to adjust our download stats since addurl doesn't do that and we do not use our downloaders here
                 _call(stats.increment, 'downloaded')
                 _call(stats.increment, 'downloaded_size', _call(lambda: os.stat(filepath).st_size))
+
+            if added_to_annex and self.ultimatedb and lexists(filepath):
+                # Note that we don't bother registering if no download has happened since we
+                # care ATM to register content we can get checksums of
+                # TODO: above without url
+                #  OR  may be we should move all this into annex_addurl_to_file?! and annex_add ?
+                self._ultimatedb.process_file(
+                    filepath,
+                    urls=url,
+                    repos=[self.repo],
+                    special_remotes=None,
+                    checked=True,  # we can get here only if we got the file, so it is checked and valid
+                    valid=True
+                )
 
         # file might have been added but really not changed anything (e.g. the same README was generated)
         # TODO:
