@@ -20,11 +20,13 @@ class FileStatus(object):
 
     """
 
-    def __init__(self, size=None, mtime=None, filename=None):
+    def __init__(self, size=None, mtime=None, filename=None, content_type=None):
         self.size = size
         self.mtime = mtime
         # TODO: actually not sure if filename should be here!
         self.filename = filename
+        # Those below aren't used for comparison
+        self.content_type = content_type
 
     def __eq__(self, other):
         # Disallow comparison of empty ones

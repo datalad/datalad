@@ -445,11 +445,12 @@ class Annexificator(object):
                 #  OR  may be we should move all this into annex_addurl_to_file?! and annex_add ?
                 with self._ultimatedb as db:
                     file_ = db.process_file(filepath)
-                    file_.add_url(url, filename=basename(fpath),
-                                  # TODO: obtain from the above statusdb?
-                                  #last_modified=,
-                                  #content_type=,
-                                  checked=True, valid=True)
+                    db.add_url(file_, url,
+                               filename=basename(fpath),
+                               # TODO: obtain from the above statusdb?
+                               #last_modified=,
+                               #content_type=,
+                               checked=True, valid=True)
                 # TODO: file_.add_key(out_json['key'])
                 # TODO: file_.add_repo(annex)  # we might even cache/reuse the Annex ORM object here
 

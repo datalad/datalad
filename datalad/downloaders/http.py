@@ -368,8 +368,10 @@ class HTTPDownloader(BaseDownloader):
         HTTP_HEADERS_TO_STATUS = {
             'Content-Length': int,
             'Content-Disposition': str,
+            'Content-Type': str,
             'Last-Modified': rfc2822_to_epoch
         }
+
         # Allow for webserver to return them in other casing
         HTTP_HEADERS_TO_STATUS_lower = {s.lower(): (s, t) for s, t in HTTP_HEADERS_TO_STATUS.items()}
         status = {}
@@ -385,5 +387,6 @@ class HTTPDownloader(BaseDownloader):
         return FileStatus(
             size=status.get('Content-Length'),
             mtime=status.get('Last-Modified'),
-            filename=get_response_disposition_filename(status.get('Content-Disposition'))
+            filename=get_response_disposition_filename(status.get('Content-Disposition')),
+            content_type=status.get('Content-Type')
         )

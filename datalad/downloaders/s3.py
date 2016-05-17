@@ -196,7 +196,8 @@ class S3Downloader(BaseDownloader):
     def get_key_headers(cls, key, dateformat='rfc2822'):
         headers = {
             'Content-Length': key.size,
-            'Content-Disposition': key.name
+            'Content-Disposition': key.name,
+            'Content-Type': key.content_type,
         }
 
         if key.last_modified:
@@ -214,7 +215,8 @@ class S3Downloader(BaseDownloader):
         return FileStatus(
             size=headers.get('Content-Length'),
             mtime=headers.get('Last-Modified'),
-            filename=headers.get('Content-Disposition')
+            filename=headers.get('Content-Disposition'),
+            content_type=headers.get('Content-Type')
         )
 
     @classmethod

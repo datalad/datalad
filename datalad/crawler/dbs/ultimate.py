@@ -266,7 +266,7 @@ class UltimateDB(object):
             urls = [u for u in urls if u.valid]
         return [u.url for u in urls] if url_only else urls
 
-    def _set_content_type_info(self, file, fpath):
+    def _set_content_type_info(self, file_, fpath):
         pass   # TODO, implement helper under datalad.utils
 
     def process_file(self, fpath):
