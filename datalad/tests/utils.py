@@ -688,6 +688,9 @@ def skip_if_no_network(func=None):
         def newfunc(*args, **kwargs):
             check_and_raise()
             return func(*args, **kwargs)
+        # right away tag the test as a networked test
+        tags = getattr(newfunc, 'tags', [])
+        newfunc.tags = tags + ['network']
         return newfunc
     else:
         check_and_raise()
