@@ -8,14 +8,15 @@ Uploaders:
 Build-Depends:
  debhelper (>= 9),
  dh-python,
- git-annex (>= 6.20160219) | git-annex-standalone (>= 6.20160219),
+ git-annex (>= 6.20160425) | git-annex-standalone (>= 6.20160425),
  help2man,
  patool,
  python-all,
  python-appdirs,
  python-argcomplete,
+ python-boto,
  python-bs4,
- python-git (>= 1.0.1+git137~),
+ python-git (>= 2.0.2~),
  python-html5lib,
  python-httpretty,
  python-humanize,
@@ -24,13 +25,12 @@ Build-Depends:
  python-msgpack,
  python-nose,
  python-progressbar,
- python-rdflib (>= 4.1.2~),
+ python-requests,
  python-scrapy,
  python-setuptools,
  python-six (>= 1.8.0~),
- python-sparqlwrapper,
- python-testtools
-Standards-Version: 3.9.7
+ python-testtools,
+Standards-Version: 3.9.8
 Homepage: http://datalad.org
 Vcs-Git: git://github.com/datalad/datalad -b debian
 Vcs-Browser: https://github.com/datalad/datalad/
@@ -54,7 +54,8 @@ Description: data files crawler and data distribution
   - command line interface for manipulation of datasets
     (search, install, uninstall, upgrade etc)
  .
- This package provides the command line tool.
+ This package provides the command line tool.  Install without
+ Recommends if you need only core functionality.
  .
  DISCLAIMER:  DataLad is Work-In-Progress and this package is not yet
  for regular user consumption.  Primarily intended for demonstrations
@@ -65,30 +66,28 @@ Architecture: all
 Section: python
 Provides: ${python:Provides}
 Depends:
- git-annex (>= 6.20160219) | git-annex-standalone (>= 6.20160219),
+ git-annex (>= 6.20160425) | git-annex-standalone (>= 6.20160425),
+ patool,
  python-appdirs,
- python-git (>= 1.0.1+git137~),
+ python-git (>= 2.0.2~),
  python-humanize,
  python-keyring,
  python-mock,
+ python-msgpack,
  python-progressbar,
- python-rdflib (>= 4.1.2~),
  python-six (>= 1.8.0~),
- python-sparqlwrapper,
  ${misc:Depends},
  ${python:Depends}
 Recommends:
- patool,
  python-html5lib,
  python-httpretty,
- python-msgpack,
  python-nose,
  python-numpy,
  python-scrapy,
- python-testtools
+ python-testtools,
+ python-vcr,
 Suggests:
- python-bs4,
- python-vcr
+ python-bs4
 Description: data files crawler and data distribution (Python 2)
  DataLad is a data distribution providing access to a wide range of
  data resources already available online (initially aiming for
@@ -100,7 +99,9 @@ Description: data files crawler and data distribution (Python 2)
   - command line interface for manipulation of datasets
     (search, install, uninstall, upgrade etc)
  .
- This package installs the module for Python 2.
+ This package installs the module for Python 2, and Recommends install
+ all dependencies necessary for crawling and testing.
+ If you need base functionality, install without Recommends.
  .
  DISCLAIMER:  DataLad is Work-In-Progress and this package is not yet
  for regular user consumption.  Primarily intended for demonstrations

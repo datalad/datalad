@@ -1,3 +1,10 @@
+datalad (0.2-1) unstable; urgency=medium
+
+  * New upstream release, with complete refactoring of the "distribution"
+    component.
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Thu, 19 May 2016 15:29:08 -0400
+
 datalad (0.1+git589-g4f196dc-1) neurodebian-devel; urgency=medium
 
   * New upstream snapshot from 0.1-573-gec0b018
