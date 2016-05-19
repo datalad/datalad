@@ -402,10 +402,16 @@ def serve_path_via_http(tfunc, *targs):
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
+            # Such tests don't require real network so if http_proxy settings were
+            # provided, we remove them from the env for the duration of this run
+            orig_env = os.environ.copy()
+            os.environ.pop('http_proxy', None)
             return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
+            # restoring environment
+            os.environ = orig_env
 
     return newfunc
 
