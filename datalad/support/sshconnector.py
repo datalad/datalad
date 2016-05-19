@@ -86,9 +86,8 @@ class SSHConnection(object):
         return self._runner
 
     def open(self):
-        # TODO: What if already opened? Check for ssh behaviour.
         # start control master:
-        cmd = "ssh -o ControlMaster=yes -o \"ControlPath=%s\" " \
+        cmd = "ssh -o ControlMaster=auto -o \"ControlPath=%s\" " \
               "-o ControlPersist=yes %s exit" % (self.ctrl_path, self.host)
         lgr.debug("Try starting control master by calling:\n%s" % cmd)
         proc = Popen(cmd, shell=True)
@@ -107,6 +106,7 @@ class SSHConnection(object):
                 pass
             else:
                 raise
+
 
 @auto_repr
 class SSHManager(object):
