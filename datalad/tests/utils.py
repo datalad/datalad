@@ -673,15 +673,24 @@ def with_fake_cookies_db(func, cookies={}):
     return newfunc
 
 
-def skip_if_no_network(func):
+def skip_if_no_network(func=None):
     """Skip test completely in NONETWORK settings
+
+    If not used as a decorator, and just a function, could be used at the module level
     """
-    @wraps(func)
-    def newfunc(*args, **kwargs):
+
+    def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
             raise SkipTest("Skipping since no network settings")
-        return func(*args, **kwargs)
-    return newfunc
+
+    if func:
+        @wraps(func)
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        return newfunc
+    else:
+        check_and_raise()
 
 
 def skip_if_on_windows(func):
