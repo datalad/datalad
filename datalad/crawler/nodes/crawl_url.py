@@ -133,8 +133,8 @@ class crawl_url(object):
 
 """
     for extractors, actions in conditionals:
-        extractors = _assure_listuple(extractors)
-        actions = _assure_listuple(actions)
+        extractors = assure_tuple_or_list(extractors)
+        actions = assure_tuple_or_list(actions)
         seen_urls = set()
         for extractor in extractors:
             for url, meta_ in extractor(parent_url, meta=meta):

@@ -71,6 +71,11 @@ class crawl_s3(object):
           If not None, to define a version from the last processed key
         repo: GitRepo, optional
           Under which to store information about latest scraped version
+        strategy: {'naive', 'commit-versions'}, optional
+          With `naive` strategy no commits are made if there is a deletion,
+          or update event, so a single run should result in a single commit
+          even though interim different "load" could be added to annex under
+          the same filename
         ncommits: int or None, optional
           If specified, used as max number of commits to perform.
           ??? In principle the same effect could be achieved by a node
@@ -165,7 +170,9 @@ class crawl_s3(object):
                 # We should finish this one and commit
                 if staged:
                     if self.versionfx and e_prev is not None:
-                        stats.versions.append(self.versionfx(e_prev))
+                        version = self.versionfx(e_prev)
+                        if version not in stats.versions:
+                            stats.versions.append(version)
                     if versions_db:
                         # Save current "version" DB so we would know where to pick up from
                         # upon next rerun.  Record should contain
@@ -185,6 +192,9 @@ class crawl_s3(object):
                     break  # we are done
             staged.add(filename)
             if isinstance(e, Key):
+                if e.name.endswith('/'):
+                    # signals a directory for which we don't care explicitly (git doesn't -- we don't! ;) )
+                    continue
                 url = get_key_url(e, schema=self.url_schema)
                 # generate and pass along the status right away since we can
                 yield updated(

@@ -15,29 +15,34 @@ import os
 import time
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
+from os.path import isdir, islink
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
 from six import iteritems
 from six import string_types
 from distutils.version import LooseVersion
+from functools import partial
 
 from git import Repo
 
 from ...version import __version__
 from ...api import add_archive_content
+from ...api import clean
 from ...consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ...utils import rmtree, updated
 from ...utils import lmtime
 from ...utils import find_files
 from ...utils import auto_repr
+from ...utils import getpwd
 from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
+from ...distribution.dataset import Dataset
+from ...api import install
 from ...support.configparserinc import SafeConfigParserWithIncludes
-from ...support.gitrepo import GitRepo
+from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
-from ...support.handlerepo import HandleRepo
 from ...support.stats import ActivityStats
 from ...support.versions import get_versions
 from ...support.network import get_url_straight_filename, get_url_disposition_filename
@@ -46,6 +51,7 @@ from ... import cfg
 from ...cmd import get_runner
 
 from ..pipeline import CRAWLER_PIPELINE_SECTION
+from ..pipeline import initiate_pipeline_config
 from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
 
@@ -62,14 +68,17 @@ _run = _runner.run
 class initiate_handle(object):
     """Action to initiate a handle following one of the known templates
     """
-    def __init__(self, template, handle_name=None, collection_name=None,
+    def __init__(self, template, handle_name=None,  # collection_name=None,
                  path=None, branch=None, backend=None,
+                 template_func=None,
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
         ----------
         template : str
-          Which template (probably matching the collection name) to use
+          Which template (probably matching the collection name) to use.
+          TODO: refer to specs of template that it might understand some
+          arguments encoded, such as #func=custom_pipeline
         handle_name : str
           Name of the handle. If None, reacts on 'handle_name' in data
         collection_name : str, optional
@@ -90,14 +99,14 @@ class initiate_handle(object):
         add_fields : dict, optional
           Dictionary of additional fields to store in the crawler configuration
           to be passed into the template
-        existing : ('skip', 'raise', 'replace', crawl'), optional
+        existing : ('skip', 'raise', 'adjust', 'replace', 'crawl'), optional
           Behavior if encountering existing handle
         """
         # TODO: add_fields might not be flexible enough for storing more elaborate
         # configurations for e.g. "basic" template
         self.template = template
         self.handle_name = handle_name
-        self.collection_name = collection_name
+        ## self.collection_name = collection_name
         self.data_fields = data_fields
         self.add_fields = add_fields
         self.existing = existing
@@ -117,66 +126,38 @@ class initiate_handle(object):
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creater"
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
-        repo = HandleRepo(
-            path,
-            direct=cfg.getboolean('crawl', 'init direct', default=False),
-            name=name,
-            backend=backend,
-            create=True)
+        repo = AnnexRepo(
+             path,
+             direct=cfg.getboolean('crawl', 'init direct', default=False),
+             #  name=name,
+             backend=backend,
+             create=True)
         # TODO: centralize
         if backend:
             put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
         return repo
 
-    def _save_crawl_config(self, handle_path, name, data):
-        lgr.debug("Creating handle configuration for %s" % name)
-        repo = GitRepo(handle_path)
-        crawl_config_dir = opj(handle_path, CRAWLER_META_DIR)
-        if not exists(crawl_config_dir):
-            lgr.log(2, "Creating %s", crawl_config_dir)
-            makedirs(crawl_config_dir)
-
-        crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
-        cfg = SafeConfigParserWithIncludes()
-        cfg.add_section(CRAWLER_PIPELINE_SECTION)
-        def secset(k, v):
-            cfg.set(CRAWLER_PIPELINE_SECTION, k, str(v))
-        secset('template', self.template)
-        # TODO: why should we set all this information into a handle?
-        # handle should be independent of a collection, and if necessary
-        # we should be able to track it back to collection(s) of which
-        # it belongs to
-        #if self.collection_name:
-        #    secset('collection', self.collection_name)
-        #secset('name', name)
-        # additional options to be obtained from the data
-        for f in self.data_fields:
-            secset(f, data[f])
+    def _save_crawl_config(self, handle_path, data):
+        kwargs = {f: data[f] for f in self.data_fields}
         # additional options given as a dictionary
-        for k, v in self.add_fields:
-            secset(k, v)
-        with open(crawl_config, 'w') as f:
-            cfg.write(f)
-        repo.git_add(crawl_config)
-        if repo.dirty:
-            repo.git_commit("Initialized crawling configuration to use template %s" % self.template)
-        else:
-            lgr.debug("Repository is not dirty -- not committing")
-
+        kwargs.update(self.add_fields)
+        return initiate_pipeline_config(
+            template=self.template,
+            path=handle_path,
+            kwargs=kwargs,
+            commit=True
+        )
 
     def __call__(self, data={}):
         # figure out directory where create such a handle
-        handle_name = self.handle_name or data['handle_name']
-        if self.path is None:
-            crawl_toppath = cfg.get('crawl', 'collectionspath',
-                                    default=opj(expanduser('~'), 'datalad', 'crawl'))
-            handle_path = opj(crawl_toppath,
-                              self.collection_name or self.template,
-                              handle_name)
-        else:
-            handle_path = self.path
+        handle_name = self.handle_name or data.get('handle_name', None)
+        handle_path = opj(os.curdir, handle_name) \
+            if self.path is None \
+            else self.path
 
-        lgr.debug("Request to initialize a handle at %s", handle_path)
+        data_updated = updated(data, {'handle_path': handle_path,
+                                      'handle_name': handle_name})
+        lgr.debug("Request to initialize a handle %s at %s", handle_name, handle_path)
         init = True
         if exists(handle_path):
             # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
@@ -184,7 +165,7 @@ class initiate_handle(object):
             existing = self.existing or 'skip'
             if existing == 'skip':
                 lgr.info("Skipping handle %s since already exists" % handle_name)
-                yield data
+                yield data_updated
                 return
             elif existing == 'raise':
                 raise RuntimeError("%s already exists" % handle_path)
@@ -197,11 +178,9 @@ class initiate_handle(object):
                 raise ValueError(self.existing)
         if init:
             _call(self._initiate_handle, handle_path, handle_name)
-        _call(self._save_crawl_config, handle_path, handle_name, data)
+        _call(self._save_crawl_config, handle_path, data)
 
-
-        yield updated(data, {'handle_path': handle_path,
-                             'handle_name': handle_name})
+        yield data_updated
 
 
 class Annexificator(object):
@@ -216,6 +195,7 @@ class Annexificator(object):
     def __init__(self, path=None, mode='full', options=None,
                  special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
+                 auto_finalize=True,
                  statusdb=None,
                  **kwargs):
         """
@@ -233,6 +213,10 @@ class Annexificator(object):
           List of custom special remotes to initialize and enable by default.
         yield_non_updated : bool, optional
           Either to yield original data (with filepath) if load was not updated in annex
+        auto_finalize : bool, optional
+          In some cases, if e.g. adding a file in place of an existing directory or placing
+          a file under a directory for which there is a file atm, we would 'finalize' before
+          carrying out the operation
         statusdb : {'json', 'fileattr'}, optional
           DB of file statuses which will be used to figure out if remote load has changed.
           If None, no statusdb will be used so Annexificator will process every given url
@@ -267,6 +251,7 @@ class Annexificator(object):
 
         self.mode = mode
         self.options = options or []
+        self.auto_finalize = auto_finalize
         self._states = set()
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
@@ -415,9 +400,16 @@ class Annexificator(object):
 
             if lexists(filepath):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
-                _call(unlink, filepath)
+                if isdir(filepath):
+                    # If directory - tricky, since we would want then to check if no
+                    # staged changes under
+                    _call(self._check_no_staged_changes_under_dir, filepath, stats=stats)
+                    _call(rmtree, filepath)
+                else:
+                    _call(unlink, filepath)
                 _call(stats.increment, 'overwritten')
-
+            else:
+                _call(self._check_non_existing_filepath, filepath, stats=stats)
             # TODO: We need to implement our special remote here since no downloaders used
             if self.mode == 'full' and remote_status and remote_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
@@ -445,7 +437,8 @@ class Annexificator(object):
                 # utime dereferences!
                 # _call(os.utime, filepath, (time.time(), remote_status.mtime))
                 # *nix only!  TODO
-                _call(lmtime, filepath, remote_status.mtime)
+                if remote_status.mtime:
+                    _call(lmtime, filepath, remote_status.mtime)
                 if statusdb:
                     _call(statusdb.set, filepath, remote_status)
             else:
@@ -469,6 +462,67 @@ class Annexificator(object):
         # git annex addurl --pathdepth=-1 --backend=SHA256E '-c' 'annex.alwayscommit=false' URL
         # with subsequent "drop" leaves no record that it ever was here
         yield updated_data  # There might be more to it!
+
+    def _check_no_staged_changes_under_dir(self, dirpath, stats=None):
+        """Helper to verify that we can "safely" remove a directory
+        """
+        dirty_files = self._get_status()
+        dirty_files = sum(dirty_files, [])
+        dirpath_normalized = _normalize_path(self.repo.path, dirpath)
+        for dirty_file in dirty_files:
+            if stats:
+                _call(stats.increment, 'removed')
+            if dirty_file.startswith(dirpath_normalized):
+                if self.auto_finalize:
+                    self.finalize()({'datalad_stats': stats})
+                    return
+                else:
+                    raise RuntimeError(
+                        "We need to save some file instead of directory %(dirpath)s "
+                        "but there are uncommitted changes (%(dirty_file)s) under "
+                        "that directory.  Please commit them first" % locals())
+
+    def _check_non_existing_filepath(self, filepath, stats=None):
+        """Helper to verify that we can safely save into the target path
+
+        For instance we can't save into a file d/file if d is a file, not
+        a directory
+        """
+        # if file doesn't exist we need to verify that there is no conflicts
+        dirpath, name = ops(filepath)
+        if dirpath:
+            # we need to assure that either that directory exists or directories
+            # on the way to it exist and are not a file by some chance
+            while dirpath:
+                if lexists(dirpath):
+                    if not isdir(dirpath):
+                        # we have got a problem
+                        # HANDLE THE SITUATION
+                        # check if given file is not staged for a commit or dirty
+                        dirty_files = self._get_status()
+                        # it was a tuple of 3
+                        dirty_files = sum(dirty_files, [])
+                        dirpath_normalized = _normalize_path(self.repo.path, dirpath)
+                        if dirpath_normalized in dirty_files:
+                            if self.auto_finalize:
+                                self.finalize()({'datalad_stats': stats})
+                            else:
+                                raise RuntimeError(
+                                    "We need to annex file %(filepath)s but there is a file "
+                                    "%(dirpath)s in its path which destiny wasn't yet decided "
+                                    "within git.  Please commit or remove it before trying "
+                                    "to annex this new file" % locals())
+                        lgr.debug("Removing %s as it is in the path of %s" % (dirpath, filepath))
+                        _call(os.unlink, dirpath)
+                        if stats:
+                            _call(stats.increment, 'overwritten')
+                    break  # in any case -- we are done!
+
+                dirpath, _ = ops(dirpath)
+                if not dirpath.startswith(self.repo.path):
+                    # shouldn't happen!
+                    raise RuntimeError("We escaped the border of the repository itself. "
+                                       "path: %s  repo: %s" % (dirpath, self.repo.path))
 
     def _get_fpath(self, data, stats, url=None):
         """Return relative path (fpath) to the file based on information in data or url
@@ -497,7 +551,7 @@ class Annexificator(object):
 
         return fpath
 
-    def switch_branch(self, branch, parent=None):
+    def switch_branch(self, branch, parent=None, must_exist=None):
         """Node generator to switch branch, returns actual node
 
         Parameters
@@ -507,6 +561,9 @@ class Annexificator(object):
         parent : str or None, optional
           If parent is provided, it will serve as a parent of the branch. If None,
           detached new branch will be created
+        must_exist : bool or None, optional
+          If None, doesn't matter.  If True, would fail if branch does not exist.  If
+          False, would fail if branch already exists
         """
         def switch_branch(data):
             """Switches to the branch %s""" % branch
@@ -515,6 +572,8 @@ class Annexificator(object):
             # statusdb is valid only within the same branch
             self._statusdb = None
             existing_branches = self.repo.git_get_branches()
+            if must_exist is not None:
+                assert must_exist == (branch in existing_branches)
             if branch not in existing_branches:
                 # TODO: this should be a part of the gitrepo logic
                 if parent is None:
@@ -596,7 +655,8 @@ class Annexificator(object):
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
-            lgr.info("Initiating %(nmerges)d merges of %(branch)s using strategy %(strategy)s", locals())
+            plmerges = "s" if nmerges>1 else ""
+            lgr.info("Initiating %(nmerges)d merge%(plmerges)s of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
 
             for to_merge in all_to_merge:
@@ -670,7 +730,7 @@ class Annexificator(object):
         #out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
         out, err = self.repo._git_custom_command([], ["git", "status", "--porcelain"])
         assert not err
-        staged, notstaged, untracked = [], [], []
+        staged, notstaged, untracked, deleted = [], [], [], []
         for l in out.split('\n'):
             if not l:
                 continue
@@ -681,11 +741,12 @@ class Annexificator(object):
                  'A ': staged,
                  'M ': staged,
                  ' M': notstaged,
+                 ' D': deleted,
                  }[act].append(fname)
                 # for the purpose of this use we don't even want MM or anything else
             except KeyError:
                 raise RuntimeError("git status %r not yet supported. TODO" % act)
-        return staged, notstaged, untracked
+        return staged, notstaged, untracked, deleted
 
     def commit_versions(self,
                         regex,
@@ -693,6 +754,12 @@ class Annexificator(object):
                         rename=False,
                         **kwargs):
         """Generate multiple commits if multiple versions were staged
+
+        Parameters
+        ----------
+        TODO
+        **kwargs: dict, optional
+          Passed to get_versions
         """
         def _commit_versions(data):
             self._precommit()  # so that all batched annexes stop
@@ -718,11 +785,12 @@ class Annexificator(object):
             #
             # staged = process_diff(repo.index.diff('HEAD'))#repo.head.commit))
             # notstaged = process_diff(repo.index.diff(None))
-            staged, notstaged, untracked = self._get_status()
+            staged, notstaged, untracked, deleted = self._get_status()
 
             # Verify that everything is under control!
             assert(not notstaged)  # not handling atm, although should be safe I guess just needs logic to not unstage them
             assert(not untracked)  # not handling atm
+            assert(not deleted)  # not handling atm
             if not staged:
                 return  # nothing to be done -- so we wash our hands off entirely
 
@@ -900,7 +968,7 @@ class Annexificator(object):
 
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
-    def finalize(self, tag=False, existing_tag=None):
+    def finalize(self, tag=False, existing_tag=None, cleanup=False):
         """Finalize operations -- commit uncommited, prune abandoned? etc
 
         Parameters
@@ -915,6 +983,8 @@ class Annexificator(object):
         existing_tag: None or '+suffix', optional
           What to do if tag already exists, if None -- warning is issued. If `+suffix`
           +0, +1, +2 ... are tried until available one is found.
+        cleanup: bool, optional
+          Either to perform cleanup operations, such as 'git gc' and 'datalad clean'
         """
         def _finalize(data):
             self._precommit()
@@ -959,6 +1029,20 @@ class Annexificator(object):
                         else:
                             raise ValueError(existing_tag)
                     self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
+
+            if cleanup:
+                total_stats = stats.get_total()
+                if total_stats.add_git or total_stats.add_annex or total_stats.merges:
+                    if cfg.getboolean('crawl', 'pipeline.housekeeping', default=True):
+                        lgr.info("House keeping: gc, repack and clean")
+                        # gc and repack
+                        self.repo.gc(allow_background=False)
+                        clean(annex=self.repo)
+                    else:
+                        lgr.info("No git house-keeping performed as instructed by config")
+                else:
+                    lgr.info("No git house-keeping performed as no notable changes to git")
+
             self._states = set()
             yield data
         return _finalize
@@ -1000,3 +1084,21 @@ class Annexificator(object):
             _call(stats.increment, 'removed')
         _call(self.repo.git_remove, filename)
         yield data
+
+    def initiate_handle(self, *args, **kwargs):
+        """Thin proxy to initiate_handle node which initiates handle as a subhandle to current annexificator
+        """
+        def _initiate_handle(data):
+            for data_ in initiate_handle(*args, **kwargs)(data):
+                # Also "register" as a sub-handle if not yet registered
+                ds = Dataset(self.repo.path)
+                # TODO:  rename handle_  into dataset_
+                if data['handle_name'] not in ds.get_dataset_handles():
+                    out = install(
+                            dataset=ds,
+                            path=data_['handle_path'],
+                            source=data_['handle_path'],
+                            )
+                    # TODO: reconsider adding smth to data_ to be yielded"
+                yield data_
+        return _initiate_handle

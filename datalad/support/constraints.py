@@ -11,13 +11,14 @@
 __docformat__ = 'restructuredtext'
 
 import re
-from six import string_types
 from six.moves import map as map
+
 
 def _strip_typerepr(s):
     """Strip away <class '...'> and <type '...'> decorations for docstrings
     """
     return re.sub("<(class|type) '(\S+)'>", r'\2', s)
+
 
 def _type_str(t):
     """Get string human-readable representation of a data type
@@ -29,6 +30,7 @@ def _type_str(t):
         s = ' or '.join(map(_type_str, t))
         return ("(%s)" % s) if len(t) > 1 else s
     return _strip_typerepr(str(t))
+
 
 class Constraint(object):
     """Base class for input value conversion/validation.

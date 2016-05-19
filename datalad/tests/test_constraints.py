@@ -10,11 +10,17 @@
 
 
 import sys
+import os
+from os.path import isabs, abspath, join as opj, normpath
 from six import string_types, PY2
 
 from ..support import constraints as ct
+from ..support.gitrepo import GitRepo
+from ..utils import getpwd, chpwd
+from ..tests.utils import assert_cwd_unchanged, with_testrepos, with_tempfile, \
+    on_windows
 
-from nose.tools import assert_equal, assert_raises
+from nose.tools import assert_equal, assert_raises, eq_, ok_
 
 
 def test_int():

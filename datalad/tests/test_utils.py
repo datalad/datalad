@@ -18,23 +18,28 @@ from mock import patch
 from six import PY3
 
 from os.path import dirname, normpath, pardir, basename
+from os.path import isabs, expandvars, expanduser
 from collections import OrderedDict
 
 from ..dochelpers import exc_str
 from ..utils import updated
 from ..utils import get_local_file_url
-from os.path import join as opj, isabs, abspath, exists
+from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
-from ..utils import get_local_file_url, get_url_path
+from ..utils import get_url_path
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
+from ..utils import expandpath, is_explicit_path
+from ..utils import knows_annex
+from ..utils import any_re_search
 from ..support.annexrepo import AnnexRepo
 
-from nose.tools import ok_, eq_, assert_false, assert_raises, assert_equal
+from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
+
 from .utils import with_tempfile, assert_in, with_tree
 from .utils import SkipTest
 from .utils import assert_cwd_unchanged, skip_if_on_windows
@@ -117,7 +122,7 @@ def _check_setup_exceptionhook(interactive):
             # swallows all Exceptions and hook never gets executed
             try:
                 raise RuntimeError
-            except Exception as e: #RuntimeError:
+            except Exception as e:  # RuntimeError:
                 type_, value_, tb_ = sys.exc_info()
             our_exceptionhook(type_, value_, tb_)
             if PY3:
@@ -138,6 +143,7 @@ def _check_setup_exceptionhook(interactive):
 def test_setup_exceptionhook():
     for tval in [True, False]:
         yield _check_setup_exceptionhook, tval
+
 
 def test_md5sum():
     # just a smoke (encoding/decoding) test for md5sum
@@ -271,6 +277,14 @@ def test_assure_dict_from_str():
              __ac_name='{user}', __ac_password='{password}', cookies_enabled='', submit='Log in'))
 
 
+def test_any_re_search():
+    assert_true(any_re_search('a', 'a'))
+    assert_true(any_re_search('a', 'bab'))
+    assert_false(any_re_search('^a', 'bab'))
+    assert_true(any_re_search(['b', '.ab'], 'bab'))
+    assert_false(any_re_search(['^b', 'bab'], 'ab'))
+
+
 def test_find_files():
     tests_dir = dirname(__file__)
     proj_dir = normpath(opj(dirname(__file__), pardir))
@@ -355,3 +369,30 @@ def test_file_basename():
     eq_(file_basename('/tmp/1.longish.gz'), '1.longish')
     eq_(file_basename('1_R1.1.1.tar.gz'), '1_R1.1.1')
     eq_(file_basename('ds202_R1.1.1.tgz'), 'ds202_R1.1.1')
+
+
+def test_expandpath():
+    eq_(expandpath("some", False), expanduser('some'))
+    eq_(expandpath("some", False), expandvars('some'))
+    assert_true(isabs(expandpath('some')))
+    # this may have to go because of platform issues
+    eq_(expandpath("$HOME"), expanduser('~'))
+
+
+def test_is_explicit_path():
+    # by default expanded paths are absolute, hence explicit
+    assert_true(is_explicit_path(expandpath('~')))
+    assert_false(is_explicit_path("here"))
+
+
+@with_tempfile
+@with_tempfile
+def test_knows_annex(here, there):
+    from datalad.support.gitrepo import GitRepo
+    from datalad.support.annexrepo import AnnexRepo
+    git = GitRepo(path=here, create=True)
+    assert_false(knows_annex(here))
+    annex = AnnexRepo(path=here, create=True)
+    assert_true(knows_annex(here))
+    gitclone = GitRepo(path=there, url=here, create=True)
+    assert_true(knows_annex(there))

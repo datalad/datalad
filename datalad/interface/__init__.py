@@ -12,79 +12,41 @@
 
 __docformat__ = 'restructuredtext'
 
-# the following should be series of imports of interface implementations
-# the shall be exposed in the Python API and the cmdline interface
-from .create_collection import CreateCollection
-from .create_handle import CreateHandle
-from .register_collection import RegisterCollection
-from .add_handle import AddHandle
-from .install_handle import InstallHandle
-from .unregister_collection import UnregisterCollection
-from .list_collections import ListCollection
-from .list_handles import ListHandles
-from .sparql_query import SPARQLQuery
-from .uninstall_handle import UninstallHandle
-from .test import Test
-from .get import Get
-from .drop import Drop
-from .crawl import Crawl
-from .update import Update
-from .whereis import Whereis
-from .describe import Describe
-from .pull import Pull
-from .push import Push
-from .upgrade_handle import UpgradeHandle
-from .search_handle import SearchHandle
-from .publish_handle import PublishHandle
-from .search_collection import SearchCollection
-from .publish_collection import PublishCollection
-from .import_metadata import ImportMetadata
-from .add_archive_content import AddArchiveContent
-from .download_url import DownloadURL
-from .ls import Ls
-from .clean import Clean
 
+# the following should be series of import definitions for interface implementations
+# that shall be exposed in the Python API and the cmdline interface
 # all interfaces should be associated with (at least) one of the groups below
-_group_collection = (
-    'Commands for collection handling',
+_group_dataset = (
+    'Commands for dataset operations',
     [
-        CreateCollection,
-        RegisterCollection,
-        UnregisterCollection,
-        ListCollection,
-        PublishCollection,
-    ])
-
-_group_handle = (
-    'Commands for handle operations',
-    [
-        CreateHandle,
-        AddHandle,
-        InstallHandle,
-        UninstallHandle,
-        ListHandles,
-        Get,
-        Drop,
-        UpgradeHandle,
-        PublishHandle,
+        # source module, source object[, dest. cmdline name[, dest python name]]
+        # src module can be relative, but has to be relative to the main 'datalad' package
+        ('datalad.distribution.install', 'Install'),
+        ('datalad.distribution.publish', 'Publish'),
+        ('datalad.distribution.uninstall', 'Uninstall'),
+        ('datalad.distribution.move', 'Move'),
+        ('datalad.distribution.update', 'Update'),
+        ('datalad.distribution.create_publication_target_sshwebserver',
+         'CreatePublicationTargetSSHWebserver',
+         'create-publication-target-sshwebserver'),
+        ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
+        ('datalad.distribution.modify_subhandle_urls', 'ModifySubhandleURLs',
+         'modify-subhandle-urls'),
     ])
 
 _group_misc = (
     'Miscellaneous commands',
     [
-        Test,
-        Crawl,
-        SPARQLQuery,
-        SearchHandle,
-        SearchCollection,
-        Update,
-        Whereis,
-        Describe,
-        Pull,
-        Push,
-        ImportMetadata,
-        AddArchiveContent,
-        DownloadURL,
-        Ls,
-        Clean,
+        ('datalad.interface.test', 'Test'),
+        ('datalad.interface.crawl', 'Crawl'),
+        ('datalad.interface.pull', 'Pull'),
+        ('datalad.interface.push', 'Push'),
+        ('datalad.interface.ls', 'Ls'),
+        ('datalad.interface.clean', 'Clean'),
+        ('datalad.interface.add_archive_content', 'AddArchiveContent',
+         'add-archive-content'),
+        ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
+        # very optional ones
+        ('datalad.distribution.tests.create_test_dataset', 'CreateTestDataset',
+         'create-test-dataset'),
     ])

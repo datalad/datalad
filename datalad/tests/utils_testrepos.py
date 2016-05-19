@@ -10,12 +10,10 @@
 import tempfile
 
 from abc import ABCMeta, abstractmethod
-from os.path import dirname, join as pathjoin, exists, pardir, realpath
+from os.path import dirname, join as opj, exists, pardir, realpath
 
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
-from ..support.handlerepo import HandleRepo
-from ..support.collectionrepo import CollectionRepo
 from ..cmd import Runner
 from ..utils import get_local_file_url
 from ..utils import swallow_outputs
@@ -23,9 +21,6 @@ from ..utils import swallow_logs
 
 from ..version import __version__
 from . import _TEMP_PATHS_GENERATED
-
-# TODO: Probably move automatic "git commit" vs. "git annex proxy -- git commit"
-# to AnnexRepo instead of HandleRepo and make use of it herein.
 
 
 class TestRepo(object):
@@ -57,7 +52,7 @@ class TestRepo(object):
         return get_local_file_url(self.path)
 
     def create_file(self, name, content, add=True, annex=False):
-        filename = pathjoin(self.path, name)
+        filename = opj(self.path, name)
         with open(filename, 'wb') as f:
             f.write(content.encode())
         if add:
@@ -87,7 +82,7 @@ class BasicAnnexTestRepo(TestRepo):
         self.repo.git_commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
         from .utils import on_windows
-        fileurl = get_local_file_url(realpath(pathjoin(self.path, 'test.dat'))) \
+        fileurl = get_local_file_url(realpath(opj(self.path, 'test.dat'))) \
                   if not on_windows \
                   else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
         self.repo.annex_addurl_to_file("test-annex.dat", fileurl)
@@ -127,61 +122,64 @@ class BasicGitTestRepo(TestRepo):
                          annex=False)
 
 
-class BasicHandleTestRepo(BasicAnnexTestRepo):
-    """Creates a basic test handle repository.
-
-    Technically this is just an annex with additional content in a ".datalad"
-    subdirectory.
-    """
-
-    REPO_CLASS = HandleRepo
-    # Everything necessary to distinguish from BasicAnnexTestRepo currently is
-    # done by the constructor of HandleRepo class.
-
-
-class MetadataPTHandleTestRepo(BasicHandleTestRepo):
-    """Creates a test handle repository, which provides metadata
-    in plaintext format.
-    """
-
-    REPO_CLASS = HandleRepo
+class SubmoduleDataset(BasicAnnexTestRepo):
 
     def populate(self):
-        super(MetadataPTHandleTestRepo, self).populate()
-        self.create_file('README',
-                         'This is a handle description\nwith multiple lines.\n',
-                         annex=False)
-        self.create_file('LICENSE',
-                         'A license, allowing for several things to do with\n'
-                         'the content, provided by this handle.',
-                         annex=False)
-        self.create_file('AUTHORS',
-                         'Benjamin Poldrack <benjaminpoldrack@gmail.com>\n'
-                         '# This is a comment\n'
-                         '\n'
-                         '<justanemail@address.tl>\n'
-                         'someone else\n'
-                         'digital native <https://www.myfancypage.com/digital>\n',
-                         annex=False)
-        self.repo.commit("Metadata files created.")
+
+        super(SubmoduleDataset, self).populate()
+        # add submodules
+        annex = BasicAnnexTestRepo()
+        annex.create()
+        from datalad.cmd import Runner
+        runner = Runner()
+        kw = dict(cwd=self.path, expect_stderr=True)
+        runner.run(['git', 'submodule', 'add', annex.url, 'sub1'], **kw)
+        runner.run(['git', 'submodule', 'add', annex.url, 'sub2'], **kw)
+        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'], **kw)
+        runner.run(['git', 'submodule', 'update', '--init', '--recursive'], **kw)
+        # init annex in subdatasets
+        for s in ('sub1', 'sub2'):
+            runner.run(['git', 'annex', 'init'],
+                       cwd=opj(self.path, s), expect_stderr=True)
 
 
-class BasicCollectionTestRepo(BasicGitTestRepo):
-    """Creates an empty collection repository"""
-
-    REPO_CLASS = CollectionRepo
-
-
-class CollectionTestRepo(BasicCollectionTestRepo):
-    """Creates a collection repository with two handles."""
-
-    REPO_CLASS = CollectionRepo
+class NestedDataset(BasicAnnexTestRepo):
 
     def populate(self):
-        super(CollectionTestRepo, self).populate()
-        basic_handle = BasicHandleTestRepo()
-        basic_handle.create()
-        md_handle = MetadataPTHandleTestRepo()
-        md_handle.create()
-        self.repo.add_handle(basic_handle.repo, "BasicHandle")
-        self.repo.add_handle(md_handle.repo, "MetadataHandle")
+        super(NestedDataset, self).populate()
+        ds = SubmoduleDataset()
+        ds.create()
+        from datalad.cmd import Runner
+        runner = Runner()
+        kw = dict(expect_stderr=True)
+        runner.run(['git', 'submodule', 'add', ds.url, 'subdataset'],
+                   cwd=self.path, **kw)
+        runner.run(['git', 'submodule', 'add', ds.url, 'subsubdataset'],
+                   cwd=opj(self.path, 'subdataset'), **kw)
+        runner.run(['git', 'commit', '-m', 'Added subdataset.'],
+                   cwd=opj(self.path, 'subdataset'), **kw)
+        runner.run(['git', 'commit', '-a', '-m', 'Added subdatasets.'],
+                   cwd=self.path, **kw)
+        runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
+                   cwd=self.path, **kw)
+        # init all annexes
+        for s in ('', 'subdataset', opj('subdataset', 'subsubdataset')):
+            runner.run(['git', 'annex', 'init'],
+                       cwd=opj(self.path, s), expect_stderr=True)
+
+
+class InnerSubmodule(object):
+
+    def __init__(self):
+        self._ds = NestedDataset()
+
+    @property
+    def path(self):
+        return opj(self._ds.path, 'subdataset', 'sub1')
+
+    @property
+    def url(self):
+        return get_local_file_url(self.path)
+
+    def create(self):
+        self._ds.create()

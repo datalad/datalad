@@ -63,14 +63,5 @@ class FileNotInRepositoryError(FileNotInAnnexError):
     """
 
 
-class CollectionBrokenError(Exception):
-    """Thrown if a collection repository is somehow invalid
-    """
-    pass
-
-
-class ReadOnlyBackendError(Exception):
-    """Thrown if a Collection or Handle is trying to write to a read-only
-    backend.
-    """
-    pass
+class InsufficientArgumentsError(ValueError):
+    """To be raise instead of `ValueError` when use help output is desired"""

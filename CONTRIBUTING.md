@@ -155,8 +155,11 @@ rules before submitting a pull request:
 
 ### Tests
 
-All tests are available under `datalad/tests`.  To execute tests, the codebase
-needs to be "installed" in order to generate scripts for the entry points.  For
+`datalad/tests` contains tests for the core portion of the project, and
+more tests are provided under corresponding submodules in `tests/`
+subdirectories to simplify re-running the tests concerning that portion
+of the codebase.  To execute many tests, the codebase first needs to be
+"installed" in order to generate scripts for the entry points.  For
 that, the recommended course of action is to use `virtualenv`, e.g.
 
 ```sh
@@ -257,3 +260,7 @@ Various hints for developers
 
 - to monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
   just plug it in the middle of your pipe
+
+- for remote debugging epdb could be used (avail in pip) by using
+  `import epdb; epdb.serve()` in Python code and then connecting to it with
+  `python - c "import epdb; epdb.connect()"`

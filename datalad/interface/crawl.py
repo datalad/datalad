@@ -15,6 +15,7 @@ from os.path import exists, isdir
 from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
+from datalad.crawler.pipeline import initiate_pipeline_config
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
@@ -38,10 +39,14 @@ class Crawl(Interface):
             args=("--is-pipeline",),
             action="store_true",
             doc="""Flag if provided file is a Python script which defines pipeline()"""),
+        is_template=Parameter(
+            args=("-t", "--is-template"),
+            action="store_true",
+            doc="""Flag if provided value is the name of the template to use"""),
         chdir=Parameter(
             args=("-C", "--chdir"),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""Directory to chrdir to for crawling"""),
+            doc="""Directory to chdir to for crawling"""),
         path=Parameter(
             args=('path',),
             metavar='file',
@@ -51,14 +56,23 @@ class Crawl(Interface):
                 of a handle on which to perform crawling using its standard crawling specification"""),
     )
 
-    def __call__(self, path=None, dry_run=False, is_pipeline=False, chdir=None):
+    @staticmethod
+    def __call__(path=None, dry_run=False, is_pipeline=False, is_template=False, chdir=None):
         from datalad.crawler.pipeline import (
-            load_pipeline_from_config, load_pipeline_from_script,
+            load_pipeline_from_config, load_pipeline_from_module,
             get_repo_pipeline_config_path, get_repo_pipeline_script_path
         )
         from datalad.crawler.pipeline import run_pipeline
         from datalad.utils import chpwd  # import late so we could mock during tests
         with chpwd(chdir):
+
+            assert not (is_pipeline and is_template), "it is either a pipeline or a template name, can't be both"
+
+            if is_template:
+                # generate a config and overload path with its filename
+                path = initiate_pipeline_config(template=path,  # kwargs=TODO,
+                                                commit=True)
+
             # TODO: centralize via _params_ handling
             if dry_run:
                 if not 'crawl' in cfg.sections():
@@ -83,7 +97,7 @@ class Crawl(Interface):
 
             if is_pipeline:
                 lgr.info("Loading pipeline definition from %s" % path)
-                pipeline = load_pipeline_from_script(path)
+                pipeline = load_pipeline_from_module(path)
             else:
                 lgr.info("Loading pipeline specification from %s" % path)
                 pipeline = load_pipeline_from_config(path)
@@ -98,3 +112,5 @@ class Crawl(Interface):
                 # probably ask via ui which action should be performed unless
                 # explicitly specified
                 raise
+
+            # TODO:  Move gc/clean over here!

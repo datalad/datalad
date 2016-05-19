@@ -12,8 +12,9 @@ import re
 import six.moves.builtins as __builtin__
 import time
 
-from os.path import curdir, basename, exists, realpath, islink
+from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
+from six import text_type
 
 import logging
 import shutil
@@ -25,7 +26,6 @@ import platform
 import gc
 
 from functools import wraps
-from os.path import exists, join as opj, isabs, normpath
 from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
@@ -46,6 +46,23 @@ except:  # pragma: no cover
 #
 # Little helpers
 #
+
+
+def assure_tuple_or_list(obj):
+    """Given an object, wrap into a tuple if not list or tuple
+    """
+    if isinstance(obj, list) or isinstance(obj, tuple):
+        return obj
+    return (obj,)
+
+
+def any_re_search(regexes, value):
+    """Return if any of regexes (list or str) searches succesfully for value"""
+    for regex in assure_tuple_or_list(regexes):
+        if re.search(regex, value):
+            return True
+    return False
+
 
 def not_supported_on_windows(msg=None):
     """A little helper to be invoked to consistently fail whenever functionality is
@@ -167,10 +184,46 @@ def get_local_file_url(fname):
         furl = "file://%s" % urlquote(fname)
     return furl
 
+
 def get_url_path(url):
     """Given a file:// url, return the path itself"""
 
     return urlunquote(urlsplit(url).path)
+
+
+def parse_url_opts(url):
+    """Given a string with url-style options, split into content before # and options as dict"""
+    if '#' in url:
+        url_, attrs_str = url.split('#', 1)
+        opts = dict(x.split('=', 1) for x in attrs_str.split('&'))
+        if 'size' in opts:
+            opts['size'] = int(opts['size'])
+    else:
+        url_, opts = url, {}
+    return url_, opts
+
+
+def expandpath(path, force_absolute=True):
+    """Expand all variables and user handles in a path.
+
+    By default return an absolute path
+    """
+    path = expandvars(expanduser(path))
+    if force_absolute:
+        path = abspath(path)
+    return path
+
+
+def is_explicit_path(path):
+    """Return whether a path explicitly points to a location
+
+    Any absolute path, or relative path starting with either '../' or
+    './' is assumed to indicate a location on the filesystem. Any other
+    path format is not considered explicit."""
+    path = expandpath(path, force_absolute=False)
+    return isabs(path) \
+        or path.startswith(os.curdir + os.sep) \
+        or path.startswith(os.pardir + os.sep)
 
 def rotree(path, ro=True, chmod_files=True):
     """To make tree read-only or writable
@@ -265,6 +318,20 @@ def file_basename(name, return_ext=False):
     else:
         return fbname
 
+def escape_filename(filename):
+    """Surround filename in "" and escape " in the filename
+    """
+    filename = filename.replace('"', r'\"').replace('`', r'\`')
+    filename = '"%s"' % filename
+    return filename
+
+def encode_filename(filename):
+    """Encode unicode filename
+    """
+    if isinstance(filename, text_type):
+        return filename.encode(sys.getfilesystemencoding())
+    else:
+        return filename
 
 if on_windows:
     def lmtime(filepath, mtime):
@@ -567,6 +634,11 @@ def swallow_logs(new_level=None):
         adapter.cleanup()
 
 
+def _get_cassette_path(path):
+    if not isabs(path):  # so it was given as a name
+        return "fixtures/vcr_cassettes/%s.yaml" % path
+    return path
+
 try:
     # TEMP: Just to overcome problem with testing on jessie with older requests
     # https://github.com/kevin1024/vcrpy/issues/215
@@ -589,8 +661,7 @@ try:
         path : str
           If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
         """
-        if not isabs(path):  # so it was given as a name
-            path = "fixtures/vcr_cassettes/%s.yaml" % path
+        path = _get_cassette_path(path)
         lgr.debug("Using cassette %s" % path)
         if return_body is not None:
             my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
@@ -614,14 +685,14 @@ except Exception as exc:
 
 
 @contextmanager
-def externals_use_cassette(path):
+def externals_use_cassette(name):
     """Helper to pass instruction via env variables to use specified cassette
 
     For instance whenever we are testing custom special remotes invoked by the annex
     but want to minimize their network traffic by using vcr.py
     """
     from mock import patch
-    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(path)}):
+    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(_get_cassette_path(name))}):
         yield
 
 
@@ -692,7 +763,7 @@ class chpwd(object):
     If used as a context manager it allows to temporarily change directory
     to the given path
     """
-    def __init__(self, path, mkdir=False):
+    def __init__(self, path, mkdir=False, logsuffix=''):
 
         if path:
             pwd = getpwd()
@@ -708,7 +779,7 @@ class chpwd(object):
             os.mkdir(path)
         else:
             self._mkdir = False
-
+        lgr.debug("chdir %r -> %r %s", self._prev_pwd, path, logsuffix)
         os.chdir(path)  # for grep people -- ok, to chdir here!
         os.environ['PWD'] = path
 
@@ -718,5 +789,20 @@ class chpwd(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._prev_pwd:
-            chpwd(self._prev_pwd)
+            chpwd(self._prev_pwd, logsuffix="(coming back)")
 
+
+def knows_annex(path):
+    """Returns whether at a given path there is information about an annex
+
+    This includes actually present annexes, but also uninitialized ones, or
+    even the presence of a remote annex branch.
+    """
+    from os.path import exists
+    if not exists(path):
+        lgr.debug("No annex: test path {0} doesn't exist".format(path))
+        return False
+    from datalad.support.gitrepo import GitRepo
+    repo = GitRepo(path, create=False)
+    return "origin/git-annex" in repo.git_get_remote_branches() \
+           or "git-annex" in repo.git_get_branches()

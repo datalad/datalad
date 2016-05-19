@@ -12,7 +12,7 @@ distribution with the convenience of git-annex repositories as a backend."""
 from .version import __version__
 
 from datalad.log import lgr
-
+lgr.debug("Importing the rest of datalad.__init__")
 from .config import ConfigManager
 cfg = ConfigManager()
 
@@ -30,9 +30,6 @@ except ImportError:
 
 # Following fixtures are necessary at the top level __init__ for fixtures which
 # would cover all **/tests and not just datalad/tests/
-
-from .utils import setup_exceptionhook
-setup_exceptionhook()
 
 def setup_package():
     import os

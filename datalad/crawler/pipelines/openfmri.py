@@ -20,12 +20,36 @@ from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
-from ...utils import updated
+from ...consts import ARCHIVES_SPECIAL_REMOTE
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.openfmri")
+
+TOPURL = "https://openfmri.org/dataset/"
+
+
+# define a pipeline factory function accepting necessary keyword arguments
+# Should have no strictly positional arguments
+def collection_pipeline(url=TOPURL, **kwargs):
+    annex = Annexificator()
+    lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
+    return [
+        crawl_url(url),
+        a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9a-z]*)))/*$"),
+        # https://openfmri.org/dataset/ds000001/
+        assign({'handle_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_handle(
+            template="openfmri",
+            data_fields=['dataset'],
+            # let's all specs and modifications reside in master
+            # branch='incoming',  # there will be archives etc
+            existing='skip'
+            # further any additional options
+        )
+    ]
+
 
 def extract_readme(data):
     # TODO - extract data from the page/response
@@ -39,7 +63,8 @@ def extract_readme(data):
            # 'datalad_stats': data['datalad_stats']
            }
 
-def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/"):
+
+def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
     """Pipeline to crawl/annex an openfmri dataset"""
 
     dataset_url = '%s%s' % (topurl, dataset)
@@ -49,11 +74,15 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
         # leave in Git only obvious descriptors and code snippets -- the rest goes to annex
         # so may be eventually we could take advantage of git tags for changing layout
         statusdb='json',
+        special_remotes=[ARCHIVES_SPECIAL_REMOTE],
         # all .txt and .json in root directory (only) go into git!
         options=["-c",
                  "annex.largefiles="
-                 "exclude=CHANGES* and exclude=README* and exclude=*.[mc] and exclude=dataset*.json"
-                 " and (exclude=*.txt or include=*/*.txt) "
+                 # ISSUES LICENSE Makefile
+                 "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
+                 " and exclude=CHANGES* and exclude=README*"
+                 " and exclude=*.[mc] and exclude=dataset*.json"
+                 " and (exclude=*.txt or include=*/*.txt)"
                  " and (exclude=*.json or include=*/*.json)"
                  " and (exclude=*.tsv or include=*/*.tsv)"
                  ])
@@ -92,7 +121,7 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
             ],
             # TODO: describe_handle
             # Now some true magic -- possibly multiple commits, 1 per each detected new version!
-            annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])'),
+            annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])', unversioned='default', default='1.0.0'),
         ],
         annex.remove_obsolete(),  # should be called while still within incoming but only once
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
@@ -120,4 +149,5 @@ def pipeline(dataset, versioned_urls=True, topurl="https://openfmri.org/dataset/
             annex.finalize(tag=True),
         ],
         annex.switch_branch('master'),
+        annex.finalize(cleanup=True),
     ]
