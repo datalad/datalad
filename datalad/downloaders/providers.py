@@ -52,7 +52,7 @@ class Credential(object):
         'aws-s3': ('key_id', 'secret_id')
     }
 
-    def __init__(self, name, type, url):
+    def __init__(self, name, type, url=None):
         self.name = name
         if not type in self.TYPES:
             raise ValueError("I do not know type %s credential. Known: %s"
@@ -66,6 +66,7 @@ class Credential(object):
                                  + " %s provides information on how to gain access"
                                    % self.url if self.url else '',
                            hidden=True)
+
     # TODO: I guess it, or subclasses depending on the type
     def enter_new(self):
         # Use ui., request credential fields corresponding to the type

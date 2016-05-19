@@ -47,6 +47,7 @@ KNOWN_ALGO = set(LEN_TO_ALGO.values())
 assert(set(Digester.DEFAULT_DIGESTS) == KNOWN_ALGO)
 DEFAULT_ALGO = "sha256"
 
+from datalad import cfg
 
 class HashCollisionError(ValueError):
     """Exception to "celebrate" -- we ran into a hash collision.  World should skip a bit"""
@@ -138,9 +139,11 @@ class UltimateDB(object):
     def _handle_collision(self, digest):
         raise HashCollisionError("??? multiple entries for %s" % str(digest))
 
-    def connect(self):
-        # TODO: config.crawler.db stuff
-        engine = create_engine('sqlite:///:memory:')
+    def connect(self, url='sqlite:///:memory:', username=None, password=None):
+        # TODO: might want to "grasp" http://stackoverflow.com/a/8705750
+        # and avoid creating this factory over and over again?
+        # TODO: also this is nohow thread/multiprocess safe ATM
+        engine = create_engine(url)
         # see http://docs.sqlalchemy.org/en/latest/core/pooling.html
         # may be we need some customization here
         # TODO:  see http://docs.sqlalchemy.org/en/latest/core/pooling.html#using-connection-pools-with-multiprocessing
@@ -165,6 +168,63 @@ class UltimateDB(object):
         self._contexts = []
         # TODO: is there more to do to close it "properly"?
         self._session = None
+        # I guess that will also lead to complete destroying of engine if session is gone
+
+    @staticmethod
+    def _parse_db_url(url):
+        import re
+        # dialect[+driver]://user:password@host:port/dbname[?key=value..]
+        # interesting -- can't : or / be used in the passw?
+        r = re.compile(r"""(?P<dialect>[^:]*)://                 # dialect[+driver]://
+                           (?P<user>[^:/@]+)?(?::(?P<password>[^:/@]*))? # user:password
+                           (?:@(?P<host>[^:/@]+)(?::(?P<port>\d+))?)?/                  # @host/
+                           (?P<dbname>\S+)(?:\?(?P<options>.*))? # dbname[?key=value..]
+                        """,
+                       re.X)
+        reg = re.match(r, url)
+        if not reg:
+            raise ValueError(
+                "URL for the ultimatedb should conform to the specification "
+                "expected by sqlalchemy. "
+                "See http://docs.sqlalchemy.org/en/rel_1_1/core/engines.html")
+        return reg.groupdict()
+
+    @classmethod
+    def from_config(cls):
+        """Factory to provide instance initiated based on config settings"""
+        db = cls()
+        url = cfg.getboolean('crawl', 'ultimatedb.url')
+        # may be we should use "centralized" credential specification?
+        #credential = cfg.get('ultimatedb', 'credential')
+
+        # Parse url, since if contains credentials, no need to check config
+        url_rec = cls._parse_db_url(url)
+        if url_rec['user']:
+            credkw = {
+                'user': url_rec['user'],
+                'password': url_rec['password']
+            }
+        else:
+            lgr.debug("Obtaining credentials for ultimatedb from config/credentials")
+            try:
+                cred_name = cfg.get('crawl', 'ultimatedb.credname')
+                cred_type = cfg.get('crawl', 'ultimatedb.credtype', default="user_password")
+            except IOError:  # TODO differerent
+                lgr.debug("No mentioning of credname for ultimatedb in config")
+                cred_name = None
+            if cred_name:
+                # request credential information
+                from datalad.downloaders.providers import Credential
+                cred = Credential(cred_name, cred_type)
+                assert(set(cred.keys()) == {'user', 'password'})
+                credkw = cred()
+            else:
+                credkw = {}
+        db.connect(url=url, **credkw)
+
+    #
+    # Helpers
+    #
 
     def _commit(self):
         """Would commit if outside of the cm"""

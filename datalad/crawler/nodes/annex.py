@@ -269,11 +269,11 @@ class Annexificator(object):
         self._statusdb = None  # actual DB to be instantiated later
 
         if ultimatedb is None:
-            ultimatedb = True  # TODO config crawl.annex.ultimatedb = True/False
+            ultimatedb = cfg.getboolean('crawl', 'annex.ultimatedb', default=False)
         if isinstance(ultimatedb, bool) and ultimatedb:
             # so we don't require sqlalchemy for lightweight deployments??? XXX
             from ..dbs.ultimate import UltimateDB
-            ultimatedb = UltimateDB()
+            ultimatedb = UltimateDB.from_config()
         self._ultimatedb = ultimatedb
 
     @property
