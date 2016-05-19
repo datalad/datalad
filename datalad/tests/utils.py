@@ -24,6 +24,7 @@ from six import PY2, text_type, iteritems
 from six import binary_type
 from fnmatch import fnmatch
 import time
+from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
@@ -404,14 +405,13 @@ def serve_path_via_http(tfunc, *targs):
         try:
             # Such tests don't require real network so if http_proxy settings were
             # provided, we remove them from the env for the duration of this run
-            orig_env = os.environ.copy()
-            os.environ.pop('http_proxy', None)
-            return tfunc(*(args + (path, url)), **kwargs)
+            env = os.environ.copy()
+            env.pop('http_proxy', None)
+            with patch.dict('os.environ', env):
+                return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
-            # restoring environment
-            os.environ = orig_env
 
     return newfunc
 
