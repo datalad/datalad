@@ -16,6 +16,9 @@ lgr.debug("Importing the rest of datalad.__init__")
 from .config import ConfigManager
 cfg = ConfigManager()
 
+from datalad.support.sshconnector import SSHManager
+ssh_manager = SSHManager()
+
 # be friendly on systems with ancient numpy -- no tests, but at least
 # importable
 try:

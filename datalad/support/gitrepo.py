@@ -30,6 +30,7 @@ import git
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from git.objects.blob import Blob
 
+from datalad import ssh_manager
 from ..support.exceptions import CommandError
 from ..support.exceptions import FileNotInRepositoryError
 from ..cmd import Runner
@@ -672,12 +673,49 @@ class GitRepo(object):
         self._git_custom_command('', 'git remote %s update %s' % (name, v),
                                  expect_stderr=True)
 
-    def git_fetch(self, name, options=''):
+    # TODO: Same for pull, push
+    def fetch(self, remote=None, refspec=None, progress=None, all=False):
+        # TODO: options=> **kwargs):
         """
         """
 
-        self._git_custom_command('', 'git fetch %s %s' % (options, name),
-                                 expect_stderr=True)
+        # Note: Apparently there is no explicit (fetch --all) in gitpython,
+        #       but fetch is always bound to a certain remote instead.
+        #       Therefore implement it on our own:
+        if remote is None:
+            if all:
+                remotes_to_fetch = self.repo.remotes
+            else:
+                # No explicit remote to fetch.
+                # For now this means to just rely on whatever "git fetch" does.
+                # => direct call
+                # TODO: Is that how we want to deal with it? What does it mean
+                # for control masters? What about progress?
+                # Should we look for tracking branch instead and call it explicitly?
+                self.repo.git.fetch(refspec)
+
+                return
+        else:
+            remotes_to_fetch = [self.repo.remote(remote)]
+
+        for rm in remotes_to_fetch:
+            fetch_url = \
+                rm.config_reader.get('fetchurl'
+                                     if rm.config_reader.has_option('fetchurl')
+                                     else 'url')
+            if fetch_url.startswith('ssh:'):
+                cnct = ssh_manager.get_connection(fetch_url)
+                cnct.open()
+                # TODO: with git <= 2.3 keep old mechanism:
+                #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+                with rm.repo.git.custom_environment(
+                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                    rm.fetch(refspec=refspec, progress=progress)  # TODO: progress +kwargs
+            else:
+                rm.fetch(refspec=refspec, progress=progress)  # TODO: progress +kwargs
+
+        # TODO: fetch returns a list of FetchInfo instances. Make use of it.
+
 
     def git_get_remote_url(self, name, push=False):
         """We need to know, where to clone from, if a remote is
@@ -815,6 +853,25 @@ class GitRepo(object):
         stop: bool
           if True, stop (trying to) use existing connection(s).
         """
+
+        # for all remotes
+        #   check ssh
+        #   request connection from SSHManager
+        #   => open()???? when?
+        #   => within SSHConnection, open, whenever needed, but not on construction (by default)
+        #   But: We don't know, when git needs it.
+        #
+        #   we do. At least within python level. Adapt fetch, pull,
+        #   push to request connection and call gitpython function with custom environment
+        #
+        # datalad.ssh_manager.get_...
+
+        ##
+        # annex:
+        #
+        # for now: set annex_sshoptions for all remotes using ssh (see above)
+        # later on: try using annex' controlmasters and/or implement all annex commands, that might need it
+        # (copy, move?, sync, get, ...)
 
         if not stop:
             from pkg_resources import resource_filename

@@ -126,8 +126,7 @@ class Update(Interface):
             lgr.info("Updating handle '%s' ..." % repo.path)
 
             # fetch remote(s):
-            repo.git_fetch(name if name else '',
-                           "--all" if fetch_all else '')
+            repo.fetch(remote=name, all=fetch_all)
 
             # if it is an annex and there is a tracking branch, and we didn't
             # fetch the entire remote anyway, explicitly fetch git-annex
@@ -149,7 +148,7 @@ class Update(Interface):
                     else:
                         raise
                 if std_out:  # we have a "tracking remote"
-                    repo.git_fetch("%s git-annex" % std_out.strip())
+                    repo.fetch(remote=std_out.strip(), refspec="git-annex")
 
             # merge:
             if merge:
