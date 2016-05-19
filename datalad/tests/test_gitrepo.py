@@ -353,7 +353,7 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
         f.write("New file.")
     origin.git_add(filename)
     origin.git_commit("new file added.")
-    clone.git_pull()
+    clone.pull()
     assert_true(exists(opj(clone_path, filename)))
 
 
@@ -370,7 +370,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
     clone.git_add(filename)
     clone.git_commit("new file added.")
     # TODO: need checkout first:
-    clone.git_push('origin +master:new-branch')
+    clone.push('origin', '+master:new-branch')
     origin.git_checkout('new-branch')
     assert_true(exists(opj(orig_path, filename)))
 
@@ -573,5 +573,5 @@ def test_GitRepo_git_get_branch_commits(src):
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
 # TODO:
-#   def git_fetch(self, name, options=''):
+# fetch, push, pull, ssh
 

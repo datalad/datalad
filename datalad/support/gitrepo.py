@@ -673,7 +673,7 @@ class GitRepo(object):
         self._git_custom_command('', 'git remote %s update %s' % (name, v),
                                  expect_stderr=True)
 
-    # TODO: Same for pull, push
+    # TODO: centralize all the c&p code in fetch, pull, push
     def fetch(self, remote=None, refspec=None, progress=None, all=False):
         # TODO: options=> **kwargs):
         """
@@ -726,6 +726,93 @@ class GitRepo(object):
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
 
+    def pull(self, remote=None, refspec=None, progress=None):
+        """
+        """
+        if remote is None:
+            if refspec is not None:
+                # conflicts with using tracking branch or fetch all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError("refspec specified without a remote. (%s)" %
+                                  refspec)
+            # No explicit remote to pull from.
+            # => get tracking branch:
+            tb = self.repo.active_branch.tracking_branch().name
+            if tb:
+                parts = tb.split('/')
+                assert len(parts) == 2
+                remote = self.repo.remote(parts[0])
+                refspec = parts[1]
+            else:
+                # No remote, no tracking branch
+                # => fail
+                raise ValueError("No remote specified to fetch from nor a "
+                                 "tracking branch is set up.")
+        fetch_url = \
+            remote.config_reader.get('fetchurl'
+                                     if remote.config_reader.has_option('fetchurl')
+                                     else 'url')
+        if fetch_url.startswith('ssh:'):
+            cnct = ssh_manager.get_connection(fetch_url)
+            cnct.open()
+            # TODO: with git <= 2.3 keep old mechanism:
+            #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+            with remote.repo.git.custom_environment(
+                    GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                remote.pull(refspec=refspec, progress=progress)
+                # TODO: progress +kwargs
+        else:
+            remote.pull(refspec=refspec, progress=progress)
+            # TODO: progress +kwargs
+
+    def push(self, remote=None, refspec=None, progress=None, all=False):
+        """
+        """
+
+        if remote is None:
+            if refspec is not None:
+                # conflicts with using tracking branch or fetch all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError("refspec specified without a remote. (%s)" %
+                                  refspec)
+            if all:
+                remotes_to_push = self.repo.remotes
+            else:
+                # No explicit remote to fetch.
+                # => get tracking branch:
+                tb = self.repo.active_branch.tracking_branch().name
+                if tb:
+                    parts = tb.split('/')
+                    assert len(parts) == 2
+                    remotes_to_push = [self.repo.remote(parts[0])]
+                    refspec = parts[1]
+                else:
+                    # No remote, no tracking branch
+                    # => fail
+                    raise ValueError("No remote specified to fetch from nor a "
+                                     "tracking branch is set up.")
+        else:
+            remotes_to_push = [self.repo.remote(remote)]
+
+        for rm in remotes_to_push:
+            fetch_url = \
+                rm.config_reader.get('fetchurl'
+                                     if rm.config_reader.has_option('fetchurl')
+                                     else 'url')
+            if fetch_url.startswith('ssh:'):
+                cnct = ssh_manager.get_connection(fetch_url)
+                cnct.open()
+                # TODO: with git <= 2.3 keep old mechanism:
+                #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+                with rm.repo.git.custom_environment(
+                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                    rm.push(refspec=refspec, progress=progress)
+                    # TODO: progress +kwargs
+            else:
+                rm.push(refspec=refspec, progress=progress)
+                # TODO: progress +kwargs
 
     def git_get_remote_url(self, name, push=False):
         """We need to know, where to clone from, if a remote is
@@ -777,19 +864,6 @@ class GitRepo(object):
             if stop and c.hexsha == stop:
                 return
             yield fvalue(c)
-
-    def git_pull(self, name='', options=''):
-        """
-        """
-
-        return self._git_custom_command('', 'git pull %s %s' % (options, name),
-                                 expect_stderr=True)
-
-    def git_push(self, name='', options=''):
-        """
-        """
-        self._git_custom_command('', 'git push %s %s' % (options, name),
-                                 expect_stderr=True)
 
     def git_checkout(self, name, options=''):
         """

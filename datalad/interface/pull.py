@@ -39,4 +39,4 @@ class Pull(Interface):
     def __call__(remote='origin'):
 
         repo = get_repo_instance()
-        repo.git_pull()
+        repo.pull()
