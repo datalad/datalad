@@ -678,23 +678,33 @@ class GitRepo(object):
         # TODO: options=> **kwargs):
         """
         """
-
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
         #       but fetch is always bound to a certain remote instead.
         #       Therefore implement it on our own:
+
         if remote is None:
+            if refspec is not None:
+                # conflicts with using tracking branch or fetch all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError("refspec specified without a remote. (%s)" %
+                                  refspec)
             if all:
                 remotes_to_fetch = self.repo.remotes
             else:
                 # No explicit remote to fetch.
-                # For now this means to just rely on whatever "git fetch" does.
-                # => direct call
-                # TODO: Is that how we want to deal with it? What does it mean
-                # for control masters? What about progress?
-                # Should we look for tracking branch instead and call it explicitly?
-                self.repo.git.fetch(refspec)
-
-                return
+                # => get tracking branch:
+                tb = self.repo.active_branch.tracking_branch().name
+                if tb:
+                    parts = tb.split('/')
+                    assert len(parts) == 2
+                    remotes_to_fetch = [self.repo.remote(parts[0])]
+                    refspec = parts[1]
+                else:
+                    # No remote, no tracking branch
+                    # => fail
+                    raise ValueError("No remote specified to fetch from nor a "
+                                     "tracking branch is set up.")
         else:
             remotes_to_fetch = [self.repo.remote(remote)]
 
