@@ -123,7 +123,7 @@ class SSHManager(object):
         assure_dir(self.socket_dir)
 
     def get_connection(self, url):
-        """
+        """Get a singleton, representing a shared ssh connection to `url`
 
         Parameters
         ----------

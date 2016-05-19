@@ -674,7 +674,8 @@ class GitRepo(object):
                                  expect_stderr=True)
 
     # TODO: centralize all the c&p code in fetch, pull, push
-    def fetch(self, remote=None, refspec=None, progress=None, all=False):
+    # TODO: document **kwargs passed to gitpython
+    def fetch(self, remote=None, refspec=None, progress=None, all=False, **kwargs):
         # TODO: options=> **kwargs):
         """
         """
@@ -720,13 +721,13 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    rm.fetch(refspec=refspec, progress=progress)  # TODO: progress +kwargs
+                    rm.fetch(refspec=refspec, progress=progress, **kwargs)  # TODO: progress +kwargs
             else:
-                rm.fetch(refspec=refspec, progress=progress)  # TODO: progress +kwargs
+                rm.fetch(refspec=refspec, progress=progress, **kwargs)  # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
 
-    def pull(self, remote=None, refspec=None, progress=None):
+    def pull(self, remote=None, refspec=None, progress=None, **kwargs):
         """
         """
         if remote is None:
@@ -760,13 +761,13 @@ class GitRepo(object):
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
                     GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                remote.pull(refspec=refspec, progress=progress)
+                remote.pull(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
         else:
-            remote.pull(refspec=refspec, progress=progress)
+            remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all=False):
+    def push(self, remote=None, refspec=None, progress=None, all=False, **kwargs):
         """
         """
 
@@ -808,10 +809,10 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    rm.push(refspec=refspec, progress=progress)
+                    rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
-                rm.push(refspec=refspec, progress=progress)
+                rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
 
     def git_get_remote_url(self, name, push=False):
