@@ -31,12 +31,12 @@ from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from git.objects.blob import Blob
 
 from datalad import ssh_manager
-from ..support.exceptions import CommandError
-from ..support.exceptions import FileNotInRepositoryError
-from ..cmd import Runner
-from ..utils import optional_args, on_windows, getpwd
-from ..utils import swallow_logs
-from ..utils import swallow_outputs
+from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.cmd import Runner
+from datalad.utils import optional_args, on_windows, getpwd
+from datalad.utils import swallow_logs
+from datalad.utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -682,7 +682,6 @@ class GitRepo(object):
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
         #       but fetch is always bound to a certain remote instead.
         #       Therefore implement it on our own:
-
         if remote is None:
             if refspec is not None:
                 # conflicts with using tracking branch or fetch all remotes
