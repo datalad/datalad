@@ -1,0 +1,24 @@
+From: Yaroslav Halchenko <debian@onerussian.com>
+Subject: overcome difficulty figuring out either keyrings.alt is needed
+
+ There is no __version__ specification in keyring until 8.1.  Anyways
+ we are providing *Depends within debian/control and these requirements
+ are just a sanity check here
+
+Origin: NeuroDebian
+Last-Update: 2016-05-20
+
+--- a/setup.py
++++ b/setup.py
+@@ -34,6 +34,11 @@ keyring_requires = ['keyring<8.0'] \
+     if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7' \
+     else ['keyring>=8.0', 'keyrings.alt']
+ 
++# Debian patch:  do not demand any specific version of keyring via setup
++#  we will rely on debian/control specification specific for the distribution
++#  and available versions
++keyring_requires = ['keyring']
++
+ requires = {
+     'core': [
+         'appdirs',
