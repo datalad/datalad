@@ -186,7 +186,7 @@ def get_local_file_url(fname):
 
 
 def get_url_path(url):
-    """Given a file:// url, return the path itself"""
+    """Given a url, return the path component"""
 
     return urlunquote(urlsplit(url).path)
 
@@ -201,6 +201,14 @@ def parse_url_opts(url):
     else:
         url_, opts = url, {}
     return url_, opts
+
+
+def is_url(s):
+    """Returns whether a string looks like a URL.
+
+    Test implementation uses the presence of a URL scheme as criterion.
+    """
+    return bool(urlsplit(s).scheme)
 
 
 def expandpath(path, force_absolute=True):
