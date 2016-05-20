@@ -47,6 +47,7 @@ from .utils import run_under_dir
 from .utils import use_cassette
 from .utils import skip_if
 from .utils import ok_file_has_content
+from .utils import without_http_proxy
 
 #
 # Test with_tempfile, especially nested invocations
@@ -405,6 +406,29 @@ def test_serve_path_via_http():
     # just with the last one check that we did remove proxy setting
     with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
         yield _test_serve_path_via_http, test_fpath
+
+
+def test_without_http_proxy():
+
+    @without_http_proxy
+    def check(a, kw=False):
+        assert_false('http_proxy' in os.environ)
+        assert_false('https_proxy' in os.environ)
+        assert_in(kw, [False, 'custom'])
+
+    check(1)
+
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
+        check(1, "custom")
+        with assert_raises(AssertionError):
+            check(1, "wrong")
+
+    with patch.dict('os.environ', {'https_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/',
+                                   'https_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
 
 
 def test_assert_re_in():

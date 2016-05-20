@@ -417,6 +417,24 @@ def serve_path_via_http(tfunc, *targs):
 
 
 @optional_args
+def without_http_proxy(tfunc):
+    """Decorator to remove http*_proxy env variables for the duration of the test
+    """
+
+    @wraps(tfunc)
+    def newfunc(*args, **kwargs):
+        # Such tests don't require real network so if http_proxy settings were
+        # provided, we remove them from the env for the duration of this run
+        env = os.environ.copy()
+        env.pop('http_proxy', None)
+        env.pop('https_proxy', None)
+        with patch.dict('os.environ', env, clear=True):
+            return tfunc(*args, **kwargs)
+
+    return newfunc
+
+
+@optional_args
 def with_tempfile(t, content=None, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end
 

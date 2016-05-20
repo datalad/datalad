@@ -51,6 +51,7 @@ from ...tests.utils import swallow_outputs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import skip_if
+from ...tests.utils import without_http_proxy
 from ...support.status import FileStatus
 
 def test_docstring():
@@ -247,6 +248,7 @@ test_cookie = 'somewebsite=testcookie'
 
 #@skip_httpretty_on_problematic_pythons
 @skip_if(not httpretty, "no httpretty")
+@without_http_proxy
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
@@ -325,6 +327,7 @@ class FakeCredential2(Credential):
 
 
 @skip_if(not httpretty, "no httpretty")
+@without_http_proxy
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})
