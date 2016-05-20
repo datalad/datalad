@@ -367,10 +367,11 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         test_txt = 'some txt and a randint {}'.format(random.randint(1, 10)) 
         f.write(test_txt)
 
-
     @serve_path_via_http(tmp_dir)
     def test_path_and_url(path, url):
 
+        # @serve_ should remove http_proxy from the os.environ if was present
+        assert_false('http_proxy' in os.environ)
         url = url + os.path.dirname(test_fpath)
         assert_true(urlopen(url))
         u = urlopen(url)
@@ -399,6 +400,10 @@ def test_serve_path_via_http():
                        get_most_obscure_supported_name(),
                       ]:
 
+        yield _test_serve_path_via_http, test_fpath
+
+    # just with the last one check that we did remove proxy setting
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
         yield _test_serve_path_via_http, test_fpath
 
 

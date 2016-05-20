@@ -407,7 +407,7 @@ def serve_path_via_http(tfunc, *targs):
             # provided, we remove them from the env for the duration of this run
             env = os.environ.copy()
             env.pop('http_proxy', None)
-            with patch.dict('os.environ', env):
+            with patch.dict('os.environ', env, clear=True):
                 return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
