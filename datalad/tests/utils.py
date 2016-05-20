@@ -24,6 +24,7 @@ from six import PY2, text_type, iteritems
 from six import binary_type
 from fnmatch import fnmatch
 import time
+from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
@@ -402,7 +403,12 @@ def serve_path_via_http(tfunc, *targs):
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
-            return tfunc(*(args + (path, url)), **kwargs)
+            # Such tests don't require real network so if http_proxy settings were
+            # provided, we remove them from the env for the duration of this run
+            env = os.environ.copy()
+            env.pop('http_proxy', None)
+            with patch.dict('os.environ', env):
+                return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
@@ -673,15 +679,27 @@ def with_fake_cookies_db(func, cookies={}):
     return newfunc
 
 
-def skip_if_no_network(func):
+def skip_if_no_network(func=None):
     """Skip test completely in NONETWORK settings
+
+    If not used as a decorator, and just a function, could be used at the module level
     """
-    @wraps(func)
-    def newfunc(*args, **kwargs):
+
+    def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
             raise SkipTest("Skipping since no network settings")
-        return func(*args, **kwargs)
-    return newfunc
+
+    if func:
+        @wraps(func)
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        # right away tag the test as a networked test
+        tags = getattr(newfunc, 'tags', [])
+        newfunc.tags = tags + ['network']
+        return newfunc
+    else:
+        check_and_raise()
 
 
 def skip_if_on_windows(func):
