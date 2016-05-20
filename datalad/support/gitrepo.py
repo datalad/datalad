@@ -798,12 +798,12 @@ class GitRepo(object):
             remotes_to_push = [self.repo.remote(remote)]
 
         for rm in remotes_to_push:
-            fetch_url = \
-                rm.config_reader.get('fetchurl'
-                                     if rm.config_reader.has_option('fetchurl')
+            push_url = \
+                rm.config_reader.get('pushurl'
+                                     if rm.config_reader.has_option('pushurl')
                                      else 'url')
-            if fetch_url.startswith('ssh:'):
-                cnct = ssh_manager.get_connection(fetch_url)
+            if push_url.startswith('ssh:'):
+                cnct = ssh_manager.get_connection(push_url)
                 cnct.open()
                 # TODO: with git <= 2.3 keep old mechanism:
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
