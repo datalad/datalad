@@ -34,7 +34,7 @@ override_dh_auto_test:
 	# Since pybuild overrides HOME for its own purposes, we will rely on our
 	# setup_package placing it back into HOME
 	GIT_HOME=$(CURDIR)/build PATH=$(CURDIR)/bin:$$PATH \
-	    PYBUILD_TEST_ARGS="-s -v -e test_import_meta_handle datalad" \
+	    PYBUILD_TEST_ARGS="-s -v datalad" \
 	    dh_auto_test -- --test-nose
 
 
