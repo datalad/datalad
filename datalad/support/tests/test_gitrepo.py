@@ -13,25 +13,24 @@
 import os
 from os.path import join as opj, exists, realpath, curdir, pardir
 
+from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     eq_, assert_in, assert_false, assert_not_equal
-from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 
-from ..support.gitrepo import GitRepo, normalize_paths, _normalize_path
-from ..support.exceptions import FileNotInRepositoryError
-from ..cmd import Runner
-from ..utils import getpwd, chpwd
-
-from .utils import with_tempfile, with_testrepos, \
-    assert_cwd_unchanged, on_windows, with_tree, \
-    get_most_obscure_supported_name, ok_clean_git
-from .utils import swallow_logs
-from .utils import local_testrepo_flavors
-from .utils import skip_if_no_network
-from .utils import assert_re_in
-from .utils import ok_
+from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
 from .utils import SkipTest
+from .utils import assert_re_in
+from .utils import local_testrepo_flavors
+from .utils import ok_
+from .utils import skip_if_no_network
+from .utils import swallow_logs
+from .utils import with_tempfile, with_testrepos, \
+    assert_cwd_unchanged, with_tree, \
+    get_most_obscure_supported_name, ok_clean_git
 from .utils_testrepos import BasicAnnexTestRepo
+from ..cmd import Runner
+from ..support.exceptions import FileNotInRepositoryError
+from ..utils import getpwd, chpwd
 
 
 @assert_cwd_unchanged
@@ -357,6 +356,29 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
     assert_true(exists(opj(clone_path, filename)))
 
 
+@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile
+@with_tempfile
+def test_GitRepo_fetch(test_path, orig_path, clone_path):
+
+    origin = GitRepo(orig_path, test_path)
+    clone = GitRepo(clone_path, orig_path)
+    filename = get_most_obscure_supported_name()
+
+    origin.git_checkout("new_branch", "-b")
+    with open(opj(orig_path, filename), 'w') as f:
+        f.write("New file.")
+    origin.git_add(filename)
+    origin.git_commit("new file added.")
+
+    clone.fetch(remote='origin')
+
+    ok_clean_git(clone.path, annex=False)
+    assert_in("origin/new_branch", clone.git_get_remote_branches())
+    assert_in(filename, clone.git_get_files("origin/new_branch"))
+    assert_false(exists(opj(clone_path, filename)))  # not checked out
+
+
 @with_tempfile
 @with_tempfile
 def test_GitRepo_push_n_checkout(orig_path, clone_path):
@@ -551,6 +573,7 @@ def test_GitRepo_get_merge_base(src):
     # if points to some empty/non-existing branch - should also be None
     assert(repo.git_get_merge_base(['nonexistent', branch2]) is None)
 
+
 @with_tempfile(mkdir=True)
 def test_GitRepo_git_get_branch_commits(src):
 
@@ -572,6 +595,15 @@ def test_GitRepo_git_get_branch_commits(src):
 
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
-# TODO:
-# fetch, push, pull, ssh
+
+def test_GitRepo_ssh_fetch():
+    raise SkipTest("TODO")
+
+
+def test_GitRepo_ssh_pull():
+    raise SkipTest("TODO")
+
+
+def test_GitRepo_ssh_push():
+    raise SkipTest("TODO")
 

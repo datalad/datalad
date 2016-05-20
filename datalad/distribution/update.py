@@ -12,16 +12,15 @@
 
 __docformat__ = 'restructuredtext'
 
-
 import logging
-
 from os.path import join as opj
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import CommandError
-from datalad.interface.base import Interface
+
 from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
+from datalad.interface.base import Interface
+from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
 from datalad.utils import knows_annex, getpwd
 
 lgr = logging.getLogger('datalad.distribution.update')
@@ -153,6 +152,8 @@ class Update(Interface):
             # merge:
             if merge:
                 lgr.info("Applying changes from tracking branch...")
+                # TODO: Adapt.
+                # TODO: Rethink default remote/tracking branch. See above. We need a "tracking remote" but custom refspec to fetch from that remote
                 cmd_list = ["git", "pull"]
                 if name:
                     cmd_list.append(name)

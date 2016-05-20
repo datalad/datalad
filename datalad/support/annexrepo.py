@@ -12,14 +12,15 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
-from os import linesep
-from os.path import join as opj, exists, relpath, islink, realpath, lexists
-import logging
 import json
-import re
+import logging
 import os
+import re
 import shlex
+from os import linesep
+from os.path import join as opj, exists, islink, realpath, lexists
 from subprocess import Popen, PIPE
+
 #import pexpect
 
 from functools import wraps
@@ -27,15 +28,14 @@ from functools import wraps
 from six import string_types
 from six.moves import filter
 from six.moves.configparser import NoOptionError
-from six.moves.urllib.parse import quote as urlquote
 
 from ..dochelpers import exc_str
 from ..utils import auto_repr
-from .gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
+from datalad.support.gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
 from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 from .exceptions import AnnexBatchCommandError
-from ..utils import on_windows, getpwd
+from ..utils import on_windows
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -1266,3 +1266,25 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+
+
+# TODO: ssh:
+#
+# - use annex_options
+# - override from gitrepo
+#
+#
+# annex_ssh = "-S %s" % control_path \
+#                if parsed_target.scheme == 'ssh' else None
+#
+#
+#
+# if ssh_options and not isinstance(ssh_options, string_types):
+#             ssh_options = ' '.join(ssh_options)
+#         annex_ssh = ['-c', 'annex.ssh-options=%s' % ssh_options] \
+#             if ssh_options is not None \
+#             else []
+#         for file_ in local_handle_repo.get_annexed_files():
+#             if local_handle_repo.file_has_content(file_):
+#                 cmd = ["git", "annex", "copy"] + annex_ssh + [file_, "--to=%s" % remote]
+#                 local_handle_repo._annex_custom_command('', cmd, expect_stderr=True)
