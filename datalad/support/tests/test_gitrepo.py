@@ -18,19 +18,19 @@ from nose.tools import assert_raises, assert_is_instance, assert_true, \
     eq_, assert_in, assert_false, assert_not_equal
 
 from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
-from .utils import SkipTest
-from .utils import assert_re_in
-from .utils import local_testrepo_flavors
-from .utils import ok_
-from .utils import skip_if_no_network
-from .utils import swallow_logs
-from .utils import with_tempfile, with_testrepos, \
+from ...tests.utils import SkipTest
+from ...tests.utils import assert_re_in
+from ...tests.utils import local_testrepo_flavors
+from ...tests.utils import ok_
+from ...tests.utils import skip_if_no_network
+from ...tests.utils import swallow_logs
+from ...tests.utils import with_tempfile, with_testrepos, \
     assert_cwd_unchanged, with_tree, \
     get_most_obscure_supported_name, ok_clean_git
-from .utils_testrepos import BasicAnnexTestRepo
-from ..cmd import Runner
-from ..support.exceptions import FileNotInRepositoryError
-from ..utils import getpwd, chpwd
+from ...tests.utils_testrepos import BasicAnnexTestRepo
+from ...cmd import Runner
+from ...support.exceptions import FileNotInRepositoryError
+from ...utils import getpwd, chpwd
 
 
 @assert_cwd_unchanged
