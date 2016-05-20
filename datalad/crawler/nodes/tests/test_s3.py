@@ -21,7 +21,7 @@ from ....utils import rmtree
 from ....tests.utils import eq_
 from ....tests.utils import assert_not_equal
 from ....tests.utils import assert_in, assert_not_in
-from ....tests.utils import SkipTest
+from ....tests.utils import skip_if_no_network
 from ....tests.utils import use_cassette
 from ....tests.utils import externals_use_cassette
 from ....tests.utils import with_tempfile
@@ -38,6 +38,8 @@ def _annex(path):
 
 target_version = '0.0.20151107'
 
+
+@skip_if_no_network
 @use_cassette('test_crawl_s3')
 @with_tempfile
 def test_crawl_s3(path):
@@ -71,6 +73,7 @@ def test_crawl_s3(path):
     eq_(out[0]['datalad_stats'].get_total(), ActivityStats(skipped=17))
 
 
+@skip_if_no_network
 @use_cassette('test_crawl_s3')
 @with_tempfile
 def test_crawl_s3_commit_versions(path):
@@ -117,6 +120,7 @@ def test_crawl_s3_commit_versions(path):
     eq_(out[0]['datalad_stats'].get_total(), ActivityStats(skipped=17))  # Really nothing was done
 
 
+@skip_if_no_network
 @use_cassette('test_crawl_s3_commit_versions_one_at_a_time')
 @with_tempfile
 def test_crawl_s3_commit_versions_one_at_a_time(path):
@@ -167,6 +171,7 @@ def test_crawl_s3_commit_versions_one_at_a_time(path):
 # and the other way around.  annex should handle that.  So this one serves more as integration
 # test
 #
+@skip_if_no_network
 @use_cassette('test_crawl_s3_file_to_directory')
 @with_tempfile
 def test_crawl_s3_file_to_directory(path):
@@ -194,5 +199,3 @@ def test_crawl_s3_file_to_directory(path):
     eq_(total_stats,
         # Deletions come as 'files' as well atm
         ActivityStats(files=3, downloaded=3, overwritten=2, urls=3, add_annex=3, downloaded_size=12, versions=['0.0.20160303']))
-
-
