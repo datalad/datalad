@@ -11,11 +11,11 @@
 """
 
 import os
-from os.path import join as opj, exists, realpath, curdir, pardir
+from os.path import join as opj, exists, realpath, curdir, pardir, abspath
 
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    eq_, assert_in, assert_false, assert_not_equal
+    eq_, assert_in, assert_false, assert_not_equal, assert_not_in
 
 from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
 from ...tests.utils import SkipTest
@@ -27,6 +27,7 @@ from ...tests.utils import swallow_logs
 from ...tests.utils import with_tempfile, with_testrepos, \
     assert_cwd_unchanged, with_tree, \
     get_most_obscure_supported_name, ok_clean_git
+from ...tests.utils import skip_if, skip_if_on_windows
 from ...tests.utils_testrepos import BasicAnnexTestRepo
 from ...cmd import Runner
 from ...support.exceptions import FileNotInRepositoryError
@@ -379,6 +380,57 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     assert_false(exists(opj(clone_path, filename)))  # not checked out
 
 
+@skip_if_on_windows  # No ssh support on windows yet
+@with_testrepos('basic_git', flavors=['local'])
+@with_tempfile
+def test_GitRepo_ssh_fetch(remote_path, repo_path):
+    from datalad import ssh_manager
+
+    remote_repo = GitRepo(remote_path, create=False)
+    url = "ssh://localhost" + abspath(remote_path)
+    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    repo = GitRepo(repo_path, create=True)
+    repo.git_remote_add("ssh-remote", url)
+
+    # connection not known yet:
+    assert_not_in(socket_path, ssh_manager._connections)
+    # socket does not exist:
+    ok_(not exists(socket_path))
+    # we don't know any branches of the remote:
+    eq_([], repo.git_get_remote_branches())
+
+    repo.fetch(remote="ssh-remote")
+    # TODO: There is an issue. Running the test with nosetests is kind of
+    # succesfull, but states:
+    # "Exception AttributeError: AttributeError("'NoneType' object has no attribute 'PIPE'",) in  ignored"
+    # The attribute in question changed from 'environ' to 'PIPE' during implementation of this test.
+    # Couldn't track it down yet. Seems to be raised within gitpython.
+    ok_clean_git(repo.path, annex=False)
+
+    # now, the connection is known to the SSH manager:
+    assert_in(socket_path, ssh_manager._connections)
+    # and socket was created:
+    ok_(exists(socket_path))
+
+    # TODO: destructor issue with SSHConnection
+    # For now, manually close it:
+    ssh_manager.get_connection(url).close()
+    # TODO: Also: When solved, we might be able to test whether fetch()
+    # requested connection from ssh_manager, without closing the connection,
+    # in order to use it for other tests as well.
+
+    # we actually fetched it:
+    assert_in('ssh-remote/master', repo.git_get_remote_branches())
+
+
+def test_GitRepo_ssh_pull():
+    raise SkipTest("TODO")
+
+
+def test_GitRepo_ssh_push():
+    raise SkipTest("TODO")
+
+
 @with_tempfile
 @with_tempfile
 def test_GitRepo_push_n_checkout(orig_path, clone_path):
@@ -594,16 +646,4 @@ def test_GitRepo_git_get_branch_commits(src):
     eq_(commits_hexsha_left, commits_hexsha)
 
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
-
-
-def test_GitRepo_ssh_fetch():
-    raise SkipTest("TODO")
-
-
-def test_GitRepo_ssh_pull():
-    raise SkipTest("TODO")
-
-
-def test_GitRepo_ssh_push():
-    raise SkipTest("TODO")
 
