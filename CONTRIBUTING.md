@@ -204,6 +204,10 @@ You can also check for common programming errors with the following tools:
           pip install nose coverage
           nosetests --with-coverage path/to/tests_for_package
 
+- We rely on https://codecov.io to provide convenient view of code coverage.
+  Installation of the codecov extension for Firefox/Iceweasel or Chromium
+  is strongly advised, since it provides coverage annotation of pull
+  requests.
 
 ### Linting
 
