@@ -31,8 +31,7 @@ from datalad.interface.base import Interface
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.utils import expandpath, knows_annex, assure_dir, \
-    is_explicit_path, on_windows
-
+    is_explicit_path, on_windows, swallow_logs
 
 lgr = logging.getLogger('datalad.distribution.install')
 
@@ -362,11 +361,14 @@ class Install(Interface):
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
             try:
-                vcs = Install._get_new_vcs(ds, source, vcs)
+                with swallow_logs():
+                    vcs = Install._get_new_vcs(ds, source, vcs)
             except GitCommandError:
+                lgr.debug("Cannot retrieve from URL: {0}".format(source))
                 # maybe source URL was missing a '/.git'
                 if source and not source.rstrip('/').endswith('/.git'):
                     source = '{0}/.git'.format(source.rstrip('/'))
+                    lgr.debug("Attempt to retrieve from URL: {0}".format(source))
                     vcs = Install._get_new_vcs(ds, source, vcs)
                 else:
                     lgr.debug("Unable to establish repository instance at: {0}".format(ds.path))
