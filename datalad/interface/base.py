@@ -65,6 +65,20 @@ def dedent_docstring(text):
         return textwrap.dedent(text)
 
 
+def alter_interface_docs_for_api(docs):
+    """Apply modifications to interface docstrings for Python API use."""
+    # central place to alter the impression of docstrings,
+    # like removing cmdline specific sections
+    return dedent_docstring(docs)
+
+
+def alter_interface_docs_for_cmdline(docs):
+    """Apply modifications to interface docstrings for cmdline doc use."""
+    # central place to alter the impression of docstrings,
+    # like removing Python API specific sections, and argument markup
+    return dedent_docstring(docs)
+
+
 def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
     """Generate a useful docstring from a parameter spec
 
