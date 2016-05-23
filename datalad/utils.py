@@ -191,6 +191,24 @@ def get_url_path(url):
     return urlunquote(urlsplit(url).path)
 
 
+def get_local_path_from_url(url):
+    """If given a file:// URL, returns a local path, if possible.
+
+    Raises `ValueError` if not possible, for example, if the URL
+    scheme is different, or if the `host` isn't empty or 'localhost'
+
+    The returned path is always absolute.
+    """
+    urlparts = urlsplit(url)
+    if not urlparts.scheme == 'file':
+        raise ValueError(
+            "Non 'file://' URL cannot be resolved to a local path")
+    if not (urlparts.netloc in ('', 'localhost', '::1') \
+            or urlparts.netloc.startswith('127.')):
+        raise ValueError("file:// URL does not point to 'localhost'")
+    return urlunquote(urlparts.path)
+
+
 def parse_url_opts(url):
     """Given a string with url-style options, split into content before # and options as dict"""
     if '#' in url:

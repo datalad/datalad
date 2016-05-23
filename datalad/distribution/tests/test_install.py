@@ -24,7 +24,7 @@ from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_equal
+    with_testrepos, assert_equal, assert_true
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
@@ -176,6 +176,20 @@ def test_install_dataset_from_just_source(url, path):
     ok_startswith(ds.path, path)
     ok_(ds.is_installed())
     ok_clean_git(ds.path, annex=False)
+
+@with_testrepos(flavors=['network'])
+@with_tempfile
+def test_install_dataset_from_just_source_via_path(url, path):
+    # for remote urls only, the source could be given to `path`
+    # to allows for simplistic cmdline calls
+
+    with chpwd(path, mkdir=True):
+        ds = install(path=url)
+
+    ok_startswith(ds.path, path)
+    ok_(ds.is_installed())
+    ok_clean_git(ds.path, annex=False)
+    assert_true(os.path.lexists(opj(ds.path, 'test-annex.dat')))
 
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile

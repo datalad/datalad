@@ -45,7 +45,7 @@ class ModifySubhandleURLs(Interface):
             args=("url",),
             doc="A template for building the URLs of the subhandles."
                 "List of currently available placeholders:\n"
-                "%NAME\tthe name of the handle, where slashes are replaced by "
+                "%%NAME\tthe name of the handle, where slashes are replaced by "
                 "dashes.",
             constraints=EnsureStr()),
         dataset=Parameter(

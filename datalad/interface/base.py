@@ -16,6 +16,25 @@ import sys
 
 from ..ui import ui
 
+
+def get_api_name(intfspec):
+    """Given an interface specification return an API name for it"""
+    if len(intfspec) > 3:
+        name = intfspec[3]
+    else:
+        name = intfspec[0].split('.')[-1]
+    return name
+
+
+def get_cmdline_command_name(intfspec):
+    """Given an interface specification return a cmdline command name"""
+    if len(intfspec) > 2:
+        name = intfspec[2]
+    else:
+        name = intfspec[0].split('.')[-1].replace('_', '-')
+    return name
+
+
 def get_interface_groups():
     from .. import interface as _interfaces
 
