@@ -31,7 +31,8 @@ from datalad.interface.base import Interface
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.utils import expandpath, knows_annex, assure_dir, \
-    is_explicit_path, on_windows, swallow_logs, get_local_path_from_url
+    is_explicit_path, on_windows, swallow_logs, get_local_path_from_url, \
+    is_url
 
 lgr = logging.getLogger('datalad.distribution.install')
 
