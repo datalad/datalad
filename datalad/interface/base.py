@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 import sys
+import re
 
 from ..ui import ui
 
@@ -69,14 +70,58 @@ def alter_interface_docs_for_api(docs):
     """Apply modifications to interface docstrings for Python API use."""
     # central place to alter the impression of docstrings,
     # like removing cmdline specific sections
-    return dedent_docstring(docs)
+    if not docs:
+        return docs
+    docs = dedent_docstring(docs)
+    # clean cmdline sections
+    docs = re.sub(
+        '\|\| Command line use only \>\>.*\<\< Command line use only \|\|',
+        '',
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    # clean cmdline in-line bits
+    docs = re.sub(
+        '\[CMD:\s.*CMD\]',
+        '',
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    return docs
 
 
 def alter_interface_docs_for_cmdline(docs):
     """Apply modifications to interface docstrings for cmdline doc use."""
     # central place to alter the impression of docstrings,
     # like removing Python API specific sections, and argument markup
-    return dedent_docstring(docs)
+    if not docs:
+        return docs
+    docs = dedent_docstring(docs)
+    # clean cmdline sections
+    docs = re.sub(
+        '\|\| Python use only \>\>.*\<\< Python use only \|\|',
+        '',
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    # clean cmdline in-line bits
+    docs = re.sub(
+        '\[PY:\s.*PY\]',
+        '',
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    # remove None constraint. In general, `None` on the cmdline means don't
+    # give option at all, but specifying `None` explicitly is practically
+    # impossible
+    docs = re.sub(
+        ',\sor\svalue\smust\sbe\s`None`',
+        '',
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    # capitalize variables and remove backticks to uniformize with
+    # argparse output
+    docs = re.sub(
+        '`\S*`',
+        lambda match: match.group(0).strip('`').upper(),
+        docs)
+    return docs
 
 
 def update_docstring_with_parameters(func, params, prefix=None, suffix=None):
@@ -158,14 +203,15 @@ class Interface(object):
             parser_kwargs = param.cmd_kwargs
             if defaults_idx >= 0:
                 parser_kwargs['default'] = defaults[defaults_idx]
-            help = param._doc
+            help = alter_interface_docs_for_cmdline(param._doc)
             if help and help[-1] != '.':
                 help += '.'
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
                 # include value contraint description and default
                 # into the help string
-                cdoc = param.constraints.long_description()
+                cdoc = alter_interface_docs_for_cmdline(
+                    param.constraints.long_description())
                 if cdoc[0] == '(' and cdoc[-1] == ')':
                     cdoc = cdoc[1:-1]
                 help += ' Constraints: %s.' % cdoc
