@@ -20,6 +20,8 @@ from shlex import split as sh_split
 
 from six.moves.urllib.parse import urlparse
 
+# TODO: centralize AppDirs (=> datalad.config?)
+from appdirs import AppDirs
 from datalad.support.exceptions import CommandError
 from datalad.utils import not_supported_on_windows
 from datalad.utils import on_windows
@@ -116,7 +118,8 @@ class SSHManager(object):
                                  "interface platform dependent SSH")
 
         self._connections = dict()
-        self.socket_dir = "/var/run/user/%s/datalad" % geteuid()
+
+        self.socket_dir = AppDirs('datalad', 'datalad.org').user_config_dir
         assure_dir(self.socket_dir)
 
     def get_connection(self, url):
