@@ -160,7 +160,7 @@ class LoggerHelper(object):
     def _get_environ(self, var, default=None):
         return os.environ.get(self.name.upper() + '_%s' % var.upper(), default)
 
-    def set_level(self, level=None, default='WARNING'):
+    def set_level(self, level=None, default='INFO'):
         """Helper to set loglevel for an arbitrary logger
 
         By default operates for 'datalad'.
