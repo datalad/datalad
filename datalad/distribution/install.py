@@ -379,7 +379,7 @@ class Install(Interface):
 
         assert(ds is not None)
 
-        lgr.debug("Resolved target dataset for installation: {0}".format(ds))
+        lgr.info("Installing {0}".format(ds))
 
         vcs = ds.repo
         if vcs is None:
