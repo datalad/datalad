@@ -120,8 +120,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         clone_urls.append('{0}/{1}{2}'.format(
             remote_url, sm_path, url_suffix))
     # attempt: configured submodule URL
-    if sm_url.startswith('/') \
-            or sm_url.split('://')[0] in ('http', 'https', 'ssh', 'file', 'git'):  # XXX: should we allow ANY protocol?
+    if sm_url.startswith('/') or is_url(sm_url):
         # this seems to be an absolute location -> take as is
         clone_urls.append(sm_url)
     else:
