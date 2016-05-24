@@ -19,6 +19,7 @@ from ..misc import sub
 from ..misc import find_files
 from ..misc import switch
 from ..misc import assign
+from ..misc import rename
 from ...pipeline import FinishPipeline
 from ....tests.utils import with_tree
 from ....utils import updated
@@ -57,7 +58,14 @@ def test_assign():
 
 
 def test_rename():
-    raise SkipTest('TODO')
+    data = {'x': 'y'}
+    datamulti = {'x': 'y', 'aa': 'bb'}
+
+    gen = rename({'x': 'newkey', 'aa': 'bb'})
+    genmulti = rename({'x': 'newkey', 'aa': 'newerkey'})
+
+    eq_(list(gen(data)), [{'newkey': 'y'}])
+    eq_(list(genmulti(datamulti)), [{'newkey': 'y', 'newerkey': 'bb'}])
 
 
 def test_range_node():
@@ -110,7 +118,7 @@ def test_skip_if_negate():
 
 def test_func_to_node():
     int_node = func_to_node(int)  # node which requires nothing and nothing of output is used
-    assert (int_node.__doc__)
+    assert int_node.__doc__
     in_dict = {'in': 1}
     ok_generator(int_node(in_dict))
 
@@ -149,7 +157,7 @@ def test_sub():
 
     assert_equal(
         list(s({
-                   'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
+                'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
         [{
              'url': "http://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"}]
     )
