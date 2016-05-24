@@ -51,9 +51,6 @@ class SSHConnection(object):
         self.ctrl_path = ctrl_path
         self.cmd_prefix = ["ssh", "-S", self.ctrl_path, self.host]
 
-    def __del__(self):
-        self.close()
-
     def __call__(self, cmd):
         """
         Parameters
@@ -159,3 +156,8 @@ class SSHManager(object):
             c = SSHConnection(ctrl_path, parsed_target.netloc)
             self._connections[ctrl_path] = c
             return c
+
+    def close(self):
+        lgr.debug("Closing SSH connections ...")
+        for cnct in self._connections:
+            self._connections[cnct].close()

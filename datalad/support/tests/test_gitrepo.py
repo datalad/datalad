@@ -381,7 +381,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
 
 
 @skip_if_on_windows  # No ssh support on windows yet
-@with_testrepos('basic_git', flavors=['local'])
+@with_testrepos(flavors=['local'])
 @with_tempfile
 def test_GitRepo_ssh_fetch(remote_path, repo_path):
     from datalad import ssh_manager
@@ -392,32 +392,16 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     repo = GitRepo(repo_path, create=True)
     repo.git_remote_add("ssh-remote", url)
 
-    # connection not known yet:
-    assert_not_in(socket_path, ssh_manager._connections)
-    # socket does not exist:
-    ok_(not exists(socket_path))
     # we don't know any branches of the remote:
     eq_([], repo.git_get_remote_branches())
 
     repo.fetch(remote="ssh-remote")
-    # TODO: There is an issue. Running the test with nosetests is kind of
-    # succesfull, but states:
-    # "Exception AttributeError: AttributeError("'NoneType' object has no attribute 'PIPE'",) in  ignored"
-    # The attribute in question changed from 'environ' to 'PIPE' during implementation of this test.
-    # Couldn't track it down yet. Seems to be raised within gitpython.
     ok_clean_git(repo.path, annex=False)
 
-    # now, the connection is known to the SSH manager:
+    # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, ssh_manager._connections)
     # and socket was created:
     ok_(exists(socket_path))
-
-    # TODO: destructor issue with SSHConnection
-    # For now, manually close it:
-    ssh_manager.get_connection(url).close()
-    # TODO: Also: When solved, we might be able to test whether fetch()
-    # requested connection from ssh_manager, without closing the connection,
-    # in order to use it for other tests as well.
 
     # we actually fetched it:
     assert_in('ssh-remote/master', repo.git_get_remote_branches())
