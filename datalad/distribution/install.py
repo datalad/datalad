@@ -261,7 +261,7 @@ class Install(Interface):
 
     _params_ = dict(
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc="""specify the dataset to perform the install operation on. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
@@ -281,7 +281,7 @@ class Install(Interface):
             constraints=EnsureStr() | EnsureNone()),
         # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
             doc="""If set, all content is installed recursively, including
             content of any subdatasets."""),
