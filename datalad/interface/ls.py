@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import sys
 import time
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir
@@ -201,31 +202,46 @@ class LsFormatter(string.Formatter):
         GREEN = ColorFormatter.COLOR_SEQ % (ColorFormatter.GREEN + 30)
         RESET = ColorFormatter.RESET_SEQ
     else:
-        BLUE = RED = GREEN = RESET = ""
+        BLUE = RED = GREEN = RESET = u""
+
+    # http://stackoverflow.com/questions/9932406/unicodeencodeerror-only-when-running-as-a-cron-job
+    # reveals that Python uses ascii encoding when stdout is a pipe, so we shouldn't force it to be
+    # unicode then
+    # TODO: we might want to just ignore and force utf8 while explicitly .encode()'ing output!
+    if sys.getdefaultencoding() == 'ascii':
+        OK = 'OK'   # u"✓"
+        NOK = 'X'  # u"✗"
+        NONE = '-'  # u"✗"
+    else:
+        # unicode versions which look better but which blow during tests etc
+        OK = u"✓"
+        NOK = u"✗"
+        NONE = u"✗"
+
 
     def convert_field(self, value, conversion):
         #print("%r->%r" % (value, conversion))
         if conversion == 'D':  # Date
             if value is not None:
-                return time.strftime("%Y-%m-%d/%H:%M:%S", time.localtime(value))
+                return time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(value))
             else:
-                return '-'
+                return u'-'
         elif conversion == 'S':  # Human size
             #return value
             if value is not None:
-                return str(humanize.naturalsize(value))
+                return humanize.naturalsize(value)
             else:
-                return '-'
+                return u'-'
         elif conversion == 'X':  # colored bool
-            chr, col = ("✓", self.GREEN) if value else ("✗", self.RED)
-            return "%s%s%s" % (col, chr, self.RESET)
+            chr, col = (self.OK, self.GREEN) if value else (self.NOK, self.RED)
+            return u"%s%s%s" % (col, chr, self.RESET)
         elif conversion == 'N':  # colored Red - if None
             if value is None:
                 # return "%s✖%s" % (self.RED, self.RESET)
-                return "%s✗%s" % (self.RED, self.RESET)
+                return u"%s%s%s" % (self.RED, self.NONE, self.RESET)
             return value
         elif conversion in {'B', 'R'}:
-            return "%s%s%s" % ({'B': self.BLUE, 'R': self.RED}[conversion], value, self.RESET)
+            return u"%s%s%s" % ({'B': self.BLUE, 'R': self.RED}[conversion], value, self.RESET)
 
         return super(LsFormatter, self).convert_field(value, conversion)
 
@@ -234,7 +250,7 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
     try:
         #print("WORKING ON %s" % ds_model.path)
         if not exists(ds_model.ds.path) or not ds_model.ds.repo:
-            return formatter.format(format_exc, ds=ds_model, msg="not installed")
+            return formatter.format(format_exc, ds=ds_model, msg=u"not installed")
         ds_formatted = formatter.format(format_str, ds=ds_model)
         #print("FINISHED ON %s" % ds_model.path)
         return ds_formatted
@@ -263,13 +279,13 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         ds_model.path = path
 
     maxpath = max(len(ds_model.path) for ds_model in dsms)
-    path_fmt = "{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
-    pathtype_fmt = path_fmt + "  [{ds.type}]"
-    full_fmt = pathtype_fmt + "  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
+    path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    pathtype_fmt = path_fmt + u"  [{ds.type}]"
+    full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
     if (not fast) or all:
-        full_fmt += "  {ds.clean!X}"
+        full_fmt += u"  {ds.clean!X}"
     if all:
-        full_fmt += "  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
+        full_fmt += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
 
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
@@ -278,7 +294,8 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     #         for dsm in dss):
     #     print(out)
     for dsm in dsms:
-        print(format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + "  {msg!R}"))
+        ds_str = format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + u"  {msg!R}")
+        print(ds_str)
 
 #
 # S3 listing
