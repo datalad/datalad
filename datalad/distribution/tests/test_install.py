@@ -10,6 +10,7 @@
 """
 
 import os
+import shutil
 from os.path import join as opj, abspath
 
 from ..dataset import Dataset
@@ -62,6 +63,10 @@ def test_get_containing_subdataset(path):
     subds = ds.install("sub", source=path)
     eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
     eq_(get_containing_subdataset(ds, "some").path, ds.path)
+    # make sure the subds is found, even when it is not present, but still
+    # known
+    shutil.rmtree(subds.path)
+    eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
     assert_raises(ValueError, get_containing_subdataset, ds, outside_path)

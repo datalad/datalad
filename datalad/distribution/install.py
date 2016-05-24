@@ -243,8 +243,7 @@ def get_containing_subdataset(ds, path):
 
     for subds in ds.get_dataset_handles():
         common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
-        # TODO: Rethink these conditions. Last one needed? What about uninitialized submodules?
-        if common.endswith(sep) and common == _with_sep(subds) and isdir(opj(ds.path, common)):
+        if common.endswith(sep) and common == _with_sep(subds):
             return Dataset(path=opj(ds.path, common))
     return ds
 
