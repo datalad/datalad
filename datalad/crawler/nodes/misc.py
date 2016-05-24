@@ -142,10 +142,10 @@ class assign(object):
         self.interpolate = interpolate
 
     def __call__(self, data):
-        data = data.copy()  # we need to operate on a copy
+        data_ = data.copy()  # we need to operate on a copy
         for k, v in self.assignments.items():
-            data[k] = v % data if self.interpolate else v
-        yield data
+            data_[k] = v % data if self.interpolate else v
+        yield data_
 
 
 # class prune(object):

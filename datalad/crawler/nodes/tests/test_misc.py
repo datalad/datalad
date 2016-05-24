@@ -56,13 +56,10 @@ def test_assign():
     genf = assign({'key': 'value %(x)s'}, interpolate=False)
     eq_(list(genf(data)), [{'key': 'value %(x)s', 'x': 'y'}])
 
-
-def test_assign2():
-    data = {'x': 'z'}
+    datadup = {'x': 'z'}
 
     gen = assign({'x': 'value', 'g': 'y %(x)s'}, interpolate=True)
-    # this should interpolate with z, but picks up on incorrect dict due to same key
-    print(list(gen(data)))
+    eq_(list(gen(datadup)), [{'x': 'value', 'g': 'y z'}])
 
 
 def test_rename():
