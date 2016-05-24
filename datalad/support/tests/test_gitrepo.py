@@ -381,7 +381,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
 
 
 @skip_if_on_windows  # No ssh support on windows yet
-@with_testrepos(flavors=['local'])
+@with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile
 def test_GitRepo_ssh_fetch(remote_path, repo_path):
     from datalad import ssh_manager
@@ -408,19 +408,20 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
 
 
 @skip_if_on_windows  # No ssh support on windows yet
-@with_testrepos('.*basic.*', flavors=['local'])
+@with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_pull(remote_path, repo_path):
     from datalad import ssh_manager
 
-    remote_repo = GitRepo(remote_path, create=False)
+    remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + abspath(remote_path)
     socket_path = opj(ssh_manager.socket_dir, 'localhost')
     repo = GitRepo(repo_path, create=True)
     repo.git_remote_add("ssh-remote", url)
 
     # modify remote:
-    with open(opj(remote.path, "ssh_testfile.dat"), "w") as f:
+    remote_repo.git_checkout("ssh-test", "-b")
+    with open(opj(remote_repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
     remote_repo.git_add("ssh_testfile.dat")
     remote_repo.git_commit("ssh_testfile.dat added.")
@@ -442,18 +443,19 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
 
 
 @skip_if_on_windows  # No ssh support on windows yet
-@with_testrepos(flavors=['local'])
 @with_tempfile
-def test_GitRepo_ssh_push(remote_path, repo_path):
+@with_tempfile
+def test_GitRepo_ssh_push(repo_path, remote_path):
     from datalad import ssh_manager
 
-    remote_repo = GitRepo(remote_path, create=False)
+    remote_repo = GitRepo(remote_path, create=True)
     url = "ssh://localhost" + abspath(remote_path)
     socket_path = opj(ssh_manager.socket_dir, 'localhost')
     repo = GitRepo(repo_path, create=True)
     repo.git_remote_add("ssh-remote", url)
 
     # modify local repo:
+    repo.git_checkout("ssh-test", "-b")
     with open(opj(repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
     repo.git_add("ssh_testfile.dat")
@@ -463,7 +465,7 @@ def test_GitRepo_ssh_push(remote_path, repo_path):
     assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
 
     # push changes:
-    repo.push(remote="ssh-remote", refspec="+master:ssh-test")
+    repo.push(remote="ssh-remote", refspec="ssh-test")
 
     # the connection is known to the SSH manager, since fetch() requested it:
     assert_in(socket_path, ssh_manager._connections)
