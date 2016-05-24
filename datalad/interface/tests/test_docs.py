@@ -12,6 +12,7 @@
 
 __docformat__ = 'restructuredtext'
 
+from datalad.interface.base import dedent_docstring
 from datalad.interface.base import alter_interface_docs_for_api
 from datalad.interface.base import alter_interface_docs_for_cmdline
 from datalad.tests.utils import assert_true, assert_false, assert_in, \
@@ -68,6 +69,11 @@ demo_argdoc = """\
     (e.g. a path), or value must be `None`. [Default:
     None]
 """
+
+
+def test_dedent():
+    assert_false(dedent_docstring("one liner").endswith("\n"))
+
 
 def test_alter_interface_docs_for_api():
     alt = alter_interface_docs_for_api(demo_doc)

@@ -49,13 +49,13 @@ class ModifySubhandleURLs(Interface):
                 "dashes.",
             constraints=EnsureStr()),
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset",),
             doc=""""specify the dataset to update. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             action="store_true",
             doc="Recursively modify all subhandle URLs of `dataset`."),)
 

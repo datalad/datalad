@@ -261,27 +261,26 @@ class Install(Interface):
 
     _params_ = dict(
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc="""specify the dataset to perform the install operation on. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
-            doc="""path/name of the installation target. If no `dataset` and
-            `source` are provided, this is interpreted as a `source` URL of
-            a dataset and a destination path will be derived from the URL
-            similar to 'git clone'.""",
+            doc="""path/name of the installation target. If no `source` is
+            provided, and no `dataset` is given or detected, this is
+            interpreted as the source URL of a dataset and a destination
+            path will be derived from the URL similar to 'git clone'.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
             doc="url or local path of the installation source",
-            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
             doc="""If set, all content is installed recursively, including
             content of any subdatasets."""),

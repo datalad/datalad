@@ -48,15 +48,15 @@ class DownloadURL(Interface):
             metavar='url',
             nargs='+'),
         overwrite=Parameter(
-            args=("--overwrite", "-o"),
+            args=("-o", "--overwrite"),
             action="store_true",
             doc="""Flag to overwrite it if target file exists"""),
         stop_on_failure=Parameter(
-            args=("--stop-on-failure", "-x"),
+            args=("-x", "--stop-on-failure"),
             action="store_true",
             doc="""Flag to stop subsequent downloads upon first failure to download"""),
         path=Parameter(
-            args=("--path", '-O'),
+            args=("-O", "--path"),
             doc="Path (filename or directory path) where to store downloaded file(s). "
                 "In case of multiple URLs provided, must point to a directory.  Otherwise current "
                 "directory is used",
