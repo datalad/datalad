@@ -277,7 +277,6 @@ class Install(Interface):
         source=Parameter(
             args=("-s", "--source",),
             doc="url or local path of the installation source",
-            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(
