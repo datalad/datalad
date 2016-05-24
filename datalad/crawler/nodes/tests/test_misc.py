@@ -57,6 +57,14 @@ def test_assign():
     eq_(list(genf(data)), [{'key': 'value %(x)s', 'x': 'y'}])
 
 
+def test_assign2():
+    data = {'x': 'z'}
+
+    gen = assign({'x': 'value', 'g': 'y %(x)s'}, interpolate=True)
+    # this should interpolate with z, but picks up on incorrect dict due to same key
+    print(list(gen(data)))
+
+
 def test_rename():
     data = {'x': 'y'}
     datamulti = {'x': 'y', 'aa': 'bb'}
@@ -157,9 +165,9 @@ def test_sub():
 
     assert_equal(
         list(s({
-                'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
+            'url': "https://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"})),
         [{
-             'url': "http://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"}]
+            'url': "http://s3.amazonaws.com/openfmri/tarballs/ds031_retinotopy.tgz?versionId=HcKd4prWsHup6nEwuIq2Ejdv49zwX5U"}]
     )
 
 
