@@ -40,9 +40,10 @@ manpages: bin
 		--help-option="--help-np" -N -n "data management and sharing tool" \
 			"bin/datalad" > build/man/datalad.1 ; \
 	# figure out all relevant interface files, fuck yeah Python
-	for api in $$(PYTHONPATH=. python -c "from datalad.interface.base import get_interface_groups; print(' '.join([' '.join([j.__module__.split('.')[-1] for j in i[2]]) for i in get_interface_groups()]))"); do \
-		cmd="$$(echo "$$api" | tr '_' '-')" ; \
-		summary="$$(grep -A 1 'class.*(.*Interface.*)' $$(python -c "import inspect; from datalad.api import $${api} as fx; print(inspect.getfile(fx))") | grep -v ':' | grep -v '^--' | sed -e 's/"//g' -e 's/^[ \t]*//;s/[ \t.]*$$//' | tr 'A-Z' 'a-z')" ; \
+	for api in $$(PYTHONPATH=. python -c "from datalad.interface.base import get_interface_groups, get_cmdline_command_name; print(' '.join([' '.join([intf[0] + ':' + get_cmdline_command_name(intf) for intf in group[2]]) for group in get_interface_groups()]))"); do \
+		mod="$$(echo $${api} | cut -d ':' -f 1)" ; \
+		cmd="$$(echo $${api} | cut -d ':' -f 2)" ; \
+		summary="$$(grep -A 1 'class.*(.*Interface.*)' $$(python -c "import inspect; import $${mod} as mod; print(inspect.getsourcefile(mod))") | grep -v ':' | grep -v '^--' | sed -e 's/"//g' -e 's/^[ \t]*//;s/[ \t.]*$$//' | tr 'A-Z' 'a-z')" ; \
 		DATALAD_HELP2MAN=1 PYTHONPATH=. help2man --no-discard-stderr \
 			--help-option="--help-np" -N -n "$$summary" \
 				"bin/datalad $${cmd}" > build/man/datalad-$${cmd}.1 ; \

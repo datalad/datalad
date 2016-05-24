@@ -20,6 +20,7 @@ from six.moves.urllib.parse import urlparse
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
+from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
 from datalad.cmd import Runner
 from ..interface.base import Interface
@@ -102,12 +103,14 @@ class CreatePublicationTargetSSHWebserver(Interface):
             action="store_true",
             doc="""Recursively create the publication target for all
                 subdatasets of `dataset`""",),
-        force=Parameter(
-            args=("--force", "-f",),
-            action="store_true",
-            doc="""If target directory exists already, force to (re-)init
-                git. Also forces to (re-)configure sibling `target`
-                (i.e. its URL(s)) in case it already exists.""",),
+        existing=Parameter(
+            args=("--existing",),
+            constraints=EnsureChoice('skip', 'replace', 'raise'),
+            doc="""Action to perform, if target directory exists already.
+                Dataset is skipped if `skip`. `replace` forces to (re-)init
+                git and to (re-)configure sibling `target`
+                (i.e. its URL(s)) in case it already exists. `raise` just
+                raises an Exception""",),
         shared=Parameter(
             args=("--shared",),
             doc="""passed to git-init. TODO: Figure out how to communicate what
@@ -119,7 +122,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
     def __call__(sshurl, target=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
-                 force=False, shared=False):
+                 existing='raise', shared=False):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -221,8 +224,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                             start=ds.path)))
 
             if path != '.':
-                # check if target exists, and if not --force is given,
-                # fail here
+                # check if target exists
                 # TODO: Is this condition valid for != '.' only?
                 path_exists = True
                 cmd = ssh_cmd + ["ls", path]
@@ -236,9 +238,16 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     else:
                         raise  # It's an unexpected failure here
 
-                if path_exists and not force:
-                    raise RuntimeError("Target directory %s already exists." %
-                                       path)
+                if path_exists:
+                    if existing == 'raise':
+                        raise RuntimeError(
+                            "Target directory %s already exists." % path)
+                    elif existing == 'skip':
+                        continue
+                    elif existing == 'replace':
+                        pass
+                    else:
+                        raise ValueError("Do not know how to hand existing=%s" % repr(existing))
 
                 cmd = ssh_cmd + ["mkdir", "-p", path]
                 try:
@@ -320,6 +329,6 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                          url=target_url,
                                          pushurl=target_pushurl,
                                          recursive=recursive,
-                                         force=force)
+                                         force=existing in {'replace'})
 
         # TODO: Return value!?

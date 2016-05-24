@@ -10,15 +10,15 @@
 
 """
 
+
 from ..support.s3 import get_versioned_url
-from ..downloaders.tests.utils import get_test_providers
+from .utils import use_cassette
 
 from nose.tools import eq_, assert_raises
-from nose import SkipTest
+from datalad.tests.utils import skip_if_no_network
+from ..downloaders.tests.utils import get_test_providers
 
-from ..support.keyring_ import keyring
-
-from .utils import use_cassette
+skip_if_no_network()  # ATM we don't ship fixtures, so if no network -- no network!
 
 
 @use_cassette('s3_test0')

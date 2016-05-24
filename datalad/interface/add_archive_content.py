@@ -146,9 +146,9 @@ class AddArchiveContent(Interface):
             doc="""Drop extracted files after adding to annex.""",
         ),
         delete_after=Parameter(
-            args=("--remove-after",),
+            args=("--delete-after",),
             action="store_true",
-            doc="""Extract under a temporary directory, git-annex add, and remove after.
+            doc="""Extract under a temporary directory, git-annex add, and delete after.
          To be used to "index" files within annex without actually creating corresponding
          files under git.  Note that `annex dropunused` would later remove that load."""),
 

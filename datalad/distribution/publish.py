@@ -124,7 +124,7 @@ class Publish(Interface):
         if path is not None:
             path = resolve_path(path, ds)
 
-        lgr.debug("Resolved component to be published: {0}".format(path))
+        lgr.info("Publishing {0}".format(path))
 
         # if we have no dataset given, figure out which one we need to operate
         # on, based on the resolved location (that is now guaranteed to

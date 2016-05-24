@@ -47,6 +47,7 @@ from .utils import run_under_dir
 from .utils import use_cassette
 from .utils import skip_if
 from .utils import ok_file_has_content
+from .utils import without_http_proxy
 
 #
 # Test with_tempfile, especially nested invocations
@@ -367,10 +368,11 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         test_txt = 'some txt and a randint {}'.format(random.randint(1, 10)) 
         f.write(test_txt)
 
-
     @serve_path_via_http(tmp_dir)
     def test_path_and_url(path, url):
 
+        # @serve_ should remove http_proxy from the os.environ if was present
+        assert_false('http_proxy' in os.environ)
         url = url + os.path.dirname(test_fpath)
         assert_true(urlopen(url))
         u = urlopen(url)
@@ -400,6 +402,33 @@ def test_serve_path_via_http():
                       ]:
 
         yield _test_serve_path_via_http, test_fpath
+
+    # just with the last one check that we did remove proxy setting
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
+        yield _test_serve_path_via_http, test_fpath
+
+
+def test_without_http_proxy():
+
+    @without_http_proxy
+    def check(a, kw=False):
+        assert_false('http_proxy' in os.environ)
+        assert_false('https_proxy' in os.environ)
+        assert_in(kw, [False, 'custom'])
+
+    check(1)
+
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
+        check(1, "custom")
+        with assert_raises(AssertionError):
+            check(1, "wrong")
+
+    with patch.dict('os.environ', {'https_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/',
+                                   'https_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
 
 
 def test_assert_re_in():
@@ -431,10 +460,17 @@ def test_skip_if_no_network():
         @skip_if_no_network
         def somefunc(a1):
             return a1
+        eq_(somefunc.tags, ['network'])
         with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
+        # and now if used as a function, not a decorator
+        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+            assert_raises(SkipTest, skip_if_no_network)
+        with patch.dict('os.environ', {}):
+            eq_(skip_if_no_network(), None)
+
 
 def test_skip_if():
 

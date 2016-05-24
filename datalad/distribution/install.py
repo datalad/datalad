@@ -30,7 +30,8 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
-    is_explicit_path, on_windows
+    is_explicit_path, on_windows, swallow_logs, get_local_path_from_url, \
+    is_url
 
 lgr = logging.getLogger('datalad.distribution.install')
 
@@ -323,20 +324,47 @@ class Install(Interface):
 
         # resolve the target location against the provided dataset
         if path is not None:
-            path = resolve_path(path, ds)
+            # make sure it is not a URL, `resolve_path` cannot handle that
+            if is_url(path):
+                try:
+                    path = get_local_path_from_url(path)
+                    path = resolve_path(path, ds)
+                except ValueError:
+                    # URL doesn't point to a local something
+                    pass
+            else:
+                path = resolve_path(path, ds)
 
-        lgr.debug("Resolved installation target: {0}".format(path))
+        # any `path` argument that point to something local now resolved and
+        # is no longer a URL
 
         # if we have no dataset given, figure out which one we need to operate
         # on, based on the resolved target location (that is now guaranteed to
-        # be specified
-        if ds is None and path is not None:
+        # be specified, but only if path isn't a URL (anymore) -> special case,
+        # handles below
+        if ds is None and path is not None and not is_url(path):
             # try to find a dataset at or above the installation target
             dspath = GitRepo.get_toppath(abspath(path))
             if dspath is None:
                 # no top-level dataset found, use path as such
                 dspath = path
             ds = Dataset(dspath)
+
+        if ds is None and source is None and path is not None:
+            # no dataset, no source
+            # this could be a shortcut install call, where the first
+            # arg identifies the source
+            if is_url(path) or os.path.exists(path):
+                # we have an actual URL -> this should be the source
+                # OR
+                # it is not a URL, but it exists locally
+                lgr.debug(
+                    "Single argument given to install and no dataset found. "
+                    "Assuming the argument identifies a source location.")
+                source = path
+                path = None
+
+        lgr.debug("Resolved installation target: {0}".format(path))
 
         if ds is None and path is None and source is not None:
             # we got nothing but a source. do something similar to git clone
@@ -363,11 +391,14 @@ class Install(Interface):
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
             try:
-                vcs = Install._get_new_vcs(ds, source, vcs)
+                with swallow_logs():
+                    vcs = Install._get_new_vcs(ds, source, vcs)
             except GitCommandError:
+                lgr.debug("Cannot retrieve from URL: {0}".format(source))
                 # maybe source URL was missing a '/.git'
                 if source and not source.rstrip('/').endswith('/.git'):
                     source = '{0}/.git'.format(source.rstrip('/'))
+                    lgr.debug("Attempt to retrieve from URL: {0}".format(source))
                     vcs = Install._get_new_vcs(ds, source, vcs)
                 else:
                     lgr.debug("Unable to establish repository instance at: {0}".format(ds.path))
