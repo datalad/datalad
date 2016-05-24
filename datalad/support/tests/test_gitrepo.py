@@ -407,12 +407,72 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     assert_in('ssh-remote/master', repo.git_get_remote_branches())
 
 
-def test_GitRepo_ssh_pull():
-    raise SkipTest("TODO")
+@skip_if_on_windows  # No ssh support on windows yet
+@with_testrepos('.*basic.*', flavors=['local'])
+@with_tempfile
+def test_GitRepo_ssh_pull(remote_path, repo_path):
+    from datalad import ssh_manager
+
+    remote_repo = GitRepo(remote_path, create=False)
+    url = "ssh://localhost" + abspath(remote_path)
+    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    repo = GitRepo(repo_path, create=True)
+    repo.git_remote_add("ssh-remote", url)
+
+    # modify remote:
+    with open(opj(remote.path, "ssh_testfile.dat"), "w") as f:
+        f.write("whatever")
+    remote_repo.git_add("ssh_testfile.dat")
+    remote_repo.git_commit("ssh_testfile.dat added.")
+
+    # file is not locally known yet:
+    assert_not_in("ssh_testfile.dat", repo.get_indexed_files())
+
+    # pull changes:
+    repo.pull(remote="ssh-remote", refspec=remote_repo.git_get_active_branch())
+    ok_clean_git(repo.path, annex=False)
+
+    # the connection is known to the SSH manager, since fetch() requested it:
+    assert_in(socket_path, ssh_manager._connections)
+    # and socket was created:
+    ok_(exists(socket_path))
+
+    # we actually pulled the changes
+    assert_in("ssh_testfile.dat", repo.get_indexed_files())
 
 
-def test_GitRepo_ssh_push():
-    raise SkipTest("TODO")
+@skip_if_on_windows  # No ssh support on windows yet
+@with_testrepos(flavors=['local'])
+@with_tempfile
+def test_GitRepo_ssh_push(remote_path, repo_path):
+    from datalad import ssh_manager
+
+    remote_repo = GitRepo(remote_path, create=False)
+    url = "ssh://localhost" + abspath(remote_path)
+    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    repo = GitRepo(repo_path, create=True)
+    repo.git_remote_add("ssh-remote", url)
+
+    # modify local repo:
+    with open(opj(repo.path, "ssh_testfile.dat"), "w") as f:
+        f.write("whatever")
+    repo.git_add("ssh_testfile.dat")
+    repo.git_commit("ssh_testfile.dat added.")
+
+    # file is not known to the remote yet:
+    assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
+
+    # push changes:
+    repo.push(remote="ssh-remote", refspec="+master:ssh-test")
+
+    # the connection is known to the SSH manager, since fetch() requested it:
+    assert_in(socket_path, ssh_manager._connections)
+    # and socket was created:
+    ok_(exists(socket_path))
+
+    # remote now knows the changes:
+    assert_in("ssh-test", remote_repo.git_get_branches())
+    assert_in("ssh_testfile.dat", remote_repo.git_get_files("ssh-test"))
 
 
 @with_tempfile

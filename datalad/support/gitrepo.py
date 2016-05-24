@@ -749,6 +749,9 @@ class GitRepo(object):
                 # => fail
                 raise ValueError("No remote specified to fetch from nor a "
                                  "tracking branch is set up.")
+        else:
+            remote = self.repo.remote(remote)
+
         fetch_url = \
             remote.config_reader.get('fetchurl'
                                      if remote.config_reader.has_option('fetchurl')
