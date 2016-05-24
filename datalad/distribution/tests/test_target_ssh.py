@@ -74,7 +74,7 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                                target="local_target",
                                                sshurl="ssh://localhost" +
                                                       opj(target_path, "basic"),
-                                               force=True)
+                                               existing='replace')
         eq_("ssh://localhost" + opj(target_path, "basic"),
             source.repo.git_get_remote_url("local_target"))
         eq_("ssh://localhost" + opj(target_path, "basic"),
@@ -91,7 +91,7 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                                               "basic"),
                                                target_pushurl="ssh://localhost" +
                                                       opj(target_path, "basic"),
-                                               force=True)
+                                               existing='replace')
         eq_(opj(target_path, "basic"),
             source.repo.git_get_remote_url("local_target"))
         eq_("ssh://localhost" + opj(target_path, "basic"),
