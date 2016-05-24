@@ -269,7 +269,7 @@ class Install(Interface):
         path=Parameter(
             args=("path",),
             doc="""path/name of the installation target. If no `dataset` and
-            `source` are provided, this is interpreted as a `source` URL of
+            `source` are provided, this is interpreted as a source URL of
             a dataset and a destination path will be derived from the URL
             similar to 'git clone'.""",
             nargs="*",
