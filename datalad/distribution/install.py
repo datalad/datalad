@@ -268,10 +268,10 @@ class Install(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
-            doc="""path/name of the installation target. If no `dataset` and
-            `source` are provided, this is interpreted as a source URL of
-            a dataset and a destination path will be derived from the URL
-            similar to 'git clone'.""",
+            doc="""path/name of the installation target. If no `source` is
+            provided, and no `dataset` is given or detected, this is
+            interpreted as the source URL of a dataset and a destination
+            path will be derived from the URL similar to 'git clone'.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
