@@ -195,7 +195,7 @@ class AnnexRepo(GitRepo):
         for r in self.git_get_remotes():
             for url in [self.git_get_remote_url(r),
                         self.git_get_remote_url(r, push=True)]:
-                if url.startswith('ssh:'):
+                if url is not None and url.startswith('ssh:'):
                     c = ssh_manager.get_connection(url)
 
                     self.repo.config_writer().set_value("remote \"%s\"" % r,

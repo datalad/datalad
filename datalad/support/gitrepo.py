@@ -818,13 +818,29 @@ class GitRepo(object):
                 # TODO: progress +kwargs
 
     def git_get_remote_url(self, name, push=False):
-        """We need to know, where to clone from, if a remote is
-        requested
-        """
+        """Get the url of a remote.
 
-        remote = self.repo.remote(name)
-        return remote.config_reader.get(
-            'pushurl' if push and remote.config_reader.has_option('pushurl') else 'url')
+        Reads the configuration of remote `name` and returns its url or None,
+        if there is no url configured.
+
+        Parameters
+        ----------
+        name: str
+          name of the remote
+        push: bool
+          if True, get the pushurl instead of the fetch url.
+        """
+        cfg_reader = self.repo.remote(name).config_reader
+        if push:
+            if cfg_reader.has_option('pushurl'):
+                return cfg_reader.get('pushurl')
+            else:
+                return None
+        else:
+            if cfg_reader.has_option('url'):
+                return cfg_reader.get('url')
+            else:
+                return None
 
     def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
