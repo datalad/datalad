@@ -786,6 +786,51 @@ class GitRepo(object):
             return []
         return self.repo.submodules
 
-# TODO add_submodule
+    def add_submodule(self, path, name=None, url=None, branch=None):
+        """Add a new submodule to the repository.
+
+        This will alter the index as well as the .gitmodules file, but will not
+        create a new commit.  If the submodule already exists, no matter if the
+        configuration differs from the one provided, the existing submodule
+        is considered as already added and no further action is performed.
+
+        Parameters
+        ----------
+        path : str
+          repository-relative path at which the submodule should be located, and
+          which will be created as required during the repository initialization.
+        name : str or None
+          name/identifier for the submodule. If `None`, the `path` will be used as
+          name.
+        url : str or None
+          git-clone compatible URL. If `None`, the repository is assumed to exist,
+          and the url of the first remote is taken instead. This is useful if you
+          want to make an existing repository a submodule of another one.
+        branch : str or None
+          name of branch to be checked out in the submodule. The given branch must
+          exist in the remote repository, and will be checked out locally as a
+          tracking branch. If `None`, remote HEAD will be checked out.
+        """
+        if name is None:
+            name = path
+        # XXX the following should do it, but GitPython will refuse to add a submodule
+        # unless you specify a URL that is configured as one of its remotes, or you
+        # specify no URL, but the repo has at least one remote.
+        # this is stupid, as for us it is valid to not have any remote, because we can
+        # still obtain the submodule from a future publication location, based on the
+        # parent
+        #git.Submodule.add(self.repo, name, path, url=url, branch=branch)
+        # going git native instead
+        cmd = ['git', 'submodule', 'add', '--name', name]
+        if branch is not None:
+            cmd += ['-b', branch]
+        if url is None:
+            if not isabs(path):
+                path = opj(curdir, path)
+            url = path
+        cmd += [url, path]
+        self._git_custom_command('', cmd)
+
+# TODO
 # remove submodule
 # status?
