@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "127.0.0.1  test99" > /etc/hosts
+echo "127.0.0.1  datalad-test" > /etc/hosts
 apt-get install openssh-client
 ssh-keygen
 

@@ -143,6 +143,25 @@ class AnnexRepo(GitRepo):
             else:
                 raise e
 
+        # Note: set ssh options before any possible invocation of git-annex
+        # Temporary approach to ssh connection sharing:
+        # Register every ssh remote with the corresponding control master.
+        # Issues:
+        # - currently overwrites existing ssh config of the remote
+        # - request SSHConnection instance and write config even if no
+        #   connection needed (but: connection is not actually created/opened)
+        # - no solution for a ssh url of a file (annex addurl)
+        for r in self.git_get_remotes():
+            for url in [self.git_get_remote_url(r),
+                        self.git_get_remote_url(r, push=True)]:
+                if url is not None and url.startswith('ssh:'):
+                    c = ssh_manager.get_connection(url)
+
+                    self.repo.config_writer().set_value("remote \"%s\"" % r,
+                                                        "annex-ssh-options",
+                                                        "-o ControlMaster=auto"
+                                                        " -S %s" % c.ctrl_path)
+
         self.always_commit = always_commit
         if fix_it:
             self._annex_init()
@@ -185,32 +204,16 @@ class AnnexRepo(GitRepo):
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
-        # Temporary approach to ssh connection sharing:
-        # Register every ssh remote with the corresponding control master.
-        # Issues:
-        # - currently overwrites existing ssh config of the remote
-        # - request SSHConnection instance and write config even if no
-        #   connection needed (but: connection is not actually created/opened)
-        # - no solution for a ssh url of a file (annex addurl)
-        for r in self.git_get_remotes():
-            for url in [self.git_get_remote_url(r),
-                        self.git_get_remote_url(r, push=True)]:
-                if url is not None and url.startswith('ssh:'):
-                    c = ssh_manager.get_connection(url)
-
-                    self.repo.config_writer().set_value("remote \"%s\"" % r,
-                                                        "annex-ssh-options",
-                                                        "-o ControlMaster=auto"
-                                                        "-S %s" % c.ctrl_path)
-
     def git_remote_add(self, name, url, options=''):
+        """Overrides method from GitRepo in order to set
+        remote.<name>.annex-ssh-options in case of a SSH remote."""
         super(AnnexRepo, self).git_remote_add(name, url, options)
         if url.startswith('ssh:'):
             c = ssh_manager.get_connection(url)
             self.repo.config_writer().set_value("remote \"%s\"" % name,
                                                 "annex-ssh-options",
                                                 "-o ControlMaster=auto"
-                                                "-S %s" % c.ctrl_path)
+                                                " -S %s" % c.ctrl_path)
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -260,7 +263,7 @@ class AnnexRepo(GitRepo):
         try:
             return self.cmd_call_wrapper.run(cmd_list, **kwargs)
         except CommandError as e:
-            if "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
+            if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
                                                "Unknown command:"
                                                " 'git-annex %s'" % annex_cmd,

@@ -815,3 +815,73 @@ def test_annex_backends(path):
     # persists
     repo = AnnexRepo(path)
     eq_(repo.default_backends, ['MD5E'])
+
+
+@skip_if_on_windows # No ssh support on windows yet
+@with_tempfile
+@with_testrepos('basic_annex', flavors=['local'])
+@with_testrepos('basic_annex', flavors=['local'])
+def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
+    from datalad import ssh_manager
+    # create remotes:
+    rm1 = AnnexRepo(remote_1_path, create=False)
+    rm2 = AnnexRepo(remote_2_path, create=False)
+
+    # repo to test:AnnexRepo(repo_path)
+    # At first, directly use git to add the remote, which should be recognized
+    # by AnnexRepo's constructor
+    gr = GitRepo(repo_path, create=True)
+    AnnexRepo(repo_path)
+    gr.git_remote_add("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
+    socket_1 = opj(ssh_manager.socket_dir, 'datalad-test')
+
+    # Now, make it an annex:
+    ar = AnnexRepo(repo_path, create=False)
+
+    # connection to 'datalad-test' should be known to ssh manager:
+    assert_in(socket_1, ssh_manager._connections)
+    # but socket itself does not exist yet:
+    ok_(not exists(socket_1))
+
+    # remote interaction causes socket to be created:
+    try:
+        # Note: For some reason, it hangs if log_stdout/err True
+        # TODO: Figure out what's going on
+        ar._run_annex_command('sync',
+                              expect_stderr=True,
+                              log_stdout=False,
+                              log_stderr=False,
+                              expect_fail=True)
+    # sync should return exit code 1, since it can not merge
+    # doesn't matter for the purpose of this test
+    except CommandError as e:
+        if e.code == 1:
+            pass
+
+    ok_(exists(socket_1))
+
+    # add another remote:
+    ar.git_remote_add('ssh-remote-2', "ssh://localhost" + remote_2_path)
+    socket_2 = opj(ssh_manager.socket_dir, 'localhost')
+
+    # now, this connection to localhost was requested:
+    assert_in(socket_2, ssh_manager._connections)
+    # but socket itself does not exist yet:
+    ok_(not exists(socket_2))
+
+    # sync with the new remote:
+    try:
+        # Note: For some reason, it hangs if log_stdout/err True
+        # TODO: Figure out what's going on
+        ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
+                              expect_stderr=True,
+                              log_stdout=False,
+                              log_stderr=False,
+                              expect_fail=True)
+    # sync should return exit code 1, since it can not merge
+    # doesn't matter for the purpose of this test
+    except CommandError as e:
+        if e.code == 1:
+            pass
+
+    ok_(exists(socket_2))
