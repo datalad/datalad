@@ -831,6 +831,39 @@ class GitRepo(object):
         cmd += [url, path]
         self._git_custom_command('', cmd)
 
+    def update_submodule(self, path, mode='checkout', init=False):
+        """Update a registered submodule.
+
+        This will make the submodule match what the superproject expects by
+        cloning missing submodules and updating the working tree of the
+        submodules. The "updating" can be done in several ways depending
+        on the value of submodule.<name>.update configuration variable, or
+        the `mode` argument.
+
+        Parameters
+        ----------
+        path : str
+          Identifies which submodule to operate on by it's repository-relative
+          path.
+        mode : {checkout, rebase, merge}
+          Update procedure to perform. 'checkout': the commit recorded in the
+          superproject will be checked out in the submodule on a detached HEAD;
+          'rebase': the current branch of the submodule will be rebased onto
+          the commit recorded in the superproject; 'merge': the commit recorded
+          in the superproject will be merged into the current branch in the
+          submodule.
+        init : bool
+          If True, initialize all submodules for which "git submodule init" has
+          not been called so far before updating.
+        """
+        cmd = ['git', 'submodule', 'update', '--%s' % mode]
+        if init:
+            cmd.append('--init')
+        cmd += ['--', path]
+        self._git_custom_command('', cmd)
+
+
+
 # TODO
 # remove submodule
 # status?
