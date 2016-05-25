@@ -20,6 +20,7 @@ from ..misc import find_files
 from ..misc import switch
 from ..misc import assign
 from ..misc import rename
+from ..misc import Sink
 from ...pipeline import FinishPipeline
 from ....tests.utils import with_tree
 from ....utils import updated
@@ -45,6 +46,18 @@ def test_get_disposition_filename():
     output = list(get_disposition_filename(input))
     eq_(len(output), 1)
     eq_(output[0]['filename'], 'T1.nii.gz')
+
+
+def test_sink():
+    data = {'x': 'y', 'g': 'h', 'a': 'b'}
+
+    # no arguments
+    genempty = Sink()
+    eq_(list(genempty(data)), [{'a': 'b', 'x': 'y', 'g': 'h'}])
+
+    # if key for sunk data is specified
+    gen = Sink(None, 'result')
+    eq_(list(gen(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b', 'x': 'y', 'g': 'h'}], 'g': 'h'}])
 
 
 def test_assign():

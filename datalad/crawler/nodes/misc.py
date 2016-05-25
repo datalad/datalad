@@ -25,6 +25,7 @@ from ...utils import auto_repr
 from ...utils import find_files as _find_files
 
 from logging import getLogger
+from nose.tools import eq_, assert_raises
 
 lgr = getLogger('datalad.crawler.nodes')
 
@@ -58,7 +59,7 @@ class Sink(object):
     def __call__(self, data):
         # ??? for some reason didn't work when I made entire thing a list
         if self.keys:
-            raise NotImplementedError("Jason will do it")
+            raise NotImplementedError("Gergana will do it")
         else:
             data_ = {k: v
                      for k, v in data.items()
