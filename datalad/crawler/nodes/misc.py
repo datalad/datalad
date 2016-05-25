@@ -57,14 +57,19 @@ class Sink(object):
         return [[d[k] for k in keys] for d in self.data]
 
     def __call__(self, data):
-        # ??? for some reason didn't work when I made entire thing a list
         if self.keys:
-            raise NotImplementedError("Gergana will do it")
+            for k in data.keys():
+                size = len(self.keys)
+                for i in range(0, size):
+                    key = self.keys[i]
+                    if key == k:
+                        self.data.append({key: data.get(key)})
         else:
             data_ = {k: v
                      for k, v in data.items()
                      if not any(k.startswith(p) for p in self.ignore_prefixes)}
             self.data.append(data_)
+
         if self.output:
             data = updated(data, {self.output: self.data})
         yield data

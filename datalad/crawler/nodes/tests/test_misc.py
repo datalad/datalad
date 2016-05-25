@@ -50,9 +50,10 @@ def test_get_disposition_filename():
 
 def test_sink():
     data = {'x': 'y', 'g': 'h', 'a': 'b'}
+    keys = ['x', 'a']
 
     # no arguments
-    genempty = Sink()
+    genempty = Sink(None, None)
     eq_(list(genempty(data)), [{'a': 'b', 'x': 'y', 'g': 'h'}])
 
     # if key for sunk data is specified
