@@ -35,7 +35,6 @@ class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
     """
 
-    # TODO: add argument for selection of fields of data to keep
     def __init__(self, keys=None, output=None, ignore_prefixes=['datalad_']):
         """
         Parameters
@@ -47,6 +46,7 @@ class Sink(object):
           data
         ignore_prefixes : list, optional
           Keys with which prefixes to ignore.  By default all 'datalad_' ignored
+
         """
         self.data = []
         self.keys = keys
@@ -58,20 +58,17 @@ class Sink(object):
 
     def __call__(self, data):
         if self.keys:
-            for k in data.keys():
-                size = len(self.keys)
-                for i in range(0, size):
-                    key = self.keys[i]
-                    if key == k:
-                        self.data.append({key: data.get(key)})
+                    self.data.append({key: data[key] for key in self.keys if key in data})
+
         else:
             data_ = {k: v
                      for k, v in data.items()
                      if not any(k.startswith(p) for p in self.ignore_prefixes)}
             self.data.append(data_)
 
-        if self.output:
+        if self.output and len(self.data[0]) != 0:
             data = updated(data, {self.output: self.data})
+
         yield data
 
     def clean(self):

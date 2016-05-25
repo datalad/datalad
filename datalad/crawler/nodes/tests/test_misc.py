@@ -50,19 +50,25 @@ def test_get_disposition_filename():
 
 def test_sink():
     data = {'x': 'y', 'g': 'h', 'a': 'b'}
+
     keys = ['x', 'a']
+    nomatch = ['z']
 
     # no arguments
-    genempty = Sink(None, None)
+    genempty = Sink()
     eq_(list(genempty(data)), [{'a': 'b', 'x': 'y', 'g': 'h'}])
 
     # if key for sunk data is specified
-    gen = Sink(None, 'result')
+    gen = Sink(output='result')
     eq_(list(gen(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b', 'x': 'y', 'g': 'h'}], 'g': 'h'}])
 
     # if list of keys is specified
     genkeys = Sink(keys, 'result')
-    eq_(list(genkeys(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b'}, {'x': 'y'}], 'g': 'h'}])
+    eq_(list(genkeys(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b', 'x': 'y'}], 'g': 'h'}])
+
+    # if list of keys has no match
+    gentwo = Sink(nomatch, 'result')
+    eq_(list(gentwo(data)), [{'a': 'b', 'x': 'y', 'g': 'h'}])
 
 
 def test_assign():
