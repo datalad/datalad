@@ -20,11 +20,11 @@ from shutil import copyfile
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
 
-from ..support.annexrepo import AnnexRepo, kwargs_to_options, GitRepo
-from ..support.exceptions import CommandNotAvailableError, \
+from ..annexrepo import AnnexRepo, kwargs_to_options, GitRepo
+from ..exceptions import CommandNotAvailableError, \
     FileInGitError, FileNotInAnnexError, CommandError, AnnexBatchCommandError
-from ..cmd import Runner
-from .utils import *
+from ...cmd import Runner
+from ...tests.utils import *
 
 
 @ignore_nose_capturing_stdout
