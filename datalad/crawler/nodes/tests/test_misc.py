@@ -60,6 +60,10 @@ def test_sink():
     gen = Sink(None, 'result')
     eq_(list(gen(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b', 'x': 'y', 'g': 'h'}], 'g': 'h'}])
 
+    # if list of keys is specified
+    genkeys = Sink(keys, 'result')
+    eq_(list(genkeys(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b'}, {'x': 'y'}], 'g': 'h'}])
+
 
 def test_assign():
     data = {'x': 'y'}
