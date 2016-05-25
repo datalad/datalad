@@ -154,15 +154,14 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             # attempt left-overs.
             continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-        try:
+        if sm_path in ds.get_dataset_handles(absolute=False, recursive=False):
             # XXX next line should be enough, but isn't -> workaround via Git call
             #submodule.update(init=True)
             ds.repo._git_custom_command(
                 '', ['git', 'submodule', 'update', '--init', sm_path],
                 expect_fail=True)
-        except CommandError:
-            # if the submodule is brand-new and previously unknown the above
-            # will fail -> simply add it
+        else:
+            # if the submodule is brand-new and previously unknown
             ds.repo.add_submodule(sm_path, url=clone_url)
         _fixup_submodule_dotgit_setup(ds, sm_path)
         return subds
