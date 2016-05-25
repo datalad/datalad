@@ -36,6 +36,7 @@ from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 from .exceptions import AnnexBatchCommandError
 from ..utils import on_windows
+from datalad import ssh_manager
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -183,6 +184,33 @@ class AnnexRepo(GitRepo):
             writer.release()
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
+
+        # Temporary approach to ssh connection sharing:
+        # Register every ssh remote with the corresponding control master.
+        # Issues:
+        # - currently overwrites existing ssh config of the remote
+        # - request SSHConnection instance and write config even if no
+        #   connection needed (but: connection is not actually created/opened)
+        # - no solution for a ssh url of a file (annex addurl)
+        for r in self.git_get_remotes():
+            for url in [self.git_get_remote_url(r),
+                        self.git_get_remote_url(r, push=True)]:
+                if url.startswith('ssh:'):
+                    c = ssh_manager.get_connection(url)
+
+                    self.repo.config_writer().set_value("remote \"%s\"" % r,
+                                                        "annex-ssh-options",
+                                                        "-o ControlMaster=auto"
+                                                        "-S %s" % c.ctrl_path)
+
+    def git_remote_add(self, name, url, options=''):
+        super(AnnexRepo, self).git_remote_add(name, url, options)
+        if url.startswith('ssh:'):
+            c = ssh_manager.get_connection(url)
+            self.repo.config_writer().set_value("remote \"%s\"" % name,
+                                                "annex-ssh-options",
+                                                "-o ControlMaster=auto"
+                                                "-S %s" % c.ctrl_path)
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -1268,23 +1296,3 @@ class BatchedAnnex(object):
             lgr.debug("Process %s has finished", process)
 
 
-# TODO: ssh:
-#
-# - use annex_options
-# - override from gitrepo
-#
-#
-# annex_ssh = "-S %s" % control_path \
-#                if parsed_target.scheme == 'ssh' else None
-#
-#
-#
-# if ssh_options and not isinstance(ssh_options, string_types):
-#             ssh_options = ' '.join(ssh_options)
-#         annex_ssh = ['-c', 'annex.ssh-options=%s' % ssh_options] \
-#             if ssh_options is not None \
-#             else []
-#         for file_ in local_handle_repo.get_annexed_files():
-#             if local_handle_repo.file_has_content(file_):
-#                 cmd = ["git", "annex", "copy"] + annex_ssh + [file_, "--to=%s" % remote]
-#                 local_handle_repo._annex_custom_command('', cmd, expect_stderr=True)
