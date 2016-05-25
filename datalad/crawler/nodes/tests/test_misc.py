@@ -68,7 +68,7 @@ def test_sink():
 
     # if list of keys has no match
     gentwo = Sink(nomatch, 'result')
-    eq_(list(gentwo(data)), [{'a': 'b', 'x': 'y', 'g': 'h'}])
+    eq_(list(gentwo(data)), [{'a': 'b', 'result': [{}], 'x': 'y', 'g': 'h'}])
 
 
 def test_assign():

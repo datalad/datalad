@@ -66,7 +66,7 @@ class Sink(object):
                      if not any(k.startswith(p) for p in self.ignore_prefixes)}
             self.data.append(data_)
 
-        if self.output and len(self.data[0]) != 0:
+        if self.output:
             data = updated(data, {self.output: self.data})
 
         yield data
