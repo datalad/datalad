@@ -53,7 +53,7 @@ class Sink(object):
         self.output = output
         self.ignore_prefixes = ignore_prefixes or []
 
-    def get_values(self, *keys):
+    def get_values(self, keys):       # need to fix relevant usages into lists!!
         return [[d[k] for k in keys] for d in self.data]
 
     def __call__(self, data):
