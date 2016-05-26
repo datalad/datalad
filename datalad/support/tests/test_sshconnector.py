@@ -15,7 +15,7 @@ from os.path import exists, join as opj
 from nose.tools import ok_, assert_is_instance
 
 from datalad.support.sshconnector import SSHConnection, SSHManager
-from datalad.tests.utils import assert_raises
+from datalad.tests.utils import assert_raises, eq_
 from datalad.tests.utils import skip_ssh
 
 
@@ -45,8 +45,11 @@ def test_ssh_open_close():
     # control master exists:
     ok_(exists(path))
 
-    # TODO: how to test, we can actually use it? => SSHConnection callable.
-    # But what command call would be possible to prove the point?
+    # use connection to execute remote command:
+    out, err = c1(['ls', '-a'])
+    remote_ls = [entry for entry in out.splitlines() if entry != '.' and entry != '..']
+    local_ls = os.listdir(os.path.expanduser('~'))
+    eq_(set(remote_ls), set(local_ls))
 
     c1.close()
     # control master doesn't exist anymore:
