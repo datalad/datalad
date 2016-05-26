@@ -28,6 +28,7 @@ from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
+from datalad import ssh_manager
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -185,29 +186,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 datasets[basename(ds.path) + '/' + subds] = \
                     Dataset(sub_path)
 
-        # setup SSH Connection:
-        # TODO: Make the entire setup a helper to use it when pushing via
-        # publish?
-
-        # - build control master:
-        from datalad.utils import assure_dir
+        # request ssh connection:
         not_supported_on_windows("TODO")
-        from os import geteuid  # Linux specific import
-        var_run_user_datalad = "/var/run/user/%s/datalad" % geteuid()
-        assure_dir(var_run_user_datalad)
-        control_path = "%s/%s" % (var_run_user_datalad, host_name)
-        control_path += ":%s" % parsed_target.port if parsed_target.port else ""
-
-        # - start control master:
-        cmd = "ssh -o ControlMaster=yes -o \"ControlPath=%s\" " \
-              "-o ControlPersist=yes %s exit" % (control_path, host_name)
-        lgr.debug("Try starting control master by calling:\n%s" % cmd)
-        import subprocess
-        proc = subprocess.Popen(cmd, shell=True)
-        proc.communicate(input="\n")  # why the f.. this is necessary?
-
-        runner = Runner()
-        ssh_cmd = ["ssh", "-S", control_path, host_name]
+        lgr.info("Connecting ...")
+        ssh = ssh_manager.get_connection(sshurl)
+        ssh.open()
 
         lgr.info("Creating target datasets ...")
         for current_dataset in datasets:
@@ -227,10 +210,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 # check if target exists
                 # TODO: Is this condition valid for != '.' only?
                 path_exists = True
-                cmd = ssh_cmd + ["ls", path]
                 try:
-                    out, err = runner.run(cmd, expect_fail=True,
-                                          expect_stderr=True)
+                    out, err = ssh(["ls", path])
                 except CommandError as e:
                     if "No such file or directory" in e.stderr and \
                                     path in e.stderr:
@@ -249,29 +230,27 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     else:
                         raise ValueError("Do not know how to hand existing=%s" % repr(existing))
 
-                cmd = ssh_cmd + ["mkdir", "-p", path]
                 try:
-                    runner.run(cmd)
+                    ssh(["mkdir", "-p", path])
                 except CommandError as e:
                     lgr.error("Remotely creating target directory failed at "
                               "%s.\nError: %s" % (path, str(e)))
                     continue
 
             # init git repo
-            cmd = ssh_cmd + ["git", "-C", path, "init"]
+            cmd = ["git", "-C", path, "init"]
             if shared:
                 cmd.append("--shared=%s" % shared)
             try:
-                runner.run(cmd)
+                ssh(cmd)
             except CommandError as e:
                 lgr.error("Remotely initializing git repository failed at %s."
                           "\nError: %s\nSkipping ..." % (path, str(e)))
                 continue
 
             # check git version on remote end:
-            cmd = ssh_cmd + ["git", "version"]
             try:
-                out, err = runner.run(cmd)
+                out, err = ssh(["git", "version"])
                 git_version = out.lstrip("git version").strip()
                 lgr.debug("Detected git version on server: %s" % git_version)
                 if git_version < "2.4":
@@ -287,36 +266,28 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     "...".format(e.message))
 
             # allow for pushing to checked out branch
-            cmd = ssh_cmd + ["git", "-C", path, "config",
-                             "receive.denyCurrentBranch",
-                             "updateInstead"]
             try:
-                runner.run(cmd)
+                ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
+                     "updateInstead"])
             except CommandError as e:
                 lgr.warning("git config failed at remote location %s.\n"
                             "You will not be able to push to checked out "
                             "branch." % path)
 
             # enable post-update hook:
-            cmd = ssh_cmd + ["mv", opj(path, ".git/hooks/post-update.sample"),
-                             opj(path, ".git/hooks/post-update")]
             try:
-                runner.run(cmd)
+                ssh(["mv", opj(path, ".git/hooks/post-update.sample"),
+                             opj(path, ".git/hooks/post-update")])
             except CommandError as e:
                 lgr.error("Failed to enable post update hook.\n"
                           "Error: %s" % e.message)
 
             # initially update server info "manually":
-            cmd = ssh_cmd + ["git", "-C", path, "update-server-info"]
             try:
-                runner.run(cmd)
+                ssh(["git", "-C", path, "update-server-info"])
             except CommandError as e:
                 lgr.error("Failed to update server info.\n"
                           "Error: %s" % e.message)
-
-        # stop controlmaster (close ssh connection):
-        cmd = ["ssh", "-O", "stop", "-S", control_path, host_name]
-        out, err = runner.run(cmd, expect_stderr=True)
 
         if target:
             # add the sibling(s):

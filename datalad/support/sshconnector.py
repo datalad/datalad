@@ -69,8 +69,7 @@ class SSHConnection(object):
         # TODO: Do we need to check for the connection to be open or just rely
         # on possible ssh failing?
 
-        ssh_cmd = self.cmd_prefix
-        ssh_cmd += cmd if isinstance(cmd, list) \
+        ssh_cmd = self.cmd_prefix + cmd if isinstance(cmd, list) \
             else sh_split(cmd, posix=not on_windows)
             # windows check currently not needed, but keep it as a reminder
 
