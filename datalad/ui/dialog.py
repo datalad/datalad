@@ -16,8 +16,10 @@ import os
 import sys
 from six import PY2
 from getpass import getpass
+from mock import patch
 
 from ..utils import auto_repr
+from ..utils import on_windows
 from .base import InteractiveUI
 
 # Example APIs which might be useful to look for "inspiration"
@@ -105,6 +107,19 @@ class ConsoleLog(object):
         return ProgressBar(widgets=widgets, maxval=maxval, fd=self.out).start()
 
 
+def getpass_echo(*args, **kwargs):
+    """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
+    """
+    if on_windows:
+        # Can't do anything fancy yet, so just ask the one without echo
+        return getpass(*args, **kwargs)
+    else:
+        # We can mock patch termios so that ECHO is not turned OFF.
+        # Side-effect -- additional empty line is printed
+        with patch('termios.ECHO', 255**2):
+            return getpass(*args, **kwargs)
+
+
 @auto_repr
 class DialogUI(ConsoleLog, InteractiveUI):
 
@@ -116,8 +131,13 @@ class DialogUI(ConsoleLog, InteractiveUI):
         if default and default not in choices:
             raise ValueError("default value %r is not among choices: %s"
                              % (default, choices))
+
+        msg = ''
         if title:
-            self.out.write(title + "\n")
+            # might not actually get displayed if all in/out redirected
+            # self.out.write(title + "\n")
+            # so merge into msg for getpass
+            msg += title + os.linesep
 
         def mark_default(x):
             return "[%s]" % x \
@@ -125,9 +145,9 @@ class DialogUI(ConsoleLog, InteractiveUI):
                 else x
 
         if choices is not None:
-            msg = "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
+            msg += "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
         else:
-            msg = text
+            msg += text
         """
         Anaconda format:
 
@@ -139,17 +159,17 @@ Question? [choice1|choice2]
             attempt += 1
             if attempt >= 100:
                 raise RuntimeError("This is 100th attempt. Something really went wrong")
-            if not hidden:
-                self.out.write(msg + ": ")
-                self.out.flush()  # not effective for stderr for some reason under annex
-
-                # TODO: raw_input works only if stdin was not controlled by
-                # (e.g. if coming from annex).  So we might need to do the
-                # same trick as get_pass() does while directly dealing with /dev/pty
-                # and provide per-OS handling with stdin being override
-                response = (raw_input if PY2 else input)()
-            else:
-                response = getpass(msg + ": ")
+            # if not hidden:
+            #     self.out.write(msg + ": ")
+            #     self.out.flush()  # not effective for stderr for some reason under annex
+            #
+            #     # TODO: raw_input works only if stdin was not controlled by
+            #     # (e.g. if coming from annex).  So we might need to do the
+            #     # same trick as get_pass() does while directly dealing with /dev/pty
+            #     # and provide per-OS handling with stdin being override
+            #     response = (raw_input if PY2 else input)()
+            # else:
+            response = (getpass if hidden else getpass_echo)(msg + ": ")
 
             if not response and default:
                 response = default

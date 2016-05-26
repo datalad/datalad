@@ -15,6 +15,7 @@ from six import iteritems
 from six.moves.urllib.parse import urlparse
 
 from os.path import dirname, abspath, join as pathjoin
+from collections import OrderedDict
 
 from ..dochelpers import exc_str
 from ..support.configparserinc import SafeConfigParserWithIncludes
@@ -48,8 +49,8 @@ from ..support.keyring_ import keyring
 @auto_repr
 class Credential(object):
     TYPES = {
-        'user_password': ('user', 'password'),
-        'aws-s3': ('key_id', 'secret_id')
+        'user_password': OrderedDict([('user', {}), ('password', {'hidden': True})]),
+        'aws-s3': OrderedDict([('key_id', {}), ('secret_id', {'hidden': True})]),
     }
 
     def __init__(self, name, type, url):
@@ -60,18 +61,20 @@ class Credential(object):
         self.type = type
         self.url = url
 
-    def _ask_field_value(self, f):
+    def _ask_field_value(self, f, hidden=False):
         return ui.question(f,
-                           title="You need to authenticate with %r credentials." % self.name
-                                 + " %s provides information on how to gain access"
-                                   % self.url if self.url else '',
-                           hidden=True)
+                           title="You need to authenticate with %r credentials." % self.name +
+                                 " %s provides information on how to gain access"
+                                 % self.url if self.url else '',
+                           hidden=hidden)
+
     # TODO: I guess it, or subclasses depending on the type
     def enter_new(self):
         # Use ui., request credential fields corresponding to the type
         # TODO: this is duplication with __call__
-        for f in self.TYPES[self.type]:
-            v = self._ask_field_value(f)
+        fields = self.TYPES[self.type]
+        for f, fopts in fields.items():
+            v = self._ask_field_value(f, **fopts)
             keyring.set_password(self.uid, f, v)
         pass
 
@@ -93,10 +96,10 @@ class Credential(object):
         # TODO: redo not stupid way
         uid = self.uid
         credentials = {}
-        for f in self.TYPES[self.type]:
+        for f, fopts in self.TYPES[self.type].items():
             v = keyring.get_password(uid, f)
             while v is None:  # was not known
-                v = self._ask_field_value(f)
+                v = self._ask_field_value(f, **fopts)
             keyring.set_password(uid, f, v)
             credentials[f] = v
 
