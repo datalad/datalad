@@ -58,7 +58,7 @@ def check_dropall_get(repo):
     clean(annex=repo)  # remove possible extracted archives
     with assert_raises(AssertionError):
         ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
-    repo.annex_get('.')
+    repo.get('.')
     ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
 
 

@@ -244,7 +244,7 @@ class Annexificator(object):
         if special_remotes:
             for remote in special_remotes:
                 if remote not in git_remotes:
-                    self.repo.annex_initremote(
+                    self.repo.init_remote(
                             remote,
                             ['encryption=none', 'type=external', 'autoenable=true',
                              'externaltype=%s' % remote])
@@ -266,7 +266,7 @@ class Annexificator(object):
 
     # def add(self, filename, url=None):
     #     # TODO: modes
-    #     self.repo.annex_addurl_to_file(filename, url, batch=True #, TODO  backend
+    #     self.repo.add_url_to_file(filename, url, batch=True #, TODO  backend
     #                                    )
     #     raise NotImplementedError()
     #
@@ -382,7 +382,7 @@ class Annexificator(object):
         #         # TODO: better function which explicitly checks if file is under annex or either under git
         #         if self.repo.file_has_content(fpath):
         #             stats.add_annex += 1
-        #             self.repo.annex_addurl_to_file(fpath, url, batch=True)
+        #             self.repo.add_url_to_file(fpath, url, batch=True)
         #         else:
         #             stats.add_git += 1
         #     _call(_download_and_git_annex_add, url, fpath)
@@ -414,7 +414,7 @@ class Annexificator(object):
             if self.mode == 'full' and remote_status and remote_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
                          % (naturalsize(remote_status.size), url))
-            out_json = _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options, batch=True)
+            out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
             added_to_annex = 'key' in out_json
 
             if self.mode == 'full' or not added_to_annex:
@@ -453,7 +453,7 @@ class Annexificator(object):
         # db_filename = self.db.get_filename(url)
         # if filename is not None and filename != db_filename:
         #     # need to download new
-        #     self.repo.annex_addurls
+        #     self.repo.add_urls
         #     # remove old
         #     self.repo.git_remove([db_filename])
         #     self.db.set_filename(url, filename)

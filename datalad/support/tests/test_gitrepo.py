@@ -290,7 +290,7 @@ def test_GitRepo_remote_add(orig_path, path):
     out = gr.git_remote_show()
     assert_in('origin', out)
     eq_(len(out), 1)
-    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     out = gr.git_remote_show()
     assert_in('origin', out)
     assert_in('github', out)
@@ -304,7 +304,7 @@ def test_GitRepo_remote_add(orig_path, path):
 def test_GitRepo_remote_remove(orig_path, path):
 
     gr = GitRepo(path, orig_path)
-    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     gr.git_remote_remove('github')
     out = gr.git_remote_show()
     eq_(len(out), 1)
@@ -316,7 +316,7 @@ def test_GitRepo_remote_remove(orig_path, path):
 def test_GitRepo_remote_show(orig_path, path):
 
     gr = GitRepo(path, orig_path)
-    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     out = gr.git_remote_show(verbose=True)
     eq_(len(out), 4)
     assert_in('origin\t%s (fetch)' % orig_path, out)
@@ -334,7 +334,7 @@ def test_GitRepo_remote_show(orig_path, path):
 def test_GitRepo_get_remote_url(orig_path, path):
 
     gr = GitRepo(path, orig_path)
-    gr.git_remote_add('github', 'git://github.com/datalad/testrepo--basic--r1')
+    gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
     eq_(gr.git_get_remote_url('origin'), orig_path)
     eq_(gr.git_get_remote_url('github'),
                  'git://github.com/datalad/testrepo--basic--r1')
@@ -390,7 +390,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     url = "ssh://localhost" + abspath(remote_path)
     socket_path = opj(ssh_manager.socket_dir, 'localhost')
     repo = GitRepo(repo_path, create=True)
-    repo.git_remote_add("ssh-remote", url)
+    repo.add_remote("ssh-remote", url)
 
     # we don't know any branches of the remote:
     eq_([], repo.git_get_remote_branches())
@@ -417,7 +417,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     url = "ssh://localhost" + abspath(remote_path)
     socket_path = opj(ssh_manager.socket_dir, 'localhost')
     repo = GitRepo(repo_path, create=True)
-    repo.git_remote_add("ssh-remote", url)
+    repo.add_remote("ssh-remote", url)
 
     # modify remote:
     remote_repo.git_checkout("ssh-test", "-b")
@@ -452,7 +452,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     url = "ssh://localhost" + abspath(remote_path)
     socket_path = opj(ssh_manager.socket_dir, 'localhost')
     repo = GitRepo(repo_path, create=True)
-    repo.git_remote_add("ssh-remote", url)
+    repo.add_remote("ssh-remote", url)
 
     # modify local repo:
     repo.git_checkout("ssh-test", "-b")
@@ -504,8 +504,8 @@ def test_GitRepo_remote_update(path1, path2, path3):
     git2 = GitRepo(path2)
     git3 = GitRepo(path3)
 
-    git1.git_remote_add('git2', path2)
-    git1.git_remote_add('git3', path3)
+    git1.add_remote('git2', path2)
+    git1.add_remote('git3', path3)
 
     # Setting up remote 'git2'
     with open(opj(path2, 'masterfile'), 'w') as f:

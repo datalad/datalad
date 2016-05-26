@@ -190,7 +190,7 @@ class Uninstall(Interface):
 
             # it's an annexed file
             if data_only:
-                ds.repo.annex_drop([path])
+                ds.repo.drop([path])
                 return path
             else:
                 raise NotImplementedError("TODO: fully uninstall file %s "

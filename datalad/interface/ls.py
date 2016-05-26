@@ -176,7 +176,7 @@ class DsModel(object):
     @property
     def info(self):
         if self._info is None and isinstance(self.repo, AnnexRepo):
-            self._info = self.repo.annex_repo_info()
+            self._info = self.repo.repo_info()
         return self._info
 
     @property

@@ -643,7 +643,7 @@ class GitRepo(object):
 
 # TODO: --------------------------------------------------------------------
 
-    def git_remote_add(self, name, url, options=''):
+    def add_remote(self, name, url, options=''):
         """
         """
 

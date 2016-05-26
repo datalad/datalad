@@ -231,7 +231,7 @@ class Publish(Interface):
             # #       - or: We need a different approach on the templates
             #
             # # Add the remote
-            # ds.repo.git_remote_add(dest_resolved, remote_url)
+            # ds.repo.add_remote(dest_resolved, remote_url)
             # if dest_pushurl:
             #     # Fill in template:
             #     remote_url_push = \

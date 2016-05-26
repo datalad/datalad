@@ -460,7 +460,7 @@ class Install(Interface):
                 # this is an annex'ed file -> get it
                 # TODO implement `copy --from` using `source`
                 # TODO fail if `source` is something strange
-                vcs.annex_get(relativepath)
+                vcs.get(relativepath)
                 # return the absolute path to the installed file
                 return path
 
@@ -649,7 +649,7 @@ class Install(Interface):
             except CommandError:
                 # FLOW GUIDE EXIT POINT
                 # apaarently not a repo, assume it is a file url
-                vcs.annex_addurl_to_file(relativepath, source)
+                vcs.add_url_to_file(relativepath, source)
                 return path
 
     @staticmethod

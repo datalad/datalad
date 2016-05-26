@@ -120,7 +120,7 @@ class Dataset(object):
 
         if name not in repo.git_get_remotes():
             # Add remote
-            repo.git_remote_add(name, url)
+            repo.add_remote(name, url)
             if publish_url is not None:
                 # set push url:
                 repo._git_custom_command('', ["git", "remote",

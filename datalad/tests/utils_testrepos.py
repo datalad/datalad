@@ -85,9 +85,9 @@ class BasicAnnexTestRepo(TestRepo):
         fileurl = get_local_file_url(realpath(opj(self.path, 'test.dat'))) \
                   if not on_windows \
                   else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
-        self.repo.annex_addurl_to_file("test-annex.dat", fileurl)
+        self.repo.add_url_to_file("test-annex.dat", fileurl)
         self.repo.git_commit("Adding a rudimentary git-annex load file")
-        self.repo.annex_drop("test-annex.dat")  # since available from URL
+        self.repo.drop("test-annex.dat")  # since available from URL
 
     def create_info_file(self):
         runner = Runner()

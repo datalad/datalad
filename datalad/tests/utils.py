@@ -131,7 +131,7 @@ def ok_clean_git_annex_proxy(path):
     chpwd(path)
 
     try:
-        out = ar.annex_proxy("git status")
+        out = ar.proxy("git status")
     except CommandNotAvailableError as e:
         raise SkipTest
     finally:
@@ -276,14 +276,14 @@ def ok_git_config_not_empty(ar):
 
 
 def ok_annex_get(ar, files, network=True):
-    """Helper to run .annex_get decorated checking for correct operation
+    """Helper to run .get decorated checking for correct operation
 
-    annex_get passes through stderr from the ar to the user, which pollutes
+    get passes through stderr from the ar to the user, which pollutes
     screen while running tests
     """
     ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
-        ar.annex_get(files)
+        ar.get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
             ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)

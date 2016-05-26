@@ -50,7 +50,7 @@ def test_publish_simple(origin, src_path, dst_path):
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
     target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    source.repo.add_remote("target", dst_path)
 
     res = publish(dataset=source, dest="target")
     eq_(res, source)
@@ -108,7 +108,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
     target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    source.repo.add_remote("target", dst_path)
 
     # subdatasets have no remote yet, so recursive publishing should fail:
     with assert_raises(ValueError) as cm:
@@ -122,8 +122,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub2_target.git_checkout("TMP", "-b")
     sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
     sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
-    sub1.git_remote_add("target", sub1_pub)
-    sub2.git_remote_add("target", sub2_pub)
+    sub1.add_remote("target", sub1_pub)
+    sub2.add_remote("target", sub2_pub)
 
     # publish recursively
     res = publish(dataset=source, dest="target", recursive=True)
@@ -168,7 +168,7 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     source_sub = Dataset(opj(src_path, 'sub1'))
     target = GitRepo(target_1, create=True)
     target.git_checkout("TMP", "-b")
-    source_sub.repo.git_remote_add("target", target_1)
+    source_sub.repo.add_remote("target", target_1)
 
     res = publish(dataset=source_super, dest="target", path="sub1")
     assert_is_instance(res, Dataset)
@@ -182,7 +182,7 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     # now, publish directly from within submodule:
     target = GitRepo(target_2, create=True)
     target.git_checkout("TMP", "-b")
-    source_sub.repo.git_remote_add("target2", target_2)
+    source_sub.repo.add_remote("target2", target_2)
 
     res = publish(dataset=source_sub, dest="target2")
     eq_(res, source_sub)
@@ -209,7 +209,7 @@ def test_publish_with_data(origin, src_path, dst_path):
     # create plain git at target:
     target = AnnexRepo(dst_path, create=True)
     target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    source.repo.add_remote("target", dst_path)
 
     res = publish(dataset=source, dest="target", with_data=['test-annex.dat'])
     eq_(res, source)
@@ -244,7 +244,7 @@ def test_publish_file_handle(origin, src_path, dst_path):
     # actually not needed for this test, but provide same setup as
     # everywhere else:
     target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    source.repo.add_remote("target", dst_path)
 
     # directly publish a file handle, not the dataset itself:
     res = publish(dataset=source, dest="target", path="test-annex.dat")
@@ -257,9 +257,9 @@ def test_publish_file_handle(origin, src_path, dst_path):
 
     # content is now available from 'target':
     assert_in("target",
-              source.repo.annex_whereis('test-annex.dat',
-                                        output="descriptions"))
-    source.repo.annex_drop('test-annex.dat')
+              source.repo.whereis('test-annex.dat',
+                                  output="descriptions"))
+    source.repo.drop('test-annex.dat')
     eq_(source.repo.file_has_content(['test-annex.dat']), [False])
     source.repo._run_annex_command('get', annex_options=['test-annex.dat',
                                                          '--from=target'])
