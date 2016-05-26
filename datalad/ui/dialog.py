@@ -48,29 +48,123 @@ for i in range(10):
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
 
-from progressbar import Bar, ETA, FileTransferSpeed, \
-    Percentage, ProgressBar, RotatingMarker
 
-# TODO: might better delegate to an arbitrary bar?
-class BarWithFillText(Bar):
-    """A progress bar widget which fills the bar with the target text"""
+#
+# Haven't found an ideal progress bar yet, so to make things modular etc
+# we will provide our interface and adapters for few popular ones
+#
 
-    def __init__(self, fill_text, **kwargs):
-        super(BarWithFillText, self).__init__(**kwargs)
-        self.fill_text = fill_text
+class ProgressBarBase(object):
+    def __init__(self):
+        self._prev_value = 0
 
-    def update(self, pbar, width):
-        orig = super(BarWithFillText, self).update(pbar, width)
-        # replace beginning with the title
-        if len(self.fill_text) > width:
-            # TODO:  make it fancier! That we also at the same time scroll it from
-            # the left so it does end up at the end with the tail but starts with
-            # the beginning
-            fill_text = '...' + self.fill_text[-(width-4):]
+    def update(self, size, increment=False):
+        if increment:
+            self._prev_value += size
         else:
-            fill_text = self.fill_text
-        fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
-        return fill_text + " " + orig[len(fill_text)+1:]
+            self._prev_value = size
+
+    def start(self):
+        raise NotImplementedError
+
+    def finish(self):
+        self._prev_value = 0
+
+_progressbars = {}
+try:
+    from progressbar import Bar, ETA, FileTransferSpeed, \
+        Percentage, ProgressBar, RotatingMarker
+
+    # TODO: might better delegate to an arbitrary bar?
+    class BarWithFillText(Bar):
+        """A progress bar widget which fills the bar with the target text"""
+
+        def __init__(self, fill_text, **kwargs):
+            super(BarWithFillText, self).__init__(**kwargs)
+            self.fill_text = fill_text
+
+        def update(self, pbar, width):
+            orig = super(BarWithFillText, self).update(pbar, width)
+            # replace beginning with the title
+            if len(self.fill_text) > width:
+                # TODO:  make it fancier! That we also at the same time scroll it from
+                # the left so it does end up at the end with the tail but starts with
+                # the beginning
+                fill_text = '...' + self.fill_text[-(width-4):]
+            else:
+                fill_text = self.fill_text
+            fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
+            return fill_text + " " + orig[len(fill_text)+1:]
+
+    class progressbarProgressBar(ProgressBarBase):
+        """Adapter for progressbar.ProgressBar"""
+
+        backend = 'progressbar'
+
+        def __init__(self, label='', fill_text=None, currval=None, maxval=None, unit='B', out=sys.stdout):
+            super(progressbarProgressBar, self).__init__()
+            assert(unit == 'B')  # none other "supported" ATM
+            bar = dict(marker=RotatingMarker())
+            # TODO: RF entire messaging to be able to support multiple progressbars at once
+            widgets = ['%s: ' % label,
+                       BarWithFillText(fill_text=fill_text, marker=RotatingMarker()), ' ',
+                       Percentage(), ' ',
+                       ETA(), ' ',
+                       FileTransferSpeed()]
+            if currval is not None:
+                raise NotImplementedError("Not yet supported to set currval in the beginning")
+            self._pbar = ProgressBar(widgets=widgets, maxval=maxval, fd=out).start()
+
+        def update(self, size, increment=False):
+            self._pbar.update(self._prev_value + size if increment else size)
+            super(progressbarProgressBar, self).update(size, increment=increment)
+
+        def start(self):
+            self._pbar.start()
+
+        def finish(self):
+            self._pbar.finish()
+
+    _progressbars['progressbar'] = progressbarProgressBar
+except ImportError:
+    pass
+
+try:
+    from tqdm import tqdm
+
+    class tqdmProgressBar(ProgressBarBase):
+        """Adapter for tqdm.ProgressBar"""
+
+        backend = 'tqdm'
+
+        def __init__(self, label='', fill_text=None, currval=None, maxval=None, unit='B', out=sys.stdout):
+            super(tqdmProgressBar, self).__init__()
+            self._pbar_params = dict(desc=label, unit=unit, unit_scale=True, total=maxval, file=out)
+            self._pbar = None
+
+        def _create(self):
+            if self._pbar is None:
+                # set miniters to 1, and mininterval to 0, so it always updates
+                self._pbar = tqdm(miniters=1, mininterval=0, **self._pbar_params)
+
+        def update(self, size, increment=False):
+            self._create()
+            inc = size - self._prev_value
+            self._pbar.update(size if increment else inc)
+            super(tqdmProgressBar, self).update(size, increment=increment)
+
+        def start(self):
+            self._create()
+
+        def finish(self):
+            self._pbar.close()
+            self._pbar = None
+
+    _progressbars['tqdm'] = tqdmProgressBar
+except ImportError:
+    pass
+
+assert len(_progressbars), "We need tqdm or progressbar library to report progress"
 
 
 @auto_repr
@@ -87,22 +181,20 @@ class ConsoleLog(object):
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
 
-    def get_progressbar(self, label='', fill_text=None, currval=None, maxval=None):
-        """'Inspired' by progressbar module interface
+    def get_progressbar(self, *args, **kwargs):
+        """Return a progressbar.  See e.g. `tqdmProgressBar` about the interface
 
-        Should return an object with .update(), and .finish()
-        methods, and maxval, currval attributes
-        """
-        bar = dict(marker=RotatingMarker())
-        # TODO: RF entire messaging to be able to support multiple progressbars at once
-        widgets = ['%s: ' % label,
-                   BarWithFillText(fill_text=fill_text, marker=RotatingMarker()), ' ',
-                   Percentage(), ' ',
-                   ETA(), ' ',
-                   FileTransferSpeed()]
-        if currval is not None:
-            raise NotImplementedError("Not yet supported to set currval in the beginning")
-        return ProgressBar(widgets=widgets, maxval=maxval, fd=self.out).start()
+        Additional parameter is backend to choose among available: %s
+        """ % str(_progressbars.keys())
+        backend = kwargs.pop('backend', None)
+        if backend is None:
+            try:
+                pbar = _progressbars['tqdm']
+            except KeyError:
+                pbar = _progressbars.values()[0]  # any
+        else:
+            pbar = _progressbars[backend]
+        return pbar(*args, out=self.out, **kwargs)
 
 
 @auto_repr

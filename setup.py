@@ -41,7 +41,7 @@ requires = {
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
-        'progressbar',
+        'tqdm',
         'six>=1.8.0',
     ],
     'downloaders': [
