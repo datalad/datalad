@@ -27,7 +27,7 @@ from ...tests.utils import swallow_logs
 from ...tests.utils import with_tempfile, with_testrepos, \
     assert_cwd_unchanged, with_tree, \
     get_most_obscure_supported_name, ok_clean_git
-from ...tests.utils import skip_if, skip_if_on_windows
+from ...tests.utils import skip_ssh
 from ...tests.utils_testrepos import BasicAnnexTestRepo
 from ...cmd import Runner
 from ...support.exceptions import FileNotInRepositoryError
@@ -380,7 +380,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     assert_false(exists(opj(clone_path, filename)))  # not checked out
 
 
-@skip_if_on_windows  # No ssh support on windows yet
+@skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile
 def test_GitRepo_ssh_fetch(remote_path, repo_path):
@@ -407,7 +407,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     assert_in('ssh-remote/master', repo.git_get_remote_branches())
 
 
-@skip_if_on_windows  # No ssh support on windows yet
+@skip_ssh
 @with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_pull(remote_path, repo_path):
@@ -442,7 +442,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     assert_in("ssh_testfile.dat", repo.get_indexed_files())
 
 
-@skip_if_on_windows  # No ssh support on windows yet
+@skip_ssh
 @with_tempfile
 @with_tempfile
 def test_GitRepo_ssh_push(repo_path, remote_path):

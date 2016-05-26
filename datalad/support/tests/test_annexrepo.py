@@ -817,7 +817,7 @@ def test_annex_backends(path):
     eq_(repo.default_backends, ['MD5E'])
 
 
-@skip_if_on_windows # No ssh support on windows yet
+@skip_ssh
 @with_tempfile
 @with_testrepos('basic_annex', flavors=['local'])
 @with_testrepos('basic_annex', flavors=['local'])
@@ -827,21 +827,29 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
     rm1 = AnnexRepo(remote_1_path, create=False)
     rm2 = AnnexRepo(remote_2_path, create=False)
 
+    # check whether we are the first to use these sockets:
+    socket_1 = opj(ssh_manager.socket_dir, 'datalad-test')
+    socket_2 = opj(ssh_manager.socket_dir, 'localhost')
+    datalad_test_was_open = exists(socket_1)
+    localhost_was_open = exists(socket_2)
+
     # repo to test:AnnexRepo(repo_path)
     # At first, directly use git to add the remote, which should be recognized
     # by AnnexRepo's constructor
     gr = GitRepo(repo_path, create=True)
     AnnexRepo(repo_path)
     gr.git_remote_add("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
-    socket_1 = opj(ssh_manager.socket_dir, 'datalad-test')
 
     # Now, make it an annex:
     ar = AnnexRepo(repo_path, create=False)
 
     # connection to 'datalad-test' should be known to ssh manager:
     assert_in(socket_1, ssh_manager._connections)
-    # but socket itself does not exist yet:
-    ok_(not exists(socket_1))
+    # but socket was not touched:
+    if datalad_test_was_open:
+        ok_(exists(socket_1))
+    else:
+        ok_(not exists(socket_1))
 
     # remote interaction causes socket to be created:
     try:
@@ -862,12 +870,14 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
 
     # add another remote:
     ar.git_remote_add('ssh-remote-2', "ssh://localhost" + remote_2_path)
-    socket_2 = opj(ssh_manager.socket_dir, 'localhost')
 
     # now, this connection to localhost was requested:
     assert_in(socket_2, ssh_manager._connections)
-    # but socket itself does not exist yet:
-    ok_(not exists(socket_2))
+    # but socket was not touched:
+    if localhost_was_open:
+        ok_(exists(socket_2))
+    else:
+        ok_(not exists(socket_2))
 
     # sync with the new remote:
     try:

@@ -743,6 +743,20 @@ def skip_if(func, cond=True, msg=None):
     return newfunc
 
 
+def skip_ssh(func):
+    """Skips SSH tests if on windows or if environment variable
+    DATALAD_TESTS_SSH was not set
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows:
+            raise SkipTest("SSH currently not available on windows.")
+        if not os.environ.get('DATALAD_TESTS_SSH'):
+            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
+        return func(*args, **kwargs)
+    return newfunc
+
+
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
