@@ -119,8 +119,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         clone_urls.append('{0}/{1}{2}'.format(
             remote_url, sm_path, url_suffix))
     # attempt: configured submodule URL
-    if sm_url.startswith('/') \
-            or sm_url.split('://')[0] in ('http', 'https', 'ssh', 'file', 'git'):  # XXX: should we allow ANY protocol?
+    if sm_url.startswith('/') or is_url(sm_url):
         # this seems to be an absolute location -> take as is
         clone_urls.append(sm_url)
     else:
@@ -243,8 +242,7 @@ def get_containing_subdataset(ds, path):
 
     for subds in ds.get_dataset_handles():
         common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
-        # TODO: Rethink these conditions. Last one needed? What about uninitialized submodules?
-        if common.endswith(sep) and common == _with_sep(subds) and isdir(opj(ds.path, common)):
+        if common.endswith(sep) and common == _with_sep(subds):
             return Dataset(path=opj(ds.path, common))
     return ds
 
@@ -263,27 +261,26 @@ class Install(Interface):
 
     _params_ = dict(
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc="""specify the dataset to perform the install operation on. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
-            doc="""path/name of the installation target. If no `dataset` and
-            `source` are provided, this is interpreted as a `source` URL of
-            a dataset and a destination path will be derived from the URL
-            similar to 'git clone'.""",
+            doc="""path/name of the installation target. If no `source` is
+            provided, and no `dataset` is given or detected, this is
+            interpreted as the source URL of a dataset and a destination
+            path will be derived from the URL similar to 'git clone'.""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
             doc="url or local path of the installation source",
-            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
             doc="""If set, all content is installed recursively, including
             content of any subdatasets."""),
@@ -384,7 +381,7 @@ class Install(Interface):
 
         assert(ds is not None)
 
-        lgr.debug("Resolved target dataset for installation: {0}".format(ds))
+        lgr.info("Installing {0}".format(ds))
 
         vcs = ds.repo
         if vcs is None:

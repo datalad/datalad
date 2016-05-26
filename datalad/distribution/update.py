@@ -36,7 +36,7 @@ class Update(Interface):
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc=""""specify the dataset to update. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory""",
@@ -49,7 +49,7 @@ class Update(Interface):
                 "given.",),
         # TODO: How to document it without using the term 'tracking branch'?
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             action="store_true",
             doc="""If set this updates all possibly existing subdatasets,
              too."""),

@@ -60,6 +60,9 @@ def dedent_docstring(text):
         return None
     if not text.startswith(' '):
         lines = text.split('\n')
+        if len(lines) == 1:
+            # single line, no indentation, nothing to do
+            return text
         text2 = '\n'.join(lines[1:])
         return lines[0] + "\n" + textwrap.dedent(text2)
     else:

@@ -53,7 +53,7 @@ class Uninstall(Interface):
 
     _params_ = dict(
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc="""specify the dataset to perform the uninstall operation on.
             If no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
@@ -68,7 +68,7 @@ class Uninstall(Interface):
             doc="If set, only data is uninstalled, but the handles are kept.",
             action="store_true"),
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             doc="""If set, uninstall recursively, including all subdatasets.
             The value of `data` is used for recursive uninstallation, too.""",
             action="store_true"))
