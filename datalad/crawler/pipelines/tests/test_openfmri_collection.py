@@ -30,9 +30,11 @@ from ....tests.utils import use_cassette
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import ok_file_under_git
 from ....distribution.dataset import Dataset
+from ....distribution.dataset import Dataset
 from ....consts import CRAWLER_META_CONFIG_PATH
 
 from ..openfmri import collection_pipeline as ofcpipeline
+from datalad.api import crawl
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
@@ -52,16 +54,18 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @serve_path_via_http
 @with_tempfile
 def test_openfmri_collection_pipeline1(ind, topurl, outd):
-
+    # XXX since below pipeline is called directly, this setting of template= is not used!
     list(initiate_handle(
-        template="openfmri_collection",
+        template="openfmri",
+        template_func="collection_pipeline",
         path=outd,
     )())
 
     with chpwd(outd):
-        pipeline = ofcpipeline(url=topurl)
-        out = run_pipeline(pipeline)
-    eq_(out, [{'datalad_stats': ActivityStats()}])
+        crawl()
+        #pipeline = ofcpipeline(url=topurl)
+        #out = run_pipeline(pipeline)
+    #eq_(out, [{'datalad_stats': ActivityStats()}])
 
     # TODO: replace below command with the one listing subdatasets
     subdatasets = ['ds000001', 'ds000002']

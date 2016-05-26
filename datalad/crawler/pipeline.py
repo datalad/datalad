@@ -459,7 +459,7 @@ def load_pipeline_from_config(path):
         func = pipeline1
         _kwarg1 = 1
 
-    which would instantial pipeline from standard.py module by calling
+    which would instantiate a pipeline from standard.py module by calling
     `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
 
         [crawl:pipeline]

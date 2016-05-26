@@ -105,6 +105,7 @@ class initiate_handle(object):
         # TODO: add_fields might not be flexible enough for storing more elaborate
         # configurations for e.g. "basic" template
         self.template = template
+        self.template_func = template_func
         self.handle_name = handle_name
         ## self.collection_name = collection_name
         self.data_fields = data_fields
@@ -139,6 +140,8 @@ class initiate_handle(object):
 
     def _save_crawl_config(self, handle_path, data):
         kwargs = {f: data[f] for f in self.data_fields}
+        if self.template_func:
+            kwargs['func'] = self.template_func
         # additional options given as a dictionary
         kwargs.update(self.add_fields)
         return initiate_pipeline_config(
