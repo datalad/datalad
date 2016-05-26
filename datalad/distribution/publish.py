@@ -179,7 +179,7 @@ class Publish(Interface):
             try:
                 std_out, std_err = \
                     ds.repo._git_custom_command('',
-                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.git_get_active_branch())],
+                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.get_active_branch())],
                                                 expect_fail=True)
             except CommandError as e:
                 if e.code == 1 and e.stdout == "":
@@ -202,7 +202,7 @@ class Publish(Interface):
             std_out, std_err = \
                 ds.repo._git_custom_command('',
                                             ["git", "config", "--get",
-                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.git_get_active_branch())],
+                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.get_active_branch())],
                                             expect_fail=True)
         except CommandError as e:
             if e.code == 1 and e.stdout == "":
@@ -212,7 +212,7 @@ class Publish(Interface):
                 raise
 
         # is `dest` an already known remote?
-        if dest_resolved not in ds.repo.git_get_remotes():
+        if dest_resolved not in ds.repo.get_remotes():
             # unknown remote
             raise ValueError("No sibling '%s' found." % dest_resolved)
 
@@ -266,7 +266,7 @@ class Publish(Interface):
             # => publish the dataset itself
             # push local state:
             ds.repo.push(remote=dest_resolved,
-                         refspec=ds.repo.git_get_active_branch(),
+                         refspec=ds.repo.get_active_branch(),
                          set_upstream=set_upstream)
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):

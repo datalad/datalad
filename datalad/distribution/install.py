@@ -111,7 +111,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     if tracking_branch:
         # name of the default remote for the active branch
         remote_name = repo.active_branch.tracking_branch().remote_name
-        remote_url = vcs.git_get_remote_url(remote_name, push=False)
+        remote_url = vcs.get_remote_url(remote_name, push=False)
         if remote_url.rstrip('/').endswith('/.git'):
             url_suffix = '/.git'
             remote_url = remote_url[:-5]

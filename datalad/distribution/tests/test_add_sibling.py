@@ -42,22 +42,22 @@ def test_add_sibling(origin, repo_path):
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
         AnnexRepo(opj(repo_path, subds), init=True,
-                  create=True).git_checkout("master")
+                  create=True).checkout("master")
 
     res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location")
     eq_(res, [basename(source.path)])
-    assert_in("test-remote", source.repo.git_get_remotes())
+    assert_in("test-remote", source.repo.get_remotes())
     eq_("http://some.remo.te/location",
-        source.repo.git_get_remote_url("test-remote"))
+        source.repo.get_remote_url("test-remote"))
 
     # doing it again doesn't do anything
     res = add_sibling(dataset=source, name="test-remote",
                       url="http://some.remo.te/location")
     eq_(res, [])
-    assert_in("test-remote", source.repo.git_get_remotes())
+    assert_in("test-remote", source.repo.get_remotes())
     eq_("http://some.remo.te/location",
-        source.repo.git_get_remote_url("test-remote"))
+        source.repo.get_remote_url("test-remote"))
 
     # fail with conflicting url:
     with assert_raises(RuntimeError) as cm:
@@ -71,7 +71,7 @@ def test_add_sibling(origin, repo_path):
                       url="http://some.remo.te/location/elsewhere", force=True)
     eq_(res, [basename(source.path)])
     eq_("http://some.remo.te/location/elsewhere",
-        source.repo.git_get_remote_url("test-remote"))
+        source.repo.get_remote_url("test-remote"))
 
     # add a push url without force fails, since in a way the fetch url is the
     # configured push url, too, in that case:
@@ -88,9 +88,9 @@ def test_add_sibling(origin, repo_path):
                       pushurl="ssh://push.it", force=True)
     eq_(res, [basename(source.path)])
     eq_("http://some.remo.te/location/elsewhere",
-        source.repo.git_get_remote_url("test-remote"))
+        source.repo.get_remote_url("test-remote"))
     eq_("ssh://push.it",
-        source.repo.git_get_remote_url("test-remote", push=True))
+        source.repo.get_remote_url("test-remote", push=True))
 
     # recursively:
     res = add_sibling(dataset=source, name="test-remote",
@@ -104,9 +104,9 @@ def test_add_sibling(origin, repo_path):
     for repo in [source.repo,
                  GitRepo(opj(source.path, "sub1")),
                  GitRepo(opj(source.path, "sub2"))]:
-        assert_in("test-remote", repo.git_get_remotes())
-        url = repo.git_get_remote_url("test-remote")
-        pushurl = repo.git_get_remote_url("test-remote", push=True)
+        assert_in("test-remote", repo.get_remotes())
+        url = repo.get_remote_url("test-remote")
+        pushurl = repo.get_remote_url("test-remote", push=True)
         ok_(url.startswith("http://some.remo.te/location/" + basename(source.path)))
         ok_(url.endswith(basename(repo.path)))
         ok_(pushurl.startswith("ssh://push.it/" + basename(source.path)))
@@ -125,9 +125,9 @@ def test_add_sibling(origin, repo_path):
     for repo in [source.repo,
                  GitRepo(opj(source.path, "sub1")),
                  GitRepo(opj(source.path, "sub2"))]:
-        assert_in("test-remote-2", repo.git_get_remotes())
-        url = repo.git_get_remote_url("test-remote-2")
-        pushurl = repo.git_get_remote_url("test-remote-2", push=True)
+        assert_in("test-remote-2", repo.get_remotes())
+        url = repo.get_remote_url("test-remote-2")
+        pushurl = repo.get_remote_url("test-remote-2", push=True)
         ok_(url.startswith("http://some.remo.te/location"))
         ok_(pushurl.startswith("ssh://push.it/"))
         if repo != source.repo:

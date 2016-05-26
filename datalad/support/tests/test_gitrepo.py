@@ -287,15 +287,15 @@ def test_GitRepo_files_decorator():
 def test_GitRepo_remote_add(orig_path, path):
 
     gr = GitRepo(path, orig_path)
-    out = gr.git_remote_show()
+    out = gr.show_remotes()
     assert_in('origin', out)
     eq_(len(out), 1)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    out = gr.git_remote_show()
+    out = gr.show_remotes()
     assert_in('origin', out)
     assert_in('github', out)
     eq_(len(out), 2)
-    out = gr.git_remote_show('github')
+    out = gr.show_remotes('github')
     assert_in('  Fetch URL: git://github.com/datalad/testrepo--basic--r1', out)
 
 
@@ -305,8 +305,8 @@ def test_GitRepo_remote_remove(orig_path, path):
 
     gr = GitRepo(path, orig_path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    gr.git_remote_remove('github')
-    out = gr.git_remote_show()
+    gr.remove_remote('github')
+    out = gr.show_remotes()
     eq_(len(out), 1)
     assert_in('origin', out)
 
@@ -317,7 +317,7 @@ def test_GitRepo_remote_show(orig_path, path):
 
     gr = GitRepo(path, orig_path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    out = gr.git_remote_show(verbose=True)
+    out = gr.show_remotes(verbose=True)
     eq_(len(out), 4)
     assert_in('origin\t%s (fetch)' % orig_path, out)
     assert_in('origin\t%s (push)' % orig_path, out)
@@ -335,8 +335,8 @@ def test_GitRepo_get_remote_url(orig_path, path):
 
     gr = GitRepo(path, orig_path)
     gr.add_remote('github', 'git://github.com/datalad/testrepo--basic--r1')
-    eq_(gr.git_get_remote_url('origin'), orig_path)
-    eq_(gr.git_get_remote_url('github'),
+    eq_(gr.get_remote_url('origin'), orig_path)
+    eq_(gr.get_remote_url('github'),
                  'git://github.com/datalad/testrepo--basic--r1')
 
 
@@ -366,7 +366,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     clone = GitRepo(clone_path, orig_path)
     filename = get_most_obscure_supported_name()
 
-    origin.git_checkout("new_branch", "-b")
+    origin.checkout("new_branch", "-b")
     with open(opj(orig_path, filename), 'w') as f:
         f.write("New file.")
     origin.git_add(filename)
@@ -375,8 +375,8 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     clone.fetch(remote='origin')
 
     ok_clean_git(clone.path, annex=False)
-    assert_in("origin/new_branch", clone.git_get_remote_branches())
-    assert_in(filename, clone.git_get_files("origin/new_branch"))
+    assert_in("origin/new_branch", clone.get_remote_branches())
+    assert_in(filename, clone.get_files("origin/new_branch"))
     assert_false(exists(opj(clone_path, filename)))  # not checked out
 
 
@@ -393,7 +393,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     repo.add_remote("ssh-remote", url)
 
     # we don't know any branches of the remote:
-    eq_([], repo.git_get_remote_branches())
+    eq_([], repo.get_remote_branches())
 
     repo.fetch(remote="ssh-remote")
     ok_clean_git(repo.path, annex=False)
@@ -404,7 +404,7 @@ def test_GitRepo_ssh_fetch(remote_path, repo_path):
     ok_(exists(socket_path))
 
     # we actually fetched it:
-    assert_in('ssh-remote/master', repo.git_get_remote_branches())
+    assert_in('ssh-remote/master', repo.get_remote_branches())
 
 
 @skip_ssh
@@ -420,7 +420,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     repo.add_remote("ssh-remote", url)
 
     # modify remote:
-    remote_repo.git_checkout("ssh-test", "-b")
+    remote_repo.checkout("ssh-test", "-b")
     with open(opj(remote_repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
     remote_repo.git_add("ssh_testfile.dat")
@@ -430,7 +430,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     assert_not_in("ssh_testfile.dat", repo.get_indexed_files())
 
     # pull changes:
-    repo.pull(remote="ssh-remote", refspec=remote_repo.git_get_active_branch())
+    repo.pull(remote="ssh-remote", refspec=remote_repo.get_active_branch())
     ok_clean_git(repo.path, annex=False)
 
     # the connection is known to the SSH manager, since fetch() requested it:
@@ -455,7 +455,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     repo.add_remote("ssh-remote", url)
 
     # modify local repo:
-    repo.git_checkout("ssh-test", "-b")
+    repo.checkout("ssh-test", "-b")
     with open(opj(repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
     repo.git_add("ssh_testfile.dat")
@@ -473,8 +473,8 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     ok_(exists(socket_path))
 
     # remote now knows the changes:
-    assert_in("ssh-test", remote_repo.git_get_branches())
-    assert_in("ssh_testfile.dat", remote_repo.git_get_files("ssh-test"))
+    assert_in("ssh-test", remote_repo.get_branches())
+    assert_in("ssh_testfile.dat", remote_repo.get_files("ssh-test"))
 
 
 @with_tempfile
@@ -491,7 +491,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
     clone.git_commit("new file added.")
     # TODO: need checkout first:
     clone.push('origin', '+master:new-branch')
-    origin.git_checkout('new-branch')
+    origin.checkout('new-branch')
     assert_true(exists(opj(orig_path, filename)))
 
 
@@ -512,7 +512,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
         f.write("git2 in master")
     git2.git_add('masterfile')
     git2.git_commit("Add something to master.")
-    git2.git_checkout('branch2', '-b')
+    git2.checkout('branch2', '-b')
     with open(opj(path2, 'branch2file'), 'w') as f:
         f.write("git2 in branch2")
     git2.git_add('branch2file')
@@ -523,20 +523,20 @@ def test_GitRepo_remote_update(path1, path2, path3):
         f.write("git3 in master")
     git3.git_add('masterfile')
     git3.git_commit("Add something to master.")
-    git3.git_checkout('branch3', '-b')
+    git3.checkout('branch3', '-b')
     with open(opj(path3, 'branch3file'), 'w') as f:
         f.write("git3 in branch3")
     git3.git_add('branch3file')
     git3.git_commit("Add something to branch3.")
 
-    git1.git_remote_update()
+    git1.update_remote()
 
     # checkouts are 'tests' themselves, since they'll raise CommandError
     # if something went wrong
-    git1.git_checkout('branch2')
-    git1.git_checkout('branch3')
+    git1.checkout('branch2')
+    git1.checkout('branch3')
 
-    branches1 = git1.git_get_branches()
+    branches1 = git1.get_branches()
     eq_({'branch2', 'branch3'}, set(branches1))
 
 
@@ -557,15 +557,15 @@ def test_GitRepo_get_files(url, path):
             os_files.add(opj(rel_dir, file_).lstrip("./"))
 
     # get the files via GitRepo:
-    local_files = set(gr.git_get_files())
-    remote_files = set(gr.git_get_files(branch="origin/master"))
+    local_files = set(gr.get_files())
+    remote_files = set(gr.get_files(branch="origin/master"))
 
     eq_(local_files, set(gr.get_indexed_files()))
     eq_(local_files, remote_files)
     eq_(local_files, os_files)
 
     # create a different branch:
-    gr.git_checkout('new_branch', '-b')
+    gr.checkout('new_branch', '-b')
     filename = 'another_file.dat'
     with open(opj(path, filename), 'w') as f:
         f.write("something")
@@ -573,17 +573,17 @@ def test_GitRepo_get_files(url, path):
     gr.git_commit("Added.")
 
     # now get the files again:
-    local_files = set(gr.git_get_files())
+    local_files = set(gr.get_files())
     eq_(local_files, os_files.union({filename}))
     # retrieve remote branch again, which should not have changed:
-    remote_files = set(gr.git_get_files(branch="origin/master"))
+    remote_files = set(gr.get_files(branch="origin/master"))
     eq_(remote_files, os_files)
     eq_(set([filename]), local_files.difference(remote_files))
 
     # switch back and query non-active branch:
-    gr.git_checkout('master')
-    local_files = set(gr.git_get_files())
-    branch_files = set(gr.git_get_files(branch="new_branch"))
+    gr.checkout('master')
+    local_files = set(gr.get_files())
+    branch_files = set(gr.get_files(branch="new_branch"))
     eq_(set([filename]), branch_files.difference(local_files))
 
 
@@ -644,15 +644,15 @@ def test_GitRepo_get_merge_base(src):
     repo.git_add('*')
     repo.git_commit('committing')
 
-    assert_raises(ValueError, repo.git_get_merge_base, [])
-    branch1 = repo.git_get_active_branch()
-    branch1_hexsha = repo.git_get_hexsha()
+    assert_raises(ValueError, repo.get_merge_base, [])
+    branch1 = repo.get_active_branch()
+    branch1_hexsha = repo.get_hexsha()
     eq_(len(branch1_hexsha), 40)
-    eq_(repo.git_get_merge_base(branch1), branch1_hexsha)
+    eq_(repo.get_merge_base(branch1), branch1_hexsha)
 
     # Let's create a detached branch
     branch2 = "_detach_"
-    repo.git_checkout(branch2, options="--orphan")
+    repo.checkout(branch2, options="--orphan")
     # it will have all the files
     # Must not do:  https://github.com/gitpython-developers/GitPython/issues/375
     # repo.git_add('.')
@@ -661,15 +661,15 @@ def test_GitRepo_get_merge_base(src):
     # so it results in a different checksum ;)
     repo.git_commit("committing again")
     assert(repo.get_indexed_files())  # we did commit
-    assert(repo.git_get_merge_base(branch1) is None)
-    assert(repo.git_get_merge_base([branch2, branch1]) is None)
+    assert(repo.get_merge_base(branch1) is None)
+    assert(repo.get_merge_base([branch2, branch1]) is None)
 
     # Let's merge them up -- then merge base should match the master
-    repo.git_merge(branch1)
-    eq_(repo.git_get_merge_base(branch1), branch1_hexsha)
+    repo.merge(branch1)
+    eq_(repo.get_merge_base(branch1), branch1_hexsha)
 
     # if points to some empty/non-existing branch - should also be None
-    assert(repo.git_get_merge_base(['nonexistent', branch2]) is None)
+    assert(repo.get_merge_base(['nonexistent', branch2]) is None)
 
 
 @with_tempfile(mkdir=True)
@@ -681,12 +681,12 @@ def test_GitRepo_git_get_branch_commits(src):
     repo.git_add('*')
     repo.git_commit('committing')
 
-    commits = list(repo.git_get_branch_commits('master'))
+    commits = list(repo.get_branch_commits('master'))
     eq_(len(commits), 1)
-    commits_stop0 = list(repo.git_get_branch_commits('master', stop=commits[0].hexsha))
+    commits_stop0 = list(repo.get_branch_commits('master', stop=commits[0].hexsha))
     eq_(commits_stop0, [])
-    commits_hexsha = list(repo.git_get_branch_commits('master', value='hexsha'))
-    commits_hexsha_left = list(repo.git_get_branch_commits('master', value='hexsha', limit='left-only'))
+    commits_hexsha = list(repo.get_branch_commits('master', value='hexsha'))
+    commits_hexsha_left = list(repo.get_branch_commits('master', value='hexsha', limit='left-only'))
     eq_([commits[0].hexsha], commits_hexsha)
     # our unittest is rudimentary ;-)
     eq_(commits_hexsha_left, commits_hexsha)

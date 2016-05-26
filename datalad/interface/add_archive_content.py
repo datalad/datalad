@@ -246,7 +246,7 @@ class AddArchiveContent(Interface):
         earchive = annexarchive.cache[key_path]
 
         # TODO: check if may be it was already added
-        if ARCHIVES_SPECIAL_REMOTE not in annex.git_get_remotes():
+        if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
             lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
             annex.init_remote(
                 ARCHIVES_SPECIAL_REMOTE,

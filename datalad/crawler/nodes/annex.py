@@ -122,7 +122,7 @@ class initiate_handle(object):
             # we need first initiate a git repository
             git_repo = GitRepo(path, create=True)
             # since we are initiatializing, that branch shouldn't exist yet, thus --orphan
-            git_repo.git_checkout(self.branch, options="--orphan")
+            git_repo.checkout(self.branch, options="--orphan")
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creater"
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
@@ -240,7 +240,7 @@ class Annexificator(object):
         # then those could be overriden via options
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
 
-        git_remotes = self.repo.git_get_remotes()
+        git_remotes = self.repo.get_remotes()
         if special_remotes:
             for remote in special_remotes:
                 if remote not in git_remotes:
@@ -571,7 +571,7 @@ class Annexificator(object):
             list(self.finalize()(data))
             # statusdb is valid only within the same branch
             self._statusdb = None
-            existing_branches = self.repo.git_get_branches()
+            existing_branches = self.repo.get_branches()
             if must_exist is not None:
                 assert must_exist == (branch in existing_branches)
             if branch not in existing_branches:
@@ -579,17 +579,17 @@ class Annexificator(object):
                 if parent is None:
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
-                    self.repo.git_checkout(branch, options="--orphan")
+                    self.repo.checkout(branch, options="--orphan")
                     if self.repo.dirty:
                         self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
                     lgr.info("Checking out %s into a new branch %s" % (parent, branch))
-                    self.repo.git_checkout(parent, options="-b %s" % branch)
+                    self.repo.checkout(parent, options="-b %s" % branch)
             else:
                 lgr.info("Checking out an existing branch %s" % (branch))
-                self.repo.git_checkout(branch)
+                self.repo.checkout(branch)
             yield updated(data, {"git_branch": branch})
         return switch_branch
 
@@ -623,18 +623,18 @@ class Annexificator(object):
         def merge_branch(data):
 
             if target_branch is not None:
-                orig_branch = self.repo.git_get_active_branch()
+                orig_branch = self.repo.get_active_branch()
                 target_branch_ = target_branch
                 list(self.switch_branch(target_branch_)(data))
             else:
                 orig_branch = None
-                target_branch_ = self.repo.git_get_active_branch()
+                target_branch_ = self.repo.get_active_branch()
 
             if self.repo.dirty:
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
 
-            last_merged_checksum = self.repo.git_get_merge_base([target_branch_, branch])
-            if last_merged_checksum == self.repo.git_get_hexsha(branch):
+            last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
+            if last_merged_checksum == self.repo.get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
                 skip_no_changes_ = skip_no_changes
                 if skip_no_changes is None:
@@ -646,7 +646,7 @@ class Annexificator(object):
 
             if one_commit_at_a_time:
                 all_to_merge = list(
-                        self.repo.git_get_branch_commits(
+                        self.repo.get_branch_commits(
                                 branch,
                                 limit='left-only',
                                 stop=last_merged_checksum,
@@ -661,12 +661,12 @@ class Annexificator(object):
 
             for to_merge in all_to_merge:
                 # we might have switched away to orig_branch
-                if self.repo.git_get_active_branch() != target_branch_:
-                    self.repo.git_checkout(target_branch_)
+                if self.repo.get_active_branch() != target_branch_:
+                    self.repo.checkout(target_branch_)
                 if strategy is None:
-                    self.repo.git_merge(to_merge, options=options)
+                    self.repo.merge(to_merge, options=options)
                 elif strategy == 'theirs':
-                    self.repo.git_merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
+                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
                     self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
                     self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
                 else:
@@ -682,7 +682,7 @@ class Annexificator(object):
                     if stats:
                         stats.merges.append([branch, target_branch_])
                 if orig_branch is not None:
-                    self.repo.git_checkout(orig_branch)
+                    self.repo.checkout(orig_branch)
                 yield data
         return merge_branch
 

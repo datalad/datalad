@@ -380,6 +380,7 @@ class GitRepo(object):
         except OSError:
             return GitRepo.get_toppath(dirname(path))
 
+    # TODO: see AnnexRepo.add_to_git/annex
     @normalize_paths
     def git_add(self, files):
         """Adds file(s) to the repository.
@@ -407,6 +408,7 @@ class GitRepo(object):
         else:
             lgr.warning("git_add was called with empty file list.")
 
+    # TODO: like add melt in
     @normalize_paths(match_return_type=False)
     def git_remove(self, files, **kwargs):
         """Remove files.
@@ -431,6 +433,7 @@ class GitRepo(object):
         """
         self.repo.index.write()  # flush possibly cached in GitPython changes to index
 
+    # TODO: Before renaming, change calls => super().git_commit
     def git_commit(self, msg=None, options=None):
         """Commit changes to git.
 
@@ -471,7 +474,7 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def git_get_hexsha(self, branch=None):
+    def get_hexsha(self, branch=None):
         """Return a hexsha for a given branch name. If None - of current branch
 
         Parameters
@@ -486,7 +489,7 @@ class GitRepo(object):
                 return b.object.hexsha
         raise ValueError("Unknown branch %s" % branch)
 
-    def git_get_merge_base(self, treeishes):
+    def get_merge_base(self, treeishes):
         """Get a merge base hexsha
 
         Parameters
@@ -506,7 +509,7 @@ class GitRepo(object):
         if not treeishes:
             raise ValueError("Provide at least a single value")
         elif len(treeishes) == 1:
-            treeishes = treeishes + [self.git_get_active_branch()]
+            treeishes = treeishes + [self.get_active_branch()]
 
         try:
             bases = self.repo.merge_base(*treeishes)
@@ -520,11 +523,11 @@ class GitRepo(object):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
-    def git_get_active_branch(self):
+    def get_active_branch(self):
 
         return self.repo.active_branch.name
 
-    def git_get_branches(self):
+    def get_branches(self):
         """Get all branches of the repo.
 
         Returns
@@ -535,7 +538,7 @@ class GitRepo(object):
 
         return [branch.name for branch in self.repo.branches]
 
-    def git_get_remote_branches(self):
+    def get_remote_branches(self):
         """Get all branches of all remotes of the repo.
 
         Returns
@@ -543,6 +546,8 @@ class GitRepo(object):
         [str]
             Names of all remote branches.
         """
+        # TODO: Reconsider melting with get_branches()
+
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
 
@@ -562,10 +567,10 @@ class GitRepo(object):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def git_get_remotes(self):
+    def get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
 
-    def git_get_files(self, branch=None):
+    def get_files(self, branch=None):
         """Get a list of files in git.
 
         Lists the files in the (remote) branch.
@@ -580,6 +585,7 @@ class GitRepo(object):
         [str]
           list of files.
         """
+        # TODO: RF codes base and melt get_indexed_files() in
 
         if branch is None:
             # active branch can be queried way faster:
@@ -588,7 +594,7 @@ class GitRepo(object):
             return [item.path for item in self.repo.tree(branch).traverse()
                     if isinstance(item, Blob)]
 
-    def git_get_file_content(self, file_, branch='HEAD'):
+    def get_file_content(self, file_, branch='HEAD'):
         """
 
         Returns
@@ -650,13 +656,13 @@ class GitRepo(object):
         return self._git_custom_command('', 'git remote add %s %s %s' %
                                  (options, name, url))
 
-    def git_remote_remove(self, name):
+    def remove_remote(self, name):
         """
         """
 
         return self._git_custom_command('', 'git remote remove %s' % name)
 
-    def git_remote_show(self, name='', verbose=False):
+    def show_remotes(self, name='', verbose=False):
         """
         """
 
@@ -665,7 +671,7 @@ class GitRepo(object):
                                             (v, name))
         return out.rstrip(linesep).splitlines()
 
-    def git_remote_update(self, name='', verbose=False):
+    def update_remote(self, name='', verbose=False):
         """
         """
 
@@ -817,7 +823,7 @@ class GitRepo(object):
                 rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
 
-    def git_get_remote_url(self, name, push=False):
+    def get_remote_url(self, name, push=False):
         """Get the url of a remote.
 
         Reads the configuration of remote `name` and returns its url or None,
@@ -842,7 +848,7 @@ class GitRepo(object):
             else:
                 return None
 
-    def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
+    def get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
 
         Pretty much similar to what 'git log <branch>' does.
@@ -884,7 +890,7 @@ class GitRepo(object):
                 return
             yield fvalue(c)
 
-    def git_checkout(self, name, options=''):
+    def checkout(self, name, options=''):
         """
         """
         # TODO: May be check for the need of -b options herein?
@@ -892,15 +898,17 @@ class GitRepo(object):
         self._git_custom_command('', 'git checkout %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_merge(self, name, options=[], msg=None, **kwargs):
+    # TODO: Before implementing annex merge, find usages and check for a needed
+    # change to call super().merge
+    def merge(self, name, options=[], msg=None, **kwargs):
         if msg:
             options = options + ["-m", msg]
         self._git_custom_command('', ['git', 'merge'] + options + [name], **kwargs)
 
-    def git_remove_branch(self, branch):
+    def remove_branch(self, branch):
         self._git_custom_command('', 'git branch -D %s' % branch)
 
-    def git_ls_remote(self, remote, options=None):
+    def ls_remote(self, remote, options=None):
         self._git_custom_command('', 'git ls-remote %s %s' %
                                  (options if options is not None else '',
                                   remote))

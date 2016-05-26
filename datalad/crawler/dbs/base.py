@@ -50,8 +50,8 @@ class JsonBaseDB(object):
         if self._filepath is not None:
             return
         self._filepath = opj(realpath(self.repo.path),
-                     self.__class__.__crawler_subdir__,
-                     (self.name or self.repo.git_get_active_branch())+'.json')
+                             self.__class__.__crawler_subdir__,
+                             (self.name or self.repo.get_active_branch()) + '.json')
         if lexists(self._filepath):
             self.load()
             self._loaded = True

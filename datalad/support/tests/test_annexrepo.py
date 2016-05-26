@@ -780,11 +780,11 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
         ar2.add_url_to_file(filename, testurl, batch=True)
         assert_equal(len(ar2._batched), 1)  # we added one more with batch_size=1
     ar2.commit("added new file")  # would do nothing ATM, but also doesn't fail
-    assert_in(filename, ar2.git_get_files())
+    assert_in(filename, ar2.get_files())
     assert_in(ar.WEB_UUID, ar2.whereis(filename))
 
     ar.commit("actually committing new files")
-    assert_in(filename, ar.git_get_files())
+    assert_in(filename, ar.get_files())
     assert_in(ar.WEB_UUID, ar.whereis(filename))
     # this poor bugger still wasn't added since we used default batch_size=0 on him
 

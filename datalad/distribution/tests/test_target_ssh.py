@@ -50,8 +50,8 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                            target_dir=opj(target_path, "basic"))
 
     GitRepo(opj(target_path, "basic"), create=False) # raises if not a git repo
-    assert_in("local_target", source.repo.git_get_remotes())
-    eq_("ssh://localhost", source.repo.git_get_remote_url("local_target"))
+    assert_in("local_target", source.repo.get_remotes())
+    eq_("ssh://localhost", source.repo.get_remote_url("local_target"))
     # should NOT be able to push now, since url isn't correct:
     assert_raises(GitCommandError, publish, dataset=source, dest="local_target")
 
@@ -76,9 +76,9 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                                       opj(target_path, "basic"),
                                                existing='replace')
         eq_("ssh://localhost" + opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target"))
+            source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target", push=True))
+            source.repo.get_remote_url("local_target", push=True))
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
@@ -93,9 +93,9 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                                       opj(target_path, "basic"),
                                                existing='replace')
         eq_(opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target"))
+            source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target", push=True))
+            source.repo.get_remote_url("local_target", push=True))
 
         # now, push should work:
         publish(dataset=source, dest="local_target")
@@ -113,7 +113,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True,
-                  create=False).git_checkout("master")
+                  create=False).checkout("master")
 
     sub1 = Dataset(opj(src_path, "sub1"))
     sub2 = Dataset(opj(src_path, "sub2"))
@@ -131,5 +131,5 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                      create=False)
 
     for repo in [source.repo, sub1.repo, sub2.repo]:
-        assert_not_in("local_target", repo.git_get_remotes())
+        assert_not_in("local_target", repo.get_remotes())
 

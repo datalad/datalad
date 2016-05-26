@@ -151,9 +151,9 @@ class AnnexRepo(GitRepo):
         # - request SSHConnection instance and write config even if no
         #   connection needed (but: connection is not actually created/opened)
         # - no solution for a ssh url of a file (annex addurl)
-        for r in self.git_get_remotes():
-            for url in [self.git_get_remote_url(r),
-                        self.git_get_remote_url(r, push=True)]:
+        for r in self.get_remotes():
+            for url in [self.get_remote_url(r),
+                        self.get_remote_url(r, push=True)]:
                 if url is not None and url.startswith('ssh:'):
                     c = ssh_manager.get_connection(url)
 
@@ -172,8 +172,8 @@ class AnnexRepo(GitRepo):
         if not exists(opj(self.path, '.git', 'annex')):
             # so either it is not annex at all or just was not yet initialized
             # TODO: unify/reuse code somewhere else on detecting being annex
-            if any((b.endswith('/git-annex') for b in self.git_get_remote_branches())) or \
-                any((b == 'git-annex' for b in self.git_get_branches())):
+            if any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
+                any((b == 'git-annex' for b in self.get_branches())):
                 # it is an annex repository which was not initialized yet
                 if create or init:
                     lgr.debug('Annex repository was not yet initialized at %s.'
