@@ -70,7 +70,17 @@ def test_sink():
     # if list of keys has no match
     gentwo = Sink(nomatch, 'result')
     eq_(list(gentwo(data)), [{'a': 'b', 'result': [{}], 'x': 'y', 'g': 'h'}])
-    print(list(gen.get_values(nomatch)))    # fails if there is no match - need to return empty list / or raise error
+
+
+def test_get_values():
+    data = {'x': 'y', 'g': 'h', 'a': 'b'}
+
+    keys = ['x', 'a']
+    nomatch = ['z']
+
+    gen = Sink()
+    list(gen(data))
+    eq_(gen.get_values(keys), [['y', 'b']])
 
 
 def test_assign():
