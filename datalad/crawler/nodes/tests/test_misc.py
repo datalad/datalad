@@ -71,12 +71,13 @@ def test_sink():
     gentwo = Sink(nomatch, 'result')
     eq_(list(gentwo(data)), [{'a': 'b', 'result': [{}], 'x': 'y', 'g': 'h'}])
 
+    # check that data's key/value pair matches will be sunk again
+    eq_(list(gentwo(data)), [{'a': 'b', 'x': 'y', 'result': [{}, {}], 'g': 'h'}])
+
 
 def test_get_values():
     data = {'x': 'y', 'g': 'h', 'a': 'b'}
-
     keys = ['x', 'a']
-    nomatch = ['z']
 
     gen = Sink()
     list(gen(data))
