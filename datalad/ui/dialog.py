@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 import os
 import sys
 from six import PY2
-from getpass import getpass
+import getpass
 from mock import patch
 
 from ..utils import auto_repr
@@ -112,12 +112,12 @@ def getpass_echo(*args, **kwargs):
     """
     if on_windows:
         # Can't do anything fancy yet, so just ask the one without echo
-        return getpass(*args, **kwargs)
+        return getpass.getpass(*args, **kwargs)
     else:
         # We can mock patch termios so that ECHO is not turned OFF.
         # Side-effect -- additional empty line is printed
         with patch('termios.ECHO', 255**2):
-            return getpass(*args, **kwargs)
+            return getpass.getpass(*args, **kwargs)
 
 
 @auto_repr
@@ -169,7 +169,7 @@ Question? [choice1|choice2]
             #     # and provide per-OS handling with stdin being override
             #     response = (raw_input if PY2 else input)()
             # else:
-            response = (getpass if hidden else getpass_echo)(msg + ": ")
+            response = (getpass.getpass if hidden else getpass_echo)(msg + ": ")
 
             if not response and default:
                 response = default
