@@ -379,7 +379,7 @@ class Install(Interface):
 
         assert(ds is not None)
 
-        lgr.info("Installing {0}".format(ds))
+        lgr.info("Installing {0}".format(path if path else ds))
 
         vcs = ds.repo
         if vcs is None:
