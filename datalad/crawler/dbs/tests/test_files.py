@@ -32,7 +32,7 @@ def _test_AnnexDB(cls, path):
     annex = AnnexRepo(path, create=True)
     # PhysicalFileStatusesDB relies on information in annex so files
     # must be committed first
-    annex.annex_add('file1.txt')
+    annex.add('file1.txt')
     annex.git_commit("initial commit")
     db = cls(annex=annex)
 

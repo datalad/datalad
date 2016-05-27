@@ -366,8 +366,8 @@ class Annexificator(object):
             # So we have only filename
             assert(fpath)
             # Just add into git directly for now
-            # TODO: tune  annex_add so we could use its json output, and may be even batch it
-            out_json = _call(self.repo.annex_add, fpath, options=self.options)
+            # TODO: tune  add so we could use its json output, and may be even batch it
+            out_json = _call(self.repo.add, fpath, options=self.options)
         # elif self.mode == 'full':
         #     # Since addurl ignores annex.largefiles we need first to download that file and then
         #     # annex add it
@@ -377,7 +377,7 @@ class Annexificator(object):
         #         # Just to feed into _call for dry-run
         #         filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
         #         assert(filepath_downloaded == filepath)
-        #         self.repo.annex_add(fpath, options=self.options)
+        #         self.repo.add(fpath, options=self.options)
         #         # and if the file ended up under annex, and not directly under git -- addurl
         #         # TODO: better function which explicitly checks if file is under annex or either under git
         #         if self.repo.file_has_content(fpath):
@@ -668,7 +668,7 @@ class Annexificator(object):
                 elif strategy == 'theirs':
                     self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
                     self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
-                    self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
+                    self.repo.add('.', options=self.options)  # so everything is staged to be committed
                 else:
                     raise NotImplementedError(strategy)
 
@@ -991,7 +991,7 @@ class Annexificator(object):
             stats = data.get('datalad_stats', None)
             if self.repo.dirty:  # or self.tracker.dirty # for dry run
                 lgr.info("Repository found dirty -- adding and committing")
-                _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
+                _call(self.repo.add, '.', options=self.options)  # so everything is committed
 
                 stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
                 _call(self._commit, "%s%s" % (', '.join(self._states), stats_str), options=["-a"])

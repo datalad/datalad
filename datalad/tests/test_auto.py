@@ -60,7 +60,7 @@ def test_proxying_open_testrepobased(repo):
     os.makedirs(dirname(fpath2))
     with open(fpath2, 'w') as f:
         f.write(content)
-    annex.annex_add(fpath2)
+    annex.add(fpath2)
     annex.drop(fpath2)
     annex.git_commit("added and dropped")
     assert_raises(IOError, open, fpath2)
@@ -85,7 +85,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
     generate_load(fpath1)
     os.makedirs(dirname(fpath2))
     generate_load(fpath2)
-    annex.annex_add([fpath1, fpath2])
+    annex.add([fpath1, fpath2])
     verify_load(fpath1)
     verify_load(fpath2)
     annex.git_commit("Added some files")

@@ -42,8 +42,8 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
          ])
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
-    annex.add_to_annex(fn_archive, "Added tarball")
-    annex.add_to_annex(fn_extracted, "Added the load file")
+    annex.add(fn_archive, commit=True, msg="Added tarball")
+    annex.add(fn_extracted, commit=True, msg="Added the load file")
 
     # Operations with archive remote URL
     annexcr = ArchiveAnnexCustomRemote(path=d)

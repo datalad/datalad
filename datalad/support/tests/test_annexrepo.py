@@ -134,7 +134,7 @@ def test_AnnexRepo_annex_add(src, annex_path):
     f = open(filename_abs, 'w')
     f.write("What to write?")
     f.close()
-    out_json = ar.annex_add(filename)
+    out_json = ar.add(filename)
     if not ar.is_direct_mode():
         assert_true(os.path.islink(filename_abs),
                     "Annexed file is not a link.")
@@ -237,21 +237,21 @@ def test_AnnexRepo_options_decorator():
                  {' --someoption=first', ' --someotheroption=second'})
 
 
-@assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-@with_tempfile
-def test_AnnexRepo_annex_add_to_git(src, dst):
-
-    ar = AnnexRepo(dst, src)
-
-    filename = get_most_obscure_supported_name()
-    filename_abs = os.path.join(dst, filename)
-    with open(filename_abs, 'w') as f:
-        f.write("What to write?")
-
-    assert_raises(IOError, ar.get_file_key, filename)
-    ar.add_to_git(filename)
-    assert_in(filename, ar.get_indexed_files())
+# @assert_cwd_unchanged
+# @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+# @with_tempfile
+# def test_AnnexRepo_annex_add_to_git(src, dst):
+#
+#     ar = AnnexRepo(dst, src)
+#
+#     filename = get_most_obscure_supported_name()
+#     filename_abs = os.path.join(dst, filename)
+#     with open(filename_abs, 'w') as f:
+#         f.write("What to write?")
+#
+#     assert_raises(IOError, ar.get_file_key, filename)
+#     ar.add_to_git(filename)
+#     assert_in(filename, ar.get_indexed_files())
 
 
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
@@ -408,7 +408,7 @@ def test_AnnexRepo_migrating_backends(src, dst):
     f.write("What to write?")
     f.close()
 
-    ar.annex_add(filename, backend='MD5')
+    ar.add(filename, backend='MD5')
     assert_equal(ar.get_file_backend(filename), 'MD5')
     assert_equal(ar.get_file_backend('test-annex.dat'), 'SHA256E')
 
@@ -451,7 +451,7 @@ def __test_get_md5s(path):
     # was used just to generate above dict
     annex = AnnexRepo(path, init=True, backend='MD5E')
     files = [basename(f) for f in find_files('.*', path)]
-    annex.add_to_annex(files)
+    annex.add(files, commit=True)
     print({f: annex.get_file_key(f) for f in files})
 
 
@@ -461,7 +461,7 @@ def test_dropkey(batch, direct, path):
     kw = {'batch': batch}
     annex = AnnexRepo(path, init=True, backend='MD5E', direct=direct)
     files = list(tree1_md5e_keys)
-    annex.add_to_annex(files)
+    annex.add(files, commit=True)
     # drop one key
     annex.drop_key(tree1_md5e_keys[files[0]], **kw)
     # drop multiple
@@ -478,8 +478,8 @@ def test_dropkey(batch, direct, path):
 def test_AnnexRepo_backend_option(path, url):
     ar = AnnexRepo(path, backend='MD5')
 
-    ar.annex_add('firstfile', backend='SHA1')
-    ar.annex_add('secondfile')
+    ar.add('firstfile', backend='SHA1')
+    ar.add('secondfile')
     assert_equal(ar.get_file_backend('firstfile'), 'SHA1')
     assert_equal(ar.get_file_backend('secondfile'), 'MD5')
 
@@ -528,7 +528,7 @@ def test_AnnexRepo_always_commit(path):
         f.write("Second file.")
 
     # always_commit == True is expected to be default
-    repo.annex_add(file1)
+    repo.add(file1)
 
     # Now git-annex log should show the addition:
     out, err = repo._run_annex_command('log')
@@ -545,7 +545,7 @@ def test_AnnexRepo_always_commit(path):
     assert_equal(num_commits, 3)
 
     repo.always_commit = False
-    repo.annex_add(file2)
+    repo.add(file2)
 
     # No additional git commit:
     out, err = runner.run(['git', 'log', 'git-annex'])
@@ -600,7 +600,7 @@ def test_AnnexRepo_commit(src, path):
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
-    ds.annex_add(filename)
+    ds.add(filename)
 
     if ds.is_direct_mode():
         assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
@@ -614,52 +614,52 @@ def test_AnnexRepo_commit(src, path):
         ok_clean_git(path, annex=True)
 
 
-@assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-@with_tempfile
-def test_AnnexRepo_add_to_git(src, dst):
+# @assert_cwd_unchanged
+# @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+# @with_tempfile
+# def test_AnnexRepo_add_to_git(src, dst):
+#
+#     ds = AnnexRepo(dst, src)
+#
+#     filename = get_most_obscure_supported_name()
+#     filename_abs = opj(dst, filename)
+#     with open(filename_abs, 'w') as f:
+#         f.write("What to write?")
+#     ds.add_to_git(filename_abs)
+#
+#     if ds.is_direct_mode():
+#         ok_clean_git_annex_proxy(dst)
+#     else:
+#         ok_clean_git(dst, annex=True)
+#     ok_file_under_git(dst, filename)
+#     assert_raises(FileInGitError, ds.get_file_key, filename)
 
-    ds = AnnexRepo(dst, src)
 
-    filename = get_most_obscure_supported_name()
-    filename_abs = opj(dst, filename)
-    with open(filename_abs, 'w') as f:
-        f.write("What to write?")
-    ds.add_to_git(filename_abs)
-
-    if ds.is_direct_mode():
-        ok_clean_git_annex_proxy(dst)
-    else:
-        ok_clean_git(dst, annex=True)
-    ok_file_under_git(dst, filename)
-    assert_raises(FileInGitError, ds.get_file_key, filename)
-
-
-@assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-@with_tempfile
-def test_AnnexRepo_add_to_annex(src, dst):
-
-    ds = AnnexRepo(dst, src)
-    filename = get_most_obscure_supported_name()
-    filename_abs = opj(dst, filename)
-    with open(filename_abs, 'w') as f:
-        f.write("What to write?")
-    ds.add_to_annex(filename)
-
-    if not ds.is_direct_mode():
-        assert_true(islink(filename_abs),
-                    "Annexed file is not a link.")
-        ok_clean_git(dst, annex=True)
-    else:
-        assert_false(islink(filename_abs),
-                     "Annexed file is link in direct mode.")
-        ok_clean_git_annex_proxy(dst)
-
-    key = ds.get_file_key(filename)
-    assert_false(key == '')
-    # could test for the actual key, but if there's something and no
-    # exception raised, it's fine anyway.
+# @assert_cwd_unchanged
+# @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
+# @with_tempfile
+# def test_AnnexRepo_add_to_annex(src, dst):
+#
+#     ds = AnnexRepo(dst, src)
+#     filename = get_most_obscure_supported_name()
+#     filename_abs = opj(dst, filename)
+#     with open(filename_abs, 'w') as f:
+#         f.write("What to write?")
+#     ds.add_to_annex(filename)
+#
+#     if not ds.is_direct_mode():
+#         assert_true(islink(filename_abs),
+#                     "Annexed file is not a link.")
+#         ok_clean_git(dst, annex=True)
+#     else:
+#         assert_false(islink(filename_abs),
+#                      "Annexed file is link in direct mode.")
+#         ok_clean_git_annex_proxy(dst)
+#
+#     key = ds.get_file_key(filename)
+#     assert_false(key == '')
+#     # could test for the actual key, but if there's something and no
+#     # exception raised, it's fine anyway.
 
 
 @ignore_nose_capturing_stdout
@@ -753,7 +753,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
     # add to an existing and staged annex file
     copyfile(opj(sitepath, 'about2.txt'), opj(dst, testfile2))
-    ar.annex_add(testfile2)
+    ar.add(testfile2)
     ar.add_url_to_file(testfile2, testurl2, batch=True)
     assert(ar.info(testfile2))
     # not committed yet
@@ -761,7 +761,7 @@ def test_AnnexRepo_addurl_to_file_batched(sitepath, siteurl, dst):
 
     # add to an existing and committed annex file
     copyfile(opj(sitepath, 'about2_.txt'), opj(dst, testfile2_))
-    ar.annex_add(testfile2_)
+    ar.add(testfile2_)
     assert_not_in(ar.WEB_UUID, ar.whereis(testfile))
     ar.commit("added about2_.txt and there was about2.txt lingering around")
     # commit causes closing all batched annexes, so testfile gets committed

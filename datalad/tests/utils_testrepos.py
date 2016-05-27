@@ -56,7 +56,7 @@ class TestRepo(object):
         with open(filename, 'wb') as f:
             f.write(content.encode())
         if add:
-            (self.repo.annex_add if annex else self.repo.git_add)(name)
+            (self.repo.add if annex else self.repo.git_add)(name)
 
     def create(self):
         if self._created:

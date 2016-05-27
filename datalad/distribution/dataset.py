@@ -236,7 +236,7 @@ class Dataset(object):
                 "cannot remember a state when a dataset is not yet installed")
         repo = self.repo
         if auto_add_changes:
-            repo.annex_add('.')
+            repo.add('.')
         repo.commit(message)
         if version:
             repo._git_custom_command('', 'git tag "{0}"'.format(version))

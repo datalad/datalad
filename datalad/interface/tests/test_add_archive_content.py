@@ -227,7 +227,7 @@ class TestAddArchiveOptions():
         direct = False  # TODO: test on undirect, but too long ATM
         self.annex = annex = AnnexRepo(repo_path, create=True, direct=direct)
         # Let's add first archive to the annex so we could test
-        annex.annex_add('1.tar')
+        annex.add('1.tar')
         annex.commit(msg="added 1.tar")
 
     def teardown(self):

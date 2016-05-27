@@ -108,7 +108,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
     # modify the remotes:
     with open(opj(remote_1, "first.txt"), "w") as f:
         f.write("some file load")
-    rmt1.add_to_annex("first.txt")
+    rmt1.add("first.txt", commit=True)
     # TODO: Modify an already present file!
 
     with open(opj(remote_2, "second.txt"), "w") as f:

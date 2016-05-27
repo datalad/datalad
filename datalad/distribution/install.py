@@ -557,7 +557,7 @@ class Install(Interface):
                 added_files = resolve_path(relativepath, ds)
             else:
                 # do a blunt `annex add`
-                added_files = vcs.annex_add(relativepath)
+                added_files = vcs.add(relativepath)
                 # return just the paths of the installed components
                 if isinstance(added_files, list):
                     added_files = [resolve_path(i['file'], ds) for i in added_files]

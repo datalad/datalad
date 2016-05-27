@@ -393,7 +393,7 @@ class AddArchiveContent(Interface):
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
-                # annex.annex_add(target_path, options=annex_options)
+                # annex.add(target_path, options=annex_options)
                 # # above action might add to git or to annex
                 # if annex.file_has_content(target_path):
                 #     # if not --  it was added to git, if in annex, it is present and output is True

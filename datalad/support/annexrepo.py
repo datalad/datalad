@@ -379,17 +379,61 @@ class AnnexRepo(GitRepo):
                                 log_online=log_online, expect_stderr=True)
 
     @normalize_paths
-    def annex_add(self, files, backend=None, options=None):
-        """Add file(s) to the annex.
+    def add(self, files, git=False, backend=None, options=None, commit=False,
+            msg=None):
+        """Add file(s) to the repository.
+
 
         Parameters
         ----------
         files: list of str
-            list of paths to add to the annex
-        """
-        options = options[:] if options else []
+          list of paths to add to the annex
+        git
+        commit
+        msg
+        backend
+        options
 
-        return list(self._run_annex_command_json('add', args=options + files, backend=backend))
+        Returns
+        -------
+        list of dict
+        """
+        # Note: As long as we support direct mode, one should not call
+        # super().add() directly. Once direct mode is gone, we might remove
+        # `git` parameter and call GitRepo's add() instead.
+        if git:
+            # add to git instead of annex
+            # TODO: `options` currently unused in case of git
+            if self.is_direct_mode():
+                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + files
+                self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
+                # TODO: use options with git_add instead!
+                # => return value
+                # to be replaced:
+                return_list = {u'file': '', u'success': True}
+            else:
+                # TODO: Make sure return value from GitRepo is consistent
+                return_list = super(AnnexRepo, self).git_add(files)
+        else:
+            options = options[:] if options else []
+
+            return_list = list(self._run_annex_command_json(
+                'add', args=options + files, backend=backend))
+
+        if commit:
+            if msg is None:
+                # TODO: centralize JSON handling
+                if isinstance(return_list, list):
+                    file_list = [d['file'] for d in return_list if d['success']]
+                elif isinstance(return_list, dict):
+                    file_list = [return_list['file']] \
+                        if return_list['success'] else []
+                else:
+                    # don't know how to deal with
+                    file_list = []
+                msg = "Added file(s):" + '\n'.join(file_list)
+            self.commit(msg)  # TODO: For consisteny: Also json return value (success)?
+        return return_list
 
     def proxy(self, git_cmd, **kwargs):
         """Use git-annex as a proxy to git
@@ -553,50 +597,6 @@ class AnnexRepo(GitRepo):
                     islink(filepath) and '.git/annex/objects' in realpath(filepath)
                 )
             return out
-
-    # TODO: add_to_git and add_to_annex:
-    #       - integrate with add
-    #       - options for: git, commit + msg
-
-    @normalize_paths
-    def add_to_git(self, files, commit_msg="Added file(s) to git."):
-        """Add file(s) directly to git
-
-        Adds files directly to git and commits.
-
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to git; Can also be a str, in case of a single
-            path.
-        """
-        if self.is_direct_mode():
-            cmd_list = ['git', '-c', 'core.bare=false', 'add'] + files
-            self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
-            # TODO: use options with git_add instead!
-        else:
-            super(AnnexRepo, self).git_add(files)
-        self.commit(commit_msg)
-
-    @normalize_paths
-    def add_to_annex(self, files, commit_msg="Added file(s) to annex."):
-        """Add file(s) to the annex.
-
-        Adds files to the annex and commits.
-
-        Parameters
-        ----------
-        commit_msg: str
-            commit message
-        files: list
-            list of paths to add to the annex; Can also be a str, in case of a
-            single path.
-        """
-
-        self.annex_add(files)
-        self.commit(commit_msg)
 
     def init_remote(self, name, options):
         """Creates a new special remote
@@ -1156,8 +1156,10 @@ def readlines_until_ok_or_failed(stdout, maxlines=100):
             break
     return out.rstrip()
 
+
 def readline_json(stdout):
     return json.loads(stdout.readline().strip())
+
 
 @auto_repr
 class BatchedAnnex(object):
