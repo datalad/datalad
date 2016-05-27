@@ -382,7 +382,7 @@ class GitRepo(object):
 
     # TODO: see AnnexRepo.add_to_git/annex
     @normalize_paths
-    def git_add(self, files):
+    def add(self, files):
         """Adds file(s) to the repository.
 
         Parameters

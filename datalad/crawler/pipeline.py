@@ -336,7 +336,7 @@ def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
 
     if commit:
         repo = GitRepo(path)
-        repo.git_add(crawl_config_repo_path)
+        repo.add(crawl_config_repo_path)
         if repo.dirty:
             repo.git_commit("Initialized crawling configuration to use template %s" % template)
         else:

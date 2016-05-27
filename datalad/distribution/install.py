@@ -553,7 +553,13 @@ class Install(Interface):
 
             # switch `add` procedure between Git and Git-annex according to flag
             if add_data_to_git:
-                vcs.git_add(relativepath)
+                if isinstance(vcs, AnnexRepo):
+                    vcs.add(relativepath, git=True)
+                elif isinstance(vcs, GitRepo):
+                    vcs.add(relativepath)
+                else:
+                    # unknown vcs
+                    raise ValueError("Unknown VCS ({0})".format(vcs))
                 added_files = resolve_path(relativepath, ds)
             else:
                 # do a blunt `annex add`

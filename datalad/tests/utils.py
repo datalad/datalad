@@ -198,7 +198,12 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
             repo = AnnexRepo(repo.path)
         repo.add(file_repo_path, commit=True)
     else:
-        repo.git_add(file_repo_path)
+        if isinstance(repo, AnnexRepo):
+            repo.add(file_repo_path, git=True)
+        elif isinstance(repo, GitRepo):
+            repo.add(file_repo_path)
+        else:
+            raise ValueError("Unknown repo: %s" % repo)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 

@@ -56,7 +56,18 @@ class TestRepo(object):
         with open(filename, 'wb') as f:
             f.write(content.encode())
         if add:
-            (self.repo.add if annex else self.repo.git_add)(name)
+            if annex:
+                if isinstance(self.repo, AnnexRepo):
+                    self.repo.add(name)
+                else:
+                    raise ValueError("Can't annex add to a non-annex repo.")
+            else:
+                if isinstance(self.repo, AnnexRepo):
+                    self.repo.add(name, git=True)
+                elif isinstance(self.repo, GitRepo):
+                    self.repo.add(name)
+                else:
+                    raise ValueError("Unknown repo: %s" % self.repo)
 
     def create(self):
         if self._created:

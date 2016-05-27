@@ -66,7 +66,7 @@ def _test_AnnexDB(cls, path):
     # we should be able to get status of files out and inside of git
     set_db_status_from_file('2git')
     status_git1 = db.get('2git')
-    annex.git_add('2git')
+    annex.add('2git', git=True)
     annex.git_commit("added 2git")
     assert_equal(db.get('2git'), status_git1)
 

@@ -113,8 +113,7 @@ def test_update_fetch_all(src, remote_1, remote_2):
 
     with open(opj(remote_2, "second.txt"), "w") as f:
         f.write("different file load")
-    rmt2.git_add("second.txt")
-    rmt2.git_commit("Add file to git.")
+    rmt2.add("second.txt", git=True, commit=True, msg="Add file to git.")
 
     # fetch all remotes
     ds.update(fetch_all=True)

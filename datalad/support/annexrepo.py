@@ -413,7 +413,7 @@ class AnnexRepo(GitRepo):
                 return_list = {u'file': '', u'success': True}
             else:
                 # TODO: Make sure return value from GitRepo is consistent
-                return_list = super(AnnexRepo, self).git_add(files)
+                return_list = super(AnnexRepo, self).add(files)
         else:
             options = options[:] if options else []
 

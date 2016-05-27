@@ -78,7 +78,11 @@ def _makeds(path, levels, ds=None):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    repo.git_add(fn)
+    if isinstance(repo, AnnexRepo):
+        repo.add(fn, git=True)
+    else:
+        # GitRepo (see line 74)
+        repo.add(fn)
     repo.git_commit("Added %s" % fn)
     if ds:
         rpath = os.path.relpath(path, ds.path)

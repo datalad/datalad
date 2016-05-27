@@ -107,7 +107,7 @@ def test_GitRepo_add(src, path):
     filename = get_most_obscure_supported_name()
     with open(opj(path, filename), 'w') as f:
         f.write("File to add to git")
-    gr.git_add(filename)
+    gr.add(filename)
 
     assert_in(filename, gr.get_indexed_files(), "%s not successfully added to %s" % (filename, path))
 
@@ -125,7 +125,7 @@ def test_GitRepo_add(src, path):
 def test_GitRepo_remove(path):
 
     gr = GitRepo(path, create=True)
-    gr.git_add('*')
+    gr.add('*')
     gr.git_commit("committing all the files")
 
     eq_(gr.git_remove('file'), ['file'])
@@ -142,7 +142,7 @@ def test_GitRepo_commit(path):
     with open(opj(path, filename), 'w') as f:
         f.write("File to add to git")
 
-    gr.git_add(filename)
+    gr.add(filename)
     gr.git_commit("Testing GitRepo.git_commit().")
     ok_clean_git(path, annex=False, untracked=[])
 
@@ -351,7 +351,7 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
 
     with open(opj(orig_path, filename), 'w') as f:
         f.write("New file.")
-    origin.git_add(filename)
+    origin.add(filename)
     origin.git_commit("new file added.")
     clone.pull()
     assert_true(exists(opj(clone_path, filename)))
@@ -369,7 +369,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     origin.checkout("new_branch", "-b")
     with open(opj(orig_path, filename), 'w') as f:
         f.write("New file.")
-    origin.git_add(filename)
+    origin.add(filename)
     origin.git_commit("new file added.")
 
     clone.fetch(remote='origin')
@@ -423,7 +423,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     remote_repo.checkout("ssh-test", "-b")
     with open(opj(remote_repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
-    remote_repo.git_add("ssh_testfile.dat")
+    remote_repo.add("ssh_testfile.dat")
     remote_repo.git_commit("ssh_testfile.dat added.")
 
     # file is not locally known yet:
@@ -458,7 +458,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     repo.checkout("ssh-test", "-b")
     with open(opj(repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
-    repo.git_add("ssh_testfile.dat")
+    repo.add("ssh_testfile.dat")
     repo.git_commit("ssh_testfile.dat added.")
 
     # file is not known to the remote yet:
@@ -487,7 +487,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
 
     with open(opj(clone_path, filename), 'w') as f:
         f.write("New file.")
-    clone.git_add(filename)
+    clone.add(filename)
     clone.git_commit("new file added.")
     # TODO: need checkout first:
     clone.push('origin', '+master:new-branch')
@@ -510,23 +510,23 @@ def test_GitRepo_remote_update(path1, path2, path3):
     # Setting up remote 'git2'
     with open(opj(path2, 'masterfile'), 'w') as f:
         f.write("git2 in master")
-    git2.git_add('masterfile')
+    git2.add('masterfile')
     git2.git_commit("Add something to master.")
     git2.checkout('branch2', '-b')
     with open(opj(path2, 'branch2file'), 'w') as f:
         f.write("git2 in branch2")
-    git2.git_add('branch2file')
+    git2.add('branch2file')
     git2.git_commit("Add something to branch2.")
 
     # Setting up remote 'git3'
     with open(opj(path3, 'masterfile'), 'w') as f:
         f.write("git3 in master")
-    git3.git_add('masterfile')
+    git3.add('masterfile')
     git3.git_commit("Add something to master.")
     git3.checkout('branch3', '-b')
     with open(opj(path3, 'branch3file'), 'w') as f:
         f.write("git3 in branch3")
-    git3.git_add('branch3file')
+    git3.add('branch3file')
     git3.git_commit("Add something to branch3.")
 
     git1.update_remote()
@@ -569,7 +569,7 @@ def test_GitRepo_get_files(url, path):
     filename = 'another_file.dat'
     with open(opj(path, filename), 'w') as f:
         f.write("something")
-    gr.git_add(filename)
+    gr.add(filename)
     gr.git_commit("Added.")
 
     # now get the files again:
@@ -641,7 +641,7 @@ def test_GitRepo_get_merge_base(src):
     repo = GitRepo(src, create=True)
     with open(opj(src, 'file.txt'), 'w') as f:
         f.write('load')
-    repo.git_add('*')
+    repo.add('*')
     repo.git_commit('committing')
 
     assert_raises(ValueError, repo.get_merge_base, [])
@@ -656,7 +656,7 @@ def test_GitRepo_get_merge_base(src):
     # it will have all the files
     # Must not do:  https://github.com/gitpython-developers/GitPython/issues/375
     # repo.git_add('.')
-    repo.git_add('*')
+    repo.add('*')
     # NOTE: fun part is that we should have at least a different commit message
     # so it results in a different checksum ;)
     repo.git_commit("committing again")
@@ -678,7 +678,7 @@ def test_GitRepo_git_get_branch_commits(src):
     repo = GitRepo(src, create=True)
     with open(opj(src, 'file.txt'), 'w') as f:
         f.write('load')
-    repo.git_add('*')
+    repo.add('*')
     repo.git_commit('committing')
 
     commits = list(repo.get_branch_commits('master'))

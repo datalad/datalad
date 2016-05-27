@@ -718,7 +718,7 @@ class Annexificator(object):
         self.repo._git_custom_command(fpaths, ["git", "reset"])
 
     def _stage(self, fpaths):
-        self.repo.git_add(fpaths)
+        self.repo.add(fpaths, git=True)
         # self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
 
     def _get_status(self):

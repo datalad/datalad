@@ -21,6 +21,8 @@ from os.path import isabs
 from ...utils import auto_repr
 from ...utils import find_files
 from ...consts import HANDLE_META_DIR
+from ...support.annexrepo import AnnexRepo
+from ...support.gitrepo import GitRepo
 
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
@@ -85,7 +87,15 @@ class JsonBaseDB(object):
         lgr.debug("Writing %s to %s" % (self.__class__.__name__, self._filepath))
         with open(self._filepath, 'w') as f:
             json.dump(db, f, indent=2, sort_keys=True, separators=(',', ': '))
-        self.repo.git_add(self._filepath)  # stage to be committed
+
+        # stage to be committed:
+        if isinstance(self.repo, AnnexRepo):
+            self.repo.add(self._filepath, git=True)
+        elif isinstance(self.repo, GitRepo):
+            self.repo.add(self._filepath)
+        else:
+            raise ValueError("Unknown repo: %s" % self.repo)
+
 
     @property
     def db_version(self):
