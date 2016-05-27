@@ -90,14 +90,14 @@ class BasicAnnexTestRepo(TestRepo):
     def populate(self):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
-        self.repo.git_commit("Adding a basic INFO file and rudimentary load file for annex testing")
+        self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
         from .utils import on_windows
         fileurl = get_local_file_url(realpath(opj(self.path, 'test.dat'))) \
                   if not on_windows \
                   else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
         self.repo.add_url_to_file("test-annex.dat", fileurl)
-        self.repo.git_commit("Adding a rudimentary git-annex load file")
+        self.repo.commit("Adding a rudimentary git-annex load file")
         self.repo.drop("test-annex.dat")  # since available from URL
 
     def create_info_file(self):
@@ -120,7 +120,7 @@ class BasicGitTestRepo(TestRepo):
     def populate(self):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
-        self.repo.git_commit("Adding a basic INFO file and rudimentary "
+        self.repo.commit("Adding a basic INFO file and rudimentary "
                              "load file.")
 
     def create_info_file(self):

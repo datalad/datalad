@@ -87,7 +87,7 @@ def test_add_archive_content(path_orig, url, repo_path):
         repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
         for s in range(1, 5):
             repo.add_urls([opj(url, '%du/1.tar.gz' % s)], options=["--pathdepth", "-2"])
-    repo.git_commit("added 1.tar.gz")
+    repo.commit("added 1.tar.gz")
 
     key_1tar = repo.get_file_key('1.tar.gz')  # will be used in the test later
 
@@ -148,7 +148,7 @@ def test_add_archive_content(path_orig, url, repo_path):
         with swallow_outputs():
             repo.add_urls([opj(url, 'd1', '1.tar.gz')], options=["--pathdepth", "-1"],
                           cwd=getpwd())  # invoke under current subdir
-        repo.git_commit("added 1.tar.gz in d1")
+        repo.commit("added 1.tar.gz in d1")
 
         def d2_basic_checks():
             ok_(exists('1'))
@@ -202,7 +202,7 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
     # Let's add first archive to the repo so we could test
     with swallow_outputs():
         repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
-    repo.git_commit("added 1.tar.gz")
+    repo.commit("added 1.tar.gz")
 
     add_archive_content('1.tar.gz', strip_leading_dirs=True)
     ok_(not exists('1'))

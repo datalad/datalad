@@ -129,7 +129,7 @@ def test_install_plain_git(src, path):
     # make plain git repo
     gr = GitRepo(src, create=True)
     gr.add('test.txt')
-    gr.git_commit('demo')
+    gr.commit('demo')
     # now install it somewhere else
     ds = install(path=path, source=src)
     # stays plain Git repo

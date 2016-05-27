@@ -955,7 +955,7 @@ class AnnexRepo(GitRepo):
         if self.is_direct_mode():
             self.proxy('git commit -m "%s"' % msg, expect_stderr=True)
         else:
-            super(AnnexRepo, self).git_commit(msg)
+            super(AnnexRepo, self).commit(msg)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False):

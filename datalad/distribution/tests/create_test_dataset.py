@@ -83,7 +83,7 @@ def _makeds(path, levels, ds=None):
     else:
         # GitRepo (see line 74)
         repo.add(fn)
-    repo.git_commit("Added %s" % fn)
+    repo.commit("Added %s" % fn)
     if ds:
         rpath = os.path.relpath(path, ds.path)
         out = install(
@@ -95,7 +95,7 @@ def _makeds(path, levels, ds=None):
         if isinstance(ds.repo, AnnexRepo):
             ds.repo.commit("subdataset %s installed." % rpath)
         else:
-            ds.repo.git_commit("subdataset %s installed." % rpath)
+            ds.repo.commit("subdataset %s installed." % rpath)
 
     if not levels:
         return

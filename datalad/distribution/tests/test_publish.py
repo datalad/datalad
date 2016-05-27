@@ -83,7 +83,7 @@ def test_publish_simple(origin, src_path, dst_path):
         source.repo.add(opj(src_path, 'test_mod_file'))
     else:
         raise ValueError("Unknown repo: %s" % source.repo)
-    source.repo.git_commit("Modified.")
+    source.repo.commit("Modified.")
     ok_clean_git(src_path, annex=False)
 
     res = publish(dataset=source)

@@ -414,7 +414,7 @@ class GitRepo(object):
         if commit:
             if msg is None:
                 msg = "Added file(s):" + '\n'.join(files)
-            self.git_commit(msg=msg)
+            self.commit(msg=msg)
 
     # TODO: like add melt in
     @normalize_paths(match_return_type=False)
@@ -441,8 +441,7 @@ class GitRepo(object):
         """
         self.repo.index.write()  # flush possibly cached in GitPython changes to index
 
-    # TODO: Before renaming, change calls => super().git_commit
-    def git_commit(self, msg=None, options=None):
+    def commit(self, msg=None, options=None):
         """Commit changes to git.
 
         Parameters

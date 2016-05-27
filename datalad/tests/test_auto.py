@@ -62,7 +62,7 @@ def test_proxying_open_testrepobased(repo):
         f.write(content)
     annex.add(fpath2)
     annex.drop(fpath2)
-    annex.git_commit("added and dropped")
+    annex.commit("added and dropped")
     assert_raises(IOError, open, fpath2)
 
     # Let's use context manager form
@@ -88,7 +88,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
     annex.add([fpath1, fpath2])
     verify_load(fpath1)
     verify_load(fpath2)
-    annex.git_commit("Added some files")
+    annex.commit("Added some files")
 
     # clone to another repo
     repo2 = repo + "_2"
