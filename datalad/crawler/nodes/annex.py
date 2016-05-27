@@ -455,7 +455,7 @@ class Annexificator(object):
         #     # need to download new
         #     self.repo.add_urls
         #     # remove old
-        #     self.repo.git_remove([db_filename])
+        #     self.repo.remove([db_filename])
         #     self.db.set_filename(url, filename)
         # # figure out if we need to download it
         # #if self.mode in ('relaxed', 'fast'):
@@ -581,7 +581,7 @@ class Annexificator(object):
                     lgr.info("Checking out a new detached branch %s" % (branch))
                     self.repo.checkout(branch, options="--orphan")
                     if self.repo.dirty:
-                        self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
+                        self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
@@ -1062,7 +1062,7 @@ class Annexificator(object):
                     files_str = ": " + ', '.join(obsolete) if len(obsolete) < 10 else ""
                     lgr.info('Removing %d obsolete files%s' % (len(obsolete), files_str))
                     stats = data.get('datalad_stats', None)
-                    _call(self.repo.git_remove, obsolete)
+                    _call(self.repo.remove, obsolete)
                     if stats:
                         _call(stats.increment, 'removed', len(obsolete))
                     for filepath in obsolete:
@@ -1082,7 +1082,7 @@ class Annexificator(object):
         # TODO: not sure if we should may be check if exists, and skip/just complain if not
         if stats:
             _call(stats.increment, 'removed')
-        _call(self.repo.git_remove, filename)
+        _call(self.repo.remove, filename)
         yield data
 
     def initiate_handle(self, *args, **kwargs):

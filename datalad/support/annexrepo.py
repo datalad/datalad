@@ -958,7 +958,7 @@ class AnnexRepo(GitRepo):
             super(AnnexRepo, self).commit(msg)
 
     @normalize_paths(match_return_type=False)
-    def remove(self, files, force=False):
+    def remove(self, files, force=False, **kwargs):
         """Remove files from git/annex (works in direct mode as well)
 
         Parameters
@@ -966,17 +966,20 @@ class AnnexRepo(GitRepo):
         files
         force: bool, optional
         """
-        self.precommit()  # since might interfer
+        self.precommit()  # since might interfere
         if self.is_direct_mode():
-            self.proxy('git rm ' + ('--force ' if force else '') + ' '.join(files))
-            # yoh gives up -- for some reason sometimes it remains, so if we force -- we mean it!
+            self.proxy('git rm ' + ('--force ' if force else '') +
+                       ' '.join(files))
+            # yoh gives up -- for some reason sometimes it remains,
+            # so if we force -- we mean it!
             if force:
                 for f in files:
                     filepath = opj(self.path, f)
                     if lexists(filepath):
                         os.unlink(filepath)
         else:
-            self.git_remove(files, force=force, normalize_paths=False)
+            super(AnnexRepo, self).remove(files, force=force,
+                                          normalize_paths=False, **kwargs)
 
     def get_contentlocation(self, key, batch=False):
         """Get location of the key content

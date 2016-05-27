@@ -213,7 +213,7 @@ class Uninstall(Interface):
                 raise ValueError("%s is not a file handle. Removing its "
                                  "data only doesn't make sense." % path)
             else:
-                return ds.repo.git_remove([relativepath])
+                return ds.repo.remove([relativepath])
 
         elif _untracked_or_within_submodule:
             subds = get_containing_subdataset(ds, relativepath)

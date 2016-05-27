@@ -128,10 +128,10 @@ def test_GitRepo_remove(path):
     gr.add('*')
     gr.commit("committing all the files")
 
-    eq_(gr.git_remove('file'), ['file'])
-    eq_(set(gr.git_remove('d', r=True, f=True)), {'d/f1', 'd/f2'})
+    eq_(gr.remove('file'), ['file'])
+    eq_(set(gr.remove('d', r=True, f=True)), {'d/f1', 'd/f2'})
 
-    eq_(set(gr.git_remove('*', r=True, f=True)), {'file2', 'd2/f1', 'd2/f2'})
+    eq_(set(gr.remove('*', r=True, f=True)), {'file2', 'd2/f1', 'd2/f2'})
 
 @assert_cwd_unchanged
 @with_tempfile

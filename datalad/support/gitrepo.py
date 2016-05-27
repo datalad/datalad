@@ -418,7 +418,7 @@ class GitRepo(object):
 
     # TODO: like add melt in
     @normalize_paths(match_return_type=False)
-    def git_remove(self, files, **kwargs):
+    def remove(self, files, **kwargs):
         """Remove files.
 
         Parameters
