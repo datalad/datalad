@@ -62,13 +62,16 @@ def test_question_choices():
     assert_re_in(".*prompt.*ERROR: .incorrect. is not among choices.*", out.getvalue())
 
 
-def _test_progress_bar(backend, len):
+def _test_progress_bar(backend, len, increment):
     out = StringIO()
     fill_str = ('123456890' * (len//10))[:len]
     pb = DialogUI(out).get_progressbar('label', fill_str, maxval=10, backend=backend)
     pb.start()
+    # we can't increment 11 times
     for x in range(11):
-        pb.update(x)
+        if not (increment and x == 0):
+            # do not increment on 0
+            pb.update(x if not increment else 1, increment=increment)
         out.flush()  # needed atm
         pstr = out.getvalue()
         ok_startswith(pstr.lstrip('\r'), 'label:')
@@ -78,8 +81,10 @@ def _test_progress_bar(backend, len):
     pb.finish()
     ok_endswith(out.getvalue(), '\n')
 
+
 def test_progress_bar():
     # More of smoke testing given various lengths of fill_text
     for backend in _progressbars:
         for l in 0, 4, 10, 1000:
-            yield _test_progress_bar, backend, l
+            for increment in True, False:
+                yield _test_progress_bar, backend, l, increment

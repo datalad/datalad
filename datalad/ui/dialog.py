@@ -65,7 +65,7 @@ class ProgressBarBase(object):
             self._prev_value = size
 
     def start(self):
-        raise NotImplementedError
+        pass
 
     def finish(self):
         self._prev_value = 0
@@ -101,7 +101,7 @@ try:
 
         backend = 'progressbar'
 
-        def __init__(self, label='', fill_text=None, currval=None, maxval=None, unit='B', out=sys.stdout):
+        def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
             super(progressbarProgressBar, self).__init__()
             assert(unit == 'B')  # none other "supported" ATM
             bar = dict(marker=RotatingMarker())
@@ -111,8 +111,6 @@ try:
                        Percentage(), ' ',
                        ETA(), ' ',
                        FileTransferSpeed()]
-            if currval is not None:
-                raise NotImplementedError("Not yet supported to set currval in the beginning")
             self._pbar = ProgressBar(widgets=widgets, maxval=maxval, fd=out).start()
 
         def update(self, size, increment=False):
@@ -120,13 +118,15 @@ try:
             super(progressbarProgressBar, self).update(size, increment=increment)
 
         def start(self):
+            super(progressbarProgressBar, self).start()
             self._pbar.start()
 
         def finish(self):
             self._pbar.finish()
+            super(progressbarProgressBar, self).finish()
 
     _progressbars['progressbar'] = progressbarProgressBar
-except ImportError:
+except ImportError:  # pragma: no cover
     pass
 
 try:
@@ -137,7 +137,7 @@ try:
 
         backend = 'tqdm'
 
-        def __init__(self, label='', fill_text=None, currval=None, maxval=None, unit='B', out=sys.stdout):
+        def __init__(self, label='', fill_text=None, maxval=None, unit='B', out=sys.stdout):
             super(tqdmProgressBar, self).__init__()
             self._pbar_params = dict(desc=label, unit=unit, unit_scale=True, total=maxval, file=out)
             self._pbar = None
@@ -154,14 +154,16 @@ try:
             super(tqdmProgressBar, self).update(size, increment=increment)
 
         def start(self):
+            super(tqdmProgressBar, self).start()
             self._create()
 
         def finish(self):
             self._pbar.close()
             self._pbar = None
+            super(tqdmProgressBar, self).finish()
 
     _progressbars['tqdm'] = tqdmProgressBar
-except ImportError:
+except ImportError:  # pragma: no cover
     pass
 
 assert len(_progressbars), "We need tqdm or progressbar library to report progress"
