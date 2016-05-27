@@ -45,7 +45,9 @@ before_install:
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - travis_retry sudo apt-get install git-annex-standalone zip help2man python-progressbar
+  - travis_retry sudo apt-get install git-annex-standalone zip help2man
+  # For Python3 compatibility needs never-released master
+  - pip install https://github.com/niltonvolpato/python-progressbar/archive/master.zip
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - git submodule update --init --recursive

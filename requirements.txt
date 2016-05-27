@@ -6,6 +6,3 @@
 
 # -- Optional for Testing
 nose-timer
-
-# -- Optional dependencies, installing for being able to test them
-progressbar
