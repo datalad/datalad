@@ -11,6 +11,7 @@ import os
 from os.path import join as opj
 from six import next
 from ..misc import get_disposition_filename
+from ..misc import get_url_filename
 from ..misc import range_node
 from ..misc import interrupt_if
 from ..misc import skip_if
@@ -42,10 +43,18 @@ from nose import SkipTest
 @skip_if_no_network
 @use_cassette('brain-map.org-1', return_body='')
 def test_get_disposition_filename():
-    input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
-    output = list(get_disposition_filename(input))
+    inputted = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
+    output = list(get_disposition_filename(inputted))
     eq_(len(output), 1)
     eq_(output[0]['filename'], 'T1.nii.gz')
+
+
+def test_get_url_filename():
+    inputted = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
+    output = list(get_url_filename(inputted))
+    eq_(len(output[0]), 2)
+    eq_(len(output), 1)
+    eq_(output[0]['filename'], '157722290')
 
 
 def test_sink():
