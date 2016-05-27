@@ -58,21 +58,27 @@ def test_sink():
     genempty = Sink()
     eq_(list(genempty(data)), [{'a': 'b', 'x': 'y', 'g': 'h'}])
 
+    # check the internal state
+    eq_(list(genempty.data), [{'a': 'b', 'x': 'y', 'g': 'h'}])
+
     # if key for sunk data is specified
     gen = Sink(output='result')
     eq_(list(gen(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b', 'x': 'y', 'g': 'h'}], 'g': 'h'}])
+    eq_(list(gen.data), [{'a': 'b', 'x': 'y', 'g': 'h'}])
 
     # if list of keys is specified
     genkeys = Sink(keys, 'result')
     eq_(list(genkeys(data)), [{'a': 'b', 'x': 'y', 'result': [{'a': 'b', 'x': 'y'}], 'g': 'h'}])
-    eq_(genkeys.get_values(keys), [['y', 'b']])
+    eq_(list(genkeys.data), [{'a': 'b', 'x': 'y'}])
 
     # if list of keys has no match
     gentwo = Sink(nomatch, 'result')
     eq_(list(gentwo(data)), [{'a': 'b', 'result': [{}], 'x': 'y', 'g': 'h'}])
+    eq_(list(gentwo.data), [{}])
 
     # check that data's key/value pair matches will be sunk again
     eq_(list(gentwo(data)), [{'a': 'b', 'x': 'y', 'result': [{}, {}], 'g': 'h'}])
+    eq_(list(gentwo.data), [{}, {}])
 
 
 def test_get_values():
