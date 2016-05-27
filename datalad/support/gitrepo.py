@@ -380,26 +380,29 @@ class GitRepo(object):
         except OSError:
             return GitRepo.get_toppath(dirname(path))
 
-    # TODO: see AnnexRepo.add_to_git/annex
     @normalize_paths
-    def add(self, files):
+    def add(self, files, commit=False, msg=None):
         """Adds file(s) to the repository.
 
         Parameters
         ----------
         files: list
             list of paths to add
+        commit: bool
+        msg: str
         """
 
         files = _remove_empty_items(files)
         if files:
             try:
                 self.cmd_call_wrapper(self.repo.index.add, files, write=True)
-                # TODO: May be make use of 'fprogress'-option to indicate progress
+                # TODO: May be make use of 'fprogress'-option to indicate
+                # progress
                 # But then, we don't have it for git-annex add, anyway.
                 #
                 # TODO: Is write=True a reasonable way to do it?
-                # May be should not write until success of operation is confirmed?
+                # May be should not write until success of operation is
+                # confirmed?
                 # What's best in case of a list of files?
             except OSError as e:
                 lgr.error("git_add: %s" % e)
@@ -407,6 +410,11 @@ class GitRepo(object):
 
         else:
             lgr.warning("git_add was called with empty file list.")
+
+        if commit:
+            if msg is None:
+                msg = "Added file(s):" + '\n'.join(files)
+            self.git_commit(msg=msg)
 
     # TODO: like add melt in
     @normalize_paths(match_return_type=False)

@@ -408,12 +408,14 @@ class AnnexRepo(GitRepo):
                 cmd_list = ['git', '-c', 'core.bare=false', 'add'] + files
                 self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
                 # TODO: use options with git_add instead!
-                # => return value
-                # to be replaced:
-                return_list = {u'file': '', u'success': True}
             else:
-                # TODO: Make sure return value from GitRepo is consistent
-                return_list = super(AnnexRepo, self).add(files)
+                super(AnnexRepo, self).add(files)
+
+            # TODO: Make sure return value from GitRepo is consistent
+            # currently simulating return value, assuming success
+            # for all files:
+            return_list = [{u'file': f, u'success': True} for f in files]
+
         else:
             options = options[:] if options else []
 
@@ -429,8 +431,8 @@ class AnnexRepo(GitRepo):
                     file_list = [return_list['file']] \
                         if return_list['success'] else []
                 else:
-                    # don't know how to deal with
-                    file_list = []
+                    raise ValueError("Unexpected return type: %s" %
+                                     type(return_list))
                 msg = "Added file(s):" + '\n'.join(file_list)
             self.commit(msg)  # TODO: For consisteny: Also json return value (success)?
         return return_list
