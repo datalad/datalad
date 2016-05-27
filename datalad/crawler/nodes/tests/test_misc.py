@@ -20,6 +20,7 @@ from ..misc import sub
 from ..misc import find_files
 from ..misc import switch
 from ..misc import assign
+from ..misc import _act_if
 from ..misc import rename
 from ..misc import Sink
 from ...pipeline import FinishPipeline
@@ -112,6 +113,28 @@ def test_assign():
 
     gen = assign({'x': 'value', 'g': 'y %(x)s'}, interpolate=True)
     eq_(list(gen(datadup)), [{'x': 'value', 'g': 'y z'}])
+
+
+def test__act_if():
+    values = {'x': 'y', 'a': 'b'}
+    data = {'x': 'y'}
+    datamatch = {'x': 'y', 'a': 'b'}
+
+    # matched = false
+    gen = _act_if(values, False, True)
+    eq_(list(gen(data)), ['y'])
+
+    # matched = false
+    genfal = _act_if(values, False, False)
+    eq_(list(genfal(data)), [{'x': 'y'}])
+
+    # matched = true
+    genn = _act_if(values, False, True)
+    eq_(list(genn(datamatch)), [{'a': 'b', 'x': 'y'}])
+
+    # matched = true
+    genn = _act_if(values, False, False)
+    eq_(list(genn(datamatch)), ['b', 'y'])
 
 
 def test_rename():

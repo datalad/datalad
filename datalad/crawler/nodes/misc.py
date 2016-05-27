@@ -188,6 +188,7 @@ class _act_if(object):
     def __call__(self, data):
         comp = re.search if self.re else lambda x, y: x == y
         matched = True
+        # finds if all match
         for k, v in iteritems(self.values):
             if not (k in data and comp(v, data[k])):
                 # do nothing and pass the data further
@@ -200,8 +201,8 @@ class _act_if(object):
         else:
             yield data
 
-    def _act(self):
-        raise NotImplementedError
+    def _act(self, data):
+        return data.values()
 
 
 @auto_repr
