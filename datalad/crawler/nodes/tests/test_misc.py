@@ -44,18 +44,18 @@ from nose import SkipTest
 @skip_if_no_network
 @use_cassette('brain-map.org-1', return_body='')
 def test_get_disposition_filename():
-    inputted = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
-    output = list(get_disposition_filename(inputted))
+    input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
+    output = list(get_disposition_filename(input))
     eq_(len(output), 1)
     eq_(output[0]['filename'], 'T1.nii.gz')
 
 
 def test_get_url_filename():
-    inputted = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
-    output = list(get_url_filename(inputted))
+    input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
+    output = list(get_url_filename(input))
     eq_(len(output[0]), 2)
     eq_(len(output), 1)
-    eq_(output[0]['filename'], '157722290')
+    eq_(output, [{'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290', 'filename': '157722290'}])
 
 
 def test_sink():
@@ -135,6 +135,16 @@ def test__act_if():
     # matched = true
     genn = _act_if(values, False, False)
     eq_(list(genn(datamatch)), ['b', 'y'])
+
+
+def test_func_node():
+    data = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
+    key = {'url': 'test'}
+
+    gen = (func_to_node(get_disposition_filename(data), data_args=['url'], outputs=['url'], kwargs={'test': 1}))
+    list(gen(data))
+
+    print(gen.func_node(key))
 
 
 def test_rename():
