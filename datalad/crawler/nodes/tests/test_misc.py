@@ -228,6 +228,17 @@ def test_func_to_node():
     ok_generator(gen)
     assert_equal(list(gen), [{'offset': 5, 'out': 5, 'in': 1}])
 
+    # with multiple outputs
+    def split_(s, num):
+        yield s.split('/', num)
+
+    data = {'num': 3, 'in': 'datalad/crawler/nodes'}
+    split_node = func_to_node(split_, data_args='in', data_kwargs=['num'], outputs=['a', 'b', 'c'])
+    assert_in('assigned to a, b, c', split_node.__doc__)
+    assert_false('Additional keyword arguments' in split_node.__doc__)
+    split_node_gen = split_node(data)
+    assert_equal(list(split_node_gen), [{'a': 'datalad', 'c': 'nodes', 'b': 'crawler', 'num': 3, 'in': 'datalad/crawler/nodes'}])
+
 
 def test_sub():
     s = sub({
