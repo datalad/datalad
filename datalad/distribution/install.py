@@ -154,32 +154,21 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             # attempt left-overs.
             continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-        try:
-            # XXX next line should be enough, but isn't -> workaround via Git call
-            #submodule.update(init=True)
-            ds.repo._git_custom_command(
-                '', ['git', 'submodule', 'update', '--init', sm_path],
-                expect_fail=True)
-        except CommandError:
-            # if the submodule is brand-new and previously unknown the above
-            # will fail -> simply add it\
-            # RF: Re-implement with GitPython
-            ds.repo._git_custom_command(
-                '', ["git", "submodule", "add", clone_url, sm_path])
+        if sm_path in ds.get_dataset_handles(absolute=False, recursive=False):
+            ds.repo.update_submodule(sm_path, init=True)
+        else:
+            # submodule is brand-new and previously unknown
+            ds.repo.add_submodule(sm_path, url=clone_url)
         _fixup_submodule_dotgit_setup(ds, sm_path)
         return subds
 
 
-def _install_subds_inplace(ds, path, relativepath, source, runner):
+def _install_subds_inplace(ds, path, relativepath):
     """Register an existing repository in the repo tree as a submodule"""
-    # RF: replace `runner` with GitPython implementation
-
     # FLOW GUIDE EXIT POINT
     # this is an existing repo and must be in-place turned into
     # a submodule of this dataset
-    cmd_list = ["git", "submodule", "add", source,
-                relativepath]
-    runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
+    ds.repo.add_submodule(relativepath, url=None)
     _fixup_submodule_dotgit_setup(ds, relativepath)
     # return newly added submodule as a dataset
     return Dataset(path)
@@ -527,7 +516,7 @@ class Install(Interface):
                 # this is an existing repo and must be in-place turned into
                 # a submodule of this dataset
                 return _install_subds_inplace(
-                    ds, path, relativepath, source, runner)
+                    ds, path, relativepath)
 
             # FLOW GUIDE EXIT POINT
             # - untracked file or directory in this dataset
