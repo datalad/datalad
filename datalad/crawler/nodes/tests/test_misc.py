@@ -120,21 +120,17 @@ def test__act_if():
     data = {'x': 'y'}
     datamatch = {'x': 'y', 'a': 'b'}
 
+    # matched = true
+    gen = _act_if(values)
+    assert_raises(NotImplementedError, list, gen(datamatch))
+    
     # matched = false
-    gen = _act_if(values, False, True)
-    eq_(list(gen(data)), ['y'])
-
-    # matched = false
-    genfal = _act_if(values, False, False)
+    genfal = _act_if(values, re=True, negate=False)
     eq_(list(genfal(data)), [{'x': 'y'}])
 
     # matched = true
-    genn = _act_if(values, False, True)
-    eq_(list(genn(datamatch)), [{'a': 'b', 'x': 'y'}])
-
-    # matched = true
-    genn = _act_if(values, False, False)
-    eq_(list(genn(datamatch)), ['b', 'y'])
+    gent = _act_if(values, re=True, negate=True)
+    eq_(list(gent(datamatch)), [{'a': 'b', 'x': 'y'}])
 
 
 def test_func_node():
