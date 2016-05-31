@@ -202,7 +202,7 @@ class _act_if(object):
             yield data
 
     def _act(self, data):
-        return data.values()
+        raise NotImplementedError
 
 
 @auto_repr
