@@ -123,7 +123,7 @@ def test__act_if():
     # matched = true
     gen = _act_if(values)
     assert_raises(NotImplementedError, list, gen(datamatch))
-    
+
     # matched = false
     genfal = _act_if(values, re=True, negate=False)
     eq_(list(genfal(data)), [{'x': 'y'}])
@@ -131,16 +131,6 @@ def test__act_if():
     # matched = true
     gent = _act_if(values, re=True, negate=True)
     eq_(list(gent(datamatch)), [{'a': 'b', 'x': 'y'}])
-
-
-def test_func_node():
-    data = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
-    key = {'url': 'test'}
-
-    gen = (func_to_node(get_disposition_filename(data), data_args=['url'], outputs=['url'], kwargs={'test': 1}))
-    list(gen(data))
-
-    print(gen.func_node(key))
 
 
 def test_rename():
@@ -227,6 +217,16 @@ def test_func_to_node():
     range_node_gen = xrange_node(in_dict)
     ok_generator(range_node_gen)
     assert_equal(list(range_node_gen), [{'in': 1, 'out': 10}])
+
+    # testing func_node
+    data = {'offset': 5, 'in': 1}
+
+    xrange_node = func_to_node(xrange_, data_args='in', data_kwargs=['offset'], outputs='out')
+    assert_in('assigned to out', xrange_node.__doc__)
+    assert_false('Additional keyword arguments' in xrange_node.__doc__)
+    gen = xrange_node(data)
+    ok_generator(gen)
+    assert_equal(list(gen), [{'offset': 5, 'out': 5, 'in': 1}])
 
 
 def test_sub():
