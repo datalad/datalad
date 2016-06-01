@@ -115,10 +115,10 @@ def __test_basic_openfmri_top_pipeline():
 
     # and sink2 should collect everything downloadable from under AWS Link section
     # test that we got all needed tags etc propagated properly!
-    all_aws_entries = sink2.get_values('dataset', 'url_text', 'url')
+    all_aws_entries = sink2.get_values(['dataset', 'url_text', 'url'])
     ok_(len(all_aws_entries) > len(urls))  # that we have at least as many ;-)
     #print('\n'.join(map(str, all_aws_entries)))
-    all_licenses = sink_licenses.get_values('dataset', 'url_text', 'url')
+    all_licenses = sink_licenses.get_values(['dataset', 'url_text', 'url'])
     eq_(len(all_licenses), len(urls))
     #print('\n'.join(map(str, all_licenses)))
 
