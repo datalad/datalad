@@ -153,73 +153,40 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             # attempt left-overs.
             continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-        try:
-            # XXX next line should be enough, but isn't -> workaround via Git call
-            #submodule.update(init=True)
-            ds.repo._git_custom_command(
-                '', ['git', 'submodule', 'update', '--init', sm_path],
-                expect_fail=True)
-        except CommandError:
-            # if the submodule is brand-new and previously unknown the above
-            # will fail -> simply add it\
-            # RF: Re-implement with GitPython
-            ds.repo._git_custom_command(
-                '', ["git", "submodule", "add", clone_url, sm_path])
+        if sm_path in ds.get_dataset_handles(absolute=False, recursive=False):
+            ds.repo.update_submodule(sm_path, init=True)
+        else:
+            # submodule is brand-new and previously unknown
+            ds.repo.add_submodule(sm_path, url=clone_url)
         _fixup_submodule_dotgit_setup(ds, sm_path)
         return subds
 
 
-def _install_subds_inplace(ds, path, relativepath, source, runner):
+def _install_subds_inplace(ds, path, relativepath):
     """Register an existing repository in the repo tree as a submodule"""
-    # RF: replace `runner` with GitPython implementation
-
     # FLOW GUIDE EXIT POINT
     # this is an existing repo and must be in-place turned into
     # a submodule of this dataset
-    cmd_list = ["git", "submodule", "add", source,
-                relativepath]
-    runner.run(cmd_list, cwd=ds.path, expect_stderr=True)
+    ds.repo.add_submodule(relativepath, url=None)
     _fixup_submodule_dotgit_setup(ds, relativepath)
     # return newly added submodule as a dataset
     return Dataset(path)
 
 
 def _fixup_submodule_dotgit_setup(ds, relativepath):
-    """Implementation of our current of .git in a subdataset"""
+    """Implementation of our current of .git in a subdataset
+
+    Each subdataset/module has its own .git directory where a standalone
+    repository would have it. No gitdir files, no symlinks.
+    """
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file
     path = opj(ds.path, relativepath)
-    subds_git_dir = opj(path, ".git")
-    ds_git_dir = get_git_dir(ds.path)
-    moved_git_dir = opj(ds.path, ds_git_dir,
-                        "modules", relativepath)
-    # safety net
-    if islink(subds_git_dir) \
-            and realpath(subds_git_dir) == moved_git_dir:
-        # .git dir is already moved and linked
-        # remove link to enable .git replacement logic below
-        os.remove(subds_git_dir)
-    else:
-        # move .git
-        from os import rename, listdir, rmdir
-        assure_dir(moved_git_dir)
-        for dot_git_entry in listdir(subds_git_dir):
-            rename(opj(subds_git_dir, dot_git_entry),
-                   opj(moved_git_dir, dot_git_entry))
-        assert not listdir(subds_git_dir)
-        rmdir(subds_git_dir)
+    src_dotgit = get_git_dir(path)
 
-    # TODO: symlink or whatever annex does, since annexes beneath
-    #       might break
-    #       - figure out, what annex does in direct mode
-    #         and/or on windows
-    #       - for now use .git file on windows and symlink otherwise
-    if not on_windows:
-        os.symlink(relpath(moved_git_dir, start=path),
-                   opj(path, ".git"))
-    else:
-        with open(opj(path, ".git"), "w") as f:
-            f.write("gitdir: {moved}\n".format(moved=relpath(moved_git_dir, start=path)))
+    # at this point install always yields the desired result
+    # just make sure
+    assert(src_dotgit == '.git')
 
 
 def get_containing_subdataset(ds, path):
@@ -381,7 +348,7 @@ class Install(Interface):
 
         assert(ds is not None)
 
-        lgr.info("Installing {0}".format(ds))
+        lgr.info("Installing {0}".format(path if path else ds))
 
         vcs = ds.repo
         if vcs is None:
@@ -529,7 +496,7 @@ class Install(Interface):
                 # this is an existing repo and must be in-place turned into
                 # a submodule of this dataset
                 return _install_subds_inplace(
-                    ds, path, relativepath, source, runner)
+                    ds, path, relativepath)
 
             # FLOW GUIDE EXIT POINT
             # - untracked file or directory in this dataset

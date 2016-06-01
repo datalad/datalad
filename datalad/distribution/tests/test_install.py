@@ -11,7 +11,7 @@
 
 import os
 import shutil
-from os.path import join as opj, abspath
+from os.path import join as opj, abspath, isdir
 
 from ..dataset import Dataset
 from datalad.api import install
@@ -98,6 +98,7 @@ def test_create(path):
     ok_(added_subds.is_installed())
     ok_clean_git(sub_path_1, annex=False)
     eq_(added_subds.path, sub_path_1)
+    assert_true(isdir(opj(added_subds.path, '.git')))
     # will not list it unless committed
     assert_not_in("sub", ds.get_dataset_handles())
     ds.remember_state("added submodule")
@@ -201,6 +202,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
 def test_install_into_dataset(source, top_path):
     ds = install(top_path)
     subds = ds.install(path="sub", source=source)
+    assert_true(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     # sub is clean:
     ok_clean_git(subds.path, annex=False)
@@ -225,6 +227,7 @@ def test_install_subdataset(src, path):
 
     # install it:
     ds.install('sub1')
+    assert_true(isdir(opj(subds.path, '.git')))
 
     ok_(subds.is_installed())
     # Verify that it is the correct submodule installed and not
