@@ -12,10 +12,4 @@ cat /tmp/dl-test-ssh-id.pub >> ~/.ssh/authorized_keys
 eval $(ssh-agent)
 ssh-add /tmp/dl-test-ssh-id
 
-# Done.
-# test it:
-echo "DEBUG: test connection ..."
-ssh -v localhost exit
-# don't wait for travis to timeout:
-exit 1
 

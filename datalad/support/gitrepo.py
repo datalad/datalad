@@ -812,29 +812,29 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    try:
-                        rm.push(refspec=refspec, progress=progress, **kwargs)
+                    #try:
+                    rm.push(refspec=refspec, progress=progress, **kwargs)
                         # TODO: progress +kwargs
-                    except BadName as e:
-                        lgr.error("GitPython reported BadName Exception: %s" % e)
+                    #except BadName as e:
+                    #    lgr.error("GitPython reported BadName Exception: %s" % e)
                         # TODO: There seems to be a bug in GitPython, which leads
                         # to a BadName exception on a forced update. It somehow
                         # cannot resolve the short SHA of the OLD COMMIT,
                         # reported by Git AFTER the push (forced update) was done.
                         # Document and watch it!
-                        pass
+                    #    pass
             else:
-                try:
-                    rm.push(refspec=refspec, progress=progress, **kwargs)
+                #try:
+                rm.push(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
-                except BadName as e:
-                    lgr.error("GitPython reported BadName Exception: %s" % e)
-                    # TODO: There seems to be a bug in GitPython, which leads
-                    # to a BadName exception on a forced update. It somehow
-                    # cannot resolve the short SHA of the OLD COMMIT,
-                    # reported by Git AFTER the push (forced update) was done.
-                    # Document and watch it!
-                    pass
+                #except BadName as e:
+                #    lgr.error("GitPython reported BadName Exception: %s" % e)
+                #    # TODO: There seems to be a bug in GitPython, which leads
+                #    # to a BadName exception on a forced update. It somehow
+                #    # cannot resolve the short SHA of the OLD COMMIT,
+                #    # reported by Git AFTER the push (forced update) was done.
+                #    # Document and watch it!
+                #    pass
 
     def git_get_remote_url(self, name, push=False):
         """Get the url of a remote.
