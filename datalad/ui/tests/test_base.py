@@ -15,6 +15,7 @@ from ..dialog import DialogUI, ConsoleLog
 from ...tests.utils import assert_equal, assert_not_equal
 from ...tests.utils import assert_raises
 from ...tests.utils import assert_false
+from ...tests.utils import with_testsui
 
 
 def test_ui_switcher():
@@ -60,3 +61,27 @@ def test_tests_ui():
     # and if we switch back to some other backend -- we would loose *responses methods
     ui.set_backend('annex')
     assert_false(hasattr(ui, 'add_responses'))
+
+
+def test_with_testsui():
+
+    @with_testsui
+    def nothing(x, k=1):
+        assert_equal(x, 1)
+        assert_equal(k, 2)
+
+    nothing(1, k=2)
+
+    @with_testsui(responses='a')
+    def nothing(x, k=1):
+        assert_equal(x, 1)
+        assert_equal(k, 2)
+
+    # responses were not used
+    assert_raises(AssertionError, nothing, 1, k=2)
+
+    from datalad.ui import ui
+
+    @with_testsui(responses='a')
+    def ask():
+        assert_equal(ui.question('what is a?'), 'a')

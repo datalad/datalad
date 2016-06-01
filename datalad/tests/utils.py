@@ -910,6 +910,28 @@ def get_most_obscure_supported_name(tdir):
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
 
+
+@optional_args
+def with_testsui(t, responses=None):
+    """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
+
+    @wraps(t)
+    def newfunc(*args, **kwargs):
+        from datalad.ui import ui
+        old_backend = ui.backend
+        try:
+            ui.set_backend('tests')
+            if responses:
+                ui.add_responses(responses)
+            ret = t(*args, **kwargs)
+            if responses:
+                responses_left = ui.get_responses()
+                assert not len(responses_left), "Some responses were left not used: %s" % str(responses_left)
+            return ret
+        finally:
+            ui.set_backend(old_backend)
+
+    return newfunc
 #
 # Context Managers
 #
