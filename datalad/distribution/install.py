@@ -194,26 +194,11 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file
     path = opj(ds.path, relativepath)
-    subds_dotgit = opj(path, ".git")
     src_dotgit = get_git_dir(path)
 
-    if src_dotgit == '.git':
-        # this is what we want
-        return
-
-    # what we have here is some kind of reference, remove and
-    # replace by the target
-    os.remove(subds_dotgit)
-    # make absolute
-    src_dotgit = opj(path, src_dotgit)
-    # move .git
-    from os import rename, listdir, rmdir
-    assure_dir(subds_dotgit)
-    for dot_git_entry in listdir(src_dotgit):
-        rename(opj(src_dotgit, dot_git_entry),
-               opj(subds_dotgit, dot_git_entry))
-    assert not listdir(src_dotgit)
-    rmdir(src_dotgit)
+    # at this point install always yields the desired result
+    # just make sure
+    assert(src_dotgit == '.git')
 
 
 def get_containing_subdataset(ds, path):
