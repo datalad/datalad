@@ -175,41 +175,19 @@ def _install_subds_inplace(ds, path, relativepath):
 
 
 def _fixup_submodule_dotgit_setup(ds, relativepath):
-    """Implementation of our current of .git in a subdataset"""
+    """Implementation of our current of .git in a subdataset
+
+    Each subdataset/module has its own .git directory where a standalone
+    repository would have it. No gitdir files, no symlinks.
+    """
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file
     path = opj(ds.path, relativepath)
-    subds_git_dir = opj(path, ".git")
-    ds_git_dir = get_git_dir(ds.path)
-    moved_git_dir = opj(ds.path, ds_git_dir,
-                        "modules", relativepath)
-    # safety net
-    if islink(subds_git_dir) \
-            and realpath(subds_git_dir) == moved_git_dir:
-        # .git dir is already moved and linked
-        # remove link to enable .git replacement logic below
-        os.remove(subds_git_dir)
-    else:
-        # move .git
-        from os import rename, listdir, rmdir
-        assure_dir(moved_git_dir)
-        for dot_git_entry in listdir(subds_git_dir):
-            rename(opj(subds_git_dir, dot_git_entry),
-                   opj(moved_git_dir, dot_git_entry))
-        assert not listdir(subds_git_dir)
-        rmdir(subds_git_dir)
+    src_dotgit = get_git_dir(path)
 
-    # TODO: symlink or whatever annex does, since annexes beneath
-    #       might break
-    #       - figure out, what annex does in direct mode
-    #         and/or on windows
-    #       - for now use .git file on windows and symlink otherwise
-    if not on_windows:
-        os.symlink(relpath(moved_git_dir, start=path),
-                   opj(path, ".git"))
-    else:
-        with open(opj(path, ".git"), "w") as f:
-            f.write("gitdir: {moved}\n".format(moved=relpath(moved_git_dir, start=path)))
+    # at this point install always yields the desired result
+    # just make sure
+    assert(src_dotgit == '.git')
 
 
 def get_containing_subdataset(ds, path):
