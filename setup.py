@@ -29,10 +29,14 @@ datalad_pkgs = [pkg for pkg in find_packages('.') if pkg.startswith('datalad')]
 # keyring is a tricky one since it got split into two as of 8.0 and on older
 # systems there is a problem installing via pip (e.g. on wheezy) so for those we
 # would just ask for keyring
+keyring_requires = ['keyring>=8.0', 'keyrings.alt']
+pbar_requires = ['tqdm']
+
 dist = platform.dist()
-keyring_requires = ['keyring<8.0'] \
-    if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7' \
-    else ['keyring>=8.0', 'keyrings.alt']
+# on oldstable Debian let's ask for lower versions and progressbar instead
+if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
+    keyring_requires = ['keyring<8.0']
+    pbar_requires = ['progressbar']
 
 requires = {
     'core': [
@@ -41,9 +45,8 @@ requires = {
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
-        'tqdm',
         'six>=1.8.0',
-    ],
+    ] + pbar_requires,
     'downloaders': [
         'boto',
         'msgpack-python',
