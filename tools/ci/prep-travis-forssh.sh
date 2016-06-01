@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo echo "127.0.0.1  datalad-test localhost" > /etc/hosts
+sudo echo "127.0.0.1  datalad-test" >> /etc/hosts
 ###### why "ssh: Could not resolve hostname datalad-test: Name or service not known"?
 echo "DEBUG:"
 sudo cat /etc/hosts
