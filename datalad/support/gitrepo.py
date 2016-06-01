@@ -27,7 +27,8 @@ from six import string_types
 from functools import wraps
 
 import git
-from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
+from git.exc import GitCommandError, NoSuchPathError, \
+    InvalidGitRepositoryError, BadName
 from git.objects.blob import Blob
 
 from datalad import ssh_manager
@@ -1019,8 +1020,7 @@ class GitRepo(object):
         cmd += ['--', path]
         self._git_custom_command('', cmd)
 
-
-
 # TODO
 # remove submodule
 # status?
+

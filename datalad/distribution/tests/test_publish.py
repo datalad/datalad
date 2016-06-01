@@ -216,6 +216,13 @@ def test_publish_with_data(origin, src_path, dst_path):
     target.checkout("TMP", "-b")
     source.repo.add_remote("target", dst_path)
 
+    # TMP: Insert the fetch to prevent GitPython to fail after the push,
+    # because it cannot resolve the SHA of the old commit of the remote,
+    # that git reports back after the push.
+    # TODO: Figure out, when to fetch things in general; Alternatively:
+    # Is there an option for push, that prevents GitPython from failing?
+    source.repo.fetch("target")
+
     res = publish(dataset=source, dest="target", with_data=['test-annex.dat'])
     eq_(res, source)
 
