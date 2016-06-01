@@ -10,5 +10,10 @@ chmod 755 ~/.ssh
 ssh-keygen -f /tmp/dl-test-ssh-id -N ""
 cat /tmp/dl-test-ssh-id.pub >> ~/.ssh/authorized_keys
 chmod 644 ~/.ssh/authorized_keys
+echo "DEBUG: ssh-agent"
 eval $(ssh-agent)
+echo "DEBUG: Exit: $?"
+echo "DEBUG: ssh-add"
 ssh-add
+echo "DEBUG: Exit: $?"
+
