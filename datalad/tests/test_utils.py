@@ -55,9 +55,17 @@ from .utils import skip_if_no_module
 
 
 def test_parse_url_opts():
-    url = 'http://human.brain-map.org/api/v2/well_known_file_download/?id=157722290'
+    url = 'http://map.org/api/download/?id=157'
     output = parse_url_opts(url)
-    eq_(output, ('http://human.brain-map.org/api/v2/well_known_file_download/', {'id': '157722290'}))
+    eq_(output, ('http://map.org/api/download/', {'id': '157'}))
+
+    url = 's3://bucket/save/?key=891'
+    output = parse_url_opts(url)
+    eq_(output, ('s3://bucket/save/', {'key': '891'}))
+
+    url = 'http://map.org/api/download/?id=98&code=12'
+    output = parse_url_opts(url)
+    eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '12'}))
 
 
 @with_tempfile(mkdir=True)
