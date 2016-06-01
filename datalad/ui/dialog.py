@@ -17,6 +17,8 @@ import sys
 from six import PY2
 import getpass
 from mock import patch
+from collections import deque
+from copy import copy
 
 from ..utils import auto_repr
 from ..utils import on_windows
@@ -194,3 +196,49 @@ class UnderAnnexUI(DialogUI):
             # but wasn't effective! sp kist straogjt for now
             kwargs['out'] = sys.stderr
         super(UnderAnnexUI, self).__init__(**kwargs)
+
+
+@auto_repr
+class UnderTestsUI(DialogUI):
+    """UI to help with testing functionality requiring interaction
+
+    It will provide additional method to push responses to be provided,
+    and could be used as a context manager
+    """
+
+    def __init__(self, **kwargs):
+        super(UnderTestsUI, self).__init__(**kwargs)
+        self._responses = deque()
+
+    # TODO: possibly allow to provide expected messages etc, so we could
+    # test that those are the actual ones which were given
+    def add_responses(self, responses):
+        if not isinstance(responses, (list, tuple)):
+            responses = [responses]
+        self._responses += list(responses)
+        return self  # so we could use it as a context manager
+
+    def get_responses(self):
+        return self._responses
+
+    def clear_responses(self):
+        self._responses = deque()
+
+    def question(self, *args, **kwargs):
+        if not self._responses:
+            raise AssertionError(
+                "We are asked for a response whenever none is left to give"
+            )
+        return self._responses.popleft()
+
+    # Context manager mode of operation which would also verify that
+    # no responses left upon exiting
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        responses = copy(self._responses)
+        # we should clear the state so there is no side-effect
+        self.clear_responses()
+        assert not len(responses), \
+            "Still have some responses left: %s" % repr(self._responses)

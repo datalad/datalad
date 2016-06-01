@@ -43,8 +43,8 @@ def resolve_url_to_name(d, url):
     return None
 
 
-
 from ..support.keyring_ import keyring
+
 
 @auto_repr
 class Credential(object):
