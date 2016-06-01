@@ -63,9 +63,9 @@ def test_parse_url_opts():
     output = parse_url_opts(url)
     eq_(output, ('s3://bucket/save/', {'key': '891'}))
 
-    url = 'http://map.org/api/download/?id=98&code=12'
+    url = 'http://map.org/api/download/?id=98&code=13'
     output = parse_url_opts(url)
-    eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '12'}))
+    eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '13'}))
 
 
 @with_tempfile(mkdir=True)
