@@ -11,7 +11,7 @@
 from collections import OrderedDict
 
 from ..dochelpers import exc_str
-from ..support.keyring_ import keyring
+from ..support.keyring_ import keyring as keyring_
 from ..ui import ui
 from ..utils import auto_repr
 
@@ -26,13 +26,22 @@ class Credential(object):
         'aws-s3': OrderedDict([('key_id', {}), ('secret_id', {'hidden': True})]),
     }
 
-    def __init__(self, name, type, url):
+    def __init__(self, name, type, url=None, keyring=None):
+        """
+
+        Parameters
+        ----------
+        keyring : a keyring
+          object providing (g|s)et_password.  If None, keyring module is used
+          as is
+        """
         self.name = name
         if not type in self.TYPES:
             raise ValueError("I do not know type %s credential. Known: %s"
                              % (type, self.TYPES.keys()))
         self.type = type
         self.url = url
+        self._keyring = keyring or keyring_
 
     def _ask_field_value(self, f, hidden=False):
         return ui.question(f,
@@ -48,18 +57,12 @@ class Credential(object):
         fields = self.TYPES[self.type]
         for f, fopts in fields.items():
             v = self._ask_field_value(f, **fopts)
-            keyring.set_password(self.uid, f, v)
-        pass
-
-    @property
-    def uid(self):
-        return "datalad-%s" % (self.name,)
+            self._keyring.set(self.name, f, v)
 
     @property
     def is_known(self):
-        uid = self.uid
         try:
-            return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
+            return all(self._keyring.get(self.name, f) is not None for f in self.TYPES[self.type])
         except Exception as exc:
             lgr.warning("Failed to query keyring: %s" % exc_str(exc))
             return False
@@ -67,16 +70,16 @@ class Credential(object):
     # should implement corresponding handling (get/set) via keyring module
     def __call__(self):
         # TODO: redo not stupid way
-        uid = self.uid
+        name = self.name
         credentials = {}
         for f, fopts in self.TYPES[self.type].items():
-            v = keyring.get_password(uid, f)
+            v = self._keyring.get(name, f)
             while v is None:  # was not known
                 v = self._ask_field_value(f, **fopts)
-            keyring.set_password(uid, f, v)
+                self._keyring.set(name, f, v)
             credentials[f] = v
 
-        #values = [keyring.get_password(uid, f) for f in fields]
+        #values = [keyring.get(name, f) for f in fields]
         #if not all(values):
         # TODO: Fancy form
         return credentials
