@@ -13,5 +13,8 @@ ssh -v localhost exit
 echo "DEBUG: test connection to datalad-test ..."
 ssh -v datalad-test exit
 
+# tmp: don't run the actual tests:
+exit 1
+
 
 
