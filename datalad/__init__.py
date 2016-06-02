@@ -21,20 +21,22 @@ ssh_manager = SSHManager()
 import atexit
 atexit.register(ssh_manager.close)
 
+
 # be friendly on systems with ancient numpy -- no tests, but at least
 # importable
-try:
-    from numpy.testing import Tester
-    test = Tester().test
-    bench = Tester().bench
-    del Tester
-except ImportError:
-    def test(*args, **kwargs):
-        lgr.warning('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
-    test.__test__ = False
+def test(package='datalad', **kwargs):
+    try:
+        from numpy.testing import Tester
+        Tester(package=package).test(**kwargs)
+        # we don't have any benchmarks atm
+        # bench = Tester().bench
+    except ImportError:
+        raise RuntimeError('Need numpy >= 1.2 for datalad.tests().  Nothing is done')
+test.__test__ = False
 
 # Following fixtures are necessary at the top level __init__ for fixtures which
 # would cover all **/tests and not just datalad/tests/
+
 
 def setup_package():
     import os
@@ -52,6 +54,7 @@ def setup_package():
         if ev in os.environ and not (os.environ[ev]):
             lgr.debug("Removing %s from the environment since it is empty", ev)
             os.environ.pop(ev)
+
 
 def teardown_package():
     from datalad.tests import _TEMP_PATHS_GENERATED
