@@ -78,8 +78,12 @@ def _makeds(path, levels, ds=None):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    repo.git_add(fn)
-    repo.git_commit("Added %s" % fn)
+    if isinstance(repo, AnnexRepo):
+        repo.add(fn, git=True)
+    else:
+        # GitRepo (see line 74)
+        repo.add(fn)
+    repo.commit("Added %s" % fn)
     if ds:
         rpath = os.path.relpath(path, ds.path)
         out = install(
@@ -91,7 +95,7 @@ def _makeds(path, levels, ds=None):
         if isinstance(ds.repo, AnnexRepo):
             ds.repo.commit("subdataset %s installed." % rpath)
         else:
-            ds.repo.git_commit("subdataset %s installed." % rpath)
+            ds.repo.commit("subdataset %s installed." % rpath)
 
     if not levels:
         return

@@ -111,7 +111,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
     if tracking_branch:
         # name of the default remote for the active branch
         remote_name = repo.active_branch.tracking_branch().remote_name
-        remote_url = vcs.git_get_remote_url(remote_name, push=False)
+        remote_url = vcs.get_remote_url(remote_name, push=False)
         if remote_url.rstrip('/').endswith('/.git'):
             url_suffix = '/.git'
             remote_url = remote_url[:-5]
@@ -427,7 +427,7 @@ class Install(Interface):
                 # this is an annex'ed file -> get it
                 # TODO implement `copy --from` using `source`
                 # TODO fail if `source` is something strange
-                vcs.annex_get(relativepath)
+                vcs.get(relativepath)
                 # return the absolute path to the installed file
                 return path
 
@@ -520,11 +520,17 @@ class Install(Interface):
 
             # switch `add` procedure between Git and Git-annex according to flag
             if add_data_to_git:
-                vcs.git_add(relativepath)
+                if isinstance(vcs, AnnexRepo):
+                    vcs.add(relativepath, git=True)
+                elif isinstance(vcs, GitRepo):
+                    vcs.add(relativepath)
+                else:
+                    # unknown vcs
+                    raise ValueError("Unknown VCS ({0})".format(vcs))
                 added_files = resolve_path(relativepath, ds)
             else:
                 # do a blunt `annex add`
-                added_files = vcs.annex_add(relativepath)
+                added_files = vcs.add(relativepath)
                 # return just the paths of the installed components
                 if isinstance(added_files, list):
                     added_files = [resolve_path(i['file'], ds) for i in added_files]
@@ -616,7 +622,7 @@ class Install(Interface):
             except CommandError:
                 # FLOW GUIDE EXIT POINT
                 # apaarently not a repo, assume it is a file url
-                vcs.annex_addurl_to_file(relativepath, source)
+                vcs.add_url_to_file(relativepath, source)
                 return path
 
     @staticmethod

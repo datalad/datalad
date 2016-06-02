@@ -129,8 +129,8 @@ def test_create(path):
 def test_install_plain_git(src, path):
     # make plain git repo
     gr = GitRepo(src, create=True)
-    gr.git_add('test.txt')
-    gr.git_commit('demo')
+    gr.add('test.txt')
+    gr.commit('demo')
     # now install it somewhere else
     ds = install(path=path, source=src)
     # stays plain Git repo

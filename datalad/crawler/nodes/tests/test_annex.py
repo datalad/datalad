@@ -86,7 +86,7 @@ def _test_annex_file(mode, topdir, topurl, outdir):
         # in fast or relaxed mode there must not be any content
         assert_raises(AssertionError, ok_file_has_content, tfile, '1.dat load')
 
-    whereis = annex.repo.annex_whereis(tfile)
+    whereis = annex.repo.whereis(tfile)
     assert_in(annex.repo.WEB_UUID, whereis)  # url must have been added
     assert_equal(len(whereis), 1 + int(mode == 'full'))
     # TODO: check the url
