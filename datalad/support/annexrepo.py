@@ -156,11 +156,12 @@ class AnnexRepo(GitRepo):
                         self.git_get_remote_url(r, push=True)]:
                 if url is not None and url.startswith('ssh:'):
                     c = ssh_manager.get_connection(url)
-
-                    self.repo.config_writer().set_value("remote \"%s\"" % r,
-                                                        "annex-ssh-options",
-                                                        "-o ControlMaster=auto"
-                                                        " -S %s" % c.ctrl_path)
+                    writer = self.repo.config_writer()
+                    writer.set_value("remote \"%s\"" % r,
+                                     "annex-ssh-options",
+                                     "-o ControlMaster=auto"
+                                     " -S %s" % c.ctrl_path)
+                    writer.release()
 
         self.always_commit = always_commit
         if fix_it:
@@ -210,10 +211,13 @@ class AnnexRepo(GitRepo):
         super(AnnexRepo, self).git_remote_add(name, url, options)
         if url.startswith('ssh:'):
             c = ssh_manager.get_connection(url)
-            self.repo.config_writer().set_value("remote \"%s\"" % name,
-                                                "annex-ssh-options",
-                                                "-o ControlMaster=auto"
-                                                " -S %s" % c.ctrl_path)
+            writer = self.repo.config_writer()
+            writer.set_value("remote \"%s\"" % name,
+                             "annex-ssh-options",
+                             "-o ControlMaster=auto"
+                             " -S %s" % c.ctrl_path)
+            writer.release()
+
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
