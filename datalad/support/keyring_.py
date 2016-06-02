@@ -9,7 +9,10 @@
 """Adapters and decorators for keyrings
 """
 
+from datalad.utils import auto_repr
 
+
+@auto_repr
 class Keyring(object):
     """Adapter to keyring module
 
@@ -17,6 +20,10 @@ class Keyring(object):
     """
     def __init__(self):
         self.__keyring = None
+
+    def __str__(self):
+        backend_name = self._keyring.core._keyring_backend.__module__.split('.')[-1]
+        return "Keyring:%s" % backend_name
 
     @property
     def _keyring(self):
