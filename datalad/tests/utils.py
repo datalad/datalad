@@ -947,6 +947,8 @@ def with_testsui(t, responses=None):
             ui.set_backend(old_backend)
 
     return newfunc
+with_testsui.__test__ = False
+
 #
 # Context Managers
 #
