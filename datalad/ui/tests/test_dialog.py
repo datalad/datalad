@@ -22,7 +22,7 @@ from ...tests.utils import assert_in
 from ...tests.utils import ok_startswith
 from ...tests.utils import ok_endswith
 from ..dialog import DialogUI
-from ..dialog import _progressbars
+from datalad.ui.progressbars import progressbars
 
 
 def patch_input(**kwargs):
@@ -84,7 +84,7 @@ def _test_progress_bar(backend, len, increment):
 
 def test_progress_bar():
     # More of smoke testing given various lengths of fill_text
-    for backend in _progressbars:
+    for backend in progressbars:
         for l in 0, 4, 10, 1000:
             for increment in True, False:
                 yield _test_progress_bar, backend, l, increment
