@@ -17,7 +17,8 @@ from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     eq_, assert_in, assert_false, assert_not_equal, assert_not_in
 
-from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path
+from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path, \
+    split_remote_branch
 from ...tests.utils import SkipTest
 from ...tests.utils import assert_re_in
 from ...tests.utils import local_testrepo_flavors
@@ -693,3 +694,13 @@ def test_GitRepo_git_get_branch_commits(src):
 
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
+
+def test_split_remote_branch():
+    r, b = split_remote_branch("MyRemote/SimpleBranch")
+    eq_(r, "MyRemote")
+    eq_(b, "SimpleBranch")
+    r, b = split_remote_branch("MyRemote/Branch/with/slashes")
+    eq_(r, "MyRemote")
+    eq_(b, "Branch/with/slashes")
+    assert_raises(AssertionError, split_remote_branch, "NoSlashesAtAll")
+    assert_raises(AssertionError, split_remote_branch, "TrailingSlash/")
