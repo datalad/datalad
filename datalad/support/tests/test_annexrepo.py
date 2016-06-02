@@ -238,23 +238,6 @@ def test_AnnexRepo_options_decorator():
                  {' --someoption=first', ' --someotheroption=second'})
 
 
-# @assert_cwd_unchanged
-# @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-# @with_tempfile
-# def test_AnnexRepo_annex_add_to_git(src, dst):
-#
-#     ar = AnnexRepo(dst, src)
-#
-#     filename = get_most_obscure_supported_name()
-#     filename_abs = os.path.join(dst, filename)
-#     with open(filename_abs, 'w') as f:
-#         f.write("What to write?")
-#
-#     assert_raises(IOError, ar.get_file_key, filename)
-#     ar.add_to_git(filename)
-#     assert_in(filename, ar.get_indexed_files())
-
-
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
@@ -601,6 +584,8 @@ def test_AnnexRepo_commit(src, path):
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
+    # TODO: Ths wrong now, since add will annex_add in that case
+    # => assertions insufficient!
     ds.add(filename)
 
     if ds.is_direct_mode():
@@ -615,52 +600,92 @@ def test_AnnexRepo_commit(src, path):
         ok_clean_git(path, annex=True)
 
 
-# @assert_cwd_unchanged
-# @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-# @with_tempfile
-# def test_AnnexRepo_add_to_git(src, dst):
-#
-#     ds = AnnexRepo(dst, src)
-#
-#     filename = get_most_obscure_supported_name()
-#     filename_abs = opj(dst, filename)
-#     with open(filename_abs, 'w') as f:
-#         f.write("What to write?")
-#     ds.add_to_git(filename_abs)
-#
-#     if ds.is_direct_mode():
-#         ok_clean_git_annex_proxy(dst)
-#     else:
-#         ok_clean_git(dst, annex=True)
-#     ok_file_under_git(dst, filename)
-#     assert_raises(FileInGitError, ds.get_file_key, filename)
+@with_testrepos('.*annex.*', flavors=['clone'])
+def test_AnnexRepo_add_to_annex(path):
+
+    # Note: Some test repos appears to not be initialized.
+    #       Therefore: 'init=True'
+    # TODO: Fix these repos finally!
+    repo = AnnexRepo(path, create=False, init=True)
+    if repo.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
+    filename = get_most_obscure_supported_name()
+    with open(opj(path, filename), "w") as f:
+        f.write("some")
+    repo.add(filename)
+
+    # known to annex:
+    ok_(repo.get_file_key(filename))
+    ok_(repo.file_has_content(filename))
+    # uncommitted:
+    ok_(repo.repo.is_dirty())
+
+    repo.commit("Added file to annex.")
+    if repo.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
+
+    # now using commit/msg options:
+    filename = "another.txt"
+    with open(opj(path, filename), "w") as f:
+        f.write("something else")
+
+    repo.add(filename, commit=True, msg="Added another file to annex.")
+    # known to annex:
+    ok_(repo.get_file_key(filename))
+    ok_(repo.file_has_content(filename))
+
+    # and committed:
+    if repo.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
 
 
-# @assert_cwd_unchanged
-# @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-# @with_tempfile
-# def test_AnnexRepo_add_to_annex(src, dst):
-#
-#     ds = AnnexRepo(dst, src)
-#     filename = get_most_obscure_supported_name()
-#     filename_abs = opj(dst, filename)
-#     with open(filename_abs, 'w') as f:
-#         f.write("What to write?")
-#     ds.add_to_annex(filename)
-#
-#     if not ds.is_direct_mode():
-#         assert_true(islink(filename_abs),
-#                     "Annexed file is not a link.")
-#         ok_clean_git(dst, annex=True)
-#     else:
-#         assert_false(islink(filename_abs),
-#                      "Annexed file is link in direct mode.")
-#         ok_clean_git_annex_proxy(dst)
-#
-#     key = ds.get_file_key(filename)
-#     assert_false(key == '')
-#     # could test for the actual key, but if there's something and no
-#     # exception raised, it's fine anyway.
+@with_testrepos('.*annex.*', flavors=['clone'])
+def test_AnnexRepo_add_to_git(path):
+
+    # Note: Some test repos appears to not be initialized.
+    #       Therefore: 'init=True'
+    # TODO: Fix these repos finally!
+    repo = AnnexRepo(path, create=False, init=True)
+    if repo.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
+    filename = get_most_obscure_supported_name()
+    with open(opj(path, filename), "w") as f:
+        f.write("some")
+    repo.add(filename, git=True)
+
+    # not in annex, but in git:
+    assert_raises(FileInGitError, repo.get_file_key, filename)
+    # uncommitted:
+    ok_(repo.repo.is_dirty())
+    repo.commit("Added file to annex.")
+    if repo.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
+
+    # now using commit/msg options:
+    filename = "another.txt"
+    with open(opj(path, filename), "w") as f:
+        f.write("something else")
+
+    repo.add(filename, git=True, commit=True,
+             msg="Added another file to annex.")
+    # not in annex, but in git:
+    assert_raises(FileInGitError, repo.get_file_key, filename)
+
+    # and committed:
+    if repo.is_direct_mode():
+        ok_clean_git_annex_proxy(path)
+    else:
+        ok_clean_git(path, annex=True)
 
 
 @ignore_nose_capturing_stdout
