@@ -261,6 +261,26 @@ def Repo(*args, **kwargs):
     return git.Repo(*args, **kwargs)
 
 
+def split_remote_branch(branch):
+    """Splits a remote branch's name into the name of the remote and the name
+    of the branch.
+
+    Parameters
+    ----------
+    branch: str
+      the remote branch's name to split
+
+    Returns
+    -------
+    list of str
+    """
+    assert '/' in branch, \
+        "remote branch %s must have had a /" % branch
+    assert not branch.endswith('/'), \
+        "branch name with trailing / is invalid. (%s)" % branch
+    return branch.split('/', 1)
+
+
 class GitRepo(object):
     """Representation of a git repository
 
@@ -566,7 +586,7 @@ class GitRepo(object):
                 for ref in remote.refs:
                     remote_branches.append(ref.name)
             except AssertionError as e:
-                if e.message.endswith("did not have any references"):
+                if str(e).endswith("did not have any references"):
                     # this will happen with git annex special remotes
                     pass
                 else:
@@ -689,10 +709,33 @@ class GitRepo(object):
 
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
-    def fetch(self, remote=None, refspec=None, progress=None, all=False, **kwargs):
+    def fetch(self, remote=None, refspec=None, progress=None, all_=False,
+              **kwargs):
+        """Fetches changes from a remote (or all_ remotes).
+
+        Parameters
+        ----------
+        remote: str
+          (optional) name of the remote to fetch from. If no remote is given and
+          `all_` is not set, the tracking branch is fetched.
+        refspec: str
+          (optional) refspec to fetch.
+        progress:
+          passed to gitpython. TODO: Figure it out, make consistent use of it
+          and document it.
+        all_: bool
+          fetch all_ remotes (and all_ of their branches).
+          Fails if `remote` was given.
+        kwargs:
+          passed to gitpython. TODO: Figure it out, make consistent use of it
+          and document it.
+
+        Returns
+        -------
+        Nothing yet.
+        TODO: Provide FetchInfo?
+        """
         # TODO: options=> **kwargs):
-        """
-        """
         # Note: Apparently there is no explicit (fetch --all) in gitpython,
         #       but fetch is always bound to a certain remote instead.
         #       Therefore implement it on our own:
@@ -703,22 +746,20 @@ class GitRepo(object):
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
                                   refspec)
-            if all:
+            if all_:
                 remotes_to_fetch = self.repo.remotes
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
                 tb = self.repo.active_branch.tracking_branch().name
                 if tb:
-                    parts = tb.split('/')
-                    assert len(parts) == 2
-                    remotes_to_fetch = [self.repo.remote(parts[0])]
-                    refspec = parts[1]
+                    tb_remote, refspec = split_remote_branch(tb)
+                    remotes_to_fetch = [self.repo.remote(tb_remote)]
                 else:
                     # No remote, no tracking branch
                     # => fail
-                    raise ValueError("No remote specified to fetch from nor a "
-                                     "tracking branch is set up.")
+                    raise ValueError("Neither a remote is specified to fetch "
+                                     "from nor a tracking branch is set up.")
         else:
             remotes_to_fetch = [self.repo.remote(remote)]
 
@@ -741,7 +782,7 @@ class GitRepo(object):
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
 
     def pull(self, remote=None, refspec=None, progress=None, **kwargs):
-        """
+        """See fetch
         """
         if remote is None:
             if refspec is not None:
@@ -754,10 +795,8 @@ class GitRepo(object):
             # => get tracking branch:
             tb = self.repo.active_branch.tracking_branch().name
             if tb:
-                parts = tb.split('/')
-                assert len(parts) == 2
-                remote = self.repo.remote(parts[0])
-                refspec = parts[1]
+                tb_remote, refspec = split_remote_branch(tb)
+                remote = self.repo.remote(tb_remote)
             else:
                 # No remote, no tracking branch
                 # => fail
@@ -783,8 +822,8 @@ class GitRepo(object):
             remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all=False, **kwargs):
-        """
+    def push(self, remote=None, refspec=None, progress=None, all_=False, **kwargs):
+        """See fetch
         """
 
         if remote is None:
@@ -794,17 +833,15 @@ class GitRepo(object):
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
                                   refspec)
-            if all:
+            if all_:
                 remotes_to_push = self.repo.remotes
             else:
                 # No explicit remote to fetch.
                 # => get tracking branch:
                 tb = self.repo.active_branch.tracking_branch().name
                 if tb:
-                    parts = tb.split('/')
-                    assert len(parts) == 2
-                    remotes_to_push = [self.repo.remote(parts[0])]
-                    refspec = parts[1]
+                    tb_remote, refspec = split_remote_branch(tb)
+                    remotes_to_push = [self.repo.remote(tb_remote)]
                 else:
                     # No remote, no tracking branch
                     # => fail

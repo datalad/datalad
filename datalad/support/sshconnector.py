@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interface to a ssh connection.
+"""Interface to an ssh connection.
 
 Allows for connecting via ssh and keeping the connection open
 (by using a controlmaster), in order to perform several ssh commands or
@@ -14,7 +14,6 @@ git calls to a ssh remote without the need to reauthenticate.
 """
 
 import logging
-from os import geteuid  # Linux specific import
 from subprocess import Popen
 from shlex import split as sh_split
 
@@ -38,12 +37,18 @@ class SSHConnection(object):
     """
 
     def __init__(self, ctrl_path, host):
-        """
+        """Create the connection.
+
+        This does not actually open the connection.
+        It's just its representation.
+
         Parameters
         ----------
         ctrl_path: str
+          path to SSH controlmaster
 
         host: str
+          host to connect to. This may include the user ( [user@]host )
         """
         self._runner = None
 
@@ -54,7 +59,8 @@ class SSHConnection(object):
         self.cmd_prefix = ["ssh", "-S", self.ctrl_path, self.host]
 
     def __call__(self, cmd):
-        """
+        """Executes a command on the remote.
+
         Parameters
         ----------
         cmd: list or str
@@ -62,8 +68,8 @@ class SSHConnection(object):
 
         Returns
         -------
-        tuple
-          stdout, stderr
+        tuple of str
+          stdout, stderr of the command run.
         """
 
         # TODO: Do we need to check for the connection to be open or just rely
@@ -84,6 +90,12 @@ class SSHConnection(object):
         return self._runner
 
     def open(self):
+        """Opens the connection.
+
+        In other words: Creates the SSH controlmaster to be used by this
+        connection, if it is not there already.
+        """
+
         # start control master:
         cmd = "ssh -o ControlMaster=auto -o \"ControlPath=%s\" " \
               "-o ControlPersist=yes %s exit" % (self.ctrl_path, self.host)
@@ -91,9 +103,10 @@ class SSHConnection(object):
         proc = Popen(cmd, shell=True)
         proc.communicate(input="\n")  # why the f.. this is necessary?
 
-    # TODO: Probably not needed as an explicit call.
-    # Destructor should be sufficient.
     def close(self):
+        """Closes the connection.
+        """
+
         # stop controlmaster:
         cmd = ["ssh", "-O", "stop", "-S", self.ctrl_path, self.host]
         try:
@@ -160,6 +173,9 @@ class SSHManager(object):
             return c
 
     def close(self):
+        """Closes all connections, known to this instance.
+        """
         lgr.debug("Closing SSH connections ...")
         for cnct in self._connections:
             self._connections[cnct].close()
+

@@ -13,8 +13,8 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-
 from os.path import join as opj, abspath, basename, relpath, normpath
+from distutils.version import LooseVersion
 
 from six.moves.urllib.parse import urlparse
 
@@ -251,9 +251,10 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # check git version on remote end:
             try:
                 out, err = ssh(["git", "version"])
-                git_version = out.lstrip("git version").strip()
+                assert out.strip().startswith("git version")
+                git_version = out.strip().split()[2]
                 lgr.debug("Detected git version on server: %s" % git_version)
-                if git_version < "2.4":
+                if LooseVersion(git_version) < "2.4":
                     lgr.error("Git version >= 2.4 needed to configure remote."
                               " Version detected on server: %s\nSkipping ..."
                               % git_version)
