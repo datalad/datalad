@@ -17,6 +17,8 @@ matrix:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
+    # no key authentication for root:
+    - unset -v DATALAD_TESTS_SSH
   - python: 2.7
     env:
     - DATALAD_TESTS_NONETWORK=1
@@ -33,10 +35,11 @@ matrix:
 # can't since coverage doesn't support it yet: https://bitbucket.org/ned/coveragepy/issues/391/getargspec-was-finally-removed-will-not-be
 # - python: nightly
 
-# to overcome problem with system-wide installed boto on travis
-# see https://github.com/travis-ci/travis-ci/issues/5246
 env:
+  # to overcome problem with system-wide installed boto on travis
+  # see https://github.com/travis-ci/travis-ci/issues/5246
   - BOTO_CONFIG=/tmp/nowhere
+  - DATALAD_TESTS_SSH=1
 
 before_install:
   # The ultimate one-liner setup for NeuroDebian repository
@@ -61,7 +64,7 @@ install:
 
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-  - DATALAD_TESTS_SSH=1 DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO
+  - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   # Verify that we can render manpages
   - make manpages
