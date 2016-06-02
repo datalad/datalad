@@ -45,6 +45,7 @@ from ..cmd import Runner
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
+from ..support.vcr_ import *
 from ..dochelpers import exc_str
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
