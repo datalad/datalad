@@ -9,22 +9,29 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
-from .version import __version__
+import atexit
 
-from datalad.log import lgr
-lgr.debug("Importing the rest of datalad.__init__")
+from .version import __version__
+from .log import lgr
+
+# Other imports are interspersed with lgr.debug to ease troubleshooting startup
+# delays etc.
+lgr.debug("Instantiating config")
 from .config import ConfigManager
 cfg = ConfigManager()
 
-from datalad.support.sshconnector import SSHManager
+lgr.debug("Instantiating ssh manager")
+from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
-import atexit
 atexit.register(ssh_manager.close)
 
 
-# be friendly on systems with ancient numpy -- no tests, but at least
-# importable
 def test(package='datalad', **kwargs):
+    """A helper to run datalad's tests.  Requires numpy and nose
+
+    See numpy.testing.Tester -- **kwargs are passed into the
+    Tester().test call
+    """
     try:
         from numpy.testing import Tester
         Tester(package=package).test(**kwargs)
