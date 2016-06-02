@@ -16,11 +16,11 @@ from .log import lgr
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
 # delays etc.
-lgr.debug("Instantiating config")
+lgr.log(5, "Instantiating config")
 from .config import ConfigManager
 cfg = ConfigManager()
 
-lgr.debug("Instantiating ssh manager")
+lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
 atexit.register(ssh_manager.close)
@@ -73,3 +73,5 @@ def teardown_package():
     lgr.debug("Teardown tests. " + msg)
     for path in _TEMP_PATHS_GENERATED:
         rmtemp(path, ignore_errors=True)
+
+lgr.log(5, "Done importing main __init__")

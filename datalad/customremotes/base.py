@@ -15,22 +15,18 @@ import os
 import sys
 
 from os.path import exists, join as opj, realpath, dirname, lexists
-from traceback import format_exc
 
 from six.moves import range
 from six.moves.urllib.parse import urlparse, urlunparse
 
-from ..cmd import Runner
-from ..support.exceptions import CommandError
+import logging
+lgr = logging.getLogger('datalad.customremotes')
+lgr.log(5, "Importing datalad.customremotes.main")
+
 from ..support.protocol import ProtocolInterface
-from ..support.annexrepo import AnnexRepo
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 
-import logging
-
-
-lgr = logging.getLogger('datalad.customremotes')
 
 URI_PREFIX = "dl"
 SUPPORTED_PROTOCOL = 1
@@ -190,6 +186,9 @@ class AnnexCustomRemote(object):
         """
         # TODO: probably we shouldn't have runner here but rather delegate
         # to AnnexRepo's functionality
+        from ..support.annexrepo import AnnexRepo
+        from ..cmd import Runner
+        
         self.runner = Runner()
 
         # Custom remotes correspond to annex via stdin/stdout
@@ -377,6 +376,7 @@ class AnnexCustomRemote(object):
             except Exception as e:
                 self.error("Problem processing %r with parameters %r: %r"
                            % (req, req_load, e))
+                from traceback import format_exc
                 lgr.error("Caught exception detail: %s" % format_exc())
 
     def req_INITREMOTE(self, *args):
@@ -556,3 +556,5 @@ class AnnexCustomRemote(object):
     # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED
     #SETSTATE GETSTATE SETURLPRESENT  SETURLMISSING
+
+lgr.log(5, "Done importing datalad.customremotes.main")

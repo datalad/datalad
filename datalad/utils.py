@@ -30,16 +30,19 @@ from time import sleep
 
 lgr = logging.getLogger("datalad.utils")
 
+lgr.log(5, "Importing datalad.utils")
 #
 # Some useful variables
 #
-on_windows = platform.system() == 'Windows'
-on_osx = platform.system() == 'Darwin'
-on_linux = platform.system() == 'Linux'
+_platform_system = platform.system().lower()
+on_windows = _platform_system == 'windows'
+on_osx = _platform_system == 'darwin'
+on_linux = _platform_system == 'linux'
 try:
-    on_debian_wheezy = platform.system() == 'Linux' \
-                and platform.linux_distribution()[0] == 'debian' \
-                and platform.linux_distribution()[1].startswith('7.')
+    linux_distribution = platform.linux_distribution()
+    on_debian_wheezy = on_linux \
+                       and linux_distribution[0] == 'debian' \
+                       and linux_distribution[1].startswith('7.')
 except:  # pragma: no cover
     on_debian_wheezy = False
 
@@ -770,3 +773,5 @@ def knows_annex(path):
     repo = GitRepo(path, create=False)
     return "origin/git-annex" in repo.git_get_remote_branches() \
            or "git-annex" in repo.git_get_branches()
+
+lgr.log(5, "Done importing datalad.utils")
