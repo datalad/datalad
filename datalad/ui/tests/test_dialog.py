@@ -30,6 +30,10 @@ def patch_input(**kwargs):
     return patch.object(__builtin__, 'raw_input' if PY2 else 'input', **kwargs)
 
 
+def patch_getpass(**kwargs):
+    return patch('getpass.getpass', **kwargs)
+
+
 def test_question_choices():
 
     # TODO: come up with a reusable fixture for testing here
@@ -45,11 +49,15 @@ def test_question_choices():
         for entered_value, expected_value in [(default_value, default_value),
                                               ('', default_value),
                                               ('cc', 'cc')]:
-            with patch_input(return_value=entered_value):
+            with patch_getpass(return_value=entered_value), \
+                patch_getpass(return_value=entered_value):
                 out = StringIO()
                 response = DialogUI(out=out).question("prompt", choices=sorted(choices), default=default_value)
                 eq_(response, expected_value)
-                eq_(out.getvalue(), 'prompt (choices: %s): ' % choices_str)
+                # getpass doesn't use out -- goes straight to the terminal
+                eq_(out.getvalue(), '')
+                # TODO: may be test that the prompt was passed as a part of the getpass arg
+                #eq_(out.getvalue(), 'prompt (choices: %s): ' % choices_str)
 
     # check some expected exceptions to be thrown
     out = StringIO()
@@ -57,9 +65,9 @@ def test_question_choices():
     assert_raises(ValueError, ui.question, "prompt", choices=['a'], default='b')
     eq_(out.getvalue(), '')
 
-    with patch_input(return_value='incorrect'):
+    with patch_getpass(return_value='incorrect'):
         assert_raises(RuntimeError, ui.question, "prompt", choices=['a', 'b'])
-    assert_re_in(".*prompt.*ERROR: .incorrect. is not among choices.*", out.getvalue())
+    assert_re_in(".*ERROR: .incorrect. is not among choices.*", out.getvalue())
 
 
 def _test_progress_bar(backend, len, increment):

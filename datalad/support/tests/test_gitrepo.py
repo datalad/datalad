@@ -11,27 +11,28 @@
 """
 
 import os
-from os.path import join as opj, exists, realpath, curdir, pardir
+from os.path import join as opj, exists, realpath, curdir, pardir, abspath
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    eq_, assert_in, assert_false, assert_not_equal
 from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
+from nose.tools import assert_raises, assert_is_instance, assert_true, \
+    eq_, assert_in, assert_false, assert_not_equal, assert_not_in
 
-from ..support.gitrepo import GitRepo, normalize_paths, _normalize_path
-from ..support.exceptions import FileNotInRepositoryError
-from ..cmd import Runner
-from ..utils import getpwd, chpwd
-
-from .utils import with_tempfile, with_testrepos, \
-    assert_cwd_unchanged, on_windows, with_tree, \
+from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path, \
+    split_remote_branch
+from ...tests.utils import SkipTest
+from ...tests.utils import assert_re_in
+from ...tests.utils import local_testrepo_flavors
+from ...tests.utils import ok_
+from ...tests.utils import skip_if_no_network
+from ...tests.utils import swallow_logs
+from ...tests.utils import with_tempfile, with_testrepos, \
+    assert_cwd_unchanged, with_tree, \
     get_most_obscure_supported_name, ok_clean_git
-from .utils import swallow_logs
-from .utils import local_testrepo_flavors
-from .utils import skip_if_no_network
-from .utils import assert_re_in
-from .utils import ok_
-from .utils import SkipTest
-from .utils_testrepos import BasicAnnexTestRepo
+from ...tests.utils import skip_ssh
+from ...tests.utils_testrepos import BasicAnnexTestRepo
+from ...cmd import Runner
+from ...support.exceptions import FileNotInRepositoryError
+from ...utils import getpwd, chpwd
 
 
 @assert_cwd_unchanged
@@ -353,8 +354,128 @@ def test_GitRepo_pull(test_path, orig_path, clone_path):
         f.write("New file.")
     origin.git_add(filename)
     origin.git_commit("new file added.")
-    clone.git_pull()
+    clone.pull()
     assert_true(exists(opj(clone_path, filename)))
+
+
+@with_testrepos(flavors=local_testrepo_flavors)
+@with_tempfile
+@with_tempfile
+def test_GitRepo_fetch(test_path, orig_path, clone_path):
+
+    origin = GitRepo(orig_path, test_path)
+    clone = GitRepo(clone_path, orig_path)
+    filename = get_most_obscure_supported_name()
+
+    origin.git_checkout("new_branch", "-b")
+    with open(opj(orig_path, filename), 'w') as f:
+        f.write("New file.")
+    origin.git_add(filename)
+    origin.git_commit("new file added.")
+
+    clone.fetch(remote='origin')
+
+    ok_clean_git(clone.path, annex=False)
+    assert_in("origin/new_branch", clone.git_get_remote_branches())
+    assert_in(filename, clone.git_get_files("origin/new_branch"))
+    assert_false(exists(opj(clone_path, filename)))  # not checked out
+
+
+@skip_ssh
+@with_testrepos('.*basic.*', flavors=['local'])
+@with_tempfile
+def test_GitRepo_ssh_fetch(remote_path, repo_path):
+    from datalad import ssh_manager
+
+    remote_repo = GitRepo(remote_path, create=False)
+    url = "ssh://localhost" + abspath(remote_path)
+    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    repo = GitRepo(repo_path, create=True)
+    repo.git_remote_add("ssh-remote", url)
+
+    # we don't know any branches of the remote:
+    eq_([], repo.git_get_remote_branches())
+
+    repo.fetch(remote="ssh-remote")
+    ok_clean_git(repo.path, annex=False)
+
+    # the connection is known to the SSH manager, since fetch() requested it:
+    assert_in(socket_path, ssh_manager._connections)
+    # and socket was created:
+    ok_(exists(socket_path))
+
+    # we actually fetched it:
+    assert_in('ssh-remote/master', repo.git_get_remote_branches())
+
+
+@skip_ssh
+@with_tempfile
+@with_tempfile
+def test_GitRepo_ssh_pull(remote_path, repo_path):
+    from datalad import ssh_manager
+
+    remote_repo = GitRepo(remote_path, create=True)
+    url = "ssh://localhost" + abspath(remote_path)
+    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    repo = GitRepo(repo_path, create=True)
+    repo.git_remote_add("ssh-remote", url)
+
+    # modify remote:
+    remote_repo.git_checkout("ssh-test", "-b")
+    with open(opj(remote_repo.path, "ssh_testfile.dat"), "w") as f:
+        f.write("whatever")
+    remote_repo.git_add("ssh_testfile.dat")
+    remote_repo.git_commit("ssh_testfile.dat added.")
+
+    # file is not locally known yet:
+    assert_not_in("ssh_testfile.dat", repo.get_indexed_files())
+
+    # pull changes:
+    repo.pull(remote="ssh-remote", refspec=remote_repo.git_get_active_branch())
+    ok_clean_git(repo.path, annex=False)
+
+    # the connection is known to the SSH manager, since fetch() requested it:
+    assert_in(socket_path, ssh_manager._connections)
+    # and socket was created:
+    ok_(exists(socket_path))
+
+    # we actually pulled the changes
+    assert_in("ssh_testfile.dat", repo.get_indexed_files())
+
+
+@skip_ssh
+@with_tempfile
+@with_tempfile
+def test_GitRepo_ssh_push(repo_path, remote_path):
+    from datalad import ssh_manager
+
+    remote_repo = GitRepo(remote_path, create=True)
+    url = "ssh://localhost" + abspath(remote_path)
+    socket_path = opj(ssh_manager.socket_dir, 'localhost')
+    repo = GitRepo(repo_path, create=True)
+    repo.git_remote_add("ssh-remote", url)
+
+    # modify local repo:
+    repo.git_checkout("ssh-test", "-b")
+    with open(opj(repo.path, "ssh_testfile.dat"), "w") as f:
+        f.write("whatever")
+    repo.git_add("ssh_testfile.dat")
+    repo.git_commit("ssh_testfile.dat added.")
+
+    # file is not known to the remote yet:
+    assert_not_in("ssh_testfile.dat", remote_repo.get_indexed_files())
+
+    # push changes:
+    repo.push(remote="ssh-remote", refspec="ssh-test")
+
+    # the connection is known to the SSH manager, since fetch() requested it:
+    assert_in(socket_path, ssh_manager._connections)
+    # and socket was created:
+    ok_(exists(socket_path))
+
+    # remote now knows the changes:
+    assert_in("ssh-test", remote_repo.git_get_branches())
+    assert_in("ssh_testfile.dat", remote_repo.git_get_files("ssh-test"))
 
 
 @with_tempfile
@@ -370,7 +491,7 @@ def test_GitRepo_push_n_checkout(orig_path, clone_path):
     clone.git_add(filename)
     clone.git_commit("new file added.")
     # TODO: need checkout first:
-    clone.git_push('origin +master:new-branch')
+    clone.push('origin', '+master:new-branch')
     origin.git_checkout('new-branch')
     assert_true(exists(opj(orig_path, filename)))
 
@@ -551,6 +672,7 @@ def test_GitRepo_get_merge_base(src):
     # if points to some empty/non-existing branch - should also be None
     assert(repo.git_get_merge_base(['nonexistent', branch2]) is None)
 
+
 @with_tempfile(mkdir=True)
 def test_GitRepo_git_get_branch_commits(src):
 
@@ -572,6 +694,13 @@ def test_GitRepo_git_get_branch_commits(src):
 
     raise SkipTest("TODO: Was more of a smoke test -- improve testing")
 
-# TODO:
-#   def git_fetch(self, name, options=''):
 
+def test_split_remote_branch():
+    r, b = split_remote_branch("MyRemote/SimpleBranch")
+    eq_(r, "MyRemote")
+    eq_(b, "SimpleBranch")
+    r, b = split_remote_branch("MyRemote/Branch/with/slashes")
+    eq_(r, "MyRemote")
+    eq_(b, "Branch/with/slashes")
+    assert_raises(AssertionError, split_remote_branch, "NoSlashesAtAll")
+    assert_raises(AssertionError, split_remote_branch, "TrailingSlash/")

@@ -265,16 +265,13 @@ class Publish(Interface):
         if path is None or path == ds.path:
             # => publish the dataset itself
             # push local state:
-            # TODO: Rework git_push in GitRepo
-            cmd = ['git', 'push']
-            if set_upstream:
-                # no upstream branch yet
-                cmd.append("--set-upstream")
-            cmd += [dest_resolved, ds.repo.git_get_active_branch()]
-            ds.repo._git_custom_command('', cmd)
+            ds.repo.push(remote=dest_resolved,
+                         refspec=ds.repo.git_get_active_branch(),
+                         set_upstream=set_upstream)
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.git_push("%s +git-annex:git-annex" % dest_resolved)
+                ds.repo.push(remote=dest_resolved,
+                             refspec="+git-annex:git-annex")
 
             # TODO: if with_data is a shell pattern, we get a list, when called
             # from shell, right?
