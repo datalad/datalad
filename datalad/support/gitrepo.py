@@ -696,22 +696,22 @@ class GitRepo(object):
 
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
-    def fetch(self, remote=None, refspec=None, progress=None, all=False,
+    def fetch(self, remote=None, refspec=None, progress=None, all_=False,
               **kwargs):
-        """Fetches changes from a remote (or all remotes).
+        """Fetches changes from a remote (or all_ remotes).
 
         Parameters
         ----------
         remote: str
           (optional) name of the remote to fetch from. If no remote is given and
-          `all` is not set, the tracking branch is fetched.
+          `all_` is not set, the tracking branch is fetched.
         refspec: str
           (optional) refspec to fetch.
         progress:
           passed to gitpython. TODO: Figure it out, make consistent use of it
           and document it.
-        all: bool
-          fetch all remotes (and all of their branches).
+        all_: bool
+          fetch all_ remotes (and all_ of their branches).
           Fails if `remote` was given.
         kwargs:
           passed to gitpython. TODO: Figure it out, make consistent use of it
@@ -733,7 +733,7 @@ class GitRepo(object):
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
                                   refspec)
-            if all:
+            if all_:
                 remotes_to_fetch = self.repo.remotes
             else:
                 # No explicit remote to fetch.
@@ -809,7 +809,7 @@ class GitRepo(object):
             remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all=False, **kwargs):
+    def push(self, remote=None, refspec=None, progress=None, all_=False, **kwargs):
         """See fetch
         """
 
@@ -820,7 +820,7 @@ class GitRepo(object):
                 # TODO: May be check whether it fits to tracking branch
                 raise ValueError("refspec specified without a remote. (%s)" %
                                   refspec)
-            if all:
+            if all_:
                 remotes_to_push = self.repo.remotes
             else:
                 # No explicit remote to fetch.

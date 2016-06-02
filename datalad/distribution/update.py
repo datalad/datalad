@@ -125,7 +125,7 @@ class Update(Interface):
             lgr.info("Updating handle '%s' ..." % repo.path)
 
             # fetch remote(s):
-            repo.fetch(remote=name, all=fetch_all)
+            repo.fetch(remote=name, all_=fetch_all)
 
             # if it is an annex and there is a tracking branch, and we didn't
             # fetch the entire remote anyway, explicitly fetch git-annex
