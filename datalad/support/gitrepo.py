@@ -574,7 +574,7 @@ class GitRepo(object):
                 for ref in remote.refs:
                     remote_branches.append(ref.name)
             except AssertionError as e:
-                if e.message.endswith("did not have any references"):
+                if str(e).endswith("did not have any references"):
                     # this will happen with git annex special remotes
                     pass
                 else:
