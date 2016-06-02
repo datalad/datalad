@@ -56,3 +56,19 @@ def test_ssh_open_close():
     ok_(not exists(path))
 
 
+@skip_ssh
+def test_ssh_manager_close():
+
+    manager = SSHManager()
+    manager.get_connection('ssh://localhost').open()
+    manager.get_connection('ssh://datalad-test').open()
+    ok_(exists(opj(manager.socket_dir, 'localhost')))
+    ok_(exists(opj(manager.socket_dir, 'datalad-test')))
+
+    manager.close()
+
+    ok_(not exists(opj(manager.socket_dir, 'localhost')))
+    ok_(not exists(opj(manager.socket_dir, 'datalad-test')))
+
+
+
