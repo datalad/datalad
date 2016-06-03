@@ -30,6 +30,8 @@ def test_GitRepo_instance_from_clone(src, dst):
 
     gr = GitRepo(dst, src)
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
+    assert_is_instance(gr.repo, gitpy.Repo,
+                       "Failed to instantiate GitPython Repo object.")
     assert_true(exists(opj(dst, '.git')))
 
     # do it again should raise GitCommandError since git will notice there's
