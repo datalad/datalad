@@ -10,29 +10,17 @@
 
 """
 
-import os
-from os.path import join as opj, exists, realpath, curdir, pardir, abspath
+from nose.tools import assert_is_instance
 
-from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
-from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    eq_, assert_in, assert_false, assert_not_equal, assert_not_in
+from datalad.tests.utils import *
+from datalad.tests.utils_testrepos import BasicAnnexTestRepo
+from datalad.utils import getpwd, chpwd
 
-from datalad.support.gitrepo import GitRepo, normalize_paths, _normalize_path, \
-    split_remote_branch
-from ...tests.utils import SkipTest
-from ...tests.utils import assert_re_in
-from ...tests.utils import local_testrepo_flavors
-from ...tests.utils import ok_
-from ...tests.utils import skip_if_no_network
-from ...tests.utils import swallow_logs
-from ...tests.utils import with_tempfile, with_testrepos, \
-    assert_cwd_unchanged, with_tree, \
-    get_most_obscure_supported_name, ok_clean_git
-from ...tests.utils import skip_ssh
-from ...tests.utils_testrepos import BasicAnnexTestRepo
-from ...cmd import Runner
-from ...support.exceptions import FileNotInRepositoryError
-from ...utils import getpwd, chpwd
+# imports from same module:
+# we want to test everything in gitrepo:
+from ..gitrepo import *
+from ..gitrepo import _normalize_path
+from ..exceptions import FileNotInRepositoryError
 
 
 @assert_cwd_unchanged
@@ -44,8 +32,8 @@ def test_GitRepo_instance_from_clone(src, dst):
     assert_is_instance(gr, GitRepo, "GitRepo was not created.")
     assert_true(exists(opj(dst, '.git')))
 
-    # do it again should raise GitCommandError since git will notice there's already a git-repo at that path
-    # and therefore can't clone to `dst`
+    # do it again should raise GitCommandError since git will notice there's
+    # already a git-repo at that path and therefore can't clone to `dst`
     with swallow_logs() as logs:
         assert_raises(GitCommandError, GitRepo, dst, src)
 

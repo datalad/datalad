@@ -14,29 +14,37 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 import json
 import logging
-import os
 import re
 import shlex
 from os import linesep
-from os.path import join as opj, exists, islink, realpath, lexists
+from os import unlink
+from os.path import join as opj
+from os.path import exists
+from os.path import islink
+from os.path import realpath
+from os.path import lexists
 from subprocess import Popen, PIPE
-
-#import pexpect
-
 from functools import wraps
 
 from six import string_types
 from six.moves import filter
 from six.moves.configparser import NoOptionError
 
-from ..dochelpers import exc_str
-from ..utils import auto_repr
-from datalad.support.gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
-from .exceptions import CommandNotAvailableError, CommandError, \
-    FileNotInAnnexError, FileInGitError
-from .exceptions import AnnexBatchCommandError
-from ..utils import on_windows
 from datalad import ssh_manager
+from datalad.dochelpers import exc_str
+from datalad.utils import auto_repr
+from datalad.utils import on_windows
+
+# imports from same module:
+from .gitrepo import GitRepo
+from .gitrepo import normalize_path
+from .gitrepo import normalize_paths
+from .gitrepo import GitCommandError
+from .exceptions import CommandNotAvailableError
+from .exceptions import CommandError
+from .exceptions import FileNotInAnnexError
+from .exceptions import FileInGitError
+from .exceptions import AnnexBatchCommandError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -983,7 +991,7 @@ class AnnexRepo(GitRepo):
                 for f in files:
                     filepath = opj(self.path, f)
                     if lexists(filepath):
-                        os.unlink(filepath)
+                        unlink(filepath)
         else:
             super(AnnexRepo, self).remove(files, force=force,
                                           normalize_paths=False, **kwargs)

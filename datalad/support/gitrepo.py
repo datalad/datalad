@@ -12,32 +12,46 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
 
+import logging
+import shlex
 from os import linesep
-from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir, abspath
-from os.path import dirname, basename
-from os.path import curdir, pardir, sep
+from os.path import join as opj
+from os.path import exists
+from os.path import normpath
+from os.path import isabs
+from os.path import commonprefix
+from os.path import relpath
+from os.path import realpath
+from os.path import abspath
+from os.path import dirname
+from os.path import basename
+from os.path import curdir
+from os.path import pardir
+from os.path import sep
+
+from six import string_types
+from functools import wraps
+import git as gitpy
+from git.exc import GitCommandError
+from git.exc import NoSuchPathError
+from git.exc import InvalidGitRepositoryError
+from git.objects.blob import Blob
+
+from datalad import ssh_manager
+from datalad.cmd import Runner
+from datalad.utils import optional_args
+from datalad.utils import on_windows
+from datalad.utils import getpwd
+from datalad.utils import swallow_logs
+
+# imports from same module:
+from .exceptions import CommandError
+from .exceptions import FileNotInRepositoryError
+
 # shortcuts
 _curdirsep = curdir + sep
 _pardirsep = pardir + sep
 
-import logging
-import shlex
-from six import string_types
-
-from functools import wraps
-
-import git as gitpy
-from git.exc import GitCommandError, NoSuchPathError, \
-    InvalidGitRepositoryError, BadName
-from git.objects.blob import Blob
-
-from datalad import ssh_manager
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.cmd import Runner
-from datalad.utils import optional_args, on_windows, getpwd
-from datalad.utils import swallow_logs
-from datalad.utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
 

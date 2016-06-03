@@ -10,21 +10,15 @@
 
 """
 
-import gc
-from os.path import exists, islink
-from git.exc import GitCommandError
-from six import PY3
-from six.moves.urllib.parse import urljoin, urlsplit
+from six.moves.urllib.parse import urljoin
+from six.moves.urllib.parse import urlsplit
 from shutil import copyfile
+from nose.tools import assert_is_instance
 
-from nose.tools import assert_raises, assert_is_instance, assert_true, \
-    assert_equal, assert_false, assert_in, assert_not_in
+from datalad.tests.utils import *
 
-from ..annexrepo import AnnexRepo, kwargs_to_options, GitRepo
-from ..exceptions import CommandNotAvailableError, \
-    FileInGitError, FileNotInAnnexError, CommandError, AnnexBatchCommandError
-from ...cmd import Runner
-from ...tests.utils import *
+# imports from same module:
+from ..annexrepo import *
 
 
 @ignore_nose_capturing_stdout
@@ -43,7 +37,6 @@ def test_AnnexRepo_instance_from_clone(src, dst):
         assert_raises(GitCommandError, AnnexRepo, dst, src)
         if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
             assert("already exists" in cm.out)
-
 
 
 @ignore_nose_capturing_stdout
