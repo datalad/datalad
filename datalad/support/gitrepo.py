@@ -27,15 +27,17 @@ from six import string_types
 from functools import wraps
 
 import git
-from git.exc import GitCommandError, NoSuchPathError, InvalidGitRepositoryError
+from git.exc import GitCommandError, NoSuchPathError, \
+    InvalidGitRepositoryError, BadName
 from git.objects.blob import Blob
 
-from ..support.exceptions import CommandError
-from ..support.exceptions import FileNotInRepositoryError
-from ..cmd import Runner
-from ..utils import optional_args, on_windows, getpwd
-from ..utils import swallow_logs
-from ..utils import swallow_outputs
+from datalad import ssh_manager
+from datalad.support.exceptions import CommandError
+from datalad.support.exceptions import FileNotInRepositoryError
+from datalad.cmd import Runner
+from datalad.utils import optional_args, on_windows, getpwd
+from datalad.utils import swallow_logs
+from datalad.utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
 
@@ -250,12 +252,34 @@ def _remove_empty_items(list_):
         return list_
     return [file_ for file_ in list_ if file_]
 
+
 def Repo(*args, **kwargs):
     """Factory method around git.Repo to consistently initiate with different backend
     """
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
     return git.Repo(*args, **kwargs)
+
+
+def split_remote_branch(branch):
+    """Splits a remote branch's name into the name of the remote and the name
+    of the branch.
+
+    Parameters
+    ----------
+    branch: str
+      the remote branch's name to split
+
+    Returns
+    -------
+    list of str
+    """
+    assert '/' in branch, \
+        "remote branch %s must have had a /" % branch
+    assert not branch.endswith('/'), \
+        "branch name with trailing / is invalid. (%s)" % branch
+    return branch.split('/', 1)
+
 
 class GitRepo(object):
     """Representation of a git repository
@@ -355,7 +379,6 @@ class GitRepo(object):
         This is done by comparing the base repository path.
         """
         return self.path == obj.path
-
 
     @classmethod
     def get_toppath(cls, path):
@@ -551,7 +574,7 @@ class GitRepo(object):
                 for ref in remote.refs:
                     remote_branches.append(ref.name)
             except AssertionError as e:
-                if e.message.endswith("did not have any references"):
+                if str(e).endswith("did not have any references"):
                     # this will happen with git annex special remotes
                     pass
                 else:
@@ -671,21 +694,191 @@ class GitRepo(object):
         self._git_custom_command('', 'git remote %s update %s' % (name, v),
                                  expect_stderr=True)
 
-    def git_fetch(self, name, options=''):
+    # TODO: centralize all the c&p code in fetch, pull, push
+    # TODO: document **kwargs passed to gitpython
+    def fetch(self, remote=None, refspec=None, progress=None, all_=False,
+              **kwargs):
+        """Fetches changes from a remote (or all_ remotes).
+
+        Parameters
+        ----------
+        remote: str
+          (optional) name of the remote to fetch from. If no remote is given and
+          `all_` is not set, the tracking branch is fetched.
+        refspec: str
+          (optional) refspec to fetch.
+        progress:
+          passed to gitpython. TODO: Figure it out, make consistent use of it
+          and document it.
+        all_: bool
+          fetch all_ remotes (and all_ of their branches).
+          Fails if `remote` was given.
+        kwargs:
+          passed to gitpython. TODO: Figure it out, make consistent use of it
+          and document it.
+
+        Returns
+        -------
+        Nothing yet.
+        TODO: Provide FetchInfo?
         """
+        # TODO: options=> **kwargs):
+        # Note: Apparently there is no explicit (fetch --all) in gitpython,
+        #       but fetch is always bound to a certain remote instead.
+        #       Therefore implement it on our own:
+        if remote is None:
+            if refspec is not None:
+                # conflicts with using tracking branch or fetch all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError("refspec specified without a remote. (%s)" %
+                                  refspec)
+            if all_:
+                remotes_to_fetch = self.repo.remotes
+            else:
+                # No explicit remote to fetch.
+                # => get tracking branch:
+                tb = self.repo.active_branch.tracking_branch().name
+                if tb:
+                    tb_remote, refspec = split_remote_branch(tb)
+                    remotes_to_fetch = [self.repo.remote(tb_remote)]
+                else:
+                    # No remote, no tracking branch
+                    # => fail
+                    raise ValueError("Neither a remote is specified to fetch "
+                                     "from nor a tracking branch is set up.")
+        else:
+            remotes_to_fetch = [self.repo.remote(remote)]
+
+        for rm in remotes_to_fetch:
+            fetch_url = \
+                rm.config_reader.get('fetchurl'
+                                     if rm.config_reader.has_option('fetchurl')
+                                     else 'url')
+            if fetch_url.startswith('ssh:'):
+                cnct = ssh_manager.get_connection(fetch_url)
+                cnct.open()
+                # TODO: with git <= 2.3 keep old mechanism:
+                #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+                with rm.repo.git.custom_environment(
+                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                    rm.fetch(refspec=refspec, progress=progress, **kwargs)  # TODO: progress +kwargs
+            else:
+                rm.fetch(refspec=refspec, progress=progress, **kwargs)  # TODO: progress +kwargs
+
+        # TODO: fetch returns a list of FetchInfo instances. Make use of it.
+
+    def pull(self, remote=None, refspec=None, progress=None, **kwargs):
+        """See fetch
+        """
+        if remote is None:
+            if refspec is not None:
+                # conflicts with using tracking branch or fetch all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError("refspec specified without a remote. (%s)" %
+                                  refspec)
+            # No explicit remote to pull from.
+            # => get tracking branch:
+            tb = self.repo.active_branch.tracking_branch().name
+            if tb:
+                tb_remote, refspec = split_remote_branch(tb)
+                remote = self.repo.remote(tb_remote)
+            else:
+                # No remote, no tracking branch
+                # => fail
+                raise ValueError("No remote specified to fetch from nor a "
+                                 "tracking branch is set up.")
+        else:
+            remote = self.repo.remote(remote)
+
+        fetch_url = \
+            remote.config_reader.get('fetchurl'
+                                     if remote.config_reader.has_option('fetchurl')
+                                     else 'url')
+        if fetch_url.startswith('ssh:'):
+            cnct = ssh_manager.get_connection(fetch_url)
+            cnct.open()
+            # TODO: with git <= 2.3 keep old mechanism:
+            #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+            with remote.repo.git.custom_environment(
+                    GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                remote.pull(refspec=refspec, progress=progress, **kwargs)
+                # TODO: progress +kwargs
+        else:
+            remote.pull(refspec=refspec, progress=progress, **kwargs)
+            # TODO: progress +kwargs
+
+    def push(self, remote=None, refspec=None, progress=None, all_=False, **kwargs):
+        """See fetch
         """
 
-        self._git_custom_command('', 'git fetch %s %s' % (options, name),
-                                 expect_stderr=True)
+        if remote is None:
+            if refspec is not None:
+                # conflicts with using tracking branch or fetch all remotes
+                # For now: Just fail.
+                # TODO: May be check whether it fits to tracking branch
+                raise ValueError("refspec specified without a remote. (%s)" %
+                                  refspec)
+            if all_:
+                remotes_to_push = self.repo.remotes
+            else:
+                # No explicit remote to fetch.
+                # => get tracking branch:
+                tb = self.repo.active_branch.tracking_branch().name
+                if tb:
+                    tb_remote, refspec = split_remote_branch(tb)
+                    remotes_to_push = [self.repo.remote(tb_remote)]
+                else:
+                    # No remote, no tracking branch
+                    # => fail
+                    raise ValueError("No remote specified to fetch from nor a "
+                                     "tracking branch is set up.")
+        else:
+            remotes_to_push = [self.repo.remote(remote)]
+
+        for rm in remotes_to_push:
+            push_url = \
+                rm.config_reader.get('pushurl'
+                                     if rm.config_reader.has_option('pushurl')
+                                     else 'url')
+            if push_url.startswith('ssh:'):
+                cnct = ssh_manager.get_connection(push_url)
+                cnct.open()
+                # TODO: with git <= 2.3 keep old mechanism:
+                #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
+                with rm.repo.git.custom_environment(
+                        GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
+                    rm.push(refspec=refspec, progress=progress, **kwargs)
+                    # TODO: progress +kwargs
+            else:
+                rm.push(refspec=refspec, progress=progress, **kwargs)
+                # TODO: progress +kwargs
 
     def git_get_remote_url(self, name, push=False):
-        """We need to know, where to clone from, if a remote is
-        requested
-        """
+        """Get the url of a remote.
 
-        remote = self.repo.remote(name)
-        return remote.config_reader.get(
-            'pushurl' if push and remote.config_reader.has_option('pushurl') else 'url')
+        Reads the configuration of remote `name` and returns its url or None,
+        if there is no url configured.
+
+        Parameters
+        ----------
+        name: str
+          name of the remote
+        push: bool
+          if True, get the pushurl instead of the fetch url.
+        """
+        cfg_reader = self.repo.remote(name).config_reader
+        if push:
+            if cfg_reader.has_option('pushurl'):
+                return cfg_reader.get('pushurl')
+            else:
+                return None
+        else:
+            if cfg_reader.has_option('url'):
+                return cfg_reader.get('url')
+            else:
+                return None
 
     def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
@@ -728,19 +921,6 @@ class GitRepo(object):
             if stop and c.hexsha == stop:
                 return
             yield fvalue(c)
-
-    def git_pull(self, name='', options=''):
-        """
-        """
-
-        return self._git_custom_command('', 'git pull %s %s' % (options, name),
-                                 expect_stderr=True)
-
-    def git_push(self, name='', options=''):
-        """
-        """
-        self._git_custom_command('', 'git push %s %s' % (options, name),
-                                 expect_stderr=True)
 
     def git_checkout(self, name, options=''):
         """
@@ -786,6 +966,83 @@ class GitRepo(object):
             return []
         return self.repo.submodules
 
-# TODO add_submodule
+    def add_submodule(self, path, name=None, url=None, branch=None):
+        """Add a new submodule to the repository.
+
+        This will alter the index as well as the .gitmodules file, but will not
+        create a new commit.  If the submodule already exists, no matter if the
+        configuration differs from the one provided, the existing submodule
+        is considered as already added and no further action is performed.
+
+        Parameters
+        ----------
+        path : str
+          repository-relative path at which the submodule should be located, and
+          which will be created as required during the repository initialization.
+        name : str or None
+          name/identifier for the submodule. If `None`, the `path` will be used as
+          name.
+        url : str or None
+          git-clone compatible URL. If `None`, the repository is assumed to exist,
+          and the url of the first remote is taken instead. This is useful if you
+          want to make an existing repository a submodule of another one.
+        branch : str or None
+          name of branch to be checked out in the submodule. The given branch must
+          exist in the remote repository, and will be checked out locally as a
+          tracking branch. If `None`, remote HEAD will be checked out.
+        """
+        if name is None:
+            name = path
+        # XXX the following should do it, but GitPython will refuse to add a submodule
+        # unless you specify a URL that is configured as one of its remotes, or you
+        # specify no URL, but the repo has at least one remote.
+        # this is stupid, as for us it is valid to not have any remote, because we can
+        # still obtain the submodule from a future publication location, based on the
+        # parent
+        #git.Submodule.add(self.repo, name, path, url=url, branch=branch)
+        # going git native instead
+        cmd = ['git', 'submodule', 'add', '--name', name]
+        if branch is not None:
+            cmd += ['-b', branch]
+        if url is None:
+            if not isabs(path):
+                path = opj(curdir, path)
+            url = path
+        cmd += [url, path]
+        self._git_custom_command('', cmd)
+
+    def update_submodule(self, path, mode='checkout', init=False):
+        """Update a registered submodule.
+
+        This will make the submodule match what the superproject expects by
+        cloning missing submodules and updating the working tree of the
+        submodules. The "updating" can be done in several ways depending
+        on the value of submodule.<name>.update configuration variable, or
+        the `mode` argument.
+
+        Parameters
+        ----------
+        path : str
+          Identifies which submodule to operate on by it's repository-relative
+          path.
+        mode : {checkout, rebase, merge}
+          Update procedure to perform. 'checkout': the commit recorded in the
+          superproject will be checked out in the submodule on a detached HEAD;
+          'rebase': the current branch of the submodule will be rebased onto
+          the commit recorded in the superproject; 'merge': the commit recorded
+          in the superproject will be merged into the current branch in the
+          submodule.
+        init : bool
+          If True, initialize all submodules for which "git submodule init" has
+          not been called so far before updating.
+        """
+        cmd = ['git', 'submodule', 'update', '--%s' % mode]
+        if init:
+            cmd.append('--init')
+        cmd += ['--', path]
+        self._git_custom_command('', cmd)
+
+# TODO
 # remove submodule
 # status?
+

@@ -11,13 +11,15 @@
 
 import os
 from os.path import join as opj, abspath, basename
+
+from git.exc import GitCommandError
+
 from ..dataset import Dataset
 from datalad.api import publish, install, create_publication_target_sshwebserver
 from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import CommandError
 
 from nose.tools import ok_, eq_, assert_false, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
@@ -29,13 +31,11 @@ from datalad.tests.utils import ok_generator
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module, skip_if, skip_if_on_windows
+from datalad.tests.utils import skip_if_no_module, skip_ssh
 from datalad.tests.utils import ok_clean_git, on_windows, get_local_file_url
 
 
-@skip_if(cond=not os.environ.get('DATALAD_TESTS_SSH'),
-         msg="Run this test by setting the DATALAD_TESTS_SSH")
-@skip_if_on_windows
+@skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -53,7 +53,7 @@ def test_target_ssh_simple(origin, src_path, target_path):
     assert_in("local_target", source.repo.git_get_remotes())
     eq_("ssh://localhost", source.repo.git_get_remote_url("local_target"))
     # should NOT be able to push now, since url isn't correct:
-    assert_raises(CommandError, publish, dataset=source, dest="local_target")
+    assert_raises(GitCommandError, publish, dataset=source, dest="local_target")
 
     # do it again without force:
     with assert_raises(RuntimeError) as cm:
@@ -101,9 +101,7 @@ def test_target_ssh_simple(origin, src_path, target_path):
         publish(dataset=source, dest="local_target")
 
 
-@skip_if(cond=not os.environ.get('DATALAD_TESTS_SSH'),
-         msg="Run this test by setting the DATALAD_TESTS_SSH")
-@skip_if_on_windows
+@skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)

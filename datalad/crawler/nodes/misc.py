@@ -25,6 +25,7 @@ from ...utils import auto_repr
 from ...utils import find_files as _find_files
 
 from logging import getLogger
+from nose.tools import eq_, assert_raises
 
 lgr = getLogger('datalad.crawler.nodes')
 
@@ -34,7 +35,6 @@ class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
     """
 
-    # TODO: add argument for selection of fields of data to keep
     def __init__(self, keys=None, output=None, ignore_prefixes=['datalad_']):
         """
         Parameters
@@ -46,26 +46,29 @@ class Sink(object):
           data
         ignore_prefixes : list, optional
           Keys with which prefixes to ignore.  By default all 'datalad_' ignored
+
         """
         self.data = []
         self.keys = keys
         self.output = output
         self.ignore_prefixes = ignore_prefixes or []
 
-    def get_values(self, *keys):
+    def get_values(self, keys):
         return [[d[k] for k in keys] for d in self.data]
 
     def __call__(self, data):
-        # ??? for some reason didn't work when I made entire thing a list
         if self.keys:
-            raise NotImplementedError("Jason will do it")
+                    self.data.append({key: data[key] for key in self.keys if key in data})
+
         else:
             data_ = {k: v
                      for k, v in data.items()
                      if not any(k.startswith(p) for p in self.ignore_prefixes)}
             self.data.append(data_)
+
         if self.output:
             data = updated(data, {self.output: self.data})
+
         yield data
 
     def clean(self):
@@ -185,6 +188,7 @@ class _act_if(object):
     def __call__(self, data):
         comp = re.search if self.re else lambda x, y: x == y
         matched = True
+        # finds if all match
         for k, v in iteritems(self.values):
             if not (k in data and comp(v, data[k])):
                 # do nothing and pass the data further
@@ -197,7 +201,7 @@ class _act_if(object):
         else:
             yield data
 
-    def _act(self):
+    def _act(self, data):
         raise NotImplementedError
 
 

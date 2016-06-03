@@ -20,11 +20,11 @@ from shutil import copyfile
 from nose.tools import assert_raises, assert_is_instance, assert_true, \
     assert_equal, assert_false, assert_in, assert_not_in
 
-from ..support.annexrepo import AnnexRepo, kwargs_to_options, GitRepo
-from ..support.exceptions import CommandNotAvailableError, \
+from ..annexrepo import AnnexRepo, kwargs_to_options, GitRepo
+from ..exceptions import CommandNotAvailableError, \
     FileInGitError, FileNotInAnnexError, CommandError, AnnexBatchCommandError
-from ..cmd import Runner
-from .utils import *
+from ...cmd import Runner
+from ...tests.utils import *
 
 
 @ignore_nose_capturing_stdout
@@ -41,8 +41,9 @@ def test_AnnexRepo_instance_from_clone(src, dst):
     # there's already a git-repo at that path and therefore can't clone to `dst`
     with swallow_logs() as cm:
         assert_raises(GitCommandError, AnnexRepo, dst, src)
-        if git.__version__ != "1.0.2":
+        if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
             assert("already exists" in cm.out)
+
 
 
 @ignore_nose_capturing_stdout
@@ -815,3 +816,83 @@ def test_annex_backends(path):
     # persists
     repo = AnnexRepo(path)
     eq_(repo.default_backends, ['MD5E'])
+
+
+@skip_ssh
+@with_tempfile
+@with_testrepos('basic_annex', flavors=['local'])
+@with_testrepos('basic_annex', flavors=['local'])
+def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
+    from datalad import ssh_manager
+    # create remotes:
+    rm1 = AnnexRepo(remote_1_path, create=False)
+    rm2 = AnnexRepo(remote_2_path, create=False)
+
+    # check whether we are the first to use these sockets:
+    socket_1 = opj(ssh_manager.socket_dir, 'datalad-test')
+    socket_2 = opj(ssh_manager.socket_dir, 'localhost')
+    datalad_test_was_open = exists(socket_1)
+    localhost_was_open = exists(socket_2)
+
+    # repo to test:AnnexRepo(repo_path)
+    # At first, directly use git to add the remote, which should be recognized
+    # by AnnexRepo's constructor
+    gr = GitRepo(repo_path, create=True)
+    AnnexRepo(repo_path)
+    gr.git_remote_add("ssh-remote-1", "ssh://datalad-test" + remote_1_path)
+
+    # Now, make it an annex:
+    ar = AnnexRepo(repo_path, create=False)
+
+    # connection to 'datalad-test' should be known to ssh manager:
+    assert_in(socket_1, ssh_manager._connections)
+    # but socket was not touched:
+    if datalad_test_was_open:
+        ok_(exists(socket_1))
+    else:
+        ok_(not exists(socket_1))
+
+    # remote interaction causes socket to be created:
+    try:
+        # Note: For some reason, it hangs if log_stdout/err True
+        # TODO: Figure out what's going on
+        ar._run_annex_command('sync',
+                              expect_stderr=True,
+                              log_stdout=False,
+                              log_stderr=False,
+                              expect_fail=True)
+    # sync should return exit code 1, since it can not merge
+    # doesn't matter for the purpose of this test
+    except CommandError as e:
+        if e.code == 1:
+            pass
+
+    ok_(exists(socket_1))
+
+    # add another remote:
+    ar.git_remote_add('ssh-remote-2', "ssh://localhost" + remote_2_path)
+
+    # now, this connection to localhost was requested:
+    assert_in(socket_2, ssh_manager._connections)
+    # but socket was not touched:
+    if localhost_was_open:
+        ok_(exists(socket_2))
+    else:
+        ok_(not exists(socket_2))
+
+    # sync with the new remote:
+    try:
+        # Note: For some reason, it hangs if log_stdout/err True
+        # TODO: Figure out what's going on
+        ar._run_annex_command('sync', annex_options=['ssh-remote-2'],
+                              expect_stderr=True,
+                              log_stdout=False,
+                              log_stderr=False,
+                              expect_fail=True)
+    # sync should return exit code 1, since it can not merge
+    # doesn't matter for the purpose of this test
+    except CommandError as e:
+        if e.code == 1:
+            pass
+
+    ok_(exists(socket_2))

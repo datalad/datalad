@@ -12,14 +12,15 @@ For further information on git-annex see https://git-annex.branchable.com/.
 
 """
 
-from os import linesep
-from os.path import join as opj, exists, relpath, islink, realpath, lexists
-import logging
 import json
-import re
+import logging
 import os
+import re
 import shlex
+from os import linesep
+from os.path import join as opj, exists, islink, realpath, lexists
 from subprocess import Popen, PIPE
+
 #import pexpect
 
 from functools import wraps
@@ -27,15 +28,15 @@ from functools import wraps
 from six import string_types
 from six.moves import filter
 from six.moves.configparser import NoOptionError
-from six.moves.urllib.parse import quote as urlquote
 
 from ..dochelpers import exc_str
 from ..utils import auto_repr
-from .gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
+from datalad.support.gitrepo import GitRepo, normalize_path, normalize_paths, GitCommandError
 from .exceptions import CommandNotAvailableError, CommandError, \
     FileNotInAnnexError, FileInGitError
 from .exceptions import AnnexBatchCommandError
-from ..utils import on_windows, getpwd
+from ..utils import on_windows
+from datalad import ssh_manager
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -142,6 +143,26 @@ class AnnexRepo(GitRepo):
             else:
                 raise e
 
+        # Note: set ssh options before any possible invocation of git-annex
+        # Temporary approach to ssh connection sharing:
+        # Register every ssh remote with the corresponding control master.
+        # Issues:
+        # - currently overwrites existing ssh config of the remote
+        # - request SSHConnection instance and write config even if no
+        #   connection needed (but: connection is not actually created/opened)
+        # - no solution for a ssh url of a file (annex addurl)
+        for r in self.git_get_remotes():
+            for url in [self.git_get_remote_url(r),
+                        self.git_get_remote_url(r, push=True)]:
+                if url is not None and url.startswith('ssh:'):
+                    c = ssh_manager.get_connection(url)
+                    writer = self.repo.config_writer()
+                    writer.set_value("remote \"%s\"" % r,
+                                     "annex-ssh-options",
+                                     "-o ControlMaster=auto"
+                                     " -S %s" % c.ctrl_path)
+                    writer.release()
+
         self.always_commit = always_commit
         if fix_it:
             self._annex_init()
@@ -183,6 +204,20 @@ class AnnexRepo(GitRepo):
             writer.release()
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
+
+    def git_remote_add(self, name, url, options=''):
+        """Overrides method from GitRepo in order to set
+        remote.<name>.annex-ssh-options in case of a SSH remote."""
+        super(AnnexRepo, self).git_remote_add(name, url, options)
+        if url.startswith('ssh:'):
+            c = ssh_manager.get_connection(url)
+            writer = self.repo.config_writer()
+            writer.set_value("remote \"%s\"" % name,
+                             "annex-ssh-options",
+                             "-o ControlMaster=auto"
+                             " -S %s" % c.ctrl_path)
+            writer.release()
+
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -232,7 +267,7 @@ class AnnexRepo(GitRepo):
         try:
             return self.cmd_call_wrapper.run(cmd_list, **kwargs)
         except CommandError as e:
-            if "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
+            if e.stderr and "git-annex: Unknown command '%s'" % annex_cmd in e.stderr:
                 raise CommandNotAvailableError(str(cmd_list),
                                                "Unknown command:"
                                                " 'git-annex %s'" % annex_cmd,
@@ -1266,3 +1301,5 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
+
+

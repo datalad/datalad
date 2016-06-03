@@ -16,6 +16,7 @@ from abc import ABCMeta, abstractmethod
 
 from ..utils import auto_repr
 
+
 @auto_repr
 class InteractiveUI(object):
     """Semi-abstract class for interfaces to implement interactive UI"""

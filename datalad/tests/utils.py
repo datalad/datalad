@@ -743,6 +743,20 @@ def skip_if(func, cond=True, msg=None):
     return newfunc
 
 
+def skip_ssh(func):
+    """Skips SSH tests if on windows or if environment variable
+    DATALAD_TESTS_SSH was not set
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows:
+            raise SkipTest("SSH currently not available on windows.")
+        if not os.environ.get('DATALAD_TESTS_SSH'):
+            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
+        return func(*args, **kwargs)
+    return newfunc
+
+
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
@@ -909,6 +923,30 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+
+@optional_args
+def with_testsui(t, responses=None):
+    """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
+
+    @wraps(t)
+    def newfunc(*args, **kwargs):
+        from datalad.ui import ui
+        old_backend = ui.backend
+        try:
+            ui.set_backend('tests')
+            if responses:
+                ui.add_responses(responses)
+            ret = t(*args, **kwargs)
+            if responses:
+                responses_left = ui.get_responses()
+                assert not len(responses_left), "Some responses were left not used: %s" % str(responses_left)
+            return ret
+        finally:
+            ui.set_backend(old_backend)
+
+    return newfunc
+with_testsui.__test__ = False
 
 #
 # Context Managers

@@ -20,9 +20,9 @@ from datalad.downloaders.tests.utils import get_test_providers
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
+from ..credentials import Credential
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
-from ..providers import Credential  # to test against crcns
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 
@@ -312,7 +312,6 @@ def test_HTMLFormAuthenticator_httpretty(d):
 
     # Unsuccesfull scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
-
 
 
 class FakeCredential2(Credential):

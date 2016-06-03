@@ -24,6 +24,7 @@ from ...support.network import dlurljoin
 from logging import getLogger
 lgr = getLogger('datalad.crawler')
 
+
 # for now heavily based on scrapy but we might make the backend
 # replaceable
 class ExtractorMatch(object):
@@ -52,7 +53,7 @@ class ExtractorMatch(object):
 
         if isinstance(input, Response):
             selector = Selector(response=input)
-            if hasattr(input, 'url') and input.url and (not 'url' in data):
+            if hasattr(input, 'url') and input.url and ('url' not in data):
                 # take the url of the response object
                 data = updated(data, {'url': input.url})
         else:
@@ -162,6 +163,7 @@ class AExtractorMatch(ExtractorMatch):
 
             yield url_e, data_
 
+
 class a_href_match(AExtractorMatch):
     """Helper to simplify matching based on URL while also extracting various tags from URL while at it
 
@@ -171,6 +173,7 @@ class a_href_match(AExtractorMatch):
     entry for the url extractor in the field specified by output argument
     """
     _TARGET = 'href'
+
 
 class a_text_match(AExtractorMatch):
     """Helper to simplify matching based on A target's text while also extracting various tags from it while at it
