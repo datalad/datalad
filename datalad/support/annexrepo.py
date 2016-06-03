@@ -437,7 +437,7 @@ class AnnexRepo(GitRepo):
                 else:
                     raise ValueError("Unexpected return type: %s" %
                                      type(return_list))
-                msg = "Added file(s):" + '\n'.join(file_list)
+                msg = self._get_added_files_commit_msg(file_list)
             self.commit(msg)  # TODO: For consisteny: Also json return value (success)?
         return return_list
 
