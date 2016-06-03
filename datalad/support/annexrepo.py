@@ -387,16 +387,19 @@ class AnnexRepo(GitRepo):
             msg=None):
         """Add file(s) to the repository.
 
-
         Parameters
         ----------
         files: list of str
           list of paths to add to the annex
-        git
-        commit
-        msg
-        backend
-        options
+        git: bool
+          if True, add to git instead of annex.
+        commit: bool
+          whether or not to directly commit
+        msg: str
+          commit message in case `commit=True`. A default message, containing
+          the list of files that were added, is created by default.
+        backend:
+        options:
 
         Returns
         -------

@@ -77,13 +77,8 @@ def test_publish_simple(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    if isinstance(source.repo, AnnexRepo):
-        source.repo.add(opj(src_path, 'test_mod_file'), git=True)
-    elif isinstance(source.repo, GitRepo):
-        source.repo.add(opj(src_path, 'test_mod_file'))
-    else:
-        raise ValueError("Unknown repo: %s" % source.repo)
-    source.repo.commit("Modified.")
+    source.repo.add(opj(src_path, 'test_mod_file'), git=True,
+                    commit=True, msg="Modified.")
     ok_clean_git(src_path, annex=False)
 
     res = publish(dataset=source)

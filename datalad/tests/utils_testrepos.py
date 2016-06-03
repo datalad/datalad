@@ -62,12 +62,7 @@ class TestRepo(object):
                 else:
                     raise ValueError("Can't annex add to a non-annex repo.")
             else:
-                if isinstance(self.repo, AnnexRepo):
-                    self.repo.add(name, git=True)
-                elif isinstance(self.repo, GitRepo):
-                    self.repo.add(name)
-                else:
-                    raise ValueError("Unknown repo: %s" % self.repo)
+                self.repo.add(name, git=True)
 
     def create(self):
         if self._created:

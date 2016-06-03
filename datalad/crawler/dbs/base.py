@@ -89,13 +89,7 @@ class JsonBaseDB(object):
             json.dump(db, f, indent=2, sort_keys=True, separators=(',', ': '))
 
         # stage to be committed:
-        if isinstance(self.repo, AnnexRepo):
-            self.repo.add(self._filepath, git=True)
-        elif isinstance(self.repo, GitRepo):
-            self.repo.add(self._filepath)
-        else:
-            raise ValueError("Unknown repo: %s" % self.repo)
-
+        self.repo.add(self._filepath, git=True)
 
     @property
     def db_version(self):

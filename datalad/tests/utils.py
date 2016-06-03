@@ -184,6 +184,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
 
     assert(annexed == in_annex)
 
+
 def put_file_under_git(path, filename=None, content=None, annexed=False):
     """Place file under git/annex and return used Repo
     """
@@ -198,14 +199,10 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
             repo = AnnexRepo(repo.path)
         repo.add(file_repo_path, commit=True)
     else:
-        if isinstance(repo, AnnexRepo):
-            repo.add(file_repo_path, git=True)
-        elif isinstance(repo, GitRepo):
-            repo.add(file_repo_path)
-        else:
-            raise ValueError("Unknown repo: %s" % repo)
+        repo.add(file_repo_path, git=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
+
 
 def _prep_file_under_git(path, filename):
     """Get instance of the repository for the given filename

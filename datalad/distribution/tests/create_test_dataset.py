@@ -78,12 +78,7 @@ def _makeds(path, levels, ds=None):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    if isinstance(repo, AnnexRepo):
-        repo.add(fn, git=True)
-    else:
-        # GitRepo (see line 74)
-        repo.add(fn)
-    repo.commit("Added %s" % fn)
+    repo.add(fn, git=True, commit=True, msg="Added %s" % fn)
     if ds:
         rpath = os.path.relpath(path, ds.path)
         out = install(

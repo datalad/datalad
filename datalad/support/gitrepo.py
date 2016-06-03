@@ -26,7 +26,7 @@ from six import string_types
 
 from functools import wraps
 
-import git
+import git as gitpy
 from git.exc import GitCommandError, NoSuchPathError, \
     InvalidGitRepositoryError, BadName
 from git.objects.blob import Blob
@@ -43,7 +43,7 @@ lgr = logging.getLogger('datalad.gitrepo')
 
 # Override default GitPython's DB backend to talk directly to git so it doesn't interfer with
 # possible operations performed by gc/repack
-default_git_odbt = git.GitCmdObjectDB
+default_git_odbt = gitpy.GitCmdObjectDB
 
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
 # Didn't work as expected on a first try. Probably there is a neatier way to
@@ -254,11 +254,11 @@ def _remove_empty_items(list_):
 
 
 def Repo(*args, **kwargs):
-    """Factory method around git.Repo to consistently initiate with different backend
+    """Factory method around gitpy.Repo to consistently initiate with different backend
     """
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
-    return git.Repo(*args, **kwargs)
+    return gitpy.Repo(*args, **kwargs)
 
 
 def split_remote_branch(branch):
@@ -337,7 +337,7 @@ class GitRepo(object):
             # of create argument?
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(git.Repo.clone_from, url, path)
+                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path)
                 lgr.debug("Git clone completed")
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
@@ -345,7 +345,7 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
             except ValueError as e:
-                if git.__version__ == '1.0.2' and e.message == "I/O operation on closed file":
+                if gitpy.__version__ == '1.0.2' and e.message == "I/O operation on closed file":
                     # bug https://github.com/gitpython-developers/GitPython/issues/383
                     raise GitCommandError("clone has failed, telling ya",
                                           999,  # good number
@@ -356,7 +356,7 @@ class GitRepo(object):
         if create and not exists(opj(path, '.git')):
             try:
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
-                self.repo = self.cmd_call_wrapper(git.Repo.init, path, True, odbt=default_git_odbt)
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path, True, odbt=default_git_odbt)
             except GitCommandError as e:
                 lgr.error(str(e))
                 raise
@@ -402,7 +402,7 @@ class GitRepo(object):
             return GitRepo.get_toppath(dirname(path))
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None):
+    def add(self, files, commit=False, msg=None, git=True):
         """Adds file(s) to the repository.
 
         Parameters
@@ -410,8 +410,17 @@ class GitRepo(object):
         files: list
             list of paths to add
         commit: bool
+          whether or not to directly commit
         msg: str
+          commit message in case `commit=True`. A default message, containing
+          the list of files that were added, is created by default.
+        git: bool
+          somewhat ugly construction to be compatible with AnnexRepo.add();
+          has to be always true.
         """
+
+        # needs to be True - see docstring:
+        assert(git)
 
         files = _remove_empty_items(files)
         if files:
@@ -426,11 +435,11 @@ class GitRepo(object):
                 # confirmed?
                 # What's best in case of a list of files?
             except OSError as e:
-                lgr.error("git_add: %s" % e)
+                lgr.error("add: %s" % e)
                 raise
 
         else:
-            lgr.warning("git_add was called with empty file list.")
+            lgr.warning("add was called with empty file list.")
 
         if commit:
             if msg is None:
@@ -1014,7 +1023,7 @@ class GitRepo(object):
         # this is stupid, as for us it is valid to not have any remote, because we can
         # still obtain the submodule from a future publication location, based on the
         # parent
-        #git.Submodule.add(self.repo, name, path, url=url, branch=branch)
+        #gitpy.Submodule.add(self.repo, name, path, url=url, branch=branch)
         # going git native instead
         cmd = ['git', 'submodule', 'add', '--name', name]
         if branch is not None:
