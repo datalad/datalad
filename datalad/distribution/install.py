@@ -633,9 +633,9 @@ class Install(Interface):
     @staticmethod
     def _get_new_vcs(ds, source):
         if source is None:
-            # always come with annex when created from scratch
-            lgr.info("Creating a new annex repo at %s", ds.path)
-            vcs = AnnexRepo(ds.path, url=source, create=True)
+            raise RuntimeError(
+                "No `source` was provided. To create a new dataset "
+                "use the `create` command.")
         else:
             # when obtained from remote, try with plain Git
             lgr.info("Creating a new git repo at %s", ds.path)

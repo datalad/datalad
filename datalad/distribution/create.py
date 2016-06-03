@@ -13,12 +13,14 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+import os
 from datalad.distribution.dataset import Dataset, datasetmethod
 from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.param import Parameter
+from datalad.support.annexrepo import AnnexRepo
 
-lgr = logging.getLogger('datalad.distribution.install')
+lgr = logging.getLogger('datalad.distribution.create')
 
 
 class Create(Interface):
@@ -38,4 +40,9 @@ class Create(Interface):
     @staticmethod
     @datasetmethod(name='create')
     def __call__(path=None):
-        raise NotImplementedError
+        if path is None:
+            path = os.curdir
+        # always come with annex when created from scratch
+        lgr.info("Creating a new annex repo at %s", path)
+        vcs = AnnexRepo(path, url=None, create=True)
+        return Dataset(path)

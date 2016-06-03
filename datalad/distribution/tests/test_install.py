@@ -16,6 +16,7 @@ from os.path import exists
 from os.path import realpath
 
 from ..dataset import Dataset
+from datalad.api import create
 from datalad.api import install
 from datalad.distribution.install import get_containing_subdataset
 from datalad.distribution.install import _installationpath_from_url
@@ -64,7 +65,7 @@ def test_installationpath_from_url():
 @with_tree(tree={'test.txt': 'whatever'})
 def test_get_containing_subdataset(path):
 
-    ds = Dataset(path).install()
+    ds = create(path)
     ds.install(path='test.txt')
     ds.remember_state("Initial commit")
     subds = ds.install("sub", source=path)
@@ -85,8 +86,10 @@ def test_get_containing_subdataset(path):
 
 @with_tempfile
 def test_create(path):
+    # install doesn't create anymore
+    assert_raises(RuntimeError, Dataset(path).install)
     # only needs a path
-    ds = install(path)
+    ds = create(path)
     ok_(ds.is_installed())
     ok_clean_git(path, annex=False)
 
@@ -94,7 +97,7 @@ def test_create(path):
     ok_(isinstance(ds.repo, AnnexRepo))
 
     sub_path_1 = opj(path, "sub")
-    subds1 = install(sub_path_1)
+    subds1 = create(sub_path_1)
     ok_(subds1.is_installed())
     ok_clean_git(sub_path_1, annex=False)
     # wasn't installed into ds:
@@ -159,7 +162,7 @@ def test_install_plain_git(src, path):
                  'dir': {'testindir': 'someother',
                          'testindir2': 'none'}})
 def test_install_files(path):
-    ds = install(path)
+    ds = create(path)
     # install a single file
     eq_(ds.install('test.txt'), opj(path, 'test.txt'))
     # install it again, should given same result
@@ -207,7 +210,7 @@ def test_install_dataset_from_just_source_via_path(url, path):
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_into_dataset(source, top_path):
-    ds = install(top_path)
+    ds = create(top_path)
     subds = ds.install(path="sub", source=source)
     assert_true(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
