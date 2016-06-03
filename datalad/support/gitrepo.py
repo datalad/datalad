@@ -415,6 +415,16 @@ class GitRepo(object):
         except OSError:
             return GitRepo.get_toppath(dirname(path))
 
+    # classmethod so behavior could be tuned in derived classes
+    @classmethod
+    def _get_added_files_commit_msg(cls, files):
+        if not files:
+            return "No files were added"
+        msg = "Added %d file" % len(files)
+        if len(files) > 1:
+            msg += "s"
+        return msg + '\n\nFiles:\n' + '\n'.join(files)
+
     @normalize_paths
     def add(self, files, commit=False, msg=None, git=True):
         """Adds file(s) to the repository.
@@ -457,7 +467,7 @@ class GitRepo(object):
 
         if commit:
             if msg is None:
-                msg = "Added file(s):" + '\n'.join(files)
+                msg = self._get_added_files_commit_msg(files)
             self.commit(msg=msg)
 
     # TODO: like add melt in

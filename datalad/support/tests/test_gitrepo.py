@@ -708,3 +708,10 @@ def test_split_remote_branch():
     eq_(b, "Branch/with/slashes")
     assert_raises(AssertionError, split_remote_branch, "NoSlashesAtAll")
     assert_raises(AssertionError, split_remote_branch, "TrailingSlash/")
+
+
+def test_get_added_files_commit_msg():
+    f = GitRepo._get_added_files_commit_msg
+    eq_(f([]), 'No files were added')
+    eq_(f(["f1"]), 'Added 1 file\n\nFiles:\nf1')
+    eq_(f(["f1", "f2"]), 'Added 2 files\n\nFiles:\nf1\nf2')
