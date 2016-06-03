@@ -126,33 +126,6 @@ def test_AnnexRepo_set_direct_mode(src, dst):
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
-def test_AnnexRepo_annex_add(src, annex_path):
-
-    ar = AnnexRepo(annex_path, src)
-
-    filename = get_most_obscure_supported_name()
-    filename_abs = os.path.join(annex_path, filename)
-    f = open(filename_abs, 'w')
-    f.write("What to write?")
-    f.close()
-    out_json = ar.add(filename)
-    if not ar.is_direct_mode():
-        assert_true(os.path.islink(filename_abs),
-                    "Annexed file is not a link.")
-    else:
-        assert_false(os.path.islink(filename_abs),
-                     "Annexed file is link in direct mode.")
-    assert_in('key', out_json)
-    key = ar.get_file_key(filename)
-    assert_false(key == '')
-    assert_equal(key, out_json['key'])
-    # could test for the actual key, but if there's something
-    # and no exception raised, it's fine anyway.
-
-
-@assert_cwd_unchanged
-@with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
-@with_tempfile
 def test_AnnexRepo_annex_proxy(src, annex_path):
     ar = AnnexRepo(annex_path, src)
     ar.set_direct_mode(True)
@@ -612,13 +585,25 @@ def test_AnnexRepo_add_to_annex(path):
     else:
         ok_clean_git(path, annex=True)
     filename = get_most_obscure_supported_name()
-    with open(opj(path, filename), "w") as f:
+    filename_abs = opj(path, filename)
+    with open(filename_abs, "w") as f:
         f.write("some")
-    repo.add(filename)
 
-    # known to annex:
-    ok_(repo.get_file_key(filename))
+    out_json = repo.add(filename)
+
+    # file is known to annex:
+    if not repo.is_direct_mode():
+        assert_true(os.path.islink(filename_abs),
+                    "Annexed file is not a link.")
+    else:
+        assert_false(os.path.islink(filename_abs),
+                     "Annexed file is link in direct mode.")
+    assert_in('key', out_json)
+    key = repo.get_file_key(filename)
+    assert_false(key == '')
+    assert_equal(key, out_json['key'])
     ok_(repo.file_has_content(filename))
+
     # uncommitted:
     ok_(repo.repo.is_dirty())
 
