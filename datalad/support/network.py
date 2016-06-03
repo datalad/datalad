@@ -16,11 +16,13 @@ import shutil
 import time
 
 from six import string_types
+from six import iteritems
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
-from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse
+from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, ParseResult
 from six.moves.urllib.error import URLError
 
+from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
 import requests
 
@@ -235,6 +237,217 @@ class SimpleURLStamper(object):
             return dict(mtime=r_stamp['mtime'], size=r_stamp['size'], url=url)
         finally:
             r.close()
+
+#@auto_repr
+class URL(object):
+    """A helper class to deal with URLs with some "magical" treats to facilitate use of "ssh" urls
+
+    Although largely decorating urlparse.ParseResult, it
+    - doesn't mandate providing all parts of the URL
+    - doesn't require netloc but rather asks for separate username, password, and hostname
+    - TODO fragment and query are stored as (ordered) dictionaries of single entry elements
+      (or otherwise encoded), with empty value being equivalent with no value.  If conversion
+      to value=pair fails, string would be stored (so it it was indeed a url pointing to an id
+      within a page)
+
+    The idea is that this class should help to break apart a URL, while being
+    able to rebuild itself into a string representation for reuse
+
+    If scheme was implicit (e.g. "host:path" for ssh, or later may be "host::path" for
+    rsync) ":implicit" suffix added to the scheme (so it is included in the repr of the
+    instance "for free")
+
+    Additional semantics we might want to somehow understand/map???
+    - strings starting with // (no scheme) assumed to map to local central DataLad dataset,
+      with `location` (if not empty) identifying the remote (super)dataset
+
+    Implementation:
+    - currently might be overengineered and could be simplified.  Internally keeps
+      all values as attributes, but for manipulation in dict (called fields) and converts
+      back and forth to ParseResults
+    So after we agree on viability of the approach  and collect enough tests we can simplify
+    """
+
+    # fields with their defaults
+    _FIELDS = (
+        'scheme', 'hostname',
+        'path', # 'params',
+        'query',
+        'fragment', 'username',
+        'password'
+    )
+
+    __slots__ = _FIELDS
+
+    def __init__(self, url=None, **kwargs):
+        if url and (bool(url) == bool(kwargs)):
+            raise ValueError(
+                "Specify either url or breakdown from the fields, not both. "
+                "Got url=%r, fields=%r" % (url, kwargs))
+
+        if url:
+            self._set_from_str(url)
+        else:
+            self._set_from_fields(**kwargs)
+
+    @property
+    def is_implicit(self):
+        return self.scheme and self.scheme.endswith(':implicit')
+
+    def __repr__(self):
+        # since auto_repr doesn't support "non-0" values atm
+        fields = self._to_fields()
+        return "%s(%s)" % (
+            self.__class__.__name__,
+            ", ".join(["%s=%r" % (k, v) for k, v in sorted(fields.items()) if v]))
+
+
+    def __str_ssh__(self):
+        """Custom str for ssh:implicit"""
+        url = urlunparse(self._to_pr())
+        pref = 'ssh:implicit://'
+        assert(url.startswith(pref))
+        url = url[len(pref):]
+        # and we should replace leading /
+        url = url.replace('/', ':/' if self.path.startswith('/') else ':', 1)
+        return url
+
+    def __str_datalad__(self):
+        """Custom str for datalad:implicit"""
+        fields = self._to_fields()
+        fields['scheme'] = None
+        url = urlunparse(self._fields_to_pr(fields))
+        if not self.hostname:
+            # was of /// type
+            url = '//' + url
+        return url
+
+    def __str__(self):
+        if not self.is_implicit:
+            return urlunparse(self._to_pr())
+        else:
+            base_scheme = self.scheme.split(':', 1)[0]
+            try:
+                return getattr(self, '__str_%s__' % base_scheme)()
+            except AttributeError:
+                raise ValueError("Don't know how to convert implicit %s into str"
+                                 % base_scheme)
+
+    def _set_from_fields(self, **kwargs):
+        unknown_fields = set(kwargs).difference(self._FIELDS)
+        if unknown_fields:
+            raise ValueError("Do not know about %s. Known fields are: %s"
+                             % (unknown_fields, self._FIELDS))
+        # set them to provided values
+        for f in self._FIELDS:
+            setattr(self, f, kwargs.get(f, None))
+
+    def _to_fields(self):
+        return {f: getattr(self, f) for f in self._FIELDS}
+
+    def _to_pr(self):
+        return self._fields_to_pr(self._to_fields())
+
+    @classmethod
+    def _fields_to_pr(cls, fields):
+        """Recompose back fields dict to ParseResult"""
+        netloc = fields['username'] or ''
+        if fields['password']:
+            netloc += ':' + fields['password']
+        if netloc:
+            netloc += '@'
+        netloc += fields['hostname'] if fields['hostname'] else ''
+
+        pr_fields = {
+            f: (fields[f] if fields[f] is not None else '')
+            for f in cls._FIELDS
+            if f not in ('hostname', 'password', 'username')
+        }
+        pr_fields['netloc'] = netloc
+        pr_fields['params'] = ''
+
+        return ParseResult(**pr_fields)
+
+    def _pr_to_fields(self, pr):
+        """ParseResult is a tuple so immutable, which complicates adjusting it
+
+        This function converts ParseResult into dict"""
+
+        if pr.params:
+            lgr.warning("ParseResults contains params %r, which will be ignored"
+                        % (pr.params,))
+
+        def getattrnone(f):
+            """Just a little helper so we could just map and get None if empty"""
+            v = getattr(pr, f)
+            return v if v else None
+
+        return {f: getattrnone(f) for f in self._FIELDS}
+
+    def _set_from_str(self, url):
+        fields = self._pr_to_fields(urlparse(url))
+        lgr.log(5, "Parsed url %s into fields %s" % (url, fields))
+
+        # Special treatments
+        if fields['scheme'] and not fields['hostname']:
+            # dl+archive:... or just for ssh   hostname:path/p1
+            if '+' not in fields['scheme']:
+                fields['hostname'] = fields['scheme']
+                fields['scheme'] = 'ssh:implicit'
+                lgr.log(5, "Assuming ssh style url, adjusted: %s" % (fields,))
+
+        if not fields['scheme'] and not fields['hostname']:
+            if fields['path'] and '@' in fields['path']:
+                # user@host:path/sp1
+                fields['scheme'] = 'ssh:implicit'
+            else:
+                # e.g. // or ///path
+                fields['scheme'] = 'datalad:implicit'
+
+        if not fields['scheme'] and fields['hostname']:
+            # e.g. //a/path
+            fields['scheme'] = 'datalad:implicit'
+
+        if fields['scheme'] in ('ssh:implicit',) and not fields['hostname']:
+            if fields['query'] or fields['fragment']:
+                # actually might be legit with some obscure filenames,
+                # so TODO for correct -- probably just re.match the entire url
+                # into fields
+                raise ValueError("Thought that this url would point to host:path but got query and fragments: %s"
+                                 % str(fields))
+            #  user@hostname[:path] --> ssh://user@hostname[/path]
+            parts = _split_colon(url)
+            fields['scheme'] = 'ssh:implicit'
+            if len(parts) == 2:
+                fields['hostname'] = parts[0]
+                fields['path'] = parts[1]
+            # hostname might still contain the password
+            if fields['hostname'] and '@' in fields['hostname']:
+                fields['username'], fields['hostname'] = fields['hostname'].split('@', 1)
+            lgr.log(5, "Detected ssh style url, adjusted: %s" % (fields,))
+
+        self._set_from_fields(**fields)
+
+        # well -- some urls might not unparse identically back
+        # strictly speaking, but let's assume they do
+        url_rec = str(self)
+        # print "REPR: ", repr(self)
+        if url != url_rec:
+            lgr.warning("Parsed version of url %r differs from original %r",
+                        url_rec, url)
+
+    def __eq__(self, other):
+        if not isinstance(other, URL):
+            other = URL(other)
+        return all(getattr(other, f) == getattr(self, f) for f in self._FIELDS)
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+def _split_colon(s, maxsplit=1):
+    """Split on unescaped colon"""
+    return re.compile(r'(?<!\\):').split(s, maxsplit=maxsplit)
 
 
 def parse_url_opts(url):

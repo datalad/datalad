@@ -7,13 +7,15 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from .utils import eq_, ok_, assert_raises
+from .utils import eq_, neq_, ok_, assert_raises
 
 from ..support.network import same_website, dlurljoin
 from ..support.network import get_tld
 from ..support.network import get_url_straight_filename
 from ..support.network import get_response_disposition_filename
 from ..support.network import parse_url_opts
+from ..support.network import URL
+from ..support.network import _split_colon
 
 
 def test_same_website():
@@ -84,3 +86,54 @@ def test_parse_url_opts():
     eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '13'}))
 
 
+
+def test_split_colon():
+    eq_(_split_colon('a:b'), ['a', 'b'])
+    eq_(_split_colon('a:b:c'), ['a', 'b:c'])
+    eq_(_split_colon('a:b:c', 2), ['a', 'b', 'c'])
+    eq_(_split_colon('ab'), ['ab'])
+    eq_(_split_colon(r'a\:b'), [r'a\:b'])
+
+
+def test_url_eq():
+    eq_(URL(), URL())
+    neq_(URL(), URL(hostname='x'))
+
+
+def test_url():
+    assert_raises(ValueError, URL, "http://example.com", hostname="example.com")
+    eq_(repr(URL("http://example.com")), "URL(hostname='example.com', scheme='http')")
+    eq_(URL("http://example.com"), URL(scheme='http', hostname="example.com"))
+    eq_(URL("http://example.com"), "http://example.com")  # automagic coercion in __eq__
+    neq_(URL(), URL(hostname='x'))
+    # "complete" one for classical http
+    eq_(URL("http://user:pw@example.com/p/sp?p1=v1&p2=v2#frag"),
+        URL(scheme='http', hostname="example.com", username='user', password='pw', path='/p/sp', query='p1=v1&p2=v2', fragment='frag'))
+
+    # sample one for ssh with specifying the scheme
+    # XXX? might be useful?  https://github.com/FriendCode/giturlparse.py
+    eq_(URL("ssh://host/path/sp1"), URL(scheme='ssh', hostname='host', path='/path/sp1'))
+    eq_(URL("user@host:path/sp1"), URL(scheme='ssh:implicit', hostname='host', path='path/sp1', username='user'))
+    eq_(URL("host:path/sp1"), URL(scheme='ssh:implicit', hostname='host', path='path/sp1'))
+    eq_(URL("host:path"), URL(scheme='ssh:implicit', hostname='host', path='path'))
+    eq_(URL("host:/path"), URL(scheme='ssh:implicit', hostname='host', path='/path'))
+    # TODO!!!  should this be a legit URL like this?
+    # eq_(URL("host"), URL(scheme='ssh:implicit', hostname='host'))
+    eq_(repr(URL("host:path")), "URL(hostname='host', path='path', scheme='ssh:implicit')")
+
+    # And now perspective 'datalad:implicit' urls pointing to the canonical center location
+    eq_(URL("///"), URL(scheme='datalad:implicit', path='/'))
+    eq_(URL("///p/s1"), URL(scheme='datalad:implicit', path='/p/s1'))
+    eq_(URL("//a/"), URL(scheme='datalad:implicit', path='/', hostname='a'))
+    eq_(URL("//a/data"), URL(scheme='datalad:implicit', path='/data', hostname='a'))
+
+    # here we will do custom magic allowing only schemes with + in them, such as dl+archive
+    # or not so custom as
+    eq_(URL("hg+https://host/user/proj"),
+        URL(scheme="hg+https", hostname='host', path='/user/proj'))
+    # "old" style
+    eq_(URL("dl+archive:KEY/path/sp1#size=123"),
+        URL(scheme='dl+archive', path='KEY/path/sp1', fragment='size=123'))
+    # "new" style
+    eq_(URL("dl+archive:KEY#path=path/sp1&size=123"),
+        URL(scheme='dl+archive', path='KEY', fragment='path=path/sp1&size=123'))

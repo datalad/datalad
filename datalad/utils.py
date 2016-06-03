@@ -100,6 +100,10 @@ def __auto_repr__(obj):
         if attr.startswith('_'):
             continue
         value = getattr(obj, attr)
+        # TODO:  should we add this feature to minimize some talktative reprs
+        # such as of URL?
+        #if value is None:
+        #    continue
         items.append("%s=%s" % (attr, shortened_repr(value)))
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
