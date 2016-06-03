@@ -110,7 +110,23 @@ def test_GitRepo_add(src, path):
         f.write("File to add to git")
     gr.add(filename)
 
-    assert_in(filename, gr.get_indexed_files(), "%s not successfully added to %s" % (filename, path))
+    assert_in(filename, gr.get_indexed_files(),
+              "%s not successfully added to %s" % (filename, path))
+    # uncommitted:
+    ok_(gr.repo.is_dirty())
+
+    filename = "another.txt"
+    with open(opj(path, filename), 'w') as f:
+        f.write("Another file to add to git")
+    assert_raises(AssertionError, gr.add, filename, git=False)
+    assert_raises(AssertionError, gr.add, filename, git=None)
+
+    # include committing:
+    gr.add(filename, commit=True, msg="Add two files.")
+
+    assert_in(filename, gr.get_indexed_files(),
+              "%s not successfully added to %s" % (filename, path))
+    ok_clean_git(path, annex=False)
 
 
 @assert_cwd_unchanged
