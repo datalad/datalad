@@ -13,6 +13,7 @@ from ..support.network import same_website, dlurljoin
 from ..support.network import get_tld
 from ..support.network import get_url_straight_filename
 from ..support.network import get_response_disposition_filename
+from ..support.network import parse_url_opts
 
 
 def test_same_website():
@@ -67,3 +68,19 @@ def test_rfc2822_to_epoch():
 def test_get_response_disposition_filename():
     eq_(get_response_disposition_filename('attachment;filename="Part1-Subjects1-99.tar"'), "Part1-Subjects1-99.tar")
     eq_(get_response_disposition_filename('attachment'), None)
+
+
+def test_parse_url_opts():
+    url = 'http://map.org/api/download/?id=157'
+    output = parse_url_opts(url)
+    eq_(output, ('http://map.org/api/download/', {'id': '157'}))
+
+    url = 's3://bucket/save/?key=891'
+    output = parse_url_opts(url)
+    eq_(output, ('s3://bucket/save/', {'key': '891'}))
+
+    url = 'http://map.org/api/download/?id=98&code=13'
+    output = parse_url_opts(url)
+    eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '13'}))
+
+

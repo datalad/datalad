@@ -51,9 +51,9 @@ from .. import cfg
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
-from ..utils import parse_url_opts
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
+from ..support.network import parse_url_opts
 from ..support.stats import ActivityStats
 from ..support.configparserinc import SafeConfigParserWithIncludes
 

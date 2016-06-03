@@ -22,8 +22,8 @@ lgr = logging.getLogger('datalad.customremotes.archive')
 from ..cmd import link_file_load, Runner
 from ..support.exceptions import CommandError
 from ..support.archives import ArchivesCache
+from ..support.network import parse_url_opts
 from ..utils import getpwd
-from ..utils import parse_url_opts
 from .base import AnnexCustomRemote
 from .base import URI_PREFIX
 

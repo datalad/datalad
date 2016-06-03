@@ -235,3 +235,17 @@ class SimpleURLStamper(object):
             return dict(mtime=r_stamp['mtime'], size=r_stamp['size'], url=url)
         finally:
             r.close()
+
+
+def parse_url_opts(url):
+    """Given a string with url-style query, split into content before # and options as dict"""
+    if '?' in url:
+        url_, attrs_str = url.split('?', 1)
+        opts = dict(x.split('=', 1) for x in attrs_str.split('&'))
+        if 'size' in opts:
+            opts['size'] = int(opts['size'])
+    else:
+        url_, opts = url, {}
+    return url_, opts
+
+

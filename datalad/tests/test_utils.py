@@ -54,20 +54,6 @@ from .utils import ok_startswith
 from .utils import skip_if_no_module
 
 
-def test_parse_url_opts():
-    url = 'http://map.org/api/download/?id=157'
-    output = parse_url_opts(url)
-    eq_(output, ('http://map.org/api/download/', {'id': '157'}))
-
-    url = 's3://bucket/save/?key=891'
-    output = parse_url_opts(url)
-    eq_(output, ('s3://bucket/save/', {'key': '891'}))
-
-    url = 'http://map.org/api/download/?id=98&code=13'
-    output = parse_url_opts(url)
-    eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '13'}))
-
-
 @with_tempfile(mkdir=True)
 def test_rotree(d):
     d2 = opj(d, 'd1', 'd2')  # deep nested directory
