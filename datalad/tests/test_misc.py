@@ -37,5 +37,8 @@ def test_test():
         assert LooseVersion(numpy.__version__) >= '1.2'
     except:
         raise SkipTest("Need numpy 1.2")
-    # we can't swallow outputs due to all the nosetests dances etc
-    datalad.test('datalad.support.tests.test_status', verbose=0)
+
+    # we need to avoid running global teardown
+    with patch.dict('os.environ', {'DATALAD_TESTS_NOTEARDOWN': '1'}):
+        # we can't swallow outputs due to all the nosetests dances etc
+        datalad.test('datalad.support.tests.test_status', verbose=0)

@@ -64,6 +64,9 @@ def setup_package():
 
 
 def teardown_package():
+    import os
+    if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
+        return
     from datalad.tests import _TEMP_PATHS_GENERATED
     from datalad.tests.utils import rmtemp
     if len(_TEMP_PATHS_GENERATED):
