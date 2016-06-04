@@ -7,7 +7,12 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from .utils import eq_, neq_, ok_, assert_raises
+import logging
+
+from .utils import eq_, neq_, ok_, nok_, assert_raises
+from .utils import skip_if_on_windows
+from .utils import swallow_logs
+from .utils import assert_re_in
 
 from ..support.network import same_website, dlurljoin
 from ..support.network import get_tld
@@ -16,6 +21,7 @@ from ..support.network import get_response_disposition_filename
 from ..support.network import parse_url_opts
 from ..support.network import URL
 from ..support.network import _split_colon
+from ..support.network import is_url
 
 
 def test_same_website():
@@ -86,7 +92,6 @@ def test_parse_url_opts():
     eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '13'}))
 
 
-
 def test_split_colon():
     eq_(_split_colon('a:b'), ['a', 'b'])
     eq_(_split_colon('a:b:c'), ['a', 'b:c'])
@@ -105,15 +110,22 @@ def _check_url(url, **fields):
     url_ = URL(**fields)
     eq_(URL(url), url_)
     eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
-    eq_(url, str(url_))  # that we can reconstruct it
+    eq_(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
+    # and that we have access to all those fields
+    for f, v in fields.items():
+        eq_(getattr(url_, f), v)
 
 
 def test_url():
+    # Basic checks
     assert_raises(ValueError, URL, "http://example.com", hostname="example.com")
     eq_(repr(URL("http://example.com")), "URL(hostname='example.com', scheme='http')")
-    _check_url("http://example.com", scheme='http', hostname="example.com")
     eq_(URL("http://example.com"), "http://example.com")  # automagic coercion in __eq__
     neq_(URL(), URL(hostname='x'))
+    ok_(bool(URL('smth')))
+    nok_(bool(URL()))
+
+    _check_url("http://example.com", scheme='http', hostname="example.com")
     # "complete" one for classical http
     _check_url("http://user:pw@example.com/p/sp?p1=v1&p2=v2#frag",
         scheme='http', hostname="example.com", username='user', password='pw', path='/p/sp', query='p1=v1&p2=v2', fragment='frag')
@@ -166,3 +178,40 @@ def test_url():
     _check_url("git://host/user/proj", scheme="git", hostname="host", path="/user/proj")
     _check_url("git@host:user/proj",
                scheme="ssh:implicit", hostname="host", path="user/proj", username='git')
+
+    _check_url('weired:/', scheme='ssh:implicit', hostname='weired', path='/')
+    # check that we are getting a warning logged when url can't be reconstructed
+    # precisely
+    # actually failed to come up with one -- becomes late here
+    #_check_url("http://host///..//p", scheme='http', path='/..//p')
+
+    # actually this one is good enough to trigger a warning and I still don't know
+    # what it should exactly be!?
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        repr(URL('weired://'))
+        assert_re_in('Parsed version of url .weired. differs from original .weired://.',
+                     cml.out)
+
+
+@skip_if_on_windows
+def test_get_url_path_on_fileurls():
+    eq_(URL('file:///a').path, '/a')
+    eq_(URL('file:///a/b').path, '/a/b')
+    eq_(URL('file:///a/b#id').path, '/a/b')
+    eq_(URL('file:///a/b?whatever').path, '/a/b')
+
+
+def test_is_url():
+    ok_(is_url('file://localhost/some'))
+    ok_(is_url('http://localhost'))
+    ok_(is_url('ssh://me@localhost'))
+    # in current understanding it is indeed a url but an 'ssh:implicit', not just
+    # a useless scheme=weird with a hope to point to a netloc
+    with swallow_logs():
+        ok_(is_url('weired://'))
+    nok_(is_url('relative'))
+    nok_(is_url('/absolute'))
+    nok_(is_url('like@sshlogin'))
+    nok_(is_url(''))
+    nok_(is_url(' '))
+

@@ -26,13 +26,10 @@ from ..utils import updated
 from ..utils import get_local_file_url
 from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
-from ..utils import get_url_path
-from ..utils import is_url
 from ..utils import get_local_path_from_url
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
-from ..utils import parse_url_opts
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
@@ -179,28 +176,10 @@ def test_get_local_file_url_linux():
     assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
     assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
 
-@skip_if_on_windows
-def test_get_url_path_on_fileurls():
-    assert_equal(get_url_path('file:///a'), '/a')
-    assert_equal(get_url_path('file:///a/b'), '/a/b')
-    assert_equal(get_url_path('file:///a/b#id'), '/a/b')
-    assert_equal(get_url_path('file:///a/b?whatever'), '/a/b')
-
-def test_is_url():
-    assert_true(is_url('file://localhost/some'))
-    assert_true(is_url('http://localhost'))
-    assert_true(is_url('ssh://me@localhost'))
-    assert_true(is_url('weired://'))
-    assert_false(is_url('relative'))
-    assert_false(is_url('/absolute'))
-    assert_false(is_url('like@sshlogin'))
-    assert_false(is_url(''))
-
-
 def test_get_local_path_from_url():
     assert_raises(ValueError, get_local_path_from_url, 'http://some')
     assert_raises(ValueError, get_local_path_from_url, 'file://elsewhere/some')
-    # invalid URL
+    # invalid URL -- is it?  just that 'hostname' is some and no path
     assert_raises(ValueError, get_local_path_from_url, 'file://some')
     assert_equal(get_local_path_from_url('file:///some'), '/some')
     assert_equal(get_local_path_from_url('file://localhost/some'), '/some')

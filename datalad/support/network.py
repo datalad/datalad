@@ -271,7 +271,7 @@ class URL(object):
 
     # fields with their defaults
     _FIELDS = (
-        'scheme', 'hostname',
+        'scheme', 'hostname', 'port',
         'path', # 'params',
         'query',
         'fragment', 'username',
@@ -310,7 +310,9 @@ class URL(object):
         assert(url.startswith(pref))
         url = url[len(pref):]
         # and we should replace leading /
-        url = url.replace('/', ':/' if self.path.startswith('/') else ':', 1)
+        url = url.replace('/',
+                          ':/' if self.path and self.path.startswith('/') else ':',
+                          1)
         return url
 
     def __str_datalad__(self):
@@ -336,10 +338,14 @@ class URL(object):
         else:
             base_scheme = self.scheme.split(':', 1)[0]
             try:
-                return getattr(self, '__str_%s__' % base_scheme)()
+                __str__ = getattr(self, '__str_%s__' % base_scheme)
             except AttributeError:
-                raise ValueError("Don't know how to convert implicit %s into str"
+                raise ValueError("Don't know how to convert %s:implicit into str"
                                  % base_scheme)
+            return __str__()
+
+    def __nonzero__(self):
+        return any(getattr(self, f) for f in self._FIELDS)
 
     def _set_from_fields(self, **kwargs):
         unknown_fields = set(kwargs).difference(self._FIELDS)
@@ -365,11 +371,13 @@ class URL(object):
         if netloc:
             netloc += '@'
         netloc += fields['hostname'] if fields['hostname'] else ''
+        if fields['port']:
+            netloc += ':%s' % fields['port']
 
         pr_fields = {
             f: (fields[f] if fields[f] is not None else '')
             for f in cls._FIELDS
-            if f not in ('hostname', 'password', 'username')
+            if f not in ('hostname', 'password', 'username', 'port')
         }
         pr_fields['netloc'] = netloc
         pr_fields['params'] = ''
@@ -472,5 +480,21 @@ def parse_url_opts(url):
     else:
         url_, opts = url, {}
     return url_, opts
+
+
+# TODO: should we just define URL.good_for_git or smth like that? ;)
+# although git also understands regular paths
+def is_url(s):
+    """Returns whether a string looks like something what datalad should treat as a URL
+
+    This includes ssh "urls" which git understands.
+    """
+    try:
+        url = URL(s)
+    except:
+        return False
+    implicit = url.is_implicit
+    scheme = url.scheme
+    return scheme in {'ssh:implicit'} or (not implicit and bool(url))
 
 

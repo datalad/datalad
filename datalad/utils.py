@@ -189,12 +189,6 @@ def get_local_file_url(fname):
     return furl
 
 
-def get_url_path(url):
-    """Given a url, return the path component"""
-
-    return urlunquote(urlsplit(url).path)
-
-
 def get_local_path_from_url(url):
     """If given a file:// URL, returns a local path, if possible.
 
@@ -211,14 +205,6 @@ def get_local_path_from_url(url):
             or urlparts.netloc.startswith('127.')):
         raise ValueError("file:// URL does not point to 'localhost'")
     return urlunquote(urlparts.path)
-
-
-def is_url(s):
-    """Returns whether a string looks like a URL.
-
-    Test implementation uses the presence of a URL scheme as criterion.
-    """
-    return bool(urlsplit(s).scheme)
 
 
 def expandpath(path, force_absolute=True):
