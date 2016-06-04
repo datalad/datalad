@@ -302,7 +302,7 @@ class URL(object):
             self.__class__.__name__,
             ", ".join(["%s=%r" % (k, v) for k, v in sorted(fields.items()) if v]))
 
-
+    # Some custom __str__s for :implicit URLs
     def __str_ssh__(self):
         """Custom str for ssh:implicit"""
         url = urlunparse(self._to_pr())
@@ -344,8 +344,19 @@ class URL(object):
                                  % base_scheme)
             return __str__()
 
+    #
+    # If any field is specified, URL is not considered 'False', i.e.
+    # non-existing, although may be we could/shout omit having only
+    # scheme or port specified since it doesn't point to any useful
+    # location
+    #
+
     def __nonzero__(self):
         return any(getattr(self, f) for f in self._FIELDS)
+
+    #
+    # Helpers to deal with internal structures and conversions
+    #
 
     def _set_from_fields(self, **kwargs):
         unknown_fields = set(kwargs).difference(self._FIELDS)
@@ -455,6 +466,10 @@ class URL(object):
         if url != url_rec:
             lgr.warning("Parsed version of url %r differs from original %r",
                         url_rec, url)
+
+    #
+    # Quick comparators
+    #
 
     def __eq__(self, other):
         if not isinstance(other, URL):
