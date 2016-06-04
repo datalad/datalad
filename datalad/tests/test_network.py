@@ -13,6 +13,7 @@ from .utils import eq_, neq_, ok_, nok_, assert_raises
 from .utils import skip_if_on_windows
 from .utils import swallow_logs
 from .utils import assert_re_in
+from .utils import get_most_obscure_supported_name
 
 from ..support.network import same_website, dlurljoin
 from ..support.network import get_tld
@@ -159,6 +160,9 @@ def test_url():
     # "new" style
     _check_url("dl+archive:KEY#path=path/sp1&size=123",
         scheme='dl+archive', path='KEY', fragment='path=path/sp1&size=123')
+    # actually above one is probably wrong since we need to encode the path
+    _check_url("dl+archive:KEY#path=path%2Fbsp1&size=123",
+        scheme='dl+archive', path='KEY', fragment='path=path%2Fbsp1&size=123')
 
     #https://en.wikipedia.org/wiki/File_URI_scheme
     _check_url("file://host", scheme='file', hostname='host')
@@ -192,6 +196,30 @@ def test_url():
         assert_re_in('Parsed version of url .weired. differs from original .weired://.',
                      cml.out)
 
+
+def test_url_compose_archive_one():
+    eq_(str(URL(scheme='dl+archive', path='KEY', fragment={'path': 'f/p', 'size': 30})),
+        'dl+archive:KEY#path=f%2Fp&size=30')
+
+
+def test_url_fragments_and_query():
+    url = URL(hostname="host", query={'a': 'x/b', 'b': 'y'})
+    eq_(str(url), '//host?a=x%2Fb&b=y')
+    eq_(url.query, 'a=x%2Fb&b=y')
+    eq_(url.query_dict, {'a': 'x/b', 'b': 'y'})
+
+    url = URL(hostname="host", fragment={'a': 'x', 'b': 'y'})
+    eq_(str(url), '//host#a=x&b=y')
+    eq_(url.fragment, 'a=x&b=y')
+    eq_(url.fragment_dict, {'a': 'x', 'b': 'y'})
+
+    fname = get_most_obscure_supported_name()
+    url = URL(hostname="host", fragment={'a': fname})
+    eq_(url.fragment_dict, {'a': fname})
+
+
+def test_url_dicts():
+    eq_(URL("http://host").query_dict, {})
 
 @skip_if_on_windows
 def test_get_url_path_on_fileurls():

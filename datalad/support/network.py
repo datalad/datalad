@@ -20,6 +20,8 @@ from six import iteritems
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, ParseResult
+from six.moves.urllib.parse import parse_qs
+from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
 
 from datalad.utils import auto_repr
@@ -271,11 +273,13 @@ class URL(object):
 
     # fields with their defaults
     _FIELDS = (
-        'scheme', 'hostname', 'port',
+        'scheme',
+        'username',
+        'password',
+        'hostname', 'port',
         'path', # 'params',
         'query',
-        'fragment', 'username',
-        'password'
+        'fragment',
     )
 
     __slots__ = _FIELDS
@@ -363,6 +367,13 @@ class URL(object):
         if unknown_fields:
             raise ValueError("Do not know about %s. Known fields are: %s"
                              % (unknown_fields, self._FIELDS))
+
+        # encode dicts for query or fragment into
+        for f in {'query', 'fragment'}:
+            v = kwargs.get(f)
+            if isinstance(v, dict):
+                kwargs[f] = urlencode(v)
+
         # set them to provided values
         for f in self._FIELDS:
             setattr(self, f, kwargs.get(f, None))
@@ -478,6 +489,32 @@ class URL(object):
 
     def __ne__(self, other):
         return not (self == other)
+
+    #
+    # Access helpers
+    #
+
+    def _parse_qs(self, s, auto_delist=True):
+        """Helper around parse_qs to strip unneeded 'list'ing etc and return a dict of key=values"""
+        if not s:
+            return {}
+        out = parse_qs(s, 1)
+        if not auto_delist:
+            return out
+        for k in out:
+            v = out[k]
+            if isinstance(v, list) and len(v) == 1:
+                v = v[0]
+                out[k] = None if v == '' else v
+        return out
+
+    @property
+    def query_dict(self):
+        return self._parse_qs(self.query)
+
+    @property
+    def fragment_dict(self):
+        return self._parse_qs(self.fragment)
 
 
 def _split_colon(s, maxsplit=1):
