@@ -198,8 +198,10 @@ def test_url():
 
 
 def test_url_compose_archive_one():
-    eq_(str(URL(scheme='dl+archive', path='KEY', fragment={'path': 'f/p', 'size': 30})),
-        'dl+archive:KEY#path=f%2Fp&size=30')
+    url = URL(scheme='dl+archive', path='KEY', fragment={'path': 'f/p/ s+', 'size': 30})
+    # funny - space is encoded as + but + is %2B
+    eq_(str(url), 'dl+archive:KEY#path=f/p/+s%2B&size=30')
+    eq_(url.fragment_dict, {'path': 'f/p/ s+', 'size': '30'})
 
 
 def test_url_fragments_and_query():
@@ -208,10 +210,10 @@ def test_url_fragments_and_query():
     eq_(url.query, 'a=x%2Fb&b=y')
     eq_(url.query_dict, {'a': 'x/b', 'b': 'y'})
 
-    url = URL(hostname="host", fragment={'a': 'x', 'b': 'y'})
-    eq_(str(url), '//host#a=x&b=y')
-    eq_(url.fragment, 'a=x&b=y')
-    eq_(url.fragment_dict, {'a': 'x', 'b': 'y'})
+    url = URL(hostname="host", fragment={'a': 'x/b', 'b': 'y'})
+    eq_(str(url), '//host#a=x/b&b=y')
+    eq_(url.fragment, 'a=x/b&b=y')
+    eq_(url.fragment_dict, {'a': 'x/b', 'b': 'y'})
 
     fname = get_most_obscure_supported_name()
     url = URL(hostname="host", fragment={'a': fname})

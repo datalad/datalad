@@ -372,7 +372,17 @@ class URL(object):
         for f in {'query', 'fragment'}:
             v = kwargs.get(f)
             if isinstance(v, dict):
-                kwargs[f] = urlencode(v)
+
+                ev = urlencode(v)
+                # / is reserved char within query
+                if f == 'fragment' and '%2F' not in str(v):
+                    # but seems to be ok'ish within the fragment which is
+                    # the last element of URI and anyways used only by the
+                    # client (i.e. by us here if used to compose the URL)
+                    # so let's return / back for clarity if there were no
+                    # awkward %2F to startwith
+                    ev = ev.replace('%2F', '/')
+                kwargs[f] = ev
 
         # set them to provided values
         for f in self._FIELDS:
