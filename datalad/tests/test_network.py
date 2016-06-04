@@ -100,40 +100,69 @@ def test_url_eq():
     neq_(URL(), URL(hostname='x'))
 
 
+def _check_url(url, **fields):
+    """just a helper to carry out few checks on urls"""
+    url_ = URL(**fields)
+    eq_(URL(url), url_)
+    eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
+    eq_(url, str(url_))  # that we can reconstruct it
+
+
 def test_url():
     assert_raises(ValueError, URL, "http://example.com", hostname="example.com")
     eq_(repr(URL("http://example.com")), "URL(hostname='example.com', scheme='http')")
-    eq_(URL("http://example.com"), URL(scheme='http', hostname="example.com"))
+    _check_url("http://example.com", scheme='http', hostname="example.com")
     eq_(URL("http://example.com"), "http://example.com")  # automagic coercion in __eq__
     neq_(URL(), URL(hostname='x'))
     # "complete" one for classical http
-    eq_(URL("http://user:pw@example.com/p/sp?p1=v1&p2=v2#frag"),
-        URL(scheme='http', hostname="example.com", username='user', password='pw', path='/p/sp', query='p1=v1&p2=v2', fragment='frag'))
+    _check_url("http://user:pw@example.com/p/sp?p1=v1&p2=v2#frag",
+        scheme='http', hostname="example.com", username='user', password='pw', path='/p/sp', query='p1=v1&p2=v2', fragment='frag')
 
     # sample one for ssh with specifying the scheme
     # XXX? might be useful?  https://github.com/FriendCode/giturlparse.py
-    eq_(URL("ssh://host/path/sp1"), URL(scheme='ssh', hostname='host', path='/path/sp1'))
-    eq_(URL("user@host:path/sp1"), URL(scheme='ssh:implicit', hostname='host', path='path/sp1', username='user'))
-    eq_(URL("host:path/sp1"), URL(scheme='ssh:implicit', hostname='host', path='path/sp1'))
-    eq_(URL("host:path"), URL(scheme='ssh:implicit', hostname='host', path='path'))
-    eq_(URL("host:/path"), URL(scheme='ssh:implicit', hostname='host', path='/path'))
+    _check_url("ssh://host/path/sp1", scheme='ssh', hostname='host', path='/path/sp1')
+    _check_url("user@host:path/sp1",
+               scheme='ssh:implicit', hostname='host', path='path/sp1', username='user')
+    _check_url("host:path/sp1", scheme='ssh:implicit', hostname='host', path='path/sp1')
+    _check_url("host:path", scheme='ssh:implicit', hostname='host', path='path')
+    _check_url("host:/path", scheme='ssh:implicit', hostname='host', path='/path')
     # TODO!!!  should this be a legit URL like this?
-    # eq_(URL("host"), URL(scheme='ssh:implicit', hostname='host'))
+    # _check_url("host", scheme='ssh:implicit', hostname='host'))
     eq_(repr(URL("host:path")), "URL(hostname='host', path='path', scheme='ssh:implicit')")
 
     # And now perspective 'datalad:implicit' urls pointing to the canonical center location
-    eq_(URL("///"), URL(scheme='datalad:implicit', path='/'))
-    eq_(URL("///p/s1"), URL(scheme='datalad:implicit', path='/p/s1'))
-    eq_(URL("//a/"), URL(scheme='datalad:implicit', path='/', hostname='a'))
-    eq_(URL("//a/data"), URL(scheme='datalad:implicit', path='/data', hostname='a'))
+    _check_url("///", scheme='datalad:implicit', path='/')
+    _check_url("///p/s1", scheme='datalad:implicit', path='/p/s1')
+    # could be considered by someone as "URI reference" relative to scheme
+    _check_url("//a/", scheme='datalad:implicit', path='/', hostname='a')
+    _check_url("//a/data", scheme='datalad:implicit', path='/data', hostname='a')
 
     # here we will do custom magic allowing only schemes with + in them, such as dl+archive
     # or not so custom as
-    eq_(URL("hg+https://host/user/proj"),
-        URL(scheme="hg+https", hostname='host', path='/user/proj'))
+    _check_url("hg+https://host/user/proj",
+        scheme="hg+https", hostname='host', path='/user/proj')
     # "old" style
-    eq_(URL("dl+archive:KEY/path/sp1#size=123"),
-        URL(scheme='dl+archive', path='KEY/path/sp1', fragment='size=123'))
+    _check_url("dl+archive:KEY/path/sp1#size=123",
+        scheme='dl+archive', path='KEY/path/sp1', fragment='size=123')
     # "new" style
-    eq_(URL("dl+archive:KEY#path=path/sp1&size=123"),
-        URL(scheme='dl+archive', path='KEY', fragment='path=path/sp1&size=123'))
+    _check_url("dl+archive:KEY#path=path/sp1&size=123",
+        scheme='dl+archive', path='KEY', fragment='path=path/sp1&size=123')
+
+    #https://en.wikipedia.org/wiki/File_URI_scheme
+    _check_url("file://host", scheme='file', hostname='host')
+    _check_url("file://host/path/sp1", scheme='file', hostname='host', path='/path/sp1')
+    _check_url("file:///path/sp1", scheme='file', path='/path/sp1')
+    _check_url("file:///~/path/sp1", scheme='file', path='/~/path/sp1')
+    # not sure but let's check
+    _check_url("file:///c:/path/sp1", scheme='file', path='/c:/path/sp1')
+
+    # and now implicit paths or actually they are also "URI references"
+    _check_url("f", scheme='file:implicit', path='f')
+    _check_url("f/s1", scheme='file:implicit', path='f/s1')
+    _check_url("/f", scheme='file:implicit', path='/f')
+    _check_url("/f/s1", scheme='file:implicit', path='/f/s1')
+
+    # some github ones, just to make sure
+    _check_url("git://host/user/proj", scheme="git", hostname="host", path="/user/proj")
+    _check_url("git@host:user/proj",
+               scheme="ssh:implicit", hostname="host", path="user/proj", username='git')

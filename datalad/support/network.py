@@ -239,6 +239,7 @@ class SimpleURLStamper(object):
             r.close()
 
 #@auto_repr
+# TODO: Well -- it is more of a URI than URL I guess
 class URL(object):
     """A helper class to deal with URLs with some "magical" treats to facilitate use of "ssh" urls
 
@@ -322,6 +323,13 @@ class URL(object):
             url = '//' + url
         return url
 
+    def __str_file__(self):
+        """Custom str for datalad:implicit"""
+        fields = self._to_fields()
+        fields['scheme'] = None
+        url = urlunparse(self._fields_to_pr(fields))
+        return url
+
     def __str__(self):
         if not self.is_implicit:
             return urlunparse(self._to_pr())
@@ -389,7 +397,9 @@ class URL(object):
         lgr.log(5, "Parsed url %s into fields %s" % (url, fields))
 
         # Special treatments
-        if fields['scheme'] and not fields['hostname']:
+        # file:///path should stay file:
+        if fields['scheme'] and fields['scheme'] not in {'file'} \
+                and not fields['hostname']:
             # dl+archive:... or just for ssh   hostname:path/p1
             if '+' not in fields['scheme']:
                 fields['hostname'] = fields['scheme']
@@ -400,9 +410,11 @@ class URL(object):
             if fields['path'] and '@' in fields['path']:
                 # user@host:path/sp1
                 fields['scheme'] = 'ssh:implicit'
-            else:
+            elif url.startswith('//'):
                 # e.g. // or ///path
                 fields['scheme'] = 'datalad:implicit'
+            else:
+                fields['scheme'] = 'file:implicit'
 
         if not fields['scheme'] and fields['hostname']:
             # e.g. //a/path
