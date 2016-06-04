@@ -21,7 +21,6 @@ from ..cmdline import helpers
 from ..cmdline.main import _license_info
 
 from ..utils import setup_exceptionhook
-from ..utils import use_cassette
 from ..ui import ui
 
 backends = ['archive']
@@ -100,6 +99,7 @@ def _main(args, backend=None):
         # If no command - run the special remote
         if 'DATALAD_USECASSETTE' in os.environ:
             # optionally feeding it a cassette, used by tests
+            from ..support.vcr_ import use_cassette
             with use_cassette(os.environ['DATALAD_USECASSETTE']):
                 remote.main()
         else:

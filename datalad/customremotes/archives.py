@@ -18,9 +18,9 @@ from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
+lgr.log(5, "Importing datalad.customremotes.archive")
 
-from ..cmd import link_file_load, Runner
-from ..support.exceptions import CommandError
+from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import parse_url_opts
 from ..utils import getpwd
@@ -301,3 +301,5 @@ from .main import main as super_main
 def main():
     """cmdline entry point"""
     super_main(backend="archive")
+
+lgr.log(5, "Done importing datalad.customremotes.archive")
