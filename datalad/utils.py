@@ -173,43 +173,6 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
             yield path
 
 
-#### windows workaround ###
-# TODO: There should be a better way
-def get_local_file_url(fname):
-    """Return OS specific URL pointing to a local file
-
-    Parameters
-    ----------
-    fname : string
-        Full filename
-    """
-    if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % urlquote(fname_rep)
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
-    else:
-        furl = "file://%s" % urlquote(fname)
-    return furl
-
-
-def get_local_path_from_url(url):
-    """If given a file:// URL, returns a local path, if possible.
-
-    Raises `ValueError` if not possible, for example, if the URL
-    scheme is different, or if the `host` isn't empty or 'localhost'
-
-    The returned path is always absolute.
-    """
-    urlparts = urlsplit(url)
-    if not urlparts.scheme == 'file':
-        raise ValueError(
-            "Non 'file://' URL cannot be resolved to a local path")
-    if not (urlparts.netloc in ('', 'localhost', '::1') \
-            or urlparts.netloc.startswith('127.')):
-        raise ValueError("file:// URL does not point to 'localhost'")
-    return urlunquote(urlparts.path)
-
-
 def expandpath(path, force_absolute=True):
     """Expand all variables and user handles in a path.
 

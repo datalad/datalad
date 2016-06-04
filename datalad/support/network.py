@@ -15,6 +15,8 @@ import re
 import shutil
 import time
 
+from os.path import abspath
+
 from six import string_types
 from six import iteritems
 from six.moves.urllib.request import urlopen, Request
@@ -23,6 +25,8 @@ from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlu
 from six.moves.urllib.parse import parse_qs
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
+
+from datalad.tests.utils import on_windows
 
 from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
@@ -239,6 +243,10 @@ class SimpleURLStamper(object):
             return dict(mtime=r_stamp['mtime'], size=r_stamp['size'], url=url)
         finally:
             r.close()
+
+
+# TODO:  make it consistent/clear at what stage % encoding/decoding happens!
+# now it is a mix!
 
 #@auto_repr
 # TODO: Well -- it is more of a URI than URL I guess
@@ -559,3 +567,38 @@ def is_url(s):
     return scheme in {'ssh:implicit'} or (not implicit and bool(url))
 
 
+#### windows workaround ###
+# TODO: There should be a better way
+def get_local_file_url(fname):
+    """Return OS specific URL pointing to a local file
+
+    Parameters
+    ----------
+    fname : string
+        Full filename
+    """
+    if on_windows:
+        fname_rep = fname.replace('\\', '/')
+        furl = "file:///%s" % urlquote(fname_rep)
+        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
+    else:
+        return str(URL(scheme='file', path=abspath(fname)))
+    return furl
+
+
+def get_local_path_from_url(url):
+    """If given a file:// URL, returns a local path, if possible.
+
+    Raises `ValueError` if not possible, for example, if the URL
+    scheme is different, or if the `host` isn't empty or 'localhost'
+
+    The returned path is always absolute.
+    """
+    urlparts = urlsplit(url)
+    if not urlparts.scheme == 'file':
+        raise ValueError(
+            "Non 'file://' URL cannot be resolved to a local path")
+    if not (urlparts.netloc in ('', 'localhost', '::1') \
+            or urlparts.netloc.startswith('127.')):
+        raise ValueError("file:// URL does not point to 'localhost'")
+    return urlunquote(urlparts.path)

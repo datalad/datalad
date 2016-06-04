@@ -23,10 +23,8 @@ from collections import OrderedDict
 
 from ..dochelpers import exc_str
 from ..utils import updated
-from ..utils import get_local_file_url
 from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
-from ..utils import get_local_path_from_url
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
@@ -169,22 +167,6 @@ def test_updated():
     d_ = updated(d, {0: 1})
     ok_(isinstance(d_, OrderedDict))
     eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
-
-def test_get_local_file_url_linux():
-    assert_equal(get_local_file_url('/a'), 'file:///a')
-    assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
-    assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
-    assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
-
-def test_get_local_path_from_url():
-    assert_raises(ValueError, get_local_path_from_url, 'http://some')
-    assert_raises(ValueError, get_local_path_from_url, 'file://elsewhere/some')
-    # invalid URL -- is it?  just that 'hostname' is some and no path
-    assert_raises(ValueError, get_local_path_from_url, 'file://some')
-    assert_equal(get_local_path_from_url('file:///some'), '/some')
-    assert_equal(get_local_path_from_url('file://localhost/some'), '/some')
-    assert_equal(get_local_path_from_url('file://::1/some'), '/some')
-    assert_equal(get_local_path_from_url('file://127.3.4.155/some'), '/some')
 
 
 def test_get_local_file_url_windows():

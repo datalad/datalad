@@ -23,7 +23,8 @@ from ..support.network import parse_url_opts
 from ..support.network import URL
 from ..support.network import _split_colon
 from ..support.network import is_url
-
+from ..support.network import get_local_file_url
+from ..support.network import get_local_path_from_url
 
 def test_same_website():
     ok_(same_website("http://a.b", "http://a.b/2014/01/xxx/"))
@@ -244,4 +245,23 @@ def test_is_url():
     nok_(is_url('like@sshlogin'))
     nok_(is_url(''))
     nok_(is_url(' '))
+
+
+def test_get_local_file_url_linux():
+    eq_(get_local_file_url('/a'), 'file:///a')
+    eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')
+    eq_(get_local_file_url('/a~'), 'file:///a%7E')
+    eq_(get_local_file_url('/a b/'), 'file:///a%20b/')
+
+
+def test_get_local_path_from_url():
+    assert_raises(ValueError, get_local_path_from_url, 'http://some')
+    assert_raises(ValueError, get_local_path_from_url, 'file://elsewhere/some')
+    # invalid URL -- is it?  just that 'hostname' is some and no path
+    assert_raises(ValueError, get_local_path_from_url, 'file://some')
+    eq_(get_local_path_from_url('file:///some'), '/some')
+    eq_(get_local_path_from_url('file://localhost/some'), '/some')
+    eq_(get_local_path_from_url('file://::1/some'), '/some')
+    eq_(get_local_path_from_url('file://127.3.4.155/some'), '/some')
+
 
