@@ -30,8 +30,8 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
-    is_explicit_path, on_windows, swallow_logs, get_local_path_from_url, \
-    is_url
+    is_explicit_path, on_windows, swallow_logs, get_local_path_from_url
+from datalad.support.network import is_url
 
 lgr = logging.getLogger('datalad.distribution.install')
 

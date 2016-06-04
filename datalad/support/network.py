@@ -301,7 +301,7 @@ class URL(object):
 
     def __repr__(self):
         # since auto_repr doesn't support "non-0" values atm
-        fields = self._to_fields()
+        fields = self.to_fields()
         return "%s(%s)" % (
             self.__class__.__name__,
             ", ".join(["%s=%r" % (k, v) for k, v in sorted(fields.items()) if v]))
@@ -309,7 +309,7 @@ class URL(object):
     # Some custom __str__s for :implicit URLs
     def __str_ssh__(self):
         """Custom str for ssh:implicit"""
-        url = urlunparse(self._to_pr())
+        url = urlunparse(self.to_pr())
         pref = 'ssh:implicit://'
         assert(url.startswith(pref))
         url = url[len(pref):]
@@ -321,7 +321,7 @@ class URL(object):
 
     def __str_datalad__(self):
         """Custom str for datalad:implicit"""
-        fields = self._to_fields()
+        fields = self.to_fields()
         fields['scheme'] = None
         url = urlunparse(self._fields_to_pr(fields))
         if not self.hostname:
@@ -331,14 +331,14 @@ class URL(object):
 
     def __str_file__(self):
         """Custom str for datalad:implicit"""
-        fields = self._to_fields()
+        fields = self.to_fields()
         fields['scheme'] = None
         url = urlunparse(self._fields_to_pr(fields))
         return url
 
     def __str__(self):
         if not self.is_implicit:
-            return urlunparse(self._to_pr())
+            return urlunparse(self.to_pr())
         else:
             base_scheme = self.scheme.split(':', 1)[0]
             try:
@@ -388,11 +388,11 @@ class URL(object):
         for f in self._FIELDS:
             setattr(self, f, kwargs.get(f, None))
 
-    def _to_fields(self):
+    def to_fields(self):
         return {f: getattr(self, f) for f in self._FIELDS}
 
-    def _to_pr(self):
-        return self._fields_to_pr(self._to_fields())
+    def to_pr(self):
+        return self._fields_to_pr(self.to_fields())
 
     @classmethod
     def _fields_to_pr(cls, fields):
@@ -534,14 +534,13 @@ def _split_colon(s, maxsplit=1):
 
 def parse_url_opts(url):
     """Given a string with url-style query, split into content before # and options as dict"""
-    if '?' in url:
-        url_, attrs_str = url.split('?', 1)
-        opts = dict(x.split('=', 1) for x in attrs_str.split('&'))
-        if 'size' in opts:
-            opts['size'] = int(opts['size'])
-    else:
-        url_, opts = url, {}
-    return url_, opts
+    url = URL(url)
+    # we need to filter out query and fragment to get the base url
+    fields = url.to_fields()
+    fields.pop('query')
+    fields.pop('fragment')
+    opts = url.query_dict
+    return str(URL(**fields)), opts
 
 
 # TODO: should we just define URL.good_for_git or smth like that? ;)
