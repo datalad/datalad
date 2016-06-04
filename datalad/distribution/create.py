@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 import os
-from datalad.distribution.dataset import Dataset, datasetmethod
+from datalad.distribution.dataset import Dataset, datasetmethod, EnsureDataset
 from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.param import Parameter
@@ -29,20 +29,22 @@ class Create(Interface):
     """
 
     _params_ = dict(
-        path=Parameter(
-            args=("path",),
-            doc="""path where the dataset shall be  created. If `None`,
-            a dataset will be created in the current working directory.
-            """,
+        loc=Parameter(
+            args=("loc",),
+            doc="""location where the dataset shall be  created. If `None`,
+            a dataset will be created in the current working directory.""",
             nargs="*",
-            constraints=EnsureStr() | EnsureNone()))
+            # put dataset 2nd to avoid useless conversion
+            constraints=EnsureStr() | EnsureDataset() | EnsureNone()))
 
     @staticmethod
-    @datasetmethod(name='create')
-    def __call__(path=None):
-        if path is None:
-            path = os.curdir
+    @datasetmethod(name='create', dataset_argname='loc')
+    def __call__(loc=None):
+        if loc is None:
+            loc = os.curdir
+        elif isinstance(loc, Dataset):
+            loc = loc.path
         # always come with annex when created from scratch
-        lgr.info("Creating a new annex repo at %s", path)
-        vcs = AnnexRepo(path, url=None, create=True)
-        return Dataset(path)
+        lgr.info("Creating a new annex repo at %s", loc)
+        vcs = AnnexRepo(loc, url=None, create=True)
+        return Dataset(loc)
