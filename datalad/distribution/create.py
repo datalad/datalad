@@ -37,6 +37,11 @@ class Create(Interface):
             nargs='?',
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
+        description=Parameter(
+            args=("-d", "--description",),
+            doc="""Short description that humans can use to identify the
+            repository/location, e.g. "Precious data on my laptop.""",
+            nargs=1),
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""Flag that if given a plain Git repository will be created
@@ -60,7 +65,7 @@ class Create(Interface):
     @staticmethod
     @datasetmethod(name='create', dataset_argname='loc')
     def __call__(
-            loc=None, no_annex=False, annex_version=None,
+            loc=None, description=None, no_annex=False, annex_version=None,
             annex_backend='MD5E'):
         if loc is None:
             loc = os.curdir
@@ -74,5 +79,5 @@ class Create(Interface):
             lgr.info("Creating a new annex repo at %s", loc)
             vcs = AnnexRepo(
                 loc, url=None, create=True, backend=annex_backend,
-                version=annex_version)
+                version=annex_version, description=description)
         return Dataset(loc)

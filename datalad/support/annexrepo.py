@@ -94,7 +94,7 @@ class AnnexRepo(GitRepo):
     # TODO: pass description
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None, always_commit=True, create=True, init=False,
-                 batch_size=None, version=None):
+                 batch_size=None, version=None, description=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -141,6 +141,10 @@ class AnnexRepo(GitRepo):
 
         version: int, optional
           if given, pass as --version to `git annex init`
+
+        description: str, optional
+          short description that humans can use to identify the
+          repository/location, e.g. "Precious data on my laptop"
         """
         fix_it = False
         try:
@@ -177,7 +181,7 @@ class AnnexRepo(GitRepo):
 
         self.always_commit = always_commit
         if fix_it:
-            self._init(version=version)
+            self._init(version=version, description=description)
             self.fsck()
 
         # Check whether an annex already exists at destination
@@ -191,10 +195,10 @@ class AnnexRepo(GitRepo):
                 if create or init:
                     lgr.debug('Annex repository was not yet initialized at %s.'
                               ' Initializing ...' % self.path)
-                    self._init(version=version)
+                    self._init(version=version, description=description)
             elif create:
                 lgr.debug('Initializing annex repository at %s...' % self.path)
-                self._init(version=version)
+                self._init(version=version, description=description)
             else:
                 raise RuntimeError("No annex found at %s." % self.path)
 
@@ -357,7 +361,7 @@ class AnnexRepo(GitRepo):
         self._direct_mode = None
         assert(self.is_direct_mode() == enable_direct_mode)
 
-    def _init(self, version=None):
+    def _init(self, version=None, description=None):
         """Initializes an annex repository.
 
         Note: This is intended for private use in this class by now.
@@ -369,6 +373,8 @@ class AnnexRepo(GitRepo):
         # TODO: Document (or implement respectively) behaviour in special cases
         # like direct mode (if it's different), not existing paths, etc.
         opts = []
+        if description is not None:
+            opts += [description]
         if version is not None:
             opts += ['--version', '{0}'.format(version)]
         if not len(opts):

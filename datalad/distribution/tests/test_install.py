@@ -28,6 +28,7 @@ from datalad.support.gitrepo import GitCommandError
 from datalad.cmd import Runner
 
 from datalad.support.annexrepo import AnnexRepo
+from datalad.cmd import Runner
 
 from nose.tools import ok_, eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
@@ -94,7 +95,7 @@ def test_create(path):
     ok_clean_git(path, annex=False)
     ok_(isinstance(ds.repo, GitRepo))
 
-    ds = create(path)
+    ds = create(path, description="funny")
     ok_(ds.is_installed())
     ok_clean_git(path, annex=False)
     # any dataset created from scratch has an annex
@@ -103,6 +104,12 @@ def test_create(path):
     assert_equal(
         ds.repo.repo.config_reader().get_value("annex", "backends"),
         'MD5E')
+    runner = Runner()
+    # check description in `info`
+    cmd = ['git-annex', 'info']
+    cmlout = runner.run(cmd, cwd=path)
+    assert_in('funny [here]', cmlout[0])
+
 
     sub_path_1 = opj(path, "sub")
     subds1 = create(sub_path_1)
