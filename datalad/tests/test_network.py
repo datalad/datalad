@@ -201,6 +201,10 @@ def test_url_samples():
                scheme="ssh:implicit", hostname="host", path="user/proj", username='git')
 
     _check_url('weired:/', scheme='ssh:implicit', hostname='weired', path='/')
+    # FAIL?!!!  since schema is not allowing some symbols so we need to add additional
+    # check
+    #_check_url('weired_url:/', scheme='ssh:implicit', hostname='weired_url', path='/')
+
     # check that we are getting a warning logged when url can't be reconstructed
     # precisely
     # actually failed to come up with one -- becomes late here
@@ -209,9 +213,14 @@ def test_url_samples():
     # actually this one is good enough to trigger a warning and I still don't know
     # what it should exactly be!?
     with swallow_logs(new_level=logging.WARNING) as cml:
-        repr(URL('weired://'))
+        weired_str = 'weired://'
+        weired_url = URL(weired_str)
+        repr(weired_url)
         assert_re_in('Parsed version of url .weired. differs from original .weired://.',
                      cml.out)
+        # but we store original str
+        eq_(str(weired_url), weired_str)
+        neq_(weired_url._as_str(), weired_str)
 
 
 def test_url_compose_archive_one():

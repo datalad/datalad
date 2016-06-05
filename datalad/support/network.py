@@ -265,6 +265,8 @@ class SimpleURLStamper(object):
 class URL(object):
     """A helper class to deal with URLs with some "magical" treats to facilitate use of "ssh" urls
 
+    Intended to be a R/O object (i.e. no fields should be changed in-place)
+
     Although largely decorating urlparse.ParseResult, it
     - doesn't mandate providing all parts of the URL
     - doesn't require netloc but rather asks for separate username, password, and hostname
@@ -302,7 +304,7 @@ class URL(object):
         'fragment',
     )
 
-    __slots__ = _FIELDS + ('_fields',)
+    __slots__ = _FIELDS + ('_fields', '_str')
 
     def __init__(self, url=None, **kwargs):
         if url and (bool(url) == bool(kwargs)):
@@ -369,7 +371,15 @@ class URL(object):
         url = urlunparse(self._fields_to_pr(fields))
         return url
 
+    # Lazily evaluated if _str was not set
     def __str__(self):
+        if self._str is None:
+            self._str = self._as_str()
+        return self._str
+
+    def _as_str(self):
+        """Re-evaluate string repsentation"""
+
         if not self.is_implicit:
             return urlunparse(self.to_pr())
         else:
@@ -422,6 +432,7 @@ class URL(object):
                 fields[f] = ev
 
         self._fields.update(fields)
+        self._str = None
 
     def to_pr(self):
         return self._fields_to_pr(self._fields)
@@ -510,14 +521,14 @@ class URL(object):
             lgr.log(5, "Detected ssh style url, adjusted: %s" % (fields,))
 
         self._set_from_fields(**fields)
+        self._str = url
 
         # well -- some urls might not unparse identically back
         # strictly speaking, but let's assume they do
-        url_rec = str(self)
-        # print "REPR: ", repr(self)
-        if url != url_rec:
+        url_ = self._as_str()
+        if url != url_:
             lgr.warning("Parsed version of url %r differs from original %r",
-                        url_rec, url)
+                        url_, url)
 
     #
     # Quick comparators
