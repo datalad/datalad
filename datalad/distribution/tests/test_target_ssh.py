@@ -30,9 +30,8 @@ from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
 from datalad.tests.utils import ok_generator
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module, skip_ssh
-from datalad.tests.utils import ok_clean_git, on_windows, get_local_file_url
+from datalad.tests.utils import skip_ssh
+from datalad.utils import on_windows
 
 
 @skip_ssh
