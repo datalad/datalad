@@ -99,6 +99,10 @@ def test_create(path):
     ok_clean_git(path, annex=False)
     # any dataset created from scratch has an annex
     ok_(isinstance(ds.repo, AnnexRepo))
+    # check default backend
+    assert_equal(
+        ds.repo.repo.config_reader().get_value("annex", "backends"),
+        'MD5E')
 
     sub_path_1 = opj(path, "sub")
     subds1 = create(sub_path_1)

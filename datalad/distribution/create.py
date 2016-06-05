@@ -16,7 +16,7 @@ import logging
 import os
 from datalad.distribution.dataset import Dataset, datasetmethod, EnsureDataset
 from datalad.interface.base import Interface
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
@@ -41,11 +41,27 @@ class Create(Interface):
             args=("--no-annex",),
             doc="""Flag that if given a plain Git repository will be created
             without any annex.""",
-            action='store_false'))
+            action='store_false'),
+        annex_version=Parameter(
+            args=("--annex-version",),
+            doc="""Select particular annex repository version. The list of
+            supported versions depends on the available git-annex version.""",
+            nargs=1,
+            constraints=EnsureDType(int) | EnsureNone()),
+        annex_backend=Parameter(
+            args=("--annex-backend",),
+            # not listing choices here on purpose to avoid future bugs
+            doc="""Set default hashing backend used by the new dataset.
+            For a list of supported backends see the git-annex
+            documentation.""",
+            nargs=1),
+    )
 
     @staticmethod
     @datasetmethod(name='create', dataset_argname='loc')
-    def __call__(loc=None, no_annex=False):
+    def __call__(
+            loc=None, no_annex=False, annex_version=None,
+            annex_backend='MD5E'):
         if loc is None:
             loc = os.curdir
         elif isinstance(loc, Dataset):
@@ -56,5 +72,7 @@ class Create(Interface):
         else:
             # always come with annex when created from scratch
             lgr.info("Creating a new annex repo at %s", loc)
-            vcs = AnnexRepo(loc, url=None, create=True)
+            vcs = AnnexRepo(
+                loc, url=None, create=True, backend=annex_backend,
+                version=annex_version)
         return Dataset(loc)
