@@ -214,8 +214,8 @@ def get_local_path_from_url(url):
 
 def parse_url_opts(url):
     """Given a string with url-style options, split into content before # and options as dict"""
-    if '#' in url:
-        url_, attrs_str = url.split('#', 1)
+    if '?' in url:
+        url_, attrs_str = url.split('?', 1)
         opts = dict(x.split('=', 1) for x in attrs_str.split('&'))
         if 'size' in opts:
             opts['size'] = int(opts['size'])

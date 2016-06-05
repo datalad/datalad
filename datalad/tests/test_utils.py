@@ -32,6 +32,7 @@ from ..utils import get_local_path_from_url
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
+from ..utils import parse_url_opts
 from ..utils import line_profile
 from ..utils import not_supported_on_windows
 from ..utils import file_basename
@@ -51,6 +52,20 @@ from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
+
+
+def test_parse_url_opts():
+    url = 'http://map.org/api/download/?id=157'
+    output = parse_url_opts(url)
+    eq_(output, ('http://map.org/api/download/', {'id': '157'}))
+
+    url = 's3://bucket/save/?key=891'
+    output = parse_url_opts(url)
+    eq_(output, ('s3://bucket/save/', {'key': '891'}))
+
+    url = 'http://map.org/api/download/?id=98&code=13'
+    output = parse_url_opts(url)
+    eq_(output, ('http://map.org/api/download/', {'id': '98', 'code': '13'}))
 
 
 @with_tempfile(mkdir=True)
