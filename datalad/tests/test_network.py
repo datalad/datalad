@@ -113,6 +113,7 @@ def _check_url(url, **fields):
     """just a helper to carry out few checks on urls"""
     url_ = URL(**fields)
     eq_(URL(url), url_)
+    eq_(str(URL(url)), url)
     eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
     eq_(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
     # and that we have access to all those fields
@@ -201,9 +202,19 @@ def test_url_samples():
                scheme="ssh:implicit", hostname="host", path="user/proj", username='git')
 
     _check_url('weired:/', scheme='ssh:implicit', hostname='weired', path='/')
-    # FAIL?!!!  since schema is not allowing some symbols so we need to add additional
-    # check
-    #_check_url('weired_url:/', scheme='ssh:implicit', hostname='weired_url', path='/')
+    # since schema is not allowing some symbols so we need to add additional check
+    _check_url('weired_url:/', scheme='ssh:implicit', hostname='weired_url', path='/')
+    _check_url('example.com:/', scheme='ssh:implicit', hostname='example.com', path='/')
+    _check_url('example.com:path/sp1', scheme='ssh:implicit', hostname='example.com', path='path/sp1')
+    _check_url('example.com/path/sp1\:fname',
+               scheme='file:implicit', path='example.com/path/sp1\:fname')
+    # ssh is as stupid as us, so we will stay "Consistently" dumb
+    """
+    $> ssh example.com/path/sp1:fname
+    ssh: Could not resolve hostname example.com/path/sp1:fname: Name or service not known
+    """
+    _check_url('example.com/path/sp1:fname',
+               scheme='ssh:implicit', hostname='example.com/path/sp1', path='fname')
 
     # check that we are getting a warning logged when url can't be reconstructed
     # precisely

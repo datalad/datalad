@@ -348,10 +348,16 @@ class URL(object):
         pref = 'ssh:implicit://'
         assert(url.startswith(pref))
         url = url[len(pref):]
-        # and we should replace leading /
-        url = url.replace('/',
-                          ':/' if self.path.startswith('/') else ':',
-                          1)
+        # and we should replace leading / after the hostname
+        # Will preserve hostname as is, since we are trying to be as silly as ssh
+        # where it tries to resolve hostnames with /
+        lhostname = len(self.hostname)
+
+        url = url[:lhostname] + \
+              url[lhostname:].replace(
+                  '/',
+                  ':/' if self.path.startswith('/') else ':',
+                  1)
         return url
 
     def __str_datalad__(self):
@@ -477,7 +483,6 @@ class URL(object):
     def _set_from_str(self, url):
         fields = self._pr_to_fields(urlparse(url))
         lgr.log(5, "Parsed url %s into fields %s" % (url, fields))
-
         # Special treatments
         # file:///path should stay file:
         if fields['scheme'] and fields['scheme'] not in {'file'} \
@@ -489,8 +494,11 @@ class URL(object):
                 lgr.log(5, "Assuming ssh style url, adjusted: %s" % (fields,))
 
         if not fields['scheme'] and not fields['hostname']:
-            if fields['path'] and '@' in fields['path']:
+            parts = _split_colon(url)
+            if fields['path'] and '@' in fields['path'] or len(parts) > 1:
                 # user@host:path/sp1
+                # or host_name: (hence parts check)
+                # TODO: we need a regex to catch those really, parts check is not suff
                 fields['scheme'] = 'ssh:implicit'
             elif url.startswith('//'):
                 # e.g. // or ///path
