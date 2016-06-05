@@ -89,10 +89,14 @@ def test_create(path):
     # install doesn't create anymore
     assert_raises(RuntimeError, Dataset(path).install)
     # only needs a path
+    ds = create(path, no_annex=True)
+    ok_(ds.is_installed())
+    ok_clean_git(path, annex=False)
+    ok_(isinstance(ds.repo, GitRepo))
+
     ds = create(path)
     ok_(ds.is_installed())
     ok_clean_git(path, annex=False)
-
     # any dataset created from scratch has an annex
     ok_(isinstance(ds.repo, AnnexRepo))
 
