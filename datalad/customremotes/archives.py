@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 import os
 import re
 from os.path import exists, join as opj, basename, abspath
-
+from collections import OrderedDict
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 
 import logging
@@ -22,7 +22,6 @@ lgr.log(5, "Importing datalad.customremotes.archive")
 
 from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
-from ..support.network import parse_url_opts
 from ..support.network import URL
 from ..utils import getpwd
 from .base import AnnexCustomRemote
@@ -81,11 +80,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 raise ValueError("Provide archive_file or archive_key - not both")
             archive_key = self.repo.get_file_key(archive_file)
         assert(archive_key is not None)
-        attrs = {}  # looking forward for more
-        if size is not None:
-            attrs['size'] = size
+        attrs = OrderedDict()  # looking forward for more
         if file:
             attrs['path'] = file.lstrip('/')
+        if size is not None:
+            attrs['size'] = size
         return str(URL(scheme=self.URL_SCHEME, path=archive_key, fragment=attrs))
 
     @property

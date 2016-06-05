@@ -9,6 +9,8 @@
 
 import logging
 
+from collections import OrderedDict
+
 from .utils import eq_, neq_, ok_, nok_, assert_raises
 from .utils import skip_if_on_windows
 from .utils import swallow_logs
@@ -199,7 +201,8 @@ def test_url():
 
 
 def test_url_compose_archive_one():
-    url = URL(scheme='dl+archive', path='KEY', fragment={'path': 'f/p/ s+', 'size': 30})
+    url = URL(scheme='dl+archive', path='KEY',
+              fragment=OrderedDict((('path', 'f/p/ s+'), ('size', 30))))
     # funny - space is encoded as + but + is %2B
     eq_(str(url), 'dl+archive:KEY#path=f/p/+s%2B&size=30')
     eq_(url.fragment_dict, {'path': 'f/p/ s+', 'size': '30'})
@@ -223,6 +226,7 @@ def test_url_fragments_and_query():
 
 def test_url_dicts():
     eq_(URL("http://host").query_dict, {})
+
 
 @skip_if_on_windows
 def test_get_url_path_on_fileurls():

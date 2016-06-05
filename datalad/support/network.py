@@ -15,18 +15,19 @@ import re
 import shutil
 import time
 
-from os.path import abspath
+from collections import OrderedDict
+from os.path import abspath, isabs
 
 from six import string_types
 from six import iteritems
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 from six.moves.urllib.parse import urljoin, urlparse, urlsplit, urlunsplit, urlunparse, ParseResult
-from six.moves.urllib.parse import parse_qs
+from six.moves.urllib.parse import parse_qsl
 from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
 
-from datalad.tests.utils import on_windows
+from datalad.utils import on_windows
 
 from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
@@ -102,6 +103,7 @@ def get_url_straight_filename(url, strip=[], allowdir=False):
     else:
         return None
 
+
 def get_url_filename(url, headers=None, strip=[]):
     """Get filename from the url, first consulting server about Content-Disposition
     """
@@ -109,6 +111,7 @@ def get_url_filename(url, headers=None, strip=[]):
     if filename:
         return filename
     return get_url_straight_filename(url, strip=[])
+
 
 def get_url_response_stamp(url, response_info):
     size, mtime = None, None
@@ -139,22 +142,24 @@ def get_tld(url):
             raise ValueError("It seems that only the scheme was provided without the net location/TLD")
     return rec.netloc
 
+
 from email.utils import parsedate_tz, mktime_tz
 def rfc2822_to_epoch(datestr):
     """Given rfc2822 date/time format, return seconds since epoch"""
     return mktime_tz(parsedate_tz(datestr))
+
 
 import calendar
 from datetime import datetime
 def iso8601_to_epoch(datestr):
     return calendar.timegm(datetime.strptime(datestr, "%Y-%m-%dT%H:%M:%S.%fZ").timetuple())
 
+
 def __urlopen_requests(url, header_vals=None):
     # XXX Workaround for now for ... broken code
     if isinstance(url, Request):
         url = url.get_full_url()
     return requests.Session().get(url)
-
 
 
 def retry_urlopen(url, retries=3):
@@ -247,6 +252,13 @@ class SimpleURLStamper(object):
 
 # TODO:  make it consistent/clear at what stage % encoding/decoding happens!
 # now it is a mix!
+
+#
+# Useful functionality in requests.models
+#  utils.requote_uri -- quote/unquote cycle to guarantee consistent appearance
+#  RequestEncodingMixin._encode_params -- Will successfully encode parameters when passed as a dict or a list of ...
+#  PreparedRequest().prepare_url(url, params) -- nicely cares about url encodings etc
+#
 
 #@auto_repr
 # TODO: Well -- it is more of a URI than URL I guess
@@ -365,6 +377,9 @@ class URL(object):
 
     def __nonzero__(self):
         return any(getattr(self, f) for f in self._FIELDS)
+
+    # for PY3
+    __bool__ = __nonzero__
 
     #
     # Helpers to deal with internal structures and conversions
@@ -516,7 +531,7 @@ class URL(object):
         """Helper around parse_qs to strip unneeded 'list'ing etc and return a dict of key=values"""
         if not s:
             return {}
-        out = parse_qs(s, 1)
+        out = OrderedDict(parse_qsl(s, 1))
         if not auto_delist:
             return out
         for k in out:
@@ -575,14 +590,16 @@ def get_local_file_url(fname):
     Parameters
     ----------
     fname : string
-        Full filename
+        Filename.  If not absolute, abspath is used
     """
+    fname = fname if isabs(fname) else abspath(fname)
     if on_windows:
         fname_rep = fname.replace('\\', '/')
         furl = "file:///%s" % urlquote(fname_rep)
         lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
     else:
-        return str(URL(scheme='file', path=abspath(fname)))
+        # TODO:  need to fix for all the encoding etc
+        furl = str(URL(scheme='file', path=urlquote(fname)))
     return furl
 
 
