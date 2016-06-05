@@ -138,6 +138,13 @@ def test_create(path):
     assert_raises(InsufficientArgumentsError, install, ds, path=sub_path_2)
 
 
+@with_tempfile
+def test_create_curdir(path):
+    with chpwd(path, mkdir=True):
+        create()
+    ok_(Dataset(path).is_installed())
+
+
 @with_tree(tree={'test.txt': 'some', 'test2.txt': 'other'})
 @with_tempfile(mkdir=True)
 def test_install_plain_git(src, path):
