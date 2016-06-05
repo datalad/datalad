@@ -297,12 +297,12 @@ class URL(object):
         'username',
         'password',
         'hostname', 'port',
-        'path', # 'params',
+        'path',  # 'params',
         'query',
         'fragment',
     )
 
-    __slots__ = _FIELDS
+    __slots__ = _FIELDS + ('_fields',)
 
     def __init__(self, url=None, **kwargs):
         if url and (bool(url) == bool(kwargs)):
@@ -310,6 +310,13 @@ class URL(object):
                 "Specify either url or breakdown from the fields, not both. "
                 "Got url=%r, fields=%r" % (url, kwargs))
 
+        # ok -- let's default to all of them being an empty string
+        # Originally used None to signal no value but it complicated
+        # operations since often needed first a check before e.g. doing
+        # .startswith.  So more harmonic is just to store strings.
+        # Not provided seems to be exactly as empty string, so Ok (stdlib
+        # guys knew what they were doing ;)
+        self._fields = {f: '' for f in self._FIELDS}
         if url:
             self._set_from_str(url)
         else:
@@ -317,14 +324,20 @@ class URL(object):
 
     @property
     def is_implicit(self):
-        return self.scheme and self.scheme.endswith(':implicit')
+        return self._fields['scheme'].endswith(':implicit')
+
+    @property
+    def fields(self):
+        """Returns shallow copy of fields to ease manipulations"""
+        return self._fields.copy()
 
     def __repr__(self):
         # since auto_repr doesn't support "non-0" values atm
-        fields = self.to_fields()
         return "%s(%s)" % (
             self.__class__.__name__,
-            ", ".join(["%s=%r" % (k, v) for k, v in sorted(fields.items()) if v]))
+            ", ".join(["%s=%r" % (k, v)
+                       for k, v in sorted(self._fields.items())
+                       if v]))
 
     # Some custom __str__s for :implicit URLs
     def __str_ssh__(self):
@@ -335,24 +348,24 @@ class URL(object):
         url = url[len(pref):]
         # and we should replace leading /
         url = url.replace('/',
-                          ':/' if self.path and self.path.startswith('/') else ':',
+                          ':/' if self.path.startswith('/') else ':',
                           1)
         return url
 
     def __str_datalad__(self):
         """Custom str for datalad:implicit"""
-        fields = self.to_fields()
-        fields['scheme'] = None
+        fields = self._fields.copy()
+        fields['scheme'] = ''
         url = urlunparse(self._fields_to_pr(fields))
-        if not self.hostname:
+        if not fields['hostname']:
             # was of /// type
             url = '//' + url
         return url
 
     def __str_file__(self):
         """Custom str for datalad:implicit"""
-        fields = self.to_fields()
-        fields['scheme'] = None
+        fields = self._fields.copy()
+        fields['scheme'] = ''
         url = urlunparse(self._fields_to_pr(fields))
         return url
 
@@ -376,7 +389,8 @@ class URL(object):
     #
 
     def __nonzero__(self):
-        return any(getattr(self, f) for f in self._FIELDS)
+        fields = self._fields
+        return any(fields.values())
 
     # for PY3
     __bool__ = __nonzero__
@@ -385,15 +399,15 @@ class URL(object):
     # Helpers to deal with internal structures and conversions
     #
 
-    def _set_from_fields(self, **kwargs):
-        unknown_fields = set(kwargs).difference(self._FIELDS)
+    def _set_from_fields(self, **fields):
+        unknown_fields = set(fields).difference(self._FIELDS)
         if unknown_fields:
             raise ValueError("Do not know about %s. Known fields are: %s"
                              % (unknown_fields, self._FIELDS))
 
         # encode dicts for query or fragment into
         for f in {'query', 'fragment'}:
-            v = kwargs.get(f)
+            v = fields.get(f)
             if isinstance(v, dict):
 
                 ev = urlencode(v)
@@ -405,17 +419,12 @@ class URL(object):
                     # so let's return / back for clarity if there were no
                     # awkward %2F to startwith
                     ev = ev.replace('%2F', '/')
-                kwargs[f] = ev
+                fields[f] = ev
 
-        # set them to provided values
-        for f in self._FIELDS:
-            setattr(self, f, kwargs.get(f, None))
-
-    def to_fields(self):
-        return {f: getattr(self, f) for f in self._FIELDS}
+        self._fields.update(fields)
 
     def to_pr(self):
-        return self._fields_to_pr(self.to_fields())
+        return self._fields_to_pr(self._fields)
 
     @classmethod
     def _fields_to_pr(cls, fields):
@@ -425,12 +434,12 @@ class URL(object):
             netloc += ':' + fields['password']
         if netloc:
             netloc += '@'
-        netloc += fields['hostname'] if fields['hostname'] else ''
+        netloc += fields['hostname']
         if fields['port']:
             netloc += ':%s' % fields['port']
 
         pr_fields = {
-            f: (fields[f] if fields[f] is not None else '')
+            f: fields[f]
             for f in cls._FIELDS
             if f not in ('hostname', 'password', 'username', 'port')
         }
@@ -448,12 +457,11 @@ class URL(object):
             lgr.warning("ParseResults contains params %r, which will be ignored"
                         % (pr.params,))
 
-        def getattrnone(f):
-            """Just a little helper so we could just map and get None if empty"""
-            v = getattr(pr, f)
-            return v if v else None
-
-        return {f: getattrnone(f) for f in self._FIELDS}
+        # can't use just pr._asdict since we care to ask those properties
+        # such as .port , .hostname etc
+        # Forcing '' instead of None since those properties (.hostname), .password,
+        # .username return None if not available and we decided to uniformize
+        return {f: (getattr(pr, f) or '') for f in self._FIELDS}
 
     def _set_from_str(self, url):
         fields = self._pr_to_fields(urlparse(url))
@@ -518,7 +526,7 @@ class URL(object):
     def __eq__(self, other):
         if not isinstance(other, URL):
             other = URL(other)
-        return all(getattr(other, f) == getattr(self, f) for f in self._FIELDS)
+        return other._fields == self._fields
 
     def __ne__(self, other):
         return not (self == other)
@@ -549,6 +557,29 @@ class URL(object):
     def fragment_dict(self):
         return self._parse_qs(self.fragment)
 
+    # def __getattribute__(self, item):
+    #     if item.startswith('_') or item not in URL._FIELDS:
+    #         return super(URL, self).__getattribute__(item)
+    #     else:
+    #         return self._fields[item]
+
+# Bind properties to access fields (without overriding __getattr*)
+# This one doesn't work -- I guess due to absent binding of f value
+# to the context
+#for f in URL._FIELDS:
+#   setattr(URL, f, property(lambda self: self._fields[f]))
+# These work but ugly duplication
+# URL.hostname = property(lambda self: self._fields['hostname'])
+# URL.path = property(lambda self: self._fields['path'])
+# URL.query = property(lambda self: self._fields['query'])
+# URL.scheme = property(lambda self: self._fields['scheme'])
+# URL.fragment = property(lambda self: self._fields['fragment'])
+# URL.username = property(lambda self: self._fields['username'])
+# URL.password = property(lambda self: self._fields['password'])
+# URL.port = property(lambda self: self._fields['port'])
+for f in URL._FIELDS:
+    exec("URL.%s = property(lambda self: self._fields['%s'])" % (f, f))
+
 
 def _split_colon(s, maxsplit=1):
     """Split on unescaped colon"""
@@ -559,7 +590,7 @@ def parse_url_opts(url):
     """Given a string with url-style query, split into content before # and options as dict"""
     url = URL(url)
     # we need to filter out query and fragment to get the base url
-    fields = url.to_fields()
+    fields = url.fields
     fields.pop('query')
     fields.pop('fragment')
     opts = url.query_dict

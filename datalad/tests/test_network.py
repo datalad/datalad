@@ -116,19 +116,33 @@ def _check_url(url, **fields):
     eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
     eq_(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
     # and that we have access to all those fields
+    nok_(set(fields).difference(URL._FIELDS))
     for f, v in fields.items():
         eq_(getattr(url_, f), v)
 
 
-def test_url():
+def test_url_base():
     # Basic checks
     assert_raises(ValueError, URL, "http://example.com", hostname="example.com")
-    eq_(repr(URL("http://example.com")), "URL(hostname='example.com', scheme='http')")
-    eq_(URL("http://example.com"), "http://example.com")  # automagic coercion in __eq__
+
+    url = URL("http://example.com")
+    eq_(url.hostname, 'example.com')
+    eq_(url.scheme, 'http')
+    eq_(url.port, '')  # not specified -- empty strings
+    eq_(url.username, '')  # not specified -- empty strings
+    nok_(url.is_implicit)
+    eq_(repr(url), "URL(hostname='example.com', scheme='http')")
+    eq_(url, "http://example.com")  # automagic coercion in __eq__
+
     neq_(URL(), URL(hostname='x'))
-    ok_(bool(URL('smth')))
+
+    smth = URL('smth')
+    eq_(smth.hostname, '')
+    ok_(bool(smth))
     nok_(bool(URL()))
 
+
+def test_url_samples():
     _check_url("http://example.com", scheme='http', hostname="example.com")
     # "complete" one for classical http
     _check_url("http://user:pw@example.com/p/sp?p1=v1&p2=v2#frag",
@@ -209,15 +223,15 @@ def test_url_compose_archive_one():
 
 
 def test_url_fragments_and_query():
-    url = URL(hostname="host", query={'a': 'x/b', 'b': 'y'})
+    url = URL(hostname="host", query=OrderedDict((('a', 'x/b'), ('b', 'y'))))
     eq_(str(url), '//host?a=x%2Fb&b=y')
     eq_(url.query, 'a=x%2Fb&b=y')
     eq_(url.query_dict, {'a': 'x/b', 'b': 'y'})
 
-    url = URL(hostname="host", fragment={'a': 'x/b', 'b': 'y'})
-    eq_(str(url), '//host#a=x/b&b=y')
-    eq_(url.fragment, 'a=x/b&b=y')
-    eq_(url.fragment_dict, {'a': 'x/b', 'b': 'y'})
+    url = URL(hostname="host", fragment=OrderedDict((('b', 'x/b'), ('a', 'y'))))
+    eq_(str(url), '//host#b=x/b&a=y')
+    eq_(url.fragment, 'b=x/b&a=y')
+    eq_(url.fragment_dict, {'a': 'y', 'b': 'x/b'})
 
     fname = get_most_obscure_supported_name()
     url = URL(hostname="host", fragment={'a': fname})
