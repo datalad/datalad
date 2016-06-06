@@ -54,7 +54,6 @@ class Create(Interface):
             args=("--annex-version",),
             doc="""Select particular annex repository version. The list of
             supported versions depends on the available git-annex version.""",
-            nargs=1,
             constraints=EnsureDType(int) | EnsureNone()),
         annex_backend=Parameter(
             args=("--annex-backend",),
