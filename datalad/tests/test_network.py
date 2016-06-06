@@ -15,6 +15,7 @@ from .utils import eq_, neq_, ok_, nok_, assert_raises
 from .utils import skip_if_on_windows
 from .utils import swallow_logs
 from .utils import assert_re_in
+from .utils import assert_in
 from .utils import get_most_obscure_supported_name
 
 from ..support.network import same_website, dlurljoin
@@ -114,6 +115,7 @@ def _check_url(url, **fields):
     url_ = URL(**fields)
     eq_(URL(url), url_)
     eq_(str(URL(url)), url)
+    eq_(eval(repr(url_)), url)  # repr leads back to identical url_
     eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
     eq_(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
     # and that we have access to all those fields
@@ -142,12 +144,23 @@ def test_url_base():
     ok_(bool(smth))
     nok_(bool(URL()))
 
+    assert_raises(ValueError, str, URL(scheme="unknown:implicit"))
+    assert_raises(ValueError, url._set_from_fields, unknown='1')
+
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        # we don't "care" about params ATM so there is a warning if there are any
+        purl = URL("http://example.com/;param")
+        eq_(str(purl), 'http://example.com/;param')
+        assert_in('ParseResults contains params', cml.out)
+        eq_(purl._as_str(), 'http://example.com/')
 
 def test_url_samples():
     _check_url("http://example.com", scheme='http', hostname="example.com")
     # "complete" one for classical http
-    _check_url("http://user:pw@example.com/p/sp?p1=v1&p2=v2#frag",
-        scheme='http', hostname="example.com", username='user', password='pw', path='/p/sp', query='p1=v1&p2=v2', fragment='frag')
+    _check_url("http://user:pw@example.com:8080/p/sp?p1=v1&p2=v2#frag",
+        scheme='http', hostname="example.com", port=8080,
+        username='user', password='pw', path='/p/sp',
+        query='p1=v1&p2=v2', fragment='frag')
 
     # sample one for ssh with specifying the scheme
     # XXX? might be useful?  https://github.com/FriendCode/giturlparse.py
