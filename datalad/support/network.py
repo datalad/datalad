@@ -388,11 +388,12 @@ class URL(object):
         return url
 
     def __str_file__(self):
-        """Custom str for datalad:implicit"""
-        fields = self._fields.copy()
-        fields['scheme'] = ''
-        url = urlunparse(self._fields_to_pr(fields))
-        return url
+        """Custom str for file:implicit"""
+        fields = self._fields
+        for field in ('username', 'hostname', 'password', 'query', 'fragment'):
+            assert not fields[field], \
+                "file:implicit should not have %s defined. It is %r" % (field, fields[field])
+        return self.path
 
     # Lazily evaluated if _str was not set
     def __str__(self):
@@ -479,7 +480,9 @@ class URL(object):
         }
         pr_fields['netloc'] = netloc
         pr_fields['params'] = ''
-
+        # We need to quote the path
+        pr_fields['path'] = urlquote(pr_fields['path'])
+        # TODO: figure out what to do with query/fragment... one step at a time
         return ParseResult(**pr_fields)
 
     def _pr_to_fields(self, pr):
@@ -552,6 +555,7 @@ class URL(object):
             # we need to unquote some.
             # for field in ('hostname', '')
             # TODO
+            fields['path'] = urlunquote(fields['path'])
             pass
 
         self._set_from_fields(**fields)
@@ -694,7 +698,7 @@ def get_local_file_url(fname):
         lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
     else:
         # TODO:  need to fix for all the encoding etc
-        furl = str(URL(scheme='file', path=urlquote(fname)))
+        furl = str(URL(scheme='file', path=fname))
     return furl
 
 

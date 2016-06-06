@@ -110,14 +110,17 @@ def test_url_eq():
     neq_(URL(), URL(hostname='x'))
 
 
-def _check_url(url, **fields):
+def _check_url(url, exact_str=True, **fields):
     """just a helper to carry out few checks on urls"""
-    url_ = URL(**fields)
-    eq_(URL(url), url_)
-    eq_(str(URL(url)), url)
-    eq_(eval(repr(url_)), url)  # repr leads back to identical url_
-    eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
-    eq_(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
+    with swallow_logs(new_level=logging.WARNING) as cml:
+        url_ = URL(**fields)
+        eq_(URL(url), url_)
+        eq_(str(URL(url)), url)
+        eq_(eval(repr(url_)), url)  # repr leads back to identical url_
+        eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
+        if not exact_str:
+            assert_in('Parsed version of url', cml.out)
+    (eq_ if exact_str else neq_)(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
     # and that we have access to all those fields
     nok_(set(fields).difference(URL._FIELDS))
     for f, v in fields.items():
@@ -201,9 +204,10 @@ def test_url_samples():
     _check_url("file://host", scheme='file', hostname='host')
     _check_url("file://host/path/sp1", scheme='file', hostname='host', path='/path/sp1')
     _check_url("file:///path/sp1", scheme='file', path='/path/sp1')
-    _check_url("file:///~/path/sp1", scheme='file', path='/~/path/sp1')
+    _check_url("file:///~/path/sp1", scheme='file', path='/~/path/sp1', exact_str=False)
+    _check_url("file:///%7E/path/sp1", scheme='file', path='/~/path/sp1')
     # not sure but let's check
-    _check_url("file:///c:/path/sp1", scheme='file', path='/c:/path/sp1')
+    _check_url("file:///c:/path/sp1", scheme='file', path='/c:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
     _check_url("f", scheme='file:implicit', path='f')
@@ -249,18 +253,27 @@ def test_url_samples():
         neq_(weired_url._as_str(), weired_str)
 
 
-def test_url_quote_ssh_paths():
-    path = ' "\';a&b&cd `| '
-    url = URL(scheme="ssh:implicit", hostname="example.com", path=path)
+def _test_url_quote_path(scheme, target_url):
+    path = '/ "\';a&b&cd `| '
+    url = URL(scheme=scheme, hostname="example.com", path=path)
     eq_(url.path, path)
     eq_(url.hostname, 'example.com')
     # all nasty symbols should be quoted
     url_str = str(url)
-    eq_(url_str, r'example.com:\ \"' + r"\'\;a\&b\&cd\ \`\|\ ")
+    eq_(url_str, target_url)
+    # no side-effects:
+    eq_(url.path, path)
+    eq_(url.hostname, 'example.com')
+
     # and unquoted
     url_ = URL(url_str)
     eq_(url_.path, path)
     eq_(url.hostname, 'example.com')
+
+
+def test_url_quote_path():
+    yield _test_url_quote_path, "ssh:implicit", r'example.com:/\ \"' + r"\'\;a\&b\&cd\ \`\|\ "
+    yield _test_url_quote_path, "http", 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'
 
 
 def test_url_compose_archive_one():
