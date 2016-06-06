@@ -255,25 +255,27 @@ def test_url_samples():
 
 def _test_url_quote_path(scheme, target_url):
     path = '/ "\';a&b&cd `| '
-    url = URL(scheme=scheme, hostname="example.com", path=path)
+    hostname = 'example.com' if scheme not in ('file:implicit',) else ''
+    url = URL(scheme=scheme, hostname=hostname, path=path)
     eq_(url.path, path)
-    eq_(url.hostname, 'example.com')
+    eq_(url.hostname, hostname)
     # all nasty symbols should be quoted
     url_str = str(url)
     eq_(url_str, target_url)
     # no side-effects:
     eq_(url.path, path)
-    eq_(url.hostname, 'example.com')
+    eq_(url.hostname, hostname)
 
     # and unquoted
     url_ = URL(url_str)
     eq_(url_.path, path)
-    eq_(url.hostname, 'example.com')
+    eq_(url.hostname, hostname)
 
 
 def test_url_quote_path():
     yield _test_url_quote_path, "ssh:implicit", r'example.com:/\ \"' + r"\'\;a\&b\&cd\ \`\|\ "
     yield _test_url_quote_path, "http", 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'
+    yield _test_url_quote_path, "file:implicit", r'/ "' + r"';a&b&cd `| "  # nothing is done to file:implicit
 
 
 def test_url_compose_archive_one():

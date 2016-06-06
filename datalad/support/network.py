@@ -341,8 +341,8 @@ class URL(object):
             self._set_from_fields(**kwargs)
 
     @classmethod
-    def _get_blank_fields(cls):
-        return OrderedDict(((f, '') for f in cls._FIELDS))
+    def _get_blank_fields(cls, **kwargs):
+        return OrderedDict(((f, kwargs.get(f, '')) for f in cls._FIELDS))
 
     @property
     def is_implicit(self):
@@ -542,14 +542,16 @@ class URL(object):
                     " -- it failed matching regex. Dunno how to handle. Contact developers"
                     % (url,)
                 )
-            fields = self._get_blank_fields()  # reset them all
+            fields = self._get_blank_fields(scheme='ssh:implicit')  # reset them all
             fields.update({k: v for k, v in iteritems(ssh_re.groupdict()) if v})
-            fields['scheme'] = 'ssh:implicit'
             if fields['path'] and fields['path'].startswith('//'):
                 # Let's normalize for now to avoid multiple leading slashes
                 fields['path'] = '/' + fields['path'].lstrip('/')
             # escape path so we have direct representation of the path to work with
             fields['path'] = unescape_ssh_path(fields['path'])
+        elif fields['scheme'] == 'file:implicit':
+            fields = self._get_blank_fields(scheme='file:implicit')  # reset them all
+            fields['path'] = url
         elif not fields['scheme'].endswith(':implicit'):
             # So regular URL -- entries should have been quoted, we need to unquote
             # we need to unquote some.
