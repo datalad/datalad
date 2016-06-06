@@ -27,13 +27,16 @@ lgr = logging.getLogger('datalad.distribution.create')
 class Create(Interface):
     """Create a new dataset.
 
+    This command initializes a new repository at a given location, or the
+    current directory.
     """
 
     _params_ = dict(
         loc=Parameter(
             args=("loc",),
             doc="""location where the dataset shall be  created. If `None`,
-            a dataset will be created in the current working directory.""",
+            is given a dataset will be created in the current working
+            directory.""",
             nargs='?',
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
