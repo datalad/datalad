@@ -126,6 +126,16 @@ Development environment
 
 See [README.md:Dependencies](README.md#Dependencies).
 
+Documentation
+-------------
+
+### Docstrings
+
+We use [NumPy standard] for docstrings.  If you are using PyCharm, set your
+project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
+
+[NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
+
 Additional Hints
 ----------------
 
