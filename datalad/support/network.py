@@ -211,9 +211,10 @@ def dlurljoin(u_path, url):
         # independent full url, so just return it
         return url
     if u_path.endswith('/'):  # should here be also a scheme use?
-        if url.startswith('/'): # jump to the root
+        if url.startswith('/'):  # jump to the root
             u_path_rec = urlparse(u_path)
-            return urljoin(urlunparse((u_path_rec.scheme, u_path_rec.netloc, '','','','')), url)
+            return urljoin(urlunparse(
+                (u_path_rec.scheme, u_path_rec.netloc, '', '', '', '')), url)
         else:
             return os.path.join(u_path, url)
     # TODO: recall where all this dirname came from and bring into the test
@@ -323,6 +324,15 @@ class URL(object):
     __slots__ = _FIELDS + ('_fields', '_str')
 
     def __init__(self, url=None, **kwargs):
+        """
+
+        Parameters
+        ----------
+        url: str
+          String representation of the url
+        **kwargs: dict
+          The values for the fields defined in _FIELDS class variable.
+        """
         if url and (bool(url) == bool(kwargs)):
             raise ValueError(
                 "Specify either url or breakdown from the fields, not both. "
