@@ -287,7 +287,7 @@ class URL(object):
       with `location` (if not empty) identifying the remote (super)dataset
 
     Implementation:
-    - currently might be overengineered and could be simplified.  Internally keeps
+    - currently might be over-engineered and could be simplified.  Internally keeps
       all values as attributes, but for manipulation in dict (called fields) and converts
       back and forth to ParseResults
     So after we agree on viability of the approach  and collect enough tests we can simplify
@@ -304,6 +304,22 @@ class URL(object):
         'fragment',
     )
 
+    """
+        # fields with their quote/unquote adapters
+        # Ordered just to mimic natural order within standard URI/URL - might come handy?
+        _FIELDS = OrderedDict(
+            ('scheme', (None, None)),
+            ('username', (None, None)),
+            ('password', (None, None)),  # or it needs quote/unquote?
+            ('hostname', (None, None)),
+            ('port', (None, None)),
+            ('path', (urlquote_path, url)),   # grr -- but for ssh ones we don't need to apply the same rules
+            # 'params',
+            'query',
+            'fragment',
+        }
+    """
+
     __slots__ = _FIELDS + ('_fields', '_str')
 
     def __init__(self, url=None, **kwargs):
@@ -318,11 +334,15 @@ class URL(object):
         # .startswith.  So more harmonic is just to store strings.
         # Not provided seems to be exactly as empty string, so Ok (stdlib
         # guys knew what they were doing ;)
-        self._fields = {f: '' for f in self._FIELDS}
+        self._fields = self._get_blank_fields()
         if url:
             self._set_from_str(url)
         else:
             self._set_from_fields(**kwargs)
+
+    @classmethod
+    def _get_blank_fields(cls):
+        return OrderedDict(((f, '') for f in cls._FIELDS))
 
     @property
     def is_implicit(self):
@@ -341,24 +361,21 @@ class URL(object):
                        for k, v in sorted(self._fields.items())
                        if v]))
 
-    # Some custom __str__s for :implicit URLs
+    # Some custom __str__s for :implicit URLs -- begging for subclassing TODO
     def __str_ssh__(self):
         """Custom str for ssh:implicit"""
-        url = urlunparse(self.to_pr())
-        pref = 'ssh:implicit://'
-        assert(url.startswith(pref))
-        url = url[len(pref):]
-        # and we should replace leading / after the hostname
-        # Will preserve hostname as is, since we are trying to be as silly as ssh
-        # where it tries to resolve hostnames with /
-        lhostname = len(self.hostname)
+        fields = self.fields  # copy so we could escape symbols
+        for field in ('password', 'query', 'fragment'):
+            assert not fields[field], \
+                "ssh:implicit should not have %s defined. It is %r" % (field, fields[field])
+        url_fmt = '%(hostname)s'
 
-        url = url[:lhostname] + \
-              url[lhostname:].replace(
-                  '/',
-                  ':/' if self.path.startswith('/') else ':',
-                  1)
-        return url
+        if fields['username']:
+            url_fmt = ("%(username)s@" % fields) + url_fmt
+        if fields['path']:
+            url_fmt += ':%(path)s'
+        fields['path'] = escape_ssh_path(fields['path'])
+        return url_fmt % fields
 
     def __str_datalad__(self):
         """Custom str for datalad:implicit"""
@@ -433,7 +450,7 @@ class URL(object):
                     # the last element of URI and anyways used only by the
                     # client (i.e. by us here if used to compose the URL)
                     # so let's return / back for clarity if there were no
-                    # awkward %2F to startwith
+                    # awkward %2F to startswith
                     ev = ev.replace('%2F', '/')
                 fields[f] = ev
 
@@ -489,7 +506,6 @@ class URL(object):
                 and not fields['hostname']:
             # dl+archive:... or just for ssh   hostname:path/p1
             if '+' not in fields['scheme']:
-                fields['hostname'] = fields['scheme']
                 fields['scheme'] = 'ssh:implicit'
                 lgr.log(5, "Assuming ssh style url, adjusted: %s" % (fields,))
 
@@ -510,23 +526,33 @@ class URL(object):
             # e.g. //a/path
             fields['scheme'] = 'datalad:implicit'
 
-        if fields['scheme'] in ('ssh:implicit',) and not fields['hostname']:
-            if fields['query'] or fields['fragment']:
-                # actually might be legit with some obscure filenames,
-                # so TODO for correct -- probably just re.match the entire url
-                # into fields
-                raise ValueError("Thought that this url would point to host:path but got query and fragments: %s"
-                                 % str(fields))
-            #  user@hostname[:path] --> ssh://user@hostname[/path]
-            parts = _split_colon(url)
+        if fields['scheme'] == 'ssh:implicit':
+            # just parse the url according to regex matchint ssh "url" specs
+            lgr.log(5, "Detected ssh style url")
+            ssh_re = re.match(
+                r'((?P<username>\S*)@)?(?P<hostname>[^:]+)(\:(?P<path>.*))?$',
+                url)
+            if not ssh_re:
+                # TODO: custom error?
+                raise ValueError(
+                    "Possibly incorrectly determined url %r to be ssh:internal"
+                    " -- it failed matching regex. Dunno how to handle. Contact developers"
+                    % (url,)
+                )
+            fields = self._get_blank_fields()  # reset them all
+            fields.update({k: v for k, v in iteritems(ssh_re.groupdict()) if v})
             fields['scheme'] = 'ssh:implicit'
-            if len(parts) == 2:
-                fields['hostname'] = parts[0]
-                fields['path'] = parts[1]
-            # hostname might still contain the password
-            if fields['hostname'] and '@' in fields['hostname']:
-                fields['username'], fields['hostname'] = fields['hostname'].split('@', 1)
-            lgr.log(5, "Detected ssh style url, adjusted: %s" % (fields,))
+            if fields['path'] and fields['path'].startswith('//'):
+                # Let's normalize for now to avoid multiple leading slashes
+                fields['path'] = '/' + fields['path'].lstrip('/')
+            # escape path so we have direct representation of the path to work with
+            fields['path'] = unescape_ssh_path(fields['path'])
+        elif not fields['scheme'].endswith(':implicit'):
+            # So regular URL -- entries should have been quoted, we need to unquote
+            # we need to unquote some.
+            # for field in ('hostname', '')
+            # TODO
+            pass
 
         self._set_from_fields(**fields)
         self._str = url
@@ -545,7 +571,7 @@ class URL(object):
     def __eq__(self, other):
         if not isinstance(other, URL):
             other = URL(other)
-        return other._fields == self._fields
+        return dict(other._fields) == dict(self._fields)
 
     def __ne__(self, other):
         return not (self == other)
@@ -603,6 +629,25 @@ for f in URL._FIELDS:
 def _split_colon(s, maxsplit=1):
     """Split on unescaped colon"""
     return re.compile(r'(?<!\\):').split(s, maxsplit=maxsplit)
+
+# \ should be first to deal with
+_SSH_ESCAPED_CHARACTERS = '\\#&;`|*?~<>^()[]{}$\'" '
+
+# TODO: RF using re.sub
+def escape_ssh_path(path):
+    """Escape all special characters present in the path"""
+    for c in _SSH_ESCAPED_CHARACTERS:
+        if c in path:
+            path = path.replace(c, '\\' + c)
+    return path
+
+
+def unescape_ssh_path(path):
+    """Un-escape all special characters present in the path"""
+    for c in _SSH_ESCAPED_CHARACTERS[::-1]:
+        if c in path:
+            path = path.replace('\\' + c, c)
+    return path
 
 
 def parse_url_opts(url):

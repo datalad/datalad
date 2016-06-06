@@ -154,6 +154,7 @@ def test_url_base():
         assert_in('ParseResults contains params', cml.out)
         eq_(purl._as_str(), 'http://example.com/')
 
+
 def test_url_samples():
     _check_url("http://example.com", scheme='http', hostname="example.com")
     # "complete" one for classical http
@@ -170,6 +171,7 @@ def test_url_samples():
     _check_url("host:path/sp1", scheme='ssh:implicit', hostname='host', path='path/sp1')
     _check_url("host:path", scheme='ssh:implicit', hostname='host', path='path')
     _check_url("host:/path", scheme='ssh:implicit', hostname='host', path='/path')
+    _check_url("user@host", scheme='ssh:implicit', hostname='host', username='user')
     # TODO!!!  should this be a legit URL like this?
     # _check_url("host", scheme='ssh:implicit', hostname='host'))
     eq_(repr(URL("host:path")), "URL(hostname='host', path='path', scheme='ssh:implicit')")
@@ -240,11 +242,25 @@ def test_url_samples():
         weired_str = 'weired://'
         weired_url = URL(weired_str)
         repr(weired_url)
-        assert_re_in('Parsed version of url .weired. differs from original .weired://.',
+        assert_re_in('Parsed version of url .weired:/. differs from original .weired://.',
                      cml.out)
         # but we store original str
         eq_(str(weired_url), weired_str)
         neq_(weired_url._as_str(), weired_str)
+
+
+def test_url_quote_ssh_paths():
+    path = ' "\';a&b&cd `| '
+    url = URL(scheme="ssh:implicit", hostname="example.com", path=path)
+    eq_(url.path, path)
+    eq_(url.hostname, 'example.com')
+    # all nasty symbols should be quoted
+    url_str = str(url)
+    eq_(url_str, r'example.com:\ \"' + r"\'\;a\&b\&cd\ \`\|\ ")
+    # and unquoted
+    url_ = URL(url_str)
+    eq_(url_.path, path)
+    eq_(url.hostname, 'example.com')
 
 
 def test_url_compose_archive_one():
@@ -293,7 +309,7 @@ def test_is_url():
         ok_(is_url('weired://'))
     nok_(is_url('relative'))
     nok_(is_url('/absolute'))
-    nok_(is_url('like@sshlogin'))
+    ok_(is_url('like@sshlogin'))  # actually we do allow ssh:implicit urls ATM
     nok_(is_url(''))
     nok_(is_url(' '))
 
