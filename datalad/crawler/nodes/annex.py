@@ -240,8 +240,9 @@ class Annexificator(object):
         # Well -- different annexifiers might have different ideas for the backend, but
         # then those could be overriden via options
 
-        if (len(listdir(path))) > 0 and (not allow_dirty):
-            raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
+        if not exists(opj(path, '.git')):
+            if (len(listdir(path))) > 0 and (not allow_dirty):
+                raise RuntimeError("Directory %s is not empty.")
 
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
 
@@ -261,6 +262,10 @@ class Annexificator(object):
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
         self.yield_non_updated = yield_non_updated
+
+        if (not allow_dirty) and self.repo.dirty:
+            raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
+
         self.statusdb = statusdb
         self._statusdb = None  # actual DB to be instantiated later
 
