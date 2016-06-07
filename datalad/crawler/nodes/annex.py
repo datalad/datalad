@@ -13,6 +13,7 @@ via Annexificator class, which could be used to add files, checkout branches etc
 
 import os
 import time
+from os import listdir
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os.path import isdir, islink
@@ -238,6 +239,10 @@ class Annexificator(object):
         # give that duty to the handle initialization routine to change default backend?
         # Well -- different annexifiers might have different ideas for the backend, but
         # then those could be overriden via options
+
+        if (len(listdir(path))) > 0 and (not allow_dirty):
+            raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
+
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
 
         git_remotes = self.repo.git_get_remotes()
@@ -256,10 +261,6 @@ class Annexificator(object):
         # TODO: may be should be a lazy centralized instance?
         self._providers = Providers.from_config_files()
         self.yield_non_updated = yield_non_updated
-
-        if (not allow_dirty) and self.repo.dirty:
-            raise RuntimeError("Repository %s is dirty.  Finalize your changes before running this pipeline" % path)
-
         self.statusdb = statusdb
         self._statusdb = None  # actual DB to be instantiated later
 

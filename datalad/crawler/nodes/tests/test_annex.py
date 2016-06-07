@@ -30,7 +30,7 @@ from ....support.annexrepo import AnnexRepo
 @with_tempfile(mkdir=True)
 def test_annexificator_no_git_if_dirty(outdir):
 
-    eq_(listdir(outdir), [])     # directory is new and empty
+    eq_(listdir(outdir), [])
 
     filepath = opj(outdir, 'myfile.txt')
     with open(filepath, 'w') as f:
@@ -39,7 +39,7 @@ def test_annexificator_no_git_if_dirty(outdir):
     eq_(listdir(outdir), ['myfile.txt'])
 
     assert_raises(RuntimeError, Annexificator, path=outdir)
-    eq_(listdir(outdir), ['myfile.txt'])      # AssertionError: ['.git', 'myfile.txt'] != ['myfile.txt']
+    eq_(listdir(outdir), ['myfile.txt'])
 
 
 @with_tempfile(mkdir=True)
