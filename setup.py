@@ -123,19 +123,23 @@ class BuildManPage(Command):
     description = 'Generate man page from an ArgumentParser instance.'
 
     user_options = [
-        ('output_path=', None, 'output path'),
+        ('man_path=', None, 'output path for manpages'),
+        ('rst_path=', None, 'output path for RST files'),
         ('parser=', None, 'module path to an ArgumentParser instance'
          '(e.g. mymod:func, where func is a method or function which return'
          'a dict with one or more arparse.ArgumentParser instances.'),
     ]
 
     def initialize_options(self):
-        self.output_path = None
+        self.man_path = None
+        self.rst_path = None
         self.parser = None
 
     def finalize_options(self):
-        if self.output_path is None:
-            raise DistutilsOptionError('\'output_path\' option is required')
+        if self.man_path is None:
+            raise DistutilsOptionError('\'man_path\' option is required')
+        if self.rst_path is None:
+            raise DistutilsOptionError('\'rst_path\' option is required')
         if self.parser is None:
             raise DistutilsOptionError('\'parser\' option is required')
         mod_name, func_name = self.parser.split(':')
@@ -149,38 +153,38 @@ class BuildManPage(Command):
         except ImportError as err:
             raise err
 
-        self.announce('Writing man page(s) to %s' % self.output_path)
+        self.announce('Writing man page(s) to %s' % self.man_path)
         self._today = datetime.date.today()
 
     def run(self):
 
         dist = self.distribution
-        homepage = dist.get_url()
+        #homepage = dist.get_url()
         #appname = self._parser.prog
         appname = 'datalad'
 
         sections = {
-            'authors': """{0} is developed by {1} <{2}>.""".format(
+            'Authors': """{0} is developed by {1} <{2}>.""".format(
                 appname, dist.get_author(), dist.get_author_email()),
         }
 
         dist = self.distribution
-        if not os.path.exists(self.output_path):
-            os.makedirs(self.output_path)
-
-        for cmdname in self._parser:
-            p = self._parser[cmdname]
-            mpf = ManPageFormatter(cmdname,
-                                   desc=dist.get_description(),
-                                   long_desc=dist.get_long_description(),
-                                   ext_sections=sections)
-            m = mpf.format_man_page(p)
-
-            with open(opj(self.output_path, '{0}{1}.1'.format(
-                            'datalad-' if cmdname != 'datalad' else '',
-                            cmdname)),
-                      'w') as f:
-                f.write(m)
+        for cls, opath, ext in ((ManPageFormatter, self.man_path, '1'),
+                                (RSTManPageFormatter, self.rst_path, 'rst')):
+            if not os.path.exists(opath):
+                os.makedirs(opath)
+            for cmdname in self._parser:
+                p = self._parser[cmdname]
+                cmdname = "{0}{1}".format(
+                    'datalad-' if cmdname != 'datalad' else '',
+                    cmdname)
+                format = cls(cmdname, ext_sections=sections)
+                formatted = format.format_man_page(p)
+                with open(opj(opath, '{0}.{1}'.format(
+                            cmdname,
+                            ext)),
+                          'w') as f:
+                    f.write(formatted)
 
 
 class ManPageFormatter(argparse.HelpFormatter):
@@ -217,8 +221,6 @@ class ManPageFormatter(argparse.HelpFormatter):
                  max_help_position=24,
                  width=None,
                  section=1,
-                 desc=None,
-                 long_desc=None,
                  ext_sections=None,
                  authors=None,
                  ):
@@ -228,8 +230,6 @@ class ManPageFormatter(argparse.HelpFormatter):
         self._prog = prog
         self._section = 1
         self._today = datetime.date.today().strftime('%Y\\-%m\\-%d')
-        self._desc = desc
-        self._long_desc = long_desc
         self._ext_sections = ext_sections
 
     def _get_formatter(self, **kwargs):
@@ -344,6 +344,78 @@ class ManPageFormatter(argparse.HelpFormatter):
 #############################################################################
 ## End of manpage generator code ############################################
 #############################################################################
+
+
+class RSTManPageFormatter(ManPageFormatter):
+    def _get_formatter(self, **kwargs):
+        return self.formatter_class(prog=self.prog, **kwargs)
+
+    def _markup(self, txt):
+        # put general tune-ups here
+        return txt
+
+    def _underline(self, string):
+        return "*{0}*".format(string)
+
+    def _bold(self, string):
+        return 'FUCK'
+        return "**{0}**".format(string)
+
+    def _mk_synopsis(self, parser):
+        self.add_usage(parser.usage, parser._actions,
+                       parser._mutually_exclusive_groups, prefix='')
+        usage = self._format_usage(None, parser._actions,
+                                   parser._mutually_exclusive_groups, '')
+
+        usage = usage.replace('%s ' % self._prog, '')
+        usage = 'Synopsis\n--------\n::\n  %s %s\n' % (self._markup(self._prog),
+                                                    usage)
+        return usage
+
+    def _mk_title(self, prog):
+        title = "Manual for {0}".format(prog)
+        title += '\n{0}\n\n'.format('=' * len(title))
+        return title
+
+    def _make_name(self, parser):
+        return ''
+
+    def _mk_description(self, parser):
+        desc = parser.description
+        if not desc:
+            return ''
+        return 'Description\n-----------\n%s\n' % self._markup(desc)
+
+    def _mk_footer(self, sections):
+        if not hasattr(sections, '__iter__'):
+            return ''
+
+        footer = []
+        for section, value in sections.items():
+            part = "\n{0}\n{1}\n{2}\n".format(
+                section,
+                '-' * len(section),
+                value)
+            footer.append(part)
+
+        return '\n'.join(footer)
+
+    def _mk_options(self, parser):
+
+        formatter = parser._get_formatter()
+
+        # positionals, optionals and user-defined groups
+        for action_group in parser._action_groups:
+            formatter.start_section(None)
+            formatter.add_text(None)
+            formatter.add_arguments(action_group._group_actions)
+            formatter.end_section()
+
+        # epilog
+        formatter.add_text(parser.epilog)
+
+        # determine help from format above
+        return 'Options\n-------\n' + formatter.format_help()
 
 setup(
     name="datalad",
