@@ -63,6 +63,8 @@ install:
   - pip install -e .
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
+  # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
+  - pip install sphinx
 
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
@@ -70,6 +72,10 @@ script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   # Verify that we can render manpages
   - make manpages
+  # Generate documentation
+  - cd docs; PYTHONPATH=$PWD/.. make html
+  # Run the doctests in the documentation
+  - PYTHONPATH=$PWD/.. make doctest
 
 after_success:
   - coveralls
