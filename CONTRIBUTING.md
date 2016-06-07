@@ -78,7 +78,9 @@ we outline the workflow used by the developers:
 
          ghremote git@github.com:YourLogin/datalad.git
 
-    to add the above `gh-YourLogin` remote.
+    to add the above `gh-YourLogin` remote.  Additional handy aliases
+    such as `ghpr` (to fetch existing pr from someone's remote) and 
+    `ghsendpr` could be found at [yarikoptic's bash config file](http://git.onerussian.com/?p=etc/bash.git;a=blob;f=.bash/bashrc/30_aliases_sh;hb=HEAD#l865)
 
 3. Create a branch (generally off the `origin/master`) to hold your changes:
 
@@ -123,6 +125,16 @@ Development environment
 -----------------------
 
 See [README.md:Dependencies](README.md#Dependencies).
+
+Documentation
+-------------
+
+### Docstrings
+
+We use [NumPy standard] for docstrings.  If you are using PyCharm, set your
+project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
+
+[NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
 
 Additional Hints
 ----------------
@@ -268,3 +280,6 @@ Various hints for developers
 - for remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
   `python - c "import epdb; epdb.connect()"`
+
+- We are using codecov which has extensions for the popular browsers
+  (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.

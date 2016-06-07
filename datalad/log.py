@@ -10,6 +10,8 @@
 import logging, os, sys, platform
 import logging.handlers
 
+from os.path import basename, dirname
+
 from .utils import is_interactive
 
 __all__ = ['ColorFormatter', 'log']
@@ -17,9 +19,6 @@ __all__ = ['ColorFormatter', 'log']
 # Snippets from traceback borrowed from duecredit which was borrowed from
 # PyMVPA upstream/2.4.0-39-g69ad545  MIT license (the same copyright as DataLad)
 
-import traceback
-import re
-from os.path import basename, dirname
 
 def mbasename(s):
     """Custom function to include directory name if filename is too common
@@ -32,6 +31,7 @@ def mbasename(s):
     if base in set(['base', '__init__']):
         base = basename(dirname(s)) + '.' + base
     return base
+
 
 class TraceBack(object):
     """Customized traceback to be included in debug messages
@@ -49,8 +49,18 @@ class TraceBack(object):
         self.__prev = ""
         self.__collide = collide
 
+        # delayed imports and preparing the regex substitution
+        if collide:
+            import re
+            self.__prefix_re = re.compile('>[^>]*$')
+        else:
+            self.__prefix_re = None
+
+        import traceback
+        self._extract_stack = traceback.extract_stack
+
     def __call__(self):
-        ftb = traceback.extract_stack(limit=100)[:-2]
+        ftb = self._extract_stack(limit=100)[:-2]
         entries = [[mbasename(x[0]), str(x[1])] for x in ftb if mbasename(x[0]) != 'logging.__init__']
         entries = [e for e in entries if e[0] != 'unittest']
 
@@ -67,7 +77,7 @@ class TraceBack(object):
             # lets remove part which is common with previous invocation
             prev_next = sftb
             common_prefix = os.path.commonprefix((self.__prev, sftb))
-            common_prefix2 = re.sub('>[^>]*$', '', common_prefix)
+            common_prefix2 = self.__prefix_re.sub('', common_prefix)
 
             if common_prefix2 != "":
                 sftb = '...' + sftb[len(common_prefix2):]
