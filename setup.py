@@ -367,12 +367,12 @@ class RSTManPageFormatter(ManPageFormatter):
                                    parser._mutually_exclusive_groups, '')
 
         usage = usage.replace('%s ' % self._prog, '')
-        usage = 'Synopsis\n--------\n::\n  %s %s\n' % (self._markup(self._prog),
+        usage = 'Synopsis\n--------\n::\n\n  %s %s\n' % (self._markup(self._prog),
                                                     usage)
         return usage
 
     def _mk_title(self, prog):
-        title = "Manual for {0}".format(prog)
+        title = "{0}".format(prog)
         title += '\n{0}\n\n'.format('=' * len(title))
         return title
 
@@ -415,7 +415,38 @@ class RSTManPageFormatter(ManPageFormatter):
         formatter.add_text(parser.epilog)
 
         # determine help from format above
-        return 'Options\n-------\n' + formatter.format_help()
+        option_sec = formatter.format_help()
+
+        return '\n\nOptions\n-------\n{0}'.format(option_sec)
+
+    def _format_action(self, action):
+        # determine the required width and the entry label
+        action_header = self._format_action_invocation(action)
+
+        # if there was help for the action, add lines of help text
+       # if action.help:
+       #     help_text = self._expand_help(action)
+       #     help_lines = self._split_lines(help_text, help_width)
+       #     parts.append('%*s%s\n' % (indent_first, '', help_lines[0]))
+       #     for line in help_lines[1:]:
+       #         parts.append('%*s%s\n' % (help_position, '', line))
+
+        if action.help:
+            help_text = self._expand_help(action)
+            help_lines = self._split_lines(help_text, 80)
+            help = ' '.join(help_lines)
+        else:
+            help = ''
+
+        # return a single string
+        from datalad.interface.base import dedent_docstring
+        return '{0}\n{1}\n{2}\n\n'.format(
+            action_header,
+            '~' * len(action_header),
+            help)
+        #' '.join([dedent_docstring(s) for s in action.help.split('\n')]) \
+         #       if action.help else '')
+#
 
 setup(
     name="datalad",
