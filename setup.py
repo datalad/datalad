@@ -358,7 +358,6 @@ class RSTManPageFormatter(ManPageFormatter):
         return "*{0}*".format(string)
 
     def _bold(self, string):
-        return 'FUCK'
         return "**{0}**".format(string)
 
     def _mk_synopsis(self, parser):
@@ -402,7 +401,8 @@ class RSTManPageFormatter(ManPageFormatter):
 
     def _mk_options(self, parser):
 
-        formatter = parser._get_formatter()
+        # this non-obvious maneuver is really necessary!
+        formatter = self.__class__(self._prog)
 
         # positionals, optionals and user-defined groups
         for action_group in parser._action_groups:
