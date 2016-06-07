@@ -24,6 +24,21 @@ from ...pipeline import load_pipeline_from_config
 from ....consts import CRAWLER_META_CONFIG_PATH, DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ....support.stats import ActivityStats
 from ....support.annexrepo import AnnexRepo
+from os import listdir
+
+
+@with_tempfile(mkdir=True)
+def test_Annexificator(outdir):
+
+    eq_(listdir(outdir), [])     # directory is new and empty
+
+    filed = open(outdir+'/myfile.txt', 'w+')
+    filed.close
+    eq_(listdir(outdir), ['myfile.txt'])
+
+    assert_raises(RuntimeError, Annexificator, path=outdir)
+    eq_(listdir(outdir), ['myfile.txt'])      # AssertionError: ['.git', 'myfile.txt'] != ['myfile.txt']
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile()

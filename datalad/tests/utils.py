@@ -436,6 +436,7 @@ def without_http_proxy(tfunc):
 
 @optional_args
 def with_tempfile(t, content=None, **tkwargs):
+    # type: (object, object, object) -> object
     """Decorator function to provide a temporary file name and remove it at the end
 
     Parameters
