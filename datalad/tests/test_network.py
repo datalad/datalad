@@ -136,7 +136,7 @@ def test_url_base():
     eq_(url.scheme, 'http')
     eq_(url.port, '')  # not specified -- empty strings
     eq_(url.username, '')  # not specified -- empty strings
-    nok_(url.is_implicit)
+    nok_(url.implicit)
     eq_(repr(url), "URL(hostname='example.com', scheme='http')")
     eq_(url, "http://example.com")  # automagic coercion in __eq__
 

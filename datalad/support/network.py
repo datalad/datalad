@@ -323,7 +323,7 @@ class URL(object):
 
     __slots__ = _FIELDS + ('_fields', '_str')
 
-    def __init__(self, url=None, **kwargs):
+    def __init__(self, url=None, implicit=None, **kwargs):
         """
 
         Parameters
@@ -345,6 +345,7 @@ class URL(object):
         # Not provided seems to be exactly as empty string, so Ok (stdlib
         # guys knew what they were doing ;)
         self._fields = self._get_blank_fields()
+        self._implicit = None
         if url:
             self._set_from_str(url)
         else:
@@ -353,10 +354,6 @@ class URL(object):
     @classmethod
     def _get_blank_fields(cls, **kwargs):
         return OrderedDict(((f, kwargs.get(f, '')) for f in cls._FIELDS))
-
-    @property
-    def is_implicit(self):
-        return self._fields['scheme'].endswith(':implicit')
 
     @property
     def fields(self):
@@ -414,7 +411,7 @@ class URL(object):
     def _as_str(self):
         """Re-evaluate string repsentation"""
 
-        if not self.is_implicit:
+        if not self.implicit:
             return urlunparse(self.to_pr())
         else:
             base_scheme = self.scheme.split(':', 1)[0]
@@ -688,7 +685,7 @@ def is_url(s):
         url = URL(s)
     except:
         return False
-    implicit = url.is_implicit
+    implicit = url.implicit
     scheme = url.scheme
     return scheme in {'ssh:implicit'} or (not implicit and bool(url))
 
