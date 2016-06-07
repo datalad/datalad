@@ -44,6 +44,33 @@ class HelpAction(argparse.Action):
                 "Use '--help' to get more comprehensive information.")
         else:
             helpstr = parser.format_help()
+        # better for help2man
+        # For main command -- should be different sections. And since we are in
+        # heavy output massaging mode...
+        if "commands for dataset operations" in helpstr.lower():
+            opt_args_str = '*Global options*'
+            pos_args_str = '*Commands*'
+            # tune up usage -- default one is way too heavy
+            helpstr = re.sub('^[uU]sage: .*?\n\s*\n',
+                             'Usage: datalad [global-opts] command [command-opts]\n\n',
+                             helpstr,
+                             flags=re.MULTILINE | re.DOTALL)
+            # And altogether remove section with long list of commands
+            helpstr = re.sub(r'positional arguments:\s*\n\s*{.*}\n', '', helpstr)
+        else:
+            opt_args_str = "*Options*"
+            pos_args_str = "*Arguments*"
+        helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
+        helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
+        # convert all heading to have the first character uppercase
+        headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
+        helpstr = re.subn(
+            headpat,
+            lambda match: r'{0}{1}:'.format(match.group(1).upper(),
+                                            match.group(2)),
+            helpstr)[0]
+        # usage is on the same line
+        helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
 
         print(helpstr)
         sys.exit(0)
