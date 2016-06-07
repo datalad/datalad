@@ -89,7 +89,7 @@ class Dataset(object):
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
-            if 'git-annex' in self._repo.git_get_branches():
+            if 'git-annex' in self._repo.get_branches():
                 # we acquired git-annex branch
                 self._repo = AnnexRepo(self._repo.path, create=False)
         return self._repo
@@ -118,9 +118,9 @@ class Dataset(object):
         if verify is not None:
             raise NotImplementedError("TODO: verify not implemented yet")
 
-        if name not in repo.git_get_remotes():
+        if name not in repo.get_remotes():
             # Add remote
-            repo.git_remote_add(name, url)
+            repo.add_remote(name, url)
             if publish_url is not None:
                 # set push url:
                 repo._git_custom_command('', ["git", "remote",
@@ -236,7 +236,7 @@ class Dataset(object):
                 "cannot remember a state when a dataset is not yet installed")
         repo = self.repo
         if auto_add_changes:
-            repo.annex_add('.')
+            repo.add('.')
         repo.commit(message)
         if version:
             repo._git_custom_command('', 'git tag "{0}"'.format(version))
@@ -253,7 +253,7 @@ class Dataset(object):
         if not self.is_installed():
             raise RuntimeError(
                 "cannot remember a state when a dataset is not yet installed")
-        self.repo.git_checkout(whereto)
+        self.repo.checkout(whereto)
 
     def is_installed(self):
         """Returns whether a dataset is installed.

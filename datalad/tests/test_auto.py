@@ -60,9 +60,9 @@ def test_proxying_open_testrepobased(repo):
     os.makedirs(dirname(fpath2))
     with open(fpath2, 'w') as f:
         f.write(content)
-    annex.annex_add(fpath2)
-    annex.annex_drop(fpath2)
-    annex.git_commit("added and dropped")
+    annex.add(fpath2)
+    annex.drop(fpath2)
+    annex.commit("added and dropped")
     assert_raises(IOError, open, fpath2)
 
     # Let's use context manager form
@@ -85,10 +85,10 @@ def _test_proxying_open(generate_load, verify_load, repo):
     generate_load(fpath1)
     os.makedirs(dirname(fpath2))
     generate_load(fpath2)
-    annex.annex_add([fpath1, fpath2])
+    annex.add([fpath1, fpath2])
     verify_load(fpath1)
     verify_load(fpath2)
-    annex.git_commit("Added some files")
+    annex.commit("Added some files")
 
     # clone to another repo
     repo2 = repo + "_2"
@@ -101,7 +101,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
 
     with AutomagicIO():
         # verify that it doesn't even try to get files which do not exist
-        with patch('datalad.support.annexrepo.AnnexRepo.annex_get') as gricm:
+        with patch('datalad.support.annexrepo.AnnexRepo.get') as gricm:
             # if we request absent file
             assert_raises(IOError, open, fpath1_2+"_", 'r')
             # no get should be called
@@ -109,7 +109,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
         verify_load(fpath1_2)
         verify_load(fpath2_2)
         # and even if we drop it -- we still can get it no problem
-        annex2.annex_drop(fpath2_2)
+        annex2.drop(fpath2_2)
         assert_false(annex2.file_has_content(fpath2_2))
         verify_load(fpath2_2)
         assert_true(annex2.file_has_content(fpath2_2))
@@ -117,7 +117,7 @@ def _test_proxying_open(generate_load, verify_load, repo):
     # if we override stdout with something not supporting fileno, like tornado
     # does which ruins using get under IPython
     # TODO: we might need to refuse any online logging in other places like that
-    annex2.annex_drop(fpath2_2)
+    annex2.drop(fpath2_2)
     class StringIOfileno(StringIO):
         def fileno(self):
             raise Exception("I have no clue how to do fileno")

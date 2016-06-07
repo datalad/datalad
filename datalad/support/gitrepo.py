@@ -12,38 +12,52 @@ For further information on GitPython see http://gitpython.readthedocs.org/
 
 """
 
+import logging
+import shlex
 from os import linesep
-from os.path import join as opj, exists, normpath, isabs, commonprefix, relpath, realpath, isdir, abspath
-from os.path import dirname, basename
-from os.path import curdir, pardir, sep
+from os.path import join as opj
+from os.path import exists
+from os.path import normpath
+from os.path import isabs
+from os.path import commonprefix
+from os.path import relpath
+from os.path import realpath
+from os.path import abspath
+from os.path import dirname
+from os.path import basename
+from os.path import curdir
+from os.path import pardir
+from os.path import sep
+
+from six import string_types
+from functools import wraps
+import git as gitpy
+from git.exc import GitCommandError
+from git.exc import NoSuchPathError
+from git.exc import InvalidGitRepositoryError
+from git.objects.blob import Blob
+
+from datalad import ssh_manager
+from datalad.cmd import Runner
+from datalad.utils import optional_args
+from datalad.utils import on_windows
+from datalad.utils import getpwd
+from datalad.utils import swallow_logs
+
+# imports from same module:
+from .exceptions import CommandError
+from .exceptions import FileNotInRepositoryError
+
 # shortcuts
 _curdirsep = curdir + sep
 _pardirsep = pardir + sep
 
-import logging
-import shlex
-from six import string_types
-
-from functools import wraps
-
-import git
-from git.exc import GitCommandError, NoSuchPathError, \
-    InvalidGitRepositoryError, BadName
-from git.objects.blob import Blob
-
-from datalad import ssh_manager
-from datalad.support.exceptions import CommandError
-from datalad.support.exceptions import FileNotInRepositoryError
-from datalad.cmd import Runner
-from datalad.utils import optional_args, on_windows, getpwd
-from datalad.utils import swallow_logs
-from datalad.utils import swallow_outputs
 
 lgr = logging.getLogger('datalad.gitrepo')
 
-# Override default GitPython's DB backend to talk directly to git so it doesn't interfer with
-# possible operations performed by gc/repack
-default_git_odbt = git.GitCmdObjectDB
+# Override default GitPython's DB backend to talk directly to git so it doesn't
+# interfere with possible operations performed by gc/repack
+default_git_odbt = gitpy.GitCmdObjectDB
 
 # TODO: Figure out how GIT_PYTHON_TRACE ('full') is supposed to be used.
 # Didn't work as expected on a first try. Probably there is a neatier way to
@@ -82,12 +96,13 @@ def _normalize_path(base_dir, path):
     base_dir = realpath(base_dir)
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
-    # But we don't want to realpath relative paths, in case cwd isn't the correct base.
+    # But we don't want to realpath relative paths, in case cwd isn't the
+    # correct base.
 
     if isabs(path):
         # path might already be a symlink pointing to annex etc,
-        # so realpath only its directory, to get "inline" with realpath(base_dir)
-        # above
+        # so realpath only its directory, to get "inline" with
+        # realpath(base_dir) above
         path = opj(realpath(dirname(path)), basename(path))
         if commonprefix([path, base_dir]) != base_dir:
             raise FileNotInRepositoryError(msg="Path outside repository: %s"
@@ -156,7 +171,8 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
 
     If a call to the wrapped function includes normalize_path and it is False
     no normalization happens for that function call (used for calls to wrapped
-    functions within wrapped functions, while possible CWD is within a repository)
+    functions within wrapped functions, while possible CWD is within a
+    repository)
 
     Parameters
     ----------
@@ -184,8 +200,8 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
                 files_new = [normalize(self.path, path) for path in files]
                 single_file = False
             else:
-                raise ValueError("_files_decorator: Don't know how to handle instance of %s." %
-                                 type(files))
+                raise ValueError("_files_decorator: Don't know how to handle "
+                                 "instance of %s." % type(files))
         else:
             single_file = None
             files_new = []
@@ -254,11 +270,17 @@ def _remove_empty_items(list_):
 
 
 def Repo(*args, **kwargs):
-    """Factory method around git.Repo to consistently initiate with different backend
+    """Factory method around gitpy.Repo to consistently initiate with different
+    backend
     """
+    # TODO: This probably doesn't work as intended (or at least not as
+    #       consistently as intended). gitpy.Repo could be instantiated by
+    #       classmethods Repo.init or Repo.clone_from. In these cases 'odbt'
+    #       would be needed as a paramter to these methods instead of the
+    #       constructor.
     if 'odbt' not in kwargs:
         kwargs['odbt'] = default_git_odbt
-    return git.Repo(*args, **kwargs)
+    return gitpy.Repo(*args, **kwargs)
 
 
 def split_remote_branch(branch):
@@ -293,9 +315,9 @@ class GitRepo(object):
 
     # Disable automatic garbage and autopacking
     _GIT_COMMON_OPTIONS = ['-c', 'receive.autogc=0', '-c', 'gc.auto=0']
-    # actually no need with default GitPython db backend not in memory default_git_odbt
-    # but still allows for faster testing etc.  May be eventually we would make it switchable
-    #_GIT_COMMON_OPTIONS = []
+    # actually no need with default GitPython db backend not in memory
+    # default_git_odbt but still allows for faster testing etc.
+    # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
     def __init__(self, path, url=None, runner=None, create=True):
         """Creates representation of git repository at `path`.
@@ -329,15 +351,16 @@ class GitRepo(object):
         #       should be a single instance collecting everything or more
         #       fine grained.
 
-        # TODO: somehow do more extensive checks that url and path don't point to the
-        # same location
+        # TODO: somehow do more extensive checks that url and path don't point
+        #       to the same location
         if url is not None and not (url == path):
             # TODO: What to do, in case url is given, but path exists already?
             # Just rely on whatever clone_from() does, independently on value
             # of create argument?
             try:
                 lgr.debug("Git clone from {0} to {1}".format(url, path))
-                self.cmd_call_wrapper(git.Repo.clone_from, url, path)
+                self.cmd_call_wrapper(gitpy.Repo.clone_from, url, path,
+                                      odbt=default_git_odbt)
                 lgr.debug("Git clone completed")
                 # TODO: more arguments possible: ObjectDB etc.
             except GitCommandError as e:
@@ -345,18 +368,20 @@ class GitRepo(object):
                 lgr.error(str(e))
                 raise
             except ValueError as e:
-                if git.__version__ == '1.0.2' and e.message == "I/O operation on closed file":
+                if gitpy.__version__ == '1.0.2' and \
+                   "I/O operation on closed file" in str(e):
                     # bug https://github.com/gitpython-developers/GitPython/issues/383
-                    raise GitCommandError("clone has failed, telling ya",
-                                          999,  # good number
-                                          stdout="%s already exists" if exists(path) else ""
-                                          )
+                    raise GitCommandError(
+                        "clone has failed, telling ya",
+                        999,  # good number
+                        stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
 
         if create and not exists(opj(path, '.git')):
             try:
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
-                self.repo = self.cmd_call_wrapper(git.Repo.init, path, True, odbt=default_git_odbt)
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path, True,
+                                                  odbt=default_git_odbt)
             except GitCommandError as e:
                 lgr.error(str(e))
                 raise
@@ -401,35 +426,64 @@ class GitRepo(object):
         except OSError:
             return GitRepo.get_toppath(dirname(path))
 
+    # classmethod so behavior could be tuned in derived classes
+    @classmethod
+    def _get_added_files_commit_msg(cls, files):
+        if not files:
+            return "No files were added"
+        msg = "Added %d file" % len(files)
+        if len(files) > 1:
+            msg += "s"
+        return msg + '\n\nFiles:\n' + '\n'.join(files)
+
     @normalize_paths
-    def git_add(self, files):
+    def add(self, files, commit=False, msg=None, git=True):
         """Adds file(s) to the repository.
 
         Parameters
         ----------
         files: list
             list of paths to add
+        commit: bool
+          whether or not to directly commit
+        msg: str
+          commit message in case `commit=True`. A default message, containing
+          the list of files that were added, is created by default.
+        git: bool
+          somewhat ugly construction to be compatible with AnnexRepo.add();
+          has to be always true.
         """
+
+        # needs to be True - see docstring:
+        assert(git)
 
         files = _remove_empty_items(files)
         if files:
             try:
                 self.cmd_call_wrapper(self.repo.index.add, files, write=True)
-                # TODO: May be make use of 'fprogress'-option to indicate progress
+                # TODO: May be make use of 'fprogress'-option to indicate
+                # progress
                 # But then, we don't have it for git-annex add, anyway.
                 #
                 # TODO: Is write=True a reasonable way to do it?
-                # May be should not write until success of operation is confirmed?
+                # May be should not write until success of operation is
+                # confirmed?
                 # What's best in case of a list of files?
             except OSError as e:
-                lgr.error("git_add: %s" % e)
+                lgr.error("add: %s" % e)
                 raise
 
         else:
-            lgr.warning("git_add was called with empty file list.")
+            lgr.warning("add was called with empty file list.")
 
+        if commit:
+            if msg is None:
+                msg = self._get_added_files_commit_msg(files)
+            self.commit(msg=msg)
+
+    # TODO: like add melt in
     @normalize_paths(match_return_type=False)
-    def git_remove(self, files, **kwargs):
+    def remove(self, files, **kwargs):
         """Remove files.
 
         Parameters
@@ -450,9 +504,10 @@ class GitRepo(object):
     def precommit(self):
         """Perform pre-commit maintenance tasks
         """
-        self.repo.index.write()  # flush possibly cached in GitPython changes to index
+        # flush possibly cached in GitPython changes to index:
+        self.repo.index.write()
 
-    def git_commit(self, msg=None, options=None):
+    def commit(self, msg=None, options=None):
         """Commit changes to git.
 
         Parameters
@@ -492,7 +547,7 @@ class GitRepo(object):
         return [x[0] for x in self.cmd_call_wrapper(
             self.repo.index.entries.keys)]
 
-    def git_get_hexsha(self, branch=None):
+    def get_hexsha(self, branch=None):
         """Return a hexsha for a given branch name. If None - of current branch
 
         Parameters
@@ -507,27 +562,28 @@ class GitRepo(object):
                 return b.object.hexsha
         raise ValueError("Unknown branch %s" % branch)
 
-    def git_get_merge_base(self, treeishes):
+    def get_merge_base(self, treeishes):
         """Get a merge base hexsha
 
         Parameters
         ----------
         treeishes: str or list of str
-          List of treeishes (branches, hexshas, etc) to determine the merge base of.
-          If a single value provided, returns merge_base with the current branch.
+          List of treeishes (branches, hexshas, etc) to determine the merge
+          base of. If a single value provided, returns merge_base with the
+          current branch.
 
         Returns
         -------
         str or None
-          If no merge-base for given commits, or specified treeish doesn't exist,
-          None returned
+          If no merge-base for given commits, or specified treeish doesn't
+          exist, None returned
         """
         if isinstance(treeishes, string_types):
             treeishes = [treeishes]
         if not treeishes:
             raise ValueError("Provide at least a single value")
         elif len(treeishes) == 1:
-            treeishes = treeishes + [self.git_get_active_branch()]
+            treeishes = treeishes + [self.get_active_branch()]
 
         try:
             bases = self.repo.merge_base(*treeishes)
@@ -541,11 +597,11 @@ class GitRepo(object):
         assert(len(bases) == 1)  # we do not do 'all' yet
         return bases[0].hexsha
 
-    def git_get_active_branch(self):
+    def get_active_branch(self):
 
         return self.repo.active_branch.name
 
-    def git_get_branches(self):
+    def get_branches(self):
         """Get all branches of the repo.
 
         Returns
@@ -556,7 +612,7 @@ class GitRepo(object):
 
         return [branch.name for branch in self.repo.branches]
 
-    def git_get_remote_branches(self):
+    def get_remote_branches(self):
         """Get all branches of all remotes of the repo.
 
         Returns
@@ -564,6 +620,8 @@ class GitRepo(object):
         [str]
             Names of all remote branches.
         """
+        # TODO: Reconsider melting with get_branches()
+
         # TODO: treat entries like this: origin/HEAD -> origin/master'
         # currently this is done in collection
 
@@ -583,10 +641,10 @@ class GitRepo(object):
         # return [branch.strip() for branch in
         #         self.repo.git.branch(r=True).splitlines()]
 
-    def git_get_remotes(self):
+    def get_remotes(self):
         return [remote.name for remote in self.repo.remotes]
 
-    def git_get_files(self, branch=None):
+    def get_files(self, branch=None):
         """Get a list of files in git.
 
         Lists the files in the (remote) branch.
@@ -601,6 +659,7 @@ class GitRepo(object):
         [str]
           list of files.
         """
+        # TODO: RF codes base and melt get_indexed_files() in
 
         if branch is None:
             # active branch can be queried way faster:
@@ -609,7 +668,7 @@ class GitRepo(object):
             return [item.path for item in self.repo.tree(branch).traverse()
                     if isinstance(item, Blob)]
 
-    def git_get_file_content(self, file_, branch='HEAD'):
+    def get_file_content(self, file_, branch='HEAD'):
         """
 
         Returns
@@ -664,20 +723,20 @@ class GitRepo(object):
 
 # TODO: --------------------------------------------------------------------
 
-    def git_remote_add(self, name, url, options=''):
+    def add_remote(self, name, url, options=''):
         """
         """
 
         return self._git_custom_command('', 'git remote add %s %s %s' %
                                  (options, name, url))
 
-    def git_remote_remove(self, name):
+    def remove_remote(self, name):
         """
         """
 
         return self._git_custom_command('', 'git remote remove %s' % name)
 
-    def git_remote_show(self, name='', verbose=False):
+    def show_remotes(self, name='', verbose=False):
         """
         """
 
@@ -686,7 +745,7 @@ class GitRepo(object):
                                             (v, name))
         return out.rstrip(linesep).splitlines()
 
-    def git_remote_update(self, name='', verbose=False):
+    def update_remote(self, name='', verbose=False):
         """
         """
 
@@ -762,9 +821,11 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    rm.fetch(refspec=refspec, progress=progress, **kwargs)  # TODO: progress +kwargs
+                    rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                    # TODO: progress +kwargs
             else:
-                rm.fetch(refspec=refspec, progress=progress, **kwargs)  # TODO: progress +kwargs
+                rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
 
@@ -793,9 +854,9 @@ class GitRepo(object):
             remote = self.repo.remote(remote)
 
         fetch_url = \
-            remote.config_reader.get('fetchurl'
-                                     if remote.config_reader.has_option('fetchurl')
-                                     else 'url')
+            remote.config_reader.get(
+                'fetchurl' if remote.config_reader.has_option('fetchurl')
+                else 'url')
         if fetch_url.startswith('ssh:'):
             cnct = ssh_manager.get_connection(fetch_url)
             cnct.open()
@@ -809,7 +870,8 @@ class GitRepo(object):
             remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
-    def push(self, remote=None, refspec=None, progress=None, all_=False, **kwargs):
+    def push(self, remote=None, refspec=None, progress=None, all_=False,
+             **kwargs):
         """See fetch
         """
 
@@ -855,7 +917,7 @@ class GitRepo(object):
                 rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
 
-    def git_get_remote_url(self, name, push=False):
+    def get_remote_url(self, name, push=False):
         """Get the url of a remote.
 
         Reads the configuration of remote `name` and returns its url or None,
@@ -880,7 +942,7 @@ class GitRepo(object):
             else:
                 return None
 
-    def git_get_branch_commits(self, branch, limit=None, stop=None, value=None):
+    def get_branch_commits(self, branch, limit=None, stop=None, value=None):
         """Return GitPython's commits for the branch
 
         Pretty much similar to what 'git log <branch>' does.
@@ -891,11 +953,14 @@ class GitRepo(object):
         branch: str
         limit: None | 'left-only', optional
           Limit which commits to report.  If None -- all commits (merged or not),
-          if 'left-only' -- only the commits from the left side of the tree upon merges
+          if 'left-only' -- only the commits from the left side of the tree upon
+          merges
         stop: str, optional
-          hexsha of the commit at which stop reporting (matched one is not reported either)
+          hexsha of the commit at which stop reporting (matched one is not
+          reported either)
         value: None | 'hexsha', optional
-          What to yield.  If None - entire commit object is yielded, if 'hexsha' only its hexsha
+          What to yield.  If None - entire commit object is yielded, if 'hexsha'
+          only its hexsha
         """
 
         fvalue = {None: lambda x: x, 'hexsha': lambda x: x.hexsha}[value]
@@ -908,7 +973,8 @@ class GitRepo(object):
                 for co_ in co.traverse():
                     yield co_
         elif limit == 'left-only':
-            # we need a custom implementation since couldn't figure out how to do with .traversal
+            # we need a custom implementation since couldn't figure out how to
+            # do with .traversal
             def gen():
                 co = self.repo.branches[branch].commit
                 while co:
@@ -922,7 +988,7 @@ class GitRepo(object):
                 return
             yield fvalue(c)
 
-    def git_checkout(self, name, options=''):
+    def checkout(self, name, options=''):
         """
         """
         # TODO: May be check for the need of -b options herein?
@@ -930,15 +996,18 @@ class GitRepo(object):
         self._git_custom_command('', 'git checkout %s %s' % (options, name),
                                  expect_stderr=True)
 
-    def git_merge(self, name, options=[], msg=None, **kwargs):
+    # TODO: Before implementing annex merge, find usages and check for a needed
+    # change to call super().merge
+    def merge(self, name, options=[], msg=None, **kwargs):
         if msg:
             options = options + ["-m", msg]
-        self._git_custom_command('', ['git', 'merge'] + options + [name], **kwargs)
+        self._git_custom_command('', ['git', 'merge'] + options + [name],
+                                 **kwargs)
 
-    def git_remove_branch(self, branch):
+    def remove_branch(self, branch):
         self._git_custom_command('', 'git branch -D %s' % branch)
 
-    def git_ls_remote(self, remote, options=None):
+    def ls_remote(self, remote, options=None):
         self._git_custom_command('', 'git ls-remote %s %s' %
                                  (options if options is not None else '',
                                   remote))
@@ -946,7 +1015,8 @@ class GitRepo(object):
     
     @property
     def dirty(self):
-        """Returns true if there is uncommitted changes or files not known to index"""
+        """Returns true if there are uncommitted changes or files not known to
+        index"""
         return self.repo.is_dirty(untracked_files=True)
 
     def gc(self, allow_background=False, auto=False):
@@ -980,16 +1050,17 @@ class GitRepo(object):
           repository-relative path at which the submodule should be located, and
           which will be created as required during the repository initialization.
         name : str or None
-          name/identifier for the submodule. If `None`, the `path` will be used as
-          name.
+          name/identifier for the submodule. If `None`, the `path` will be used
+          as name.
         url : str or None
-          git-clone compatible URL. If `None`, the repository is assumed to exist,
-          and the url of the first remote is taken instead. This is useful if you
-          want to make an existing repository a submodule of another one.
+          git-clone compatible URL. If `None`, the repository is assumed to
+          exist, and the url of the first remote is taken instead. This is
+          useful if you want to make an existing repository a submodule of
+          another one.
         branch : str or None
-          name of branch to be checked out in the submodule. The given branch must
-          exist in the remote repository, and will be checked out locally as a
-          tracking branch. If `None`, remote HEAD will be checked out.
+          name of branch to be checked out in the submodule. The given branch
+          must exist in the remote repository, and will be checked out locally
+          as a tracking branch. If `None`, remote HEAD will be checked out.
         """
         if name is None:
             name = path
@@ -999,7 +1070,7 @@ class GitRepo(object):
         # this is stupid, as for us it is valid to not have any remote, because we can
         # still obtain the submodule from a future publication location, based on the
         # parent
-        #git.Submodule.add(self.repo, name, path, url=url, branch=branch)
+        # gitpy.Submodule.add(self.repo, name, path, url=url, branch=branch)
         # going git native instead
         cmd = ['git', 'submodule', 'add', '--name', name]
         if branch is not None:

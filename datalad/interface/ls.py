@@ -149,7 +149,7 @@ class DsModel(object):
         """Date of the last commit
         """
         try:
-            commit = next(self.ds.repo.git_get_branch_commits(self.branch))
+            commit = next(self.ds.repo.get_branch_commits(self.branch))
         except:
             return None
         return commit.committed_date
@@ -162,7 +162,7 @@ class DsModel(object):
     def branch(self):
         if self._branch is None:
             try:
-                self._branch = self.repo.git_get_active_branch()
+                self._branch = self.repo.get_active_branch()
             except:
                 return None
         return self._branch
@@ -176,7 +176,7 @@ class DsModel(object):
     @property
     def info(self):
         if self._info is None and isinstance(self.repo, AnnexRepo):
-            self._info = self.repo.annex_repo_info()
+            self._info = self.repo.repo_info()
         return self._info
 
     @property

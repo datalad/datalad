@@ -35,15 +35,15 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 @with_tempfile()
 def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     annex = AnnexRepo(d, runner=_get_custom_runner(d), direct=direct)
-    annex.annex_initremote(
+    annex.init_remote(
         ARCHIVES_SPECIAL_REMOTE,
         ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
          'autoenable=true'
          ])
     # We want two maximally obscure names, which are also different
     assert(fn_extracted != fn_inarchive_obscure)
-    annex.add_to_annex(fn_archive, "Added tarball")
-    annex.add_to_annex(fn_extracted, "Added the load file")
+    annex.add(fn_archive, commit=True, msg="Added tarball")
+    annex.add(fn_extracted, commit=True, msg="Added the load file")
 
     # Operations with archive remote URL
     annexcr = ArchiveAnnexCustomRemote(path=d)
@@ -59,32 +59,32 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
         archive_file=fn_archive,
         file=fn_archive.replace('.tar.gz', '') + '/d/'+fn_inarchive_obscure)
 
-    annex.annex_addurl_to_file(fn_extracted, file_url, ['--relaxed'])
-    annex.annex_drop(fn_extracted)
+    annex.add_url_to_file(fn_extracted, file_url, ['--relaxed'])
+    annex.drop(fn_extracted)
 
-    list_of_remotes = annex.annex_whereis(fn_extracted, output='descriptions')
+    list_of_remotes = annex.whereis(fn_extracted, output='descriptions')
     in_('[%s]' % ARCHIVES_SPECIAL_REMOTE, list_of_remotes)
 
     assert_false(annex.file_has_content(fn_extracted))
     annex.get(fn_extracted)
     assert_true(annex.file_has_content(fn_extracted))
 
-    annex.annex_rmurl(fn_extracted, file_url)
+    annex.rm_url(fn_extracted, file_url)
     with swallow_logs() as cm:
-        assert_raises(RuntimeError, annex.annex_drop, fn_extracted)
+        assert_raises(RuntimeError, annex.drop, fn_extracted)
         in_("git-annex: drop: 1 failed", cm.out)
 
-    annex.annex_addurl_to_file(fn_extracted, file_url)
-    annex.annex_drop(fn_extracted)
+    annex.add_url_to_file(fn_extracted, file_url)
+    annex.drop(fn_extracted)
     annex.get(fn_extracted)
-    annex.annex_drop(fn_extracted)  # so we don't get from this one next
+    annex.drop(fn_extracted)  # so we don't get from this one next
 
     # Let's create a clone and verify chain of getting file through the tarball
     cloned_annex = AnnexRepo(d2, d,
                            runner=_get_custom_runner(d2),
                            direct=direct)
     # we still need to enable manually atm that special remote for archives
-    # cloned_annex.annex_enableremote('annexed-archives')
+    # cloned_annex.enable_remote('annexed-archives')
 
     assert_false(cloned_annex.file_has_content(fn_archive))
     assert_false(cloned_annex.file_has_content(fn_extracted))

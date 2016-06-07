@@ -56,7 +56,13 @@ class TestRepo(object):
         with open(filename, 'wb') as f:
             f.write(content.encode())
         if add:
-            (self.repo.annex_add if annex else self.repo.git_add)(name)
+            if annex:
+                if isinstance(self.repo, AnnexRepo):
+                    self.repo.add(name)
+                else:
+                    raise ValueError("Can't annex add to a non-annex repo.")
+            else:
+                self.repo.add(name, git=True)
 
     def create(self):
         if self._created:
@@ -79,15 +85,15 @@ class BasicAnnexTestRepo(TestRepo):
     def populate(self):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
-        self.repo.git_commit("Adding a basic INFO file and rudimentary load file for annex testing")
+        self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
         from .utils import on_windows
         fileurl = get_local_file_url(realpath(opj(self.path, 'test.dat'))) \
                   if not on_windows \
                   else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
-        self.repo.annex_addurl_to_file("test-annex.dat", fileurl)
-        self.repo.git_commit("Adding a rudimentary git-annex load file")
-        self.repo.annex_drop("test-annex.dat")  # since available from URL
+        self.repo.add_url_to_file("test-annex.dat", fileurl)
+        self.repo.commit("Adding a rudimentary git-annex load file")
+        self.repo.drop("test-annex.dat")  # since available from URL
 
     def create_info_file(self):
         runner = Runner()
@@ -109,7 +115,7 @@ class BasicGitTestRepo(TestRepo):
     def populate(self):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
-        self.repo.git_commit("Adding a basic INFO file and rudimentary "
+        self.repo.commit("Adding a basic INFO file and rudimentary "
                              "load file.")
 
     def create_info_file(self):

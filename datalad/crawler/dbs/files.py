@@ -54,7 +54,7 @@ class PhysicalFileStatusesDB(FileStatusesBaseDB):
         filestat = os.lstat(filepath)
         try:
             with swallow_logs():
-                info = self.annex.annex_info(filepath, batch=True)
+                info = self.annex.info(filepath, batch=True)
             size = info['size']
         except (CommandError, TypeError) as exc:
             # must be under git or a plain file

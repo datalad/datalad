@@ -106,7 +106,7 @@ class Update(Interface):
 
         for repo in repos_to_update:
             # get all remotes:
-            remotes = repo.git_get_remotes()
+            remotes = repo.get_remotes()
             if name and name not in remotes:
                 lgr.warning("'%s' not known to dataset %s.\nSkipping" %
                             (name, repo.path))
@@ -138,9 +138,9 @@ class Update(Interface):
                 try:
                     std_out, std_err = \
                         repo._git_custom_command('',
-                        ["git", "config", "--get",
+                                                 ["git", "config", "--get",
                          "branch.{active_branch}.remote".format(
-                             active_branch=repo.git_get_active_branch())])
+                             active_branch=repo.get_active_branch())])
                 except CommandError as e:
                     if e.code == 1 and e.stdout == "":
                         std_out = None
@@ -163,7 +163,7 @@ class Update(Interface):
                     # => TODO: allow for passing a branch
                     # (or more general refspec?)
                     # For now, just use the same name
-                    cmd_list.append(repo.git_get_active_branch())
+                    cmd_list.append(repo.get_active_branch())
 
                 out, err = repo._git_custom_command('', cmd_list)
                 lgr.info(out)
