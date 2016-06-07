@@ -240,8 +240,10 @@ class Annexificator(object):
         # Well -- different annexifiers might have different ideas for the backend, but
         # then those could be overriden via options
 
-        if not exists(opj(path, '.git')) and not allow_dirty:
-                raise RuntimeError("Directory %s is not empty.")
+        if exists(path):
+            if not exists(opj(path, '.git')):
+                if (len(listdir(path))) and (not allow_dirty):
+                    raise RuntimeError("Directory %s is not empty.")
 
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
 
