@@ -9,6 +9,7 @@
 import platform
 
 from glob import glob
+import os
 from os.path import sep as pathsep, join as opj, dirname
 
 from setuptools import setup, find_packages
@@ -122,19 +123,19 @@ class BuildManPage(Command):
     description = 'Generate man page from an ArgumentParser instance.'
 
     user_options = [
-        ('output=', 'O', 'output file'),
+        ('output_path=', None, 'output path'),
         ('parser=', None, 'module path to an ArgumentParser instance'
          '(e.g. mymod:func, where func is a method or function which return'
-         'an arparse.ArgumentParser instance.'),
+         'a dict with one or more arparse.ArgumentParser instances.'),
     ]
 
     def initialize_options(self):
-        self.output = None
+        self.output_path = None
         self.parser = None
 
     def finalize_options(self):
-        if self.output is None:
-            raise DistutilsOptionError('\'output\' option is required')
+        if self.output_path is None:
+            raise DistutilsOptionError('\'output_path\' option is required')
         if self.parser is None:
             raise DistutilsOptionError('\'parser\' option is required')
         mod_name, func_name = self.parser.split(':')
@@ -142,39 +143,44 @@ class BuildManPage(Command):
         try:
             mod = __import__(mod_name, fromlist=fromlist)
             self._parser = getattr(mod, func_name)(
-                formatter_class=ManPageFormatter)
+                formatter_class=ManPageFormatter,
+                return_subparsers=True)
 
         except ImportError as err:
             raise err
 
-        self.announce('Writing man page %s' % self.output)
+        self.announce('Writing man page(s) to %s' % self.output_path)
         self._today = datetime.date.today()
 
     def run(self):
 
         dist = self.distribution
         homepage = dist.get_url()
-        appname = self._parser.prog
+        #appname = self._parser.prog
+        appname = 'datalad'
 
-        sections = {'authors': ("pwman3 was originally written by Ivan Kelly "
-                                "<ivan@ivankelly.net>.\n pwman3 is now "
-                                "maintained "
-                                "by Oz Nahum <nahumoz@gmail.com>."),
-                    'distribution': ("The latest version of {} may be "
-                                     "downloaded from {}".format(appname,
-                                                                 homepage))
-                    }
+        sections = {
+            'authors': """{0} is developed by {1} <{2}>.""".format(
+                appname, dist.get_author(), dist.get_author_email()),
+        }
 
         dist = self.distribution
-        mpf = ManPageFormatter(appname,
-                               desc=dist.get_description(),
-                               long_desc=dist.get_long_description(),
-                               ext_sections=sections)
+        if not os.path.exists(self.output_path):
+            os.makedirs(self.output_path)
 
-        m = mpf.format_man_page(self._parser)
+        for cmdname in self._parser:
+            p = self._parser[cmdname]
+            mpf = ManPageFormatter(cmdname,
+                                   desc=dist.get_description(),
+                                   long_desc=dist.get_long_description(),
+                                   ext_sections=sections)
+            m = mpf.format_man_page(p)
 
-        with open(self.output, 'w') as f:
-            f.write(m)
+            with open(opj(self.output_path, '{0}{1}.1'.format(
+                            'datalad-' if cmdname != 'datalad' else '',
+                            cmdname)),
+                      'w') as f:
+                f.write(m)
 
 
 class ManPageFormatter(argparse.HelpFormatter):
@@ -265,12 +271,12 @@ class ManPageFormatter(argparse.HelpFormatter):
         return '.SH NAME\n%s \\- %s\n' % (parser.prog,
                                           parser.description)
 
-    def _mk_description(self):
-        if self._long_desc:
-            long_desc = self._long_desc.replace('\n', '\n.br\n')
-            return '.SH DESCRIPTION\n%s\n' % self._markup(long_desc)
-        else:
+    def _mk_description(self, parser):
+        desc = parser.description
+        if not desc:
             return ''
+        desc = desc.replace('\n', '\n.br\n')
+        return '.SH DESCRIPTION\n%s\n' % self._markup(desc)
 
     def _mk_footer(self, sections):
         if not hasattr(sections, '__iter__'):
@@ -287,7 +293,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         page = []
         page.append(self._mk_title(self._prog))
         page.append(self._mk_synopsis(parser))
-        page.append(self._mk_description())
+        page.append(self._mk_description(parser))
         page.append(self._mk_options(parser))
         page.append(self._mk_footer(self._ext_sections))
 
@@ -341,7 +347,7 @@ class ManPageFormatter(argparse.HelpFormatter):
 
 setup(
     name="datalad",
-    author="DataLad Team and Contributors",
+    author="The DataLad Team and Contributors",
     author_email="team@datalad.org",
     version=version,
     description="data distribution geared toward scientific datasets",
