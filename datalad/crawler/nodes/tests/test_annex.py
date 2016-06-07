@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from os import listdir
 from os.path import join as opj, exists, lexists
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
 
@@ -24,16 +25,17 @@ from ...pipeline import load_pipeline_from_config
 from ....consts import CRAWLER_META_CONFIG_PATH, DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ....support.stats import ActivityStats
 from ....support.annexrepo import AnnexRepo
-from os import listdir
 
 
 @with_tempfile(mkdir=True)
-def test_Annexificator(outdir):
+def test_annexificator_no_git_if_dirty(outdir):
 
     eq_(listdir(outdir), [])     # directory is new and empty
 
-    filed = open(outdir+'/myfile.txt', 'w+')
-    filed.close
+    filepath = opj(outdir, 'myfile.txt')
+    with open(filepath, 'w') as f:
+        f.write("myfile")
+
     eq_(listdir(outdir), ['myfile.txt'])
 
     assert_raises(RuntimeError, Annexificator, path=outdir)
