@@ -347,7 +347,7 @@ class RI(object):
             # RI class was used as a factory
             cls = _guess_ri_cls(ri)
 
-        ri_obj = super(RI, cls).__new__(cls, ri=ri, **kwargs)
+        ri_obj = super(RI, cls).__new__(cls)
         # Store internally original str
         ri_obj._str = ri
         return ri_obj
