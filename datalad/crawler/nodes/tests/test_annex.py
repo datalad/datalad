@@ -7,6 +7,7 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+from os import listdir
 from os.path import join as opj, exists, lexists
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
 
@@ -24,6 +25,24 @@ from ...pipeline import load_pipeline_from_config
 from ....consts import CRAWLER_META_CONFIG_PATH, DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
 from ....support.stats import ActivityStats
 from ....support.annexrepo import AnnexRepo
+
+
+@with_tempfile(mkdir=True)
+def test_annexificator_no_git_if_dirty(outdir):
+
+    eq_(listdir(outdir), [])
+
+    filepath = opj(outdir, '.myfile')
+    with open(filepath, 'w'):
+        pass
+
+    eq_(listdir(outdir), ['.myfile'])
+    assert_raises(RuntimeError, Annexificator, path=outdir)
+    eq_(listdir(outdir), ['.myfile'])
+
+    Annexificator(path=outdir, allow_dirty=True)
+    eq_(sorted(listdir(outdir)), sorted(['.myfile', '.git']))
+
 
 @with_tempfile(mkdir=True)
 @with_tempfile()
