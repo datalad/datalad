@@ -66,7 +66,7 @@ class Publish(Interface):
         #     If you want to publish with `recursive`, it is expected, that you
         #     pass a template for building the URLs of all (sub)datasets to be
         #     published by using placeholders.\n
-        #     list of currently available placeholders:\n
+        #     List of currently available placeholders:\n
         #     %%NAME\tthe name of the dataset, where slashes are replaced by
         #     dashes.\nThis option is ignored if there is already a configured
         #     sibling dataset under the name given by `dest`.""",

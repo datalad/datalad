@@ -76,7 +76,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 created by using placeholders.  If you don't provide a template
                 the local hierarchy with respect to `dataset` will be
                 replicated on the server rooting in `target_dir`.\n
-                list of currently available placeholders:\n
+                List of currently available placeholders:\n
                 %%NAME\tthe name of the datasets, where slashes are
                 replaced by dashes\n""",
             constraints=EnsureStr() | EnsureNone()),
@@ -88,7 +88,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 Especially when using `recursive`, it's possible to provide a
                 template for building the URLs of all (sub)datasets to be
                 created by using placeholders.\n
-                list of currently available placeholders:\n
+                List of currently available placeholders:\n
                 %%NAME\tthe name of the datasets, where slashes are
                 replaced by dashes\n""",
             nargs="?",
@@ -107,7 +107,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'replace', 'raise'),
-            doc="""zction to perform, if target directory exists already.
+            doc="""action to perform, if target directory exists already.
                 Dataset is skipped if `skip`. `replace` forces to (re-)init
                 git and to (re-)configure sibling `target`
                 (i.e. its URL(s)) in case it already exists.  `raise` just
