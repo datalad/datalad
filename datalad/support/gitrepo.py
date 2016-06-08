@@ -319,7 +319,7 @@ class GitRepo(object):
     # default_git_odbt but still allows for faster testing etc.
     # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
-    def __init__(self, path, url=None, runner=None, create=True):
+    def __init__(self, path, url=None, runner=None, create=True, **kwargs):
         """Creates representation of git repository at `path`.
 
         If `url` is given, a clone is created at `path`.
@@ -339,6 +339,24 @@ class GitRepo(object):
           creates `path`, if it doesn't exist.
           If set to false, an exception is raised in case `path` doesn't exist
           or doesn't contain a git repository.
+        kwargs:
+          keyword arguments serving as additional options to the git-init
+          command. Therefore, it makes sense only if called with `create`.
+
+          Generally, this way of passing options to the git executable is
+          (or will be) used a lot in this class. It's a transformation of
+          python-style keyword arguments (or a `dict`) to command line arguments,
+          provided by GitPython.
+
+          A single character keyword will be prefixed by '-', multiple characters
+          by '--'. An underscore in the keyword becomes a dash. The value of the
+          keyword argument is used as the value for the corresponding command
+          line argument. Assigning a boolean creates a flag.
+
+          Examples:
+          no_commit=True => --no-commit
+          C='/my/path'   => -C /my/path
+
         """
 
         self.path = abspath(normpath(path))
@@ -381,7 +399,8 @@ class GitRepo(object):
             try:
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path, True,
-                                                  odbt=default_git_odbt)
+                                                  odbt=default_git_odbt,
+                                                  **kwargs)
             except GitCommandError as e:
                 lgr.error(str(e))
                 raise
@@ -759,8 +778,6 @@ class GitRepo(object):
             cmd_options = {}
         cmd_options.update({'with_exceptions': with_exceptions,
                             'with_extended_output': True})
-
-
 
         with self.repo.git.custom_environment(**env):
             try:

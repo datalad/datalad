@@ -77,6 +77,15 @@ def test_GitRepo_instance_from_not_existing(path, path2):
 
 
 @with_tempfile
+def test_GitRepo_init_options(path):
+    # passing an option, not explicitly defined in GitRepo class:
+    gr = GitRepo(path, create=True, bare=True)
+
+    cfg = gr.repo.config_reader()
+    ok_(cfg.get_value(section="core", option="bare"))
+
+
+@with_tempfile
 @with_tempfile
 def test_GitRepo_equals(path1, path2):
 
@@ -777,3 +786,5 @@ def test_git_custom_calls(path, path2):
         repo._gitpy_custom_call('status', git_options={'C': path2})
         assert_in("git -C %s status" % path2, str(cm.exception))
         assert_in("fatal: Not a git repository", str(cm.exception))
+
+    # TODO: How to test 'env'?
