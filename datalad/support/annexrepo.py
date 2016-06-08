@@ -1055,10 +1055,11 @@ class AnnexRepo(GitRepo):
         cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
             if isinstance(cmd_str, string_types) \
             else cmd_str + files
-        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
-                                  log_stdout=log_stdout, log_online=log_online,
-                                  expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell, expect_fail=expect_fail)
+        return self.cmd_call_wrapper.run(
+            cmd,
+            log_stderr=log_stderr, log_stdout=log_stdout, log_online=log_online,
+            expect_stderr=expect_stderr,
+            cwd=cwd, env=env, shell=shell, expect_fail=expect_fail)
 
     @normalize_paths
     def migrate_backend(self, files, backend=None):
