@@ -41,6 +41,10 @@ class Constraint(object):
 
     # TODO: __str__ and/or __repr__ for every one of them
 
+    def __repr__(self):
+        """Rudimentary repr to avoid default scary to the user Python repr"""
+        return "constraint:%s" % self.short_description()
+
     def __and__(self, other):
         return Constraints(self, other)
 
