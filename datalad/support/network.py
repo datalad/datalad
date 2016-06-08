@@ -261,9 +261,66 @@ class SimpleURLStamper(object):
 #  PreparedRequest().prepare_url(url, params) -- nicely cares about url encodings etc
 #
 
+def MURL(url):
+    """Factory function which would determine which type of a url a provided string is"""
+    # We assume that it is a URL and parse it. Depending on the result
+    # we might decide that it was something else ;)
+    fields = URL._pr_to_fields(urlparse(url))
+    lgr.log(5, "Parsed url %s into fields %s" % (url, fields))
+
+    type_ = 'url'
+    # Special treatments
+    # file:///path should stay file:
+    if fields['scheme'] and fields['scheme'] not in {'file'} \
+            and not fields['hostname']:
+        # dl+archive:... or just for ssh   hostname:path/p1
+        if '+' not in fields['scheme']:
+            type_ = 'ssh'
+            lgr.log(5, "Assuming ssh style url, adjusted: %s" % (fields,))
+
+    if not fields['scheme'] and not fields['hostname']:
+        parts = _split_colon(url)
+        if fields['path'] and '@' in fields['path'] or len(parts) > 1:
+            # user@host:path/sp1
+            # or host_name: (hence parts check)
+            # TODO: we need a regex to catch those really, parts check is not suff
+            type_ = 'ssh'
+        elif url.startswith('//'):
+            # e.g. // or ///path
+            type_ = 'datalad'
+        else:
+            type_ = 'file'
+
+    if not fields['scheme'] and fields['hostname']:
+        # e.g. //a/path
+        type_ = 'datalad'
+
+    TYPES = {
+        'url': URL,
+        'ssh':  SSHURL,
+        'file': FileURL,
+        'datalad': DataLadURL
+    }
+    cls = TYPES[type_]
+    # just parse the url according to regex matchint ssh "url" specs
+    lgr.log(5, "Detected %s url" % type_)
+    url_obj = cls.from_str(url)
+
+    # Store internally original str
+    url_obj._str = url
+
+    # well -- some urls might not unparse identically back
+    # strictly speaking, but let's assume they do
+    url_ = url_obj.as_str()
+    if url != url_:
+        lgr.warning("Parsed version of url %r differs from original %r",
+                    url_, url)
+    return url_obj
+
+
 #@auto_repr
 # TODO: Well -- it is more of a URI than URL I guess
-class URL(object):
+class URLBase(object):
     """A helper class to deal with URLs with some "magical" treats to facilitate use of "ssh" urls
 
     Intended to be a R/O object (i.e. no fields should be changed in-place)
@@ -293,70 +350,40 @@ class URL(object):
     So after we agree on viability of the approach  and collect enough tests we can simplify
     """
 
-    # fields with their defaults
+    # All of the subclasses will provide path
     _FIELDS = (
-        'scheme',
-        'username',
-        'password',
-        'hostname', 'port',
-        'path',  # 'params',
-        'query',
-        'fragment',
+        'path',
     )
 
-    """
-        # fields with their quote/unquote adapters
-        # Ordered just to mimic natural order within standard URI/URL - might come handy?
-        _FIELDS = OrderedDict(
-            ('scheme', (None, None)),
-            ('username', (None, None)),
-            ('password', (None, None)),  # or it needs quote/unquote?
-            ('hostname', (None, None)),
-            ('port', (None, None)),
-            ('path', (urlquote_path, url)),   # grr -- but for ssh ones we don't need to apply the same rules
-            # 'params',
-            'query',
-            'fragment',
-        }
-    """
+    __slots__ = _FIELDS + ('_fields', '_str')
 
-    __slots__ = _FIELDS + ('_fields', '_str', '_implicit')
-
-    def __init__(self, url=None, implicit=None, **kwargs):
+    def __init__(self, url=None, **fields):
         """
 
         Parameters
         ----------
-        url: str
-          String representation of the url
-        **kwargs: dict
+        url: str, optional
+          String version of a URL specific for this class.  If you would like
+          a type of URL be deduced, use MURL
+        **fields: dict, optional
           The values for the fields defined in _FIELDS class variable.
         """
-        if url and (bool(url) == (bool(kwargs) or implicit is not None)):
+        if url and (bool(url) == bool(fields)):
             raise ValueError(
                 "Specify either url or breakdown from the fields, not both. "
-                "Got url=%r, fields=%r" % (url, kwargs))
+                "Got url=%r, fields=%r" % (url, fields))
 
-        # ok -- let's default to all of them being an empty string
-        # Originally used None to signal no value but it complicated
-        # operations since often needed first a check before e.g. doing
-        # .startswith.  So more harmonic is just to store strings.
-        # Not provided seems to be exactly as empty string, so Ok (stdlib
-        # guys knew what they were doing ;)
         self._fields = self._get_blank_fields()
-        self._implicit = None
-        if url:
-            self._set_from_str(url)
+        if url is not None:
+            fields = self._str_to_fields(url)
+            self._str = url
         else:
-            self._set_from_fields(implicit, **kwargs)
-
-    @property
-    def implicit(self):
-        return self._implicit
+            self._str = None  # subject to lazy evaluation
+        self._set_from_fields(**fields)
 
     @classmethod
-    def _get_blank_fields(cls, **kwargs):
-        return OrderedDict(((f, kwargs.get(f, '')) for f in cls._FIELDS))
+    def _get_blank_fields(cls, **fields):
+        return OrderedDict(((f, fields.get(f, '')) for f in cls._FIELDS))
 
     @property
     def fields(self):
@@ -368,62 +395,28 @@ class URL(object):
         return "%s(%s)" % (
             self.__class__.__name__,
             ", ".join(["%s=%r" % (k, v)
-                       for k, v in sorted(self._fields.items()) + [('implicit', self.implicit)]
+                       for k, v in sorted(self._fields.items())
                        if v]))
-
-    # Some custom __str__s for :implicit URLs -- begging for subclassing TODO
-    def __str_ssh__(self):
-        """Custom str for implicit ssh"""
-        fields = self.fields  # copy so we could escape symbols
-        for field in ('password', 'query', 'fragment'):
-            assert not fields[field], \
-                "implicit ssh should not have %s defined. It is %r" % (field, fields[field])
-        url_fmt = '%(hostname)s'
-
-        if fields['username']:
-            url_fmt = ("%(username)s@" % fields) + url_fmt
-        if fields['path']:
-            url_fmt += ':%(path)s'
-        fields['path'] = escape_ssh_path(fields['path'])
-        return url_fmt % fields
-
-    def __str_datalad__(self):
-        """Custom str for implicit datalad"""
-        fields = self._fields.copy()
-        fields['scheme'] = ''
-        url = urlunparse(self._fields_to_pr(fields))
-        if not fields['hostname']:
-            # was of /// type
-            url = '//' + url
-        return url
-
-    def __str_file__(self):
-        """Custom str for file"""
-        fields = self._fields
-        for field in ('username', 'hostname', 'password', 'query', 'fragment'):
-            assert not fields[field], \
-                "implicit file should not have %s defined. It is %r" % (field, fields[field])
-        return self.path
 
     # Lazily evaluated if _str was not set
     def __str__(self):
         if self._str is None:
-            self._str = self._as_str()
+            self._str = self.as_str()
         return self._str
 
-    def _as_str(self):
-        """Re-evaluate string repsentation"""
+    @classmethod
+    def from_str(cls, url_str):
+        obj = cls(**cls._str_to_fields(url_str))
+        obj._str = url_str
+        return obj
 
-        if not self.implicit:
-            return urlunparse(self.to_pr())
-        else:
-            base_scheme = self.scheme.split(':', 1)[0]
-            try:
-                __str__ = getattr(self, '__str_%s__' % base_scheme)
-            except AttributeError:
-                raise ValueError("Don't know how to convert implicit %s into str"
-                                 % base_scheme)
-            return __str__()
+    # Apparently doesn't quite play nicely with multiple inheritence for MixIn'
+    # of regexp based URLs
+    #@abstractmethod
+    #@classmethod
+    #def _str_to_fields(cls, url_str):
+    #    raise NotImplementedError
+
 
     #
     # If any field is specified, URL is not considered 'False', i.e.
@@ -443,11 +436,11 @@ class URL(object):
     # Helpers to deal with internal structures and conversions
     #
 
-    def _set_from_fields(self, implicit=False, **fields):
+    def _set_from_fields(self, **fields):
         unknown_fields = set(fields).difference(self._FIELDS)
         if unknown_fields:
-            raise ValueError("Do not know about %s. Known fields are: %s"
-                             % (unknown_fields, self._FIELDS))
+            raise ValueError("Do not know about %s. Known fields for %s are: %s"
+                             % (unknown_fields, self.__class__, self._FIELDS))
 
         # encode dicts for query or fragment into
         for f in {'query', 'fragment'}:
@@ -466,8 +459,45 @@ class URL(object):
                 fields[f] = ev
 
         self._fields.update(fields)
-        self._str = None
-        self._implicit = implicit
+
+    #
+    # Quick comparators
+    #
+
+    def __eq__(self, other):
+        if not isinstance(other, URLBase):
+            other = MURL(other)
+        return isinstance(other, self.__class__) and dict(other._fields) == dict(self._fields)
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __getattribute__(self, item):
+        if item.startswith('_') or item not in self._FIELDS:
+            return super(URLBase, self).__getattribute__(item)
+        else:
+            return self._fields[item]
+
+
+class URL(URLBase):
+    # fields with their defaults
+    _FIELDS = URLBase._FIELDS + (
+        'scheme',
+        'username',
+        'password',
+        'hostname', 'port',
+        'query',
+        'fragment',
+    )
+
+    def as_str(self):
+        return urlunparse(self.to_pr())
+
+    @classmethod
+    def _str_to_fields(cls, url_str):
+        fields = URL._pr_to_fields(urlparse(url_str))
+        fields['path'] = urlunquote(fields['path'])
+        return fields
 
     def to_pr(self):
         return self._fields_to_pr(self._fields)
@@ -496,7 +526,8 @@ class URL(object):
         # TODO: figure out what to do with query/fragment... one step at a time
         return ParseResult(**pr_fields)
 
-    def _pr_to_fields(self, pr):
+    @classmethod
+    def _pr_to_fields(cls, pr):
         """ParseResult is a tuple so immutable, which complicates adjusting it
 
         This function converts ParseResult into dict"""
@@ -509,97 +540,7 @@ class URL(object):
         # such as .port , .hostname etc
         # Forcing '' instead of None since those properties (.hostname), .password,
         # .username return None if not available and we decided to uniformize
-        return {f: (getattr(pr, f) or '') for f in self._FIELDS}
-
-    def _set_from_str(self, url):
-        fields = self._pr_to_fields(urlparse(url))
-        lgr.log(5, "Parsed url %s into fields %s" % (url, fields))
-
-        # Special treatments
-        # file:///path should stay file:
-        if fields['scheme'] and fields['scheme'] not in {'file'} \
-                and not fields['hostname']:
-            # dl+archive:... or just for ssh   hostname:path/p1
-            if '+' not in fields['scheme']:
-                fields['scheme'] = 'ssh:implicit'
-                lgr.log(5, "Assuming ssh style url, adjusted: %s" % (fields,))
-
-        if not fields['scheme'] and not fields['hostname']:
-            parts = _split_colon(url)
-            if fields['path'] and '@' in fields['path'] or len(parts) > 1:
-                # user@host:path/sp1
-                # or host_name: (hence parts check)
-                # TODO: we need a regex to catch those really, parts check is not suff
-                fields['scheme'] = 'ssh:implicit'
-            elif url.startswith('//'):
-                # e.g. // or ///path
-                fields['scheme'] = 'datalad:implicit'
-            else:
-                fields['scheme'] = 'file:implicit'
-
-        if not fields['scheme'] and fields['hostname']:
-            # e.g. //a/path
-            fields['scheme'] = 'datalad:implicit'
-
-        if fields['scheme'] == 'ssh:implicit':
-            # just parse the url according to regex matchint ssh "url" specs
-            lgr.log(5, "Detected ssh style url")
-            ssh_re = re.match(
-                r'((?P<username>\S*)@)?(?P<hostname>[^:]+)(\:(?P<path>.*))?$',
-                url)
-            if not ssh_re:
-                # TODO: custom error?
-                raise ValueError(
-                    "Possibly incorrectly determined url %r to be ssh:internal"
-                    " -- it failed matching regex. Dunno how to handle. Contact developers"
-                    % (url,)
-                )
-            fields = self._get_blank_fields(scheme='ssh:implicit')  # reset them all
-            fields.update({k: v for k, v in iteritems(ssh_re.groupdict()) if v})
-            if fields['path'] and fields['path'].startswith('//'):
-                # Let's normalize for now to avoid multiple leading slashes
-                fields['path'] = '/' + fields['path'].lstrip('/')
-            # escape path so we have direct representation of the path to work with
-            fields['path'] = unescape_ssh_path(fields['path'])
-        elif fields['scheme'] == 'file:implicit':
-            fields = self._get_blank_fields(scheme='file:implicit')  # reset them all
-            fields['path'] = url
-        elif not fields['scheme'].endswith(':implicit'):
-            # So regular URL -- entries should have been quoted, we need to unquote
-            # we need to unquote some.
-            # for field in ('hostname', '')
-            # TODO
-            fields['path'] = urlunquote(fields['path'])
-            pass
-
-        if ':' in fields['scheme']:
-            fields['scheme'], implicit_str = fields['scheme'].split(':', 1)
-            assert(implicit_str == 'implicit')
-            implicit = True
-        else:
-            implicit = False
-
-        self._set_from_fields(implicit, **fields)
-        self._str = url
-
-        # well -- some urls might not unparse identically back
-        # strictly speaking, but let's assume they do
-        url_ = self._as_str()
-        if url != url_:
-            lgr.warning("Parsed version of url %r differs from original %r",
-                        url_, url)
-
-    #
-    # Quick comparators
-    #
-
-    def __eq__(self, other):
-        if not isinstance(other, URL):
-            other = URL(other)
-        return dict(other._fields) == dict(self._fields)
-
-    def __ne__(self, other):
-        return not (self == other)
+        return {f: (getattr(pr, f) or '') for f in cls._FIELDS}
 
     #
     # Access helpers
@@ -627,11 +568,89 @@ class URL(object):
     def fragment_dict(self):
         return self._parse_qs(self.fragment)
 
-    # def __getattribute__(self, item):
-    #     if item.startswith('_') or item not in URL._FIELDS:
-    #         return super(URL, self).__getattribute__(item)
-    #     else:
-    #         return self._fields[item]
+
+class FileURL(URLBase):
+
+    def as_str(self):
+        return self.path
+
+    @classmethod
+    def _str_to_fields(cls, url_str):
+        return dict(path=url_str)
+
+
+class RegexBasedURLMixin(object):
+    """Base class for URLs which we could simple parse using regular expressions"""
+
+    _REGEX = None
+
+    # not used ATM but possible ;)
+    # @classmethod
+    # def is_str_matches(cls, url_str):
+    #     return bool(cls._REGEX.match(url_str))
+
+    @classmethod
+    def _str_to_fields(cls, url_str):
+        re_match = cls._REGEX.match(url_str)
+        if not re_match:
+            # TODO: custom error?
+            raise ValueError(
+                "Possibly incorrectly determined string %r correspond to %s address"
+                " -- it failed matching regex. Dunno how to handle. Contact developers"
+                % (cls, url_str,)
+            )
+        fields = cls._get_blank_fields()
+        fields.update({k: v for k, v in iteritems(re_match.groupdict()) if v})
+        cls._normalize_fields(fields)
+        return fields
+
+    @classmethod
+    def _normalize_fields(self, fields):
+        """Helper to be ran if any of the fields need to be normalized after parsing"""
+        pass
+
+
+class SSHURL(URLBase, RegexBasedURLMixin):
+
+    _FIELDS = URLBase._FIELDS + (
+        'username',
+        'hostname',
+    )
+
+    _REGEX = re.compile(r'((?P<username>\S*)@)?(?P<hostname>[^:]+)(\:(?P<path>.*))?$')
+
+    @classmethod
+    def _normalize_fields(cls, fields):
+        if fields['path'] and fields['path'].startswith('//'):
+            # Let's normalize for now to avoid multiple leading slashes
+            fields['path'] = '/' + fields['path'].lstrip('/')
+        # escape path so we have direct representation of the path to work with
+        fields['path'] = unescape_ssh_path(fields['path'])
+
+    def as_str(self):
+        fields = self.fields  # copy so we could escape symbols
+        url_fmt = '{hostname}'
+        if fields['username']:
+            url_fmt = "{username}@" + url_fmt
+        if fields['path']:
+            url_fmt += ':{path}'
+        fields['path'] = escape_ssh_path(fields['path'])
+        return url_fmt.format(**fields)
+
+
+class DataLadURL(URLBase, RegexBasedURLMixin):
+
+    _FIELDS = URLBase._FIELDS + (
+        'remote',
+    )
+
+    # For now or forever we don't deal with any fragments or other special stuff
+    _REGEX = re.compile(r'//(?P<remote>\S*?)?/(?P<path>.*)?$')
+
+    # do they need to be normalized??? loosing track ...
+
+    def as_str(self):
+        return "//{remote}/{path}".format(**self._fields)
 
 # Bind properties to access fields (without overriding __getattr*)
 # This one doesn't work -- I guess due to absent binding of f value
@@ -647,8 +666,8 @@ class URL(object):
 # URL.username = property(lambda self: self._fields['username'])
 # URL.password = property(lambda self: self._fields['password'])
 # URL.port = property(lambda self: self._fields['port'])
-for f in URL._FIELDS:
-    exec("URL.%s = property(lambda self: self._fields['%s'])" % (f, f))
+#for f in URL._FIELDS:
+#    exec("URL.%s = property(lambda self: self._fields['%s'])" % (f, f))
 
 
 def _split_colon(s, maxsplit=1):
@@ -694,12 +713,10 @@ def is_url(s):
     This includes ssh "urls" which git understands.
     """
     try:
-        url = URL(s)
+        url = MURL(s)
     except:
         return False
-    implicit = url.implicit
-    scheme = url.scheme
-    return implicit and scheme in {'ssh'} or (not implicit and bool(url))
+    return isinstance(url, (URL, SSHURL))
 
 
 #### windows workaround ###
