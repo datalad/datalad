@@ -12,6 +12,7 @@ from ..archives import ArchiveAnnexCustomRemote
 from ...support.annexrepo import AnnexRepo
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from ...tests.utils import *
+from ...cmd import Runner
 
 from . import _get_custom_runner
 
@@ -28,7 +29,7 @@ fn_extracted_obscure = fn_inarchive_obscure.replace('a', 'z')
 # TODO: with_tree ATM for archives creates this nested top directory
 # matching archive name, so it will be a/d/test.dat ... we don't want that probably
 @with_tree(
-    tree=(('a.tar.gz', (('d', ((fn_inarchive_obscure, '123'),)),)),
+    tree=(('a.tar.gz', {'d': {fn_inarchive_obscure: '123'}}),
           ('simple.txt', '123'),
           (fn_archive_obscure, (('d', ((fn_inarchive_obscure, '123'),)),)),
           (fn_extracted_obscure, '123')))
@@ -96,6 +97,19 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     # verify that we can drop if original archive gets dropped but available online:
     #  -- done as part of the test_add_archive_content.py
     # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
+
+
+@with_tree(
+    tree={'a.tar.gz': {'d': {fn_inarchive_obscure: '123'}}}
+)
+def test_annex_get_from_subdir(topdir):
+    from datalad.api import add_archive_content
+    annex = AnnexRepo(topdir, init=True)
+    annex.add('a.tar.gz', commit=True)
+    add_archive_content('a.tar.gz', annex=annex, delete=True)
+    with chpwd(opj(topdir, 'a', 'd')):
+        runner = Runner()
+        runner(['git', 'annex', 'drop', fn_inarchive_obscure])
 
 
 def test_basic_scenario():
