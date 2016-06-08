@@ -175,7 +175,8 @@ class SSHManager(object):
     def close(self):
         """Closes all connections, known to this instance.
         """
-        lgr.debug("Closing SSH connections ...")
-        for cnct in self._connections:
-            self._connections[cnct].close()
+        if self._connections:
+            lgr.debug("Closing %d SSH connections..." % len(self._connections))
+            for cnct in self._connections:
+                self._connections[cnct].close()
 
