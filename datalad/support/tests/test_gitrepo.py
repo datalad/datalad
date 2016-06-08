@@ -717,3 +717,63 @@ def test_get_added_files_commit_msg():
     eq_(f([]), 'No files were added')
     eq_(f(["f1"]), 'Added 1 file\n\nFiles:\nf1')
     eq_(f(["f1", "f2"]), 'Added 2 files\n\nFiles:\nf1\nf2')
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_git_custom_calls(path, path2):
+    # we need a GitRepo instance
+    repo = GitRepo(path, create=True)
+    with open(opj(path, "cc_test.dat"), 'w') as f:
+        f.write("test_git_custom_calls")
+
+    out, err = repo._gitpy_custom_call('add', 'cc_test.dat')
+
+    # actually executed:
+    assert_in("cc_test.dat", repo.get_indexed_files())
+    ok_(repo.dirty)
+
+    # call using cmd_options:
+    out, err = repo._gitpy_custom_call('commit',
+                                       cmd_options={'m': 'added file'})
+    ok_clean_git(path, annex=False)
+    # check output:
+    assert_in("1 file changed", out)
+    assert_in("cc_test.dat", out)
+    eq_('', err)
+
+    # impossible 'add' call should raise ...
+    assert_raises(GitCommandError, repo._gitpy_custom_call,
+                  'add', 'not_existing', expect_fail=False)
+    # .. except we expect it to fail:
+    repo._gitpy_custom_call('add', 'not_existing', expect_fail=True)
+
+    # log outputs:
+    with swallow_logs(new_level=logging.DEBUG) as cm:
+        out, err = repo._gitpy_custom_call('status',
+                                           log_stdout=True,
+                                           log_stderr=True)
+
+        assert_in("On branch master", out)
+        assert_in("nothing to commit, working directory clean", out)
+        eq_("", err)
+        for line in out.splitlines():
+            assert_in("stdout| " + line, cm.out)
+
+    # don't log outputs:
+    with swallow_logs(new_level=logging.DEBUG) as cm:
+        out, err = repo._gitpy_custom_call('status',
+                                           log_stdout=False,
+                                           log_stderr=False)
+
+        assert_in("On branch master", out)
+        assert_in("nothing to commit, working directory clean", out)
+        eq_("", err)
+        eq_("", cm.out)
+
+    # use git_options:
+    # Note: 'path2' doesn't contain a git repository
+    with assert_raises(GitCommandError) as cm:
+        repo._gitpy_custom_call('status', git_options={'C': path2})
+        assert_in("git -C %s status" % path2, str(cm.exception))
+        assert_in("fatal: Not a git repository", str(cm.exception))

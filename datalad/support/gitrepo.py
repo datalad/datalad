@@ -555,6 +555,7 @@ class GitRepo(object):
         branch: str, optional
         """
         # TODO: support not only a branch but any treeish
+        #       Note: repo.tree(treeish).hexsha
         if branch is None:
             return self.repo.active_branch.object.hexsha
         for b in self.repo.branches:
@@ -689,6 +690,101 @@ class GitRepo(object):
         else:
             return content_str.splitlines()
         # TODO: keep splitlines?
+
+    def _gitpy_custom_call(self, cmd, cmd_args=None, cmd_options=None,
+                           git_options=None, env=None,
+
+                           # 'old' options for Runner; not sure yet, which of
+                           # them are actually still needed:
+                           log_stdout=True, log_stderr=True, log_online=False,
+                           expect_stderr=True, cwd=None,
+                           shell=None, expect_fail=False):
+
+        """Helper to call GitPython's wrapper for git calls.
+
+        The used instance of `gitpy.Git` is bound to the repository,
+        which determines its working directory.
+        This is used for adhoc implementation of a git command and to
+        demonstrate how to use it in more specific implementations.
+
+        Note
+        ----
+        Aims to replace the use of datalad's `Runner` class for direct git
+        calls. (Currently the `_git_custom_command()` method).
+        Therefore mimicking its behaviour during RF'ing.
+
+        Parameters
+        ----------
+        cmd: str
+          the native git command to call
+        cmd_args: list of str
+          arguments to the git command
+        cmd_options: dict
+          options for the command as key, value pair
+          (this transformation, needs some central place to document)
+        git_options: dict
+          options for the git executable as key, value pair
+          (see above)
+        env: dict
+          environment vaiables to temporarily set for this call
+
+        TODO
+        ----
+        Example
+
+        Returns
+        -------
+        (stdout, stderr)
+        """
+
+        # TODO: Reconsider when to log/stream what (stdout, stderr) and/or
+        # fully implement the behaviour of `Runner`
+
+        if log_online:
+            raise NotImplementedError("option 'log_online' not implemented yet")
+        with_exceptions = not expect_fail
+        if cwd:
+            # the gitpy.cmd.Git instance, bound to this repository doesn't allow
+            # to explicitly set the working dir, except for using os.getcwd
+            raise NotImplementedError("working dir is a read-only property")
+
+        _tmp_shell = gitpy.cmd.Git.USE_SHELL
+        gitpy.cmd.Git.USE_SHELL = shell
+
+        if env is None:
+            env = {}
+        if git_options is None:
+            git_options = {}
+        if cmd_options is None:
+            cmd_options = {}
+        cmd_options.update({'with_exceptions': with_exceptions,
+                            'with_extended_output': True})
+
+
+
+        with self.repo.git.custom_environment(**env):
+            try:
+                status, std_out, std_err = \
+                    self.repo.git(**git_options).__getattr__(cmd)(
+                        cmd_args, **cmd_options)
+            except GitCommandError as e:
+                # For now just reraise. May be raise CommandError instead
+                raise
+            finally:
+                gitpy.cmd.Git.USE_SHELL = _tmp_shell
+
+        if not expect_stderr and std_err:
+            lgr.error("Unexpected output on stderr: %s" % std_err)
+            raise CommandError
+        if log_stdout:
+            for line in std_out.splitlines():
+                lgr.debug("stdout| " + line)
+        if log_stderr:
+            for line in std_err.splitlines():
+                lgr.log(level=logging.DEBUG if expect_stderr else logging.ERROR,
+                        msg="stderr| " + line)
+
+        return std_out, std_err
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
