@@ -63,23 +63,23 @@ class AddArchiveContent(Interface):
         delete=Parameter(
             args=("-d", "--delete"),
             action="store_true",
-            doc="""Flag to delete original archive from the filesystem/git in current tree.
+            doc="""flag to delete original archive from the filesystem/git in current tree.
                    Note that it will be of no effect if --key is given."""),
         strip_leading_dirs=Parameter(
             args=("--strip-leading-dirs",),
             action="store_true",
-            doc="""Flag to move all files directories up, from how they were stored in an archive,
+            doc="""flag to move all files directories up, from how they were stored in an archive,
                    if that one contained a number (possibly more than 1 down) single leading
-                   directories."""),
+                   directories """),
         leading_dirs_depth=Parameter(
             args=("--leading-dirs-depth",),
             action="store",
             type=int,
-            doc="""Maximal depth to strip leading directories to. If not specified (None), no limit"""),
+            doc="""maximal depth to strip leading directories to.  If not specified (None), no limit"""),
         leading_dirs_consider=Parameter(
             args=("--leading-dirs-consider",),
             action="append",
-            doc="""Regular expression(s) for directories to consider to strip away""",
+            doc="""regular expression(s) for directories to consider to strip away""",
             constraints=EnsureStr() | EnsureNone(),
         ),
         # TODO: add option to extract under archive's original directory. Currently would extract in curdir
@@ -87,8 +87,8 @@ class AddArchiveContent(Interface):
             args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
             default="fail",
-            doc="""What operation to perform a file from archive tries to overwrite an existing
-             file with the same name. 'fail' (default) leads to RuntimeError exception.
+            doc="""what operation to perform a file from archive tries to overwrite an existing
+             file with the same name.  'fail' (default) leads to RuntimeError exception.
              'overwrite' silently replaces existing file.  'archive-suffix' instructs to add
              a suffix (prefixed with a '-') matching archive name from which file gets extracted,
              and if that one present, 'numeric-suffix' is in effect in addition, when incremental
@@ -97,26 +97,26 @@ class AddArchiveContent(Interface):
         exclude=Parameter(
             args=("-e", "--exclude"),
             action='append',
-            doc="""Regular expressions for filenames which to exclude from being added to annex.
-            Applied after --rename if that one is specified.  For exact matching, use anchoring.""",
+            doc="""regular expressions for filenames which to exclude from being added to annex.
+            Applied after --rename if that one is specified.  For exact matching, use anchoring""",
             constraints=EnsureStr() | EnsureNone()
         ),
         rename=Parameter(
             args=("-r", "--rename"),
             action='append',
-            doc="""Regular expressions to rename files before being added under git.
+            doc="""regular expressions to rename files before being added under git.
             First letter defines how to split provided string into two parts:
-            Python regular expression (with groups), and replacement string.""",
+            python regular expression (with groups), and replacement string""",
             constraints=EnsureStr(min_len=2) | EnsureNone()
         ),
         annex_options=Parameter(
             args=("-o", "--annex-options"),
-            doc="""Additional options to pass to git-annex""",
+            doc="""additional options to pass to git-annex""",
             constraints=EnsureStr() | EnsureNone()
         ),
         # TODO: Python only???
         annex=Parameter(
-            doc="""Annex instance to use""" #,
+            doc="""annex instance to use"""
             #constraints=EnsureStr() | EnsureNone()
         ),
         # TODO: Python only!
@@ -126,31 +126,31 @@ class AddArchiveContent(Interface):
         key=Parameter(
             args=("--key",),
             action="store_true",
-            doc="""Flag to signal if provided archive is not actually a filename on its own but an annex key"""),
+            doc="""flag to signal if provided archive is not actually a filename on its own but an annex key"""),
         copy=Parameter(
             args=("--copy",),
             action="store_true",
-            doc="""Flag to copy the content of the archive instead of moving."""),
+            doc="""flag to copy the content of the archive instead of moving"""),
         allow_dirty=Parameter(
             args=("--allow-dirty",),
             action="store_true",
-            doc="""Flag that operating on a dirty repository (uncommitted or untracked content) is Ok."""),
+            doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok"""),
         commit=Parameter(
             args=("--no-commit",),
             action="store_false",
             dest="commit",
-            doc="""Flag to not commit upon completion."""),
+            doc="""flag to not commit upon completion"""),
         drop_after=Parameter(
             args=("--drop-after",),
             action="store_true",
-            doc="""Drop extracted files after adding to annex.""",
+            doc="""drop extracted files after adding to annex""",
         ),
         delete_after=Parameter(
             args=("--delete-after",),
             action="store_true",
-            doc="""Extract under a temporary directory, git-annex add, and delete after.
-         To be used to "index" files within annex without actually creating corresponding
-         files under git.  Note that `annex dropunused` would later remove that load."""),
+            doc="""extract under a temporary directory, git-annex add, and delete after.
+             To be used to "index" files within annex without actually creating corresponding
+             files under git.  Note that `annex dropunused` would later remove that load"""),
 
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(

@@ -60,13 +60,13 @@ class Publish(Interface):
         # Note: add remote currently disabled in publish
         # dest_url=Parameter(
         #     args=('--dest-url',),
-        #     doc="""The URL of the dataset sibling named by `dest`. This URL has
+        #     doc="""the URL of the dataset sibling named by `dest`.  This URL has
         #     to be accessible to anyone, who is supposed to have access to the
         #     published dataset later on.\n
         #     If you want to publish with `recursive`, it is expected, that you
         #     pass a template for building the URLs of all (sub)datasets to be
         #     published by using placeholders.\n
-        #     List of currently available placeholders:\n
+        #     list of currently available placeholders:\n
         #     %%NAME\tthe name of the dataset, where slashes are replaced by
         #     dashes.\nThis option is ignored if there is already a configured
         #     sibling dataset under the name given by `dest`.""",
@@ -74,9 +74,9 @@ class Publish(Interface):
         #     constraints=EnsureStr() | EnsureNone()),
         # dest_pushurl=Parameter(
         #     args=('--dest-pushurl',),
-        #     doc="""In case the `dest_url` cannot be used to publish to the
+        #     doc="""in case the `dest_url` cannot be used to publish to the
         #     dataset sibling, this option specifies a URL to be used for the
-        #     actual publication operation.""",
+        #     actual publication operation""",
         #     constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("-r", "--recursive"),

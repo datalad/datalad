@@ -51,29 +51,29 @@ class Ls(Interface):
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="Recurse into subdirectories",
+            doc="recurse into subdirectories",
         ),
         fast=Parameter(
             args=("-F", "--fast"),
             action="store_true",
-            doc="Only perform fast operations. Would be overrident by --all",
+            doc="only perform fast operations.  Would be overrident by --all",
         ),
         all=Parameter(
             args=("-a", "--all"),
             action="store_true",
-            doc="List all entries, not e.g. only latest entries in case of S3",
+            doc="list all entries, not e.g. only latest entries in case of S3",
         ),
         config_file=Parameter(
-            doc="""Path to config file which could help the 'ls'.  E.g. for s3://
+            doc="""path to config file which could help the 'ls'.  E.g. for s3://
             URLs could be some ~/.s3cfg file which would provide credentials""",
             constraints=EnsureStr() | EnsureNone()
         ),
         list_content=Parameter(
             choices=(None, 'first10', 'md5', 'full'),
-            doc="""List also the content or only first 10 bytes (first10), or md5
-            checksum of an entry.  Might require expensive
-            transfer and dump binary output to your screen.  Do not enable unless
-            you know what you are after""",
+            doc="""list also the content or only first 10 bytes (first10), or md5
+            checksum of an entry.  Might require expensive transfer and dump
+            binary output to your screen.  Do not enable unless you know what you
+            are after""",
             default=None
         ),
     )
@@ -347,7 +347,8 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         providers = Providers.from_config_files()
         provider = providers.get_provider(loc)
         if not provider:
-            raise ValueError("don't know how to deal with this url %s -- no downloader defined.  Specify just s3cmd config file instead")
+            raise ValueError("don't know how to deal with this url %s -- no downloader defined.  "
+                             "Specify just s3cmd config file instead")
         bucket = provider.authenticator.authenticate(bucket_name, provider.credential)
 
     info = []
@@ -407,7 +408,7 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
                         content = digest.hexdigest()
                     else:
                         raise ValueError(list_content)
-                    #content = "[S3: OK]"
+                    # content = "[S3: OK]"
                 except S3ResponseError as err:
                     content = err.message
                 finally:

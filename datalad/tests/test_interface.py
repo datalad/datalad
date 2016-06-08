@@ -19,6 +19,7 @@ from ..interface.base import Interface, get_api_name, get_cmdline_command_name
 from ..utils import swallow_outputs
 from .utils import assert_re_in
 
+
 class Demo(Interface):
     """I am a demo"""
     _params_ = dict(
