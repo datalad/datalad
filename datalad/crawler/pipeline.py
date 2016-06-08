@@ -42,6 +42,12 @@ no verification is done and things can go utterly wrong.  So nodes must be robus
 provide informative logging.
 """
 
+__dev_doc__ = """
+Somewhat similar loose/flexible pipelining in Python approaches
+
+- https://github.com/freeman-lab/pipeit
+"""
+
 import sys
 from glob import glob
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
