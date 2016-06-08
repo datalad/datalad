@@ -280,8 +280,7 @@ class URL(object):
     able to rebuild itself into a string representation for reuse
 
     If scheme was implicit (e.g. "host:path" for ssh, or later may be "host::path" for
-    rsync) ":implicit" suffix added to the scheme (so it is included in the repr of the
-    instance "for free")
+    rsync) "implicit" property is set.
 
     Additional semantics we might want to somehow understand/map???
     - strings starting with // (no scheme) assumed to map to local central DataLad dataset,
@@ -321,7 +320,7 @@ class URL(object):
         }
     """
 
-    __slots__ = _FIELDS + ('_fields', '_str')
+    __slots__ = _FIELDS + ('_fields', '_str', '_implicit')
 
     def __init__(self, url=None, implicit=None, **kwargs):
         """
@@ -333,7 +332,7 @@ class URL(object):
         **kwargs: dict
           The values for the fields defined in _FIELDS class variable.
         """
-        if url and (bool(url) == bool(kwargs)):
+        if url and (bool(url) == (bool(kwargs) or implicit is not None)):
             raise ValueError(
                 "Specify either url or breakdown from the fields, not both. "
                 "Got url=%r, fields=%r" % (url, kwargs))
@@ -349,7 +348,11 @@ class URL(object):
         if url:
             self._set_from_str(url)
         else:
-            self._set_from_fields(**kwargs)
+            self._set_from_fields(implicit, **kwargs)
+
+    @property
+    def implicit(self):
+        return self._implicit
 
     @classmethod
     def _get_blank_fields(cls, **kwargs):
@@ -365,16 +368,16 @@ class URL(object):
         return "%s(%s)" % (
             self.__class__.__name__,
             ", ".join(["%s=%r" % (k, v)
-                       for k, v in sorted(self._fields.items())
+                       for k, v in sorted(self._fields.items()) + [('implicit', self.implicit)]
                        if v]))
 
     # Some custom __str__s for :implicit URLs -- begging for subclassing TODO
     def __str_ssh__(self):
-        """Custom str for ssh:implicit"""
+        """Custom str for implicit ssh"""
         fields = self.fields  # copy so we could escape symbols
         for field in ('password', 'query', 'fragment'):
             assert not fields[field], \
-                "ssh:implicit should not have %s defined. It is %r" % (field, fields[field])
+                "implicit ssh should not have %s defined. It is %r" % (field, fields[field])
         url_fmt = '%(hostname)s'
 
         if fields['username']:
@@ -385,7 +388,7 @@ class URL(object):
         return url_fmt % fields
 
     def __str_datalad__(self):
-        """Custom str for datalad:implicit"""
+        """Custom str for implicit datalad"""
         fields = self._fields.copy()
         fields['scheme'] = ''
         url = urlunparse(self._fields_to_pr(fields))
@@ -395,11 +398,11 @@ class URL(object):
         return url
 
     def __str_file__(self):
-        """Custom str for file:implicit"""
+        """Custom str for file"""
         fields = self._fields
         for field in ('username', 'hostname', 'password', 'query', 'fragment'):
             assert not fields[field], \
-                "file:implicit should not have %s defined. It is %r" % (field, fields[field])
+                "implicit file should not have %s defined. It is %r" % (field, fields[field])
         return self.path
 
     # Lazily evaluated if _str was not set
@@ -418,7 +421,7 @@ class URL(object):
             try:
                 __str__ = getattr(self, '__str_%s__' % base_scheme)
             except AttributeError:
-                raise ValueError("Don't know how to convert %s:implicit into str"
+                raise ValueError("Don't know how to convert implicit %s into str"
                                  % base_scheme)
             return __str__()
 
@@ -440,7 +443,7 @@ class URL(object):
     # Helpers to deal with internal structures and conversions
     #
 
-    def _set_from_fields(self, **fields):
+    def _set_from_fields(self, implicit=False, **fields):
         unknown_fields = set(fields).difference(self._FIELDS)
         if unknown_fields:
             raise ValueError("Do not know about %s. Known fields are: %s"
@@ -464,6 +467,7 @@ class URL(object):
 
         self._fields.update(fields)
         self._str = None
+        self._implicit = implicit
 
     def to_pr(self):
         return self._fields_to_pr(self._fields)
@@ -510,6 +514,7 @@ class URL(object):
     def _set_from_str(self, url):
         fields = self._pr_to_fields(urlparse(url))
         lgr.log(5, "Parsed url %s into fields %s" % (url, fields))
+
         # Special treatments
         # file:///path should stay file:
         if fields['scheme'] and fields['scheme'] not in {'file'} \
@@ -567,7 +572,14 @@ class URL(object):
             fields['path'] = urlunquote(fields['path'])
             pass
 
-        self._set_from_fields(**fields)
+        if ':' in fields['scheme']:
+            fields['scheme'], implicit_str = fields['scheme'].split(':', 1)
+            assert(implicit_str == 'implicit')
+            implicit = True
+        else:
+            implicit = False
+
+        self._set_from_fields(implicit, **fields)
         self._str = url
 
         # well -- some urls might not unparse identically back
@@ -687,7 +699,7 @@ def is_url(s):
         return False
     implicit = url.implicit
     scheme = url.scheme
-    return scheme in {'ssh:implicit'} or (not implicit and bool(url))
+    return implicit and scheme in {'ssh'} or (not implicit and bool(url))
 
 
 #### windows workaround ###

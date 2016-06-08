@@ -122,7 +122,10 @@ def _check_url(url, exact_str=True, **fields):
             assert_in('Parsed version of url', cml.out)
     (eq_ if exact_str else neq_)(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
     # and that we have access to all those fields
-    nok_(set(fields).difference(URL._FIELDS))
+    fields_noimplicit = set(fields.keys())
+    if 'implicit' in fields_noimplicit:
+        fields_noimplicit.remove('implicit')
+    nok_(fields_noimplicit.difference(set(URL._FIELDS)))
     for f, v in fields.items():
         eq_(getattr(url_, f), v)
 
@@ -147,7 +150,7 @@ def test_url_base():
     ok_(bool(smth))
     nok_(bool(URL()))
 
-    assert_raises(ValueError, str, URL(scheme="unknown:implicit"))
+    assert_raises(ValueError, str, URL(scheme="unknown", implicit=True))
     assert_raises(ValueError, url._set_from_fields, unknown='1')
 
     with swallow_logs(new_level=logging.WARNING) as cml:
@@ -170,21 +173,21 @@ def test_url_samples():
     # XXX? might be useful?  https://github.com/FriendCode/giturlparse.py
     _check_url("ssh://host/path/sp1", scheme='ssh', hostname='host', path='/path/sp1')
     _check_url("user@host:path/sp1",
-               scheme='ssh:implicit', hostname='host', path='path/sp1', username='user')
-    _check_url("host:path/sp1", scheme='ssh:implicit', hostname='host', path='path/sp1')
-    _check_url("host:path", scheme='ssh:implicit', hostname='host', path='path')
-    _check_url("host:/path", scheme='ssh:implicit', hostname='host', path='/path')
-    _check_url("user@host", scheme='ssh:implicit', hostname='host', username='user')
+               scheme='ssh', implicit=True, hostname='host', path='path/sp1', username='user')
+    _check_url("host:path/sp1", scheme='ssh', implicit=True, hostname='host', path='path/sp1')
+    _check_url("host:path", scheme='ssh', implicit=True, hostname='host', path='path')
+    _check_url("host:/path", scheme='ssh', implicit=True, hostname='host', path='/path')
+    _check_url("user@host", scheme='ssh', implicit=True, hostname='host', username='user')
     # TODO!!!  should this be a legit URL like this?
-    # _check_url("host", scheme='ssh:implicit', hostname='host'))
-    eq_(repr(URL("host:path")), "URL(hostname='host', path='path', scheme='ssh:implicit')")
+    # _check_url("host", scheme='ssh', implicit=True, hostname='host'))
+    eq_(repr(URL("host:path")), "URL(hostname='host', path='path', scheme='ssh', implicit=True)")
 
-    # And now perspective 'datalad:implicit' urls pointing to the canonical center location
-    _check_url("///", scheme='datalad:implicit', path='/')
-    _check_url("///p/s1", scheme='datalad:implicit', path='/p/s1')
+    # And now perspective 'datalad', implicit=True urls pointing to the canonical center location
+    _check_url("///", scheme='datalad', implicit=True, path='/')
+    _check_url("///p/s1", scheme='datalad', implicit=True, path='/p/s1')
     # could be considered by someone as "URI reference" relative to scheme
-    _check_url("//a/", scheme='datalad:implicit', path='/', hostname='a')
-    _check_url("//a/data", scheme='datalad:implicit', path='/data', hostname='a')
+    _check_url("//a/", scheme='datalad', implicit=True, path='/', hostname='a')
+    _check_url("//a/data", scheme='datalad', implicit=True, path='/data', hostname='a')
 
     # here we will do custom magic allowing only schemes with + in them, such as dl+archive
     # or not so custom as
@@ -210,30 +213,30 @@ def test_url_samples():
     _check_url("file:///c:/path/sp1", scheme='file', path='/c:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
-    _check_url("f", scheme='file:implicit', path='f')
-    _check_url("f/s1", scheme='file:implicit', path='f/s1')
-    _check_url("/f", scheme='file:implicit', path='/f')
-    _check_url("/f/s1", scheme='file:implicit', path='/f/s1')
+    _check_url("f", scheme='file', implicit=True, path='f')
+    _check_url("f/s1", scheme='file', implicit=True, path='f/s1')
+    _check_url("/f", scheme='file', implicit=True, path='/f')
+    _check_url("/f/s1", scheme='file', implicit=True, path='/f/s1')
 
     # some github ones, just to make sure
     _check_url("git://host/user/proj", scheme="git", hostname="host", path="/user/proj")
     _check_url("git@host:user/proj",
-               scheme="ssh:implicit", hostname="host", path="user/proj", username='git')
+               scheme='ssh', implicit=True, hostname="host", path="user/proj", username='git')
 
-    _check_url('weired:/', scheme='ssh:implicit', hostname='weired', path='/')
+    _check_url('weired:/', scheme='ssh', implicit=True, hostname='weired', path='/')
     # since schema is not allowing some symbols so we need to add additional check
-    _check_url('weired_url:/', scheme='ssh:implicit', hostname='weired_url', path='/')
-    _check_url('example.com:/', scheme='ssh:implicit', hostname='example.com', path='/')
-    _check_url('example.com:path/sp1', scheme='ssh:implicit', hostname='example.com', path='path/sp1')
+    _check_url('weired_url:/', scheme='ssh', implicit=True, hostname='weired_url', path='/')
+    _check_url('example.com:/', scheme='ssh', implicit=True, hostname='example.com', path='/')
+    _check_url('example.com:path/sp1', scheme='ssh', implicit=True, hostname='example.com', path='path/sp1')
     _check_url('example.com/path/sp1\:fname',
-               scheme='file:implicit', path='example.com/path/sp1\:fname')
+               scheme='file', implicit=True, path='example.com/path/sp1\:fname')
     # ssh is as stupid as us, so we will stay "Consistently" dumb
     """
     $> ssh example.com/path/sp1:fname
     ssh: Could not resolve hostname example.com/path/sp1:fname: Name or service not known
     """
     _check_url('example.com/path/sp1:fname',
-               scheme='ssh:implicit', hostname='example.com/path/sp1', path='fname')
+               scheme='ssh', implicit=True, hostname='example.com/path/sp1', path='fname')
 
     # check that we are getting a warning logged when url can't be reconstructed
     # precisely
@@ -253,10 +256,10 @@ def test_url_samples():
         neq_(weired_url._as_str(), weired_str)
 
 
-def _test_url_quote_path(scheme, target_url):
+def _test_url_quote_path(scheme, implicit, target_url):
     path = '/ "\';a&b&cd `| '
-    hostname = 'example.com' if scheme not in ('file:implicit',) else ''
-    url = URL(scheme=scheme, hostname=hostname, path=path)
+    hostname = 'example.com' if not (scheme == 'file' and implicit) else ''
+    url = URL(scheme=scheme, hostname=hostname, path=path, implicit=implicit)
     eq_(url.path, path)
     eq_(url.hostname, hostname)
     # all nasty symbols should be quoted
@@ -273,9 +276,9 @@ def _test_url_quote_path(scheme, target_url):
 
 
 def test_url_quote_path():
-    yield _test_url_quote_path, "ssh:implicit", r'example.com:/\ \"' + r"\'\;a\&b\&cd\ \`\|\ "
-    yield _test_url_quote_path, "http", 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'
-    yield _test_url_quote_path, "file:implicit", r'/ "' + r"';a&b&cd `| "  # nothing is done to file:implicit
+    yield _test_url_quote_path, "ssh", True, r'example.com:/\ \"' + r"\'\;a\&b\&cd\ \`\|\ "
+    yield _test_url_quote_path, "http", False, 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'
+    yield _test_url_quote_path, "file", True, r'/ "' + r"';a&b&cd `| "  # nothing is done to file:implicit
 
 
 def test_url_compose_archive_one():
@@ -318,7 +321,7 @@ def test_is_url():
     ok_(is_url('file://localhost/some'))
     ok_(is_url('http://localhost'))
     ok_(is_url('ssh://me@localhost'))
-    # in current understanding it is indeed a url but an 'ssh:implicit', not just
+    # in current understanding it is indeed a url but an 'ssh', implicit=True, not just
     # a useless scheme=weird with a hope to point to a netloc
     with swallow_logs():
         ok_(is_url('weired://'))
