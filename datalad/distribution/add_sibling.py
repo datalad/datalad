@@ -35,32 +35,31 @@ class AddSibling(Interface):
         # positional arguments
         dataset=Parameter(
             args=("--dataset", "-d",),
-            doc="""specify the dataset to add the sibling to. If
+            doc="""specify the dataset to add the sibling to.  If
                 no dataset is given, an attempt is made to identify the dataset
                 based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         name=Parameter(
             args=('name',),
-            doc="""Name of the sibling to be added. If RECURSIVE is set, the
+            doc="""name of the sibling to be added.  If RECURSIVE is set, the
                 same name will be used to address the subdatasets' siblings""",
             constraints=EnsureStr() | EnsureNone()),
         url=Parameter(
             args=('url',),
-            doc="""The URL of or path to the dataset sibling named by
-                `name`.
-                If you want to recursively add siblings, it is expected, that
+            doc="""the URL of or path to the dataset sibling named by
+                `name`.  If you want to recursively add siblings, it is expected, that
                 you pass a template for building the URLs of the siblings of
                 all (sub)datasets by using placeholders.\n
                 List of currently available placeholders:\n
                 %%NAME\tthe name of the dataset, where slashes are replaced by
-                dashes.\nThis option is ignored if there is already a
+                dashes.\nthis option is ignored if there is already a
                 configured sibling dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone(),
             nargs="?"),
         pushurl=Parameter(
             args=('--pushurl',),
-            doc="""In case the `url` cannot be used to publish to the dataset
-                sibling, this option specifies a URL to be used instead.\nIf no
+            doc="""in case the `url` cannot be used to publish to the dataset
+                sibling, this option specifies a URL to be used instead.\nif no
                 `url` is given, `pushurl` serves as `url` as well.
                 This option is ignored if there is already a configured sibling
                 dataset under the name given by `name`""",
@@ -68,12 +67,12 @@ class AddSibling(Interface):
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
-            doc="""Recursively add the sibling `name` to all subdatasets of
+            doc="""recursively add the sibling `name` to all subdatasets of
                 `dataset`""",),
         force=Parameter(
             args=("--force", "-f",),
             action="store_true",
-            doc="""If sibling `name` exists already, force to (re-)configure its
+            doc="""if sibling `name` exists already, force to (re-)configure its
                 URLs""",),)
 
     @staticmethod

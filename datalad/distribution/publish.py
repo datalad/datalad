@@ -42,7 +42,7 @@ class Publish(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to perform the publish operation on. If
+            doc="""specify the dataset to perform the publish operation on.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
@@ -81,7 +81,7 @@ class Publish(Interface):
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="Recursively publish all components of the dataset."),
+            doc="recursively publish all components of the dataset"),
         with_data=Parameter(
             args=("--with-data",),
             doc="shell pattern",
