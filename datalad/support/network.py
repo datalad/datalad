@@ -261,12 +261,12 @@ class SimpleURLStamper(object):
 #  PreparedRequest().prepare_url(url, params) -- nicely cares about url encodings etc
 #
 
-def MURL(url):
-    """Factory function which would determine which type of a url a provided string is"""
+def _guess_ri_cls(ri):
+    """Factory function which would determine which type of a ri a provided string is"""
     # We assume that it is a URL and parse it. Depending on the result
     # we might decide that it was something else ;)
-    fields = URL._pr_to_fields(urlparse(url))
-    lgr.log(5, "Parsed url %s into fields %s" % (url, fields))
+    fields = URL._pr_to_fields(urlparse(ri))
+    lgr.log(5, "Parsed ri %s into fields %s" % (ri, fields))
 
     type_ = 'url'
     # Special treatments
@@ -276,16 +276,16 @@ def MURL(url):
         # dl+archive:... or just for ssh   hostname:path/p1
         if '+' not in fields['scheme']:
             type_ = 'ssh'
-            lgr.log(5, "Assuming ssh style url, adjusted: %s" % (fields,))
+            lgr.log(5, "Assuming ssh style ri, adjusted: %s" % (fields,))
 
     if not fields['scheme'] and not fields['hostname']:
-        parts = _split_colon(url)
+        parts = _split_colon(ri)
         if fields['path'] and '@' in fields['path'] or len(parts) > 1:
             # user@host:path/sp1
             # or host_name: (hence parts check)
             # TODO: we need a regex to catch those really, parts check is not suff
             type_ = 'ssh'
-        elif url.startswith('//'):
+        elif ri.startswith('//'):
             # e.g. // or ///path
             type_ = 'datalad'
         else:
@@ -297,30 +297,17 @@ def MURL(url):
 
     TYPES = {
         'url': URL,
-        'ssh':  SSHURL,
-        'file': FileURL,
-        'datalad': DataLadURL
+        'ssh':  SSHRI,
+        'file': PathRI,
+        'datalad': DataLadRI
     }
     cls = TYPES[type_]
-    # just parse the url according to regex matchint ssh "url" specs
-    lgr.log(5, "Detected %s url" % type_)
-    url_obj = cls.from_str(url)
-
-    # Store internally original str
-    url_obj._str = url
-
-    # well -- some urls might not unparse identically back
-    # strictly speaking, but let's assume they do
-    url_ = url_obj.as_str()
-    if url != url_:
-        lgr.warning("Parsed version of url %r differs from original %r",
-                    url_, url)
-    return url_obj
+    # just parse the ri according to regex matchint ssh "ri" specs
+    lgr.log(5, "Detected %s ri" % type_)
+    return cls
 
 
-#@auto_repr
-# TODO: Well -- it is more of a URI than URL I guess
-class URLBase(object):
+class RI(object):
     """A helper class to deal with URLs with some "magical" treats to facilitate use of "ssh" urls
 
     Intended to be a R/O object (i.e. no fields should be changed in-place)
@@ -357,29 +344,52 @@ class URLBase(object):
 
     __slots__ = _FIELDS + ('_fields', '_str')
 
-    def __init__(self, url=None, **fields):
+    def __new__(cls, ri=None, **kwargs):
+        """Used as a possible factory for known RI types
+
+        Returns
+        -------
+        uninitialized RI object of appropriate class
+
+        """
+        if cls is RI and ri is not None:
+            # RI class was used as a factory
+            cls = _guess_ri_cls(ri)
+
+        ri_obj = super(RI, cls).__new__(cls, ri=ri, **kwargs)
+        # Store internally original str
+        ri_obj._str = ri
+        return ri_obj
+
+    def __init__(self, ri=None, **fields):
         """
 
         Parameters
         ----------
-        url: str, optional
+        ri: str, optional
           String version of a URL specific for this class.  If you would like
-          a type of URL be deduced, use MURL
+          a type of URL be deduced, use RI
         **fields: dict, optional
           The values for the fields defined in _FIELDS class variable.
         """
-        if url and (bool(url) == bool(fields)):
+        if ri and (bool(ri) == bool(fields)):
             raise ValueError(
-                "Specify either url or breakdown from the fields, not both. "
-                "Got url=%r, fields=%r" % (url, fields))
+                "Specify either ri or breakdown from the fields, not both. "
+                "Got ri=%r, fields=%r" % (ri, fields))
 
         self._fields = self._get_blank_fields()
-        if url is not None:
-            fields = self._str_to_fields(url)
-            self._str = url
-        else:
-            self._str = None  # subject to lazy evaluation
+        if ri is not None:
+            fields = self._str_to_fields(ri)
         self._set_from_fields(**fields)
+
+        # If was initialized from a string representation
+        if self._str is not None:
+            # well -- some ris might not unparse identically back
+            # strictly speaking, but let's assume they do
+            ri_ = self.as_str()
+            if ri != ri_:
+                lgr.warning("Parsed version of %s %r differs from original %r",
+                            self.__class__.__name__, ri_, ri)
 
     @classmethod
     def _get_blank_fields(cls, **fields):
@@ -405,16 +415,16 @@ class URLBase(object):
         return self._str
 
     @classmethod
-    def from_str(cls, url_str):
-        obj = cls(**cls._str_to_fields(url_str))
-        obj._str = url_str
+    def from_str(cls, ri_str):
+        obj = cls(**cls._str_to_fields(ri_str))
+        obj._str = ri_str
         return obj
 
     # Apparently doesn't quite play nicely with multiple inheritence for MixIn'
     # of regexp based URLs
     #@abstractmethod
     #@classmethod
-    #def _str_to_fields(cls, url_str):
+    #def _str_to_fields(cls, ri_str):
     #    raise NotImplementedError
 
 
@@ -465,8 +475,8 @@ class URLBase(object):
     #
 
     def __eq__(self, other):
-        if not isinstance(other, URLBase):
-            other = MURL(other)
+        if not isinstance(other, RI):
+            other = RI(other)
         return isinstance(other, self.__class__) and dict(other._fields) == dict(self._fields)
 
     def __ne__(self, other):
@@ -474,14 +484,14 @@ class URLBase(object):
 
     def __getattribute__(self, item):
         if item.startswith('_') or item not in self._FIELDS:
-            return super(URLBase, self).__getattribute__(item)
+            return super(RI, self).__getattribute__(item)
         else:
             return self._fields[item]
 
 
-class URL(URLBase):
+class URL(RI):
     # fields with their defaults
-    _FIELDS = URLBase._FIELDS + (
+    _FIELDS = RI._FIELDS + (
         'scheme',
         'username',
         'password',
@@ -569,7 +579,7 @@ class URL(URLBase):
         return self._parse_qs(self.fragment)
 
 
-class FileURL(URLBase):
+class PathRI(RI):
 
     def as_str(self):
         return self.path
@@ -610,9 +620,9 @@ class RegexBasedURLMixin(object):
         pass
 
 
-class SSHURL(URLBase, RegexBasedURLMixin):
+class SSHRI(RI, RegexBasedURLMixin):
 
-    _FIELDS = URLBase._FIELDS + (
+    _FIELDS = RI._FIELDS + (
         'username',
         'hostname',
     )
@@ -638,9 +648,9 @@ class SSHURL(URLBase, RegexBasedURLMixin):
         return url_fmt.format(**fields)
 
 
-class DataLadURL(URLBase, RegexBasedURLMixin):
+class DataLadRI(RI, RegexBasedURLMixin):
 
-    _FIELDS = URLBase._FIELDS + (
+    _FIELDS = RI._FIELDS + (
         'remote',
     )
 
@@ -713,10 +723,10 @@ def is_url(s):
     This includes ssh "urls" which git understands.
     """
     try:
-        url = MURL(s)
+        ri = RI(s)
     except:
         return False
-    return isinstance(url, (URL, SSHURL))
+    return isinstance(ri, (URL, SSHRI))
 
 
 #### windows workaround ###

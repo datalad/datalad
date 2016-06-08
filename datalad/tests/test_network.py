@@ -23,10 +23,10 @@ from ..support.network import get_tld
 from ..support.network import get_url_straight_filename
 from ..support.network import get_response_disposition_filename
 from ..support.network import parse_url_opts
-from ..support.network import MURL
-from ..support.network import SSHURL
-from ..support.network import FileURL
-from ..support.network import DataLadURL
+from ..support.network import RI
+from ..support.network import SSHRI
+from ..support.network import PathRI
+from ..support.network import DataLadRI
 from ..support.network import URL
 from ..support.network import _split_colon
 from ..support.network import is_url
@@ -112,31 +112,31 @@ def test_split_colon():
 def test_url_eq():
     eq_(URL(), URL())
     # doesn't make sense to ask what kind of a url it is an empty URL
-    #eq_(MURL(), MURL())
+    #eq_(RI(), RI())
     neq_(URL(), URL(hostname='x'))
     # Different types aren't equal even if have the same fields values
-    neq_(URL(path='x'), FileURL(path='x'))
-    neq_(URL(hostname='x'), SSHURL(hostname='x'))
-    neq_(str(URL(hostname='x')), str(SSHURL(hostname='x')))
+    neq_(URL(path='x'), PathRI(path='x'))
+    neq_(URL(hostname='x'), SSHRI(hostname='x'))
+    neq_(str(URL(hostname='x')), str(SSHRI(hostname='x')))
 
 
-def _check_url(url, cls, exact_str=True, **fields):
+def _check_ri(ri, cls, exact_str=True, **fields):
     """just a helper to carry out few checks on urls"""
     with swallow_logs(new_level=logging.WARNING) as cml:
-        url_ = cls(**fields)
-        murl = MURL(url)
+        ri_ = cls(**fields)
+        murl = RI(ri)
         eq_(murl.__class__, cls)  # not just a subclass
-        eq_(murl, url_)
-        eq_(str(MURL(url)), url)
-        eq_(eval(repr(url_)), url)  # repr leads back to identical url_
-        eq_(url, url_)  # just in case ;)  above should fail first if smth is wrong
+        eq_(murl, ri_)
+        eq_(str(RI(ri)), ri)
+        eq_(eval(repr(ri_)), ri)  # repr leads back to identical ri_
+        eq_(ri, ri_)  # just in case ;)  above should fail first if smth is wrong
         if not exact_str:
-            assert_in('Parsed version of url', cml.out)
-    (eq_ if exact_str else neq_)(url, str(url_))  # that we can reconstruct it EXACTLY on our examples
+            assert_in('Parsed version of', cml.out)
+    (eq_ if exact_str else neq_)(ri, str(ri_))  # that we can reconstruct it EXACTLY on our examples
     # and that we have access to all those fields
     nok_(set(fields).difference(set(cls._FIELDS)))
     for f, v in fields.items():
-        eq_(getattr(url_, f), v)
+        eq_(getattr(ri_, f), v)
 
 
 def test_url_base():
@@ -168,91 +168,91 @@ def test_url_base():
 
 
 def test_url_samples():
-    _check_url("http://example.com", URL, scheme='http', hostname="example.com")
+    _check_ri("http://example.com", URL, scheme='http', hostname="example.com")
     # "complete" one for classical http
-    _check_url("http://user:pw@example.com:8080/p/sp?p1=v1&p2=v2#frag", URL,
-        scheme='http', hostname="example.com", port=8080,
-        username='user', password='pw', path='/p/sp',
-        query='p1=v1&p2=v2', fragment='frag')
+    _check_ri("http://user:pw@example.com:8080/p/sp?p1=v1&p2=v2#frag", URL,
+              scheme='http', hostname="example.com", port=8080,
+              username='user', password='pw', path='/p/sp',
+              query='p1=v1&p2=v2', fragment='frag')
 
     # sample one for ssh with specifying the scheme
     # XXX? might be useful?  https://github.com/FriendCode/giturlparse.py
-    _check_url("ssh://host/path/sp1", URL, scheme='ssh', hostname='host', path='/path/sp1')
-    _check_url("user@host:path/sp1", SSHURL,
-               hostname='host', path='path/sp1', username='user')
-    _check_url("host:path/sp1", SSHURL, hostname='host', path='path/sp1')
-    _check_url("host:path", SSHURL, hostname='host', path='path')
-    _check_url("host:/path", SSHURL, hostname='host', path='/path')
-    _check_url("user@host", SSHURL, hostname='host', username='user')
+    _check_ri("ssh://host/path/sp1", URL, scheme='ssh', hostname='host', path='/path/sp1')
+    _check_ri("user@host:path/sp1", SSHRI,
+              hostname='host', path='path/sp1', username='user')
+    _check_ri("host:path/sp1", SSHRI, hostname='host', path='path/sp1')
+    _check_ri("host:path", SSHRI, hostname='host', path='path')
+    _check_ri("host:/path", SSHRI, hostname='host', path='/path')
+    _check_ri("user@host", SSHRI, hostname='host', username='user')
     # TODO!!!  should this be a legit URL like this?
-    # _check_url("host", SSHURL, hostname='host'))
-    eq_(repr(MURL("host:path")), "SSHURL(hostname='host', path='path')")
+    # _check_ri("host", SSHRI, hostname='host'))
+    eq_(repr(RI("host:path")), "SSHRI(hostname='host', path='path')")
 
     # And now perspective 'datalad', implicit=True urls pointing to the canonical center location
-    _check_url("///", DataLadURL)
-    _check_url("///p/s1", DataLadURL, path='p/s1')
+    _check_ri("///", DataLadRI)
+    _check_ri("///p/s1", DataLadRI, path='p/s1')
     # could be considered by someone as "URI reference" relative to scheme
-    _check_url("//a/", DataLadURL, remote='a')
-    _check_url("//a/data", DataLadURL, path='data', remote='a')
+    _check_ri("//a/", DataLadRI, remote='a')
+    _check_ri("//a/data", DataLadRI, path='data', remote='a')
 
     # here we will do custom magic allowing only schemes with + in them, such as dl+archive
     # or not so custom as
-    _check_url("hg+https://host/user/proj", URL,
-        scheme="hg+https", hostname='host', path='/user/proj')
+    _check_ri("hg+https://host/user/proj", URL,
+              scheme="hg+https", hostname='host', path='/user/proj')
     # "old" style
-    _check_url("dl+archive:KEY/path/sp1#size=123", URL,
-        scheme='dl+archive', path='KEY/path/sp1', fragment='size=123')
+    _check_ri("dl+archive:KEY/path/sp1#size=123", URL,
+              scheme='dl+archive', path='KEY/path/sp1', fragment='size=123')
     # "new" style
-    _check_url("dl+archive:KEY#path=path/sp1&size=123", URL,
-        scheme='dl+archive', path='KEY', fragment='path=path/sp1&size=123')
+    _check_ri("dl+archive:KEY#path=path/sp1&size=123", URL,
+              scheme='dl+archive', path='KEY', fragment='path=path/sp1&size=123')
     # actually above one is probably wrong since we need to encode the path
-    _check_url("dl+archive:KEY#path=path%2Fbsp1&size=123", URL,
-        scheme='dl+archive', path='KEY', fragment='path=path%2Fbsp1&size=123')
+    _check_ri("dl+archive:KEY#path=path%2Fbsp1&size=123", URL,
+              scheme='dl+archive', path='KEY', fragment='path=path%2Fbsp1&size=123')
 
     #https://en.wikipedia.org/wiki/File_URI_scheme
-    _check_url("file://host", URL, scheme='file', hostname='host')
-    _check_url("file://host/path/sp1", URL, scheme='file', hostname='host', path='/path/sp1')
-    _check_url("file:///path/sp1", URL, scheme='file', path='/path/sp1')
-    _check_url("file:///~/path/sp1", URL, scheme='file', path='/~/path/sp1', exact_str=False)
-    _check_url("file:///%7E/path/sp1", URL, scheme='file', path='/~/path/sp1')
+    _check_ri("file://host", URL, scheme='file', hostname='host')
+    _check_ri("file://host/path/sp1", URL, scheme='file', hostname='host', path='/path/sp1')
+    _check_ri("file:///path/sp1", URL, scheme='file', path='/path/sp1')
+    _check_ri("file:///~/path/sp1", URL, scheme='file', path='/~/path/sp1', exact_str=False)
+    _check_ri("file:///%7E/path/sp1", URL, scheme='file', path='/~/path/sp1')
     # not sure but let's check
-    _check_url("file:///c:/path/sp1", URL, scheme='file', path='/c:/path/sp1', exact_str=False)
+    _check_ri("file:///c:/path/sp1", URL, scheme='file', path='/c:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
-    _check_url("f", FileURL, path='f')
-    _check_url("f/s1", FileURL, path='f/s1')
-    _check_url("/f", FileURL, path='/f')
-    _check_url("/f/s1", FileURL, path='/f/s1')
+    _check_ri("f", PathRI, path='f')
+    _check_ri("f/s1", PathRI, path='f/s1')
+    _check_ri("/f", PathRI, path='/f')
+    _check_ri("/f/s1", PathRI, path='/f/s1')
 
     # some github ones, just to make sure
-    _check_url("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
-    _check_url("git@host:user/proj", SSHURL, hostname="host", path="user/proj", username='git')
+    _check_ri("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
+    _check_ri("git@host:user/proj", SSHRI, hostname="host", path="user/proj", username='git')
 
-    _check_url('weired:/', SSHURL, hostname='weired', path='/')
+    _check_ri('weired:/', SSHRI, hostname='weired', path='/')
     # since schema is not allowing some symbols so we need to add additional check
-    _check_url('weired_url:/', SSHURL, hostname='weired_url', path='/')
-    _check_url('example.com:/', SSHURL, hostname='example.com', path='/')
-    _check_url('example.com:path/sp1', SSHURL, hostname='example.com', path='path/sp1')
-    _check_url('example.com/path/sp1\:fname', FileURL, path='example.com/path/sp1\:fname')
+    _check_ri('weired_url:/', SSHRI, hostname='weired_url', path='/')
+    _check_ri('example.com:/', SSHRI, hostname='example.com', path='/')
+    _check_ri('example.com:path/sp1', SSHRI, hostname='example.com', path='path/sp1')
+    _check_ri('example.com/path/sp1\:fname', PathRI, path='example.com/path/sp1\:fname')
     # ssh is as stupid as us, so we will stay "Consistently" dumb
     """
     $> ssh example.com/path/sp1:fname
     ssh: Could not resolve hostname example.com/path/sp1:fname: Name or service not known
     """
-    _check_url('example.com/path/sp1:fname', SSHURL, hostname='example.com/path/sp1', path='fname')
+    _check_ri('example.com/path/sp1:fname', SSHRI, hostname='example.com/path/sp1', path='fname')
 
     # check that we are getting a warning logged when url can't be reconstructed
     # precisely
     # actually failed to come up with one -- becomes late here
-    #_check_url("http://host///..//p", scheme='http', path='/..//p')
+    #_check_ri("http://host///..//p", scheme='http', path='/..//p')
 
     # actually this one is good enough to trigger a warning and I still don't know
     # what it should exactly be!?
     with swallow_logs(new_level=logging.WARNING) as cml:
         weired_str = 'weired://'
-        weired_url = MURL(weired_str)
+        weired_url = RI(weired_str)
         repr(weired_url)
-        assert_re_in('Parsed version of url .weired:/. differs from original .weired://.',
+        assert_re_in('Parsed version of SSHRI .weired:/. differs from original .weired://.',
                      cml.out)
         # but we store original str
         eq_(str(weired_url), weired_str)
@@ -261,7 +261,7 @@ def test_url_samples():
 
 def _test_url_quote_path(cls, clskwargs, target_url):
     path = '/ "\';a&b&cd `| '
-    if not (cls is FileURL):
+    if not (cls is PathRI):
         clskwargs['hostname'] = hostname = 'example.com'
     url = cls(path=path, **clskwargs)
     eq_(url.path, path)
@@ -276,7 +276,7 @@ def _test_url_quote_path(cls, clskwargs, target_url):
         eq_(url.hostname, hostname)
 
     # and figured out and unquoted
-    url_ = MURL(url_str)
+    url_ = RI(url_str)
     ok_(isinstance(url_, cls))
     eq_(url_.path, path)
     if 'hostname' in clskwargs:
@@ -284,9 +284,9 @@ def _test_url_quote_path(cls, clskwargs, target_url):
 
 
 def test_url_quote_path():
-    yield _test_url_quote_path, SSHURL, {}, r'example.com:/\ \"' + r"\'\;a\&b\&cd\ \`\|\ "
+    yield _test_url_quote_path, SSHRI, {}, r'example.com:/\ \"' + r"\'\;a\&b\&cd\ \`\|\ "
     yield _test_url_quote_path, URL, {'scheme': "http"}, 'http://example.com/%20%22%27%3Ba%26b%26cd%20%60%7C%20'
-    yield _test_url_quote_path, FileURL, {}, r'/ "' + r"';a&b&cd `| "  # nothing is done to file:implicit
+    yield _test_url_quote_path, PathRI, {}, r'/ "' + r"';a&b&cd `| "  # nothing is done to file:implicit
 
 
 def test_url_compose_archive_one():
@@ -330,7 +330,7 @@ def test_is_url():
     ok_(is_url('http://localhost'))
     ok_(is_url('ssh://me@localhost'))
     # in current understanding it is indeed a url but an 'ssh', implicit=True, not just
-    # a useless scheme=weird with a hope to point to a netloc
+    # a useless scheme=weired with a hope to point to a netloc
     with swallow_logs():
         ok_(is_url('weired://'))
     nok_(is_url('relative'))
