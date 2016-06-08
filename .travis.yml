@@ -72,10 +72,8 @@ script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   # Verify that we can render manpages
   - make manpages
-  # Generate documentation
-  - cd docs; PYTHONPATH=$PWD/.. make html
-  # Run the doctests in the documentation
-  - PYTHONPATH=$PWD/.. make doctest
+  # Generate documentation and run doctests
+  - PYTHONPATH=$PWD/.. make -C docs html doctest
 
 after_success:
   - coveralls
