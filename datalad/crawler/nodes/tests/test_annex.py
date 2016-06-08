@@ -33,13 +33,17 @@ def test_annexificator_no_git_if_dirty(outdir):
     eq_(listdir(outdir), [])
 
     filepath = opj(outdir, 'myfile.txt')
-    with open(filepath, 'w') as f:
+    filepath2 = opj(outdir, '.something')
+    with open(filepath, 'w'), open(filepath2, 'w') as f:
         f.write("myfile")
+        f.write("something")
 
-    eq_(listdir(outdir), ['myfile.txt'])
-
+    eq_(listdir(outdir), ['myfile.txt', '.something'])
     assert_raises(RuntimeError, Annexificator, path=outdir)
-    eq_(listdir(outdir), ['myfile.txt'])
+    eq_(listdir(outdir), ['myfile.txt', '.something'])
+
+    Annexificator(path=outdir, allow_dirty=True)
+    eq_(listdir(outdir), ['.git', 'myfile.txt', '.something'])
 
 
 @with_tempfile(mkdir=True)
