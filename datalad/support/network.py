@@ -645,7 +645,7 @@ class DataLadURL(URLBase, RegexBasedURLMixin):
     )
 
     # For now or forever we don't deal with any fragments or other special stuff
-    _REGEX = re.compile(r'//(?P<remote>\S*?)?/(?P<path>.*)?$')
+    _REGEX = re.compile(r'//(?P<remote>[^\s/]*)/(?P<path>.*)$')
 
     # do they need to be normalized??? loosing track ...
 
