@@ -308,33 +308,22 @@ def _guess_ri_cls(ri):
 
 
 class RI(object):
-    """A helper class to deal with URLs with some "magical" treats to facilitate use of "ssh" urls
+    """Resource Identifier - base class and a factory for URL, SSHRI, etc
 
-    Intended to be a R/O object (i.e. no fields should be changed in-place)
-
-    Although largely decorating urlparse.ParseResult, it
-    - doesn't mandate providing all parts of the URL
-    - doesn't require netloc but rather asks for separate username, password, and hostname
-    - TODO fragment and query are stored as (ordered) dictionaries of single entry elements
-      (or otherwise encoded), with empty value being equivalent with no value.  If conversion
-      to value=pair fails, string would be stored (so it it was indeed a url pointing to an id
-      within a page)
-
+    Intended to be a R/O object (i.e. no fields should be changed in-place).
+    Subclasses define specific collections of fields they care about in _FIELDS
+    class variable.
     The idea is that this class should help to break apart a URL, while being
     able to rebuild itself into a string representation for reuse
 
-    If scheme was implicit (e.g. "host:path" for ssh, or later may be "host::path" for
-    rsync) "implicit" property is set.
+    `RI` could be used as factory, whenever type of the resource is unknown and
+    must be guessed from the string representation.  One of the subclasses will be
+    provided as output, e.g.
 
-    Additional semantics we might want to somehow understand/map???
-    - strings starting with // (no scheme) assumed to map to local central DataLad dataset,
-      with `location` (if not empty) identifying the remote (super)dataset
-
-    Implementation:
-    - currently might be over-engineered and could be simplified.  Internally keeps
-      all values as attributes, but for manipulation in dict (called fields) and converts
-      back and forth to ParseResults
-    So after we agree on viability of the approach  and collect enough tests we can simplify
+    >>> RI('http://example.com')
+    URL(hostname='example.com', scheme='http')
+    >>> RI('example.com:path')
+    SSHRI(hostname='example.com', path='path')
     """
 
     # All of the subclasses will provide path
@@ -349,7 +338,9 @@ class RI(object):
 
         Returns
         -------
-        uninitialized RI object of appropriate class
+        RI
+           uninitialized RI object of appropriate class with _str
+           set to string representation if was provided
 
         """
         if cls is RI and ri is not None:
@@ -363,12 +354,11 @@ class RI(object):
 
     def __init__(self, ri=None, **fields):
         """
-
         Parameters
         ----------
         ri: str, optional
-          String version of a URL specific for this class.  If you would like
-          a type of URL be deduced, use RI
+          String version of a resource specific for this class.  If you would like
+          a type of the resource be deduced, use RI(ri)
         **fields: dict, optional
           The values for the fields defined in _FIELDS class variable.
         """
@@ -426,7 +416,6 @@ class RI(object):
     #@classmethod
     #def _str_to_fields(cls, ri_str):
     #    raise NotImplementedError
-
 
     #
     # If any field is specified, URL is not considered 'False', i.e.
@@ -490,7 +479,13 @@ class RI(object):
 
 
 class URL(RI):
-    # fields with their defaults
+    """Universal resource locator
+
+    Although largely decorating urlparse.ParseResult, it
+    - doesn't mandate providing all parts of the URL
+    - doesn't require netloc but rather asks for separate username, password, and hostname
+    """
+
     _FIELDS = RI._FIELDS + (
         'scheme',
         'username',
@@ -501,6 +496,7 @@ class URL(RI):
     )
 
     def as_str(self):
+        """Render URL as a string"""
         return urlunparse(self.to_pr())
 
     @classmethod
@@ -510,6 +506,7 @@ class URL(RI):
         return fields
 
     def to_pr(self):
+        """Convert URL to urlparse.ParseResults namedtuple"""
         return self._fields_to_pr(self._fields)
 
     @classmethod
@@ -580,7 +577,7 @@ class URL(RI):
 
 
 class PathRI(RI):
-
+    """RI pointing to a (local) file/directory"""
     def as_str(self):
         return self.path
 
@@ -621,6 +618,7 @@ class RegexBasedURLMixin(object):
 
 
 class SSHRI(RI, RegexBasedURLMixin):
+    """RI pointing to a remote location reachable via SSH"""
 
     _FIELDS = RI._FIELDS + (
         'username',
@@ -649,6 +647,7 @@ class SSHRI(RI, RegexBasedURLMixin):
 
 
 class DataLadRI(RI, RegexBasedURLMixin):
+    """RI pointing to datasets within central DataLad super-dataset"""
 
     _FIELDS = RI._FIELDS + (
         'remote',
@@ -662,23 +661,6 @@ class DataLadRI(RI, RegexBasedURLMixin):
     def as_str(self):
         return "//{remote}/{path}".format(**self._fields)
 
-# Bind properties to access fields (without overriding __getattr*)
-# This one doesn't work -- I guess due to absent binding of f value
-# to the context
-#for f in URL._FIELDS:
-#   setattr(URL, f, property(lambda self: self._fields[f]))
-# These work but ugly duplication
-# URL.hostname = property(lambda self: self._fields['hostname'])
-# URL.path = property(lambda self: self._fields['path'])
-# URL.query = property(lambda self: self._fields['query'])
-# URL.scheme = property(lambda self: self._fields['scheme'])
-# URL.fragment = property(lambda self: self._fields['fragment'])
-# URL.username = property(lambda self: self._fields['username'])
-# URL.password = property(lambda self: self._fields['password'])
-# URL.port = property(lambda self: self._fields['port'])
-#for f in URL._FIELDS:
-#    exec("URL.%s = property(lambda self: self._fields['%s'])" % (f, f))
-
 
 def _split_colon(s, maxsplit=1):
     """Split on unescaped colon"""
@@ -686,6 +668,7 @@ def _split_colon(s, maxsplit=1):
 
 # \ should be first to deal with
 _SSH_ESCAPED_CHARACTERS = '\\#&;`|*?~<>^()[]{}$\'" '
+
 
 # TODO: RF using re.sub
 def escape_ssh_path(path):
