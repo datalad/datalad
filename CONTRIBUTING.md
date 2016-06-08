@@ -106,7 +106,7 @@ we outline the workflow used by the developers:
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
    entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
    examples.  If a commit closes an existing DataLad issue, then add to the end
-   of the mesage `(Closes #ISSUE_NUMER)`
+   of the message `(Closes #ISSUE_NUMER)`
 
 5. Push to GitHub with:
 
@@ -279,7 +279,7 @@ Various hints for developers
 
 - for remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
-  `python - c "import epdb; epdb.connect()"`
+  `python -c "import epdb; epdb.connect()"`
 
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.

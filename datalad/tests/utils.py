@@ -645,8 +645,10 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
 
     Examples
     --------
+
+    >>> from datalad.tests.utils import with_testrepos
     >>> @with_testrepos('basic_annex')
-    >>> def test_write(repo):
+    ... def test_write(repo):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """

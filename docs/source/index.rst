@@ -11,12 +11,13 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
+   crawler/index
    usecases/index
    modref
 
 >>> import datalad
->>> print(datalad.__version__)
-0.0.3.dev0
+>>> print(datalad.__version__)  # doctest: +SKIP
+0.2
 
 Indices and tables
 ==================
