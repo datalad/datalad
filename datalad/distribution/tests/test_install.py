@@ -12,6 +12,8 @@
 import os
 import shutil
 from os.path import join as opj, abspath, isdir
+from os.path import exists
+from os.path import realpath
 
 from ..dataset import Dataset
 from datalad.api import install
@@ -21,6 +23,9 @@ from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileInGitError
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitCommandError
+from datalad.cmd import Runner
+
 from datalad.support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false
@@ -35,7 +40,9 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_outputs
+from datalad.tests.utils import swallow_logs
 
 
 def test_insufficient_args():
@@ -265,3 +272,29 @@ def test_install_recursive(src, path):
 
 # TODO: Is there a way to test result renderer?
 #  MIH: cmdline tests have run_main() which capture the output.
+
+@with_tree(tree={'file.txt': '123'})
+@serve_path_via_http
+@with_tempfile
+def _test_guess_dot_git(annex, path, url, tdir):
+    repo = (AnnexRepo if annex else GitRepo)(path, create=True)
+    repo.add('file.txt', commit=True, git=not annex)
+
+    # we need to prepare to be served via http, otherwise it must fail
+    with swallow_logs() as cml:
+        assert_raises(GitCommandError, install, path=tdir, source=url)
+    ok_(not exists(tdir))
+
+    Runner(cwd=path)(['git', 'update-server-info'])
+
+    with swallow_logs() as cml:
+        installed = install(path=tdir, source=url)
+        assert_not_in("Failed to get annex.uuid", cml.out)
+    eq_(realpath(installed.path), realpath(tdir))
+    ok_(exists(tdir))
+    ok_clean_git(tdir, annex=annex)
+
+
+def test_guess_dot_git():
+    for annex in False, True:
+        yield _test_guess_dot_git, annex
