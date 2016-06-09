@@ -106,42 +106,33 @@ class AnnexRepo(GitRepo):
         path: str
           path to git-annex repository. In case it's not an absolute path, it's
           relative to PWD
-
         url: str, optional
           url to the to-be-cloned repository. Requires valid git url
           according to
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
-
         runner: Runner, optional
           Provide a Runner in case AnnexRepo shall not create it's own.
           This is especially needed in case of desired dry runs.
-
         direct: bool, optional
           If True, force git-annex to use direct mode
-
         backend: str, optional
           Set default backend used by this annex. This does NOT affect files,
           that are already annexed nor will it automatically migrate files,
           hat are 'getted' afterwards.
-
         create: bool, optional
           Create and initializes an annex repository at path, in case
           there is none. If set to False, and this repository is not an annex
           repository (initialized or not), an exception is raised.
-
         init: bool, optional
           Initialize git-annex repository (run "git annex init") if path is an
           annex repository which just was not yet initialized by annex (e.g. a
           fresh git clone). Note that if `create=True`, then initialization
           would happen
-
         batch_size: int, optional
           if specified and >0, instructs annex to batch this many commands before
           annex adds acts on git repository (e.g. adds them them to index for addurl).
-
         version: int, optional
           if given, pass as --version to `git annex init`
-
         description: str, optional
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
