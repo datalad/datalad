@@ -107,10 +107,14 @@ def test_annex_get_from_subdir(topdir):
     annex = AnnexRepo(topdir, init=True)
     annex.add('a.tar.gz', commit=True)
     add_archive_content('a.tar.gz', annex=annex, delete=True)
+    fpath = opj(topdir, 'a', 'd', fn_inarchive_obscure)
 
     with chpwd(opj(topdir, 'a', 'd')):
         runner = Runner()
-        runner(['git', 'annex', 'drop', fn_inarchive_obscure])
+        runner(['git', 'annex', 'drop', fn_inarchive_obscure])  # run git annex drop
+        assert_false(annex.file_has_content(fpath))             # and verify if file deleted from directory
+        runner(['git', 'annex', 'get', fn_inarchive_obscure])   # run git annex get
+        assert_true(annex.file_has_content(fpath))              # and verify if file got into directory
 
 
 def test_get_git_environ_adjusted():
