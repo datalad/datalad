@@ -49,11 +49,16 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     annexcr = ArchiveAnnexCustomRemote(path=d)
     # few quick tests for get_file_url
 
-    eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat"), "dl+archive:xyz/a.dat")
-    eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat", size=999), "dl+archive:xyz/a.dat#size=999")
+    eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat"), "dl+archive:xyz#path=a.dat")
+    eq_(annexcr.get_file_url(archive_key="xyz", file="a.dat", size=999), "dl+archive:xyz#path=a.dat&size=999")
 
+    # see https://github.com/datalad/datalad/issues/441#issuecomment-223376906
+    # old style
     eq_(annexcr._parse_url("dl+archive:xyz/a.dat#size=999"), ("xyz", "a.dat", {'size': 999}))
     eq_(annexcr._parse_url("dl+archive:xyz/a.dat"), ("xyz", "a.dat", {}))  # old format without size
+    # new style
+    eq_(annexcr._parse_url("dl+archive:xyz#path=a.dat&size=999"), ("xyz", "a.dat", {'size': 999}))
+    eq_(annexcr._parse_url("dl+archive:xyz#path=a.dat"), ("xyz", "a.dat", {}))  # old format without size
 
     file_url = annexcr.get_file_url(
         archive_file=fn_archive,

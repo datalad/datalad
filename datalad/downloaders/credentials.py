@@ -7,7 +7,17 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Interface information about credentials
+
+Provides minimalistic interface to deal (query, request, store) with most common
+types of credentials.  To be used by Authenticators
 """
+
+__dev_doc__ = """
+Possibly useful in the future 3rd part developments
+
+https://github.com/omab/python-social-auth  social authentication/registration mechanism with support for several frameworks and auth providers
+"""
+
 from collections import OrderedDict
 
 from ..dochelpers import exc_str
