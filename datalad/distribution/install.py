@@ -253,7 +253,7 @@ class Install(Interface):
             content of any subdatasets."""),
         add_data_to_git=Parameter(
             args=("--add-data-to-git",),
-            constraints=EnsureBool(),
+            action='store_true',
             doc="""Flag whether to add data directly to Git, instead of
             tracking data identity only. Usually this is not desired,
             as it inflates dataset sizes and impacts flexibility of data
