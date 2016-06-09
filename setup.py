@@ -448,6 +448,18 @@ class RSTManPageFormatter(ManPageFormatter):
          #       if action.help else '')
 #
 
+from distutils.command.build_py import build_py
+
+class my_build(build_py):
+    def run(self):
+        self.run_command('build_manpage')
+        build_py.run(self)
+
+cmdclass={
+    'build_manpage': BuildManPage,
+    'build_py': my_build
+}
+
 setup(
     name="datalad",
     author="The DataLad Team and Contributors",
@@ -464,9 +476,7 @@ setup(
             'git-annex-remote-datalad=datalad.customremotes.datalad:main',
         ],
     },
-    cmdclass={
-        'build_manpage': BuildManPage
-    },
+    cmdclass=cmdclass,
     package_data={
         'datalad': [
             'resources/git_ssh.sh',
