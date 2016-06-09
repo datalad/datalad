@@ -46,7 +46,7 @@ class HelpAction(argparse.Action):
             helpstr = parser.format_help()
         # better for help2man
         # For main command -- should be different sections. And since we are in
-        # heavy output massaging mode...
+        # heavy output messaging mode...
         if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'

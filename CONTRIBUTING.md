@@ -283,3 +283,30 @@ Various hints for developers
 
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
+
+### Useful Flags
+- **DATALAD_LOGLEVEL**:
+  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
+- **DATALAD_TESTS_KEEPTEMP**:
+  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
+- **DATALAD_HELP2MAN**:
+  Setting this flag converts *datalad --help* command into a man page appropriate format
+- **DATALAD_EXC_STR_TBLIMIT**:
+  This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
+  It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+- **DATALAD_TESTS_TEMPDIR**:
+  Create a temporary directory at location specified by this flag.
+  It is used by tests to create a temporary git directory while testing git annex archives etc
+- **DATALAD_TESTS_NONETWORK**:
+  Skips network tests completely if this flag is set
+  Examples include test for s3, git_repositories, openfmri etc
+- **DATALAD_TESTS_SSH**:
+  Skips SSH tests if this flag is **not** set
+- **DATALAD_LOGTRACEBACK**:
+  Runs TraceBack function with collide set to True, if this flag is set to 'collide' 
+  This replaces any common prefix between current traceback log and previous invocation with "..."
+- **DATALAD_TESTS_NOTEARDOWN**:
+  Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
+- **DATALAD_CMD_PROTOCOL**:
+- **DATALAD_CMD_PROTOCOL_PREFIX**:
+- **DATALAD_PROTOCOL_REMOTE**:
