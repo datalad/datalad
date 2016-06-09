@@ -34,6 +34,7 @@ from datalad import ssh_manager
 from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
+from datalad.cmd import GitRunner
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -1212,6 +1213,7 @@ class BatchedAnnex(object):
         # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
         self._process = Popen(cmd, stdin=PIPE, stdout=PIPE
                               # , stderr=PIPE
+                              , env=GitRunner.get_git_environ_adjusted()
                               , cwd=self.path
                               , bufsize=1
                               , universal_newlines=True #**kwargs

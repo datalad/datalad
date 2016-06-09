@@ -109,12 +109,8 @@ def test_annex_get_from_subdir(topdir):
     add_archive_content('a.tar.gz', annex=annex, delete=True)
 
     with chpwd(opj(topdir, 'a', 'd')):
-        runner = GitRunner(cwd=topdir)               # pass git-root to GitRunner
-        assert_true(os.path.exists(topdir+"/.git"))  # does .git exist in top-directory/git-root
-        assert_true(os.path.exists(fn_inarchive_obscure))    # does data.txt exist in current directory
-        # import pdb; pdb.set_trace()
-        runner(['git', 'annex', 'drop', fn_inarchive_obscure])  # run git annex drop through git runner
-        # git annex contentlocation
+        runner = Runner()
+        runner(['git', 'annex', 'drop', fn_inarchive_obscure])
 
 
 def test_basic_scenario():

@@ -187,9 +187,9 @@ class AnnexCustomRemote(object):
         # TODO: probably we shouldn't have runner here but rather delegate
         # to AnnexRepo's functionality
         from ..support.annexrepo import AnnexRepo
-        from ..cmd import Runner
-        
-        self.runner = Runner()
+        from ..cmd import GitRunner
+
+        self.runner = GitRunner()
 
         # Custom remotes correspond to annex via stdin/stdout
         self.fin = sys.stdin
