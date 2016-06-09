@@ -222,7 +222,7 @@ class Install(Interface):
     """Install a dataset component or entire datasets.
 
     This command can make arbitrary content available in a dataset. This
-    includes the fulfillment of exisiting dataset handles or file handles
+    includes the fulfillment of existing dataset handles or file handles
     in a dataset, as well as the adding such handles for content available
     locally or remotely.
     """
