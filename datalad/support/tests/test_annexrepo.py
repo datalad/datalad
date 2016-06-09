@@ -926,3 +926,11 @@ def test_annex_ssh(repo_path, remote_1_path, remote_2_path):
             pass
 
     ok_(exists(socket_2))
+
+
+@with_tempfile
+def test_repo_version(path):
+    annex = AnnexRepo(path, create=True, version=6)
+    ok_clean_git(path, annex=True)
+    version = annex.repo.config_reader().get_value('annex', 'version')
+    eq_(version, 6)
