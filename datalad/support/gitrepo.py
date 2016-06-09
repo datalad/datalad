@@ -500,7 +500,6 @@ class GitRepo(object):
                 msg = self._get_added_files_commit_msg(files)
             self.commit(msg=msg)
 
-    # TODO: like add melt in
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
         """Remove files.
@@ -509,6 +508,8 @@ class GitRepo(object):
         ----------
         files: str
           list of paths to remove
+        kwargs:
+          see `__init__`
 
         Returns
         -------
@@ -517,6 +518,26 @@ class GitRepo(object):
         """
 
         files = _remove_empty_items(files)
+
+        # todo: we are able to remove objects, not necessarily specified by a
+        #       path (see below). We may want to make this available at some
+        #       point.
+        # Multiple types of items are supported which may be be freely mixed.
+        #
+        #     - path string
+        #         Remove the given path at all stages. If it is a directory, you must
+        #         specify the r=True keyword argument to remove all file entries
+        #         below it. If absolute paths are given, they will be converted
+        #         to a path relative to the git repository directory containing
+        #         the working tree
+        #
+        #         The path string may include globs, such as *.c.
+        #
+        #     - Blob Object
+        #         Only the path portion is used in this case.
+        #
+        #     - BaseIndexEntry or compatible type
+        #         The only relevant information here Yis the path. The stage is ignored.
 
         return self.repo.index.remove(files, working_tree=True, **kwargs)
 
@@ -778,6 +799,8 @@ class GitRepo(object):
             cmd_options = {}
         cmd_options.update({'with_exceptions': with_exceptions,
                             'with_extended_output': True})
+
+        # TODO: GIT_COMMON_OPTIONS!
 
         with self.repo.git.custom_environment(**env):
             try:
