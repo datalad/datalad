@@ -113,6 +113,23 @@ def test_annex_get_from_subdir(topdir):
         runner(['git', 'annex', 'drop', fn_inarchive_obscure])
 
 
+def test_get_git_environ_adjusted():
+    gitrunner = GitRunner()
+    env = {"GIT_DIR": "../../.git", "GIT_WORK_TREE": "../../", "TEST_VAR": "Exists"}
+
+    # test conversion of relevant env vars from relative_path to correct absolute_path
+    adj_env = gitrunner.get_git_environ_adjusted(env)
+    assert_equal(adj_env["GIT_DIR"], abspath(env["GIT_DIR"]))
+    assert_equal(adj_env["GIT_WORK_TREE"], abspath(env["GIT_WORK_TREE"]))
+
+    # test if other environment variables passed to function returned unaltered
+    assert_equal(adj_env["TEST_VAR"], env["TEST_VAR"])
+
+    # test import of sys_env if no environment passed to function
+    sys_env = gitrunner.get_git_environ_adjusted()
+    assert_equal(sys_env["PWD"], os.environ.get("PWD"))
+
+
 def test_basic_scenario():
     yield check_basic_scenario, 'a.tar.gz', 'simple.txt', False
     if not on_windows:
