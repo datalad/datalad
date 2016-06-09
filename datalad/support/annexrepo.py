@@ -983,7 +983,9 @@ class AnnexRepo(GitRepo):
         """
         # TODO: Review!
 
-        out, err = self._run_annex_command('find')
+        out, err = self._run_annex_command('find',
+                                           annex_options=['--include', "*"])
+        # TODO: JSON
         return out.splitlines()
 
     def precommit(self):
@@ -1017,8 +1019,12 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()  # since might interfere
         if self.is_direct_mode():
-            self.proxy('git rm ' + ('--force ' if force else '') +
-                       ' '.join(files))
+            stdout, stderr = self.proxy('git rm ' +
+                                        ('--force ' if force else '') +
+                                        ' '.join(files))
+            # output per removed file is expected to be "rm 'PATH'":
+            r_list = [line.strip()[4:-1] for line in stdout.splitlines()]
+
             # yoh gives up -- for some reason sometimes it remains,
             # so if we force -- we mean it!
             if force:
@@ -1026,9 +1032,12 @@ class AnnexRepo(GitRepo):
                     filepath = opj(self.path, f)
                     if lexists(filepath):
                         unlink(filepath)
+                        r_list.append(f)
+            return r_list
         else:
-            super(AnnexRepo, self).remove(files, force=force,
-                                          normalize_paths=False, **kwargs)
+            return super(AnnexRepo, self).remove(files, force=force,
+                                                 normalize_paths=False,
+                                                 **kwargs)
 
     def get_contentlocation(self, key, batch=False):
         """Get location of the key content

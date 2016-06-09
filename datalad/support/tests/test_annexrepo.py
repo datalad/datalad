@@ -981,3 +981,37 @@ def test_annex_drop(src, dst):
     ok_(isinstance(result, list))
     eq_(result[0], testkey)
     eq_(len(result), 1)
+
+
+@with_testrepos('basic_annex', flavors=['clone'])
+@with_tempfile(mkdir=True)
+def test_annex_remove(path1, path2):
+    ar1 = AnnexRepo(path1, create=False)
+    ar2 = AnnexRepo(path2, path1, create=True, direct=True)
+
+    for repo in (ar1, ar2):
+        file_list = repo.get_annexed_files()
+        assert len(file_list) >= 1
+        # remove a single file
+        out = repo.remove(file_list[0])
+        assert_not_in(file_list[0], repo.get_annexed_files())
+        eq_(out[0], file_list[0])
+
+        with open(opj(repo.path, "rm-test.dat"), "w") as f:
+            f.write("whatever")
+
+        # add it
+        repo.add("rm-test.dat")
+
+        # remove without '--force' should fail, due to staged changes:
+        if repo.is_direct_mode():
+            assert_raises(CommandError, repo.remove, "rm-test.dat")
+        else:
+            assert_raises(GitCommandError, repo.remove, "rm-test.dat")
+        assert_in("rm-test.dat", repo.get_annexed_files())
+
+        # now force:
+        out = repo.remove("rm-test.dat", force=True)
+        assert_not_in("rm-test.dat", repo.get_annexed_files())
+        eq_(out[0], "rm-test.dat")
+
