@@ -28,7 +28,7 @@ from .dochelpers import exc_str
 from .support.exceptions import CommandError
 from .support.protocol import NullProtocol, DryRunProtocol, \
     ExecutionTimeProtocol, ExecutionTimeExternalsProtocol
-from .utils import on_windows
+from .utils import on_windows, chpwd
 from . import cfg
 
 lgr = logging.getLogger('datalad.cmd')
@@ -352,6 +352,111 @@ class Runner(object):
         else:
             lgr.log(level, "{%s} %s" % (self.protocol.__class__.__name__, msg))
 
+
+class GitRunner(Runner):
+    """
+    Overloads the runner class to check update GIT_DIR and GIT_WORK_TREE environment variables set to the correct path
+    """
+
+    def run(self, cmd, log_stdout=True, log_stderr=True, log_online=False,
+            expect_stderr=False, expect_fail=False,
+            cwd=None, env=None, shell=None):
+
+        # assert_true(cwd, None)
+        # assert_false(self.cwd, None)
+        env = {"GIT_DIR": self.cwd+"/.git", "GIT_WORK_TREE": self.cwd+"/"}  # set environment variables, rm chdir error
+
+        cwd = os.getcwd()   # store current working directory
+        # lgr.error("INFO: set environment to %s based on git_root @ %s, cwd @ %s" % (env, self.cwd, os.getcwd()))
+
+        # chpwd(self.cwd)     # move to git-root
+        # lgr.error("INFO: moved to git_root @ %s" % (os.getcwd()))
+
+        outputstream = subprocess.PIPE if log_stdout else sys.stdout
+        errstream = subprocess.PIPE if log_stderr else sys.stderr
+
+        self.log("Running: %s" % (cmd,))
+
+        if self.protocol.do_execute_ext_commands:
+
+            if shell is None:
+                shell = isinstance(cmd, string_types)
+
+            if self.protocol.records_ext_commands:
+                prot_exc = None
+                prot_id = self.protocol.start_section(
+                    shlex.split(cmd, posix=not on_windows)
+                    if isinstance(cmd, string_types)
+                    else cmd)
+
+            try:
+                proc = subprocess.Popen(cmd, stdout=outputstream,
+                                        stderr=errstream,
+                                        shell=shell,
+                                        cwd=cwd or self.cwd,
+                                        env=env or self.env)
+
+            except Exception as e:
+                prot_exc = e
+                lgr.error("Failed to start %r%r: %s" %
+                          (cmd, " under %r" % cwd if cwd else '', exc_str(e)))
+                raise
+
+            finally:
+                if self.protocol.records_ext_commands:
+                    self.protocol.end_section(prot_id, prot_exc)
+
+                # move back to current working directory
+                if os.path.isdir(cwd):
+                    chpwd(cwd)
+
+            if log_online:
+                out = self._get_output_online(proc, log_stdout, log_stderr,
+                                              expect_stderr=expect_stderr,
+                                              expect_fail=expect_fail)
+            else:
+                out = proc.communicate()
+
+            if PY3:
+                # Decoding was delayed to this point
+                def decode_if_not_None(x):
+                    return "" if x is None else binary_type.decode(x)
+                # TODO: check if we can avoid PY3 specific here
+                out = tuple(map(decode_if_not_None, out))
+
+            status = proc.poll()
+
+            # needs to be done after we know status
+            if not log_online:
+                self._log_out(out[0])
+                if status not in [0, None]:
+                    self._log_err(out[1], expected=expect_fail)
+                else:
+                    # as directed
+                    self._log_err(out[1], expected=expect_stderr)
+
+            if status not in [0, None]:
+                msg = "Failed to run %r%s. Exit code=%d. out=%s err=%s" \
+                    % (cmd, " under %r" % (cwd or self.cwd), status, out[0], out[1])
+                (lgr.debug if expect_fail else lgr.error)(msg)
+                raise CommandError(str(cmd), msg, status, out[0], out[1])
+            else:
+                self.log("Finished running %r with status %s" % (cmd, status),
+                         level=8)
+
+        else:
+            if self.protocol.records_ext_commands:
+                self.protocol.add_section(shlex.split(cmd,
+                                                      posix=not on_windows)
+                                          if isinstance(cmd, string_types)
+                                          else cmd, None)
+            out = ("DRY", "DRY")
+
+        # move back to current working directory
+        if os.path.isdir(cwd):
+            chpwd(cwd)
+
+        return out
 
 # ####
 # Preserve from previous version
