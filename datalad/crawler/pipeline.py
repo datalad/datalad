@@ -42,6 +42,12 @@ no verification is done and things can go utterly wrong.  So nodes must be robus
 provide informative logging.
 """
 
+__dev_doc__ = """
+Somewhat similar loose/flexible pipelining in Python approaches
+
+- https://github.com/freeman-lab/pipeit
+"""
+
 import sys
 from glob import glob
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
@@ -51,9 +57,9 @@ from .. import cfg
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
-from ..utils import parse_url_opts
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
+from ..support.network import parse_url_opts
 from ..support.stats import ActivityStats
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
@@ -336,9 +342,9 @@ def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
 
     if commit:
         repo = GitRepo(path)
-        repo.git_add(crawl_config_repo_path)
+        repo.add(crawl_config_repo_path)
         if repo.dirty:
-            repo.git_commit("Initialized crawling configuration to use template %s" % template)
+            repo.commit("Initialized crawling configuration to use template %s" % template)
         else:
             lgr.debug("Repository is not dirty -- not committing")
 

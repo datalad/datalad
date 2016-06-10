@@ -89,7 +89,7 @@ class Dataset(object):
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
-            if 'git-annex' in self._repo.git_get_branches():
+            if 'git-annex' in self._repo.get_branches():
                 # we acquired git-annex branch
                 self._repo = AnnexRepo(self._repo.path, create=False)
         return self._repo
@@ -118,9 +118,9 @@ class Dataset(object):
         if verify is not None:
             raise NotImplementedError("TODO: verify not implemented yet")
 
-        if name not in repo.git_get_remotes():
+        if name not in repo.get_remotes():
             # Add remote
-            repo.git_remote_add(name, url)
+            repo.add_remote(name, url)
             if publish_url is not None:
                 # set push url:
                 repo._git_custom_command('', ["git", "remote",
@@ -138,18 +138,22 @@ class Dataset(object):
         """Get names/paths of all known dataset_handles (subdatasets),
         optionally matching a specific name pattern.
 
-        If fulfilled is True, only paths to fullfiled handles are returned,
-        if False, only paths to unfulfilled handles are returned.
-
 
         Parameters
         ----------
-        pattern
-        fulfilled
+        pattern : None
+          Not implemented
+        fulfilled : None or bool
+          If not None, return either only present or absent datasets.
+        absolute : bool
+          If True, absolute paths will be returned.
+        recursive : bool
+          If True, recurse into all subdatasets and report their dataset
+          handles too.
 
         Returns
         -------
-        list(Dataset) or None
+        list(Dataset paths) or None
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
@@ -160,21 +164,41 @@ class Dataset(object):
         if repo is None:
             return
 
-        cmd = ["git", "submodule", "status"]
-        if recursive:
-            cmd.append("--recursive")
-        out, err = repo._git_custom_command('', cmd)
+        # check whether we have anything in the repo. if not go home early
+        if not repo.repo.head.is_valid():
+            return []
 
-        lines = [line.split() for line in out.splitlines()]
+        try:
+            submodules = repo.get_submodules()
+        except InvalidGitRepositoryError:
+            # this happens when we access a repository with a submodule that
+            # has no commits, hence doesn't appear in the index and
+            # 'git submodule status' also doesn't list it
+            return []
+
+        # filter if desired
         if fulfilled is None:
-            submodules = [line[1] for line in lines]
-        elif not fulfilled:
-            submodules = [line[1] for line in lines if line[0].startswith('-')]
+            submodules = [sm.path for sm in submodules]
         else:
-            submodules = [line[1] for line in lines if not line[0].startswith('-')]
+            submodules = [sm.path for sm in submodules
+                          if sm.module_exists() == fulfilled]
+
+        # expand list with child submodules. keep all paths relative to parent
+        # and convert jointly at the end
+        if recursive:
+            rsm = []
+            for sm in submodules:
+                rsm.append(sm)
+                sdspath = opj(self._path, sm)
+                rsm.extend(
+                    [opj(sm, sdsh)
+                     for sdsh in Dataset(sdspath).get_dataset_handles(
+                         pattern=pattern, fulfilled=fulfilled, absolute=False,
+                         recursive=recursive)])
+            submodules = rsm
 
         if absolute:
-            return [opj(self._path, submodule) for submodule in submodules]
+            return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
 
@@ -212,7 +236,7 @@ class Dataset(object):
                 "cannot remember a state when a dataset is not yet installed")
         repo = self.repo
         if auto_add_changes:
-            repo.annex_add('.')
+            repo.add('.')
         repo.commit(message)
         if version:
             repo._git_custom_command('', 'git tag "{0}"'.format(version))
@@ -229,7 +253,7 @@ class Dataset(object):
         if not self.is_installed():
             raise RuntimeError(
                 "cannot remember a state when a dataset is not yet installed")
-        self.repo.git_checkout(whereto)
+        self.repo.checkout(whereto)
 
     def is_installed(self):
         """Returns whether a dataset is installed.
@@ -244,16 +268,15 @@ class Dataset(object):
 
 
 @optional_args
-def datasetmethod(f, name=None):
+def datasetmethod(f, name=None, dataset_argname='dataset'):
     """Decorator to bind functions to Dataset class.
 
     The decorated function is still directly callable and additionally serves
-    as method `name` of class Dataset.
-    To achieve this, the first positional argument is redirected to original
-    keyword argument 'dataset'. All other arguments stay in order (and keep
-    their names, of course). That means, that the signature of the bound
-    function is name(self, a, b) if the original signature is
-    name(a, dataset, b) for example.
+    as method `name` of class Dataset.  To achieve this, the first positional
+    argument is redirected to original keyword argument 'dataset_argname'. All
+    other arguments stay in order (and keep their names, of course). That
+    means, that the signature of the bound function is name(self, a, b) if the
+    original signature is name(a, dataset, b) for example.
 
     The decorator has no effect on the actual function decorated with it.
     """
@@ -277,13 +300,13 @@ def datasetmethod(f, name=None):
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) > len(orig_pos) or 'dataset' in kwargs:
+        if len(args) > len(orig_pos) or dataset_argname in kwargs:
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
                             " {3}".format(name, len(orig_pos), len(args),
                                           ['self'] + [a for a in orig_pos
-                                                      if a != 'dataset']))
-        kwargs['dataset'] = args[0]
-        ds_index = orig_pos.index('dataset')
+                                                      if a != dataset_argname]))
+        kwargs[dataset_argname] = args[0]
+        ds_index = orig_pos.index(dataset_argname)
         for i in range(1, len(args)):
             if i <= ds_index:
                 kwargs[orig_pos[i-1]] = args[i]

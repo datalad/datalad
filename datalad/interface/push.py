@@ -45,4 +45,4 @@ class Push(Interface):
     def __call__(remote='origin', branch=None):
 
         repo = get_repo_instance()
-        repo.git_push(remote + (' ' + branch if branch is not None else ''))
+        repo.push(remote, branch)

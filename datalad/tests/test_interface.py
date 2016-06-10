@@ -14,7 +14,7 @@ from nose.tools import assert_is, assert_equal, assert_raises, assert_true
 
 from ..support.param import Parameter
 from ..support import constraints as cnstr
-from ..interface.base import Interface
+from ..interface.base import Interface, get_api_name, get_cmdline_command_name
 
 from ..utils import swallow_outputs
 from .utils import assert_re_in
@@ -88,7 +88,7 @@ def test_interface():
     with swallow_outputs() as cmo:
         assert_raises(SystemExit, parser.parse_args, ['--demoarg', 'abc'])
         # that is what we dump upon folks atm. TODO: improve reporting of illspecified options
-        assert_re_in(".*invalid <datalad.support.constraints.EnsureInt object at .*> value:.*",
+        assert_re_in(".*invalid constraint:int value:.*",
                      cmo.err, re.DOTALL)
 
     # missing argument to option
@@ -102,3 +102,34 @@ def test_interface():
         # PY2|PY3
         assert_re_in(".*error: (too few arguments|the following arguments are required: demoposarg)",
                      cmo.err, re.DOTALL)
+
+
+def test_name_generation():
+    assert_equal(
+        get_api_name(("some.module", "SomeClass")),
+        'module')
+    assert_equal(
+        get_api_name(("some.module", "SomeClass", "cmdline-override")),
+        'module')
+    assert_equal(
+        get_api_name(("some.module",
+                      "SomeClass",
+                      "cmdline_override",
+                      "api_override-dont-touch")),
+        "api_override-dont-touch")
+    assert_equal(
+        get_cmdline_command_name(("some.module_something", "SomeClass")),
+        "module-something")
+    assert_equal(
+        get_cmdline_command_name((
+            "some.module_something",
+            "SomeClass",
+            "override")),
+        "override")
+    assert_equal(
+        get_cmdline_command_name((
+            "some.module_something",
+            "SomeClass",
+            "override",
+            "api_ignore")),
+        "override")

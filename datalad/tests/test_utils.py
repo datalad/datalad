@@ -23,10 +23,8 @@ from collections import OrderedDict
 
 from ..dochelpers import exc_str
 from ..utils import updated
-from ..utils import get_local_file_url
 from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
-from ..utils import get_url_path
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
@@ -169,19 +167,6 @@ def test_updated():
     d_ = updated(d, {0: 1})
     ok_(isinstance(d_, OrderedDict))
     eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
-
-def test_get_local_file_url_linux():
-    assert_equal(get_local_file_url('/a'), 'file:///a')
-    assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
-    assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
-    assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
-
-@skip_if_on_windows
-def test_get_url_path_on_fileurls():
-    assert_equal(get_url_path('file:///a'), '/a')
-    assert_equal(get_url_path('file:///a/b'), '/a/b')
-    assert_equal(get_url_path('file:///a/b#id'), '/a/b')
-    assert_equal(get_url_path('file:///a/b?whatever'), '/a/b')
 
 
 def test_get_local_file_url_windows():

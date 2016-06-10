@@ -41,7 +41,7 @@ class Publish(Interface):
 
     _params_ = dict(
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc="""specify the dataset to perform the publish operation on. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
@@ -79,7 +79,7 @@ class Publish(Interface):
         #     actual publication operation.""",
         #     constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             action="store_true",
             doc="Recursively publish all components of the dataset."),
         with_data=Parameter(
@@ -124,7 +124,7 @@ class Publish(Interface):
         if path is not None:
             path = resolve_path(path, ds)
 
-        lgr.debug("Resolved component to be published: {0}".format(path))
+        lgr.info("Publishing {0}".format(path))
 
         # if we have no dataset given, figure out which one we need to operate
         # on, based on the resolved location (that is now guaranteed to
@@ -179,7 +179,7 @@ class Publish(Interface):
             try:
                 std_out, std_err = \
                     ds.repo._git_custom_command('',
-                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.git_get_active_branch())],
+                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.get_active_branch())],
                                                 expect_fail=True)
             except CommandError as e:
                 if e.code == 1 and e.stdout == "":
@@ -202,7 +202,7 @@ class Publish(Interface):
             std_out, std_err = \
                 ds.repo._git_custom_command('',
                                             ["git", "config", "--get",
-                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.git_get_active_branch())],
+                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.get_active_branch())],
                                             expect_fail=True)
         except CommandError as e:
             if e.code == 1 and e.stdout == "":
@@ -212,7 +212,7 @@ class Publish(Interface):
                 raise
 
         # is `dest` an already known remote?
-        if dest_resolved not in ds.repo.git_get_remotes():
+        if dest_resolved not in ds.repo.get_remotes():
             # unknown remote
             raise ValueError("No sibling '%s' found." % dest_resolved)
 
@@ -231,7 +231,7 @@ class Publish(Interface):
             # #       - or: We need a different approach on the templates
             #
             # # Add the remote
-            # ds.repo.git_remote_add(dest_resolved, remote_url)
+            # ds.repo.add_remote(dest_resolved, remote_url)
             # if dest_pushurl:
             #     # Fill in template:
             #     remote_url_push = \
@@ -265,16 +265,13 @@ class Publish(Interface):
         if path is None or path == ds.path:
             # => publish the dataset itself
             # push local state:
-            # TODO: Rework git_push in GitRepo
-            cmd = ['git', 'push']
-            if set_upstream:
-                # no upstream branch yet
-                cmd.append("--set-upstream")
-            cmd += [dest_resolved, ds.repo.git_get_active_branch()]
-            ds.repo._git_custom_command('', cmd)
+            ds.repo.push(remote=dest_resolved,
+                         refspec=ds.repo.get_active_branch(),
+                         set_upstream=set_upstream)
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.git_push("%s +git-annex:git-annex" % dest_resolved)
+                ds.repo.push(remote=dest_resolved,
+                             refspec="+git-annex:git-annex")
 
             # TODO: if with_data is a shell pattern, we get a list, when called
             # from shell, right?

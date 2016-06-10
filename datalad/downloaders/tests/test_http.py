@@ -20,9 +20,9 @@ from datalad.downloaders.tests.utils import get_test_providers
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
+from ..credentials import Credential
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
-from ..providers import Credential  # to test against crcns
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 
@@ -51,6 +51,7 @@ from ...tests.utils import swallow_outputs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import skip_if
+from ...tests.utils import without_http_proxy
 from ...support.status import FileStatus
 
 def test_docstring():
@@ -247,6 +248,7 @@ test_cookie = 'somewebsite=testcookie'
 
 #@skip_httpretty_on_problematic_pythons
 @skip_if(not httpretty, "no httpretty")
+@without_http_proxy
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
@@ -312,7 +314,6 @@ def test_HTMLFormAuthenticator_httpretty(d):
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
 
 
-
 class FakeCredential2(Credential):
     """Credential to test scenarios."""
     _fixed_credentials = {'user': 'testlogin', 'password': 'testpassword'}
@@ -325,6 +326,7 @@ class FakeCredential2(Credential):
 
 
 @skip_if(not httpretty, "no httpretty")
+@without_http_proxy
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})

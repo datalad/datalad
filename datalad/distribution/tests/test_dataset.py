@@ -82,14 +82,14 @@ def test_register_sibling(remote, path):
     AnnexRepo(path)
     ds = Dataset(path)
     ds.register_sibling('my_sibling', remote)
-    assert_in('my_sibling', ds.repo.git_get_remotes())
-    eq_(ds.repo.git_get_remote_url('my_sibling'), remote)
+    assert_in('my_sibling', ds.repo.get_remotes())
+    eq_(ds.repo.get_remote_url('my_sibling'), remote)
 
 
     ds.register_sibling('my_other_sibling', remote,
                         publish_url='http://fake.pushurl.com')
-    assert_in('my_other_sibling', ds.repo.git_get_remotes())
-    eq_(ds.repo.git_get_remote_url('my_other_sibling'), remote)
+    assert_in('my_other_sibling', ds.repo.get_remotes())
+    eq_(ds.repo.get_remote_url('my_other_sibling'), remote)
     # TODO: GitRepo method for push-url!
 
     # TODO: Validation!
@@ -98,11 +98,11 @@ def test_register_sibling(remote, path):
 @with_testrepos('.*nested_submodule.*', flavors=['local'])
 def test_get_dataset_handles(path):
     ds = Dataset(path)
-    eq_(set(ds.get_dataset_handles()), {'sub1', 'sub2'})
+    eq_(set(ds.get_dataset_handles()), {'subdataset'})
     eq_(set(ds.get_dataset_handles(recursive=True)),
-        {'sub1', 'sub2', 'sub1/sub1', 'sub1/sub2',
-         'sub1/sub2/sub1', 'sub1/sub2/sub2', 'sub1/sub1/sub1',
-         'sub1/sub1/sub2'})
+        {'subdataset/subsubdataset', 'subdataset/subsubdataset/sub1',
+         'subdataset/subsubdataset/sub2', 'subdataset/sub1',
+         'subdataset/sub2', 'subdataset'})
     # TODO:  More Flavors!
 
 
@@ -170,7 +170,7 @@ def test_subdatasets(path):
     ds = Dataset(path)
     assert_false(ds.is_installed())
     eq_(ds.get_dataset_handles(), None)
-    ds = ds.install()
+    ds = ds.create()
     assert_true(ds.is_installed())
     eq_(ds.get_dataset_handles(), [])
     # create some file and commit it

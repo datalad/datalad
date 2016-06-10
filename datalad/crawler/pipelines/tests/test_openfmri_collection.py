@@ -29,7 +29,7 @@ from ....tests.utils import skip_if_no_network
 from ....tests.utils import use_cassette
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import ok_file_under_git
-from ....interface.POC_helpers import get_submodules_list
+from ....distribution.dataset import Dataset
 from ....consts import CRAWLER_META_CONFIG_PATH
 
 from ..openfmri import collection_pipeline as ofcpipeline
@@ -65,7 +65,7 @@ def test_openfmri_collection_pipeline1(ind, topurl, outd):
 
     # TODO: replace below command with the one listing subdatasets
     subdatasets = ['ds000001', 'ds000002']
-    eq_(get_submodules_list(GitRepo(outd)), subdatasets)
+    eq_(Dataset(outd).get_dataset_handles(fulfilled=True), subdatasets)
 
     # Check that crawling configuration was created for every one of those
     for sub in subdatasets:

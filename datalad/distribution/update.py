@@ -12,16 +12,15 @@
 
 __docformat__ = 'restructuredtext'
 
-
 import logging
-
 from os.path import join as opj
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import CommandError
-from datalad.interface.base import Interface
+
 from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
+from datalad.interface.base import Interface
+from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
 from datalad.utils import knows_annex, getpwd
 
 lgr = logging.getLogger('datalad.distribution.update')
@@ -37,7 +36,7 @@ class Update(Interface):
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc=""""specify the dataset to update. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory""",
@@ -50,7 +49,7 @@ class Update(Interface):
                 "given.",),
         # TODO: How to document it without using the term 'tracking branch'?
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             action="store_true",
             doc="""If set this updates all possibly existing subdatasets,
              too."""),
@@ -107,7 +106,7 @@ class Update(Interface):
 
         for repo in repos_to_update:
             # get all remotes:
-            remotes = repo.git_get_remotes()
+            remotes = repo.get_remotes()
             if name and name not in remotes:
                 lgr.warning("'%s' not known to dataset %s.\nSkipping" %
                             (name, repo.path))
@@ -126,8 +125,7 @@ class Update(Interface):
             lgr.info("Updating handle '%s' ..." % repo.path)
 
             # fetch remote(s):
-            repo.git_fetch(name if name else '',
-                           "--all" if fetch_all else '')
+            repo.fetch(remote=name, all_=fetch_all)
 
             # if it is an annex and there is a tracking branch, and we didn't
             # fetch the entire remote anyway, explicitly fetch git-annex
@@ -140,20 +138,22 @@ class Update(Interface):
                 try:
                     std_out, std_err = \
                         repo._git_custom_command('',
-                        ["git", "config", "--get",
+                                                 ["git", "config", "--get",
                          "branch.{active_branch}.remote".format(
-                             active_branch=repo.git_get_active_branch())])
+                             active_branch=repo.get_active_branch())])
                 except CommandError as e:
                     if e.code == 1 and e.stdout == "":
                         std_out = None
                     else:
                         raise
                 if std_out:  # we have a "tracking remote"
-                    repo.git_fetch("%s git-annex" % std_out.strip())
+                    repo.fetch(remote=std_out.strip(), refspec="git-annex")
 
             # merge:
             if merge:
                 lgr.info("Applying changes from tracking branch...")
+                # TODO: Adapt.
+                # TODO: Rethink default remote/tracking branch. See above. We need a "tracking remote" but custom refspec to fetch from that remote
                 cmd_list = ["git", "pull"]
                 if name:
                     cmd_list.append(name)
@@ -163,7 +163,7 @@ class Update(Interface):
                     # => TODO: allow for passing a branch
                     # (or more general refspec?)
                     # For now, just use the same name
-                    cmd_list.append(repo.git_get_active_branch())
+                    cmd_list.append(repo.get_active_branch())
 
                 out, err = repo._git_custom_command('', cmd_list)
                 lgr.info(out)

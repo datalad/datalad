@@ -34,7 +34,6 @@ from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows
-from datalad.interface.POC_helpers import get_git_dir
 
 lgr = logging.getLogger('datalad.distribution.tests')
 
@@ -79,8 +78,7 @@ def _makeds(path, levels, ds=None):
     fn = opj(path, "file%d.dat" % random.randint(1, 1000))
     with open(fn, 'w') as f:
         f.write(fn)
-    repo.git_add(fn)
-    repo.git_commit("Added %s" % fn)
+    repo.add(fn, git=True, commit=True, msg="Added %s" % fn)
     if ds:
         rpath = os.path.relpath(path, ds.path)
         out = install(
@@ -92,7 +90,7 @@ def _makeds(path, levels, ds=None):
         if isinstance(ds.repo, AnnexRepo):
             ds.repo.commit("subdataset %s installed." % rpath)
         else:
-            ds.repo.git_commit("subdataset %s installed." % rpath)
+            ds.repo.commit("subdataset %s installed." % rpath)
 
     if not levels:
         return

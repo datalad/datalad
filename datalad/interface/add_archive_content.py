@@ -146,9 +146,9 @@ class AddArchiveContent(Interface):
             doc="""Drop extracted files after adding to annex.""",
         ),
         delete_after=Parameter(
-            args=("--remove-after",),
+            args=("--delete-after",),
             action="store_true",
-            doc="""Extract under a temporary directory, git-annex add, and remove after.
+            doc="""Extract under a temporary directory, git-annex add, and delete after.
          To be used to "index" files within annex without actually creating corresponding
          files under git.  Note that `annex dropunused` would later remove that load."""),
 
@@ -246,9 +246,9 @@ class AddArchiveContent(Interface):
         earchive = annexarchive.cache[key_path]
 
         # TODO: check if may be it was already added
-        if ARCHIVES_SPECIAL_REMOTE not in annex.git_get_remotes():
+        if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
             lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
-            annex.annex_initremote(
+            annex.init_remote(
                 ARCHIVES_SPECIAL_REMOTE,
                 ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
                  'autoenable=true'])
@@ -372,7 +372,7 @@ class AddArchiveContent(Interface):
                           target_file, url, annex_options)
 
                 target_file_gitpath = opj(extract_relpath, target_file) if extract_relpath else target_file
-                out_json = annex.annex_addurl_to_file(
+                out_json = annex.add_url_to_file(
                     target_file_gitpath,
                     url, options=annex_options,
                     batch=True)
@@ -393,11 +393,11 @@ class AddArchiveContent(Interface):
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
-                # annex.annex_add(target_path, options=annex_options)
+                # annex.add(target_path, options=annex_options)
                 # # above action might add to git or to annex
                 # if annex.file_has_content(target_path):
                 #     # if not --  it was added to git, if in annex, it is present and output is True
-                #     annex.annex_addurl_to_file(target_file, url, options=['--relaxed'], batch=True)
+                #     annex.add_url_to_file(target_file, url, options=['--relaxed'], batch=True)
                 #     stats.add_annex += 1
                 # else:
                 #     lgr.debug("File {} was added to git, not adding url".format(target_file))
@@ -435,7 +435,7 @@ class AddArchiveContent(Interface):
             if keys_to_drop:
                 # since we know that keys should be retrievable, we --force since no batching
                 # atm and it would be expensive
-                annex.annex_drop(keys_to_drop, options=['--force'], key=True)
+                annex.drop(keys_to_drop, options=['--force'], key=True)
                 stats.dropped += len(keys_to_drop)
                 annex.precommit()  # might need clean up etc again
 

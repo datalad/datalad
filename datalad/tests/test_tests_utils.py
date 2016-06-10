@@ -44,8 +44,9 @@ from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import run_under_dir
-from .utils import use_cassette
 from .utils import skip_if
+from .utils import ok_file_has_content
+from .utils import without_http_proxy
 
 #
 # Test with_tempfile, especially nested invocations
@@ -79,7 +80,7 @@ def test_nested_with_tempfile_basic(f1, f2):
 @with_tree((('f1.txt', 'load'),))
 @with_tempfile(suffix='.cfg')
 @with_tempfile(suffix='.cfg.old')
-@with_testrepos(flavors=local_testrepo_flavors)
+@with_testrepos(flavors=local_testrepo_flavors, count=1)
 def check_nested_with_tempfile_parametrized_surrounded(
         param, f0, tree, f1, f2, repo):
     eq_(param, "param1")
@@ -89,11 +90,23 @@ def check_nested_with_tempfile_parametrized_surrounded(
     ok_(f1 != f2)
     ok_(f1.endswith('.cfg'), msg="got %s" % f1)
     ok_(f2.endswith('.cfg.old'), msg="got %s" % f2)
-    ok_(repo) # got some repo -- local or url
+    ok_(repo)  # got some repo -- local or url
 
 
 def test_nested_with_tempfile_parametrized_surrounded():
     yield check_nested_with_tempfile_parametrized_surrounded, "param1"
+
+
+@with_tempfile(content="testtest")
+def test_with_tempfile_content(f):
+    ok_file_has_content(f, "testtest")
+
+
+def test_with_tempfile_content_raises_on_mkdir():
+    with assert_raises(ValueError):
+        @with_tempfile(content="test", mkdir=True)
+        def t():
+            pass
 
 
 def test_with_testrepos():
@@ -106,7 +119,7 @@ def test_with_testrepos():
     check_with_testrepos()
 
     eq_(len(repos),
-        2 if on_windows # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
+        2 if on_windows  # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
           else (15 if os.environ.get('DATALAD_TESTS_NONETWORK') else 16))  # local, local-url, clone, network
 
     for repo in repos:
@@ -354,10 +367,11 @@ def _test_serve_path_via_http(test_fpath, tmp_dir): # pragma: no cover
         test_txt = 'some txt and a randint {}'.format(random.randint(1, 10)) 
         f.write(test_txt)
 
-
     @serve_path_via_http(tmp_dir)
     def test_path_and_url(path, url):
 
+        # @serve_ should remove http_proxy from the os.environ if was present
+        assert_false('http_proxy' in os.environ)
         url = url + os.path.dirname(test_fpath)
         assert_true(urlopen(url))
         u = urlopen(url)
@@ -387,6 +401,33 @@ def test_serve_path_via_http():
                       ]:
 
         yield _test_serve_path_via_http, test_fpath
+
+    # just with the last one check that we did remove proxy setting
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
+        yield _test_serve_path_via_http, test_fpath
+
+
+def test_without_http_proxy():
+
+    @without_http_proxy
+    def check(a, kw=False):
+        assert_false('http_proxy' in os.environ)
+        assert_false('https_proxy' in os.environ)
+        assert_in(kw, [False, 'custom'])
+
+    check(1)
+
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
+        check(1, "custom")
+        with assert_raises(AssertionError):
+            check(1, "wrong")
+
+    with patch.dict('os.environ', {'https_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
+    with patch.dict('os.environ', {'http_proxy': 'http://127.0.0.1:9/',
+                                   'https_proxy': 'http://127.0.0.1:9/'}):
+        check(1)
 
 
 def test_assert_re_in():
@@ -418,10 +459,17 @@ def test_skip_if_no_network():
         @skip_if_no_network
         def somefunc(a1):
             return a1
+        eq_(somefunc.tags, ['network'])
         with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
             assert_raises(SkipTest, somefunc, 1)
         with patch.dict('os.environ', {}):
             eq_(somefunc(1), 1)
+        # and now if used as a function, not a decorator
+        with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+            assert_raises(SkipTest, skip_if_no_network)
+        with patch.dict('os.environ', {}):
+            eq_(skip_if_no_network(), None)
+
 
 def test_skip_if():
 
@@ -457,24 +505,3 @@ def test_run_under_dir(d):
     assert_raises(AssertionError, f, 1, 3)
     eq_(getpwd(), orig_pwd)
     eq_(os.getcwd(), orig_cwd)
-
-
-def test_use_cassette_if_no_vcr():
-    # just test that our do nothing decorator does the right thing if vcr is not present
-    skip = False
-    try:
-        import vcr
-        skip = True
-    except ImportError:
-        pass
-    except:
-        # if anything else goes wrong with importing vcr, we still should be able to
-        # run use_cassette
-        pass
-    if skip:
-        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
-    @use_cassette("some_path")
-    def checker(x):
-        return x + 1
-
-    eq_(checker(1), 2)

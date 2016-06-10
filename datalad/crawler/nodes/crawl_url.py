@@ -29,6 +29,7 @@ from ...downloaders.providers import Providers
 from logging import getLogger
 lgr = getLogger('datalad.crawl.crawl_url')
 
+
 class crawl_url(object):
     """Given a source url, perform the initial crawling of the page, i.e. simply
     bloody fetch it and pass along
@@ -117,7 +118,6 @@ class crawl_url(object):
                     # proxy findings
                     for data_matched_ in self._visit_url(data_matched['url'], data_matched):
                         yield data_matched_
-
 
     def __call__(self, data={}):
         #assert(data == {}) # atm assume we are the first of mogican

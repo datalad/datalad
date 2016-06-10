@@ -52,7 +52,8 @@ THE SOFTWARE.
 
 def setup_parser():
     # Delay since can be a heavy import
-    from ..interface.base import dedent_docstring, get_interface_groups
+    from ..interface.base import dedent_docstring, get_interface_groups, \
+        get_cmdline_command_name, alter_interface_docs_for_cmdline
     # setup cmdline args parser
     # main parser
     parser = argparse.ArgumentParser(
@@ -115,17 +116,15 @@ def setup_parser():
             # turn the interface spec into an instance
             _mod = import_module(_intfspec[0], package='datalad')
             _intf = getattr(_mod, _intfspec[1])
-            if len(_intfspec) > 2:
-                cmd_name = _intfspec[2]
-            else:
-                cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
+            cmd_name = get_cmdline_command_name(_intfspec)
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
             else:
                 parser_args = dict(formatter_class=argparse.RawDescriptionHelpFormatter)
             # use class description, if no explicit description is available
-                parser_args['description'] = dedent_docstring(_intf.__doc__)
+                parser_args['description'] = alter_interface_docs_for_cmdline(
+                    _intf.__doc__)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
