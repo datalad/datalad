@@ -68,7 +68,7 @@ class MakeMemoryEngram(Interface):
             if not dspath:
                 raise InsufficientArgumentsError("No dataset found")
             ds = Dataset(dspath)
-            
+
         ds.remember_state(message=message,
                           auto_add_changes=auto_add_changes,
                           version=version_tag)
