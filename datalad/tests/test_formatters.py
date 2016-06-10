@@ -10,6 +10,7 @@
 
 from cStringIO import StringIO as SIO
 import formatters as fmt
+from datalad.cmdline.main import setup_parser
 from .utils import assert_equal, ok_, assert_raises, assert_in, ok_startswith
 
 demo_example = """
@@ -61,3 +62,30 @@ def test_cmdline_example_to_rst():
         SIO(demo_example), ref='mydemo')
     out.seek(0)
     assert_in('.. code-block:: sh', out.read())
+
+def test_parser_access():
+    parsers = setup_parser(return_subparsers=True)
+    # we have a bunch
+    ok_(len(parsers) > 3)
+    assert_in('install', parsers.keys())
+
+
+def test_manpage_formatter():
+    addonsections = {'mytest': "uniquedummystring"}
+
+    parsers = setup_parser(return_subparsers=True)
+    for p in parsers:
+        mp = fmt.ManPageFormatter(
+            p, ext_sections=addonsections).format_man_page(parsers[p])
+        for section in ('SYNOPSIS', 'DESCRIPTION', 'OPTIONS', 'MYTEST'):
+            assert_in('.SH {0}'.format(section), mp)
+        assert_in('uniquedummystring', mp)
+
+
+def test_rstmanpage_formatter():
+    parsers = setup_parser(return_subparsers=True)
+    for p in parsers:
+        mp = fmt.RSTManPageFormatter(p).format_man_page(parsers[p])
+        for section in ('Synopsis', 'Description', 'Options'):
+            assert_in('\n{0}'.format(section), mp)
+        assert_in('{0}\n{1}'.format(p, '=' * len(p)), mp)
