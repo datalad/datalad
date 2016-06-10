@@ -70,7 +70,7 @@ class AddArchiveContent(Interface):
             action="store_true",
             doc="""flag to move all files directories up, from how they were stored in an archive,
                    if that one contained a number (possibly more than 1 down) single leading
-                   directories """),
+                   directories"""),
         leading_dirs_depth=Parameter(
             args=("--leading-dirs-depth",),
             action="store",
@@ -106,7 +106,7 @@ class AddArchiveContent(Interface):
             action='append',
             doc="""regular expressions to rename files before being added under git.
             First letter defines how to split provided string into two parts:
-            python regular expression (with groups), and replacement string""",
+            Python regular expression (with groups), and replacement string""",
             constraints=EnsureStr(min_len=2) | EnsureNone()
         ),
         annex_options=Parameter(
