@@ -34,6 +34,7 @@ from datalad import ssh_manager
 from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
+from datalad.cmd import GitRunner
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -1060,10 +1061,11 @@ class AnnexRepo(GitRepo):
         cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
             if isinstance(cmd_str, string_types) \
             else cmd_str + files
-        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
-                                  log_stdout=log_stdout, log_online=log_online,
-                                  expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell, expect_fail=expect_fail)
+        return self.cmd_call_wrapper.run(
+            cmd,
+            log_stderr=log_stderr, log_stdout=log_stdout, log_online=log_online,
+            expect_stderr=expect_stderr,
+            cwd=cwd, env=env, shell=shell, expect_fail=expect_fail)
 
     @normalize_paths
     def migrate_backend(self, files, backend=None):
@@ -1216,6 +1218,7 @@ class BatchedAnnex(object):
         # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
         self._process = Popen(cmd, stdin=PIPE, stdout=PIPE
                               # , stderr=PIPE
+                              , env=GitRunner.get_git_environ_adjusted()
                               , cwd=self.path
                               , bufsize=1
                               , universal_newlines=True #**kwargs
