@@ -32,6 +32,7 @@ _group_dataset = (
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
         ('datalad.distribution.modify_subhandle_urls', 'ModifySubhandleURLs',
          'modify-subhandle-urls'),
+        ('datalad.interface.unlock', 'Unlock', 'unlock'),
     ])
 
 _group_misc = (
