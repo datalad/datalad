@@ -15,13 +15,18 @@ __docformat__ = 'restructuredtext'
 import logging
 from os.path import join as opj
 
-from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
 from datalad.interface.base import Interface
-from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
-from datalad.utils import knows_annex, getpwd
+from datalad.utils import knows_annex
+from datalad.utils import getpwd
+
+from .dataset import Dataset
+from .dataset import EnsureDataset
+from .dataset import datasetmethod
 
 lgr = logging.getLogger('datalad.distribution.update')
 
@@ -127,27 +132,35 @@ class Update(Interface):
             # fetch remote(s):
             repo.fetch(remote=name, all_=fetch_all)
 
-            # if it is an annex and there is a tracking branch, and we didn't
-            # fetch the entire remote anyway, explicitly fetch git-annex
-            # branch:
-            # TODO: Is this logic correct? Shouldn't we fetch git-annex from
-            # `name` if there is any (or if there is no tracking branch but we
-            # have a `name`?
+            # if `repo` is an annex and we didn't fetch the entire remote
+            # anyway, explicitly fetch git-annex branch:
+
+            # TODO: This isn't correct. `fetch_all` fetches all remotes.
+            # Apparently, we currently fetch an entire remote anyway. Is this
+            # what we want? Do we want to specify a refspec instead?
+
             if knows_annex(repo.path) and not fetch_all:
-                # check for tracking branch's remote:
-                try:
-                    std_out, std_err = \
-                        repo._git_custom_command('',
-                                                 ["git", "config", "--get",
-                         "branch.{active_branch}.remote".format(
-                             active_branch=repo.get_active_branch())])
-                except CommandError as e:
-                    if e.code == 1 and e.stdout == "":
-                        std_out = None
-                    else:
-                        raise
-                if std_out:  # we have a "tracking remote"
-                    repo.fetch(remote=std_out.strip(), refspec="git-annex")
+                if name:
+                    # we are updating from a certain remote, so git-annex branch
+                    # should be updated from there as well:
+                    repo.fetch(remote=name, refspec="git-annex")
+                    # TODO: what does failing here look like?
+                else:
+                    # we have no remote given, therefore
+                    # check for tracking branch's remote:
+                    try:
+                        std_out, std_err = \
+                            repo._git_custom_command('',
+                                                     ["git", "config", "--get",
+                             "branch.{active_branch}.remote".format(
+                                 active_branch=repo.get_active_branch())])
+                    except CommandError as e:
+                        if e.code == 1 and e.stdout == "":
+                            std_out = None
+                        else:
+                            raise
+                    if std_out:  # we have a "tracking remote"
+                        repo.fetch(remote=std_out.strip(), refspec="git-annex")
 
             # merge:
             if merge:
