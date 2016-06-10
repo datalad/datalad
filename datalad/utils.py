@@ -103,6 +103,10 @@ def __auto_repr__(obj):
         if attr.startswith('_'):
             continue
         value = getattr(obj, attr)
+        # TODO:  should we add this feature to minimize some talktative reprs
+        # such as of URL?
+        #if value is None:
+        #    continue
         items.append("%s=%s" % (attr, shortened_repr(value)))
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
@@ -167,69 +171,6 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
             if exclude_vcs and re.search(_VCS_REGEX, path):
                 continue
             yield path
-
-
-#### windows workaround ###
-# TODO: There should be a better way
-def get_local_file_url(fname):
-    """Return OS specific URL pointing to a local file
-
-    Parameters
-    ----------
-    fname : string
-        Full filename
-    """
-    if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % urlquote(fname_rep)
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
-    else:
-        furl = "file://%s" % urlquote(fname)
-    return furl
-
-
-def get_url_path(url):
-    """Given a url, return the path component"""
-
-    return urlunquote(urlsplit(url).path)
-
-
-def get_local_path_from_url(url):
-    """If given a file:// URL, returns a local path, if possible.
-
-    Raises `ValueError` if not possible, for example, if the URL
-    scheme is different, or if the `host` isn't empty or 'localhost'
-
-    The returned path is always absolute.
-    """
-    urlparts = urlsplit(url)
-    if not urlparts.scheme == 'file':
-        raise ValueError(
-            "Non 'file://' URL cannot be resolved to a local path")
-    if not (urlparts.netloc in ('', 'localhost', '::1') \
-            or urlparts.netloc.startswith('127.')):
-        raise ValueError("file:// URL does not point to 'localhost'")
-    return urlunquote(urlparts.path)
-
-
-def parse_url_opts(url):
-    """Given a string with url-style options, split into content before # and options as dict"""
-    if '#' in url:
-        url_, attrs_str = url.split('#', 1)
-        opts = dict(x.split('=', 1) for x in attrs_str.split('&'))
-        if 'size' in opts:
-            opts['size'] = int(opts['size'])
-    else:
-        url_, opts = url, {}
-    return url_, opts
-
-
-def is_url(s):
-    """Returns whether a string looks like a URL.
-
-    Test implementation uses the presence of a URL scheme as criterion.
-    """
-    return bool(urlsplit(s).scheme)
 
 
 def expandpath(path, force_absolute=True):

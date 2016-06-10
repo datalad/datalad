@@ -89,7 +89,7 @@ def test_interface():
     with swallow_outputs() as cmo:
         assert_raises(SystemExit, parser.parse_args, ['--demoarg', 'abc'])
         # that is what we dump upon folks atm. TODO: improve reporting of illspecified options
-        assert_re_in(".*invalid <datalad.support.constraints.EnsureInt object at .*> value:.*",
+        assert_re_in(".*invalid constraint:int value:.*",
                      cmo.err, re.DOTALL)
 
     # missing argument to option

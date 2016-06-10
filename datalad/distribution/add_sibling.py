@@ -51,8 +51,8 @@ class AddSibling(Interface):
                 you pass a template for building the URLs of the siblings of
                 all (sub)datasets by using placeholders.\n
                 List of currently available placeholders:\n
-                %%NAME\tthe name of the dataset, where slashes are replaced by
-                dashes.\nthis option is ignored if there is already a
+                %%NAME\tThe name of the dataset, where slashes are replaced by
+                dashes.\nThis option is ignored if there is already a
                 configured sibling dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone(),
             nargs="?"),
