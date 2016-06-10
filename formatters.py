@@ -227,5 +227,45 @@ class RSTManPageFormatter(ManPageFormatter):
         # return a single string
         return '{0}\n{1}\n{2}\n\n'.format(
             action_header,
+
             '~' * len(action_header),
             help)
+
+
+def cmdline_example_to_rst(src, out=None, ref=None):
+    if out is None:
+        from cStringIO import StringIO
+        out = StringIO()
+
+    # place header
+    out.write('.. AUTO-GENERATED FILE -- DO NOT EDIT!\n\n')
+    if ref:
+        # place cross-ref target
+        out.write('.. {0}:\n\n'.format(ref))
+
+    # parser status vars
+    inexample = False
+    incodeblock = False
+
+    for line in src:
+        if line.startswith('#% EXAMPLE START'):
+            inexample = True
+            continue
+        if line.startswith('#% EXAMPLE END'):
+            break
+        if not inexample:
+            continue
+        if line.startswith('#% '):
+            incodeblock = False
+            out.write(line[3:])
+            continue
+        if incodeblock:
+            out.write('  %s' % line)
+            continue
+        # normal line
+        else:
+            if len(line.strip()):
+                incodeblock = True
+                out.write('\n.. code-block:: sh\n\n  %s' % line)
+
+    return out
