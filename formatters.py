@@ -234,7 +234,7 @@ class RSTManPageFormatter(ManPageFormatter):
 
 def cmdline_example_to_rst(src, out=None, ref=None):
     if out is None:
-        from cStringIO import StringIO
+        from six.moves import StringIO
         out = StringIO()
 
     # place header

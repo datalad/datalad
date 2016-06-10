@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """"""
 
-from cStringIO import StringIO as SIO
+from six.moves import StringIO as SIO
 import formatters as fmt
 from datalad.cmdline.main import setup_parser
 from .utils import assert_equal, ok_, assert_raises, assert_in, ok_startswith
