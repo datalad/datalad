@@ -37,9 +37,12 @@ class Credential(object):
     """
 
     # Should be defined in a subclass as an OrderedDict of fields
-    # name -> dict(attributes) where currently a single attribute 'hidden' is used
-    # to signal if value should be hidden by UI while entering
+    # name -> dict(attributes)
     _FIELDS = None
+    _KNOWN_ATTRS = {
+        'hidden',    # UI should not display the value
+        'optional',  # Not mandatory thus not requested if not set
+    }
 
     def __init__(self, name, url=None, keyring=None):
         """
@@ -64,43 +67,62 @@ class Credential(object):
 
         Created to avoid all the passing args/kwargs of __init__ all the time
         """
-        pass
+        # Basic checks
+        for f, fattrs in self._FIELDS.items():
+            unknown_attrs = set(fattrs).difference(self._KNOWN_ATTRS)
+            if unknown_attrs:
+                raise ValueError("Uknown attributes %s. Known are: %s"
+                                 % (unknown_attrs, self._KNOWN_ATTRS))
 
-    def _ask_field_value(self, f, hidden=False):
-        return ui.question(
-            f,
-            title="You need to authenticate with %r credentials." % self.name +
-                  " %s provides information on how to gain access"
-                  % self.url if self.url else '',
-            hidden=hidden)
+    def _is_field_optional(self, f):
+        return self._FIELDS[f].get('optional', False)
+
+    def _is_field_hidden(self, f):
+        return self._FIELDS[f].get('hidden', False)
 
     @property
     def is_known(self):
         """Return True if values for all fields of the credential are known"""
         try:
-            return all(self._keyring.get(self.name, f) is not None
-                       for f in self._FIELDS)
+            return all(
+                self._is_field_optional(f) or self._keyring.get(self.name, f) is not None
+                for f in self._FIELDS)
         except Exception as exc:
             lgr.warning("Failed to query keyring: %s" % exc_str(exc))
             return False
 
+    def _ask_field_value(self, f):
+        return ui.question(
+            f,
+            title="You need to authenticate with %r credentials." % self.name +
+                  " %s provides information on how to gain access"
+                  % self.url if self.url else '',
+            hidden=self._is_field_hidden(f))
+
+    def _ask_and_set(self, f):
+        v = self._ask_field_value(f)
+        self.set(**{f: v})
+        return v
+
     def enter_new(self):
         """Enter new values for the credential fields"""
         # Use ui., request credential fields corresponding to the type
-        for f, fopts in self._FIELDS.items():
-            v = self._ask_field_value(f, **fopts)
-            self.set(**{f: v})
+        for f in self._FIELDS:
+            if not self._is_field_optional(f):
+                self._ask_and_set(f)
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
         name = self.name
         fields = {}
-        for f, fopts in self._FIELDS.items():
+        for f in self._FIELDS:
             v = self._keyring.get(name, f)
-            while v is None:  # was not known
-                v = self._ask_field_value(f, **fopts)
-                self.set(**{f: v})
-            fields[f] = v
+            if not self._is_field_optional(f):
+                while v is None:  # was not known
+                    v = self._ask_and_set(f)
+                fields[f] = v
+            elif v is not None:
+                fields[f] = v
         return fields
 
     def set(self, **kwargs):
@@ -120,13 +142,18 @@ class Credential(object):
 class UserPassword(Credential):
     """Simple type of a credential which consists of user/password pair"""
 
-    _FIELDS = OrderedDict([('user', {}), ('password', {'hidden': True})])
+    _FIELDS = OrderedDict([('user', {}),
+                           ('password', {'hidden': True})])
 
 
 class AWS_S3(Credential):
     """Credential for AWS S3 service"""
 
-    _FIELDS = OrderedDict([('key_id', {}), ('secret_id', {'hidden': True})])
+    _FIELDS = OrderedDict([('key_id', {}),
+                           ('secret_id', {'hidden': True}),
+                           ('session', {'optional': True}),
+                           ('expiration', {'optional': True}),
+                           ])
 
 
 @auto_repr
@@ -198,7 +225,6 @@ class CompositeCredential(Credential):
         return self._credentials[-1]()
 
 
-# TODO: might better be a class I guess
 def _nda_adapter(user=None, password=None):
     from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
     gen = NDATokenGenerator()
@@ -206,11 +232,10 @@ def _nda_adapter(user=None, password=None):
     # There are also session and expiration we ignore... TODO anything about it?!!!
     # we could create a derived AWS_S3 which would also store session and expiration
     # and then may be Composite could use those????
-    return dict(key_id=token.access_key, secret_id=token.secret_key)
+    return dict(key_id=token.access_key, secret_id=token.secret_key,
+                session=token.session, expiration=token.expiration)
 
 
-# TODO  - think about the fact that the same "front" credential might be used
-# also independently...  theoretically should work
 class AWS_NDA(CompositeCredential):
     """Credential to access NDA AWS
 
@@ -219,7 +244,7 @@ class AWS_NDA(CompositeCredential):
     out of it
     """
     _CREDENTIAL_CLASSES = (UserPassword, AWS_S3)
-    _CREDENTIAL_ADAPTERS = (_nda_adapter)
+    _CREDENTIAL_ADAPTERS = (_nda_adapter,)
 
 
 CREDENTIAL_TYPES = {
