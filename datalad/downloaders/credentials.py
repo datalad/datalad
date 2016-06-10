@@ -15,7 +15,9 @@ types of credentials.  To be used by Authenticators
 __dev_doc__ = """
 Possibly useful in the future 3rd part developments
 
-https://github.com/omab/python-social-auth  social authentication/registration mechanism with support for several frameworks and auth providers
+https://github.com/omab/python-social-auth
+    social authentication/registration mechanism with support for several
+    frameworks and auth providers
 """
 
 from collections import OrderedDict
@@ -31,65 +33,82 @@ lgr = getLogger('datalad.downloaders.credentials')
 
 @auto_repr
 class Credential(object):
-    TYPES = {
-        'user_password': OrderedDict([('user', {}), ('password', {'hidden': True})]),
-        'aws-s3': OrderedDict([('key_id', {}), ('secret_id', {'hidden': True})]),
-    }
+    """Base class for different types of credentials
+    """
 
-    def __init__(self, name, type, url=None, keyring=None):
+    # Should be defined in a subclass as an OrderedDict of fields
+    # name -> dict(attributes) where currently a single attribute 'hidden' is used
+    # to signal if value should be hidden by UI while entering
+    _FIELDS = None
+
+    def __init__(self, name, url=None, keyring=None):
         """
-
         Parameters
         ----------
+        name : str
+            Name of the credential, as it would be identified by in the centralized
+            storage of credentials
+        url : str, optional
+            URL string to point users to where to seek obtaining the credentials
         keyring : a keyring
-          object providing (g|s)et_password.  If None, keyring module is used
-          as is
+            An object providing (g|s)et_password.  If None, keyring module is used
+            as is
         """
         self.name = name
-        if not type in self.TYPES:
-            raise ValueError("I do not know type %s credential. Known: %s"
-                             % (type, self.TYPES.keys()))
-        self.type = type
         self.url = url
         self._keyring = keyring or keyring_
 
     def _ask_field_value(self, f, hidden=False):
-        return ui.question(f,
-                           title="You need to authenticate with %r credentials." % self.name +
-                                 " %s provides information on how to gain access"
-                                 % self.url if self.url else '',
-                           hidden=hidden)
-
-    # TODO: I guess it, or subclasses depending on the type
-    def enter_new(self):
-        # Use ui., request credential fields corresponding to the type
-        # TODO: this is duplication with __call__
-        fields = self.TYPES[self.type]
-        for f, fopts in fields.items():
-            v = self._ask_field_value(f, **fopts)
-            self._keyring.set(self.name, f, v)
+        return ui.question(
+            f,
+            title="You need to authenticate with %r credentials." % self.name +
+                  " %s provides information on how to gain access"
+                  % self.url if self.url else '',
+            hidden=hidden)
 
     @property
     def is_known(self):
+        """Return True if values for all fields of the credential are known"""
         try:
-            return all(self._keyring.get(self.name, f) is not None for f in self.TYPES[self.type])
+            return all(self._keyring.get(self.name, f) is not None
+                       for f in self._FIELDS)
         except Exception as exc:
             lgr.warning("Failed to query keyring: %s" % exc_str(exc))
             return False
 
-    # should implement corresponding handling (get/set) via keyring module
+    def enter_new(self):
+        """Enter new values for the credential fields"""
+        # Use ui., request credential fields corresponding to the type
+        for f, fopts in self._FIELDS.items():
+            v = self._ask_field_value(f, **fopts)
+            self._keyring.set(self.name, f, v)
+
     def __call__(self):
-        # TODO: redo not stupid way
+        """Obtain credentials from a keyring and if any is not known -- ask"""
         name = self.name
-        credentials = {}
-        for f, fopts in self.TYPES[self.type].items():
+        fields = {}
+        for f, fopts in self._FIELDS.items():
             v = self._keyring.get(name, f)
             while v is None:  # was not known
                 v = self._ask_field_value(f, **fopts)
                 self._keyring.set(name, f, v)
-            credentials[f] = v
+            fields[f] = v
+        return fields
 
-        #values = [keyring.get(name, f) for f in fields]
-        #if not all(values):
-        # TODO: Fancy form
-        return credentials
+
+class UserPassword(Credential):
+    """Simple type of a credential which consists of user/password pair"""
+
+    _FIELDS = OrderedDict([('user', {}), ('password', {'hidden': True})])
+
+
+class AWS_S3(Credential):
+    """Credential for AWS S3 service"""
+
+    _FIELDS = OrderedDict([('key_id', {}), ('secret_id', {'hidden': True})])
+
+
+CREDENTIAL_TYPES = {
+    'user_password': UserPassword,
+    'aws-s3': AWS_S3,
+}

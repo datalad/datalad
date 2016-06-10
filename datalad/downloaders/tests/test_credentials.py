@@ -14,18 +14,13 @@ from datalad.tests.utils import assert_true, assert_false
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import SkipTest
 from datalad.support.keyring_ import MemoryKeyring
-from ..credentials import Credential
-from ..credentials import Credential
-
-
-def test_unknown_type():
-    assert_raises(ValueError, Credential, "name", "unknown_type")
+from ..credentials import UserPassword
 
 
 @with_testsui(responses=['user1', 'password1'])
 def test_cred1_enter_new():
     keyring = MemoryKeyring()
-    cred = Credential("name", "user_password", keyring=keyring)
+    cred = UserPassword("name", keyring=keyring)
     assert_false(cred.is_known)
     assert_equal(cred.enter_new(), None)
     assert_true(cred.is_known)
@@ -40,7 +35,7 @@ def test_cred1_enter_new():
 @with_testsui(responses=['password1'])
 def test_cred1_call():
     keyring = MemoryKeyring()
-    cred = Credential("name", "user_password", keyring=keyring)
+    cred = UserPassword("name", keyring=keyring)
     # we will set the name but not the password, expecting UI
     # requesting it
     assert_equal(keyring.set('name', 'user', 'user1'), None)

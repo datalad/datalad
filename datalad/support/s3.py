@@ -48,8 +48,8 @@ def _get_bucket_connection(credential):
     # with different resources. Thus for now just making an option which
     # one to use
     # do full shebang with entering credentials
-    from ..downloaders.credentials import Credential
-    credential = Credential(credential, "aws-s3", None)
+    from ..downloaders.credentials import AWS_S3
+    credential = AWS_S3(credential, None)
     if not credential.is_known:
         credential.enter_new()
     creds = credential()
