@@ -38,6 +38,7 @@ boto_lgr = logging.getLogger('boto')
 
 __docformat__ = 'restructuredtext'
 
+
 @auto_repr
 class S3Authenticator(Authenticator):
     """Authenticator for S3 AWS
@@ -64,6 +65,9 @@ class S3Authenticator(Authenticator):
         )
 
         conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
+        # TODO: credential might contain 'session' token as well
+        # which could be provided   as   security_token=<token>.,
+        # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
         try:
             bucket = conn.get_bucket(bucket_name)
         except S3ResponseError as e:

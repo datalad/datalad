@@ -57,6 +57,14 @@ class Credential(object):
         self.name = name
         self.url = url
         self._keyring = keyring or keyring_
+        self._prepare()
+
+    def _prepare(self):
+        """Additional house-keeping possibly to be performed in subclasses
+
+        Created to avoid all the passing args/kwargs of __init__ all the time
+        """
+        pass
 
     def _ask_field_value(self, f, hidden=False):
         return ui.question(
@@ -81,7 +89,7 @@ class Credential(object):
         # Use ui., request credential fields corresponding to the type
         for f, fopts in self._FIELDS.items():
             v = self._ask_field_value(f, **fopts)
-            self._keyring.set(self.name, f, v)
+            self.set(**{f: v})
 
     def __call__(self):
         """Obtain credentials from a keyring and if any is not known -- ask"""
@@ -91,9 +99,22 @@ class Credential(object):
             v = self._keyring.get(name, f)
             while v is None:  # was not known
                 v = self._ask_field_value(f, **fopts)
-                self._keyring.set(name, f, v)
+                self.set(**{f: v})
             fields[f] = v
         return fields
+
+    def set(self, **kwargs):
+        """Set field(s) of the credential"""
+        for f, v in kwargs.items():
+            if f not in self._FIELDS:
+                raise ValueError("Unknown field %s. Known are: %s"
+                                 % (f, self._FIELDS.keys()))
+            self._keyring.set(self.name, f, v)
+
+    def delete(self):
+        """Deletes credential values from the keyring"""
+        for f in self._FIELDS:
+            self._keyring.delete(self.fname, f)
 
 
 class UserPassword(Credential):
@@ -108,7 +129,101 @@ class AWS_S3(Credential):
     _FIELDS = OrderedDict([('key_id', {}), ('secret_id', {'hidden': True})])
 
 
+@auto_repr
+class CompositeCredential(Credential):
+    """Credential which represent a sequence of Credentials where front one is exposed to user
+    """
+
+    # To be defined in sub-classes
+    _CREDENTIAL_CLASSES = None
+    _CREDENTIAL_ADAPTERS = None
+
+    def _prepare(self):
+        super(CompositeCredential, self).prepare()
+        assert len(self._CREDENTIAL_CLASSES) > 1, "makes sense only if there is > 1 credential"
+        assert len(self._CREDENTIAL_CLASSES) == len(self._CREDENTIAL_ADAPTERS) + 1, \
+            "there should be 1 less of adapter than _CREDENTIAL_CLASSES"
+
+        for C in self._CREDENTIAL_CLASSES:
+            assert issubclass(C, Credential), "%s must be a subclass of Credential" % C
+
+        # First credential should bear the name and url
+        credentials = [self._CREDENTIAL_CLASSES[0](self.name, url=self.url, keyring=self.keyring)]
+        # and we just reuse its _FIELDS for _ask_field_value etc
+        self._FIELDS = credentials[0]._FIELDS
+        # the rest with index suffix, but storing themselves in the same keyring
+        for iC, C in enumerate(self._CREDENTIAL_CLASSES[1:]):
+            credentials.append(C(name="%s:%d" % (self.name, iC+1), url=None, keyring=self.keyring))
+        self._credentials = credentials
+
+    # Here it becomes tricky, since theoretically it is the "tail"
+    # ones which might expire etc, so we wouldn't exactly know what
+    # new credentials outside process wanted -- it would be silly to ask
+    # right away the "entry" credentials if it is just the expiration of the
+    # tail credentials
+    def enter_new(self):
+        # should invalidate/remove all tail credentials to avoid failing attempts to login
+        self._credentials[0].enter_new()
+        for c in self._credentials[1:]:
+            c.delete()
+
+    def __call__(self):
+        """Obtain credentials from a keyring and if any is not known -- ask"""
+        name = self.name
+
+        # Start from the tail until we have credentials set
+        idx = len(self._credentials) - 1
+        for c in self._credentials[::-1]:
+            if c.is_known():
+                break
+            idx -= 1
+
+        if idx < 0:
+            # none was known, all the same -- start with the first one
+            idx = 0
+
+        # TODO: consider moving logic of traversal into authenticator since it is
+        # the one spitting out authentication error etc
+        # Theoretically we could just reuse 'fields' from adapter in the next step
+        # but let's do full circle, so that if any "normalization" is done by
+        # Credentials we take that into account
+        for c, adapter, next_c in zip(
+                self._credentials[idx:],
+                self._CREDENTIAL_ADAPTERS[idx:],
+                self._credentials[idx+1:]):
+            fields = c()
+            next_fields = adapter(**fields)
+            next_c.set(**next_fields)
+
+        return self._credentials[-1]()
+
+
+# TODO: might better be a class I guess
+def _nda_adapter(user=None, password=None):
+    from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
+    gen = NDATokenGenerator()
+    token = gen.generate_token(user=user, password=password)
+    # There are also session and expiration we ignore... TODO anything about it?!!!
+    # we could create a derived AWS_S3 which would also store session and expiration
+    # and then may be Composite could use those????
+    return dict(key_id=token.access_key, secret_id=token.secret_key)
+
+
+# TODO  - think about the fact that the same "front" credential might be used
+# also independently...  theoretically should work
+class AWS_NDA(CompositeCredential):
+    """Credential to access NDA AWS
+
+    So for NDA we need a credential which is a composite credential.
+    User provides UserPassword and then some adapter generates AWS_S3
+    out of it
+    """
+    _CREDENTIAL_CLASSES = (UserPassword, AWS_S3)
+    _CREDENTIAL_ADAPTERS = (_nda_adapter)
+
+
 CREDENTIAL_TYPES = {
     'user_password': UserPassword,
     'aws-s3': AWS_S3,
+    'nda-aws': AWS_NDA,
 }
