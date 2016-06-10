@@ -38,7 +38,7 @@ class TraceBack(object):
     """
 
     def __init__(self, collide=False):
-        """Initialize TrackBack metric
+        """Initialize TraceBack metric
 
         Parameters
         ----------

@@ -55,6 +55,10 @@ from . import _TEMP_PATHS_GENERATED
 _TEMP_PATHS_CLONES = set()
 
 
+# additional shortcuts
+neq_ = assert_not_equal
+nok_ = assert_false
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)

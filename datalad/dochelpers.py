@@ -297,7 +297,7 @@ def borrowkwargs(cls, methodname=None, exclude=None):
 import os
 import sys
 import traceback
-# TODO: make limit respect config/environement parameter
+# TODO: make limit respect config/environment parameter
 def exc_str(exc=None, limit=None):
     """Enhanced str for exceptions.  Should include original location
 

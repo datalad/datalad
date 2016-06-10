@@ -21,6 +21,7 @@ _group_dataset = (
     [
         # source module, source object[, dest. cmdline name[, dest python name]]
         # src module can be relative, but has to be relative to the main 'datalad' package
+        ('datalad.distribution.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall'),

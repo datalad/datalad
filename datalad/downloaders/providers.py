@@ -195,7 +195,7 @@ class Providers(object):
         for section in config.sections():
             if ':' in section:
                 type_, name = section.split(':', 1)
-                assert(type_ in {'provider', 'credential'})
+                assert type_ in {'provider', 'credential'}, "we know only providers and credentials, got type %s" % type_
                 items = {
                     o: config.get(section, o) for o in config.options(section)
                 }

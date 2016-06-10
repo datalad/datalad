@@ -34,6 +34,7 @@ from datalad import ssh_manager
 from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
+from datalad.cmd import GitRunner
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -94,7 +95,7 @@ class AnnexRepo(GitRepo):
     # TODO: pass description
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None, always_commit=True, create=True, init=False,
-                 batch_size=None):
+                 batch_size=None, version=None, description=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -106,38 +107,36 @@ class AnnexRepo(GitRepo):
         path: str
           path to git-annex repository. In case it's not an absolute path, it's
           relative to PWD
-
         url: str, optional
           url to the to-be-cloned repository. Requires valid git url
           according to
           http://www.kernel.org/pub/software/scm/git/docs/git-clone.html#URLS .
-
         runner: Runner, optional
           Provide a Runner in case AnnexRepo shall not create it's own.
           This is especially needed in case of desired dry runs.
-
         direct: bool, optional
           If True, force git-annex to use direct mode
-
         backend: str, optional
           Set default backend used by this annex. This does NOT affect files,
           that are already annexed nor will it automatically migrate files,
           hat are 'getted' afterwards.
-
         create: bool, optional
           Create and initializes an annex repository at path, in case
           there is none. If set to False, and this repository is not an annex
           repository (initialized or not), an exception is raised.
-
         init: bool, optional
           Initialize git-annex repository (run "git annex init") if path is an
           annex repository which just was not yet initialized by annex (e.g. a
           fresh git clone). Note that if `create=True`, then initialization
           would happen
-
         batch_size: int, optional
           if specified and >0, instructs annex to batch this many commands before
           annex adds acts on git repository (e.g. adds them them to index for addurl).
+        version: int, optional
+          if given, pass as --version to `git annex init`
+        description: str, optional
+          short description that humans can use to identify the
+          repository/location, e.g. "Precious data on my laptop"
         """
         fix_it = False
         try:
@@ -162,6 +161,7 @@ class AnnexRepo(GitRepo):
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
+                # XXX replace with proper test for ssh location identifier
                 if url is not None and url.startswith('ssh:'):
                     c = ssh_manager.get_connection(url)
                     writer = self.repo.config_writer()
@@ -173,7 +173,7 @@ class AnnexRepo(GitRepo):
 
         self.always_commit = always_commit
         if fix_it:
-            self._init()
+            self._init(version=version, description=description)
             self.fsck()
 
         # Check whether an annex already exists at destination
@@ -187,10 +187,10 @@ class AnnexRepo(GitRepo):
                 if create or init:
                     lgr.debug('Annex repository was not yet initialized at %s.'
                               ' Initializing ...' % self.path)
-                    self._init()
+                    self._init(version=version, description=description)
             elif create:
                 lgr.debug('Initializing annex repository at %s...' % self.path)
-                self._init()
+                self._init(version=version, description=description)
             else:
                 raise RuntimeError("No annex found at %s." % self.path)
 
@@ -353,7 +353,7 @@ class AnnexRepo(GitRepo):
         self._direct_mode = None
         assert(self.is_direct_mode() == enable_direct_mode)
 
-    def _init(self):
+    def _init(self, version=None, description=None):
         """Initializes an annex repository.
 
         Note: This is intended for private use in this class by now.
@@ -364,8 +364,14 @@ class AnnexRepo(GitRepo):
         # TODO: provide git and git-annex options.
         # TODO: Document (or implement respectively) behaviour in special cases
         # like direct mode (if it's different), not existing paths, etc.
-
-        self._run_annex_command('init')
+        opts = []
+        if description is not None:
+            opts += [description]
+        if version is not None:
+            opts += ['--version', '{0}'.format(version)]
+        if not len(opts):
+            opts = None
+        self._run_annex_command('init', annex_options=opts)
         # TODO: When to expect stderr?
         # on crippled filesystem for example (think so)?
 
@@ -1055,10 +1061,11 @@ class AnnexRepo(GitRepo):
         cmd = shlex.split(cmd_str + " " + " ".join(files), posix=not on_windows) \
             if isinstance(cmd_str, string_types) \
             else cmd_str + files
-        return self.cmd_call_wrapper.run(cmd, log_stderr=log_stderr,
-                                  log_stdout=log_stdout, log_online=log_online,
-                                  expect_stderr=expect_stderr, cwd=cwd,
-                                  env=env, shell=shell, expect_fail=expect_fail)
+        return self.cmd_call_wrapper.run(
+            cmd,
+            log_stderr=log_stderr, log_stdout=log_stdout, log_online=log_online,
+            expect_stderr=expect_stderr,
+            cwd=cwd, env=env, shell=shell, expect_fail=expect_fail)
 
     @normalize_paths
     def migrate_backend(self, files, backend=None):
@@ -1211,6 +1218,7 @@ class BatchedAnnex(object):
         # kwargs = dict(bufsize=1, universal_newlines=True) if PY3 else {}
         self._process = Popen(cmd, stdin=PIPE, stdout=PIPE
                               # , stderr=PIPE
+                              , env=GitRunner.get_git_environ_adjusted()
                               , cwd=self.path
                               , bufsize=1
                               , universal_newlines=True #**kwargs

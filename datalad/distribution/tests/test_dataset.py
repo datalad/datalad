@@ -170,7 +170,7 @@ def test_subdatasets(path):
     ds = Dataset(path)
     assert_false(ds.is_installed())
     eq_(ds.get_dataset_handles(), None)
-    ds = ds.install()
+    ds = ds.create()
     assert_true(ds.is_installed())
     eq_(ds.get_dataset_handles(), [])
     # create some file and commit it

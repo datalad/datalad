@@ -15,7 +15,7 @@ from os.path import dirname, join as opj, exists, pardir, realpath
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
 from ..cmd import Runner
-from ..utils import get_local_file_url
+from ..support.network import get_local_file_url
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
 
