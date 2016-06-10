@@ -1,6 +1,5 @@
 #!/bin/sh
 
-set -u
 set -e
 
 # BOILERPLATE
@@ -97,3 +96,10 @@ git annex merge
 
 datalad install result.txt
 
+#% EXAMPLE END
+
+testEquality() {
+  assertEquals 1 1
+}
+
+[ -n "$DATALAD_RUN_CMDLINE_TESTS" ] && . shunit2 || true
