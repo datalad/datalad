@@ -50,6 +50,22 @@ def test_get_disposition_filename():
     eq_(output[0]['filename'], 'T1.nii.gz')
 
 
+@with_tempfile(mkdir=True)
+def test_fix_permissions(outdir):
+    filepath = opj(outdir, 'myfile.txt')
+    filepath2 = opj(outdir, 'badfile.py')
+    with open(filepath, 'w'), open(filepath2, 'w'):
+        pass
+
+    chmod(outdir+'/myfile.txt', 0664)
+    chmod(outdir + '/myfile.txt', 0666)
+
+    data = {'url': 'http://mapping.org/docs/?num=45', 'filename': outdir+'/myfile.txt', }
+
+    gen = fix_permissions('.txt', False, 'filename')
+    print(list(gen(data)))
+
+
 def test_get_url_filename():
     input = {'url': 'http://human.brain-map.org/api/v2/well_known_file_download/157722290'}
     output = list(get_url_filename(input))
