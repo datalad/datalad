@@ -43,21 +43,21 @@ class DownloadURL(Interface):
 
     _params_ = dict(
         urls=Parameter(
-            doc="URL(s) to be downloaded.",
+            doc="URL(s) to be downloaded",
             constraints=EnsureStr(),  # TODO: EnsureURL
             metavar='url',
             nargs='+'),
         overwrite=Parameter(
             args=("-o", "--overwrite"),
             action="store_true",
-            doc="""Flag to overwrite it if target file exists"""),
+            doc="""flag to overwrite it if target file exists"""),
         stop_on_failure=Parameter(
             args=("-x", "--stop-on-failure"),
             action="store_true",
-            doc="""Flag to stop subsequent downloads upon first failure to download"""),
+            doc="""flag to stop subsequent downloads upon first failure to download"""),
         path=Parameter(
             args=("-O", "--path"),
-            doc="Path (filename or directory path) where to store downloaded file(s). "
+            doc="path (filename or directory path) where to store downloaded file(s).  "
                 "In case of multiple URLs provided, must point to a directory.  Otherwise current "
                 "directory is used",
             constraints=EnsureStr() | EnsureNone())

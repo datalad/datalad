@@ -43,78 +43,78 @@ class CreatePublicationTargetSSHWebserver(Interface):
         # TODO: Figure out, whether (and when) to use `sshurl` as push url
         dataset=Parameter(
             args=("--dataset", "-d",),
-            doc="""specify the dataset to create the publication target for. If
+            doc="""specify the dataset to create the publication target for.  If
                 no dataset is given, an attempt is made to identify the dataset
                 based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         sshurl=Parameter(
             args=("sshurl",),
             doc="""SSH URL to use to log into the server and create the target
-                dataset(s). This also serves as a default for the URL to be
+                dataset(s).  This also serves as a default for the URL to be
                 used to add the target as a sibling to `dataset` and as a
                 default for the directory on the server, where to create the
-                dataset.""",
+                dataset""",
             constraints=EnsureStr()),
         target=Parameter(
             args=('target',),
-            doc="""Sibling name to create for this publication target.
+            doc="""sibling name to create for this publication target.
                 If `recursive` is set, the same name will be used to address
-                the subdatasets' siblings. Note, that this is just a
+                the subdatasets' siblings.  Note, that this is just a
                 convenience function, calling add_sibling after the actual
-                creation of the target dataset(s). Whenever the creation fails,
-                no siblings are added.""",
+                creation of the target dataset(s).  Whenever the creation fails,
+                no siblings are added""",
             constraints=EnsureStr() | EnsureNone(),
             nargs="?"),
         target_dir=Parameter(
             args=('--target-dir',),
-            doc="""Path to the directory on the server where to create the
-                dataset. By default it's wherever `sshurl` points to. If a
+            doc="""path to the directory on the server where to create the
+                dataset.  By default it's wherever `sshurl` points to.  If a
                 relative path is provided, it's interpreted as relative to the
                 user's home directory on the server.
                 Especially when using `recursive`, it's possible to provide a
                 template for building the URLs of all (sub)datasets to be
-                created by using placeholders. If you don't provide a template
+                created by using placeholders.  If you don't provide a template
                 the local hierarchy with respect to `dataset` will be
                 replicated on the server rooting in `target_dir`.\n
                 List of currently available placeholders:\n
                 %%NAME\tthe name of the datasets, where slashes are
-                replaced by dashes.\n""",
+                replaced by dashes\n""",
             constraints=EnsureStr() | EnsureNone()),
         target_url=Parameter(
             args=('--target-url',),
-            doc="""The URL of the dataset sibling named by `target`. Defaults
-                to `sshurl`. This URL has to be accessible to anyone, who is
+            doc="""the URL of the dataset sibling named by `target`.  Defaults
+                to `sshurl`.  This URL has to be accessible to anyone, who is
                 supposed to have access to the dataset later on.\n
                 Especially when using `recursive`, it's possible to provide a
                 template for building the URLs of all (sub)datasets to be
                 created by using placeholders.\n
                 List of currently available placeholders:\n
                 %%NAME\tthe name of the datasets, where slashes are
-                replaced by dashes.\n""",
+                replaced by dashes\n""",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         target_pushurl=Parameter(
             args=('--target-pushurl',),
-            doc="""Defaults to `sshurl`. In case the `target_url` cannot be
+            doc="""defaults to `sshurl`.  In case the `target_url` cannot be
                 used to publish to the dataset sibling, this option specifies a
-                URL to be used for the actual publication operation.""",
+                URL to be used for the actual publication operation""",
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
-            doc="""Recursively create the publication target for all
+            doc="""recursively create the publication target for all
                 subdatasets of `dataset`""",),
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'replace', 'raise'),
-            doc="""Action to perform, if target directory exists already.
+            doc="""action to perform, if target directory exists already.
                 Dataset is skipped if `skip`. `replace` forces to (re-)init
                 git and to (re-)configure sibling `target`
-                (i.e. its URL(s)) in case it already exists. `raise` just
+                (i.e. its URL(s)) in case it already exists.  `raise` just
                 raises an Exception""",),
         shared=Parameter(
             args=("--shared",),
-            doc="""passed to git-init. TODO: Figure out how to communicate what
+            doc="""passed to git-init.  TODO: Figure out how to communicate what
                 this is about""",
             constraints=EnsureStr() | EnsureBool()),)
 
