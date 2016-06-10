@@ -1,8 +1,24 @@
+#!/bin/sh
+
 set -u
 set -e
 
+# BOILERPLATE
+
 BOBS_HOME=$(readlink -f $(mktemp -d datalad_demo.XXXX))
 ALICES_HOME=$(readlink -f $(mktemp -d datalad_demo.XXXX))
+
+#% EXAMPLE START
+
+#% Build atop of 3rd-party data
+#% ============================
+#%
+#% This example shows how datalad can be used to obtain a 3rd-party dataset and
+#% use it as input for an analysis. Moreover, it demonstrates how two local
+#% collaborators can contribute to this analysis, each using their own copy
+#% of the dataset, but at the same time, being able to easily share their results
+#% back and forth.
+
 HOME=$BOBS_HOME
 
 cd
@@ -45,7 +61,7 @@ cd
 git config --global --add user.name Alice
 git config --global --add user.email alice@example.com
 
-# we are the colleague now!
+#% we are the colleague now!
 # TODO: needs to get --description to avoid confusion
 datalad install --source $BOBS_HOME/myanalysis bobs_analysis
 

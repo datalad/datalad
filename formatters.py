@@ -255,7 +255,7 @@ def cmdline_example_to_rst(src, out=None, ref=None):
             break
         if not inexample:
             continue
-        if line.startswith('#% '):
+        if line.startswith('#%'):
             incodeblock = False
             out.write(line[3:])
             continue

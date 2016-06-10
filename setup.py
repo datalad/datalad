@@ -19,7 +19,7 @@ from distutils.command.build_py import build_py
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
 import datetime
-from formatters import ManPageFormatter, RSTManPageFormatter
+import formatters as fmt
 
 # This might entail lots of imports which might not yet be available
 # so let's do ad-hoc parsing of the version.py
@@ -83,23 +83,23 @@ class BuildManPage(Command):
     description = 'Generate man page from an ArgumentParser instance.'
 
     user_options = [
-        ('man_path=', None, 'output path for manpages'),
-        ('rst_path=', None, 'output path for RST files'),
+        ('manpath=', None, 'output path for manpages'),
+        ('rstpath=', None, 'output path for RST files'),
         ('parser=', None, 'module path to an ArgumentParser instance'
          '(e.g. mymod:func, where func is a method or function which return'
          'a dict with one or more arparse.ArgumentParser instances.'),
     ]
 
     def initialize_options(self):
-        self.man_path = None
-        self.rst_path = None
+        self.manpath = None
+        self.rstpath = None
         self.parser = None
 
     def finalize_options(self):
-        if self.man_path is None:
-            raise DistutilsOptionError('\'man_path\' option is required')
-        if self.rst_path is None:
-            raise DistutilsOptionError('\'rst_path\' option is required')
+        if self.manpath is None:
+            raise DistutilsOptionError('\'manpath\' option is required')
+        if self.rstpath is None:
+            raise DistutilsOptionError('\'rstpath\' option is required')
         if self.parser is None:
             raise DistutilsOptionError('\'parser\' option is required')
         mod_name, func_name = self.parser.split(':')
@@ -107,13 +107,13 @@ class BuildManPage(Command):
         try:
             mod = __import__(mod_name, fromlist=fromlist)
             self._parser = getattr(mod, func_name)(
-                formatter_class=ManPageFormatter,
+                formatter_class=fmt.ManPageFormatter,
                 return_subparsers=True)
 
         except ImportError as err:
             raise err
 
-        self.announce('Writing man page(s) to %s' % self.man_path)
+        self.announce('Writing man page(s) to %s' % self.manpath)
         self._today = datetime.date.today()
 
     def run(self):
@@ -129,8 +129,8 @@ class BuildManPage(Command):
         }
 
         dist = self.distribution
-        for cls, opath, ext in ((ManPageFormatter, self.man_path, '1'),
-                                (RSTManPageFormatter, self.rst_path, 'rst')):
+        for cls, opath, ext in ((fmt.ManPageFormatter, self.manpath, '1'),
+                                (fmt.RSTManPageFormatter, self.rstpath, 'rst')):
             if not os.path.exists(opath):
                 os.makedirs(opath)
             for cmdname in self._parser:
@@ -147,14 +147,50 @@ class BuildManPage(Command):
                     f.write(formatted)
 
 
+class BuildRSTExamplesFromScripts(Command):
+    description = 'Generate RST variants of example shell scripts.'
+
+    user_options = [
+        ('expath=', None, 'path to look for example scripts'),
+        ('rstpath=', None, 'output path for RST files'),
+    ]
+
+    def initialize_options(self):
+        self.expath = None
+        self.rstpath = None
+
+    def finalize_options(self):
+        if self.expath is None:
+            raise DistutilsOptionError('\'expath\' option is required')
+        if self.rstpath is None:
+            raise DistutilsOptionError('\'rstpath\' option is required')
+        self.announce('Converting exanmple scripts')
+
+    def run(self):
+        opath = self.rstpath
+        if not os.path.exists(opath):
+            os.makedirs(opath)
+
+        from glob import glob
+        for example in glob(opj(self.expath, '*.sh')):
+            exname = os.path.basename(example)[:-3]
+            with open(opj(opath, '{0}.rst'.format(exname)), 'w') as out:
+                fmt.cmdline_example_to_rst(
+                    open(example),
+                    out=out,
+                    ref='_example_{0}'.format(exname))
+
+
 # configure additional command for custom build steps
 class DataladBuild(build_py):
     def run(self):
         self.run_command('build_manpage')
+        self.run_command('build_examples')
         build_py.run(self)
 
 cmdclass = {
     'build_manpage': BuildManPage,
+    'build_examples': BuildRSTExamplesFromScripts,
     'build_py': DataladBuild
 }
 
