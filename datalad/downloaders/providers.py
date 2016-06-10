@@ -131,6 +131,7 @@ class Providers(object):
         'http_basic_auth': HTTPBasicAuthAuthenticator,
         'http_digest_auth': HTTPDigestAuthAuthenticator,
         'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
+        'nda-s3': S3Authenticator,
         'xnat': NotImplementedAuthenticator,
         'none': NoneAuthenticator,
     }

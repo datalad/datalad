@@ -26,7 +26,7 @@ from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
 from .base import Authenticator
 from .base import BaseDownloader
 from .base import DownloadError, AccessDeniedError, TargetFileAbsent
-from ..support.s3 import boto, S3ResponseError
+from ..support.s3 import boto, S3ResponseError, OrdinaryCallingFormat
 from ..support.status import FileStatus
 
 import logging
@@ -67,8 +67,13 @@ class S3Authenticator(Authenticator):
         # credential might contain 'session' token as well
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
-        conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'],
-                               security_token=credentials.get('session'))
+        conn = boto.connect_s3(
+            credentials['key_id'], credentials['secret_id'],
+            security_token=credentials.get('session'),
+            # per http://stackoverflow.com/a/19089045/1265472
+            calling_format=OrdinaryCallingFormat() \
+                if bucket_name.lower() != bucket_name else None
+        )
         try:
             bucket = conn.get_bucket(bucket_name)
         except S3ResponseError as e:

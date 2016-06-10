@@ -166,7 +166,6 @@ class CompositeCredential(Credential):
     _CREDENTIAL_ADAPTERS = None
 
     def _prepare(self):
-        super(CompositeCredential, self).prepare()
         assert len(self._CREDENTIAL_CLASSES) > 1, "makes sense only if there is > 1 credential"
         assert len(self._CREDENTIAL_CLASSES) == len(self._CREDENTIAL_ADAPTERS) + 1, \
             "there should be 1 less of adapter than _CREDENTIAL_CLASSES"
@@ -175,13 +174,15 @@ class CompositeCredential(Credential):
             assert issubclass(C, Credential), "%s must be a subclass of Credential" % C
 
         # First credential should bear the name and url
-        credentials = [self._CREDENTIAL_CLASSES[0](self.name, url=self.url, keyring=self.keyring)]
+        credentials = [self._CREDENTIAL_CLASSES[0](self.name, url=self.url, keyring=self._keyring)]
         # and we just reuse its _FIELDS for _ask_field_value etc
         self._FIELDS = credentials[0]._FIELDS
         # the rest with index suffix, but storing themselves in the same keyring
         for iC, C in enumerate(self._CREDENTIAL_CLASSES[1:]):
-            credentials.append(C(name="%s:%d" % (self.name, iC+1), url=None, keyring=self.keyring))
+            credentials.append(C(name="%s:%d" % (self.name, iC+1), url=None, keyring=self._keyring))
         self._credentials = credentials
+
+        super(CompositeCredential, self)._prepare()
 
     # Here it becomes tricky, since theoretically it is the "tail"
     # ones which might expire etc, so we wouldn't exactly know what
@@ -201,7 +202,7 @@ class CompositeCredential(Credential):
         # Start from the tail until we have credentials set
         idx = len(self._credentials) - 1
         for c in self._credentials[::-1]:
-            if c.is_known():
+            if c.is_known:
                 break
             idx -= 1
 
@@ -228,7 +229,7 @@ class CompositeCredential(Credential):
 def _nda_adapter(user=None, password=None):
     from datalad.support.third.nda_aws_token_generator import NDATokenGenerator
     gen = NDATokenGenerator()
-    token = gen.generate_token(user=user, password=password)
+    token = gen.generate_token(user, password)
     # There are also session and expiration we ignore... TODO anything about it?!!!
     # we could create a derived AWS_S3 which would also store session and expiration
     # and then may be Composite could use those????
@@ -236,7 +237,7 @@ def _nda_adapter(user=None, password=None):
                 session=token.session, expiration=token.expiration)
 
 
-class AWS_NDA(CompositeCredential):
+class NDA_S3(CompositeCredential):
     """Credential to access NDA AWS
 
     So for NDA we need a credential which is a composite credential.
@@ -250,5 +251,5 @@ class AWS_NDA(CompositeCredential):
 CREDENTIAL_TYPES = {
     'user_password': UserPassword,
     'aws-s3': AWS_S3,
-    'nda-aws': AWS_NDA,
+    'nda-s3': NDA_S3,
 }

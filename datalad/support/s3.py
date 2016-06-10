@@ -31,11 +31,11 @@ try:
     import boto
     from boto.s3.key import Key
     from boto.exception import S3ResponseError
-except ImportError:
-    boto = Key = S3ResponseError = None
+    from boto.s3.connection import OrdinaryCallingFormat
 except Exception as e:
-    lgr.warning("boto module failed to import although available: %s" % exc_str(e))
-    boto = Key = S3ResponseError = None
+    if not isinstance(e, ImportError):
+        lgr.warning("boto module failed to import although available: %s" % exc_str(e))
+    boto = Key = S3ResponseError = OrdinaryCallingFormat = None
 
 
 # TODO: should become a config option and managed along with the rest
