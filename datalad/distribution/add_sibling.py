@@ -51,7 +51,7 @@ class AddSibling(Interface):
                 you pass a template for building the URLs of the siblings of
                 all (sub)datasets by using placeholders.\n
                 List of currently available placeholders:\n
-                %%NAME\tThe name of the dataset, where slashes are replaced by
+                %%NAME\tthe name of the dataset, where slashes are replaced by
                 dashes.\nThis option is ignored if there is already a
                 configured sibling dataset under the name given by `name`""",
             constraints=EnsureStr() | EnsureNone(),
@@ -59,7 +59,7 @@ class AddSibling(Interface):
         pushurl=Parameter(
             args=('--pushurl',),
             doc="""in case the `url` cannot be used to publish to the dataset
-                sibling, this option specifies a URL to be used instead.\nif no
+                sibling, this option specifies a URL to be used instead.\nIf no
                 `url` is given, `pushurl` serves as `url` as well.
                 This option is ignored if there is already a configured sibling
                 dataset under the name given by `name`""",
