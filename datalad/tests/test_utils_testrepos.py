@@ -36,7 +36,7 @@ def _test_BasicAnnexTestRepo(repodir):
     if not trepo.repo.is_crippled_fs():
         ok_broken_symlink(pathjoin(trepo.path, 'test-annex.dat'))
     with swallow_outputs():
-        trepo.repo.annex_get('test-annex.dat')
+        trepo.repo.get('test-annex.dat')
     if not trepo.repo.is_crippled_fs():
         ok_good_symlink(pathjoin(trepo.path, 'test-annex.dat'))
 

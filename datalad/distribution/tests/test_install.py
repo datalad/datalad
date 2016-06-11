@@ -10,9 +10,13 @@
 """
 
 import os
-from os.path import join as opj, abspath
+import shutil
+from os.path import join as opj, abspath, isdir
+from os.path import exists
+from os.path import realpath
 
 from ..dataset import Dataset
+from datalad.api import create
 from datalad.api import install
 from datalad.distribution.install import get_containing_subdataset
 from datalad.distribution.install import _installationpath_from_url
@@ -20,11 +24,15 @@ from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileInGitError
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import GitCommandError
+from datalad.cmd import Runner
+
 from datalad.support.annexrepo import AnnexRepo
+from datalad.cmd import Runner
 
 from nose.tools import ok_, eq_, assert_false
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_equal
+    with_testrepos, assert_equal, assert_true
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
@@ -34,7 +42,9 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.tests.utils import ok_clean_git
+from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_outputs
+from datalad.tests.utils import swallow_logs
 
 
 def test_insufficient_args():
@@ -56,12 +66,16 @@ def test_installationpath_from_url():
 @with_tree(tree={'test.txt': 'whatever'})
 def test_get_containing_subdataset(path):
 
-    ds = Dataset(path).install()
+    ds = create(path)
     ds.install(path='test.txt')
     ds.remember_state("Initial commit")
     subds = ds.install("sub", source=path)
     eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
     eq_(get_containing_subdataset(ds, "some").path, ds.path)
+    # make sure the subds is found, even when it is not present, but still
+    # known
+    shutil.rmtree(subds.path)
+    eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
     assert_raises(ValueError, get_containing_subdataset, ds, outside_path)
@@ -73,16 +87,32 @@ def test_get_containing_subdataset(path):
 
 @with_tempfile
 def test_create(path):
+    # install doesn't create anymore
+    assert_raises(RuntimeError, Dataset(path).install)
     # only needs a path
-    ds = install(path)
+    ds = create(path, no_annex=True)
     ok_(ds.is_installed())
     ok_clean_git(path, annex=False)
+    ok_(isinstance(ds.repo, GitRepo))
 
+    ds = create(path, description="funny")
+    ok_(ds.is_installed())
+    ok_clean_git(path, annex=False)
     # any dataset created from scratch has an annex
     ok_(isinstance(ds.repo, AnnexRepo))
+    # check default backend
+    assert_equal(
+        ds.repo.repo.config_reader().get_value("annex", "backends"),
+        'MD5E')
+    runner = Runner()
+    # check description in `info`
+    cmd = ['git-annex', 'info']
+    cmlout = runner.run(cmd, cwd=path)
+    assert_in('funny [here]', cmlout[0])
+
 
     sub_path_1 = opj(path, "sub")
-    subds1 = install(sub_path_1)
+    subds1 = create(sub_path_1)
     ok_(subds1.is_installed())
     ok_clean_git(sub_path_1, annex=False)
     # wasn't installed into ds:
@@ -93,6 +123,7 @@ def test_create(path):
     ok_(added_subds.is_installed())
     ok_clean_git(sub_path_1, annex=False)
     eq_(added_subds.path, sub_path_1)
+    assert_true(isdir(opj(added_subds.path, '.git')))
     # will not list it unless committed
     assert_not_in("sub", ds.get_dataset_handles())
     ds.remember_state("added submodule")
@@ -118,13 +149,20 @@ def test_create(path):
     assert_raises(InsufficientArgumentsError, install, ds, path=sub_path_2)
 
 
+@with_tempfile
+def test_create_curdir(path):
+    with chpwd(path, mkdir=True):
+        create()
+    ok_(Dataset(path).is_installed())
+
+
 @with_tree(tree={'test.txt': 'some', 'test2.txt': 'other'})
 @with_tempfile(mkdir=True)
 def test_install_plain_git(src, path):
     # make plain git repo
     gr = GitRepo(src, create=True)
-    gr.git_add('test.txt')
-    gr.git_commit('demo')
+    gr.add('test.txt')
+    gr.commit('demo')
     # now install it somewhere else
     ds = install(path=path, source=src)
     # stays plain Git repo
@@ -146,7 +184,7 @@ def test_install_plain_git(src, path):
                  'dir': {'testindir': 'someother',
                          'testindir2': 'none'}})
 def test_install_files(path):
-    ds = install(path)
+    ds = create(path)
     # install a single file
     eq_(ds.install('test.txt'), opj(path, 'test.txt'))
     # install it again, should given same result
@@ -177,11 +215,26 @@ def test_install_dataset_from_just_source(url, path):
     ok_(ds.is_installed())
     ok_clean_git(ds.path, annex=False)
 
+@with_testrepos(flavors=['network'])
+@with_tempfile
+def test_install_dataset_from_just_source_via_path(url, path):
+    # for remote urls only, the source could be given to `path`
+    # to allows for simplistic cmdline calls
+
+    with chpwd(path, mkdir=True):
+        ds = install(path=url)
+
+    ok_startswith(ds.path, path)
+    ok_(ds.is_installed())
+    ok_clean_git(ds.path, annex=False)
+    assert_true(os.path.lexists(opj(ds.path, 'test-annex.dat')))
+
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_into_dataset(source, top_path):
-    ds = install(top_path)
+    ds = create(top_path)
     subds = ds.install(path="sub", source=source)
+    assert_true(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     # sub is clean:
     ok_clean_git(subds.path, annex=False)
@@ -206,6 +259,7 @@ def test_install_subdataset(src, path):
 
     # install it:
     ds.install('sub1')
+    assert_true(isdir(opj(subds.path, '.git')))
 
     ok_(subds.is_installed())
     # Verify that it is the correct submodule installed and not
@@ -243,3 +297,29 @@ def test_install_recursive(src, path):
 
 # TODO: Is there a way to test result renderer?
 #  MIH: cmdline tests have run_main() which capture the output.
+
+@with_tree(tree={'file.txt': '123'})
+@serve_path_via_http
+@with_tempfile
+def _test_guess_dot_git(annex, path, url, tdir):
+    repo = (AnnexRepo if annex else GitRepo)(path, create=True)
+    repo.add('file.txt', commit=True, git=not annex)
+
+    # we need to prepare to be served via http, otherwise it must fail
+    with swallow_logs() as cml:
+        assert_raises(GitCommandError, install, path=tdir, source=url)
+    ok_(not exists(tdir))
+
+    Runner(cwd=path)(['git', 'update-server-info'])
+
+    with swallow_logs() as cml:
+        installed = install(path=tdir, source=url)
+        assert_not_in("Failed to get annex.uuid", cml.out)
+    eq_(realpath(installed.path), realpath(tdir))
+    ok_(exists(tdir))
+    ok_clean_git(tdir, annex=annex)
+
+
+def test_guess_dot_git():
+    for annex in False, True:
+        yield _test_guess_dot_git, annex

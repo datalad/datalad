@@ -82,14 +82,14 @@ def test_register_sibling(remote, path):
     AnnexRepo(path)
     ds = Dataset(path)
     ds.register_sibling('my_sibling', remote)
-    assert_in('my_sibling', ds.repo.git_get_remotes())
-    eq_(ds.repo.git_get_remote_url('my_sibling'), remote)
+    assert_in('my_sibling', ds.repo.get_remotes())
+    eq_(ds.repo.get_remote_url('my_sibling'), remote)
 
 
     ds.register_sibling('my_other_sibling', remote,
                         publish_url='http://fake.pushurl.com')
-    assert_in('my_other_sibling', ds.repo.git_get_remotes())
-    eq_(ds.repo.git_get_remote_url('my_other_sibling'), remote)
+    assert_in('my_other_sibling', ds.repo.get_remotes())
+    eq_(ds.repo.get_remote_url('my_other_sibling'), remote)
     # TODO: GitRepo method for push-url!
 
     # TODO: Validation!
@@ -170,7 +170,7 @@ def test_subdatasets(path):
     ds = Dataset(path)
     assert_false(ds.is_installed())
     eq_(ds.get_dataset_handles(), None)
-    ds = ds.install()
+    ds = ds.create()
     assert_true(ds.is_installed())
     eq_(ds.get_dataset_handles(), [])
     # create some file and commit it

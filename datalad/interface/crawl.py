@@ -33,26 +33,26 @@ class Crawl(Interface):
         dry_run=Parameter(
             args=("-n", "--dry-run"),
             action="store_true",
-            doc="""Flag if file manipulations to be invoked (e.g., adding to git/annex).
+            doc="""flag if file manipulations to be invoked (e.g., adding to git/annex).
             If not, commands are only printed to the stdout"""),
         is_pipeline=Parameter(
             args=("--is-pipeline",),
             action="store_true",
-            doc="""Flag if provided file is a Python script which defines pipeline()"""),
+            doc="""flag if provided file is a Python script which defines pipeline()"""),
         is_template=Parameter(
             args=("-t", "--is-template"),
             action="store_true",
-            doc="""Flag if provided value is the name of the template to use"""),
+            doc="""flag if provided value is the name of the template to use"""),
         chdir=Parameter(
             args=("-C", "--chdir"),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""Directory to chdir to for crawling"""),
+            doc="""directory to chdir to for crawling"""),
         path=Parameter(
             args=('path',),
             metavar='file',
             nargs='?',
             constraints=EnsureStr() | EnsureNone(),
-            doc="""Configuration (or pipeline if --is-pipeline) file defining crawling, or a directory
+            doc="""configuration (or pipeline if --is-pipeline) file defining crawling, or a directory
                 of a handle on which to perform crawling using its standard crawling specification"""),
     )
 

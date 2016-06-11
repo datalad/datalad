@@ -42,23 +42,23 @@ def test_publish_simple(origin, src_path, dst_path):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
-    source.repo.git_remote_remove("origin")
+    source.repo.remove_remote("origin")
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    target.checkout("TMP", "-b")
+    source.repo.add_remote("target", dst_path)
 
     res = publish(dataset=source, dest="target")
     eq_(res, source)
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
-    eq_(list(target.git_get_branch_commits("master")),
-        list(source.repo.git_get_branch_commits("master")))
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
 
     # don't fail when doing it again
     res = publish(dataset=source, dest="target")
@@ -66,10 +66,10 @@ def test_publish_simple(origin, src_path, dst_path):
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
-    eq_(list(target.git_get_branch_commits("master")),
-        list(source.repo.git_get_branch_commits("master")))
-    eq_(list(target.git_get_branch_commits("git-annex")),
-        list(source.repo.git_get_branch_commits("git-annex")))
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits("git-annex")),
+        list(source.repo.get_branch_commits("git-annex")))
 
     # 'target/master' should be tracking branch at this point, so
     # try publishing without `dest`:
@@ -77,18 +77,18 @@ def test_publish_simple(origin, src_path, dst_path):
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
         f.write("Some additional stuff.")
-    source.repo.git_add(opj(src_path, 'test_mod_file'))
-    source.repo.git_commit("Modified.")
+    source.repo.add(opj(src_path, 'test_mod_file'), git=True,
+                    commit=True, msg="Modified.")
     ok_clean_git(src_path, annex=False)
 
     res = publish(dataset=source)
     eq_(res, source)
 
     ok_clean_git(dst_path, annex=False)
-    eq_(list(target.git_get_branch_commits("master")),
-        list(source.repo.git_get_branch_commits("master")))
-    eq_(list(target.git_get_branch_commits("git-annex")),
-        list(source.repo.git_get_branch_commits("git-annex")))
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits("git-annex")),
+        list(source.repo.get_branch_commits("git-annex")))
 
 
 @with_testrepos('submodule_annex', flavors=['local'])
@@ -103,12 +103,12 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    target.checkout("TMP", "-b")
+    source.repo.add_remote("target", dst_path)
 
     # subdatasets have no remote yet, so recursive publishing should fail:
     with assert_raises(ValueError) as cm:
@@ -117,13 +117,13 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
-    sub1_target.git_checkout("TMP", "-b")
+    sub1_target.checkout("TMP", "-b")
     sub2_target = GitRepo(sub2_pub, create=True)
-    sub2_target.git_checkout("TMP", "-b")
+    sub2_target.checkout("TMP", "-b")
     sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
     sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
-    sub1.git_remote_add("target", sub1_pub)
-    sub2.git_remote_add("target", sub2_pub)
+    sub1.add_remote("target", sub1_pub)
+    sub2.add_remote("target", sub2_pub)
 
     # publish recursively
     res = publish(dataset=source, dest="target", recursive=True)
@@ -137,18 +137,18 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     eq_(res[1].path, sub1.path)
     eq_(res[2].path, sub2.path)
 
-    eq_(list(target.git_get_branch_commits("master")),
-        list(source.repo.git_get_branch_commits("master")))
-    eq_(list(target.git_get_branch_commits("git-annex")),
-        list(source.repo.git_get_branch_commits("git-annex")))
-    eq_(list(sub1_target.git_get_branch_commits("master")),
-        list(sub1.git_get_branch_commits("master")))
-    eq_(list(sub1_target.git_get_branch_commits("git-annex")),
-        list(sub1.git_get_branch_commits("git-annex")))
-    eq_(list(sub2_target.git_get_branch_commits("master")),
-        list(sub2.git_get_branch_commits("master")))
-    eq_(list(sub2_target.git_get_branch_commits("git-annex")),
-        list(sub2.git_get_branch_commits("git-annex")))
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
+    eq_(list(target.get_branch_commits("git-annex")),
+        list(source.repo.get_branch_commits("git-annex")))
+    eq_(list(sub1_target.get_branch_commits("master")),
+        list(sub1.get_branch_commits("master")))
+    eq_(list(sub1_target.get_branch_commits("git-annex")),
+        list(sub1.get_branch_commits("git-annex")))
+    eq_(list(sub2_target.get_branch_commits("master")),
+        list(sub2.get_branch_commits("master")))
+    eq_(list(sub2_target.get_branch_commits("git-annex")),
+        list(sub2.get_branch_commits("git-annex")))
 
 
 @with_testrepos('submodule_annex', flavors=['clone'])
@@ -161,36 +161,36 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 
     # first, try publishing from super dataset using `path`
     source_super = source
     source_sub = Dataset(opj(src_path, 'sub1'))
     target = GitRepo(target_1, create=True)
-    target.git_checkout("TMP", "-b")
-    source_sub.repo.git_remote_add("target", target_1)
+    target.checkout("TMP", "-b")
+    source_sub.repo.add_remote("target", target_1)
 
     res = publish(dataset=source_super, dest="target", path="sub1")
     assert_is_instance(res, Dataset)
     eq_(res.path, source_sub.path)
 
-    eq_(list(GitRepo(target_1, create=False).git_get_branch_commits("master")),
-        list(source_sub.repo.git_get_branch_commits("master")))
-    eq_(list(GitRepo(target_1, create=False).git_get_branch_commits("git-annex")),
-        list(source_sub.repo.git_get_branch_commits("git-annex")))
+    eq_(list(GitRepo(target_1, create=False).get_branch_commits("master")),
+        list(source_sub.repo.get_branch_commits("master")))
+    eq_(list(GitRepo(target_1, create=False).get_branch_commits("git-annex")),
+        list(source_sub.repo.get_branch_commits("git-annex")))
 
     # now, publish directly from within submodule:
     target = GitRepo(target_2, create=True)
-    target.git_checkout("TMP", "-b")
-    source_sub.repo.git_remote_add("target2", target_2)
+    target.checkout("TMP", "-b")
+    source_sub.repo.add_remote("target2", target_2)
 
     res = publish(dataset=source_sub, dest="target2")
     eq_(res, source_sub)
 
-    eq_(list(GitRepo(target_2, create=False).git_get_branch_commits("master")),
-        list(source_sub.repo.git_get_branch_commits("master")))
-    eq_(list(GitRepo(target_2, create=False).git_get_branch_commits("git-annex")),
-        list(source_sub.repo.git_get_branch_commits("git-annex")))
+    eq_(list(GitRepo(target_2, create=False).get_branch_commits("master")),
+        list(source_sub.repo.get_branch_commits("master")))
+    eq_(list(GitRepo(target_2, create=False).get_branch_commits("git-annex")),
+        list(source_sub.repo.get_branch_commits("git-annex")))
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -203,26 +203,33 @@ def test_publish_with_data(origin, src_path, dst_path):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
     target = AnnexRepo(dst_path, create=True)
-    target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    target.checkout("TMP", "-b")
+    source.repo.add_remote("target", dst_path)
+
+    # TMP: Insert the fetch to prevent GitPython to fail after the push,
+    # because it cannot resolve the SHA of the old commit of the remote,
+    # that git reports back after the push.
+    # TODO: Figure out, when to fetch things in general; Alternatively:
+    # Is there an option for push, that prevents GitPython from failing?
+    source.repo.fetch("target")
 
     res = publish(dataset=source, dest="target", with_data=['test-annex.dat'])
     eq_(res, source)
 
-    eq_(list(target.git_get_branch_commits("master")),
-        list(source.repo.git_get_branch_commits("master")))
+    eq_(list(target.get_branch_commits("master")),
+        list(source.repo.get_branch_commits("master")))
     # TODO: last commit in git-annex branch differs. Probably fine,
     # but figure out, when exactly to expect this for proper testing:
-    eq_(list(target.git_get_branch_commits("git-annex"))[1:],
-        list(source.repo.git_get_branch_commits("git-annex"))[1:])
+    eq_(list(target.get_branch_commits("git-annex"))[1:],
+        list(source.repo.get_branch_commits("git-annex"))[1:])
 
     # we need compare target/master:
-    target.git_checkout("master")
+    target.checkout("master")
     eq_(target.file_has_content(['test-annex.dat']), [True])
 
 
@@ -236,30 +243,30 @@ def test_publish_file_handle(origin, src_path, dst_path):
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
+        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     source.repo.get('test-annex.dat')
 
     # create plain git at target:
     target = AnnexRepo(dst_path, create=True)
     # actually not needed for this test, but provide same setup as
     # everywhere else:
-    target.git_checkout("TMP", "-b")
-    source.repo.git_remote_add("target", dst_path)
+    target.checkout("TMP", "-b")
+    source.repo.add_remote("target", dst_path)
 
     # directly publish a file handle, not the dataset itself:
     res = publish(dataset=source, dest="target", path="test-annex.dat")
     eq_(res, opj(source.path, 'test-annex.dat'))
 
     # only file was published, not the dataset itself:
-    assert_not_in("master", target.git_get_branches())
+    assert_not_in("master", target.get_branches())
     eq_(Dataset(dst_path).get_dataset_handles(), [])
-    assert_not_in("test.dat", target.git_get_files())
+    assert_not_in("test.dat", target.get_files())
 
     # content is now available from 'target':
     assert_in("target",
-              source.repo.annex_whereis('test-annex.dat',
-                                        output="descriptions"))
-    source.repo.annex_drop('test-annex.dat')
+              source.repo.whereis('test-annex.dat',
+                                  output="descriptions"))
+    source.repo.drop('test-annex.dat')
     eq_(source.repo.file_has_content(['test-annex.dat']), [False])
     source.repo._run_annex_command('get', annex_options=['test-annex.dat',
                                                          '--from=target'])
@@ -283,7 +290,7 @@ def test_publish_file_handle(origin, src_path, dst_path):
 #     # TODO: For now, circumnavigate the detached head issue.
 #     # Figure out, what to do.
 #     for subds in source.get_dataset_handles(recursive=True):
-#         AnnexRepo(opj(src_path, subds), init=True, create=True).git_checkout("master")
+#         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 #     sub1 = GitRepo(opj(src_path, 'sub1'))
 #     sub2 = GitRepo(opj(src_path, 'sub2'))
 #
@@ -294,11 +301,11 @@ def test_publish_file_handle(origin, src_path, dst_path):
 #     pub_path_sub1 = opj(dst_path, basename(src_path) + '-sub1')
 #     pub_path_sub2 = opj(dst_path, basename(src_path) + '-sub2')
 #     super_target = GitRepo(pub_path_super, create=True)
-#     super_target.git_checkout("TMP", "-b")
+#     super_target.checkout("TMP", "-b")
 #     sub1_target = GitRepo(pub_path_sub1, create=True)
-#     sub1_target.git_checkout("TMP", "-b")
+#     sub1_target.checkout("TMP", "-b")
 #     sub2_target = GitRepo(pub_path_sub2, create=True)
-#     sub2_target.git_checkout("TMP", "-b")
+#     sub2_target.checkout("TMP", "-b")
 #
 #     url_template = dst_path + os.path.sep + '%NAME'
 #
@@ -316,17 +323,17 @@ def test_publish_file_handle(origin, src_path, dst_path):
 #     eq_(res[2].path, sub2.path)
 #
 #
-#     eq_(list(super_target.git_get_branch_commits("master")),
-#         list(source.repo.git_get_branch_commits("master")))
-#     eq_(list(super_target.git_get_branch_commits("git-annex")),
-#         list(source.repo.git_get_branch_commits("git-annex")))
+#     eq_(list(super_target.get_branch_commits("master")),
+#         list(source.repo.get_branch_commits("master")))
+#     eq_(list(super_target.get_branch_commits("git-annex")),
+#         list(source.repo.get_branch_commits("git-annex")))
 #
-#     eq_(list(sub1_target.git_get_branch_commits("master")),
-#         list(sub1.git_get_branch_commits("master")))
-#     eq_(list(sub1_target.git_get_branch_commits("git-annex")),
-#         list(sub1.git_get_branch_commits("git-annex")))
+#     eq_(list(sub1_target.get_branch_commits("master")),
+#         list(sub1.get_branch_commits("master")))
+#     eq_(list(sub1_target.get_branch_commits("git-annex")),
+#         list(sub1.get_branch_commits("git-annex")))
 #
-#     eq_(list(sub2_target.git_get_branch_commits("master")),
-#         list(sub2.git_get_branch_commits("master")))
-#     eq_(list(sub2_target.git_get_branch_commits("git-annex")),
-#         list(sub2.git_get_branch_commits("git-annex")))
+#     eq_(list(sub2_target.get_branch_commits("master")),
+#         list(sub2.get_branch_commits("master")))
+#     eq_(list(sub2_target.get_branch_commits("git-annex")),
+#         list(sub2.get_branch_commits("git-annex")))

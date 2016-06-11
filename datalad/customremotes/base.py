@@ -15,22 +15,18 @@ import os
 import sys
 
 from os.path import exists, join as opj, realpath, dirname, lexists
-from traceback import format_exc
 
 from six.moves import range
 from six.moves.urllib.parse import urlparse, urlunparse
 
-from ..cmd import Runner
-from ..support.exceptions import CommandError
+import logging
+lgr = logging.getLogger('datalad.customremotes')
+lgr.log(5, "Importing datalad.customremotes.main")
+
 from ..support.protocol import ProtocolInterface
-from ..support.annexrepo import AnnexRepo
 from ..support.cache import DictCache
 from ..cmdline.helpers import get_repo_instance
 
-import logging
-
-
-lgr = logging.getLogger('datalad.customremotes')
 
 URI_PREFIX = "dl"
 SUPPORTED_PROTOCOL = 1
@@ -38,8 +34,10 @@ SUPPORTED_PROTOCOL = 1
 DEFAULT_COST = 100
 DEFAULT_AVAILABILITY = "local"
 
+
 class AnnexRemoteQuit(Exception):
     pass
+
 
 class AnnexExchangeProtocol(ProtocolInterface):
     """A little helper to protocol interactions of custom remote with annex
@@ -115,12 +113,11 @@ send () {
         self.initiate()
         with open(self._file, 'a') as f:
             f.write('%s### %s%s' % (os.linesep, cmd, os.linesep))
-        lgr.info("New section in the protocol: "
+        lgr.debug("New section in the protocol: "
                       "cd %s; PATH=%s:$PATH %s"
                       % (realpath(self.repopath),
                          dirname(self._file),
                          cmd))
-
 
     def write_entries(self, entries):
         self.initiate()
@@ -189,7 +186,10 @@ class AnnexCustomRemote(object):
         """
         # TODO: probably we shouldn't have runner here but rather delegate
         # to AnnexRepo's functionality
-        self.runner = Runner()
+        from ..support.annexrepo import AnnexRepo
+        from ..cmd import GitRunner
+
+        self.runner = GitRunner()
 
         # Custom remotes correspond to annex via stdin/stdout
         self.fin = sys.stdin
@@ -343,7 +343,7 @@ class AnnexCustomRemote(object):
 
 
     def stop(self, msg=None):
-        lgr.info("Stopping communications of %s%s" %
+        lgr.debug("Stopping communications of %s%s" %
                  (self, ": %s" % msg if msg else ""))
         raise AnnexRemoteQuit(msg)
 
@@ -376,8 +376,8 @@ class AnnexCustomRemote(object):
             except Exception as e:
                 self.error("Problem processing %r with parameters %r: %r"
                            % (req, req_load, e))
+                from traceback import format_exc
                 lgr.error("Caught exception detail: %s" % format_exc())
-
 
     def req_INITREMOTE(self, *args):
         """Initialize this remote. Provides high level abstraction.
@@ -392,7 +392,6 @@ class AnnexCustomRemote(object):
                        "INITREMOTE-FAILURE")
         else:
             self.send("INITREMOTE-SUCCESS")
-
 
     def req_PREPARE(self, *args):
         """Prepare "to deliver". Provides high level abstraction
@@ -426,7 +425,7 @@ class AnnexCustomRemote(object):
 
     def req_TRANSFER(self, cmd, key, file):
         if cmd in ("RETRIEVE",):
-            lgr.info("%s key %s into/from %s" % (cmd, key, file))
+            lgr.debug("%s key %s into/from %s" % (cmd, key, file))  # was INFO level
             self._transfer(cmd, key, file)
         else:
             self.error("Retrieved unsupported for TRANSFER command %s" % cmd)
@@ -557,3 +556,5 @@ class AnnexCustomRemote(object):
     # TODO: test on annex'es generated with those new options e.g.-c annex.tune.objecthash1=true
     #def get_GETCONFIG SETCONFIG  SETCREDS  GETCREDS  GETUUID  GETGITDIR  SETWANTED  GETWANTED
     #SETSTATE GETSTATE SETURLPRESENT  SETURLMISSING
+
+lgr.log(5, "Done importing datalad.customremotes.main")

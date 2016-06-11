@@ -46,12 +46,13 @@ def test_ls_repos(toppath):
     repos = glob(toppath + '*')
 
     for args in (repos, repos + ["bogus"]):
-        # in both cases shouldn't fail
-        with swallow_outputs() as cmo:
-            ls(args)
-            assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
-            assert_in('[annex]', cmo.out)
-            assert_in('[git]', cmo.out)
-            assert_in('master', cmo.out)
-            if "bogus" in args:
-                assert_in('unknown', cmo.out)
+        for recursive in [False, True]:
+            # in both cases shouldn't fail
+            with swallow_outputs() as cmo:
+                ls(args, recursive=recursive)
+                assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
+                assert_in('[annex]', cmo.out)
+                assert_in('[git]', cmo.out)
+                assert_in('master', cmo.out)
+                if "bogus" in args:
+                    assert_in('unknown', cmo.out)

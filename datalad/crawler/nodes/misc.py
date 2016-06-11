@@ -25,14 +25,16 @@ from ...utils import auto_repr
 from ...utils import find_files as _find_files
 
 from logging import getLogger
+from nose.tools import eq_, assert_raises
+
 lgr = getLogger('datalad.crawler.nodes')
+
 
 @auto_repr
 class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
     """
 
-    # TODO: add argument for selection of fields of data to keep
     def __init__(self, keys=None, output=None, ignore_prefixes=['datalad_']):
         """
         Parameters
@@ -44,26 +46,29 @@ class Sink(object):
           data
         ignore_prefixes : list, optional
           Keys with which prefixes to ignore.  By default all 'datalad_' ignored
+
         """
         self.data = []
         self.keys = keys
         self.output = output
         self.ignore_prefixes = ignore_prefixes or []
 
-    def get_values(self, *keys):
+    def get_values(self, keys):
         return [[d[k] for k in keys] for d in self.data]
 
     def __call__(self, data):
-        # ??? for some reason didn't work when I made entire thing a list
         if self.keys:
-            raise NotImplementedError("Jason will do it")
+                    self.data.append({key: data[key] for key in self.keys if key in data})
+
         else:
             data_ = {k: v
                      for k, v in data.items()
                      if not any(k.startswith(p) for p in self.ignore_prefixes)}
             self.data.append(data_)
+
         if self.output:
             data = updated(data, {self.output: self.data})
+
         yield data
 
     def clean(self):
@@ -75,25 +80,29 @@ class Sink(object):
 class rename(object):
     """Rename some items (i.e. change keys) in data for subsequent nodes
     """
-    def __init__(self, mapping):
+
+    def __init__(self, assignments):
         """
 
         Use OrderedDict when order of remapping matters
         """
-        self.mapping = mapping
+        assert (isinstance(assignments, dict))
+        self.assignments = assignments
 
     def __call__(self, data):
         # TODO: unittest
         data = data.copy()
-        for from_, to_ in self.mapping:
+        for from_, to_ in self.assignments.items():
             if from_ in data:
                 data[to_] = data.pop(from_)
         yield data
+
 
 # TODO: test
 @auto_repr
 class sub(object):
     """Apply re.sub regular expression substitutions to specified items"""
+
     def __init__(self, subs):
         """
 
@@ -110,6 +119,7 @@ class sub(object):
                 data[key] = re.sub(from_, to_, data[key])
         yield data
 
+
 @auto_repr
 class assign(object):
     """Class node to provide assignment of items in data
@@ -117,6 +127,7 @@ class assign(object):
     With "interpolate" it allows for
 
     """
+
     # TODO: may be allow values to be a callable taking data in, so almost like
     # a node, but not yielding and just returning some value based on the data?
     def __init__(self, assignments, interpolate=False):
@@ -129,29 +140,33 @@ class assign(object):
         interpolate: bool, optional
           Either interpolate provided values using data
         """
-        assert(isinstance(assignments, dict))
+        assert (isinstance(assignments, dict))
         self.assignments = assignments
         self.interpolate = interpolate
 
     def __call__(self, data):
-        data = data.copy()  # we need to operate on a copy
+        data_ = data.copy()  # we need to operate on a copy
         for k, v in self.assignments.items():
-            data[k] = v % data if self.interpolate else v
-        yield data
+            data_[k] = v % data if self.interpolate else v
+        yield data_
 
-#class prune(object):
+
+# class prune(object):
 
 def get_url_filename(data):
     yield updated(data, {'filename': get_url_straight_filename(data['url'])})
+
 
 def get_disposition_filename(data):
     """For the URL request content filename disposition
     """
     yield updated(data, {'filename': get_url_disposition_filename(data['url'])})
 
+
 class _act_if(object):
     """Base class for nodes which would act if input data matches specified values
     """
+
     def __init__(self, values, re=False, negate=False):
         """
 
@@ -173,6 +188,7 @@ class _act_if(object):
     def __call__(self, data):
         comp = re.search if self.re else lambda x, y: x == y
         matched = True
+        # finds if all match
         for k, v in iteritems(self.values):
             if not (k in data and comp(v, data[k])):
                 # do nothing and pass the data further
@@ -185,7 +201,7 @@ class _act_if(object):
         else:
             yield data
 
-    def _act(self):
+    def _act(self, data):
         raise NotImplementedError
 
 
@@ -195,6 +211,7 @@ class interrupt_if(_act_if):
 
     def _act(self, data):
         raise FinishPipeline
+
 
 @auto_repr
 class skip_if(_act_if):
@@ -210,6 +227,7 @@ class range_node(object):
 
     Primarily for testing
     """
+
     def __init__(self, n, output='output'):
         self.n = n
         self.output = output
@@ -218,10 +236,12 @@ class range_node(object):
         for i in range(self.n):
             yield updated(data, {self.output: i})
 
+
 def _string_as_list(x):
     if isinstance(x, string_types):
         return [x]
     return x
+
 
 def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **orig_kwargs):
     """Generate a node out of an arbitrary function
@@ -263,7 +283,7 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
                 if len(outputs_) > 1:
                     # we were requested to have multiple outputs,
                     # then function should have provided matching multiple values
-                    assert(len(return_value) == len(outputs_))
+                    assert (len(return_value) == len(outputs_))
                 else:
                     return_value = [return_value]  # for uniformicity
 
@@ -289,6 +309,7 @@ keys in the output.%s
 
     return func_node
 
+
 # TODO: come up with a generic function_to_node adapter
 #   actually there is already func_to_node but it is not clear how it works on
 #   generators... in this commit also added **orig_kwargs to it
@@ -298,6 +319,7 @@ class find_files(object):
 
     By default in current directory
     """
+
     def __init__(self, regex, fail_if_none=False, dirs=False, topdir=curdir):
         """
 
@@ -362,7 +384,7 @@ class switch(object):
 
     @missing.setter
     def missing(self, value):
-        assert(value in {'raise', 'skip', 'stop'})
+        assert (value in {'raise', 'skip', 'stop'})
         self._missing = value
 
     def __call__(self, data):

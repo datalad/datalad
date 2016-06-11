@@ -11,13 +11,15 @@
 
 import os
 from os.path import join as opj, abspath, basename
+
+from git.exc import GitCommandError
+
 from ..dataset import Dataset
 from datalad.api import publish, install, create_publication_target_sshwebserver
 from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
-from datalad.cmd import CommandError
 
 from nose.tools import ok_, eq_, assert_false, assert_is_instance
 from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
@@ -28,14 +30,11 @@ from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
 from datalad.tests.utils import ok_generator
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module, skip_if, skip_if_on_windows
-from datalad.tests.utils import ok_clean_git, on_windows, get_local_file_url
+from datalad.tests.utils import skip_ssh
+from datalad.utils import on_windows
 
 
-@skip_if(cond=not os.environ.get('DATALAD_TESTS_SSH'),
-         msg="Run this test by setting the DATALAD_TESTS_SSH")
-@skip_if_on_windows
+@skip_ssh
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -50,10 +49,10 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                            target_dir=opj(target_path, "basic"))
 
     GitRepo(opj(target_path, "basic"), create=False) # raises if not a git repo
-    assert_in("local_target", source.repo.git_get_remotes())
-    eq_("ssh://localhost", source.repo.git_get_remote_url("local_target"))
+    assert_in("local_target", source.repo.get_remotes())
+    eq_("ssh://localhost", source.repo.get_remote_url("local_target"))
     # should NOT be able to push now, since url isn't correct:
-    assert_raises(CommandError, publish, dataset=source, dest="local_target")
+    assert_raises(GitCommandError, publish, dataset=source, dest="local_target")
 
     # do it again without force:
     with assert_raises(RuntimeError) as cm:
@@ -74,11 +73,11 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                                target="local_target",
                                                sshurl="ssh://localhost" +
                                                       opj(target_path, "basic"),
-                                               force=True)
+                                               existing='replace')
         eq_("ssh://localhost" + opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target"))
+            source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target", push=True))
+            source.repo.get_remote_url("local_target", push=True))
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
@@ -91,19 +90,17 @@ def test_target_ssh_simple(origin, src_path, target_path):
                                                               "basic"),
                                                target_pushurl="ssh://localhost" +
                                                       opj(target_path, "basic"),
-                                               force=True)
+                                               existing='replace')
         eq_(opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target"))
+            source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + opj(target_path, "basic"),
-            source.repo.git_get_remote_url("local_target", push=True))
+            source.repo.get_remote_url("local_target", push=True))
 
         # now, push should work:
         publish(dataset=source, dest="local_target")
 
 
-@skip_if(cond=not os.environ.get('DATALAD_TESTS_SSH'),
-         msg="Run this test by setting the DATALAD_TESTS_SSH")
-@skip_if_on_windows
+@skip_ssh
 @with_testrepos('submodule_annex', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
@@ -115,7 +112,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True,
-                  create=False).git_checkout("master")
+                  create=False).checkout("master")
 
     sub1 = Dataset(opj(src_path, "sub1"))
     sub2 = Dataset(opj(src_path, "sub2"))
@@ -133,5 +130,5 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                      create=False)
 
     for repo in [source.repo, sub1.repo, sub2.repo]:
-        assert_not_in("local_target", repo.git_get_remotes())
+        assert_not_in("local_target", repo.get_remotes())
 

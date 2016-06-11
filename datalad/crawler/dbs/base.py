@@ -21,6 +21,8 @@ from os.path import isabs
 from ...utils import auto_repr
 from ...utils import find_files
 from ...consts import HANDLE_META_DIR
+from ...support.annexrepo import AnnexRepo
+from ...support.gitrepo import GitRepo
 
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
@@ -50,8 +52,8 @@ class JsonBaseDB(object):
         if self._filepath is not None:
             return
         self._filepath = opj(realpath(self.repo.path),
-                     self.__class__.__crawler_subdir__,
-                     (self.name or self.repo.git_get_active_branch())+'.json')
+                             self.__class__.__crawler_subdir__,
+                             (self.name or self.repo.get_active_branch()) + '.json')
         if lexists(self._filepath):
             self.load()
             self._loaded = True
@@ -85,7 +87,9 @@ class JsonBaseDB(object):
         lgr.debug("Writing %s to %s" % (self.__class__.__name__, self._filepath))
         with open(self._filepath, 'w') as f:
             json.dump(db, f, indent=2, sort_keys=True, separators=(',', ': '))
-        self.repo.git_add(self._filepath)  # stage to be committed
+
+        # stage to be committed:
+        self.repo.add(self._filepath, git=True)
 
     @property
     def db_version(self):

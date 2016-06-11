@@ -162,7 +162,7 @@ class AutomagicIO(object):
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
-            annex.annex_get(filepath, log_online=self._log_online)
+            annex.get(filepath, log_online=self._log_online)
 
     def activate(self):
         # Some beasts (e.g. tornado used by IPython) override outputs, and

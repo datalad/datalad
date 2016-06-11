@@ -13,6 +13,10 @@ from os.path import sep as pathsep, join as opj, dirname
 
 from setuptools import setup, find_packages
 
+# manpage build imports
+from distutils.command.build_py import build_py
+from setup_support import BuildManPage, BuildRSTExamplesFromScripts
+
 # This might entail lots of imports which might not yet be available
 # so let's do ad-hoc parsing of the version.py
 #import datalad.version
@@ -29,10 +33,14 @@ datalad_pkgs = [pkg for pkg in find_packages('.') if pkg.startswith('datalad')]
 # keyring is a tricky one since it got split into two as of 8.0 and on older
 # systems there is a problem installing via pip (e.g. on wheezy) so for those we
 # would just ask for keyring
+keyring_requires = ['keyring>=8.0', 'keyrings.alt']
+pbar_requires = ['tqdm']
+
 dist = platform.dist()
-keyring_requires = ['keyring<8.0'] \
-    if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7' \
-    else ['keyring>=8.0', 'keyrings.alt']
+# on oldstable Debian let's ask for lower versions and progressbar instead
+if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
+    keyring_requires = ['keyring<8.0']
+    pbar_requires = ['progressbar']
 
 requires = {
     'core': [
@@ -41,9 +49,8 @@ requires = {
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
-        'progressbar',
         'six>=1.8.0',
-    ],
+    ] + pbar_requires,
     'downloaders': [
         'boto',
         'msgpack-python',
@@ -63,9 +70,23 @@ requires = {
 }
 requires['full'] = sum(list(requires.values()), [])
 
+
+# configure additional command for custom build steps
+class DataladBuild(build_py):
+    def run(self):
+        self.run_command('build_manpage')
+        self.run_command('build_examples')
+        build_py.run(self)
+
+cmdclass = {
+    'build_manpage': BuildManPage,
+    'build_examples': BuildRSTExamplesFromScripts,
+    'build_py': DataladBuild
+}
+
 setup(
     name="datalad",
-    author="DataLad Team and Contributors",
+    author="The DataLad Team and Contributors",
     author_email="team@datalad.org",
     version=version,
     description="data distribution geared toward scientific datasets",
@@ -79,6 +100,7 @@ setup(
             'git-annex-remote-datalad=datalad.customremotes.datalad:main',
         ],
     },
+    cmdclass=cmdclass,
     package_data={
         'datalad': [
             'resources/git_ssh.sh',
