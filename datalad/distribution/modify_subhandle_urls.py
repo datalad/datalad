@@ -38,7 +38,8 @@ def get_module_parser(repo):
 
 
 class ModifySubhandleURLs(Interface):
-    """Modify the URLs of subdatasets of a dataset."""
+    """Modify the URLs of sub-datasets of a dataset
+    """
 
     _params_ = dict(
         url=Parameter(
