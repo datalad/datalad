@@ -9,7 +9,17 @@
 """"""
 
 from six.moves import StringIO as SIO
-import formatters as fmt
+from os.path import exists
+from nose import SkipTest
+try:
+    import formatters as fmt
+except ImportError:  # pragma: no cover
+    # must be running from installed version where formatters is not present
+    # These tests can be ran only with formatters, which is outside of the
+    # datalad module space in the root of the sourcebase
+    if not exists('formatters.py'):
+        raise SkipTest
+
 from datalad.cmdline.main import setup_parser
 from .utils import assert_equal, ok_, assert_raises, assert_in, ok_startswith
 
