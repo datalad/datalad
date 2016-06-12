@@ -21,8 +21,10 @@ import logging
 import random
 import socket
 from six import PY2, text_type, iteritems
+from six import binary_type
 from fnmatch import fnmatch
 import time
+from mock import patch
 
 from six.moves.SimpleHTTPServer import SimpleHTTPRequestHandler
 from six.moves.BaseHTTPServer import HTTPServer
@@ -43,6 +45,7 @@ from ..cmd import Runner
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
+from ..support.vcr_ import *
 from ..dochelpers import exc_str
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
@@ -51,6 +54,10 @@ from . import _TEMP_PATHS_GENERATED
 # temp paths used by clones
 _TEMP_PATHS_CLONES = set()
 
+
+# additional shortcuts
+neq_ = assert_not_equal
+nok_ = assert_false
 
 def skip_if_no_module(module):
     try:
@@ -129,7 +136,7 @@ def ok_clean_git_annex_proxy(path):
     chpwd(path)
 
     try:
-        out = ar.annex_proxy("git status")
+        out = ar.proxy("git status")
     except CommandNotAvailableError as e:
         raise SkipTest
     finally:
@@ -182,6 +189,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
 
     assert(annexed == in_annex)
 
+
 def put_file_under_git(path, filename=None, content=None, annexed=False):
     """Place file under git/annex and return used Repo
     """
@@ -194,11 +202,12 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add_to_annex(file_repo_path)
+        repo.add(file_repo_path, commit=True)
     else:
-        repo.git_add(file_repo_path)
+        repo.add(file_repo_path, git=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
+
 
 def _prep_file_under_git(path, filename):
     """Get instance of the repository for the given filename
@@ -274,14 +283,14 @@ def ok_git_config_not_empty(ar):
 
 
 def ok_annex_get(ar, files, network=True):
-    """Helper to run .annex_get decorated checking for correct operation
+    """Helper to run .get decorated checking for correct operation
 
-    annex_get passes through stderr from the ar to the user, which pollutes
+    get passes through stderr from the ar to the user, which pollutes
     screen while running tests
     """
     ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
-        ar.annex_get(files)
+        ar.get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
             ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
@@ -401,7 +410,12 @@ def serve_path_via_http(tfunc, *targs):
         lgr.debug("HTTP: serving {} under {}".format(path, url))
 
         try:
-            return tfunc(*(args + (path, url)), **kwargs)
+            # Such tests don't require real network so if http_proxy settings were
+            # provided, we remove them from the env for the duration of this run
+            env = os.environ.copy()
+            env.pop('http_proxy', None)
+            with patch.dict('os.environ', env, clear=True):
+                return tfunc(*(args + (path, url)), **kwargs)
         finally:
             lgr.debug("HTTP: stopping server")
             multi_proc.terminate()
@@ -410,14 +424,33 @@ def serve_path_via_http(tfunc, *targs):
 
 
 @optional_args
-def with_tempfile(t, *targs, **tkwargs):
+def without_http_proxy(tfunc):
+    """Decorator to remove http*_proxy env variables for the duration of the test
+    """
+
+    @wraps(tfunc)
+    def newfunc(*args, **kwargs):
+        # Such tests don't require real network so if http_proxy settings were
+        # provided, we remove them from the env for the duration of this run
+        env = os.environ.copy()
+        env.pop('http_proxy', None)
+        env.pop('https_proxy', None)
+        with patch.dict('os.environ', env, clear=True):
+            return tfunc(*args, **kwargs)
+
+    return newfunc
+
+
+@optional_args
+def with_tempfile(t, content=None, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end
 
     Parameters
     ----------
     mkdir : bool, optional (default: False)
         If True, temporary directory created using tempfile.mkdtemp()
-    `*targs`:
+    content : str or bytes, optional
+        Content to be stored in the file created
     `**tkwargs`:
         All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
@@ -447,12 +480,15 @@ def with_tempfile(t, *targs, **tkwargs):
         mkdir = tkwargs_.pop('mkdir', False)
 
         filename = {False: tempfile.mktemp,
-                    True: tempfile.mkdtemp}[mkdir](*targs, **tkwargs_)
+                    True: tempfile.mkdtemp}[mkdir](**tkwargs_)
         filename = realpath(filename)
 
+        if content:
+            with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
+                f.write(content)
         if __debug__:
-            lgr.debug('Running %s with temporary filename %s'
-                      % (t.__name__, filename))
+            lgr.debug('Running %s with temporary filename %s',
+                      t.__name__, filename)
         try:
             return t(*(arg + (filename,)), **kw)
         finally:
@@ -472,6 +508,10 @@ def with_tempfile(t, *targs, **tkwargs):
                     rmtemp(f)
                 except OSError:
                     pass
+
+    if tkwargs.get('mkdir', None) and content is not None:
+        raise ValueError("mkdir=True while providing content makes no sense")
+
     return newfunc
 
 
@@ -609,8 +649,10 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
 
     Examples
     --------
+
+    >>> from datalad.tests.utils import with_testrepos
     >>> @with_testrepos('basic_annex')
-    >>> def test_write(repo):
+    ... def test_write(repo):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
@@ -664,15 +706,27 @@ def with_fake_cookies_db(func, cookies={}):
     return newfunc
 
 
-def skip_if_no_network(func):
+def skip_if_no_network(func=None):
     """Skip test completely in NONETWORK settings
+
+    If not used as a decorator, and just a function, could be used at the module level
     """
-    @wraps(func)
-    def newfunc(*args, **kwargs):
+
+    def check_and_raise():
         if os.environ.get('DATALAD_TESTS_NONETWORK'):
             raise SkipTest("Skipping since no network settings")
-        return func(*args, **kwargs)
-    return newfunc
+
+    if func:
+        @wraps(func)
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        # right away tag the test as a networked test
+        tags = getattr(newfunc, 'tags', [])
+        newfunc.tags = tags + ['network']
+        return newfunc
+    else:
+        check_and_raise()
 
 
 def skip_if_on_windows(func):
@@ -694,6 +748,20 @@ def skip_if(func, cond=True, msg=None):
     def newfunc(*args, **kwargs):
         if cond:
             raise SkipTest(msg if msg else "condition was True")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_ssh(func):
+    """Skips SSH tests if on windows or if environment variable
+    DATALAD_TESTS_SSH was not set
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows:
+            raise SkipTest("SSH currently not available on windows.")
+        if not os.environ.get('DATALAD_TESTS_SSH'):
+            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc
 
@@ -864,6 +932,30 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+
+@optional_args
+def with_testsui(t, responses=None):
+    """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
+
+    @wraps(t)
+    def newfunc(*args, **kwargs):
+        from datalad.ui import ui
+        old_backend = ui.backend
+        try:
+            ui.set_backend('tests')
+            if responses:
+                ui.add_responses(responses)
+            ret = t(*args, **kwargs)
+            if responses:
+                responses_left = ui.get_responses()
+                assert not len(responses_left), "Some responses were left not used: %s" % str(responses_left)
+            return ret
+        finally:
+            ui.set_backend(old_backend)
+
+    return newfunc
+with_testsui.__test__ = False
 
 #
 # Context Managers

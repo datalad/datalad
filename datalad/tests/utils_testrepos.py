@@ -15,7 +15,7 @@ from os.path import dirname, join as opj, exists, pardir, realpath
 from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
 from ..cmd import Runner
-from ..utils import get_local_file_url
+from ..support.network import get_local_file_url
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
 
@@ -56,7 +56,13 @@ class TestRepo(object):
         with open(filename, 'wb') as f:
             f.write(content.encode())
         if add:
-            (self.repo.annex_add if annex else self.repo.git_add)(name)
+            if annex:
+                if isinstance(self.repo, AnnexRepo):
+                    self.repo.add(name)
+                else:
+                    raise ValueError("Can't annex add to a non-annex repo.")
+            else:
+                self.repo.add(name, git=True)
 
     def create(self):
         if self._created:
@@ -79,15 +85,15 @@ class BasicAnnexTestRepo(TestRepo):
     def populate(self):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
-        self.repo.git_commit("Adding a basic INFO file and rudimentary load file for annex testing")
+        self.repo.commit("Adding a basic INFO file and rudimentary load file for annex testing")
         # even this doesn't work on bloody Windows
         from .utils import on_windows
         fileurl = get_local_file_url(realpath(opj(self.path, 'test.dat'))) \
                   if not on_windows \
                   else "https://raw.githubusercontent.com/datalad/testrepo--basic--r1/master/test.dat"
-        self.repo.annex_addurl_to_file("test-annex.dat", fileurl)
-        self.repo.git_commit("Adding a rudimentary git-annex load file")
-        self.repo.annex_drop("test-annex.dat")  # since available from URL
+        self.repo.add_url_to_file("test-annex.dat", fileurl)
+        self.repo.commit("Adding a rudimentary git-annex load file")
+        self.repo.drop("test-annex.dat")  # since available from URL
 
     def create_info_file(self):
         runner = Runner()
@@ -109,7 +115,7 @@ class BasicGitTestRepo(TestRepo):
     def populate(self):
         self.create_info_file()
         self.create_file('test.dat', '123\n', annex=False)
-        self.repo.git_commit("Adding a basic INFO file and rudimentary "
+        self.repo.commit("Adding a basic INFO file and rudimentary "
                              "load file.")
 
     def create_info_file(self):
@@ -137,9 +143,13 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         runner.run(['git', 'submodule', 'add', annex.url, 'sub2'], **kw)
         runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'], **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'], **kw)
+        # init annex in subdatasets
+        for s in ('sub1', 'sub2'):
+            runner.run(['git', 'annex', 'init'],
+                       cwd=opj(self.path, s), expect_stderr=True)
 
 
-class NestedDataset(SubmoduleDataset):
+class NestedDataset(BasicAnnexTestRepo):
 
     def populate(self):
         super(NestedDataset, self).populate()
@@ -148,16 +158,20 @@ class NestedDataset(SubmoduleDataset):
         from datalad.cmd import Runner
         runner = Runner()
         kw = dict(expect_stderr=True)
-        runner.run(['git', 'submodule', 'add', ds.url, 'sub1'],
-                   cwd=opj(self.path, 'sub1'), **kw)
-        runner.run(['git', 'submodule', 'add', ds.url, 'sub2'],
-                   cwd=opj(self.path, 'sub1'), **kw)
-        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'],
-                   cwd=opj(self.path, 'sub1'), **kw)
-        runner.run(['git', 'commit', '-a', '-m', 'Added subsubmodules.'],
+        runner.run(['git', 'submodule', 'add', ds.url, 'subdataset'],
+                   cwd=self.path, **kw)
+        runner.run(['git', 'submodule', 'add', ds.url, 'subsubdataset'],
+                   cwd=opj(self.path, 'subdataset'), **kw)
+        runner.run(['git', 'commit', '-m', 'Added subdataset.'],
+                   cwd=opj(self.path, 'subdataset'), **kw)
+        runner.run(['git', 'commit', '-a', '-m', 'Added subdatasets.'],
                    cwd=self.path, **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
                    cwd=self.path, **kw)
+        # init all annexes
+        for s in ('', 'subdataset', opj('subdataset', 'subsubdataset')):
+            runner.run(['git', 'annex', 'init'],
+                       cwd=opj(self.path, s), expect_stderr=True)
 
 
 class InnerSubmodule(object):
@@ -167,7 +181,7 @@ class InnerSubmodule(object):
 
     @property
     def path(self):
-        return opj(self._ds.path, 'sub1', 'sub1')
+        return opj(self._ds.path, 'subdataset', 'sub1')
 
     @property
     def url(self):

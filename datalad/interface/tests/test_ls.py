@@ -43,9 +43,16 @@ def test_ls_repos(toppath):
     # smoke test pretty much
     GitRepo(toppath + '1', create=True)
     AnnexRepo(toppath + '2', create=True)
-    with swallow_outputs() as cmo:
-        ls(glob(toppath + '*'))
-        assert_equal(len(cmo.out.rstrip().split('\n')), 2)
-        assert_in('[annex]', cmo.out)
-        assert_in('[git]', cmo.out)
-        assert_in('master', cmo.out)
+    repos = glob(toppath + '*')
+
+    for args in (repos, repos + ["bogus"]):
+        for recursive in [False, True]:
+            # in both cases shouldn't fail
+            with swallow_outputs() as cmo:
+                ls(args, recursive=recursive)
+                assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
+                assert_in('[annex]', cmo.out)
+                assert_in('[git]', cmo.out)
+                assert_in('master', cmo.out)
+                if "bogus" in args:
+                    assert_in('unknown', cmo.out)

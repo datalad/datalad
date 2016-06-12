@@ -35,20 +35,19 @@ class AddSibling(Interface):
         # positional arguments
         dataset=Parameter(
             args=("--dataset", "-d",),
-            doc="""specify the dataset to add the sibling to. If
+            doc="""specify the dataset to add the sibling to.  If
                 no dataset is given, an attempt is made to identify the dataset
                 based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         name=Parameter(
             args=('name',),
-            doc="""Name of the sibling to be added. If RECURSIVE is set, the
+            doc="""name of the sibling to be added.  If RECURSIVE is set, the
                 same name will be used to address the subdatasets' siblings""",
             constraints=EnsureStr() | EnsureNone()),
         url=Parameter(
             args=('url',),
-            doc="""The URL of or path to the dataset sibling named by
-                `name`.
-                If you want to recursively add siblings, it is expected, that
+            doc="""the URL of or path to the dataset sibling named by
+                `name`.  If you want to recursively add siblings, it is expected, that
                 you pass a template for building the URLs of the siblings of
                 all (sub)datasets by using placeholders.\n
                 List of currently available placeholders:\n
@@ -59,7 +58,7 @@ class AddSibling(Interface):
             nargs="?"),
         pushurl=Parameter(
             args=('--pushurl',),
-            doc="""In case the `url` cannot be used to publish to the dataset
+            doc="""in case the `url` cannot be used to publish to the dataset
                 sibling, this option specifies a URL to be used instead.\nIf no
                 `url` is given, `pushurl` serves as `url` as well.
                 This option is ignored if there is already a configured sibling
@@ -68,12 +67,12 @@ class AddSibling(Interface):
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
-            doc="""Recursively add the sibling `name` to all subdatasets of
+            doc="""recursively add the sibling `name` to all subdatasets of
                 `dataset`""",),
         force=Parameter(
             args=("--force", "-f",),
             action="store_true",
-            doc="""If sibling `name` exists already, force to (re-)configure its
+            doc="""if sibling `name` exists already, force to (re-)configure its
                 URLs""",),)
 
     @staticmethod
@@ -153,14 +152,14 @@ class AddSibling(Interface):
         already_existing = list()
         conflicting = list()
         for repo in repos:
-            if name in repos[repo]['repo'].git_get_remotes():
+            if name in repos[repo]['repo'].get_remotes():
                 already_existing.append(repo)
                 lgr.debug("""Remote '{0}' already exists
                           in '{1}'.""".format(name, repo))
 
-                existing_url = repos[repo]['repo'].git_get_remote_url(name)
+                existing_url = repos[repo]['repo'].get_remote_url(name)
                 existing_pushurl = \
-                    repos[repo]['repo'].git_get_remote_url(name, push=True)
+                    repos[repo]['repo'].get_remote_url(name, push=True)
 
                 if repos[repo]['url'].rstrip('/') != existing_url.rstrip('/') \
                         or (pushurl and existing_pushurl and

@@ -15,9 +15,13 @@ __docformat__ = 'restructuredtext'
 import os
 import sys
 from six import PY2
-from getpass import getpass
+import getpass
+from mock import patch
+from collections import deque
+from copy import copy
 
 from ..utils import auto_repr
+from ..utils import on_windows
 from .base import InteractiveUI
 
 # Example APIs which might be useful to look for "inspiration"
@@ -48,33 +52,12 @@ for i in range(10):
 #
 # reference for ESC codes: http://ascii-table.com/ansi-escape-sequences.php
 
-from progressbar import Bar, ETA, FileTransferSpeed, \
-    Percentage, ProgressBar, RotatingMarker
-
-# TODO: might better delegate to an arbitrary bar?
-class BarWithFillText(Bar):
-    """A progress bar widget which fills the bar with the target text"""
-
-    def __init__(self, fill_text, **kwargs):
-        super(BarWithFillText, self).__init__(**kwargs)
-        self.fill_text = fill_text
-
-    def update(self, pbar, width):
-        orig = super(BarWithFillText, self).update(pbar, width)
-        # replace beginning with the title
-        if len(self.fill_text) > width:
-            # TODO:  make it fancier! That we also at the same time scroll it from
-            # the left so it does end up at the end with the tail but starts with
-            # the beginning
-            fill_text = '...' + self.fill_text[-(width-4):]
-        else:
-            fill_text = self.fill_text
-        fill_text = fill_text[:min(len(fill_text), int(round(width * pbar.percentage()/100.)))]
-        return fill_text + " " + orig[len(fill_text)+1:]
 
 
 @auto_repr
 class ConsoleLog(object):
+
+    progressbars = None
 
     def __init__(self, out=sys.stdout):
         self.out = out
@@ -87,22 +70,40 @@ class ConsoleLog(object):
     def error(self, error):
         self.out.write("ERROR: %s\n" % error)
 
-    def get_progressbar(self, label='', fill_text=None, currval=None, maxval=None):
-        """'Inspired' by progressbar module interface
+    def get_progressbar(self, *args, **kwargs):
+        """Return a progressbar.  See e.g. `tqdmProgressBar` about the interface
 
-        Should return an object with .update(), and .finish()
-        methods, and maxval, currval attributes
+        Additional parameter is backend to choose among available
         """
-        bar = dict(marker=RotatingMarker())
-        # TODO: RF entire messaging to be able to support multiple progressbars at once
-        widgets = ['%s: ' % label,
-                   BarWithFillText(fill_text=fill_text, marker=RotatingMarker()), ' ',
-                   Percentage(), ' ',
-                   ETA(), ' ',
-                   FileTransferSpeed()]
-        if currval is not None:
-            raise NotImplementedError("Not yet supported to set currval in the beginning")
-        return ProgressBar(widgets=widgets, maxval=maxval, fd=self.out).start()
+        backend = kwargs.pop('backend', None)
+        # Delay imports of progressbars until actually needed
+        if ConsoleLog.progressbars is None:
+            from .progressbars import progressbars
+            ConsoleLog.progressbars = progressbars
+        else:
+            progressbars = ConsoleLog.progressbars
+
+        if backend is None:
+            try:
+                pbar = progressbars['tqdm']
+            except KeyError:
+                pbar = progressbars.values()[0]  # any
+        else:
+            pbar = progressbars[backend]
+        return pbar(*args, out=self.out, **kwargs)
+
+
+def getpass_echo(*args, **kwargs):
+    """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
+    """
+    if on_windows:
+        # Can't do anything fancy yet, so just ask the one without echo
+        return getpass.getpass(*args, **kwargs)
+    else:
+        # We can mock patch termios so that ECHO is not turned OFF.
+        # Side-effect -- additional empty line is printed
+        with patch('termios.ECHO', 255**2):
+            return getpass.getpass(*args, **kwargs)
 
 
 @auto_repr
@@ -116,8 +117,13 @@ class DialogUI(ConsoleLog, InteractiveUI):
         if default and default not in choices:
             raise ValueError("default value %r is not among choices: %s"
                              % (default, choices))
+
+        msg = ''
         if title:
-            self.out.write(title + "\n")
+            # might not actually get displayed if all in/out redirected
+            # self.out.write(title + "\n")
+            # so merge into msg for getpass
+            msg += title + os.linesep
 
         def mark_default(x):
             return "[%s]" % x \
@@ -125,9 +131,9 @@ class DialogUI(ConsoleLog, InteractiveUI):
                 else x
 
         if choices is not None:
-            msg = "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
+            msg += "%s (choices: %s)" % (text, ', '.join(map(mark_default, choices)))
         else:
-            msg = text
+            msg += text
         """
         Anaconda format:
 
@@ -139,17 +145,17 @@ Question? [choice1|choice2]
             attempt += 1
             if attempt >= 100:
                 raise RuntimeError("This is 100th attempt. Something really went wrong")
-            if not hidden:
-                self.out.write(msg + ": ")
-                self.out.flush()  # not effective for stderr for some reason under annex
-
-                # TODO: raw_input works only if stdin was not controlled by
-                # (e.g. if coming from annex).  So we might need to do the
-                # same trick as get_pass() does while directly dealing with /dev/pty
-                # and provide per-OS handling with stdin being override
-                response = (raw_input if PY2 else input)()
-            else:
-                response = getpass(msg + ": ")
+            # if not hidden:
+            #     self.out.write(msg + ": ")
+            #     self.out.flush()  # not effective for stderr for some reason under annex
+            #
+            #     # TODO: raw_input works only if stdin was not controlled by
+            #     # (e.g. if coming from annex).  So we might need to do the
+            #     # same trick as get_pass() does while directly dealing with /dev/pty
+            #     # and provide per-OS handling with stdin being override
+            #     response = (raw_input if PY2 else input)()
+            # else:
+            response = (getpass.getpass if hidden else getpass_echo)(msg + ": ")
 
             if not response and default:
                 response = default
@@ -174,3 +180,49 @@ class UnderAnnexUI(DialogUI):
             # but wasn't effective! sp kist straogjt for now
             kwargs['out'] = sys.stderr
         super(UnderAnnexUI, self).__init__(**kwargs)
+
+
+@auto_repr
+class UnderTestsUI(DialogUI):
+    """UI to help with testing functionality requiring interaction
+
+    It will provide additional method to push responses to be provided,
+    and could be used as a context manager
+    """
+
+    def __init__(self, **kwargs):
+        super(UnderTestsUI, self).__init__(**kwargs)
+        self._responses = deque()
+
+    # TODO: possibly allow to provide expected messages etc, so we could
+    # test that those are the actual ones which were given
+    def add_responses(self, responses):
+        if not isinstance(responses, (list, tuple)):
+            responses = [responses]
+        self._responses += list(responses)
+        return self  # so we could use it as a context manager
+
+    def get_responses(self):
+        return self._responses
+
+    def clear_responses(self):
+        self._responses = deque()
+
+    def question(self, *args, **kwargs):
+        if not self._responses:
+            raise AssertionError(
+                "We are asked for a response whenever none is left to give"
+            )
+        return self._responses.popleft()
+
+    # Context manager mode of operation which would also verify that
+    # no responses left upon exiting
+    def __enter__(self):
+        pass
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        responses = copy(self._responses)
+        # we should clear the state so there is no side-effect
+        self.clear_responses()
+        assert not len(responses), \
+            "Still have some responses left: %s" % repr(self._responses)

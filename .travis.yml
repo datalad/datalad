@@ -17,6 +17,8 @@ matrix:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
     - NOSE_WRAPPER="sudo -E"
+    # no key authentication for root:
+    - unset -v DATALAD_TESTS_SSH
   - python: 2.7
     env:
     - DATALAD_TESTS_NONETWORK=1
@@ -33,19 +35,24 @@ matrix:
 # can't since coverage doesn't support it yet: https://bitbucket.org/ned/coveragepy/issues/391/getargspec-was-finally-removed-will-not-be
 # - python: nightly
 
-# to overcome problem with system-wide installed boto on travis
-# see https://github.com/travis-ci/travis-ci/issues/5246
 env:
+  # to overcome problem with system-wide installed boto on travis
+  # see https://github.com/travis-ci/travis-ci/issues/5246
   - BOTO_CONFIG=/tmp/nowhere
+  - DATALAD_TESTS_SSH=1
 
 before_install:
   # The ultimate one-liner setup for NeuroDebian repository
   - bash <(wget -q -O- http://neuro.debian.net/_files/neurodebian-travis.sh)
-  - sudo apt-get update -qq
+  - travis_retry sudo apt-get update -qq
+  - sudo tools/ci/prep-travis-forssh-sudo.sh
+  - tools/ci/prep-travis-forssh.sh
 
 install:
   # Install standalone build of git-annex for the recent enough version
-  - sudo apt-get install git-annex-standalone zip help2man
+  - travis_retry sudo apt-get install git-annex-standalone zip
+  # For Python3 compatibility needs never-released master
+  - pip install https://github.com/niltonvolpato/python-progressbar/archive/master.zip
   - git config --global user.email "test@travis.land"
   - git config --global user.name "Travis Almighty"
   - git submodule update --init --recursive
@@ -56,13 +63,15 @@ install:
   - pip install -e .
   # So we could test under sudo -E with PATH pointing to installed location
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
+  # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
+  - pip install sphinx
 
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --with-cov --cover-package datalad --logging-level=INFO
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-  # Verify that we can render manpages
-  - make manpages
+  # Generate documentation and run doctests
+  - PYTHONPATH=$PWD/.. make -C docs html doctest
 
 after_success:
   - coveralls

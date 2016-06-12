@@ -12,7 +12,9 @@ from importlib import import_module as _impmod
 
 from .interface.base import update_docstring_with_parameters as _update_docstring
 from .interface.base import get_interface_groups as _get_interface_groups
-from .interface.base import dedent_docstring as _dedent_docstring
+from .interface.base import get_api_name as _get_api_name
+from .interface.base import alter_interface_docs_for_api \
+    as _alter_interface_docs_for_api
 from .distribution.dataset import Dataset
 
 # auto detect all available interfaces and generate a function-based
@@ -28,15 +30,11 @@ for _grp_name, _grp_descr, _interfaces in _get_interface_groups():
         # FIXME no longer using an interface class instance
         # convert the parameter SPEC into a docstring for the function
         _update_docstring(_intf.__call__, _spec,
-                          prefix=_dedent_docstring(_intf.__doc__),
-                          suffix=_dedent_docstring(_intf.__call__.__doc__))
-        # register the function in the namespace, using the name of the
-        # module it is defined in
-        if len(_intfspec) > 3:
-            api_name = _intfspec[3]
-        else:
-            api_name = _intf.__module__.split('.')[-1]
-        globals()[api_name] = _intf.__call__
+                          prefix=_alter_interface_docs_for_api(
+                              _intf.__doc__),
+                          suffix=_alter_interface_docs_for_api(
+                              _intf.__call__.__doc__))
+        globals()[_get_api_name(_intfspec)] = _intf.__call__
         # cleanup namespace
         del _mod
         del _intfspec
@@ -46,8 +44,9 @@ for _grp_name, _grp_descr, _interfaces in _get_interface_groups():
 del _interfaces
 del _impmod
 del _get_interface_groups
+del _get_api_name
 del _grp_name
 del _grp_descr
 del _spec
 del _update_docstring
-del _dedent_docstring
+del _alter_interface_docs_for_api

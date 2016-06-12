@@ -78,7 +78,9 @@ we outline the workflow used by the developers:
 
          ghremote git@github.com:YourLogin/datalad.git
 
-    to add the above `gh-YourLogin` remote.
+    to add the above `gh-YourLogin` remote.  Additional handy aliases
+    such as `ghpr` (to fetch existing pr from someone's remote) and 
+    `ghsendpr` could be found at [yarikoptic's bash config file](http://git.onerussian.com/?p=etc/bash.git;a=blob;f=.bash/bashrc/30_aliases_sh;hb=HEAD#l865)
 
 3. Create a branch (generally off the `origin/master`) to hold your changes:
 
@@ -104,7 +106,7 @@ we outline the workflow used by the developers:
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
    entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
    examples.  If a commit closes an existing DataLad issue, then add to the end
-   of the mesage `(Closes #ISSUE_NUMER)`
+   of the message `(Closes #ISSUE_NUMER)`
 
 5. Push to GitHub with:
 
@@ -123,6 +125,16 @@ Development environment
 -----------------------
 
 See [README.md:Dependencies](README.md#Dependencies).
+
+Documentation
+-------------
+
+### Docstrings
+
+We use [NumPy standard] for docstrings.  If you are using PyCharm, set your
+project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
+
+[NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
 
 Additional Hints
 ----------------
@@ -204,6 +216,10 @@ You can also check for common programming errors with the following tools:
           pip install nose coverage
           nosetests --with-coverage path/to/tests_for_package
 
+- We rely on https://codecov.io to provide convenient view of code coverage.
+  Installation of the codecov extension for Firefox/Iceweasel or Chromium
+  is strongly advised, since it provides coverage annotation of pull
+  requests.
 
 ### Linting
 
@@ -260,3 +276,37 @@ Various hints for developers
 
 - to monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
   just plug it in the middle of your pipe
+
+- for remote debugging epdb could be used (avail in pip) by using
+  `import epdb; epdb.serve()` in Python code and then connecting to it with
+  `python -c "import epdb; epdb.connect()"`
+
+- We are using codecov which has extensions for the popular browsers
+  (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
+
+### Useful Flags
+- *DATALAD_LOGLEVEL*: 
+  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
+- *DATALAD_TESTS_KEEPTEMP*: 
+  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
+- *DATALAD_HELP2MAN*: 
+  Setting this flag converts *datalad --help* command into a man page appropriate format
+- *DATALAD_EXC_STR_TBLIMIT*: 
+  This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
+  It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+- *DATALAD_TESTS_TEMPDIR*: 
+  Create a temporary directory at location specified by this flag.
+  It is used by tests to create a temporary git directory while testing git annex archives etc
+- *DATALAD_TESTS_NONETWORK*: 
+  Skips network tests completely if this flag is set
+  Examples include test for s3, git_repositories, openfmri etc
+- *DATALAD_TESTS_SSH*: 
+  Skips SSH tests if this flag is **not** set
+- *DATALAD_LOGTRACEBACK*: 
+  Runs TraceBack function with collide set to True, if this flag is set to 'collide' 
+  This replaces any common prefix between current traceback log and previous invocation with "..."
+- *DATALAD_TESTS_NOTEARDOWN*: 
+  Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
+- *DATALAD_CMD_PROTOCOL*: 
+- *DATALAD_CMD_PROTOCOL_PREFIX*: 
+- *DATALAD_PROTOCOL_REMOTE*: 

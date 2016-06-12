@@ -46,7 +46,7 @@ class HelpAction(argparse.Action):
             helpstr = parser.format_help()
         # better for help2man
         # For main command -- should be different sections. And since we are in
-        # heavy output massaging mode...
+        # heavy output messaging mode...
         if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
@@ -71,18 +71,6 @@ class HelpAction(argparse.Action):
             helpstr)[0]
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
-        if option_string == '--help-np':
-            usagestr = re.split(r'\n\n[A-Z]+', helpstr, maxsplit=1)[0]
-            usage_length = len(usagestr)
-            usagestr = re.subn(r'\s+', ' ', usagestr.replace('\n', ' '))[0]
-            helpstr = '%s\n%s' % (usagestr, helpstr[usage_length:])
-
-        if os.environ.get('DATALAD_HELP2MAN'):
-            # Convert 1-line command descriptions to remove leading -
-            helpstr = re.sub('\n\s*-\s*([-a-z0-9]*):\s*?([^\n]*)', r"\n'\1':\n  \2\n", helpstr)
-        else:
-            # Those *s intended for man formatting do not contribute to readability in regular text mode
-            helpstr = helpstr.replace('*', '')
 
         print(helpstr)
         sys.exit(0)
@@ -274,36 +262,3 @@ from appdirs import AppDirs
 from os.path import join as opj
 
 dirs = AppDirs("datalad", "datalad.org")
-
-
-def POC_get_root_handle(root_dir=None, path_only=False):
-    """Return "master" handle.
-
-    Parameter
-    ---------
-    dir: str
-      path to the root handle. If None, datalad's default is used.
-      The default root handle lives in a sub directory
-      of user_data_dir as returned by appdirs. The default name of this
-      subdirectory is set by datalad.consts.DATALAD_ROOT_HANDLE_NAME.
-      Alternatively, a different default root handle can be set by the
-      environment variable DATALAD_ROOT_HANDLE, which then is expected to
-      contain the full path the desired root handle.
-
-    Note
-    ----
-    This is a temporary version of the above get_datalad_master, marked by the
-    prefix POC.
-    Not for general use in datalad yet.
-    """
-
-    from ..consts import DATALAD_ROOT_HANDLE_NAME
-    if root_dir is None:
-        root_dir = os.environ.get('DATALAD_ROOT_HANDLE', None) or \
-                   opj(dirs.user_data_dir, DATALAD_ROOT_HANDLE_NAME)
-    if path_only:
-        return root_dir
-
-    from ..support.gitrepo import GitRepo
-    return GitRepo(root_dir, create=True)
-

@@ -43,10 +43,10 @@ def test_update_simple(origin, src_path, dst_path):
     # Figure out, what to do.
     for subds in source.get_dataset_handles(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True,
-                  create=False).git_checkout("master")
+                  create=True).checkout("master")
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
-    source.repo.git_remote_remove("origin")
+    source.repo.remove_remote("origin")
 
     # get a clone to update later on:
     dest = install(path=dst_path, source=src_path, recursive=True)
@@ -54,7 +54,7 @@ def test_update_simple(origin, src_path, dst_path):
     # Figure out, what to do.
     for subds in dest.get_dataset_handles(recursive=True):
         AnnexRepo(opj(dst_path, subds), init=True,
-                  create=False).git_checkout("master")
+                  create=True).checkout("master")
     # test setup done;
     # assert all fine
     ok_clean_git(dst_path)
@@ -76,15 +76,15 @@ def test_update_simple(origin, src_path, dst_path):
     dest.update()
     # modification is not known to active branch:
     assert_not_in("update.txt",
-                  dest.repo.git_get_files(dest.repo.git_get_active_branch()))
+                  dest.repo.get_files(dest.repo.get_active_branch()))
     # modification is known to branch origin/master
-    assert_in("update.txt", dest.repo.git_get_files("origin/master"))
+    assert_in("update.txt", dest.repo.get_files("origin/master"))
 
     # merge:
     dest.update(merge=True)
     # modification is now known to active branch:
     assert_in("update.txt",
-              dest.repo.git_get_files(dest.repo.git_get_active_branch()))
+              dest.repo.get_files(dest.repo.get_active_branch()))
     # it's known to annex, but has no content yet:
     dest.repo.get_file_key("update.txt")  # raises if unknown
     eq_([False], dest.repo.file_has_content(["update.txt"]))
@@ -108,25 +108,24 @@ def test_update_fetch_all(src, remote_1, remote_2):
     # modify the remotes:
     with open(opj(remote_1, "first.txt"), "w") as f:
         f.write("some file load")
-    rmt1.add_to_annex("first.txt")
+    rmt1.add("first.txt", commit=True)
     # TODO: Modify an already present file!
 
     with open(opj(remote_2, "second.txt"), "w") as f:
         f.write("different file load")
-    rmt2.git_add("second.txt")
-    rmt2.git_commit("Add file to git.")
+    rmt2.add("second.txt", git=True, commit=True, msg="Add file to git.")
 
     # fetch all remotes
     ds.update(fetch_all=True)
 
     # no merge, so changes are not in active branch:
     assert_not_in("first.txt",
-                  ds.repo.git_get_files(ds.repo.git_get_active_branch()))
+                  ds.repo.get_files(ds.repo.get_active_branch()))
     assert_not_in("second.txt",
-                  ds.repo.git_get_files(ds.repo.git_get_active_branch()))
+                  ds.repo.get_files(ds.repo.get_active_branch()))
     # but we know the changes in remote branches:
-    assert_in("first.txt", ds.repo.git_get_files("sibling_1/master"))
-    assert_in("second.txt", ds.repo.git_get_files("sibling_2/master"))
+    assert_in("first.txt", ds.repo.get_files("sibling_1/master"))
+    assert_in("second.txt", ds.repo.get_files("sibling_2/master"))
 
     # no merge strategy for multiple remotes yet:
     assert_raises(NotImplementedError, ds.update, merge=True, fetch_all=True)
@@ -136,10 +135,10 @@ def test_update_fetch_all(src, remote_1, remote_2):
 
     # changes from sibling_2 still not present:
     assert_not_in("second.txt",
-                  ds.repo.git_get_files(ds.repo.git_get_active_branch()))
+                  ds.repo.get_files(ds.repo.get_active_branch()))
     # changes from sibling_1 merged:
     assert_in("first.txt",
-              ds.repo.git_get_files(ds.repo.git_get_active_branch()))
+              ds.repo.get_files(ds.repo.get_active_branch()))
     # it's known to annex, but has no content yet:
     ds.repo.get_file_key("first.txt")  # raises if unknown
     eq_([False], ds.repo.file_has_content(["first.txt"]))

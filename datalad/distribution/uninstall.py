@@ -53,7 +53,7 @@ class Uninstall(Interface):
 
     _params_ = dict(
         dataset=Parameter(
-            args=("--dataset", "-d",),
+            args=("-d", "--dataset"),
             doc="""specify the dataset to perform the uninstall operation on.
             If no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
@@ -65,12 +65,12 @@ class Uninstall(Interface):
             constraints=EnsureStr() | EnsureNone()),
         data_only=Parameter(
             args=("--data-only",),
-            doc="If set, only data is uninstalled, but the handles are kept.",
+            doc="if set, only data is uninstalled, but the handles are kept",
             action="store_true"),
         recursive=Parameter(
-            args=("--recursive", "-r"),
-            doc="""If set, uninstall recursively, including all subdatasets.
-            The value of `data` is used for recursive uninstallation, too.""",
+            args=("-r", "--recursive"),
+            doc="""if set, uninstall recursively, including all subdatasets.
+            The value of `data` is used for recursive uninstallation, too""",
             action="store_true"))
 
     @staticmethod
@@ -190,7 +190,7 @@ class Uninstall(Interface):
 
             # it's an annexed file
             if data_only:
-                ds.repo.annex_drop([path])
+                ds.repo.drop([path])
                 return path
             else:
                 raise NotImplementedError("TODO: fully uninstall file %s "
@@ -207,13 +207,12 @@ class Uninstall(Interface):
                 # a subdataset
                 _untracked_or_within_submodule = True
 
-
         if _file_in_git:
             if data_only:
                 raise ValueError("%s is not a file handle. Removing its "
                                  "data only doesn't make sense." % path)
             else:
-                return ds.repo.git_remove([relativepath])
+                return ds.repo.remove([relativepath])
 
         elif _untracked_or_within_submodule:
             subds = get_containing_subdataset(ds, relativepath)

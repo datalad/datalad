@@ -21,10 +21,20 @@ from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
-from datalad.interface.POC_helpers import get_module_parser
 from datalad.utils import getpwd
 
 lgr = logging.getLogger('datalad.distribution.modify_subhandle_urls')
+
+
+def get_module_parser(repo):
+
+    from git import GitConfigParser
+    gitmodule_path = opj(repo.path, ".gitmodules")
+    # TODO: What does constructor of GitConfigParser, in case file doesn't exist?
+    #if exists(gitmodule_path):
+    parser = GitConfigParser(gitmodule_path)
+    parser.read()
+    return parser
 
 
 class ModifySubhandleURLs(Interface):
@@ -33,21 +43,21 @@ class ModifySubhandleURLs(Interface):
     _params_ = dict(
         url=Parameter(
             args=("url",),
-            doc="A template for building the URLs of the subhandles."
+            doc="a template for building the URLs of the subhandles "
                 "List of currently available placeholders:\n"
-                "%NAME\tthe name of the handle, where slashes are replaced by "
-                "dashes.",
+                "%%NAME\tthe name of the handle, where slashes are replaced by "
+                "dashes",
             constraints=EnsureStr()),
         dataset=Parameter(
-            args=("--dataset", "-d",),
-            doc=""""specify the dataset to update. If
+            args=("-d", "--dataset",),
+            doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             action="store_true",
-            doc="Recursively modify all subhandle URLs of `dataset`."),)
+            doc="recursively modify all subhandle URLs of `dataset` "),)
 
     # TODO: User interaction. Allow for skipping and editing on a per
     # subhandle basis. Therefore some --mode option (see below). Additionally,
