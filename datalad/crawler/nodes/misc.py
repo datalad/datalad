@@ -97,7 +97,7 @@ class fix_permissions(object):
                 os.chmod(filename, current & ~stat.S_IXOTH)
 
             nper = oct(os.stat(filename)[ST_MODE])[-3:]
-         #   lgr.debug('Changing permissions for file %s from %s to %s' % filename, per, nper)
+            lgr.debug('Changing permissions for file %s from %s to %s', filename, per, nper)
 
         yield nper
 
