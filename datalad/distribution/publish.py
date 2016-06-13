@@ -34,7 +34,7 @@ lgr = logging.getLogger('datalad.distribution.publish')
 
 
 class Publish(Interface):
-    """publish a handle.
+    """Publish (e.g. to a web server) a dataset(s)
 
     This is basic implementation for testing purposes
     """

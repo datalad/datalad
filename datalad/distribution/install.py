@@ -220,7 +220,7 @@ def get_containing_subdataset(ds, path):
 # install of existing submodule; recursive call; source should not be None!
 
 class Install(Interface):
-    """Install a dataset component or entire datasets.
+    """Install a dataset component or entire dataset(s).
 
     This command can make arbitrary content available in a dataset. This
     includes the fulfillment of existing dataset handles or file handles
