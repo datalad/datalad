@@ -12,6 +12,7 @@ import os
 from os.path import lexists
 
 # Import necessary nodes
+from ..nodes.misc import assign
 from ..nodes.misc import switch
 from ..nodes.s3 import crawl_s3
 from ..nodes.annex import Annexificator
@@ -22,7 +23,46 @@ from ...consts import DATALAD_SPECIAL_REMOTE
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.nda")
 
-def pipeline(prefix=None):
+DEFAULT_BUCKET = 'NDAR_Central'
+
+
+def collection_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
+    """Pipeline to crawl/annex an entire openfmri bucket"""
+
+    lgr.info("Creating a pipeline for the openfmri bucket")
+    annex = Annexificator(
+        create=False,  # must be already initialized etc
+    )
+
+    return [
+        crawl_s3(bucket, prefix=prefix, recursive=False,
+                 strategy='commit-versions', repo=annex.repo,
+                 versioned=False),
+        switch('datalad_action',
+               {  # TODO: we should actually deal with subdirs primarily
+                   'commit': annex.finalize(tag=True),
+                   # should we bother removing anything? not sure
+                   # 'remove': annex.remove,
+                   'annex':  annex,
+                   'directory': [
+                       # for initiate_handle we should replicate filename as handle_name, prefix
+                       assign({
+                           'prefix': '%(filename)s/',
+                           'bucket': bucket,
+                           'handle_name': '%(filename)s'
+                       }, interpolate=True),
+                       annex.initiate_handle(
+                           template='nda',
+                           data_fields=['bucket', 'prefix'],
+                       )
+                   ]
+               },
+               missing='skip',  # ok to not remove
+        ),
+    ]
+
+
+def pipeline(bucket=DEFAULT_BUCKET, prefix=None):
     """Pipeline to crawl/annex an entire openfmri bucket"""
 
     lgr.info("Creating a pipeline for the NDA bucket")
@@ -36,7 +76,7 @@ def pipeline(prefix=None):
     )
 
     return [
-        crawl_s3('NDAR_Central',
+        crawl_s3(bucket,
                  prefix=prefix, strategy='commit-versions',
                  repo=annex.repo, versioned=False),
         switch('datalad_action',

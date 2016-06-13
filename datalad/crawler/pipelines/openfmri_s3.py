@@ -30,8 +30,11 @@ lgr = getLogger("datalad.crawler.pipelines.openfmri")
 # so then we could just generalize this whole shebang into a single helper
 # for crawling any S3 bucket.
 # Right away think about having an 'incoming' branch and handling of versioned files
-sub_s3_to_http = sub({'url': {'^s3://openfmri/': 'http://openfmri.s3.amazonaws.com/'}},
-                     ok_missing=True)
+sub_s3_to_http = sub({
+        'url': {'^s3://openfmri/': 'http://openfmri.s3.amazonaws.com/'}
+    },
+    ok_missing=True
+)
 
 
 def collection_pipeline(prefix=None):
