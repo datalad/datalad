@@ -258,7 +258,6 @@ class AddArchiveContent(Interface):
         try:
             old_always_commit = annex.always_commit
             annex.always_commit = False
-            keys_to_drop = []
 
             if annex_options:
                 if isinstance(annex_options, string_types):
@@ -381,7 +380,8 @@ class AddArchiveContent(Interface):
                     # due to http://git-annex.branchable.com/bugs/annex_drop_is_not___34__in_effect__34___for_load_which_was___34__addurl_--batch__34__ed_but_not_yet_committed/?updated
                     # we need to maintain a list of those to be dropped files
                     if drop_after:
-                        keys_to_drop.append(out_json['key'])
+                        annex.drop_key(out_json['key'], batch=True)
+                        stats.dropped += 1
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))
@@ -424,20 +424,14 @@ class AddArchiveContent(Interface):
                 commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
+            annex.precommit()
+
             if delete_after:
                 prefix_path = opj(annex.path, prefix_dir)
                 if exists(prefix_path):  # probably would always be there
                     lgr.info("Removing temporary directory under which extracted files were annexed: %s",
                              prefix_path)
                     rmtree(prefix_path)
-
-            annex.precommit()
-            if keys_to_drop:
-                # since we know that keys should be retrievable, we --force since no batching
-                # atm and it would be expensive
-                annex.drop(keys_to_drop, options=['--force'], key=True)
-                stats.dropped += len(keys_to_drop)
-                annex.precommit()  # might need clean up etc again
 
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure
