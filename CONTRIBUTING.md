@@ -284,13 +284,13 @@ Various hints for developers
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
 
-### Useful Flags
+### Useful Environment Variables
+Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
+
 - *DATALAD_LOGLEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_TESTS_KEEPTEMP*: 
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
-- *DATALAD_HELP2MAN*: 
-  Setting this flag converts *datalad --help* command into a man page appropriate format
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
@@ -303,10 +303,32 @@ Various hints for developers
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set
 - *DATALAD_LOGTRACEBACK*: 
-  Runs TraceBack function with collide set to True, if this flag is set to 'collide' 
+  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
+- *DATALAD_SPECIAL_REMOTE*:
+  Specifies the name of the datalad [special remote](https://git-annex.branchable.com/special_remotes/).
+- *ARCHIVES_SPECIAL_REMOTE*:
+  Specifies the name of the datalad archive [special remote](https://git-annex.branchable.com/special_remotes/).
+- *DATALAD_USECASSETTE*:
+  Specifies the location of the file to record network transactions by the VCR module.
+  Currently used by when testing custom special remotes
 - *DATALAD_CMD_PROTOCOL*: 
+  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
+  0 for ExecutionTimeExternalsProtocol, 1 for ExecutionTimeProtocol and 3 for NullProtocol.
+  Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
-- *DATALAD_PROTOCOL_REMOTE*: 
+  Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
+- *DATALAD_PROTOCOL_REMOTE*:
+  Binary flag To specify whether annex is testing a remote special remote??
+- *DATALAD_LOG_TIMESTAMP*:
+  Used to add timestamp to datalad logs
+- *DATALAD_RUN_CMDLINE_TESTS*:
+  Binary flag to specify if shell testing using shunit2 to be carried out
+- *DATALAD_TEMP_FS*:
+  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
+- *DATALAD_TEMP_FS_SIZE*:
+  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
+- *DATALAD_NONLO*:
+  Specifies network interfaces to bring down/up for testing. Currently used by travis.
