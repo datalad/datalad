@@ -380,7 +380,7 @@ class AddArchiveContent(Interface):
                     # due to http://git-annex.branchable.com/bugs/annex_drop_is_not___34__in_effect__34___for_load_which_was___34__addurl_--batch__34__ed_but_not_yet_committed/?updated
                     # we need to maintain a list of those to be dropped files
                     if drop_after:
-                        annex.annex_dropkey(out_json['key'], batch=True)
+                        annex.drop_key(out_json['key'], batch=True)
                         stats.dropped += 1
                     stats.add_annex += 1
                 else:

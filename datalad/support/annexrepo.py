@@ -795,32 +795,6 @@ class AnnexRepo(GitRepo):
         for j in json_objects:
             assert j.get('success', True)
 
-    def annex_dropkey(self, keys, options=None, batch=False):
-        """Drops the content of annexed files from this repository referenced by keys
-
-        Dangerous: it drops without checking for required minimal number of
-        available copies.
-
-        Parameters
-        ----------
-        keys: list of str, str
-
-        batch: bool, optional
-            initiate or continue with a batched run of annex dropkey, instead of just
-            calling a single git annex dropkey command
-        """
-        keys = [keys] if isinstance(keys, string_types) else keys
-
-        options = options[:] if options else []
-        options += ['--force']
-        if not batch:
-            json_objects = self._run_annex_command_json('dropkey', args=options + keys, expect_stderr=True)
-        else:
-            json_objects = self._batched.get('dropkey', annex_options=options, json=True, path=self.path)(keys)
-        for j in json_objects:
-            assert j.get('success', True)
-
-
     # TODO: a dedicated unit-test
     def _whereis_json_to_dict(self, j):
         """Convert json record returned by annex whereis --json to our dict representation for it
