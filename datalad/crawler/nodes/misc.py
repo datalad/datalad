@@ -12,8 +12,10 @@
 import inspect
 import os
 import re
+import stat
 
-from os.path import curdir, join as opj, split as ops
+from stat import *
+from os.path import curdir,isdir, isabs, exists, join as opj, split as ops
 from six import iteritems, string_types
 
 from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
@@ -28,6 +30,76 @@ from logging import getLogger
 from nose.tools import eq_, assert_raises
 
 lgr = getLogger('datalad.crawler.nodes')
+
+@auto_repr
+class fix_permissions(object):
+    """A node used to check the permissions of a file and set the executable bit
+
+    """
+
+    def __init__(self, file_re='.*', executable=False, input='filename', path=None):
+        """
+            Parameters
+            ----------
+            file_re : str, optional
+              Regular expression str to which the filename must match
+            executable : boolean, optional
+              If false, sets file to allow no one to execute. If true, sets file
+              to be executable to those already allowed to read it
+            input : str, optional
+              Key which holds value that is the filename or absolute path in data
+            path : str, optional
+              If absolute path is not specifed in data, path must be expressed
+              here
+
+            """
+        self.file_re = file_re
+        self.executable = executable
+        self.input = input
+        self.path = path
+
+    def __call__(self, data):
+        filename = data.get(self.input)
+
+        # check that file matches regex
+        if not filename.endswith(self.file_re):
+            yield data
+            return  # early termination since nothing to do
+
+        # check that absolute path exists
+        if not isabs(filename):
+            path = self.path or data.get('path')
+            if path:
+                filename = opj(path, filename)
+
+        # check existance of file and that path is not a dir
+        if exists(filename) and not isdir(filename):
+            per = oct(os.stat(filename)[ST_MODE])[-3:]
+            st = os.stat(filename)
+
+            if self.executable:
+                # make is executable for those that can read it
+                if per[0] == '6' or '4':
+                    os.chmod(filename, st.st_mode | S_IEXEC)
+                    st = os.stat(filename)
+                if per[1] == '6' or '4':
+                    os.chmod(filename, st.st_mode | S_IXGRP)
+                    st = os.stat(filename)
+                if per[2] == '6' or '4':
+                    os.chmod(filename, st.st_mode | S_IXOTH)
+            else:
+                # strip everyone away from executing
+                current = stat.S_IMODE(os.lstat(filename).st_mode)
+                os.chmod(filename, current & ~stat.S_IEXEC)
+                current = stat.S_IMODE(os.lstat(filename).st_mode)
+                os.chmod(filename, current & ~stat.S_IXGRP)
+                current = stat.S_IMODE(os.lstat(filename).st_mode)
+                os.chmod(filename, current & ~stat.S_IXOTH)
+
+            nper = oct(os.stat(filename)[ST_MODE])[-3:]
+         #   lgr.debug('Changing permissions for file %s from %s to %s' % filename, per, nper)
+
+        yield nper
 
 
 @auto_repr

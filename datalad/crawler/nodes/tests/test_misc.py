@@ -8,9 +8,12 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+from os import chmod
 from os.path import join as opj
+from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
 from six import next
 from ..misc import get_disposition_filename
+from ..misc import fix_permissions
 from ..misc import get_url_filename
 from ..misc import range_node
 from ..misc import interrupt_if
@@ -54,16 +57,41 @@ def test_get_disposition_filename():
 def test_fix_permissions(outdir):
     filepath = opj(outdir, 'myfile.txt')
     filepath2 = opj(outdir, 'badfile.py')
-    with open(filepath, 'w'), open(filepath2, 'w'):
+    filepath3 = opj(outdir, 'nopath.txt')
+    with open(filepath, 'w'), open(filepath2, 'w'), open(filepath3, 'w'):
         pass
 
-    chmod(outdir+'/myfile.txt', 0664)
-    chmod(outdir + '/myfile.txt', 0666)
+    gen = fix_permissions('.txt', True, 'filename')
 
-    data = {'url': 'http://mapping.org/docs/?num=45', 'filename': outdir+'/myfile.txt', }
+    # make file executable for everyone
+    filename = opj(outdir, 'myfile.txt')
+    chmod(filename, 0o643)
+    data = {'url': 'http://mapping.org/docs/?num=45', 'filename': filename}
+    eq_(list(gen(data)), ['753'])
 
+    # file that does not match regex
+    badfile = opj(outdir, 'badfile.py')
+    chmod(badfile, 0o666)
+    baddata = {'url': 'http://mapping.org/docs/?num=45', 'filename': badfile}
+    eq_(list(gen(baddata)), [{'url': 'http://mapping.org/docs/?num=45', 'filename': badfile}])
+
+    # file that is actually a dir
+    dirdata = {'url': 'http://mapping.org/docs/?num=45', 'filename': outdir}
+    eq_(list(gen(dirdata)), [{'url': 'http://mapping.org/docs/?num=45', 'filename': outdir}])
+
+    # path given in args
+    nopath = opj(outdir, 'nopath.txt')
+    chmod(nopath, 0o643)
+    datafile = {'url': 'http://mapping.org/docs/?num=45', 'filename': 'nopath.txt'}
+    gen = fix_permissions('.txt', True, 'filename', outdir)
+    eq_(list(gen(datafile)), ['753'])
+
+    # take permissions away from everyone
     gen = fix_permissions('.txt', False, 'filename')
-    print(list(gen(data)))
+    filename = opj(outdir, 'myfile.txt')
+    chmod(filename, 0o743)
+    data = {'url': 'http://mapping.org/docs/?num=45', 'filename': filename}
+    eq_(list(gen(data)), ['642'])
 
 
 def test_get_url_filename():
