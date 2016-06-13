@@ -77,16 +77,15 @@ class fix_permissions(object):
             per = oct(os.stat(filename)[ST_MODE])[-3:]
             st = os.stat(filename)
 
+            permissions = [S_IEXEC, S_IXGRP, S_IXOTH]
+
             if self.executable:
                 # make is executable for those that can read it
-                if per[0] == '6' or '4':
-                    os.chmod(filename, st.st_mode | S_IEXEC)
-                    st = os.stat(filename)
-                if per[1] == '6' or '4':
-                    os.chmod(filename, st.st_mode | S_IXGRP)
-                    st = os.stat(filename)
-                if per[2] == '6' or '4':
-                    os.chmod(filename, st.st_mode | S_IXOTH)
+                for i, scope in enumerate(permissions):
+                    if per[i] == '6' or '4':
+                        os.chmod(filename, st.st_mode | scope)
+                        st = os.stat(filename)
+
             else:
                 # strip everyone away from executing
                 current = stat.S_IMODE(os.lstat(filename).st_mode)
