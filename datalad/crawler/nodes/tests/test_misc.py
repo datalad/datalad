@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 import os
+from stat import *
 from os import chmod
 from os.path import join as opj
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
@@ -63,17 +64,19 @@ def test_fix_permissions(outdir):
 
     gen = fix_permissions('.txt', True, 'filename')
 
-    # make file executable for everyone
+    # make file executable for those that can read it
     filename = opj(outdir, 'myfile.txt')
     chmod(filename, 0o643)
     data = {'url': 'http://mapping.org/docs/?num=45', 'filename': filename}
-    eq_(list(gen(data)), ['753'])
+    eq_(list(gen(data)), [{'url': 'http://mapping.org/docs/?num=45', 'filename': filename}])
+    eq_(oct(os.stat(filename)[ST_MODE])[-3:], '753')
 
     # file that does not match regex
     badfile = opj(outdir, 'badfile.py')
     chmod(badfile, 0o666)
     baddata = {'url': 'http://mapping.org/docs/?num=45', 'filename': badfile}
     eq_(list(gen(baddata)), [{'url': 'http://mapping.org/docs/?num=45', 'filename': badfile}])
+    eq_(oct(os.stat(badfile)[ST_MODE])[-3:], '666')
 
     # file that is actually a dir
     dirdata = {'url': 'http://mapping.org/docs/?num=45', 'filename': outdir}
@@ -84,14 +87,16 @@ def test_fix_permissions(outdir):
     chmod(nopath, 0o643)
     datafile = {'url': 'http://mapping.org/docs/?num=45', 'filename': 'nopath.txt'}
     gen = fix_permissions('.txt', True, 'filename', outdir)
-    eq_(list(gen(datafile)), ['753'])
+    eq_(list(gen(datafile)), [{'url': 'http://mapping.org/docs/?num=45', 'filename': 'nopath.txt'}])
+    eq_(oct(os.stat(filename)[ST_MODE])[-3:], '753')
 
     # take permissions away from everyone
     gen = fix_permissions('.txt', False, 'filename')
     filename = opj(outdir, 'myfile.txt')
     chmod(filename, 0o743)
     data = {'url': 'http://mapping.org/docs/?num=45', 'filename': filename}
-    eq_(list(gen(data)), ['642'])
+    eq_(list(gen(data)), [{'url': 'http://mapping.org/docs/?num=45', 'filename': filename}])
+    eq_(oct(os.stat(filename)[ST_MODE])[-3:], '642')
 
 
 def test_get_url_filename():

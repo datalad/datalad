@@ -98,7 +98,7 @@ class fix_permissions(object):
             nper = oct(os.stat(filename)[ST_MODE])[-3:]
             lgr.debug('Changing permissions for file %s from %s to %s', filename, per, nper)
 
-        yield nper
+        yield data
 
 
 @auto_repr
