@@ -1,3 +1,9 @@
+datalad (0.2.1-2) neurodebian; urgency=medium
+
+  * Skip testing components which require recent scrapy
+
+ -- Yaroslav Halchenko <debian@onerussian.com>  Mon, 13 Jun 2016 11:12:30 -0400
+
 datalad (0.2.1-1) unstable; urgency=medium
 
   * New bugfix + enhancements upstream release
