@@ -13,6 +13,10 @@ from os.path import sep as pathsep, join as opj, dirname
 
 from setuptools import setup, find_packages
 
+# manpage build imports
+from distutils.command.build_py import build_py
+from setup_support import BuildManPage, BuildRSTExamplesFromScripts
+
 # This might entail lots of imports which might not yet be available
 # so let's do ad-hoc parsing of the version.py
 #import datalad.version
@@ -66,9 +70,23 @@ requires = {
 }
 requires['full'] = sum(list(requires.values()), [])
 
+
+# configure additional command for custom build steps
+class DataladBuild(build_py):
+    def run(self):
+        self.run_command('build_manpage')
+        self.run_command('build_examples')
+        build_py.run(self)
+
+cmdclass = {
+    'build_manpage': BuildManPage,
+    'build_examples': BuildRSTExamplesFromScripts,
+    'build_py': DataladBuild
+}
+
 setup(
     name="datalad",
-    author="DataLad Team and Contributors",
+    author="The DataLad Team and Contributors",
     author_email="team@datalad.org",
     version=version,
     description="data distribution geared toward scientific datasets",
@@ -82,6 +100,7 @@ setup(
             'git-annex-remote-datalad=datalad.customremotes.datalad:main',
         ],
     },
+    cmdclass=cmdclass,
     package_data={
         'datalad': [
             'resources/git_ssh.sh',

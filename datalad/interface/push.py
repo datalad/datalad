@@ -32,12 +32,12 @@ class Push(Interface):
     _params_ = dict(
         remote=Parameter(
             args=('remote',),
-            doc="Name of the remote repository to push to.",
+            doc="name of the remote repository to push to",
             constraints=EnsureStr(),
             nargs='?'),
         branch=Parameter(
             args=('branch',),
-            doc="branch of the remote repository to push to.",
+            doc="branch of the remote repository to push to",
             nargs='?',
             constraints=EnsureStr() | EnsureNone()))
 

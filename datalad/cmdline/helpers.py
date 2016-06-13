@@ -71,18 +71,6 @@ class HelpAction(argparse.Action):
             helpstr)[0]
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
-        if option_string == '--help-np':
-            usagestr = re.split(r'\n\n[A-Z]+', helpstr, maxsplit=1)[0]
-            usage_length = len(usagestr)
-            usagestr = re.subn(r'\s+', ' ', usagestr.replace('\n', ' '))[0]
-            helpstr = '%s\n%s' % (usagestr, helpstr[usage_length:])
-
-        if os.environ.get('DATALAD_HELP2MAN'):
-            # Convert 1-line command descriptions to remove leading -
-            helpstr = re.sub('\n\s*-\s*([-a-z0-9]*):\s*?([^\n]*)', r"\n'\1':\n  \2\n", helpstr)
-        else:
-            # Those *s intended for man formatting do not contribute to readability in regular text mode
-            helpstr = helpstr.replace('*', '')
 
         print(helpstr)
         sys.exit(0)

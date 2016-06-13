@@ -42,7 +42,7 @@ class Publish(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to perform the publish operation on. If
+            doc="""specify the dataset to perform the publish operation on.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
@@ -60,7 +60,7 @@ class Publish(Interface):
         # Note: add remote currently disabled in publish
         # dest_url=Parameter(
         #     args=('--dest-url',),
-        #     doc="""The URL of the dataset sibling named by `dest`. This URL has
+        #     doc="""the URL of the dataset sibling named by `dest`.  This URL has
         #     to be accessible to anyone, who is supposed to have access to the
         #     published dataset later on.\n
         #     If you want to publish with `recursive`, it is expected, that you
@@ -74,14 +74,14 @@ class Publish(Interface):
         #     constraints=EnsureStr() | EnsureNone()),
         # dest_pushurl=Parameter(
         #     args=('--dest-pushurl',),
-        #     doc="""In case the `dest_url` cannot be used to publish to the
+        #     doc="""in case the `dest_url` cannot be used to publish to the
         #     dataset sibling, this option specifies a URL to be used for the
-        #     actual publication operation.""",
+        #     actual publication operation""",
         #     constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="Recursively publish all components of the dataset."),
+            doc="recursively publish all components of the dataset"),
         with_data=Parameter(
             args=("--with-data",),
             doc="shell pattern",
