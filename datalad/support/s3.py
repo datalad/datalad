@@ -91,15 +91,20 @@ class VersionedFilesPool(object):
     def reset_version(self, filename):
         self._versions[filename] = 0
 
-def get_key_url(e, schema='http'):
+
+def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
     """
     if schema == 'http':
-        return "http://{e.bucket.name}.s3.amazonaws.com/{e.name}?versionId={e.version_id}".format(e=e)
+        fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name}"
     elif schema == 's3':
-        return "s3://{e.bucket.name}/{e.name}?versionId={e.version_id}".format(e=e)
+        fmt = "s3://{e.bucket.name}/{e.name}"
     else:
         raise ValueError(schema)
+    if versioned:
+        fmt += "?versionId={e.version_id}"
+    return fmt.format(e=e)
+
 
 def prune_and_delete_bucket(bucket):
     """Deletes all the content and then deletes bucket
