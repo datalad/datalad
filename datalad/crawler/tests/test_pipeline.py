@@ -9,6 +9,9 @@
 
 from os.path import join as opj
 
+from datalad.tests.utils import skip_if_scrapy_without_selector
+skip_if_scrapy_without_selector()
+
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import *
 from ..pipeline import run_pipeline, FinishPipeline
