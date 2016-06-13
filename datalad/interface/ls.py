@@ -364,20 +364,34 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
     ui.message("Bucket info:\n %s" % '\n '.join(info))
 
     kwargs = {} if recursive else {'delimiter': '/'}
-    prefix_all_versions = list(bucket.list_versions(prefix, **kwargs))
+
+    ACCESS_METHODS = [
+        bucket.list_versions,
+        bucket.list
+    ]
+
+    prefix_all_versions = None
+    for acc in ACCESS_METHODS:
+        try:
+            prefix_all_versions = list(acc(prefix, **kwargs))
+            break
+        except Exception as exc:
+            lgr.debug("Failed to access via %s: %s", acc, exc_str(exc))
 
     if not prefix_all_versions:
         ui.error("No output was provided for prefix %r" % prefix)
     else:
         max_length = max((len(e.name) for e in prefix_all_versions))
+
     for e in prefix_all_versions:
         if isinstance(e, Prefix):
             ui.message("%s" % (e.name, ),)
             continue
-        ui.message(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), cr=' ')
+        ui.message(("%%-%ds %%s %%d" % max_length) % (e.name, e.last_modified, e.size), cr=' ')
         if isinstance(e, Key):
             if not (e.is_latest or all):
                 # Skip this one
+                ui.message("")
                 continue
             url = get_key_url(e, schema='http')
             try:
