@@ -201,8 +201,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
         for current_dataset in \
-                sorted(datasets.keys(),
-                       cmp=lambda x, y: cmp(x.count('/'), y.count('/'))):
+                sorted(datasets.keys(), key=lambda x: x.count('/')):
             if not replicate_local_structure:
                 path = target_dir.replace("%NAME",
                                           current_dataset.replace("/", "-"))
