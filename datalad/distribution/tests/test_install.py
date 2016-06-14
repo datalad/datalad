@@ -135,11 +135,14 @@ def test_create(path):
     # next one will auto-annex the new file
     added_subds.save('initial commit')
     # as the submodule never entered the index, even this one won't work
+    # ben: it currently does, since 'save' was changed to call git add as well
+    # as git annex add. Therefore outcommenting. Please review, whether this is
+    # intended behaviour. I think so.
     ds.save('submodule with content')
-    assert_not_in("sub", ds.get_dataset_handles())
-    # we need to install the submodule again in the parent
-    # an actual final commit is not required
-    added_subds = ds.install("sub", source=sub_path_1)
+    # assert_not_in("sub", ds.get_dataset_handles())
+    # # we need to install the submodule again in the parent
+    # # an actual final commit is not required
+    # added_subds = ds.install("sub", source=sub_path_1)
     assert_in("sub", ds.get_dataset_handles())
 
     # next one directly created within ds:

@@ -69,8 +69,14 @@ class Save(Interface):
                 raise InsufficientArgumentsError("No dataset found")
             ds = Dataset(dspath)
 
-        ds.save(message=message,
-                auto_add_changes=auto_add_changes,
-                version=version_tag)
+        if not ds.is_installed():
+            raise RuntimeError(
+                "cannot save a state when a dataset is not yet installed")
+        if auto_add_changes:
+            ds.repo.add('.')
+            ds.repo.add('.', git=True)
+        ds.repo.commit(message)
+        if version_tag:
+            ds.repo._git_custom_command('', 'git tag "{0}"'.format(version_tag))
 
         # TODO: Should save return the commit SHA?
