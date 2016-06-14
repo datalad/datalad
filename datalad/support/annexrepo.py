@@ -1124,6 +1124,9 @@ class AnnexRepo(GitRepo):
     def fsck(self):
         self._run_annex_command('fsck')
 
+    # TODO: we probably need to override get_file_content, since it returns the
+    # symlink's target instead of the actual content.
+
 
 # TODO: Why was this commented out?
 # @auto_repr

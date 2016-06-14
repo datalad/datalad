@@ -29,6 +29,8 @@ Dataset operations
    generated/man/datalad-publish
    generated/man/datalad-uninstall
    generated/man/datalad-update
+   generated/man/datalad-save
+   generated/man/datalad-unlock
 
 Miscellaneous commands
 ======================

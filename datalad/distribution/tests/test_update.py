@@ -69,7 +69,7 @@ def test_update_simple(origin, src_path, dst_path):
     with open(opj(src_path, "update.txt"), "w") as f:
         f.write("Additional content")
     source.install(path="update.txt")
-    source.remember_state("Added update.txt")
+    source.save("Added update.txt")
     ok_clean_git(src_path)
 
     # update without `merge` only fetches:

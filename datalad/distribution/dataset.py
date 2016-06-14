@@ -221,26 +221,6 @@ class Dataset(object):
 #        """
 #        raise NotImplementedError("TODO")
 
-    # TODO maybe needs to get its own interface
-    def remember_state(self, message, auto_add_changes=True, version=None):
-        """
-        Parameters
-        ----------
-        auto_add_changes: bool
-        message: str
-        update_superdataset: bool
-        version: str
-        """
-        if not self.is_installed():
-            raise RuntimeError(
-                "cannot remember a state when a dataset is not yet installed")
-        repo = self.repo
-        if auto_add_changes:
-            repo.add('.')
-        repo.commit(message)
-        if version:
-            repo._git_custom_command('', 'git tag "{0}"'.format(version))
-
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
         (tag, commit) to "undo" a change or switch to a otherwise desired

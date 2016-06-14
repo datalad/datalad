@@ -68,7 +68,7 @@ def test_get_containing_subdataset(path):
 
     ds = create(path)
     ds.install(path='test.txt')
-    ds.remember_state("Initial commit")
+    ds.save("Initial commit")
     subds = ds.install("sub", source=path)
     eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
     eq_(get_containing_subdataset(ds, "some").path, ds.path)
@@ -126,20 +126,23 @@ def test_create(path):
     assert_true(isdir(opj(added_subds.path, '.git')))
     # will not list it unless committed
     assert_not_in("sub", ds.get_dataset_handles())
-    ds.remember_state("added submodule")
+    ds.save("added submodule")
     # will still not list it, because without a single commit, it doesn't enter
     # the index
     assert_not_in("sub", ds.get_dataset_handles())
     # now for reals
     open(opj(added_subds.path, 'somecontent'), 'w').write('stupid')
     # next one will auto-annex the new file
-    added_subds.remember_state('initial commit')
+    added_subds.save('initial commit')
     # as the submodule never entered the index, even this one won't work
-    ds.remember_state('submodule with content')
-    assert_not_in("sub", ds.get_dataset_handles())
-    # we need to install the submodule again in the parent
-    # an actual final commit is not required
-    added_subds = ds.install("sub", source=sub_path_1)
+    # ben: it currently does, since 'save' was changed to call git add as well
+    # as git annex add. Therefore outcommenting. Please review, whether this is
+    # intended behaviour. I think so.
+    ds.save('submodule with content')
+    # assert_not_in("sub", ds.get_dataset_handles())
+    # # we need to install the submodule again in the parent
+    # # an actual final commit is not required
+    # added_subds = ds.install("sub", source=sub_path_1)
     assert_in("sub", ds.get_dataset_handles())
 
     # next one directly created within ds:
@@ -243,7 +246,7 @@ def test_install_into_dataset(source, top_path):
     # unless committed the subds should not show up in the parent
     # this is the same behavior that 'git submodule status' implements
     assert_not_in('sub', ds.get_dataset_handles())
-    ds.remember_state('addsub')
+    ds.save('addsub')
     assert_in('sub', ds.get_dataset_handles())
 
 
