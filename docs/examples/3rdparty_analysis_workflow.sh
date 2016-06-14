@@ -87,7 +87,7 @@ cd ~/myanalysis
 datalad add-sibling alice $ALICES_HOME/bobs_analysis
 
 # datalad update failes:
-#% datalad update alice
+#datalad update alice
 #2016-06-09 13:59:52,338 [INFO   ] Updating handle '/tmp/datalad_demo.PU2F/myanalysis' ... (update.py:125)
 #2016-06-09 13:59:52,391 [ERROR  ] Failed to run ['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'config', '--get', 'branch.master.remote'] under '/tmp/datalad_demo.PU2F/myanalysis'. Exit code=1. out= err= (cmd.py:295)
 #
