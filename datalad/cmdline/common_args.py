@@ -23,7 +23,7 @@ help = (
     'help', ('-h', '--help', '--help-np'),
     dict(nargs=0, action=HelpAction,
          help="""show this help message and exit.  --help-np forcefully disables
-                 the use of a pager for displaying the help""")
+                 the use of a pager for displaying the help message""")
 )
 
 version = (
