@@ -468,7 +468,7 @@ class AnnexRepo(GitRepo):
         ----------
         git_cmd: str
             the actual git command
-        **kwargs: dict, optional
+        `**kwargs`: dict, optional
             passed to _run_annex_command
 
         Returns
@@ -848,15 +848,15 @@ class AnnexRepo(GitRepo):
         list of list of unicode  or dict
             if output == 'descriptions', contains a list of descriptions of remotes
             per each input file, describing the remote for each remote, which
-            was found by git-annex whereis, like:
+            was found by git-annex whereis, like::
 
-            u'me@mycomputer:~/where/my/repo/is [origin]' or
-            u'web' or
-            u'me@mycomputer:~/some/other/clone'
+                u'me@mycomputer:~/where/my/repo/is [origin]' or
+                u'web' or
+                u'me@mycomputer:~/some/other/clone'
 
             if output == 'uuids', returns a list of uuids.
             if output == 'full', returns a dictionary with filenames as keys
-            and values a detailed record, e.g.
+            and values a detailed record, e.g.::
 
                 {'00000000-0000-0000-0000-000000000001': {
                   'description': 'web',
@@ -1236,31 +1236,31 @@ class BatchedAnnex(object):
             lgr.warning("Restarting the process due to previous failure")
             self._initialize()
 
-    def __call__(self, input_):
+    def __call__(self, cmds):
         """
 
         Parameters
         ----------
-        input_ : str or tuple or list of (str or tuple)
+        cmds : str or tuple or list of (str or tuple)
         output_proc : callable
           To provide handling
 
         Returns
         -------
         str or list
-          Output received from annex.  list in case if input_ was a list
+          Output received from annex.  list in case if cmds was a list
         """
         # TODO: add checks -- may be process died off and needs to be reinitiated
         if not self._process:
             self._initialize()
 
-        input_multiple = isinstance(input_, list)
+        input_multiple = isinstance(cmds, list)
         if not input_multiple:
-            input_ = [input_]
+            cmds = [cmds]
 
         output = []
 
-        for entry in input_:
+        for entry in cmds:
             if not isinstance(entry, string_types):
                 entry = ' '.join(entry)
             entry = entry + '\n'
