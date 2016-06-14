@@ -14,8 +14,8 @@ import os
 import re
 import stat
 
-from stat import *
-from os.path import curdir,isdir, isabs, exists, join as opj, split as ops
+from stat import ST_MODE, S_IEXEC, S_IXOTH, S_IXGRP
+from os.path import curdir, isdir, isabs, exists, join as opj, split as ops
 from six import iteritems, string_types
 
 from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
@@ -89,11 +89,7 @@ class fix_permissions(object):
             else:
                 # strip everyone away from executing
                 current = stat.S_IMODE(os.lstat(filename).st_mode)
-                os.chmod(filename, current & ~stat.S_IEXEC)
-                current = stat.S_IMODE(os.lstat(filename).st_mode)
-                os.chmod(filename, current & ~stat.S_IXGRP)
-                current = stat.S_IMODE(os.lstat(filename).st_mode)
-                os.chmod(filename, current & ~stat.S_IXOTH)
+                os.chmod(filename, current & ~S_IEXEC & ~S_IXGRP & ~S_IXOTH)
 
             nper = oct(os.stat(filename)[ST_MODE])[-3:]
             lgr.debug('Changing permissions for file %s from %s to %s', filename, per, nper)
