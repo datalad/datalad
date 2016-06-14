@@ -85,11 +85,11 @@ def setup_parser(
     parser.add_argument(
         '-C', action='append', dest='change_path', metavar='PATH',
         help="""run as if datalad was started in <path> instead
-        of the current working directory. When multiple -C options are given,
+        of the current working directory.  When multiple -C options are given,
         each subsequent non-absolute -C <path> is interpreted relative to the
-        preceding -C <path>. This option affects the interpretations of the
+        preceding -C <path>.  This option affects the interpretations of the
         path names in that they are made relative to the working directory
-        caused by the -C option.""")
+        caused by the -C option""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now

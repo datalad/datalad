@@ -43,7 +43,7 @@ class Create(Interface):
         description=Parameter(
             args=("-d", "--description",),
             doc="""short description that humans can use to identify the
-            repository/location, e.g. "Precious data on my laptop.""",
+            repository/location, e.g. "Precious data on my laptop.""""",
             nargs=1),
         no_annex=Parameter(
             args=("--no-annex",),
