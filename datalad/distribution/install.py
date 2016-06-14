@@ -220,7 +220,7 @@ def get_containing_subdataset(ds, path):
 # install of existing submodule; recursive call; source should not be None!
 
 class Install(Interface):
-    """Install a dataset component or entire datasets.
+    """Install a dataset component or entire dataset(s).
 
     This command can make arbitrary content available in a dataset. This
     includes the fulfillment of existing dataset handles or file handles
@@ -231,16 +231,16 @@ class Install(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to perform the install operation on. If
+            doc="""specify the dataset to perform the install operation on.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
-            doc="""path/name of the installation target. If no `source` is
+            doc="""path/name of the installation target.  If no `source` is
             provided, and no `dataset` is given or detected, this is
             interpreted as the source URL of a dataset and a destination
-            path will be derived from the URL similar to 'git clone'.""",
+            path will be derived from the URL similar to 'git clone'""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
@@ -251,15 +251,15 @@ class Install(Interface):
         recursive=Parameter(
             args=("-r", "--recursive"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
-            doc="""If set, all content is installed recursively, including
-            content of any subdatasets."""),
+            doc="""if set, all content is installed recursively, including
+            content of any subdatasets"""),
         add_data_to_git=Parameter(
             args=("--add-data-to-git",),
             action='store_true',
-            doc="""Flag whether to add data directly to Git, instead of
-            tracking data identity only. Usually this is not desired,
+            doc="""flag whether to add data directly to Git, instead of
+            tracking data identity only.  Usually this is not desired,
             as it inflates dataset sizes and impacts flexibility of data
-            transport."""))
+            transport"""))
 
     @staticmethod
     @datasetmethod(name='install')

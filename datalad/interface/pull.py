@@ -31,7 +31,7 @@ class Pull(Interface):
 
     _params_ = dict(
         remote=Parameter(
-            doc="Name of the remote repository to pull from.",
+            doc="name of the remote repository to pull from",
             constraints=EnsureStr(),
             nargs='?'))
 

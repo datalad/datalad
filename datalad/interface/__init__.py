@@ -25,7 +25,8 @@ _group_dataset = (
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall'),
-        ('datalad.distribution.move', 'Move'),
+        # N/I ATM
+        # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
         ('datalad.distribution.create_publication_target_sshwebserver',
          'CreatePublicationTargetSSHWebserver',

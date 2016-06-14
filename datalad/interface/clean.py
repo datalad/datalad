@@ -39,7 +39,7 @@ class Clean(Interface):
         # TODO:  --info  -- which performs dry run just summarizing what is to be cleaned up
         # TODO: Python only???
         annex=Parameter(
-            doc="""Annex instance to use""" #,
+            doc="""annex instance to use"""
             #constraints=EnsureStr() | EnsureNone()
         ),
     )

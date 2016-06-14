@@ -11,8 +11,9 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   crawler/index
+   cmdline
    usecases/index
+   crawler/index
    modref
 
 >>> import datalad
