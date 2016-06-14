@@ -51,14 +51,15 @@ class CreatePublicationTargetSSHWebserver(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         sshurl=Parameter(
             args=("sshurl",),
-            doc="""SSH URL to use to log into the server and create the target
-                dataset(s).  This also serves as a default for the URL to be
-                used to add the target as a sibling to `dataset` and as a
-                default for the directory on the server, where to create the
-                dataset""",
+            metavar='SSHURL',
+            doc="""Login information for the target server. This can be given
+                as a URL (ssh://host/path) or SSH-style (user@host:path).
+                Unless overridden, this also serves the future dataset's access
+                URL and path on the server.""",
             constraints=EnsureStr()),
         target=Parameter(
             args=('target',),
+            metavar='TARGETNAME',
             doc="""sibling name to create for this publication target.
                 If `recursive` is set, the same name will be used to address
                 the subdatasets' siblings.  Note, that this is just a
@@ -69,6 +70,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             nargs="?"),
         target_dir=Parameter(
             args=('--target-dir',),
+            metavar='PATH',
             doc="""path to the directory on the server where to create the
                 dataset.  By default it's wherever `sshurl` points to.  If a
                 relative path is provided, it's interpreted as relative to the
@@ -84,6 +86,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             constraints=EnsureStr() | EnsureNone()),
         target_url=Parameter(
             args=('--target-url',),
+            metavar='URL',
             doc="""the URL of the dataset sibling named by `target`.  Defaults
                 to `sshurl`.  This URL has to be accessible to anyone, who is
                 supposed to have access to the dataset later on.\n
@@ -93,10 +96,10 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 List of currently available placeholders:\n
                 %%NAME\tthe name of the datasets, where slashes are
                 replaced by dashes\n""",
-            nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         target_pushurl=Parameter(
             args=('--target-pushurl',),
+            metavar='URL',
             doc="""defaults to `sshurl`.  In case the `target_url` cannot be
                 used to publish to the dataset sibling, this option specifies a
                 URL to be used for the actual publication operation""",
@@ -109,6 +112,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         existing=Parameter(
             args=("--existing",),
             constraints=EnsureChoice('skip', 'replace', 'raise'),
+            metavar='MODE',
             doc="""action to perform, if target directory exists already.
                 Dataset is skipped if `skip`. `replace` forces to (re-)init
                 git and to (re-)configure sibling `target`
@@ -193,8 +197,11 @@ class CreatePublicationTargetSSHWebserver(Interface):
         ssh = ssh_manager.get_connection(sshurl)
         ssh.open()
 
-        lgr.info("Creating target datasets ...")
-        for current_dataset in datasets:
+        # loop over all datasets, ordered from top to bottom to make test
+        # below valid (existing directories would cause the machinery to halt)
+        for current_dataset in \
+                sorted(datasets.keys(),
+                       cmp=lambda x, y: cmp(x.count('/'), y.count('/'))):
             if not replicate_local_structure:
                 path = target_dir.replace("%NAME",
                                           current_dataset.replace("/", "-"))
@@ -207,6 +214,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                     relpath(datasets[current_dataset].path,
                                             start=ds.path)))
 
+            lgr.info("Creating target dataset {0} at {1}".format(current_dataset, path))
             if path != '.':
                 # check if target exists
                 # TODO: Is this condition valid for != '.' only?
