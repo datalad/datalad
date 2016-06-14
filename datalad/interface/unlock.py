@@ -93,6 +93,12 @@ class Unlock(Interface):
                     # single path
                     dspath = GitRepo.get_toppath(abspath(path))
 
+            if dspath is None:
+                raise InsufficientArgumentsError(
+                    "insufficient information for unlocking: no "
+                    "dataset given and none could be derived "
+                    "from given path(s) or current working directory")
+
             ds = Dataset(dspath)
 
         assert ds
