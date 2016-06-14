@@ -23,7 +23,7 @@ help = (
     'help', ('-h', '--help', '--help-np'),
     dict(nargs=0, action=HelpAction,
          help="""show this help message and exit. --help-np forcefully disables
-                 the use of a pager for displaying the help.""")
+                 the use of a pager for displaying the help""")
 )
 
 version = (
@@ -37,7 +37,7 @@ log_level = (
     dict(action=LogLevelAction,
          choices=['critical', 'error', 'warning', 'info', 'debug'] + [str(x) for x in range(1, 10)],
          default='warning',
-         help="""level of verbosity. Integers provide even more debugging information""")
+         help="""level of verbosity.  Integers provide even more debugging information""")
 )
 
 pbs_runner = (
