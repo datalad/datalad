@@ -33,7 +33,10 @@ lgr = logging.getLogger('datalad.interface.unlock')
 
 
 class Unlock(Interface):
-    """Unlock file(s) of a dataset"""
+    """Unlock file(s) of a dataset
+
+    Unlock files of a dataset in order to be able to edit the actual content
+    """
 
     _params_ = dict(
         path=Parameter(

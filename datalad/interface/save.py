@@ -30,7 +30,10 @@ lgr = logging.getLogger('datalad.interface.commit')
 
 
 class Save(Interface):
-    """Save the current state of a dataset."""
+    """Save the current state of a dataset
+
+    Save the current state, so it can be restored and referenced.
+    """
 
     _params_ = dict(
         dataset=Parameter(
