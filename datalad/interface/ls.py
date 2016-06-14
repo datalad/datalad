@@ -56,7 +56,7 @@ class Ls(Interface):
         fast=Parameter(
             args=("-F", "--fast"),
             action="store_true",
-            doc="only perform fast operations.  Would be overrident by --all",
+            doc="only perform fast operations.  Would be overridden by --all",
         ),
         all=Parameter(
             args=("-a", "--all"),
@@ -76,14 +76,19 @@ class Ls(Interface):
             are after""",
             default=None
         ),
+        web=Parameter(
+            args=("-w", "--web"),
+            action="store_true",
+            doc="list the content state of the dataset as json for web rendering",
+        ),
     )
 
     @staticmethod
-    def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False):
+    def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False, web=False):
 
         kw = dict(fast=fast, recursive=recursive, all=all)
         if isinstance(loc, list):
-            return [Ls.__call__(loc_, config_file=config_file, list_content=list_content, **kw)
+            return [Ls.__call__(loc_, config_file=config_file, list_content=list_content, web=web, **kw)
                     for loc_ in loc]
 
         # TODO: do some clever handling of kwargs as to remember what were defaults
@@ -95,7 +100,7 @@ class Ls(Interface):
             return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
         elif lexists(loc):  # and lexists(opj(loc, '.git')):
             # TODO: use some helper like is_dataset_path ??
-            return _ls_dataset(loc, **kw)
+            return _ls_web(loc, **kw) if web else _ls_dataset(loc, **kw)
         else:
             #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
             # TODO: unify all the output here -- _ls functions should just return something
@@ -218,7 +223,6 @@ class LsFormatter(string.Formatter):
         NOK = u"✗"
         NONE = u"✗"
 
-
     def convert_field(self, value, conversion):
         #print("%r->%r" % (value, conversion))
         if conversion == 'D':  # Date
@@ -296,6 +300,82 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     for dsm in dsms:
         ds_str = format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + u"  {msg!R}")
         print(ds_str)
+
+
+def _flatten(listoflists):
+    """flattens a multi-level lists"""
+    if not isinstance(listoflists, list):
+        return listoflists
+    else:
+        flatlist = []
+        for item in listoflists:
+            if isinstance(item, list):
+                flatlist.extend(_flatten(item))
+            else:
+                flatlist.append(item)
+    return flatlist
+
+
+def _fs_traverse(loc, recursive=False):
+    """takes a path and returns a list of (not git/annex) nodes
+    """
+    from os import path, listdir
+    # if node is a file, symlink or under git or git_annex
+    if path.isfile(loc) or path.islink(loc) or path.isdir(path.join(loc, ".git")) or isinstance(loc, AnnexRepo):
+        return loc
+    # else if non git or git_annex directory
+    elif path.isdir(loc):
+        f = [loc]
+        if recursive:
+            f.extend(_flatten(_fs_traverse(path.join(loc, node), recursive=recursive) for node in listdir(loc)))
+        else:
+            f.extend([path.join(loc, node) for node in listdir(loc)])
+        return f
+
+
+def _ls_web(loc, fast=False, recursive=False, all=False):
+    from ..distribution.dataset import Dataset
+    isabs_loc = isabs(loc)
+    topdir = '' if isabs_loc else abspath(curdir)
+
+    topds = Dataset(loc)
+    dss = [topds] + (
+        [Dataset(opj(loc, sm))
+         for sm in topds.get_dataset_handles(recursive=recursive)]
+        if recursive else [])
+    dsms = list(map(DsModel, dss))
+
+    # adjust path strings
+    fs = []
+    for ds_model in dsms:
+        path = ds_model.path[len(topdir) + 1 if topdir else 0:]
+        if not path:
+            path = '.'
+        ds_model.path = path
+
+        fs.append(_flatten(_fs_traverse(ds_model.path, recursive=True)))
+
+    print fs
+    maxpath = max(len(ds_model.path) for ds_model in dsms)
+    path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    pathtype_fmt = path_fmt + u"  [{ds.type}]"
+    full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
+    if (not fast) or all:
+        full_fmt += u"  {ds.clean!X}"
+    if all:
+        full_fmt += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
+
+    formatter = LsFormatter()
+
+    # weird problems happen in the parallel run -- TODO - figure it out
+    # for out in Parallel(n_jobs=1)(
+    #         delayed(format_ds_model)(formatter, dsm, full_fmt, format_exc=path_fmt + "  {msg!R}")
+    #         for dsm in dss):
+    #     print(out)
+    for dsm in dsms:
+        ds_str = format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + u"  {msg!R}")
+        print(ds_str)
+
 
 #
 # S3 listing
@@ -418,5 +498,3 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         else:
             if all:
                 ui.message("del")
-
-
