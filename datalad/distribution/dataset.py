@@ -239,6 +239,7 @@ class Dataset(object):
         repo = self.repo
         if auto_add_changes:
             repo.add('.')
+            repo.add('.', git=True)
         repo.commit(message)
         if version:
             repo._git_custom_command('', 'git tag "{0}"'.format(version))
