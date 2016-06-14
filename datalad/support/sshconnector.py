@@ -151,7 +151,7 @@ class SSHManager(object):
 
         if not isinstance(sshri, SSHRI) \
                 and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
-                    raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(sshurl))
+                    raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(url))
 
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, sshri.hostname)
@@ -173,4 +173,3 @@ class SSHManager(object):
             lgr.debug("Closing %d SSH connections..." % len(self._connections))
             for cnct in self._connections:
                 self._connections[cnct].close()
-
