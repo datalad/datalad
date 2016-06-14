@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""For now just a wrapper for Dataset.remember_state()
+"""For now just a wrapper for Dataset.save()
 
 """
 
@@ -69,8 +69,8 @@ class Save(Interface):
                 raise InsufficientArgumentsError("No dataset found")
             ds = Dataset(dspath)
 
-        ds.remember_state(message=message,
-                          auto_add_changes=auto_add_changes,
-                          version=version_tag)
+        ds.save(message=message,
+                auto_add_changes=auto_add_changes,
+                version=version_tag)
 
-        # TODO: Should remember_state return the commit SHA?
+        # TODO: Should save return the commit SHA?

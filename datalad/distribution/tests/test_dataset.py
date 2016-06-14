@@ -177,8 +177,7 @@ def test_subdatasets(path):
     open(os.path.join(ds.path, 'test'), 'w').write('some')
     ds.install(path='test')
     assert_true(ds.is_installed())
-    # TODO change to remember_state()
-    ds.remember_state("Hello!", version=1)
+    ds.save("Hello!", version=1)
     # add a subdataset
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
@@ -190,7 +189,7 @@ def test_subdatasets(path):
     eq_(subdss, ds.get_dataset_handles(fulfilled=True))
     # don't have that right now
     assert_raises(NotImplementedError, ds.get_dataset_handles, pattern='sub*')
-    ds.remember_state("with subds", version=2)
+    ds.save("with subds", version=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())
     eq_(ds.get_dataset_handles(), [])
