@@ -33,7 +33,7 @@ lgr = getLogger('datalad.api.ls')
 
 
 class Ls(Interface):
-    """Magical helper to list content of various things (ATM only S3 buckets and datasets)
+    """List meta-information associated with URLs (e.g. s3://) and dataset(s)
 
     Examples
     --------
