@@ -89,6 +89,12 @@ datalad update alice --merge
 datalad install result.txt
 
 # total satisfaction is achieved -> public
+SERVER_URL="localhost:$(readlink -f $(mktemp -d datalad_demo_testpub.XXXX))"
+datalad create-publication-target-sshwebserver --recursive $SERVER_URL public
+
+# push
+# BUG: the following asks 4 times for a password
+datalad publish -r public
 
 #% EXAMPLE END
 
