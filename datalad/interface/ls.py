@@ -14,7 +14,8 @@ __docformat__ = 'restructuredtext'
 import sys
 import time
 from os.path import exists, lexists, join as opj, abspath, isabs
-from os.path import curdir
+from os.path import curdir, isfile, islink, isdir, dirname
+from os import readlink, listdir, lstat
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
@@ -115,6 +116,7 @@ class Ls(Interface):
 #
 
 from datalad.support.annexrepo import AnnexRepo
+from datalad.support.annexrepo import GitRepo
 
 
 @auto_repr
@@ -194,6 +196,90 @@ class DsModel(object):
         info = self.info
         return info['local annex size'] if info else None
 
+
+@auto_repr
+class FsModel(DsModel):
+
+    __slots__ = ['_path', '_info', '_repo']
+
+    def __init__(self, path, repo=""):
+        self._path = path  # can be overridden
+        self._info = None
+        self._repo = repo
+        self._branch = None
+
+    def _symlink(self):
+        if islink(self._path):                    # if symlink
+            target_path = readlink(self._path)    # find link target
+            # convert to absolute path if not
+            target_path = opj(dirname(self._path), target_path) if not isabs(target_path) else target_path
+            return target_path if exists(target_path) else False
+        return False
+
+    @property
+    def repo(self):
+        if exists(opj(self._repo, ".git", "annex")):
+            return AnnexRepo(self._repo)
+        elif exists(opj(self._repo, ".git")):
+            return GitRepo(self._repo)
+        else:
+            return None
+
+    @property
+    def date(self):
+        """Date of last modification
+        """
+        if self._type is not 'annex' and not 'git':
+            return lstat(self._path).st_mtime
+        else:
+            super(self.__class__, self).date
+
+    @property
+    def size(self):
+        _type = self._type
+        if not _type:
+            return -1
+        if 'annex' in _type:
+            return self.annex_local_size
+        elif 'git' in _type:
+            return self.git_local_size
+        elif 'file' in _type:
+            return lstat(self._path).st_size
+        elif 'broken-link' in _type:
+            return 0
+        elif 'link' in _type:
+            return lstat(self._symlink).st_size
+        elif 'dir' in _type:
+            return lstat(self._path).st_size  # add du -s command for plain dir
+        else:
+            return -1
+
+    @property
+    def _type(self):
+        if not exists(self.path):
+            return None
+        elif islink(self.path):
+            return 'broken-link' if not self._symlink else 'link'
+        elif isfile(self.path):
+            return 'file'
+        elif exists(opj(self.path, ".git", "annex")):
+            return 'annex'
+        elif exists(opj(self.path, ".git")):
+            return 'git'
+        elif isdir(self.path):
+            return 'dir'
+        else:
+            return None
+
+    @property
+    def git_local_size(self):
+        try:
+            describe, outerr = self.repo._git_custom_command([], ['git', 'count-objects', '-v'])[0].split('\n')
+            size = [item for item in describe if 'size: ' in item][0].split(': ')
+            return int(size[1])
+        except:
+            return None
+
 import string
 import humanize
 from datalad.log import ColorFormatter
@@ -272,7 +358,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     dss = [topds] + (
         [Dataset(opj(loc, sm))
          for sm in topds.get_dataset_handles(recursive=recursive)]
-         if recursive else [])
+        if recursive else [])
     dsms = list(map(DsModel, dss))
 
     # adjust path strings
@@ -304,32 +390,31 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
 
 def _flatten(listoflists):
     """flattens a multi-level lists"""
-    if not isinstance(listoflists, list):
-        return listoflists
-    else:
+    if isinstance(listoflists, list):
         flatlist = []
         for item in listoflists:
             if isinstance(item, list):
                 flatlist.extend(_flatten(item))
             else:
                 flatlist.append(item)
-    return flatlist
+        return flatlist
+    else:
+        return listoflists
 
 
 def _fs_traverse(loc, recursive=False):
     """takes a path and returns a list of (not git/annex) nodes
     """
-    from os import path, listdir
     # if node is a file, symlink or under git or git_annex
-    if path.isfile(loc) or path.islink(loc) or path.isdir(path.join(loc, ".git")) or isinstance(loc, AnnexRepo):
-        return loc
-    # else if non git or git_annex directory
-    elif path.isdir(loc):
+    if isfile(loc) or islink(loc) or isdir(opj(loc, ".git")) or isdir(opj(loc, ".git", "annex")):
+        return [loc]
+    # else if plain directory
+    elif isdir(loc):
         f = [loc]
         if recursive:
-            f.extend(_flatten(_fs_traverse(path.join(loc, node), recursive=recursive) for node in listdir(loc)))
+            f.extend(_flatten(_fs_traverse(opj(loc, node), recursive=recursive) for node in listdir(loc)))
         else:
-            f.extend([path.join(loc, node) for node in listdir(loc)])
+            f.extend([opj(loc, node) for node in listdir(loc)])
         return f
 
 
@@ -352,10 +437,17 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
         if not path:
             path = '.'
         ds_model.path = path
+        # unwrap top git directory and run traversal on each non .git node
+        fs.append(_flatten([_fs_traverse(subdir, recursive=True)
+                            for subdir in listdir(ds_model.path)
+                            if '.git' not in subdir]))
 
-        fs.append(_flatten(_fs_traverse(ds_model.path, recursive=True)))
+    # attach the FSModel to each node in the traversed fs tree
+    fsm = [FsModel(node, fss[0]) for fss in fs for node in fss]
 
-    print fs
+    for item in fsm:
+        print item._path, item._repo, item.size, item.date
+
     maxpath = max(len(ds_model.path) for ds_model in dsms)
     path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
     pathtype_fmt = path_fmt + u"  [{ds.type}]"
