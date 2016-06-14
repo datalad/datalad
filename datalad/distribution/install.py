@@ -30,8 +30,10 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
-    is_explicit_path, on_windows, swallow_logs, get_local_path_from_url, \
-    is_url
+    is_explicit_path, on_windows, swallow_logs
+from datalad.support.network import get_local_path_from_url
+from datalad.support.network import is_url
+from datalad.utils import rmtree
 
 lgr = logging.getLogger('datalad.distribution.install')
 
@@ -218,10 +220,10 @@ def get_containing_subdataset(ds, path):
 # install of existing submodule; recursive call; source should not be None!
 
 class Install(Interface):
-    """Install a dataset component or entire datasets.
+    """Install a dataset component or entire dataset(s).
 
     This command can make arbitrary content available in a dataset. This
-    includes the fulfillment of exisiting dataset handles or file handles
+    includes the fulfillment of existing dataset handles or file handles
     in a dataset, as well as the adding such handles for content available
     locally or remotely.
     """
@@ -229,16 +231,16 @@ class Install(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to perform the install operation on. If
+            doc="""specify the dataset to perform the install operation on.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
-            doc="""path/name of the installation target. If no `source` is
+            doc="""path/name of the installation target.  If no `source` is
             provided, and no `dataset` is given or detected, this is
             interpreted as the source URL of a dataset and a destination
-            path will be derived from the URL similar to 'git clone'.""",
+            path will be derived from the URL similar to 'git clone'""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
@@ -249,15 +251,15 @@ class Install(Interface):
         recursive=Parameter(
             args=("-r", "--recursive"),
             constraints=EnsureChoice('handles', 'data') | EnsureBool(),
-            doc="""If set, all content is installed recursively, including
-            content of any subdatasets."""),
+            doc="""if set, all content is installed recursively, including
+            content of any subdatasets"""),
         add_data_to_git=Parameter(
             args=("--add-data-to-git",),
-            constraints=EnsureBool(),
-            doc="""Flag whether to add data directly to Git, instead of
-            tracking data identity only. Usually this is not desired,
+            action='store_true',
+            doc="""flag whether to add data directly to Git, instead of
+            tracking data identity only.  Usually this is not desired,
             as it inflates dataset sizes and impacts flexibility of data
-            transport."""))
+            transport"""))
 
     @staticmethod
     @datasetmethod(name='install')
@@ -354,19 +356,29 @@ class Install(Interface):
         if vcs is None:
             # TODO check that a "ds.path" actually points to a TOPDIR
             # should be the case already, but maybe nevertheless check
-            try:
-                with swallow_logs():
-                    vcs = Install._get_new_vcs(ds, source, vcs)
-            except GitCommandError:
-                lgr.debug("Cannot retrieve from URL: {0}".format(source))
-                # maybe source URL was missing a '/.git'
-                if source and not source.rstrip('/').endswith('/.git'):
-                    source = '{0}/.git'.format(source.rstrip('/'))
-                    lgr.debug("Attempt to retrieve from URL: {0}".format(source))
-                    vcs = Install._get_new_vcs(ds, source, vcs)
-                else:
-                    lgr.debug("Unable to establish repository instance at: {0}".format(ds.path))
-                    raise
+            existed = ds.path and exists(ds.path)
+
+            # We possibly need to consider /.git URL
+            candidate_sources = [source]
+            if source and not source.rstrip('/').endswith('/.git'):
+                candidate_sources.append('{0}/.git'.format(source.rstrip('/')))
+
+            for source_ in candidate_sources:
+                try:
+                    lgr.debug("Retrieving a dataset from URL: {0}".format(source_))
+                    with swallow_logs():
+                        vcs = Install._get_new_vcs(ds, source_)
+                    break  # do not bother with other sources if succeeded
+                except GitCommandError:
+                    lgr.debug("Failed to retrieve from URL: {0}".format(source_))
+                    if not existed and ds.path and exists(ds.path):
+                        lgr.debug("Wiping out unsuccessful clone attempt at {}".format(ds.path))
+                        rmtree(ds.path)
+                    if source_ == candidate_sources[-1]:
+                        # Re-raise if failed even with the last candidate
+                        lgr.debug("Unable to establish repository instance at {0} from {1}"
+                                  "".format(ds.path, candidate_sources))
+                        raise
 
         assert(ds.repo)  # is automagically re-evaluated in the .repo property
 
@@ -620,11 +632,11 @@ class Install(Interface):
                 return path
 
     @staticmethod
-    def _get_new_vcs(ds, source, vcs):
+    def _get_new_vcs(ds, source):
         if source is None:
-            # always come with annex when created from scratch
-            lgr.info("Creating a new annex repo at %s", ds.path)
-            vcs = AnnexRepo(ds.path, url=source, create=True)
+            raise RuntimeError(
+                "No `source` was provided. To create a new dataset "
+                "use the `create` command.")
         else:
             # when obtained from remote, try with plain Git
             lgr.info("Creating a new git repo at %s", ds.path)

@@ -959,3 +959,12 @@ def test_annex_remove(path1, path2):
         out = repo.remove("rm-test.dat", force=True)
         assert_not_in("rm-test.dat", repo.get_annexed_files())
         eq_(out[0], "rm-test.dat")
+
+
+@with_tempfile
+def test_repo_version(path):
+    annex = AnnexRepo(path, create=True, version=6)
+    ok_clean_git(path, annex=True)
+    version = annex.repo.config_reader().get_value('annex', 'version')
+    eq_(version, 6)
+

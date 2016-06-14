@@ -55,11 +55,27 @@ from . import _TEMP_PATHS_GENERATED
 _TEMP_PATHS_CLONES = set()
 
 
+# additional shortcuts
+neq_ = assert_not_equal
+nok_ = assert_false
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
     except Exception as exc:
         raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
+
+
+def skip_if_scrapy_without_selector():
+    """A little helper to skip some tests which require recent scrapy"""
+    try:
+        import scrapy
+        from scrapy.selector import Selector
+    except ImportError:
+        from nose import SkipTest
+        raise SkipTest(
+            "scrapy misses Selector (too old? version: %s)"
+            % getattr(scrapy, '__version__'))
 
 
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
@@ -459,6 +475,8 @@ def with_tempfile(t, content=None, **tkwargs):
 
     Examples
     --------
+
+    ::
 
         @with_tempfile
         def test_write(tfile):

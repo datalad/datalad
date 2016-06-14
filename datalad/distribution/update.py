@@ -27,7 +27,9 @@ lgr = logging.getLogger('datalad.distribution.update')
 
 
 class Update(Interface):
-    """Update a dataset from a sibling."""
+    """Update a dataset from a sibling.
+
+    """
 
     _params_ = dict(
         name=Parameter(
@@ -37,30 +39,30 @@ class Update(Interface):
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to update. If
+            doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         merge=Parameter(
             args=("--merge",),
             action="store_true",
-            doc="Merge changes from sibling `name` or the remote branch, "
+            doc="merge changes from sibling `name` or the remote branch, "
                 "configured to be the tracking branch if no sibling was "
-                "given.",),
+                "given", ),
         # TODO: How to document it without using the term 'tracking branch'?
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="""If set this updates all possibly existing subdatasets,
-             too."""),
+            doc="""if set this updates all possibly existing subdatasets,
+             too"""),
         fetch_all=Parameter(
             args=("--fetch-all",),
             action="store_true",
-            doc="Fetch updates from all siblings.",),
+            doc="fetch updates from all siblings", ),
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
-            doc="TODO"),)
+            doc="TODO"), )
 
     @staticmethod
     @datasetmethod(name='update')
@@ -91,12 +93,12 @@ class Update(Interface):
             if dspath is None:
                 raise ValueError("No dataset found at %s." % getpwd())
             ds = Dataset(dspath)
-        assert(ds is not None)
+        assert (ds is not None)
 
         if not ds.is_installed():
             raise ValueError("No installed dataset found at "
                              "{0}.".format(ds.path))
-        assert(ds.repo is not None)
+        assert (ds.repo is not None)
 
         repos_to_update = [ds.repo]
         if recursive:
@@ -139,8 +141,8 @@ class Update(Interface):
                     std_out, std_err = \
                         repo._git_custom_command('',
                                                  ["git", "config", "--get",
-                         "branch.{active_branch}.remote".format(
-                             active_branch=repo.get_active_branch())])
+                                                  "branch.{active_branch}.remote".format(
+                                                     active_branch=repo.get_active_branch())])
                 except CommandError as e:
                     if e.code == 1 and e.stdout == "":
                         std_out = None
@@ -173,4 +175,4 @@ class Update(Interface):
                     out, err = repo._git_custom_command('', ["git", "annex", "merge"])
                     lgr.info(out)
 
-            # TODO: return value?
+                    # TODO: return value?

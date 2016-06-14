@@ -12,6 +12,10 @@ from glob import glob
 from os.path import exists, join as opj
 from datalad.tests.utils import eq_, ok_
 from datalad.tests.utils import serve_path_via_http, with_tree
+
+from datalad.tests.utils import skip_if_scrapy_without_selector
+skip_if_scrapy_without_selector()
+
 from ..crawl_url import crawl_url
 from ..crawl_url import parse_checksums
 from ..matches import a_href_match

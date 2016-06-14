@@ -19,6 +19,7 @@ from ..interface.base import Interface, get_api_name, get_cmdline_command_name
 from ..utils import swallow_outputs
 from .utils import assert_re_in
 
+
 class Demo(Interface):
     """I am a demo"""
     _params_ = dict(
@@ -88,7 +89,7 @@ def test_interface():
     with swallow_outputs() as cmo:
         assert_raises(SystemExit, parser.parse_args, ['--demoarg', 'abc'])
         # that is what we dump upon folks atm. TODO: improve reporting of illspecified options
-        assert_re_in(".*invalid <datalad.support.constraints.EnsureInt object at .*> value:.*",
+        assert_re_in(".*invalid constraint:int value:.*",
                      cmo.err, re.DOTALL)
 
     # missing argument to option

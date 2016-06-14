@@ -17,7 +17,7 @@ import logging
 from subprocess import Popen
 from shlex import split as sh_split
 
-from six.moves.urllib.parse import urlparse
+from datalad.support.network import RI, URL, SSHRI
 
 # TODO: centralize AppDirs (=> datalad.config?)
 from appdirs import AppDirs
@@ -146,36 +146,30 @@ class SSHManager(object):
         -------
         SSHConnection
         """
-
         # parse url:
-        parsed_target = urlparse(url)
+        sshri = RI(url)
 
-        # Note: The following is due to urlparse, not ssh itself!
-        # We probably should find a nice way to deal with anything,
-        # ssh can handle.
-        if parsed_target.scheme != 'ssh':
-            raise ValueError("Not an SSH URL: %s" % url)
-
-        if not parsed_target.netloc:
-            raise ValueError("Malformed URL (missing host): %s" % url)
+        if not isinstance(sshri, SSHRI) \
+                and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
+                    raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(url))
 
         # determine control master:
-        ctrl_path = "%s/%s" % (self.socket_dir, parsed_target.netloc)
-        if parsed_target.port:
-            ctrl_path += ":%s" % parsed_target.port
+        ctrl_path = "%s/%s" % (self.socket_dir, sshri.hostname)
+        if sshri.port:
+            ctrl_path += ":%s" % sshri.port
 
         # do we know it already?
         if ctrl_path in self._connections:
             return self._connections[ctrl_path]
         else:
-            c = SSHConnection(ctrl_path, parsed_target.netloc)
+            c = SSHConnection(ctrl_path, sshri.hostname)
             self._connections[ctrl_path] = c
             return c
 
     def close(self):
         """Closes all connections, known to this instance.
         """
-        lgr.debug("Closing SSH connections ...")
-        for cnct in self._connections:
-            self._connections[cnct].close()
-
+        if self._connections:
+            lgr.debug("Closing %d SSH connections..." % len(self._connections))
+            for cnct in self._connections:
+                self._connections[cnct].close()

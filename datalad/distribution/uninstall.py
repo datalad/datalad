@@ -28,7 +28,8 @@ lgr = logging.getLogger('datalad.distribution.uninstall')
 
 
 class Uninstall(Interface):
-    """Uninstall a dataset component or entire datasets."""
+    """Uninstall a dataset component or entire dataset(s)
+    """
 
     # TODO: It's not actually clear yet, what are the actual meanings of
     # uninstall (including options) and what exactly are the methods to
@@ -65,12 +66,12 @@ class Uninstall(Interface):
             constraints=EnsureStr() | EnsureNone()),
         data_only=Parameter(
             args=("--data-only",),
-            doc="If set, only data is uninstalled, but the handles are kept.",
+            doc="if set, only data is uninstalled, but the handles are kept",
             action="store_true"),
         recursive=Parameter(
             args=("-r", "--recursive"),
-            doc="""If set, uninstall recursively, including all subdatasets.
-            The value of `data` is used for recursive uninstallation, too.""",
+            doc="""if set, uninstall recursively, including all subdatasets.
+            The value of `data` is used for recursive uninstallation, too""",
             action="store_true"))
 
     @staticmethod
@@ -206,7 +207,6 @@ class Uninstall(Interface):
                 # also actually exists in the file system but could be part of
                 # a subdataset
                 _untracked_or_within_submodule = True
-
 
         if _file_in_git:
             if data_only:

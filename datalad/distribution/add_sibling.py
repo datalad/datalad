@@ -28,27 +28,28 @@ lgr = logging.getLogger('datalad.distribution.add_publication_target')
 
 
 class AddSibling(Interface):
-    """Adds a sibling to a dataset."""
+    """Adds a sibling to a dataset.
+
+    """
 
     _params_ = dict(
         # TODO: Somehow the replacement of '_' and '-' is buggy on
         # positional arguments
         dataset=Parameter(
             args=("--dataset", "-d",),
-            doc="""specify the dataset to add the sibling to. If
+            doc="""specify the dataset to add the sibling to.  If
                 no dataset is given, an attempt is made to identify the dataset
                 based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         name=Parameter(
             args=('name',),
-            doc="""Name of the sibling to be added. If RECURSIVE is set, the
+            doc="""name of the sibling to be added.  If RECURSIVE is set, the
                 same name will be used to address the subdatasets' siblings""",
             constraints=EnsureStr() | EnsureNone()),
         url=Parameter(
             args=('url',),
-            doc="""The URL of or path to the dataset sibling named by
-                `name`.
-                If you want to recursively add siblings, it is expected, that
+            doc="""the URL of or path to the dataset sibling named by
+                `name`.  If you want to recursively add siblings, it is expected, that
                 you pass a template for building the URLs of the siblings of
                 all (sub)datasets by using placeholders.\n
                 List of currently available placeholders:\n
@@ -59,7 +60,7 @@ class AddSibling(Interface):
             nargs="?"),
         pushurl=Parameter(
             args=('--pushurl',),
-            doc="""In case the `url` cannot be used to publish to the dataset
+            doc="""in case the `url` cannot be used to publish to the dataset
                 sibling, this option specifies a URL to be used instead.\nIf no
                 `url` is given, `pushurl` serves as `url` as well.
                 This option is ignored if there is already a configured sibling
@@ -68,12 +69,12 @@ class AddSibling(Interface):
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
-            doc="""Recursively add the sibling `name` to all subdatasets of
+            doc="""recursively add the sibling `name` to all subdatasets of
                 `dataset`""",),
         force=Parameter(
             args=("--force", "-f",),
             action="store_true",
-            doc="""If sibling `name` exists already, force to (re-)configure its
+            doc="""if sibling `name` exists already, force to (re-)configure its
                 URLs""",),)
 
     @staticmethod

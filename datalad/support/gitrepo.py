@@ -38,7 +38,7 @@ from git.exc import InvalidGitRepositoryError
 from git.objects.blob import Blob
 
 from datalad import ssh_manager
-from datalad.cmd import Runner
+from datalad.cmd import Runner, GitRunner
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
@@ -360,7 +360,7 @@ class GitRepo(object):
         """
 
         self.path = abspath(normpath(path))
-        self.cmd_call_wrapper = runner or Runner(cwd=self.path)
+        self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
         # TODO: Concept of when to set to "dry".
         #       Includes: What to do in gitrepo class?
         #       Now: setting "dry" means to give a dry-runner to constructor.

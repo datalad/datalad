@@ -42,6 +42,12 @@ no verification is done and things can go utterly wrong.  So nodes must be robus
 provide informative logging.
 """
 
+__dev_doc__ = """
+Somewhat similar loose/flexible pipelining in Python approaches
+
+- https://github.com/freeman-lab/pipeit
+"""
+
 import sys
 from glob import glob
 from os.path import dirname, join as opj, isabs, exists, curdir, basename
@@ -51,9 +57,9 @@ from .. import cfg
 from ..consts import CRAWLER_META_DIR, HANDLE_META_DIR, CRAWLER_META_CONFIG_PATH
 from ..consts import CRAWLER_META_CONFIG_FILENAME
 from ..utils import updated
-from ..utils import parse_url_opts
 from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
+from ..support.network import parse_url_opts
 from ..support.stats import ActivityStats
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
@@ -423,9 +429,9 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
     name: str
         Name of the pipeline defining the filename. Or full path to it (TODO)
     args: dict, optional
-        Positional args for the pipeline, passed as *args into the pipeline call
+        Positional args for the pipeline, passed as `*args` into the pipeline call
     kwargs: dict, optional
-        Keyword args for the pipeline, passed as **kwargs into the pipeline call
+        Keyword args for the pipeline, passed as `**kwargs` into the pipeline call
     """
 
     if isabs(name) or exists(name):
