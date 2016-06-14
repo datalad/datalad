@@ -71,7 +71,7 @@ class Credential(object):
         for f, fattrs in self._FIELDS.items():
             unknown_attrs = set(fattrs).difference(self._KNOWN_ATTRS)
             if unknown_attrs:
-                raise ValueError("Uknown attributes %s. Known are: %s"
+                raise ValueError("Unknown attributes %s. Known are: %s"
                                  % (unknown_attrs, self._KNOWN_ATTRS))
 
     def _is_field_optional(self, f):

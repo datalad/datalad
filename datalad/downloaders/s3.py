@@ -67,12 +67,14 @@ class S3Authenticator(Authenticator):
         # credential might contain 'session' token as well
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
+        conn_kwargs = {}
+        if bucket_name.lower() != bucket_name:
+            # per http://stackoverflow.com/a/19089045/1265472
+            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
         conn = boto.connect_s3(
             credentials['key_id'], credentials['secret_id'],
             security_token=credentials.get('session'),
-            # per http://stackoverflow.com/a/19089045/1265472
-            calling_format=OrdinaryCallingFormat() \
-                if bucket_name.lower() != bucket_name else None
+            **conn_kwargs
         )
         try:
             bucket = conn.get_bucket(bucket_name)
