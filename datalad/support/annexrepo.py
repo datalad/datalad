@@ -35,6 +35,7 @@ from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.cmd import GitRunner
+from datalad.support.network import RI, URL, SSHRI
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -161,15 +162,17 @@ class AnnexRepo(GitRepo):
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
-                # XXX replace with proper test for ssh location identifier
-                if url is not None and url.startswith('ssh:'):
-                    c = ssh_manager.get_connection(url)
-                    writer = self.repo.config_writer()
-                    writer.set_value("remote \"%s\"" % r,
-                                     "annex-ssh-options",
-                                     "-o ControlMaster=auto"
-                                     " -S %s" % c.ctrl_path)
-                    writer.release()
+                if url is not None:
+                    ri = RI(url)
+                    if isinstance(ri, SSHRI) \
+                            or (isinstance(ri, URL) and ri.scheme == 'ssh'):
+                        c = ssh_manager.get_connection(url)
+                        writer = self.repo.config_writer()
+                        writer.set_value("remote \"%s\"" % r,
+                                         "annex-ssh-options",
+                                         "-o ControlMaster=auto"
+                                         " -S %s" % c.ctrl_path)
+                        writer.release()
 
         self.always_commit = always_commit
         if fix_it:
