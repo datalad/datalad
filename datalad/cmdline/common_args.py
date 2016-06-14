@@ -22,14 +22,14 @@ from ..cmdline.helpers import HelpAction, LogLevelAction
 help = (
     'help', ('-h', '--help', '--help-np'),
     dict(nargs=0, action=HelpAction,
-         help="""show this help message and exit. --help-np forcefully disables
+         help="""show this help message and exit.  --help-np forcefully disables
                  the use of a pager for displaying the help""")
 )
 
 version = (
     'version', ('--version',),
     dict(action='version',
-         help="show program's version and license information and exit")
+         help="show the program's version and license information and exit")
 )
 
 log_level = (
@@ -44,6 +44,6 @@ pbs_runner = (
     'pbs-runner', ('-p', '--pbs-runner'),
     dict(choices=['condor'],
          default=None,
-         help="""execute command by scheduling it via available PBS.  For settings config fill be consulted""")
+         help="""execute command by scheduling it via available PBS.  For settings, config fill be consulted""")
 )
 
