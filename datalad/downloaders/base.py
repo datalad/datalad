@@ -484,26 +484,7 @@ class BaseDownloader(object):
         raise NotImplementedError("Implement in the subclass: %s" % cls)
 
 # Exceptions.  might migrate elsewhere
-
-class DownloadError(Exception):
-    pass
-
-class IncompleteDownloadError(DownloadError):
-    pass
-
-class TargetFileAbsent(DownloadError):
-    pass
-
-class AccessDeniedError(DownloadError):
-    pass
-
-class AccessFailedError(DownloadError):
-    pass
-
-class UnhandledRedirectError(DownloadError):
-    def __init__(self, msg=None, url=None, **kwargs):
-        super(UnhandledRedirectError, self).__init__(msg, **kwargs)
-        self.url = url
+from ..support.exceptions import *
 
 #
 # Authenticators    XXX might go into authenticators.py

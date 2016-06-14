@@ -26,6 +26,7 @@ lgr = logging.getLogger('datalad.s3')
 from .keyring_ import keyring
 
 from ..dochelpers import exc_str
+from .exceptions import DownloadError, AccessDeniedError
 
 try:
     import boto
@@ -54,6 +55,34 @@ def _get_bucket_connection(credential):
         credential.enter_new()
     creds = credential()
     return boto.connect_s3(creds["key_id"], creds["secret_id"])
+
+
+def get_bucket(conn, bucket_name):
+    """A helper to get a bucket
+
+    Parameters
+    ----------
+    bucket_name: str
+        Name of the bucket to connect to
+    """
+    try:
+        bucket = conn.get_bucket(bucket_name)
+    except S3ResponseError as e:
+        # can initially deny or error to connect to the specific bucket by name,
+        # and we would need to list which buckets are available under following
+        # credentials:
+        lgr.debug("Cannot access bucket %s by name", bucket_name)
+        all_buckets = conn.get_all_buckets()
+        all_bucket_names = [b.name for b in all_buckets]
+        lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
+        if bucket_name in all_bucket_names:
+            bucket = all_buckets[all_bucket_names.index(bucket_name)]
+        elif e.error_code == 'AccessDenied':
+            raise AccessDeniedError(exc_str(e))
+        else:
+            raise DownloadError("No S3 bucket named %s found. Initial exception: %s"
+                                % (bucket_name, exc_str(e)))
+    return bucket
 
 
 class VersionedFilesPool(object):
