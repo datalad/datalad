@@ -26,6 +26,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
+
 def _license_info():
     return """\
 Copyright (c) 2013-2016 DataLad developers
@@ -64,7 +65,7 @@ def setup_parser(
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
             DataLad provides a unified data distribution with the convenience of git-annex
-            repositories as a backend.  datalad command line tool allows to manipulate
+            repositories as a backend.  DataLad command line tools allow to manipulate
             (obtain, create, update, publish, etc.) datasets and their collections."""),
         epilog='"Control Your Data"',
         formatter_class=formatter_class,
@@ -83,7 +84,7 @@ def setup_parser(
             help="do not catch exceptions and show exception traceback")
     parser.add_argument(
         '-C', action='append', dest='change_path', metavar='PATH',
-        help="""Run as if datalad was started in <path> instead
+        help="""run as if datalad was started in <path> instead
         of the current working directory. When multiple -C options are given,
         each subsequent non-absolute -C <path> is interpreted relative to the
         preceding -C <path>. This option affects the interpretations of the

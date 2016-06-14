@@ -13,7 +13,7 @@ ALICES_HOME=$(readlink -f $(mktemp -d datalad_demo.XXXX))
 #% ============================
 #%
 #% This example shows how datalad can be used to obtain a 3rd-party dataset and
-#% use it as input for an analysis. Moreover, it demonstrates how two local
+#% use it as input for analysis. Moreover, it demonstrates how two local
 #% collaborators can contribute to this analysis, each using their own copy
 #% of the dataset, but at the same time, being able to easily share their results
 #% back and forth.
