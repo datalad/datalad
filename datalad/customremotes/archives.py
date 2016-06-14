@@ -61,8 +61,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     def get_file_url(self, archive_file=None, archive_key=None, file=None, size=None):
         """Given archive (file or a key) and a file -- compose URL for access
 
-        Examples:
-        ---------
+        Examples
+        --------
 
         dl+archive:SHA256E-s176--69...3e.tar.gz#path=1/d2/2d&size=123
             when size of file within archive was known to be 123

@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Proxy basic file operations (such as open) to obtain files automagically upon I/O
+"""Proxy basic file operations (e.g. open) to auto-obtain files upon I/O
 """
 
 import sys

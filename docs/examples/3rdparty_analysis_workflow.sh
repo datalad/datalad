@@ -26,12 +26,13 @@ git config --global --add user.name Bob
 git config --global --add user.email bob@example.com
 
 # will become: datalad create myanalysis --description "my phd in a day"
-datalad install myanalysis
+datalad create myanalysis
 
 
 cd myanalysis
 
-datalad install --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
+#datalad install --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
+datalad install --source /tmp/studyforrest-data-structural src/forrest_structural
 
 mkdir code
 
@@ -86,7 +87,7 @@ cd ~/myanalysis
 datalad add-sibling alice $ALICES_HOME/bobs_analysis
 
 # datalad update failes:
-#% datalad update alice
+#datalad update alice
 #2016-06-09 13:59:52,338 [INFO   ] Updating handle '/tmp/datalad_demo.PU2F/myanalysis' ... (update.py:125)
 #2016-06-09 13:59:52,391 [ERROR  ] Failed to run ['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'config', '--get', 'branch.master.remote'] under '/tmp/datalad_demo.PU2F/myanalysis'. Exit code=1. out= err= (cmd.py:295)
 #
@@ -95,6 +96,8 @@ git fetch alice
 git annex merge
 
 datalad install result.txt
+
+# total satisfaction is achieved -> public
 
 #% EXAMPLE END
 

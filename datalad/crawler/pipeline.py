@@ -429,9 +429,9 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
     name: str
         Name of the pipeline defining the filename. Or full path to it (TODO)
     args: dict, optional
-        Positional args for the pipeline, passed as *args into the pipeline call
+        Positional args for the pipeline, passed as `*args` into the pipeline call
     kwargs: dict, optional
-        Keyword args for the pipeline, passed as **kwargs into the pipeline call
+        Keyword args for the pipeline, passed as `**kwargs` into the pipeline call
     """
 
     if isabs(name) or exists(name):
