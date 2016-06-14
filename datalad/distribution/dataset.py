@@ -222,6 +222,8 @@ class Dataset(object):
 #        raise NotImplementedError("TODO")
 
     # TODO maybe needs to get its own interface
+    # TODO: issue: auto_add_changes isn't that easy. consider an annex repo with
+    #       with changes to a file in git. We would currently call 'annex add .'
     def remember_state(self, message, auto_add_changes=True, version=None):
         """
         Parameters
