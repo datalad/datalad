@@ -42,14 +42,14 @@ echo "nib-ls src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > 
 
 datalad install --recursive yes --add-data-to-git code
 
-datalad make-memory-engram "Initial analysis setup"
+datalad save "Initial analysis setup"
 
 bash code/get_required_data.sh
 bash code/run_analysis.sh
 
 datalad install result.txt
 
-datalad make-memory-engram "First analysis results"
+datalad save "First analysis results"
 
 
 # 1. use case: lab colleague wants to work in the same analysis, on the same machine/cluster
@@ -76,7 +76,7 @@ bash code/run_analysis.sh ||true
 
 datalad unlock
 bash code/run_analysis.sh
-datalad make-memory-engram -a "Alice always helps"
+datalad save -a "Alice always helps"
 
 
 HOME=$BOBS_HOME

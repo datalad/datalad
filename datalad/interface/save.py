@@ -29,7 +29,7 @@ from .base import Interface
 lgr = logging.getLogger('datalad.interface.commit')
 
 
-class MakeMemoryEngram(Interface):
+class Save(Interface):
     """see Dataset.remember_state()."""
 
     _params_ = dict(
@@ -53,7 +53,7 @@ class MakeMemoryEngram(Interface):
             constraints=EnsureStr() | EnsureNone()),)
 
     @staticmethod
-    @datasetmethod(name='make_memory_engram')
+    @datasetmethod(name='save')
     def __call__(message, dataset=None, auto_add_changes=True, version_tag=None):
 
         # shortcut

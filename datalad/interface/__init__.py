@@ -35,7 +35,7 @@ _group_dataset = (
         ('datalad.distribution.modify_subhandle_urls', 'ModifySubhandleURLs',
          'modify-subhandle-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
-        ('datalad.interface.make_memory_engram', 'MakeMemoryEngram', 'make-memory-engram'),
+        ('datalad.interface.save', 'Save', 'save'),
     ])
 
 _group_misc = (
