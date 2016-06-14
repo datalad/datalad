@@ -460,7 +460,19 @@ class GitRepo(object):
         files = _remove_empty_items(files)
         if files:
             try:
-                self.cmd_call_wrapper(self.repo.index.add, files, write=True)
+
+                self._git_custom_command(files, ['git', 'add'])
+
+                # Note: as opposed to git cmdline, force is True by default in
+                #       gitpython, which would lead to add things, that are
+                #       ignored or excluded otherwise
+                # 2. Note: There is an issue with globbing (like adding '.'),
+                #       which apparently doesn't care for 'force' and therefore
+                #       adds '.git/...'. May be it's expanded at the wrong
+                #       point in time or sth. like that.
+                # For now, use direct call to git add.
+                #self.cmd_call_wrapper(self.repo.index.add, files, write=True,
+                #                      force=False)
                 # TODO: May be make use of 'fprogress'-option to indicate
                 # progress
                 # But then, we don't have it for git-annex add, anyway.
