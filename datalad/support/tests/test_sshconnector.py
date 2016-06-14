@@ -29,9 +29,11 @@ def test_ssh_get_connection():
     # subsequent call returns the very same instance:
     ok_(manager.get_connection('ssh://localhost') is c1)
 
-    # fail on malformed URls (meaning: urlparse can't correctly deal with them):
+    # fail on malformed URls (meaning: out fancy URL parser can't correctly
+    # deal with them):
     assert_raises(ValueError, manager.get_connection, 'localhost')
-    assert_raises(ValueError, manager.get_connection, 'someone@localhost')
+    # we can do what urlparse cannot
+    #assert_raises(ValueError, manager.get_connection, 'someone@localhost')
     assert_raises(ValueError, manager.get_connection, 'ssh:/localhost')
 
 
