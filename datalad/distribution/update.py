@@ -156,7 +156,7 @@ class Update(Interface):
                                  active_branch=repo.get_active_branch())])
                     except CommandError as e:
                         if e.code == 1 and e.stdout == "":
-                            std_out = None
+                            std_out, std_err = None, None
                         else:
                             raise
                     if std_out:  # we have a "tracking remote"
@@ -166,7 +166,9 @@ class Update(Interface):
             if merge:
                 lgr.info("Applying changes from tracking branch...")
                 # TODO: Adapt.
-                # TODO: Rethink default remote/tracking branch. See above. We need a "tracking remote" but custom refspec to fetch from that remote
+                # TODO: Rethink default remote/tracking branch. See above.
+                # We need a "tracking remote" but custom refspec to fetch from
+                # that remote
                 cmd_list = ["git", "pull"]
                 if name:
                     cmd_list.append(name)
@@ -178,12 +180,13 @@ class Update(Interface):
                     # For now, just use the same name
                     cmd_list.append(repo.get_active_branch())
 
-                out, err = repo._git_custom_command('', cmd_list)
-                lgr.info(out)
+                std_out, std_err = repo._git_custom_command('', cmd_list)
+                lgr.info(std_out)
                 if knows_annex(repo.path):
                     # annex-apply:
                     lgr.info("Updating annex ...")
-                    out, err = repo._git_custom_command('', ["git", "annex", "merge"])
-                    lgr.info(out)
+                    std_out, std_err = repo._git_custom_command(
+                        '', ["git", "annex", "merge"])
+                    lgr.info(std_out)
 
                     # TODO: return value?
