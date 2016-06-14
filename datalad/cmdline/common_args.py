@@ -44,6 +44,6 @@ pbs_runner = (
     'pbs-runner', ('-p', '--pbs-runner'),
     dict(choices=['condor'],
          default=None,
-         help="""execute command by scheduling it via available PBS.  For settings, config fill be consulted""")
+         help="""execute command by scheduling it via available PBS.  For settings, config file will be consulted""")
 )
 
