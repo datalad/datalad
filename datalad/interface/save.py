@@ -72,3 +72,5 @@ class Save(Interface):
         ds.remember_state(message=message,
                           auto_add_changes=auto_add_changes,
                           version=version_tag)
+
+        # TODO: Should remember_state return the commit SHA?
