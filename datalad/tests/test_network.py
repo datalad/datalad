@@ -241,6 +241,9 @@ def test_url_samples():
     """
     _check_ri('example.com/path/sp1:fname', SSHRI, hostname='example.com/path/sp1', path='fname')
 
+    # SSHRIs have .port, but it is empty
+    eq_(SSHRI(hostname='example.com').port, '')
+
     # check that we are getting a warning logged when url can't be reconstructed
     # precisely
     # actually failed to come up with one -- becomes late here
