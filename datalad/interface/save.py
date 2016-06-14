@@ -30,12 +30,12 @@ lgr = logging.getLogger('datalad.interface.commit')
 
 
 class Save(Interface):
-    """see Dataset.remember_state()."""
+    """Save the current state of a dataset."""
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc=""""specify the dataset to unlock files in. If
+            doc=""""specify the dataset to save. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),

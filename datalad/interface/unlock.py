@@ -33,7 +33,7 @@ lgr = logging.getLogger('datalad.interface.unlock')
 
 
 class Unlock(Interface):
-    """Proxying annex unlock."""
+    """Unlock file(s) of a dataset"""
 
     _params_ = dict(
         path=Parameter(
@@ -78,16 +78,16 @@ class Unlock(Interface):
                 # if we still have no dataset, try deriving it from path(s):
                 if isinstance(path, list):
                     # several paths and no dataset given;
-                    # paths have to be absolute and have to have common prefix in
-                    # order to be able to find a dataset
+                    # paths have to be absolute and have to have common prefix
+                    # in order to be able to find a dataset
 
                     # TODO: maybe consider realpath?
                     prefix = commonprefix(path)
                     if not prefix:
                         raise InsufficientArgumentsError(
-                            "insufficient information for unlocking: no dataset "
-                            "given and paths don't have a common base to check for "
-                            "a dataset")
+                            "insufficient information for unlocking: no "
+                            "dataset given and paths don't have a common base "
+                            "to check for a dataset")
                     dspath = GitRepo.get_toppath(abspath(prefix))
                 else:
                     # single path
@@ -110,9 +110,10 @@ class Unlock(Interface):
         else:
             files = [path]
 
-        out, err = ds.repo._annex_custom_command(files, ['git', 'annex', 'unlock'])
+        std_out, std_err = ds.repo._annex_custom_command(
+            files, ['git', 'annex', 'unlock'])
 
-        return [line.split()[1] for line in out.splitlines()
+        return [line.split()[1] for line in std_out.splitlines()
                 if line.strip().endswith('ok')]
 
     @staticmethod
