@@ -11,14 +11,10 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   cmdline
    usecases/index
    crawler/index
+   cmdline
    modref
-
->>> import datalad
->>> print(datalad.__version__)  # doctest: +SKIP
-0.2
 
 Indices and tables
 ==================

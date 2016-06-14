@@ -3,9 +3,9 @@
 
 .. _chap_modref:
 
-****************
-Module Reference
-****************
+***********************
+Python module reference
+***********************
 
 This module reference extends the manual with a comprehensive overview of the
 available functionality built into datalad.  Each module in the package is
