@@ -33,7 +33,9 @@ lgr = logging.getLogger('datalad.distribution.update')
 
 
 class Update(Interface):
-    """Update a dataset from a sibling."""
+    """Update a dataset from a sibling.
+
+    """
 
     _params_ = dict(
         name=Parameter(

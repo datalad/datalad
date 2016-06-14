@@ -3,20 +3,20 @@
 
 .. _chap_modref:
 
-****************
-Module Reference
-****************
+***********************
+Python module reference
+***********************
 
 This module reference extends the manual with a comprehensive overview of the
 available functionality built into datalad.  Each module in the package is
 documented by a general summary of its purpose and the list of classes and
 functions it provides.
 
-.. currentmodule:: datalad
 
 High-level user interface
 =========================
 
+.. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
@@ -25,6 +25,7 @@ High-level user interface
 Plumbing
 ========
 
+.. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
@@ -37,32 +38,35 @@ Plumbing
    version
    support.annexrepo
    support.archives
-   support.collection
-   support.collectionrepo
    support.configparserinc
    customremotes.main
    customremotes.base
-   customremotes.archive
+   customremotes.archives
 
 Configuration management
 ========================
 
+.. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
-   config.base
+   config
 
 Crawler
 =======
 
+.. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
-   crawler.main
+   crawler.base
+   crawler.db
+   crawler.pipeline
 
 Test infrastructure
 ===================
 
+.. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 
@@ -73,6 +77,7 @@ Test infrastructure
 Command line interface infrastructure
 =====================================
 
+.. currentmodule:: datalad
 .. autosummary::
    :toctree: generated
 

@@ -623,6 +623,7 @@ class SSHRI(RI, RegexBasedURLMixin):
     _FIELDS = RI._FIELDS + (
         'username',
         'hostname',
+        'port',
     )
 
     _REGEX = re.compile(r'((?P<username>\S*)@)?(?P<hostname>[^:]+)(\:(?P<path>.*))?$')

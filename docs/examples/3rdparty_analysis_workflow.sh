@@ -26,12 +26,13 @@ git config --global --add user.name Bob
 git config --global --add user.email bob@example.com
 
 # will become: datalad create myanalysis --description "my phd in a day"
-datalad install myanalysis
+datalad create myanalysis
 
 
 cd myanalysis
 
-datalad install --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
+#datalad install --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
+datalad install --source /tmp/studyforrest-data-structural src/forrest_structural
 
 mkdir code
 
@@ -86,6 +87,8 @@ datalad add-sibling alice $ALICES_HOME/bobs_analysis
 datalad update alice --merge
 
 datalad install result.txt
+
+# total satisfaction is achieved -> public
 
 #% EXAMPLE END
 

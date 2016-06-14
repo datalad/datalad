@@ -476,6 +476,8 @@ def with_tempfile(t, content=None, **tkwargs):
     Examples
     --------
 
+    ::
+
         @with_tempfile
         def test_write(tfile):
             open(tfile, 'w').write('silly test')

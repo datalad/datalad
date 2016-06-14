@@ -16,13 +16,12 @@ import logging
 from os.path import join as opj, abspath, basename, relpath, normpath
 from distutils.version import LooseVersion
 
-from six.moves.urllib.parse import urlparse
+from datalad.support.network import RI, URL, SSHRI
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
-from datalad.cmd import Runner
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.cmd import CommandError
@@ -34,8 +33,11 @@ lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebse
 
 
 class CreatePublicationTargetSSHWebserver(Interface):
-    """Create a dataset on a web server via SSH, that may then serve as
-    a target for the publish command, if added as a sibling."""
+    """Create an empty dataset on a web server via SSH.
+
+    This dataset can then then serve as a target for the `publish` command,
+    once added as a sibling.
+    """
 
     _params_ = dict(
         # TODO: Somehow the replacement of '_' and '-' is buggy on
@@ -154,16 +156,15 @@ class CreatePublicationTargetSSHWebserver(Interface):
         assert(ds.repo is not None)
 
         # determine target parameters:
-        parsed_target = urlparse(sshurl)
-        host_name = parsed_target.netloc
+        sshri = RI(sshurl)
 
-        # TODO: Sufficient to fail on this condition?
-        if not parsed_target.netloc:
-            raise ValueError("Malformed URL: {0}".format(sshurl))
+        if not isinstance(sshri, SSHRI) \
+                and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
+                    raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(sshurl))
 
         if target_dir is None:
-            if parsed_target.path:
-                target_dir = parsed_target.path
+            if sshri.path:
+                target_dir = sshri.path
             else:
                 target_dir = '.'
 
@@ -214,7 +215,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     out, err = ssh(["ls", path])
                 except CommandError as e:
                     if "No such file or directory" in e.stderr and \
-                                    path in e.stderr:
+                            path in e.stderr:
                         path_exists = False
                     else:
                         raise  # It's an unexpected failure here
@@ -277,8 +278,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
             # enable post-update hook:
             try:
-                ssh(["mv", opj(path, ".git/hooks/post-update.sample"),
-                             opj(path, ".git/hooks/post-update")])
+                ssh(["mv",
+                     opj(path, ".git/hooks/post-update.sample"),
+                     opj(path, ".git/hooks/post-update")])
             except CommandError as e:
                 lgr.error("Failed to enable post update hook.\n"
                           "Error: %s" % e.message)

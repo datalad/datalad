@@ -28,7 +28,9 @@ lgr = logging.getLogger('datalad.distribution.add_publication_target')
 
 
 class AddSibling(Interface):
-    """Adds a sibling to a dataset."""
+    """Adds a sibling to a dataset.
+
+    """
 
     _params_ = dict(
         # TODO: Somehow the replacement of '_' and '-' is buggy on
