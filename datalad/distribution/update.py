@@ -151,19 +151,15 @@ class Update(Interface):
                 else:
                     # we have no remote given, therefore
                     # check for tracking branch's remote:
-                    try:
-                        std_out, std_err = \
-                            repo._git_custom_command('',
-                                                     ["git", "config", "--get",
-                             "branch.{active_branch}.remote".format(
-                                 active_branch=repo.get_active_branch())])
-                    except CommandError as e:
-                        if e.code == 1 and e.stdout == "":
-                            std_out, std_err = None, None
-                        else:
-                            raise
-                    if std_out:  # we have a "tracking remote"
-                        repo.fetch(remote=std_out.strip(), refspec="git-annex")
+
+                    cfg_reader = repo.repo.config_reader()
+                    sct = "branch \"{0}\"".format(repo.get_active_branch())
+                    track_remote = cfg_reader.get_value(
+                        section=sct, option="remote",
+                        default="DATALAD_DEFAULT")
+                    if track_remote != "DATALAD_DEFAULT":
+                        # we have a "tracking remote"
+                        repo.fetch(remote=track_remote, refspec="git-annex")
 
             # merge:
             if merge:
