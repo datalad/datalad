@@ -156,7 +156,7 @@ class DsModel(object):
         """Date of the last commit
         """
         try:
-            commit = next(self.ds.repo.get_branch_commits(self.branch))
+            commit = next(self.repo.get_branch_commits(self.branch))
         except:
             return None
         return commit.committed_date
@@ -208,6 +208,7 @@ class FsModel(DsModel):
         self._repo = repo
         self._branch = None
 
+    @property
     def _symlink(self):
         if islink(self._path):                    # if symlink
             target_path = readlink(self._path)    # find link target
@@ -229,7 +230,7 @@ class FsModel(DsModel):
     def date(self):
         """Date of last modification
         """
-        if self._type is not 'annex' and not 'git':
+        if self._type is not ['git', 'annex']:
             return lstat(self._path).st_mtime
         else:
             super(self.__class__, self).date
@@ -256,10 +257,10 @@ class FsModel(DsModel):
 
     @property
     def _type(self):
-        if not exists(self.path):
-            return None
-        elif islink(self.path):
+        if islink(self.path):
             return 'broken-link' if not self._symlink else 'link'
+        elif not exists(self.path):
+            return None
         elif isfile(self.path):
             return 'file'
         elif exists(opj(self.path, ".git", "annex")):
@@ -278,7 +279,7 @@ class FsModel(DsModel):
             size = [item for item in describe if 'size: ' in item][0].split(': ')
             return int(size[1])
         except:
-            return None
+            return lstat(self._path).st_size
 
 import string
 import humanize
@@ -438,15 +439,12 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
             path = '.'
         ds_model.path = path
         # unwrap top git directory and run traversal on each non .git node
-        fs.append(_flatten([_fs_traverse(subdir, recursive=True)
-                            for subdir in listdir(ds_model.path)
-                            if '.git' not in subdir]))
+        fs.append(_flatten([path, [_fs_traverse(subdir, recursive=True)
+                                   for subdir in listdir(path)
+                                   if '.git' not in subdir]]))
 
     # attach the FSModel to each node in the traversed fs tree
     fsm = [FsModel(node, fss[0]) for fss in fs for node in fss]
-
-    for item in fsm:
-        print item._path, item._repo, item.size, item.date
 
     maxpath = max(len(ds_model.path) for ds_model in dsms)
     path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
