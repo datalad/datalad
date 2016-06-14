@@ -32,7 +32,11 @@ lgr = logging.getLogger('datalad.interface.commit')
 class Save(Interface):
     """Save the current state of a dataset
 
-    Save the current state, so it can be restored and referenced.
+    Saving the state of a dataset records all changes that have been made
+    to it. This change record is annotated with a user-provided description.
+    Optionally, an additional tag, such as a version, can be assigned to the
+    saved state. Such tag enables straightforward retrieval of past versions
+    at a later point in time.
     """
 
     _params_ = dict(
@@ -44,6 +48,7 @@ class Save(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         message=Parameter(
             args=("message",),
+            metavar='MESSAGE',
             doc="""a message to annotate the saved state.""",
             constraints=EnsureStr()),
         auto_add_changes=Parameter(
@@ -52,6 +57,7 @@ class Save(Interface):
             action="store_true"),
         version_tag=Parameter(
             args=("--version-tag", ),
+            metavar='ID',
             doc="""an additional marker for that state.""",
             constraints=EnsureStr() | EnsureNone()),)
 
