@@ -147,14 +147,25 @@ def pipeline(collection, archives=None):
     annex = Annexificator(
         create=False,  # must be already initialized etc
         special_remotes=[DATALAD_SPECIAL_REMOTE],
-        backend='MD5E'
+        backend='MD5E',
+        skip_problematic=True,  # TODO: make it cleaner for detection of s3 "directories"
         # Primary purpose of this one is registration of all URLs with our
         # upcoming "ultimate DB" so we don't get to git anything
         # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
     )
 
     return [
-        crawl_mindar_images03(collection),
-        continue_if({'url': "s3://(?P<bucket>[^/]*)/submission_(?P<url_submission_id>[0-9]*)/(?P<filename>.*[^/])$"}, re=True),
-        annex,
+        [
+            assign(
+                {'url': 'https://ndar.nih.gov/edit_collection.html?id=%s' % collection,
+                 'filename': 'collection.html'}
+            ),
+            annex,
+        ],
+        [
+            crawl_mindar_images03(collection),
+            continue_if({'url': "s3://(?P<bucket>[^/]*)/submission_(?P<url_submission_id>[0-9]*)/(?P<filename>.*[^/])$"}, re=True),
+            annex,
+            # TODO: add annex tags may be for dataset_id, submission_id, 
+        ],
     ]
