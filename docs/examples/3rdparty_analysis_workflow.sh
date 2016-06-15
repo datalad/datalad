@@ -43,14 +43,14 @@ echo "nib-ls src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > 
 
 datalad install --recursive yes --add-data-to-git code
 
-datalad save "Initial analysis setup"
+datalad save -m "Initial analysis setup"
 
 bash code/get_required_data.sh
 bash code/run_analysis.sh
 
 datalad install result.txt
 
-datalad save "First analysis results"
+datalad save -m "First analysis results"
 
 
 # 1. use case: lab colleague wants to work in the same analysis, on the same machine/cluster
@@ -77,7 +77,7 @@ bash code/run_analysis.sh ||true
 
 datalad unlock
 bash code/run_analysis.sh
-datalad save -a "Alice always helps"
+datalad save -a -m "Alice always helps"
 
 
 HOME=$BOBS_HOME
@@ -89,7 +89,7 @@ datalad update alice --merge
 datalad install result.txt
 
 # total satisfaction is achieved -> public
-SERVER_URL="localhost:$(readlink -f $(mktemp -d datalad_demo_testpub.XXXX))"
+SERVER_URL="localhost:$(readlink -f $(mktemp --tmpdir -u -d datalad_demo_testpub.XXXX))"
 datalad create-publication-target-sshwebserver --recursive $SERVER_URL public
 
 # push
