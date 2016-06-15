@@ -1125,6 +1125,17 @@ class GitRepo(object):
         cmd += ['--', path]
         self._git_custom_command('', cmd)
 
+    def tag(self, tag):
+        """Assign a tag to current commit
+
+        Parameters
+        ----------
+        tag : str
+          Custom tag label.
+        """
+        # TODO later to be extended with tagging particular commits and signing
+        self._git_custom_command('', 'git tag "{0}"'.format(tag))
+
 # TODO
 # remove submodule
 # status?
