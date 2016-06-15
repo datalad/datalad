@@ -107,7 +107,7 @@ class Sink(object):
         Parameters
         ----------
         keys : list of str, optional
-          List of keys to store.  If not specified -- entire dictionaries stored
+          List of keys to store.  If not specified -- entire dictionaries are stored
         output : str, optional
           If specified, it will be the key in the yielded data to contain all sunk
           data
@@ -150,7 +150,6 @@ class rename(object):
 
     def __init__(self, assignments):
         """
-
         Use OrderedDict when order of remapping matters
         """
         assert (isinstance(assignments, dict))
@@ -191,7 +190,7 @@ class sub(object):
 class assign(object):
     """Class node to provide assignment of items in data
 
-    With "interpolate" it allows for
+    With "interpolate" it allows for insertion of values
 
     """
 
@@ -243,7 +242,7 @@ class _act_if(object):
           Key/value pairs to compare arrived data against.  Would raise
           FinishPipeline if all keys have matched target values
         re: bool, optional
-          If specified values to be treated as regular expression to be
+          If specified values are to be treated as regular expression to be
           searched
         negate: bool, optional
           Reverses, so acts (skips, etc) if no match
@@ -313,7 +312,7 @@ def _string_as_list(x):
 def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **orig_kwargs):
     """Generate a node out of an arbitrary function
 
-    If provided function returns a generator, each item returned separately
+    If provided function returns a generator, each item ia returned separately
 
     Parameters
     ----------
@@ -345,14 +344,14 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
         for return_value in out:
             if outputs:
                 outputs_ = _string_as_list(outputs)
-                # we need to place it into copy of data
+                # we need to place it into the copy of data
                 data_ = data.copy()
                 if len(outputs_) > 1:
                     # we were requested to have multiple outputs,
-                    # then function should have provided matching multiple values
+                    # then the function should have provided matching multiple values
                     assert (len(return_value) == len(outputs_))
                 else:
-                    return_value = [return_value]  # for uniformicity
+                    return_value = [return_value]  # for uniformity
 
                 for k, v in zip(outputs_, return_value):
                     data_[k] = v
@@ -363,10 +362,10 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
                 yield data
 
     in_args = list(_string_as_list(data_args)) + list(_string_as_list(data_kwargs))
-    func_node.__doc__ = """Function %s wrapped into a node
+    func_node.__doc__ = """function %s wrapped into a node.
 
 It expects %s keys to be provided in the data and output will be assigned to %s
-keys in the output.%s
+keys in the output %s
 """ % (
         func.__name__ if hasattr(func, '__name__') else '',
         ', '.join(in_args) if in_args else "no",
@@ -398,7 +397,7 @@ class find_files(object):
         dirs: bool, optional
           Either to match directories
         fail_if_none: bool, optional
-          Fail if none file matched throughout the life-time of this object, i.e.
+          Fail if no file matched throughout the life-time of this object, i.e.
           counts through multiple runs (if any run had files matched -- it is ok
           to have no matched files on subsequent run)
         """
@@ -432,7 +431,7 @@ class switch(object):
         key: str
         mapping: dict
         default: node or pipeline, optional
-          node or pipeline to use if no mapping was found
+          Node or pipeline to use if no mapping was found
         missing: ('raise', 'stop', 'skip'), optional
           If value is missing in the mapping or key is missing in data
           (yeah, not differentiating atm), and no default is provided:
