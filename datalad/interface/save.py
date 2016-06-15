@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
+from os.path import abspath
+
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -54,13 +56,14 @@ class Save(Interface):
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=Parameter(
-            args=("-m,", "--message",),
+            args=("-m", "--message",),
             metavar='MESSAGE',
             doc="""a message to annotate the saved state.""",
             constraints=EnsureStr() | EnsureNone()),
         auto_add_changes=Parameter(
             args=("-a", "--auto-add-changes"),
-            doc="""automatically include all changes""",
+            doc="""automatically include all changes in the entire dataset,
+            independent of the current working directory.""",
             action="store_true"),
         version_tag=Parameter(
             args=("--version-tag", ),
@@ -72,12 +75,6 @@ class Save(Interface):
     @datasetmethod(name='save')
     def __call__(message=None, dataset=None, files=None,
                  auto_add_changes=False, version_tag=None):
-        # upfront check
-        if not files and not auto_add_changes:
-            raise InsufficientArgumentsError(
-                "Neither files to consider were specified, nor auto-detection "
-                "was requested: There is nothing to save.")
-
         # shortcut
         ds = dataset
 
@@ -95,20 +92,38 @@ class Save(Interface):
             raise RuntimeError(
                 "cannot save a state when a dataset is not yet installed")
         if not message:
-            message = 'Save dataset state (datalad)'
+            message = 'Changes recorded by datalad'
         if auto_add_changes:
-            files = ['.']
+            files = [ds.path]
 
-        # TODO recode all files to be relative to ds dir, while assuming they
-        # come in relative to cwd
+        if files:  # could still be none without auto add changes
+            for f in files:
+                absf = abspath(f)
+                # XXX Is there a better way to handle files in mixed repos?
+                ds.repo.add(absf)
+                ds.repo.add(absf, git=True)
 
-        for f in files:
-            # XXX Is there a better way to handle files in mixed repos?
-            ds.repo.add(f)
-            ds.repo.add(f, git=True)
-
-        ds.repo.commit(message)
+        if ds.repo.repo.is_dirty(
+                index=True,
+                working_tree=False,
+                untracked_files=False,
+                submodules=False):
+            ds.repo.commit(message)
+        else:
+            lgr.info(
+                'Nothing to save, consider auto-detection of changes, '
+                'if this is unexpected.')
+        # MIH: let's tag even if there was nothing commit. I'd forget this
+        # option too often...
         if version_tag:
-            ds.repo._git_custom_command('', 'git tag "{0}"'.format(version_tag))
+            ds.repo.tag(version_tag)
 
-        # TODO: Should save return the commit SHA?
+        return ds.repo.repo.head.commit
+
+    @staticmethod
+    def result_renderer_cmdline(res):
+        from datalad.ui import ui
+        ui.message('Saved state: "{0}" by {1} [{2}]'.format(
+            res.message.splitlines()[0],
+            res.committer,
+            res.hexsha))
