@@ -47,10 +47,10 @@ class Save(Interface):
             based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
         message=Parameter(
-            args=("message",),
+            args=("-m,", "--message",),
             metavar='MESSAGE',
             doc="""a message to annotate the saved state.""",
-            constraints=EnsureStr()),
+            constraints=EnsureStr() | EnsureNone()),
         auto_add_changes=Parameter(
             args=("-a", "--auto-add-changes"),
             doc="""automatically include all changes""",
@@ -63,7 +63,8 @@ class Save(Interface):
 
     @staticmethod
     @datasetmethod(name='save')
-    def __call__(message, dataset=None, auto_add_changes=False, version_tag=None):
+    def __call__(message=None, dataset=None, auto_add_changes=False,
+                 version_tag=None):
 
         # shortcut
         ds = dataset
@@ -81,6 +82,8 @@ class Save(Interface):
         if not ds.is_installed():
             raise RuntimeError(
                 "cannot save a state when a dataset is not yet installed")
+        if not message:
+            message = 'Save dataset state (datalad)'
         if auto_add_changes:
             ds.repo.add('.')
             ds.repo.add('.', git=True)
