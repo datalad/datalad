@@ -165,12 +165,29 @@ class AnnexRepo(GitRepo):
                 if url is not None:
                     if is_ssh(url):
                         c = ssh_manager.get_connection(url)
-                        writer = self.repo.config_writer()
-                        writer.set_value("remote \"%s\"" % r,
-                                         "annex-ssh-options",
-                                         "-o ControlMaster=auto"
-                                         " -S %s" % c.ctrl_path)
-                        writer.release()
+                        cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
+                        sct = "remote \"%s\"" % r
+                        opt = "annex-ssh-options"
+                        reader = self.repo.config_reader()
+
+                        # we write only, if there's nothing already
+                        write = False
+                        try:
+                            cfg_string_old = reader.get_value(section=sct,
+                                                              option=opt)
+                        except NoOptionError:
+                            write = True
+                        if cfg_string_old != cfg_string:
+                            lgr.warning("Found conflicting annex-ssh-options "
+                                        "for remote '{0}':\n{1}\n"
+                                        "Did not touch it.".format(
+                                            r, cfg_string_old))
+                            continue
+                        if write:
+                            writer = self.repo.config_writer()
+                            writer.set_value(section=sct, option=opt,
+                                             value=cfg_string)
+                            writer.release()
 
         self.always_commit = always_commit
         if fix_it:
