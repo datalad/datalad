@@ -33,7 +33,7 @@ def collection_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
     annex = Annexificator(
         create=False,  # must be already initialized etc
     )
-
+    sprefix = prefix + '/' if prefix else ''
     return [
         crawl_s3(bucket, prefix=prefix, recursive=False,
                  strategy='commit-versions', repo=annex.repo,
@@ -47,7 +47,7 @@ def collection_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
                    'directory': [
                        # for initiate_handle we should replicate filename as handle_name, prefix
                        assign({
-                           'prefix': '%(filename)s/',
+                           'prefix': sprefix + '%(filename)s/',
                            'bucket': bucket,
                            'handle_name': '%(filename)s'
                        }, interpolate=True),
@@ -84,5 +84,6 @@ def pipeline(bucket=DEFAULT_BUCKET, prefix=None):
                    'commit': annex.finalize(tag=True),
                    'remove': annex.remove,
                    'annex':  annex,
+                   'directory': None,
                })
     ]

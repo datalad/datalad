@@ -405,6 +405,10 @@ class switch(object):
             elif self.missing == 'stop':
                 return
 
+        if pipeline is None:
+            yield data
+            return
+
         if not isinstance(pipeline, PIPELINE_TYPES):
             # it was a node, return its output
             gen = pipeline(data)
