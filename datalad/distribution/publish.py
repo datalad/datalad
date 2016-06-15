@@ -18,9 +18,8 @@ import logging
 from os import curdir
 from os.path import join as opj, abspath, exists, relpath
 
-from six import string_types
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
@@ -85,7 +84,7 @@ class Publish(Interface):
         with_data=Parameter(
             args=("--with-data",),
             doc="shell pattern",
-            constraints=EnsureListOf(string_types) | EnsureNone(),
+            constraints=EnsureStr() | EnsureNone(),
             nargs='*'),)
 
     @staticmethod
