@@ -259,8 +259,6 @@ class FsModel(DsModel):
     def _type(self):
         if islink(self.path):
             return 'broken-link' if not self._symlink else 'link'
-        elif not exists(self.path):
-            return None
         elif isfile(self.path):
             return 'file'
         elif exists(opj(self.path, ".git", "annex")):
@@ -389,6 +387,13 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         print(ds_str)
 
 
+def JsonFormatter(path, repo, _type, size, date):
+    pretty_size = humanize.naturalsize(size)
+    pretty_date = time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(date))
+    json_fmt = u'{\"path\": \"%s\", \"repo\": \"%s\", \"type\": \"%s\", \"size\": \"%s\", \"date\": \"%s\"}'
+    return json_fmt % (path, repo, _type, pretty_size, pretty_date)
+
+
 def _flatten(listoflists):
     """flattens a multi-level lists"""
     if isinstance(listoflists, list):
@@ -445,27 +450,10 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
 
     # attach the FSModel to each node in the traversed fs tree
     fsm = [FsModel(node, fss[0]) for fss in fs for node in fss]
-
-    maxpath = max(len(ds_model.path) for ds_model in dsms)
-    path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
-    pathtype_fmt = path_fmt + u"  [{ds.type}]"
-    full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
-    if (not fast) or all:
-        full_fmt += u"  {ds.clean!X}"
-    if all:
-        full_fmt += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
-
-    formatter = LsFormatter()
-
-    # weird problems happen in the parallel run -- TODO - figure it out
-    # for out in Parallel(n_jobs=1)(
-    #         delayed(format_ds_model)(formatter, dsm, full_fmt, format_exc=path_fmt + "  {msg!R}")
-    #         for dsm in dss):
-    #     print(out)
-    for dsm in dsms:
-        ds_str = format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + u"  {msg!R}")
-        print(ds_str)
-
+    print '[' + JsonFormatter(fsm[0]._path, fsm[0]._repo, fsm[0]._type, fsm[0].size, fsm[0].date)
+    for item in fsm[1:]:
+        print ', ' + JsonFormatter(item._path, item._repo, item._type, item.size, item.date)
+    print ']'
 
 #
 # S3 listing
