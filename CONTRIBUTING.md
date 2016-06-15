@@ -307,21 +307,17 @@ Refer datalad/config.py for information on how to add these environment variable
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
-- *DATALAD_SPECIAL_REMOTE*:
-  Specifies the name of the datalad [special remote](https://git-annex.branchable.com/special_remotes/).
-- *ARCHIVES_SPECIAL_REMOTE*:
-  Specifies the name of the datalad archive [special remote](https://git-annex.branchable.com/special_remotes/).
 - *DATALAD_USECASSETTE*:
   Specifies the location of the file to record network transactions by the VCR module.
   Currently used by when testing custom special remotes
 - *DATALAD_CMD_PROTOCOL*: 
   Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
-  0 for ExecutionTimeExternalsProtocol, 1 for ExecutionTimeProtocol and 3 for NullProtocol.
+  'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
   Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
   Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
 - *DATALAD_PROTOCOL_REMOTE*:
-  Binary flag To specify whether annex is testing a remote special remote??
+  Binary flag to specify whether to test protocol interactions of custom remote with annex
 - *DATALAD_LOG_TIMESTAMP*:
   Used to add timestamp to datalad logs
 - *DATALAD_RUN_CMDLINE_TESTS*:
