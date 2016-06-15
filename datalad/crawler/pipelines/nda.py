@@ -8,15 +8,20 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """A pipeline for crawling NIMH data archive"""
 
-import os
-from os.path import lexists
 
 # Import necessary nodes
 from ..nodes.misc import assign
 from ..nodes.misc import switch
+from ..nodes.matches import a_href_match
 from ..nodes.s3 import crawl_s3
 from ..nodes.annex import Annexificator
 from ...consts import DATALAD_SPECIAL_REMOTE
+
+from datalad.support.nda_ import get_oracle_db
+from datalad.support.nda_ import image03_fields, image03_file_fields
+from datalad.support.nda_ import image03_Record
+from datalad.utils import auto_repr, updated
+
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
@@ -62,7 +67,7 @@ def collection_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
     ]
 
 
-def pipeline(bucket=DEFAULT_BUCKET, prefix=None):
+def bucket_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
     """Pipeline to crawl/annex an entire openfmri bucket"""
 
     lgr.info("Creating a pipeline for the NDA bucket")
@@ -85,4 +90,68 @@ def pipeline(bucket=DEFAULT_BUCKET, prefix=None):
                    'remove': annex.remove,
                    'annex':  annex,
                })
+    ]
+
+
+@auto_repr
+class crawl_mindar_images03(object):
+    """Crawl miNDAR DB for a given collection
+
+    TODO: generalize for other data structures other than image03, with their
+    own sets of "File" fields
+
+    Parameters
+    ----------
+    collection
+    """
+    def __init__(self, collection):
+        self.collection = collection
+
+    def __call__(self, data):
+
+        db = get_oracle_db()
+
+        query = "SELECT %s FROM IMAGE03 WHERE COLLECTION_ID=%d" \
+                % (','.join(image03_fields), self.collection)
+        c = db.cursor()
+        c.execute(query)
+        # query and wrap into named tuples to ease access
+        for rec in c.fetchall():  # TODO -- better access method?
+            rec = image03_Record(*rec)
+            for field in image03_file_fields:
+                url = getattr(rec, field)
+                if url:
+                    # generate a new
+                    data_ = updated(data, {
+                        'url': url,
+                    })
+        c.close()
+
+
+def pipeline(collection, archives=None):
+    """Pipeline to crawl/annex NDA
+
+    Parameters
+    ----------
+    archives:
+      Idea is to be able to control how archives treated -- extracted within
+      the same repository, or extracted into a submodule. TODO
+    """
+
+    assert archives is None, "nothing else is implemented"
+    lgr.info("Creating a pipeline for the NDA bucket")
+
+    annex = Annexificator(
+        create=False,  # must be already initialized etc
+        special_remotes=[DATALAD_SPECIAL_REMOTE],
+        backend='MD5E'
+        # Primary purpose of this one is registration of all URLs with our
+        # upcoming "ultimate DB" so we don't get to git anything
+        # options=["-c", "annex.largefiles=exclude=CHANGES* and exclude=changelog.txt and exclude=dataset_description.json and exclude=README* and exclude=*.[mc]"]
+    )
+
+    return [
+        crawl_mindar_images03(collection),
+        a_href_match("s3://(?P<bucket>[^/]*)/submission_(?P<url_submission_id>[0-9]*)/(?P<filename>.*)$"),
+        annex,
     ]
