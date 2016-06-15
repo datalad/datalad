@@ -32,6 +32,7 @@ from ..support.network import _split_colon
 from ..support.network import is_url
 from ..support.network import get_local_file_url
 from ..support.network import get_local_path_from_url
+from ..support.network import is_ssh
 
 def test_same_website():
     ok_(same_website("http://a.b", "http://a.b/2014/01/xxx/"))
@@ -361,3 +362,25 @@ def test_get_local_path_from_url():
     eq_(get_local_path_from_url('file://127.3.4.155/some'), '/some')
 
 
+def test_is_ssh():
+
+    ssh_locators = ["ssh://host",
+                    "ssh://host/some/where",
+                    "user@host:path/sp1",
+                    "user@host:/absloute/path/sp1",
+                    "host:path/sp1",
+                    "host:/absloute/path/sp1",
+                    "user@host"]
+    for ri in ssh_locators:
+        ok_(is_ssh(ri), "not considered ssh (string): %s" % ri)
+        ok_(is_ssh(RI(ri)), "not considered ssh (RI): %s" % ri)
+
+    non_ssh_locators = ["file://path/to",
+                        "/abs/path",
+                        "../rel/path",
+                        "http://example.com",
+                        "git://host/user/proj",
+                        "s3://bucket/save/?key=891"]
+    for ri in non_ssh_locators:
+        ok_(not is_ssh(ri), "considered ssh (string): %s" % ri)
+        ok_(not is_ssh(RI(ri)), "considered ssh (RI): %s" % ri)

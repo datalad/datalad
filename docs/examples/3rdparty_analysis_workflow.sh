@@ -31,8 +31,8 @@ datalad create myanalysis
 
 cd myanalysis
 
-#datalad install --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
-datalad install --source /tmp/studyforrest-data-structural src/forrest_structural
+datalad install --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
+#datalad install --source /tmp/studyforrest-data-structural src/forrest_structural
 
 mkdir code
 
