@@ -46,6 +46,13 @@ class Save(Interface):
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
+        files=Parameter(
+            args=("files",),
+            metavar='FILES',
+            doc="""list of files to consider. If given, only changes made
+            to those files are recorded in the new state.""",
+            nargs='*',
+            constraints=EnsureStr() | EnsureNone()),
         message=Parameter(
             args=("-m,", "--message",),
             metavar='MESSAGE',
@@ -63,8 +70,13 @@ class Save(Interface):
 
     @staticmethod
     @datasetmethod(name='save')
-    def __call__(message=None, dataset=None, auto_add_changes=False,
-                 version_tag=None):
+    def __call__(message=None, dataset=None, files=None,
+                 auto_add_changes=False, version_tag=None):
+        # upfront check
+        if not files and not auto_add_changes:
+            raise InsufficientArgumentsError(
+                "Neither files to consider were specified, nor auto-detection "
+                "was requested: There is nothing to save.")
 
         # shortcut
         ds = dataset
@@ -85,8 +97,16 @@ class Save(Interface):
         if not message:
             message = 'Save dataset state (datalad)'
         if auto_add_changes:
-            ds.repo.add('.')
-            ds.repo.add('.', git=True)
+            files = ['.']
+
+        # TODO recode all files to be relative to ds dir, while assuming they
+        # come in relative to cwd
+
+        for f in files:
+            # XXX Is there a better way to handle files in mixed repos?
+            ds.repo.add(f)
+            ds.repo.add(f, git=True)
+
         ds.repo.commit(message)
         if version_tag:
             ds.repo._git_custom_command('', 'git tag "{0}"'.format(version_tag))
