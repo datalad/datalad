@@ -8,23 +8,23 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Pipeline functionality.
 
-Pipeline is represented by a simple list or tuple of nodes or other nested pipelines.
+A pipeline is represented by a simple list or tuple of nodes or other nested pipelines.
 Each pipeline node is a callable which receives a dictionary (commonly named `data`),
-does some processing and yields (once or multiple times) a derived dictionary (commonly
+does some processing, and yields (once or multiple times) a derived dictionary (commonly
 a shallow copy of original dict).  For a node to be parametrized it should be
 implemented as a callable (i.e. define __call__) class, which could obtain parameters
 in its constructor.
 
-TODO:  describe   PIPELINE_OPTS  and how to specify them for a give (sub-)pipeline.
+TODO:  describe   PIPELINE_OPTS  and how to specify them for a given (sub-)pipeline.
 
-`data` dictionary is used primarily to carry the scraped/produced data, but besides that
-it will carry few items which some nodes might use.  All those item names will start with
+The `data` dictionary is used primarily to carry the scraped/produced data, but besides that
+it will carry few items which some nodes might use.  All those item names will start with the
 `datalad_` prefix, and will be intended for 'inplace' modifications or querying.
-Following items are planned to be provided by the pipeline runner:
+The following items are planned to be provided by the pipeline runner:
 
 `datalad_settings`
-   PipelineSettings object which would could be used to provide configuration for current
-   run of the pipeline. E.g.
+   PipelineSettings object which could be used to provide configuration for the current
+   run of the pipeline. E.g.:
 
    - dry:  either nodes are intended not to perform any changes which would reflect on disk
    - skip_existing:
@@ -33,17 +33,17 @@ Following items are planned to be provided by the pipeline runner:
    ActivityStats/dict object to accumulate statistics on what has been done by the nodes
    so far
 
-To some degree, we could make an analogy of a `blood` to `data` and `venous system` to
-`pipeline`.  Blood delivers various elements, which are picked up by various parts of
-our body, whenever they know what to do with corresponding elements.  To the same degree
+To some degree, we could make an analogy when `blood` is to `data` and `venous system` is to
+`pipeline`.  Blood delivers various elements which are picked up by various parts of
+our body when they know what to do with the corresponding elements.  To the same degree
 nodes can consume, augment, or produce new items to the `data` and send it down the stream.
-Since there is no strict typing or specification on what nodes could consume or produce (yet)
+Since there is no strict typing or specification on what nodes could consume or produce (yet),
 no verification is done and things can go utterly wrong.  So nodes must be robust and
 provide informative logging.
 """
 
 __dev_doc__ = """
-Somewhat similar loose/flexible pipelining in Python approaches
+somewhat similar loose/flexible pipelining in Python approaches
 
 - https://github.com/freeman-lab/pipeit
 """
@@ -66,7 +66,7 @@ from ..support.configparserinc import SafeConfigParserWithIncludes
 from logging import getLogger
 lgr = getLogger('datalad.crawler.pipeline')
 
-# Name of the section in the config file which would define pipeline parameters
+# name of the section in the config file which would define pipeline parameters
 CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 CRAWLER_PIPELINE_SECTION_DEPRECATED = 'crawler'
 
@@ -75,7 +75,7 @@ class FinishPipeline(Exception):
     """
     pass
 
-# Options which could augment behavior of the pipeline, could be specified
+# options which could augment behavior of the pipeline, could be specified
 # only on top of it
 PIPELINE_OPTS = dict(
     # nested_pipeline_inherits_opts=True,
@@ -105,7 +105,7 @@ def reset_pipeline(pipeline):
 def run_pipeline(*args, **kwargs):
     """Run pipeline and assemble results into a list
 
-    Byt default pipeline returns only its input (see PIPELINE_OPTS),
+    By default, the pipeline returns only its input (see PIPELINE_OPTS),
     so if no options for the pipeline were given to return additional
     items, a `[{}]` will be provided as output
     """
@@ -177,7 +177,8 @@ def xrun_pipeline(pipeline, data=None, stats=None, reset=True):
         raise ValueError("Unknown output=%r" % output)
 
     if opts['loop'] and output == 'input':
-        lgr.debug("Assigning output='last-output' for sub-pipeline since we want to loop until pipeline returns anything")
+        lgr.debug("Assigning output='last-output' for sub-pipeline since we want "
+                  "to loop until pipeline returns anything")
         output_sub = 'last-output'
     else:
         output_sub = output
@@ -216,7 +217,7 @@ def xrun_pipeline(pipeline, data=None, stats=None, reset=True):
 
     # Input should be yielded last since otherwise it might ruin the flow for typical
     # pipelines which do not expect anything beyond going step by step
-    # We should yeild input data even if it was empty
+    # We should yield input data even if it was empty
     if 'input' in output:
         _log("finally yielding input data as instructed")
         yield data
@@ -224,11 +225,11 @@ def xrun_pipeline(pipeline, data=None, stats=None, reset=True):
 
 def xrun_pipeline_steps(pipeline, data, output='input'):
     """Actually run pipeline steps, feeding yielded results to the next node
-    and yielding results back
+    and yielding results back.
 
     Recursive beast which runs a single node and then recurses to run the rest,
-    possibly multiple times if current node is a generator.
-    It yields output from the node/nested pipelines, as directed by output
+    possibly multiple times if the current node is a generator.
+    It yields output from the node/nested pipelines, as directed by the output
     argument.
     """
     if not len(pipeline):
@@ -250,11 +251,11 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
             lgr.log(7, "Pipeline generator %s returned None", node)
             data_in_to_loop = []
         prev_stats = None  # we do not care to check if entire pipeline drops stats
-                           # since it is done below at the node level
+        # since it is done below at the node level
     else:  # it is a "node" which should generate (or return) us an iterable to feed
-           # its elements into the rest of the pipeline
+        # its elements into the rest of the pipeline
         lgr.debug("Node: %s" % node)
-        prev_stats = data.get('datalad_stats', None)  # so we could check if node doesn't dump it
+        prev_stats = data.get('datalad_stats', None)  # so we could check if the node doesn't dump it
         data_in_to_loop = node(data)
 
     log_level = lgr.getEffectiveLevel()
@@ -296,7 +297,7 @@ def xrun_pipeline_steps(pipeline, data, output='input'):
 
 
 def _compare_dicts(d1, d2):
-    """Given two dictionary, return what keys were added, removed, changed or may be changed
+    """Given two dictionaries, return what keys were added, removed, changed or might be changed
     """
     added, removed, changed, maybe_changed = [], [], [], []
     all_keys = set(d1).union(set(d2))
@@ -376,7 +377,7 @@ def load_pipeline_from_module(module, func=None, args=None, kwargs=None):
     try:
         sys.path.insert(0, dirname_)
         modname = basename(module)[:-3]
-        # To allow for relative imports within "stock" pipelines
+        # to allow for relative imports within "stock" pipelines
         if dirname_ == opj(dirname(__file__), 'pipelines'):
             mod = __import__('datalad.crawler.pipelines.%s' % modname,
                              fromlist=['datalad.crawler.pipelines'])
@@ -394,7 +395,7 @@ def load_pipeline_from_module(module, func=None, args=None, kwargs=None):
 
 
 def _find_pipeline(name):
-    """Given a name for a pipeline, looks for it under common locations
+    """Given a name for a pipeline, looks for the pipeline under common locations
     """
     def candidates(name):
         if not name.endswith('.py'):
@@ -427,7 +428,7 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
     Parameters
     ----------
     name: str
-        Name of the pipeline defining the filename. Or full path to it (TODO)
+        Name of the pipeline defining the filename, or the full path to it (TODO)
     args: dict, optional
         Positional args for the pipeline, passed as `*args` into the pipeline call
     kwargs: dict, optional
@@ -437,7 +438,7 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
     if isabs(name) or exists(name):
         raise NotImplementedError("Don't know how to import straight path %s yet" % name)
 
-    # explicit isabs since might not exist
+    # explicit isabs since it might not exist
     filename = name \
         if (isabs(name) or exists(name)) \
         else _find_pipeline(name)
@@ -458,15 +459,15 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
 
-    Typical example description
+    Typical example description:
 
         [crawl:pipeline]
         pipeline = standard
         func = pipeline1
         _kwarg1 = 1
 
-    which would instantial pipeline from standard.py module by calling
-    `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
+    which would instantiate a pipeline from standard.py module by calling
+    `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to:
 
         [crawl:pipeline]
         pipeline = standard?func=pipeline1&_kwarg1=1
@@ -519,7 +520,7 @@ def get_repo_pipeline_config_path(repo_path=curdir):
 
 
 def get_repo_pipeline_script_path(repo_path=curdir):
-    """If there is a single pipeline present among pipelines/ return path to it"""
+    """If there is a single pipeline present among 'pipelines/', return path to it"""
     # TODO: somewhat adhoc etc -- may be improve with some dedicated name being
     # tracked or smth like that
     if not exists(opj(repo_path, HANDLE_META_DIR)):

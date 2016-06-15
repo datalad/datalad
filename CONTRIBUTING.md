@@ -142,7 +142,6 @@ provided by [Sphinx].
 [Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
 [Sphinx]: http://www.sphinx-doc.org/en/stable/
 
-
 Additional Hints
 ----------------
 
