@@ -63,7 +63,7 @@ class Save(Interface):
 
     @staticmethod
     @datasetmethod(name='save')
-    def __call__(message, dataset=None, auto_add_changes=True, version_tag=None):
+    def __call__(message, dataset=None, auto_add_changes=False, version_tag=None):
 
         # shortcut
         ds = dataset

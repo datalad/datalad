@@ -138,7 +138,8 @@ def test_create(path):
     # ben: it currently does, since 'save' was changed to call git add as well
     # as git annex add. Therefore outcommenting. Please review, whether this is
     # intended behaviour. I think so.
-    ds.save('submodule with content')
+    # MIH: Now it need a flag to perform this (see #546)
+    ds.save('submodule with content', auto_add_changes=True)
     # assert_not_in("sub", ds.get_dataset_handles())
     # # we need to install the submodule again in the parent
     # # an actual final commit is not required
