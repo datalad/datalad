@@ -17,7 +17,7 @@ import logging
 from subprocess import Popen
 from shlex import split as sh_split
 
-from datalad.support.network import RI, URL, SSHRI
+from datalad.support.network import RI, is_ssh
 
 # TODO: centralize AppDirs (=> datalad.config?)
 from appdirs import AppDirs
@@ -149,9 +149,8 @@ class SSHManager(object):
         # parse url:
         sshri = RI(url)
 
-        if not isinstance(sshri, SSHRI) \
-                and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
-                    raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(url))
+        if not is_ssh(sshri):
+            raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(url))
 
         # determine control master:
         ctrl_path = "%s/%s" % (self.socket_dir, sshri.hostname)
