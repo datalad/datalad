@@ -200,16 +200,17 @@ class DsModel(object):
 @auto_repr
 class FsModel(DsModel):
 
-    __slots__ = ['_path', '_info', '_repo']
+    __slots__ = ['_path', '_info', 'repo']
 
-    def __init__(self, path, repo=""):
-        self._path = path  # can be overridden
+    def __init__(self, path, repo=None):
+        self._path = path  # fs path to the node, can be overridden
         self._info = None
-        self._repo = repo
+        self.repo = repo  # an object of the parent repository class the node is associated with
         self._branch = None
 
     @property
-    def _symlink(self):
+    def symlink(self):
+        """if symlink returns path the symlink points to else returns False"""
         if islink(self._path):                    # if symlink
             target_path = readlink(self._path)    # find link target
             # convert to absolute path if not
@@ -218,47 +219,41 @@ class FsModel(DsModel):
         return False
 
     @property
-    def repo(self):
-        if exists(opj(self._repo, ".git", "annex")):
-            return AnnexRepo(self._repo)
-        elif exists(opj(self._repo, ".git")):
-            return GitRepo(self._repo)
-        else:
-            return None
-
-    @property
     def date(self):
-        """Date of last modification
-        """
-        if self._type is not ['git', 'annex']:
+        """Date of last modification"""
+        if self.type_ is not ['git', 'annex']:
             return lstat(self._path).st_mtime
         else:
             super(self.__class__, self).date
 
     @property
     def size(self):
-        _type = self._type
-        if not _type:
+        """Size of the node computed based on its type"""
+        type_ = self.type_
+        if not type_:
             return -1
-        if 'annex' in _type:
+        if 'annex' == type_:
             return self.annex_local_size
-        elif 'git' in _type:
+        elif 'git' == type_:
             return self.git_local_size
-        elif 'file' in _type:
+        elif 'file' == type_:
             return lstat(self._path).st_size
-        elif 'broken-link' in _type:
+        elif 'broken-link' == type_:
             return 0
-        elif 'link' in _type:
-            return lstat(self._symlink).st_size
-        elif 'dir' in _type:
+        elif 'link' == type_:
+            return lstat(self.symlink).st_size
+        elif 'dir' == type_:
             return lstat(self._path).st_size  # add du -s command for plain dir
         else:
             return -1
 
     @property
-    def _type(self):
+    def type_(self):
+        """outputs the node type
+
+        Types: link, broken-link, file, dir, annex-repo, git-repo"""
         if islink(self.path):
-            return 'broken-link' if not self._symlink else 'link'
+            return 'broken-link' if not self.symlink else 'link'
         elif isfile(self.path):
             return 'file'
         elif exists(opj(self.path, ".git", "annex")):
@@ -272,6 +267,7 @@ class FsModel(DsModel):
 
     @property
     def git_local_size(self):
+        """computes the disk space used by unpacked object files in the git repository"""
         try:
             describe, outerr = self.repo._git_custom_command([], ['git', 'count-objects', '-v'])[0].split('\n')
             size = [item for item in describe if 'size: ' in item][0].split(': ')
@@ -387,11 +383,24 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         print(ds_str)
 
 
-def JsonFormatter(path, repo, _type, size, date):
+def repo(path):
+    """returns repository class the path is associated with
+
+    useful for getting repository specific information about the path"""
+    if exists(opj(path, ".git", "annex")):
+        return AnnexRepo(path)
+    elif exists(opj(path, ".git")):
+        return GitRepo(path)
+    else:
+        return None
+
+
+def JsonFormatter(path, repo, type_, size, date):
+    """formats node info into a json array element"""
     pretty_size = humanize.naturalsize(size)
     pretty_date = time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(date))
     json_fmt = u'{\"path\": \"%s\", \"repo\": \"%s\", \"type\": \"%s\", \"size\": \"%s\", \"date\": \"%s\"}'
-    return json_fmt % (path, repo, _type, pretty_size, pretty_date)
+    return json_fmt % (path, repo.path, type_, pretty_size, pretty_date)
 
 
 def _flatten(listoflists):
@@ -409,7 +418,9 @@ def _flatten(listoflists):
 
 
 def _fs_traverse(loc, recursive=False):
-    """takes a path and returns a list of (not git/annex) nodes
+    """takes a root path and returns a (recursive) list of nodes in the directory tree
+
+    does not traverse into git or annex directories
     """
     # if node is a file, symlink or under git or git_annex
     if isfile(loc) or islink(loc) or isdir(opj(loc, ".git")) or isdir(opj(loc, ".git", "annex")):
@@ -443,16 +454,20 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
         if not path:
             path = '.'
         ds_model.path = path
+
         # unwrap top git directory and run traversal on each non .git node
         fs.append(_flatten([path, [_fs_traverse(subdir, recursive=True)
                                    for subdir in listdir(path)
                                    if '.git' not in subdir]]))
 
+    # create git/annex repo object once for each submodule in current tree
+    repo_ = [repo(fss[0]) for fss in fs]
     # attach the FSModel to each node in the traversed fs tree
-    fsm = [FsModel(node, fss[0]) for fss in fs for node in fss]
-    print '[' + JsonFormatter(fsm[0]._path, fsm[0]._repo, fsm[0]._type, fsm[0].size, fsm[0].date)
+    fsm = [FsModel(node, repo_[fs.index(fss)]) for fss in fs for node in fss]
+    # format directory tree into a json array
+    print '[' + JsonFormatter(fsm[0]._path, fsm[0].repo, fsm[0].type_, fsm[0].size, fsm[0].date)
     for item in fsm[1:]:
-        print ', ' + JsonFormatter(item._path, item._repo, item._type, item.size, item.date)
+        print ', ' + JsonFormatter(item._path, item.repo, item.type_, item.size, item.date)
     print ']'
 
 #
