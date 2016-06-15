@@ -12,6 +12,7 @@
 # Import necessary nodes
 from ..nodes.misc import assign
 from ..nodes.misc import switch
+from ..nodes.misc import continue_if
 from ..nodes.matches import a_href_match
 from ..nodes.s3 import crawl_s3
 from ..nodes.annex import Annexificator
@@ -111,18 +112,19 @@ class crawl_mindar_images03(object):
 
         db = get_oracle_db()
 
-        query = "SELECT %s FROM IMAGE03 WHERE COLLECTION_ID=%d" \
+        query = "SELECT %s FROM IMAGE03 WHERE COLLECTION_ID=%s" \
                 % (','.join(image03_fields), self.collection)
         c = db.cursor()
         c.execute(query)
         # query and wrap into named tuples to ease access
+        #import ipdb; ipdb.set_trace()
         for rec in c.fetchall():  # TODO -- better access method?
             rec = image03_Record(*rec)
             for field in image03_file_fields:
                 url = getattr(rec, field)
                 if url:
                     # generate a new
-                    data_ = updated(data, {
+                    yield updated(data, {
                         'url': url,
                     })
         c.close()
@@ -152,6 +154,6 @@ def pipeline(collection, archives=None):
 
     return [
         crawl_mindar_images03(collection),
-        a_href_match("s3://(?P<bucket>[^/]*)/submission_(?P<url_submission_id>[0-9]*)/(?P<filename>.*)$"),
+        continue_if({'url': "s3://(?P<bucket>[^/]*)/submission_(?P<url_submission_id>[0-9]*)/(?P<filename>.*[^/])$"}, re=True),
         annex,
     ]

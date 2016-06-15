@@ -180,7 +180,8 @@ class _act_if(object):
           FinishPipeline if all keys have matched target values
         re: bool, optional
           If specified values to be treated as regular expression to be
-          searched
+          searched. If re and expression includes groups, those will also
+          populate yielded data
         negate: bool, optional
           Reverses, so acts (skips, etc) if no match
         """
@@ -189,22 +190,30 @@ class _act_if(object):
         self.negate = negate
 
     def __call__(self, data):
+        #import ipdb; ipdb.set_trace()
         comp = re.search if self.re else lambda x, y: x == y
         matched = True
         # finds if all match
+        data_ = data.copy()
         for k, v in iteritems(self.values):
-            if not (k in data and comp(v, data[k])):
+            res = k in data and comp(v, data[k])
+            if not res:
                 # do nothing and pass the data further
                 matched = False
                 break
+            if self.re:
+                assert(res)
+                data_.update(res.groupdict())
 
-        if matched != self.negate:
-            for v in self._act(data):
-                yield v
-        else:
-            yield data
+        for v in (self._act_mismatch
+                  if matched != self.negate
+                  else self._act_match)(data_):
+            yield v
 
-    def _act(self, data):
+    def _act_mismatch(self, data):
+        raise NotImplementedError
+
+    def _act_match(self, data):
         raise NotImplementedError
 
 
@@ -212,16 +221,34 @@ class _act_if(object):
 class interrupt_if(_act_if):
     """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
 
-    def _act(self, data):
+    def _act_mismatch(self, data):
         raise FinishPipeline
+
+    def _act_match(self, data):
+        return [data]
 
 
 @auto_repr
 class skip_if(_act_if):
     """Skip (do not yield anything) further pipeline processing whenever obtained data matches provided value(s)"""
 
-    def _act(self, data):
+    def _act_mismatch(self, data):
         return []  # nothing will be yielded etc
+
+    def _act_match(self, data):
+        return [data]
+
+
+@auto_repr
+class continue_if(_act_if):
+    """Continue if matched"""
+
+    # ?????
+    def _act_mismatch(self, data):
+        return [data]
+
+    def _act_match(self, data):
+        return []
 
 
 @auto_repr

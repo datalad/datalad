@@ -63,7 +63,7 @@ def get_oracle_db(
 
     import cx_Oracle   # you must have the beast if you want to access the dark side
     dsnStr = cx_Oracle.makedsn(dbserver, port, sid)
-    db = cx_Oracle.connect(user=credential['username'],
+    db = cx_Oracle.connect(user=credential['user'],
                            password=credential['password'],
                            dsn=dsnStr)
 
