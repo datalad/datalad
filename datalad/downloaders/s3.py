@@ -27,6 +27,7 @@ from .base import Authenticator
 from .base import BaseDownloader
 from .base import DownloadError, AccessDeniedError, TargetFileAbsent
 from ..support.s3 import boto, S3ResponseError, OrdinaryCallingFormat
+from ..support.s3 import get_bucket
 from ..support.status import FileStatus
 
 import logging
@@ -53,7 +54,7 @@ class S3Authenticator(Authenticator):
         bucket
         """
         lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
-        credentials = credential()
+
         if not boto:
             raise RuntimeError("%s requires boto module which is N/A" % self)
 
@@ -67,31 +68,17 @@ class S3Authenticator(Authenticator):
         # credential might contain 'session' token as well
         # which could be provided   as   security_token=<token>.,
         # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
+        conn_kwargs = {}
+        if bucket_name.lower() != bucket_name:
+            # per http://stackoverflow.com/a/19089045/1265472
+            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
+        credentials = credential()
         conn = boto.connect_s3(
             credentials['key_id'], credentials['secret_id'],
             security_token=credentials.get('session'),
-            # per http://stackoverflow.com/a/19089045/1265472
-            calling_format=OrdinaryCallingFormat() \
-                if bucket_name.lower() != bucket_name else None
+            **conn_kwargs
         )
-        try:
-            bucket = conn.get_bucket(bucket_name)
-        except S3ResponseError as e:
-            # can initially deny or error to connect to the specific bucket by name,
-            # and we would need to list which buckets are available under following
-            # credentials:
-            lgr.debug("Cannot access bucket %s by name", bucket_name)
-            all_buckets = conn.get_all_buckets()
-            all_bucket_names = [b.name for b in all_buckets]
-            lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
-            if bucket_name in all_bucket_names:
-                bucket = all_buckets[all_bucket_names.index(bucket_name)]
-            elif e.error_code == 'AccessDenied':
-                raise AccessDeniedError(exc_str(e))
-            else:
-                raise DownloadError("No S3 bucket named %s found. Initial exception: %s"
-                                    % (bucket_name, exc_str(e)))
-
+        bucket = get_bucket(conn, bucket_name)
         return bucket
 
 

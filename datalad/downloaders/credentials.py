@@ -20,12 +20,16 @@ https://github.com/omab/python-social-auth
     frameworks and auth providers
 """
 
+import time
+import calendar
+
 from collections import OrderedDict
 
 from ..dochelpers import exc_str
 from ..support.keyring_ import keyring as keyring_
 from ..ui import ui
 from ..utils import auto_repr
+from ..support.network import iso8601_to_epoch
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders.credentials')
@@ -71,7 +75,7 @@ class Credential(object):
         for f, fattrs in self._FIELDS.items():
             unknown_attrs = set(fattrs).difference(self._KNOWN_ATTRS)
             if unknown_attrs:
-                raise ValueError("Uknown attributes %s. Known are: %s"
+                raise ValueError("Unknown attributes %s. Known are: %s"
                                  % (unknown_attrs, self._KNOWN_ATTRS))
 
     def _is_field_optional(self, f):
@@ -133,6 +137,16 @@ class Credential(object):
                                  % (f, self._FIELDS.keys()))
             self._keyring.set(self.name, f, v)
 
+    def get(self, f, default=None):
+        """Get a field of the credential"""
+        if f not in self._FIELDS:
+            raise ValueError("Unknown field %s. Known are: %s"
+                             % (f, self._FIELDS.keys()))
+        try:
+            return self._keyring.get(self.name, f)
+        except:
+            return default
+
     def delete(self):
         """Deletes credential values from the keyring"""
         for f in self._FIELDS:
@@ -145,6 +159,8 @@ class UserPassword(Credential):
     _FIELDS = OrderedDict([('user', {}),
                            ('password', {'hidden': True})])
 
+    is_expired = False  # no expiration provisioned
+
 
 class AWS_S3(Credential):
     """Credential for AWS S3 service"""
@@ -154,6 +170,20 @@ class AWS_S3(Credential):
                            ('session', {'optional': True}),
                            ('expiration', {'optional': True}),
                            ])
+
+    @property
+    def is_expired(self):
+        exp = self.get('expiration', None)
+        if not exp:
+            return True
+        exp_epoch = iso8601_to_epoch(exp)
+        expire_in = (exp_epoch - calendar.timegm(time.localtime()))/3600.
+
+        lgr.debug(
+            ("Credential %s has expired %.2fh ago"
+                if expire_in <= 0 else "Credential %s will expire in %.2fh")
+            % (self.name, expire_in))
+        return expire_in <= 0
 
 
 @auto_repr
@@ -202,7 +232,7 @@ class CompositeCredential(Credential):
         # Start from the tail until we have credentials set
         idx = len(self._credentials) - 1
         for c in self._credentials[::-1]:
-            if c.is_known:
+            if c.is_known and not c.is_expired:
                 break
             idx -= 1
 
