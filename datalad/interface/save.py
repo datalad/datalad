@@ -97,11 +97,10 @@ class Save(Interface):
             files = [ds.path]
 
         if files:  # could still be none without auto add changes
-            for f in files:
-                absf = abspath(f)
-                # XXX Is there a better way to handle files in mixed repos?
-                ds.repo.add(absf)
-                ds.repo.add(absf, git=True)
+            absf = [abspath(f) for f in files]
+            # XXX Is there a better way to handle files in mixed repos?
+            ds.repo.add(absf)
+            ds.repo.add(absf, git=True)
 
         if ds.repo.repo.is_dirty(
                 index=True,
