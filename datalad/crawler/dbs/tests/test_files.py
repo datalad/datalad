@@ -37,7 +37,7 @@ def _test_AnnexDB(cls, path):
     db = cls(annex=annex)
 
     def set_db_status_from_file(fpath):
-        """To test JsonFileStatusesDB we need to keep updating status stored"""
+        """To test JsonFileStatusesDB, we need to keep updating the status stored"""
         if cls is JsonFileStatusesDB:
             # we need first to set the status
             db.set(fpath, db._get_fileattributes_status(fpath))
@@ -55,7 +55,6 @@ def _test_AnnexDB(cls, path):
     assert_false(db.is_different('file1.txt', status1_))
     status1_.filename = 'different.txt'
     assert_true(db.is_different('file1.txt', status1_))
-
 
     os.unlink(filepath1)  # under annex- - we don't have unlock yet and thus can't inplace augment
     with open(filepath1, 'a') as f:
@@ -84,11 +83,11 @@ def _test_AnnexDB(cls, path):
     # known as "deleted"
     assert_equal(db.get_obsolete(), [])
 
-    # Possibly save its state to persistent storage
+    # Possibly save its state for persistent storage
     #import pdb; pdb.set_trace()
     db.save()
 
-    # but if we create another db which wasn't queried yet
+    # but, if we create another DB which wasn't queried yet
     db2 = cls(annex=annex)
     # all files should be returned
     assert_equal(
@@ -101,13 +100,13 @@ def _test_AnnexDB(cls, path):
             set(db2.get_obsolete()),
             {opj(path, p) for p in ['file1.txt', '2git']})
 
-    # and if we queried with ./ prefix, should work still
+    # and if we queried with ./ prefix, should still work
     db2.get(curdir + sep + 'file1.txt')
     assert_equal(
             set(db2.get_obsolete()),
             {opj(path, p) for p in ['2git']})
 
-    # and if we queried with full path, should work still
+    # and if we queried with a full path, should still work
     db2.get(opj(path, '2git'))
     assert_equal(db2.get_obsolete(), [])
 
