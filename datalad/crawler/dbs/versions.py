@@ -29,7 +29,7 @@ class SingleVersionDB(JsonBaseDB):
     """
     Simple helper to store/retrieve information about the last scraped version
 
-    Since we do not expect many changes being done to this DB it also
+    Since we do not expect many changes being done to this DB, it also
     saves its state into the file upon any change
     """
     __version__ = 1
@@ -55,7 +55,7 @@ class SingleVersionDB(JsonBaseDB):
         """Return DB to be saved as JSON file
         """
         db = self._db.copy()
-        # since we have it ordered, let's store as list of items
+        # since we have it ordered, let's store it as a list of items
         db['versions'] = list(db['versions'].items())
         return db
 

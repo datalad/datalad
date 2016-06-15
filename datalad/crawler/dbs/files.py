@@ -37,10 +37,10 @@ class PhysicalFileStatusesDB(FileStatusesBaseDB):
     """Non-persistent DB based on file attributes
 
     It uses file modification times and size as known to annex to deduce
-    if new version is available
+    if a new version is available
 
-    In general should not be used since neither git nor annex stores any files
-    meta-information (besides mode, and size) so mtime would get lost while switching
+    In general, this should not be used since neither git nor annex stores any files
+    meta-information (besides mode and size), so mtime would get lost while switching
     the branches and dropping the load
     """
 
@@ -75,7 +75,7 @@ class PhysicalFileStatusesDB(FileStatusesBaseDB):
         )
 
     def _set(self, filepath, status):
-        # This DB doesn't implement much of it, besides marking internally that we do care about this file
+        # this DB doesn't implement much of it, besides marking internally that we do care about this file
         pass
 
     def save(self):
@@ -88,7 +88,7 @@ class PhysicalFileStatusesDB(FileStatusesBaseDB):
 
 @auto_repr
 class JsonFileStatusesDB(JsonBaseDB, PhysicalFileStatusesDB):
-    """Persistent DB to store information about files' size/mtime/filename in a json file
+    """Persistent DB to store information about files' size/mtime/filename in a JSON file
     """
 
     __version__ = 1
