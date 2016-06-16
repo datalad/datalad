@@ -110,6 +110,11 @@ def alter_interface_docs_for_cmdline(docs):
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
+    # remove :term:`...` RST markup for cmdline docs
+    docs = re.sub(
+        r':term:`.*`[\\]*',
+        lambda match: match.group(0)[7:].strip('`\\'),
+        docs)
     # remove None constraint. In general, `None` on the cmdline means don't
     # give option at all, but specifying `None` explicitly is practically
     # impossible

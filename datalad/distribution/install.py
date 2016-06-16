@@ -223,9 +223,9 @@ class Install(Interface):
     """Install a dataset component or entire dataset(s).
 
     This command can make arbitrary content available in a dataset. This
-    includes the fulfillment of existing subdataset or file handles
-    in a dataset, as well as the addition of sudatasets and such handles for
-    content available locally or remotely.
+    includes the fulfillment of existing :term:`subdataset` or file handles in
+    a dataset, as well as the addition of subdatasets and such handles for
+    content available locally or subdataset remotely.
     """
 
     _params_ = dict(
