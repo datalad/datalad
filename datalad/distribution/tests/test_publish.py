@@ -41,7 +41,7 @@ def test_publish_simple(origin, src_path, dst_path):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
@@ -102,7 +102,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 
     # create plain git at target:
@@ -160,7 +160,7 @@ def test_publish_submodule(origin, src_path, target_1, target_2):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 
     # first, try publishing from super dataset using `path`
@@ -202,7 +202,7 @@ def test_publish_with_data(origin, src_path, dst_path):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     source.repo.get('test-annex.dat')
 
@@ -236,13 +236,13 @@ def test_publish_with_data(origin, src_path, dst_path):
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_publish_file_handle(origin, src_path, dst_path):
+def test_publish_file(origin, src_path, dst_path):
 
     # prepare src
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     source.repo.get('test-annex.dat')
 
@@ -253,13 +253,13 @@ def test_publish_file_handle(origin, src_path, dst_path):
     target.checkout("TMP", "-b")
     source.repo.add_remote("target", dst_path)
 
-    # directly publish a file handle, not the dataset itself:
+    # directly publish a file, not the dataset itself:
     res = publish(dataset=source, dest="target", path="test-annex.dat")
     eq_(res, opj(source.path, 'test-annex.dat'))
 
     # only file was published, not the dataset itself:
     assert_not_in("master", target.get_branches())
-    eq_(Dataset(dst_path).get_dataset_handles(), [])
+    eq_(Dataset(dst_path).get_subdatasets(), [])
     assert_not_in("test.dat", target.get_files())
 
     # content is now available from 'target':
@@ -289,7 +289,7 @@ def test_publish_file_handle(origin, src_path, dst_path):
 #     source = install(path=src_path, source=origin, recursive=True)
 #     # TODO: For now, circumnavigate the detached head issue.
 #     # Figure out, what to do.
-#     for subds in source.get_dataset_handles(recursive=True):
+#     for subds in source.get_subdatasets(recursive=True):
 #         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 #     sub1 = GitRepo(opj(src_path, 'sub1'))
 #     sub2 = GitRepo(opj(src_path, 'sub2'))

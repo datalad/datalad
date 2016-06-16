@@ -28,7 +28,7 @@ lgr = getLogger('datalad.api.clean')
 
 
 class Clean(Interface):
-    """Clean up after DataLad (e.g. extracted temporary archives etc)
+    """Clean up after DataLad (e.g. extracted temporary archives, etc)
 
     Examples:
 

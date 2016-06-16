@@ -65,6 +65,7 @@ install:
   - sudo sed -i -e 's/^Defaults.*secure_path.*$//' /etc/sudoers
   # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
   - pip install sphinx
+  - pip install sphinx_rtd_theme
 
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi

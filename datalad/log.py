@@ -7,14 +7,17 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-import logging, os, sys, platform
+import logging
+import os
+import sys
+import platform
 import logging.handlers
 
 from os.path import basename, dirname
 
 from .utils import is_interactive
 
-__all__ = ['ColorFormatter', 'log']
+__all__ = ['ColorFormatter']
 
 # Snippets from traceback borrowed from duecredit which was borrowed from
 # PyMVPA upstream/2.4.0-39-g69ad545  MIT license (the same copyright as DataLad)
@@ -99,11 +102,11 @@ class ColorFormatter(logging.Formatter):
     BOLD_SEQ = "\033[1m"
 
     COLORS = {
-      'WARNING': YELLOW,
-      'INFO': WHITE,
-      'DEBUG': BLUE,
-      'CRITICAL': YELLOW,
-      'ERROR': RED
+        'WARNING': YELLOW,
+        'INFO': WHITE,
+        'DEBUG': BLUE,
+        'CRITICAL': YELLOW,
+        'ERROR': RED
     }
 
     def __init__(self, use_color=None, log_name=False, log_pid=False):
@@ -191,7 +194,6 @@ class LoggerHelper(object):
 
         self.lgr.setLevel(log_level)
 
-
     def get_initialized_logger(self, logtarget=None):
         """Initialize and return the logger
 
@@ -217,7 +219,7 @@ class LoggerHelper(object):
                 self.get_initialized_logger(logtarget=handler_)
             return self.lgr
 
-        if logtarget.lower() in ('stdout', 'stderr') :
+        if logtarget.lower() in ('stdout', 'stderr'):
             loghandler = logging.StreamHandler(getattr(sys, logtarget.lower()))
             use_color = is_interactive()  # explicitly decide here
         else:
@@ -242,4 +244,3 @@ class LoggerHelper(object):
         return self.lgr
 
 lgr = LoggerHelper().get_initialized_logger()
-

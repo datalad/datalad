@@ -15,14 +15,19 @@ import types
 
 from six import PY3
 
-from scrapy.selector import Selector
-from scrapy.http import Response
-
 from ...utils import updated
 from ...support.network import dlurljoin
 
 from logging import getLogger
 lgr = getLogger('datalad.crawler')
+
+from scrapy.http import Response
+try:
+    from scrapy.selector import Selector
+except ImportError:
+    lgr.debug("Failed to import Selector from scrapy, so matches would not be functional")
+    class Selector(object):
+        xpath = css = None
 
 
 # for now heavily based on scrapy but we might make the backend

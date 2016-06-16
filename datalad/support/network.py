@@ -623,6 +623,7 @@ class SSHRI(RI, RegexBasedURLMixin):
     _FIELDS = RI._FIELDS + (
         'username',
         'hostname',
+        'port',
     )
 
     _REGEX = re.compile(r'((?P<username>\S*)@)?(?P<hostname>[^:]+)(\:(?P<path>.*))?$')
@@ -710,6 +711,27 @@ def is_url(s):
     except:
         return False
     return isinstance(ri, (URL, SSHRI))
+
+
+# TODO: better name? additionally may be move to SSHRI.is_valid() or sth.
+def is_ssh(ri):
+    """helper to determine, whether `ri` requires an SSH connection
+
+    Parameters
+    ----------
+    ri: str or RI
+
+    Returns
+    -------
+    bool
+    """
+
+    # not exactly fitting the doc, but we actually can deal not necessarily with
+    # string or RI only, but with everything RI itself can deal with:
+    _ri = RI(ri) if not isinstance(ri, RI) else ri
+
+    return isinstance(_ri, SSHRI) or \
+           (isinstance(_ri, URL) and _ri.scheme == 'ssh')
 
 
 #### windows workaround ###

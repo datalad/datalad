@@ -246,18 +246,6 @@ def get_repo_instance(path=curdir, class_=None):
         raise RuntimeError("No datalad repository found in %s" % abspath_)
 
 
-# Do some centralizing of things needed by the datalad API:
-# TODO: May be there should be a dedicated class for the master collection.
-# For now just use helper functions to clean up the implementations of the API.
-# Design decision about this also depends on redesigning the handle/collection
-# classes (Metadata class => Backends => Repos).
-# The local master used by datalad is not a technically special
-# collection, but a collection with a special purpose for its "user",
-# who is datalad. So, deriving a class from Collection(Repo) and make common
-# tasks methods of this class might be an option either way. Also might become
-# handy, once we decide to have several "masters" (user-level, sys-level, etc.)
-
-
 from appdirs import AppDirs
 from os.path import join as opj
 
