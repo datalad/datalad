@@ -207,6 +207,8 @@ def get_containing_subdataset(ds, path):
     """
 
     if is_explicit_path(path) and not path.startswith(ds.path):
+        # TODO: - move to dataset class
+        #       - have dedicated exception
         raise ValueError("path {0} not in dataset.".format(path))
 
     for subds in ds.get_dataset_handles():

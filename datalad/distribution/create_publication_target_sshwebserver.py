@@ -314,3 +314,4 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                          force=existing in {'replace'})
 
         # TODO: Return value!?
+        #       => [(Dataset, fetch_url)]
