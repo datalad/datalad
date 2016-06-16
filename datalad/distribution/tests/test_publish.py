@@ -151,46 +151,46 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
         list(sub2.get_branch_commits("git-annex")))
 
 
-@with_testrepos('submodule_annex', flavors=['clone'])
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_publish_submodule(origin, src_path, target_1, target_2):
-    # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
-
-    # first, try publishing from super dataset using `path`
-    source_super = source
-    source_sub = Dataset(opj(src_path, 'sub1'))
-    target = GitRepo(target_1, create=True)
-    target.checkout("TMP", "-b")
-    source_sub.repo.add_remote("target", target_1)
-
-    res = publish(dataset=source_super, dest="target", path="sub1")
-    assert_is_instance(res, Dataset)
-    eq_(res.path, source_sub.path)
-
-    eq_(list(GitRepo(target_1, create=False).get_branch_commits("master")),
-        list(source_sub.repo.get_branch_commits("master")))
-    eq_(list(GitRepo(target_1, create=False).get_branch_commits("git-annex")),
-        list(source_sub.repo.get_branch_commits("git-annex")))
-
-    # now, publish directly from within submodule:
-    target = GitRepo(target_2, create=True)
-    target.checkout("TMP", "-b")
-    source_sub.repo.add_remote("target2", target_2)
-
-    res = publish(dataset=source_sub, dest="target2")
-    eq_(res, source_sub)
-
-    eq_(list(GitRepo(target_2, create=False).get_branch_commits("master")),
-        list(source_sub.repo.get_branch_commits("master")))
-    eq_(list(GitRepo(target_2, create=False).get_branch_commits("git-annex")),
-        list(source_sub.repo.get_branch_commits("git-annex")))
+# @with_testrepos('submodule_annex', flavors=['clone'])
+# @with_tempfile(mkdir=True)
+# @with_tempfile(mkdir=True)
+# @with_tempfile(mkdir=True)
+# def test_publish_submodule(origin, src_path, target_1, target_2):
+#     # prepare src
+#     source = install(path=src_path, source=origin, recursive=True)
+#     # TODO: For now, circumnavigate the detached head issue.
+#     # Figure out, what to do.
+#     for subds in source.get_dataset_handles(recursive=True):
+#         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
+#
+#     # first, try publishing from super dataset using `path`
+#     source_super = source
+#     source_sub = Dataset(opj(src_path, 'sub1'))
+#     target = GitRepo(target_1, create=True)
+#     target.checkout("TMP", "-b")
+#     source_sub.repo.add_remote("target", target_1)
+#
+#     res = publish(dataset=source_super, dest="target", path="sub1")
+#     assert_is_instance(res, Dataset)
+#     eq_(res.path, source_sub.path)
+#
+#     eq_(list(GitRepo(target_1, create=False).get_branch_commits("master")),
+#         list(source_sub.repo.get_branch_commits("master")))
+#     eq_(list(GitRepo(target_1, create=False).get_branch_commits("git-annex")),
+#         list(source_sub.repo.get_branch_commits("git-annex")))
+#
+#     # now, publish directly from within submodule:
+#     target = GitRepo(target_2, create=True)
+#     target.checkout("TMP", "-b")
+#     source_sub.repo.add_remote("target2", target_2)
+#
+#     res = publish(dataset=source_sub, dest="target2")
+#     eq_(res, source_sub)
+#
+#     eq_(list(GitRepo(target_2, create=False).get_branch_commits("master")),
+#         list(source_sub.repo.get_branch_commits("master")))
+#     eq_(list(GitRepo(target_2, create=False).get_branch_commits("git-annex")),
+#         list(source_sub.repo.get_branch_commits("git-annex")))
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -233,57 +233,10 @@ def test_publish_with_data(origin, src_path, dst_path):
     eq_(target.file_has_content(['test-annex.dat']), [True])
 
 
-@with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
-@with_tempfile(mkdir=True)
-@with_tempfile(mkdir=True)
-def test_publish_file_handle(origin, src_path, dst_path):
-
-    # prepare src
-    source = install(path=src_path, source=origin, recursive=True)
-    # TODO: For now, circumnavigate the detached head issue.
-    # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
-        AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
-    source.repo.get('test-annex.dat')
-
-    # create plain git at target:
-    target = AnnexRepo(dst_path, create=True)
-    # actually not needed for this test, but provide same setup as
-    # everywhere else:
-    target.checkout("TMP", "-b")
-    source.repo.add_remote("target", dst_path)
-
-    # directly publish a file handle, not the dataset itself:
-    res = publish(dataset=source, dest="target", path="test-annex.dat")
-    eq_(res, opj(source.path, 'test-annex.dat'))
-
-    # only file was published, not the dataset itself:
-    assert_not_in("master", target.get_branches())
-    eq_(Dataset(dst_path).get_dataset_handles(), [])
-    assert_not_in("test.dat", target.get_files())
-
-    # content is now available from 'target':
-    assert_in("target",
-              source.repo.whereis('test-annex.dat',
-                                  output="descriptions"))
-    source.repo.drop('test-annex.dat')
-    eq_(source.repo.file_has_content(['test-annex.dat']), [False])
-    source.repo._run_annex_command('get', annex_options=['test-annex.dat',
-                                                         '--from=target'])
-    eq_(source.repo.file_has_content(['test-annex.dat']), [True])
-
-    # TODO: While content appears to be available from 'target' if requested by
-    # source, target's annex doesn't know about the file.
-    # Figure out, whether this should behave differently and how ...
-    # eq_(target.file_has_content(['test-annex.dat']), [True])
-
-
-# Note: add remote currently disabled in publish
-#
-# @with_testrepos('submodule_annex', flavors=['local'])
+# @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
 # @with_tempfile(mkdir=True)
 # @with_tempfile(mkdir=True)
-# def test_publish_add_remote(origin, src_path, dst_path):
+# def test_publish_file_handle(origin, src_path, dst_path):
 #
 #     # prepare src
 #     source = install(path=src_path, source=origin, recursive=True)
@@ -291,49 +244,36 @@ def test_publish_file_handle(origin, src_path, dst_path):
 #     # Figure out, what to do.
 #     for subds in source.get_dataset_handles(recursive=True):
 #         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
-#     sub1 = GitRepo(opj(src_path, 'sub1'))
-#     sub2 = GitRepo(opj(src_path, 'sub2'))
+#     source.repo.get('test-annex.dat')
 #
-#     # create plain git at target locations:
-#     # we want to test URL-template, so create the desired list in FS at
-#     # destination:
-#     pub_path_super = opj(dst_path, basename(src_path))
-#     pub_path_sub1 = opj(dst_path, basename(src_path) + '-sub1')
-#     pub_path_sub2 = opj(dst_path, basename(src_path) + '-sub2')
-#     super_target = GitRepo(pub_path_super, create=True)
-#     super_target.checkout("TMP", "-b")
-#     sub1_target = GitRepo(pub_path_sub1, create=True)
-#     sub1_target.checkout("TMP", "-b")
-#     sub2_target = GitRepo(pub_path_sub2, create=True)
-#     sub2_target.checkout("TMP", "-b")
+#     # create plain git at target:
+#     target = AnnexRepo(dst_path, create=True)
+#     # actually not needed for this test, but provide same setup as
+#     # everywhere else:
+#     target.checkout("TMP", "-b")
+#     source.repo.add_remote("target", dst_path)
 #
-#     url_template = dst_path + os.path.sep + '%NAME'
+#     # directly publish a file handle, not the dataset itself:
+#     res = publish(dataset=source, dest="target", path="test-annex.dat")
+#     eq_(res, opj(source.path, 'test-annex.dat'))
 #
-#     res = publish(dataset=source, dest="target",
-#             dest_url=url_template,
-#             recursive=True)
+#     # only file was published, not the dataset itself:
+#     assert_not_in("master", target.get_branches())
+#     eq_(Dataset(dst_path).get_dataset_handles(), [])
+#     assert_not_in("test.dat", target.get_files())
 #
-#     # testing result list
-#     # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
-#     assert_is_instance(res, list)
-#     for item in res:
-#         assert_is_instance(item, Dataset)
-#     eq_(res[0].path, src_path)
-#     eq_(res[1].path, sub1.path)
-#     eq_(res[2].path, sub2.path)
+#     # content is now available from 'target':
+#     assert_in("target",
+#               source.repo.whereis('test-annex.dat',
+#                                   output="descriptions"))
+#     source.repo.drop('test-annex.dat')
+#     eq_(source.repo.file_has_content(['test-annex.dat']), [False])
+#     source.repo._run_annex_command('get', annex_options=['test-annex.dat',
+#                                                          '--from=target'])
+#     eq_(source.repo.file_has_content(['test-annex.dat']), [True])
 #
-#
-#     eq_(list(super_target.get_branch_commits("master")),
-#         list(source.repo.get_branch_commits("master")))
-#     eq_(list(super_target.get_branch_commits("git-annex")),
-#         list(source.repo.get_branch_commits("git-annex")))
-#
-#     eq_(list(sub1_target.get_branch_commits("master")),
-#         list(sub1.get_branch_commits("master")))
-#     eq_(list(sub1_target.get_branch_commits("git-annex")),
-#         list(sub1.get_branch_commits("git-annex")))
-#
-#     eq_(list(sub2_target.get_branch_commits("master")),
-#         list(sub2.get_branch_commits("master")))
-#     eq_(list(sub2_target.get_branch_commits("git-annex")),
-#         list(sub2.get_branch_commits("git-annex")))
+#     # TODO: While content appears to be available from 'target' if requested by
+#     # source, target's annex doesn't know about the file.
+#     # Figure out, whether this should behave differently and how ...
+#     # eq_(target.file_has_content(['test-annex.dat']), [True])
+

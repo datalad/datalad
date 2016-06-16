@@ -15,22 +15,24 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os import curdir
-from os.path import join as opj, abspath, exists, relpath
+from os.path import join as opj
 
 from six import string_types
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
-    FileNotInAnnexError
 from datalad.interface.base import Interface
-from datalad.distribution.dataset import EnsureDataset, Dataset, \
-    datasetmethod, resolve_path
-from datalad.distribution.install import get_containing_subdataset
-from datalad.cmd import CommandError
-from datalad.utils import getpwd
+from datalad.support.param import Parameter
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureListOf
+from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.utils import getpwd
+
+from .dataset import EnsureDataset
+from .dataset import Dataset
+from .dataset import datasetmethod
+from .install import get_containing_subdataset
+
 
 lgr = logging.getLogger('datalad.distribution.publish')
 
@@ -188,15 +190,25 @@ class Publish(Interface):
                         lgr.info("Publishing data of {0} ...".format(file_))
                         ds.repo.copy_to(file_, dest_resolved)
 
+        result_list = [ds]
         if recursive:
             for path in ds.get_dataset_handles():
-                Dataset(path).publish(dest=dest,
-                                      with_data=with_data,
-                                      recursive=recursive)
+                result = Dataset(opj(ds.path, path)).publish(
+                    dest=dest,
+                    with_data=with_data,
+                    recursive=recursive)
+                if isinstance(result, list):
+                    result_list += result
+                else:
+                    result_list.append(result)
 
+        if len(result_list) == 1:
+            return result_list[0]
+        else:
+            return result_list
 
         # TODO:
         # return values
-        #  - we now may have published a dataset as well as files
+        #  - we now may have published a dataset (or several) as well as files
         #  - how to return and render?
 
