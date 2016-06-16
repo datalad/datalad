@@ -177,8 +177,8 @@ class AnnexRepo(GitRepo):
                                                               option=opt)
                         except NoOptionError:
                             write = True
-                            cfg_string_old = ""
-                        if cfg_string_old != cfg_string:
+                            cfg_string_old = None
+                        if cfg_string_old and cfg_string_old != cfg_string:
                             lgr.warning("Found conflicting annex-ssh-options "
                                         "for remote '{0}':\n{1}\n"
                                         "Did not touch it.".format(
