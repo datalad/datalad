@@ -362,7 +362,7 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
                 yield data
 
     in_args = list(_string_as_list(data_args)) + list(_string_as_list(data_kwargs))
-    func_node.__doc__ = """function %s wrapped into a node.
+    func_node.__doc__ = """Function %s wrapped into a node.
 
 It expects %s keys to be provided in the data and output will be assigned to %s
 keys in the output %s

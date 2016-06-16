@@ -381,7 +381,7 @@ class Annexificator(object):
         #     # since addurl ignores annex.largefiles we need first to download that file and then
         #     # annex add it
         #     # see http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
-        #     lgr.debug("Downloading %s into %s and adding to annex" % url, filepath)
+        #     lgr.debug("Downloading %s into %s and adding to annex", url, filepath)
         #     def _download_and_git_annex_add(url, fpath):
         #         # Just to feed into _call for dry-run
         #         filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
@@ -999,7 +999,7 @@ class Annexificator(object):
           Also `last_version` is provided as the last one from stats.versions (None
           if empty)
         existing_tag: None or '+suffix', optional
-          What to do if tag already exists, if None:\, warning is issued. If `+suffix`,
+          What to do if tag already exists, if None, warning is issued. If `+suffix`,
           +0, +1, +2 ... are tried until available one is found.
         cleanup: bool, optional
           Either to perform cleanup operations, such as 'git gc' and 'datalad clean'
@@ -1049,7 +1049,7 @@ class Annexificator(object):
                         else:
                             raise ValueError(existing_tag)
                     self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (
-                    __version__, stats_str))
+                        __version__, stats_str))
 
             if cleanup:
                 total_stats = stats.get_total()
