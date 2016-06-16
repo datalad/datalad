@@ -1147,13 +1147,15 @@ class AnnexRepo(GitRepo):
     # symlink's target instead of the actual content.
 
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
-    def copy_to(self, files, remote):
+    def copy_to(self, files, remote, log_online=True):
         """Copy the actual content of `files` to `remote`
 
         Parameters
         ----------
         files
         remote
+        log_online
+            see get()
         """
 
         if remote not in self.get_remotes():
@@ -1169,7 +1171,9 @@ class AnnexRepo(GitRepo):
                                "list:\n{0}".format(files))
 
         self._run_annex_command('copy',
-                                annex_options=files + ['--to=%s' % remote])
+                                annex_options=files + ['--to=%s' % remote],
+                                log_stdout=True, log_stderr=not log_online,
+                                log_online=log_online, expect_stderr=True)
 
 
 # TODO: Why was this commented out?
