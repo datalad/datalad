@@ -45,6 +45,7 @@ from ..cmd import Runner
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
+from ..support.vcr_ import *
 from ..dochelpers import exc_str
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
@@ -54,11 +55,27 @@ from . import _TEMP_PATHS_GENERATED
 _TEMP_PATHS_CLONES = set()
 
 
+# additional shortcuts
+neq_ = assert_not_equal
+nok_ = assert_false
+
 def skip_if_no_module(module):
     try:
         imp = __import__(module)
     except Exception as exc:
         raise SkipTest("Module %s fails to load: %s" % (module, exc_str(exc)))
+
+
+def skip_if_scrapy_without_selector():
+    """A little helper to skip some tests which require recent scrapy"""
+    try:
+        import scrapy
+        from scrapy.selector import Selector
+    except ImportError:
+        from nose import SkipTest
+        raise SkipTest(
+            "scrapy misses Selector (too old? version: %s)"
+            % getattr(scrapy, '__version__'))
 
 
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
@@ -131,7 +148,7 @@ def ok_clean_git_annex_proxy(path):
     chpwd(path)
 
     try:
-        out = ar.annex_proxy("git status")
+        out = ar.proxy("git status")
     except CommandNotAvailableError as e:
         raise SkipTest
     finally:
@@ -184,6 +201,7 @@ def ok_file_under_git(path, filename=None, annexed=False):
 
     assert(annexed == in_annex)
 
+
 def put_file_under_git(path, filename=None, content=None, annexed=False):
     """Place file under git/annex and return used Repo
     """
@@ -196,11 +214,12 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add_to_annex(file_repo_path)
+        repo.add(file_repo_path, commit=True)
     else:
-        repo.git_add(file_repo_path)
+        repo.add(file_repo_path, git=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
+
 
 def _prep_file_under_git(path, filename):
     """Get instance of the repository for the given filename
@@ -276,14 +295,14 @@ def ok_git_config_not_empty(ar):
 
 
 def ok_annex_get(ar, files, network=True):
-    """Helper to run .annex_get decorated checking for correct operation
+    """Helper to run .get decorated checking for correct operation
 
-    annex_get passes through stderr from the ar to the user, which pollutes
+    get passes through stderr from the ar to the user, which pollutes
     screen while running tests
     """
     ok_git_config_not_empty(ar) # we should be working in already inited repo etc
     with swallow_outputs() as cmo:
-        ar.annex_get(files)
+        ar.get(files)
         if network:
             # wget or curl - just verify that annex spits out expected progress bar
             ok_('100%' in cmo.err or '100.0%' in cmo.err or '100,0%' in cmo.err)
@@ -456,6 +475,8 @@ def with_tempfile(t, content=None, **tkwargs):
 
     Examples
     --------
+
+    ::
 
         @with_tempfile
         def test_write(tfile):
@@ -642,8 +663,10 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
 
     Examples
     --------
+
+    >>> from datalad.tests.utils import with_testrepos
     >>> @with_testrepos('basic_annex')
-    >>> def test_write(repo):
+    ... def test_write(repo):
     ...    assert(os.path.exists(os.path.join(repo, '.git', 'annex')))
 
     """
@@ -739,6 +762,20 @@ def skip_if(func, cond=True, msg=None):
     def newfunc(*args, **kwargs):
         if cond:
             raise SkipTest(msg if msg else "condition was True")
+        return func(*args, **kwargs)
+    return newfunc
+
+
+def skip_ssh(func):
+    """Skips SSH tests if on windows or if environment variable
+    DATALAD_TESTS_SSH was not set
+    """
+    @wraps(func)
+    def newfunc(*args, **kwargs):
+        if on_windows:
+            raise SkipTest("SSH currently not available on windows.")
+        if not os.environ.get('DATALAD_TESTS_SSH'):
+            raise SkipTest("Run this test by setting DATALAD_TESTS_SSH")
         return func(*args, **kwargs)
     return newfunc
 
@@ -909,6 +946,30 @@ def get_most_obscure_supported_name(tdir):
             pass
     raise RuntimeError("Could not create any of the files under %s among %s"
                        % (tdir, OBSCURE_FILENAMES))
+
+
+@optional_args
+def with_testsui(t, responses=None):
+    """Switch main UI to be 'tests' UI and possibly provide answers to be used"""
+
+    @wraps(t)
+    def newfunc(*args, **kwargs):
+        from datalad.ui import ui
+        old_backend = ui.backend
+        try:
+            ui.set_backend('tests')
+            if responses:
+                ui.add_responses(responses)
+            ret = t(*args, **kwargs)
+            if responses:
+                responses_left = ui.get_responses()
+                assert not len(responses_left), "Some responses were left not used: %s" % str(responses_left)
+            return ret
+        finally:
+            ui.set_backend(old_backend)
+
+    return newfunc
+with_testsui.__test__ = False
 
 #
 # Context Managers

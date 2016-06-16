@@ -44,7 +44,6 @@ from .utils import assert_re_in
 from .utils import local_testrepo_flavors
 from .utils import skip_if_no_network
 from .utils import run_under_dir
-from .utils import use_cassette
 from .utils import skip_if
 from .utils import ok_file_has_content
 from .utils import without_http_proxy
@@ -120,7 +119,7 @@ def test_with_testrepos():
     check_with_testrepos()
 
     eq_(len(repos),
-        2 if on_windows # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
+        2 if on_windows  # TODO -- would fail now in DATALAD_TESTS_NONETWORK mode
           else (15 if os.environ.get('DATALAD_TESTS_NONETWORK') else 16))  # local, local-url, clone, network
 
     for repo in repos:
@@ -506,24 +505,3 @@ def test_run_under_dir(d):
     assert_raises(AssertionError, f, 1, 3)
     eq_(getpwd(), orig_pwd)
     eq_(os.getcwd(), orig_cwd)
-
-
-def test_use_cassette_if_no_vcr():
-    # just test that our do nothing decorator does the right thing if vcr is not present
-    skip = False
-    try:
-        import vcr
-        skip = True
-    except ImportError:
-        pass
-    except:
-        # if anything else goes wrong with importing vcr, we still should be able to
-        # run use_cassette
-        pass
-    if skip:
-        raise SkipTest("vcr is present, can't test behavior with vcr presence ATM")
-    @use_cassette("some_path")
-    def checker(x):
-        return x + 1
-
-    eq_(checker(1), 2)

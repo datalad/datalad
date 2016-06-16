@@ -23,6 +23,7 @@ import functools
 
 from six import PY3, PY2
 from six import string_types, binary_type
+from os.path import abspath, isabs
 
 from .dochelpers import exc_str
 from .support.exceptions import CommandError
@@ -44,8 +45,8 @@ if PY2:
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
-    An object of this class provides a methods calls shell commands or python
-    functions, allowing for protocolling the calls and output handling.
+    An object of this class provides a methods that calls shell commands or
+    python functions, allowing for protocolling the calls and output handling.
 
     Outputs (stdout and stderr) can be either logged or streamed to system's
     stdout/stderr during execution.
@@ -352,6 +353,35 @@ class Runner(object):
         else:
             lgr.log(level, "{%s} %s" % (self.protocol.__class__.__name__, msg))
 
+
+class GitRunner(Runner):
+    """
+    Runner to be used to run git and git annex commands
+
+    Overloads the runner class to check & update GIT_DIR and
+    GIT_WORK_TREE environment variables set to the absolute path
+    if is defined and is relative path
+    """
+
+    @staticmethod
+    def get_git_environ_adjusted(env=None):
+        """
+        Replaces GIT_DIR and GIT_WORK_TREE with absolute paths if relative path and defined
+        """
+        git_env = env.copy() if env else os.environ.copy()         # if env set copy else get os environment
+
+        for varstring in ['GIT_DIR', 'GIT_WORK_TREE']:
+            var = git_env.get(varstring)
+            if var:                                                # if env variable set
+                if not isabs(var):                                 # and it's a relative path
+                    git_env[varstring] = abspath(var)              # convert it to absolute path
+                    lgr.debug("Updated %s to %s" % (varstring, git_env[varstring]))
+
+        return git_env
+
+    def run(self, cmd, env=None, *args, **kwargs):
+        return super(GitRunner, self).run(
+            cmd, env=self.get_git_environ_adjusted(), *args, **kwargs)
 
 # ####
 # Preserve from previous version

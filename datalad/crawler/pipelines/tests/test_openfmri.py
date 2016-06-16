@@ -16,7 +16,7 @@ from ...nodes.matches import *
 from ...pipeline import run_pipeline, FinishPipeline
 
 from ...nodes.misc import Sink, assign, range_node, interrupt_if
-from ...nodes.annex import Annexificator, initiate_handle
+from ...nodes.annex import Annexificator, initiate_dataset
 from ...pipeline import load_pipeline_from_module
 
 from ....support.stats import ActivityStats
@@ -58,7 +58,7 @@ def check_dropall_get(repo):
     clean(annex=repo)  # remove possible extracted archives
     with assert_raises(AssertionError):
         ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
-    repo.annex_get('.')
+    repo.get('.')
     ok_file_has_content(t1w_fpath, "mighty load 2.0.0")
 
 
@@ -115,10 +115,10 @@ def __test_basic_openfmri_top_pipeline():
 
     # and sink2 should collect everything downloadable from under AWS Link section
     # test that we got all needed tags etc propagated properly!
-    all_aws_entries = sink2.get_values('dataset', 'url_text', 'url')
+    all_aws_entries = sink2.get_values(['dataset', 'url_text', 'url'])
     ok_(len(all_aws_entries) > len(urls))  # that we have at least as many ;-)
     #print('\n'.join(map(str, all_aws_entries)))
-    all_licenses = sink_licenses.get_values('dataset', 'url_text', 'url')
+    all_licenses = sink_licenses.get_values(['dataset', 'url_text', 'url'])
     eq_(len(all_licenses), len(urls))
     #print('\n'.join(map(str, all_licenses)))
 
@@ -132,12 +132,12 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     dataset_name = 'ds%06d' % dataset_index
     dataset_url = 'https://openfmri.org/dataset/' + dataset_name
     # needs to be a non-existing directory
-    handle_path = opj(path, dataset_name)
-    # we need to pre-initiate handle
-    list(initiate_handle('openfmri', dataset_index, path=handle_path)())
+    dataset_path = opj(path, dataset_name)
+    # we need to pre-initiate dataset
+    list(initiate_dataset('openfmri', dataset_index, path=dataset_path)())
 
     annex = Annexificator(
-        handle_path,
+        dataset_path,
         create=False,  # must be already initialized etc
         options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
 
@@ -190,9 +190,9 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @with_tempfile
 def test_openfmri_pipeline1(ind, topurl, outd):
 
-    list(initiate_handle(
+    list(initiate_dataset(
         template="openfmri",
-        handle_name='dataladtest-ds666',
+        dataset_name='dataladtest-ds666',
         path=outd,
         data_fields=['dataset'])({'dataset': 'ds666'}))
 
@@ -204,20 +204,20 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     repo = AnnexRepo(outd, create=False)  # to be used in the checks
     # Inspect the tree -- that we have all the branches
     branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
-    eq_(set(repo.git_get_branches()), branches)
+    eq_(set(repo.get_branches()), branches)
     # We do not have custom changes in master yet, so it just follows incoming-processed atm
-    # eq_(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
-    # Since we did initiate_handle -- now we have separate master!
-    assert_not_equal(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
+    # eq_(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
+    # Since we did initiate_dataset -- now we have separate master!
+    assert_not_equal(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
     # and that one is different from incoming
-    assert_not_equal(repo.git_get_hexsha('incoming'), repo.git_get_hexsha('incoming-processed'))
+    assert_not_equal(repo.get_hexsha('incoming'), repo.get_hexsha('incoming-processed'))
 
     # actually the tree should look quite neat with 1.0.0 tag having 1 parent in incoming
     # 1.0.1 having 1.0.0 and the 2nd commit in incoming as parents
 
-    commits = {b: list(repo.git_get_branch_commits(b)) for b in branches}
-    commits_hexsha = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
-    commits_l = {b: list(repo.git_get_branch_commits(b, limit='left-only')) for b in branches}
+    commits = {b: list(repo.get_branch_commits(b)) for b in branches}
+    commits_hexsha = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_l = {b: list(repo.get_branch_commits(b, limit='left-only')) for b in branches}
     eq_(len(commits['incoming']), 2)
     eq_(len(commits_l['incoming']), 2)
     eq_(len(commits['incoming-processed']), 4)
@@ -272,15 +272,15 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     eq_(set(all_files), target_files)
 
     # check that -beh was committed in 2nd commit in incoming, not the first one
-    assert_not_in('ds666-beh_R1.0.1.tar.gz', repo.git_get_files(commits_l['incoming'][-1]))
-    assert_in('ds666-beh_R1.0.1.tar.gz', repo.git_get_files(commits_l['incoming'][0]))
+    assert_not_in('ds666-beh_R1.0.1.tar.gz', repo.get_files(commits_l['incoming'][-1]))
+    assert_in('ds666-beh_R1.0.1.tar.gz', repo.get_files(commits_l['incoming'][0]))
 
     # rerun pipeline -- make sure we are on the same in all branches!
     with chpwd(outd):
         out = run_pipeline(pipeline)
     eq_(len(out), 1)
 
-    commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_hexsha_ = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
     # actually we do manage to add_git 1 (README) since it is generated committed directly to git
     # Nothing was committed so stats leaked all the way up
@@ -304,9 +304,9 @@ def test_openfmri_pipeline1(ind, topurl, outd):
 
     # new instance so it re-reads git stuff etc
     # repo = AnnexRepo(outd, create=False)  # to be used in the checks
-    commits_ = {b: list(repo.git_get_branch_commits(b)) for b in branches}
-    commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
-    commits_l_ = {b: list(repo.git_get_branch_commits(b, limit='left-only')) for b in branches}
+    commits_ = {b: list(repo.get_branch_commits(b)) for b in branches}
+    commits_hexsha_ = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_l_ = {b: list(repo.get_branch_commits(b, limit='left-only')) for b in branches}
 
     assert_not_equal(commits_hexsha, commits_hexsha_)
     eq_(out[0]['datalad_stats'], ActivityStats())  # commit happened so stats were consumed
@@ -332,10 +332,10 @@ def test_openfmri_pipeline1(ind, topurl, outd):
             # They shouldn't have any difference but still should be new commits
             assert_in("There is already a tag 2.0.0 in the repository", cml.out)
     eq_(len(out), 1)
-    incoming_files = repo.git_get_files('incoming')
+    incoming_files = repo.get_files('incoming')
     target_incoming_files.remove('ds666_R1.0.0.tar.gz')
     eq_(set(incoming_files), target_incoming_files)
-    commits_hexsha_removed = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_hexsha_removed = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
     # our 'statuses' database should have recorded the change thus got a diff
     # which propagated through all branches
     for b in 'master', 'incoming-processed':
@@ -374,9 +374,9 @@ test_openfmri_pipeline1.tags = ['integration']
 def test_openfmri_pipeline2(ind, topurl, outd):
     # no versioned files -- should still work! ;)
 
-    list(initiate_handle(
+    list(initiate_dataset(
         template="openfmri",
-        handle_name='dataladtest-ds666',
+        dataset_name='dataladtest-ds666',
         path=outd,
         data_fields=['dataset'])({'dataset': 'ds666'}))
 
@@ -388,20 +388,20 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     repo = AnnexRepo(outd, create=False)  # to be used in the checks
     # Inspect the tree -- that we have all the branches
     branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
-    eq_(set(repo.git_get_branches()), branches)
+    eq_(set(repo.get_branches()), branches)
     # We do not have custom changes in master yet, so it just follows incoming-processed atm
-    # eq_(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
-    # Since we did initiate_handle -- now we have separate master!
-    assert_not_equal(repo.git_get_hexsha('master'), repo.git_get_hexsha('incoming-processed'))
+    # eq_(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
+    # Since we did initiate_dataset -- now we have separate master!
+    assert_not_equal(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
     # and that one is different from incoming
-    assert_not_equal(repo.git_get_hexsha('incoming'), repo.git_get_hexsha('incoming-processed'))
+    assert_not_equal(repo.get_hexsha('incoming'), repo.get_hexsha('incoming-processed'))
 
     # actually the tree should look quite neat with 1.0.0 tag having 1 parent in incoming
     # 1.0.1 having 1.0.0 and the 2nd commit in incoming as parents
 
-    commits = {b: list(repo.git_get_branch_commits(b)) for b in branches}
-    commits_hexsha = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
-    commits_l = {b: list(repo.git_get_branch_commits(b, limit='left-only')) for b in branches}
+    commits = {b: list(repo.get_branch_commits(b)) for b in branches}
+    commits_hexsha = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_l = {b: list(repo.get_branch_commits(b, limit='left-only')) for b in branches}
     eq_(len(commits['incoming']), 1)
     eq_(len(commits_l['incoming']), 1)
     eq_(len(commits['incoming-processed']), 2)
@@ -414,7 +414,7 @@ def test_openfmri_pipeline2(ind, topurl, outd):
         out = run_pipeline(pipeline)
     eq_(len(out), 1)
 
-    commits_hexsha_ = {b: list(repo.git_get_branch_commits(b, value='hexsha')) for b in branches}
+    commits_hexsha_ = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
     eq_(commits_hexsha, commits_hexsha_)  # i.e. nothing new
     eq_(out[0]['datalad_stats'], ActivityStats(files=3, skipped=2, urls=2, add_git=1))
     eq_(out[0]['datalad_stats'], out[0]['datalad_stats'].get_total())

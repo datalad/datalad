@@ -25,7 +25,7 @@ from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.crcns")
 
 
-def collection_pipeline():
+def superdataset_pipeline():
     lgr.info("Creating a CRCNS collection pipeline")
     # Should return a list representing a pipeline
     annex = Annexificator()
@@ -38,9 +38,9 @@ def collection_pipeline():
         # .reset() for nodes with state so we could first get through the pipe elements and reset
         # them all
         a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
-        # https://openfmri.org/dataset/ds000001/
-        assign({'handle_name': '%(dataset)s'}, interpolate=True),
-        annex.initiate_handle(
+        # http://crcns.org/data-sets/vc/pvc-1
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_dataset(
             template="crcns",
             data_fields=['dataset_category', 'dataset'],
             # branch='incoming',  # there will be archives etc

@@ -13,17 +13,17 @@ __docformat__ = 'restructuredtext'
 import os
 import re
 from os.path import exists, join as opj, basename, abspath
-
+from collections import OrderedDict
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
+lgr.log(5, "Importing datalad.customremotes.archive")
 
-from ..cmd import link_file_load, Runner
-from ..support.exceptions import CommandError
+from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
+from ..support.network import URL
 from ..utils import getpwd
-from ..utils import parse_url_opts
 from .base import AnnexCustomRemote
 from .base import URI_PREFIX
 
@@ -39,7 +39,8 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     CUSTOM_REMOTE_NAME = "archive"
     SUPPORTED_SCHEMES = (AnnexCustomRemote._get_custom_scheme(CUSTOM_REMOTE_NAME),)
     # Since we support only 1 scheme here
-    URL_PREFIX = SUPPORTED_SCHEMES[0] + ":"
+    URL_SCHEME = SUPPORTED_SCHEMES[0]
+    URL_PREFIX = URL_SCHEME + ":"
 
     AVAILABILITY = "local"
 
@@ -60,12 +61,12 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     def get_file_url(self, archive_file=None, archive_key=None, file=None, size=None):
         """Given archive (file or a key) and a file -- compose URL for access
 
-        Examples:
-        ---------
+        Examples
+        --------
 
-        dl+archive:SHA256E-s176--69...3e.tar.gz/1/d2/2d#size=123
+        dl+archive:SHA256E-s176--69...3e.tar.gz#path=1/d2/2d&size=123
             when size of file within archive was known to be 123
-        dl+archive:SHA256E-s176--69...3e.tar.gz/1/d2/2d
+        dl+archive:SHA256E-s176--69...3e.tar.gz#path=1/d2/2d
             when size of file within archive was not provided
 
         Parameters
@@ -79,12 +80,12 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
                 raise ValueError("Provide archive_file or archive_key - not both")
             archive_key = self.repo.get_file_key(archive_file)
         assert(archive_key is not None)
-        file_quoted = urlquote(file)
-        attrs = {}  # looking forward for more
+        attrs = OrderedDict()  # looking forward for more
+        if file:
+            attrs['path'] = file.lstrip('/')
         if size is not None:
             attrs['size'] = size
-        sattrs = '#%s' % ('&'.join("%s=%s" % x for x in attrs.items())) if attrs else ''
-        return '%s%s/%s%s' % (self.URL_PREFIX, archive_key, file_quoted.lstrip('/'), sattrs)
+        return str(URL(scheme=self.URL_SCHEME, path=archive_key, fragment=attrs))
 
     @property
     def cache(self):
@@ -93,11 +94,18 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     def _parse_url(self, url):
         """Parse url and return archive key, file within archive and additional attributes (such as size)
         """
-        url_prefix = self.URL_PREFIX
-        assert(url[:len(url_prefix)] == url_prefix)
-        key, file_attrs = url[len(url_prefix):].split('/', 1)
-        file_, attrs = parse_url_opts(file_attrs)
-        return key, file_, attrs
+        url = URL(url)
+        assert(url.scheme == self.URL_SCHEME)
+        fdict = url.fragment_dict
+        if 'path' not in fdict:
+            # must be old-style key/path#size=
+            assert '/' in url.path, "must be of key/path format"
+            key, path = url.path.split('/', 1)
+        else:
+            key, path = url.path, fdict.pop('path')
+        if 'size' in fdict:
+            fdict['size'] = int(fdict['size'])
+        return key, path, fdict
 
     #
     # Helper methods
@@ -301,3 +309,5 @@ from .main import main as super_main
 def main():
     """cmdline entry point"""
     super_main(backend="archive")
+
+lgr.log(5, "Done importing datalad.customremotes.archive")

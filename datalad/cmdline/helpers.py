@@ -46,7 +46,7 @@ class HelpAction(argparse.Action):
             helpstr = parser.format_help()
         # better for help2man
         # For main command -- should be different sections. And since we are in
-        # heavy output massaging mode...
+        # heavy output messaging mode...
         if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
             pos_args_str = '*Commands*'
@@ -71,18 +71,6 @@ class HelpAction(argparse.Action):
             helpstr)[0]
         # usage is on the same line
         helpstr = re.sub(r'^usage:', 'Usage:', helpstr)
-        if option_string == '--help-np':
-            usagestr = re.split(r'\n\n[A-Z]+', helpstr, maxsplit=1)[0]
-            usage_length = len(usagestr)
-            usagestr = re.subn(r'\s+', ' ', usagestr.replace('\n', ' '))[0]
-            helpstr = '%s\n%s' % (usagestr, helpstr[usage_length:])
-
-        if os.environ.get('DATALAD_HELP2MAN'):
-            # Convert 1-line command descriptions to remove leading -
-            helpstr = re.sub('\n\s*-\s*([-a-z0-9]*):\s*?([^\n]*)', r"\n'\1':\n  \2\n", helpstr)
-        else:
-            # Those *s intended for man formatting do not contribute to readability in regular text mode
-            helpstr = helpstr.replace('*', '')
 
         print(helpstr)
         sys.exit(0)
@@ -256,18 +244,6 @@ def get_repo_instance(path=curdir, class_=None):
         raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
     else:
         raise RuntimeError("No datalad repository found in %s" % abspath_)
-
-
-# Do some centralizing of things needed by the datalad API:
-# TODO: May be there should be a dedicated class for the master collection.
-# For now just use helper functions to clean up the implementations of the API.
-# Design decision about this also depends on redesigning the handle/collection
-# classes (Metadata class => Backends => Repos).
-# The local master used by datalad is not a technically special
-# collection, but a collection with a special purpose for its "user",
-# who is datalad. So, deriving a class from Collection(Repo) and make common
-# tasks methods of this class might be an option either way. Also might become
-# handy, once we decide to have several "masters" (user-level, sys-level, etc.)
 
 
 from appdirs import AppDirs

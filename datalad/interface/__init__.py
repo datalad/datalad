@@ -21,17 +21,21 @@ _group_dataset = (
     [
         # source module, source object[, dest. cmdline name[, dest python name]]
         # src module can be relative, but has to be relative to the main 'datalad' package
+        ('datalad.distribution.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall'),
-        ('datalad.distribution.move', 'Move'),
+        # N/I ATM
+        # ('datalad.distribution.move', 'Move'),
         ('datalad.distribution.update', 'Update'),
         ('datalad.distribution.create_publication_target_sshwebserver',
          'CreatePublicationTargetSSHWebserver',
          'create-publication-target-sshwebserver'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.modify_subhandle_urls', 'ModifySubhandleURLs',
-         'modify-subhandle-urls'),
+        ('datalad.distribution.modify_subdataset_urls', 'ModifySubdatasetURLs',
+         'modify-subdataset-urls'),
+        ('datalad.interface.unlock', 'Unlock', 'unlock'),
+        ('datalad.interface.save', 'Save', 'save'),
     ])
 
 _group_misc = (
@@ -39,8 +43,6 @@ _group_misc = (
     [
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.crawl', 'Crawl'),
-        ('datalad.interface.pull', 'Pull'),
-        ('datalad.interface.push', 'Push'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',

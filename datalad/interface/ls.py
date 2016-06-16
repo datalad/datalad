@@ -33,7 +33,7 @@ lgr = getLogger('datalad.api.ls')
 
 
 class Ls(Interface):
-    """Magical helper to list content of various things (ATM only S3 buckets and datasets)
+    """List meta-information associated with URLs (e.g. s3://) and dataset(s)
 
     Examples
     --------
@@ -51,29 +51,29 @@ class Ls(Interface):
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="Recurse into subdirectories",
+            doc="recurse into subdirectories",
         ),
         fast=Parameter(
             args=("-F", "--fast"),
             action="store_true",
-            doc="Only perform fast operations. Would be overrident by --all",
+            doc="only perform fast operations.  Would be overrident by --all",
         ),
         all=Parameter(
             args=("-a", "--all"),
             action="store_true",
-            doc="List all entries, not e.g. only latest entries in case of S3",
+            doc="list all entries, not e.g. only latest entries in case of S3",
         ),
         config_file=Parameter(
-            doc="""Path to config file which could help the 'ls'.  E.g. for s3://
+            doc="""path to config file which could help the 'ls'.  E.g. for s3://
             URLs could be some ~/.s3cfg file which would provide credentials""",
             constraints=EnsureStr() | EnsureNone()
         ),
         list_content=Parameter(
             choices=(None, 'first10', 'md5', 'full'),
-            doc="""List also the content or only first 10 bytes (first10), or md5
-            checksum of an entry.  Might require expensive
-            transfer and dump binary output to your screen.  Do not enable unless
-            you know what you are after""",
+            doc="""list also the content or only first 10 bytes (first10), or md5
+            checksum of an entry.  Might require expensive transfer and dump
+            binary output to your screen.  Do not enable unless you know what you
+            are after""",
             default=None
         ),
     )
@@ -149,7 +149,7 @@ class DsModel(object):
         """Date of the last commit
         """
         try:
-            commit = next(self.ds.repo.git_get_branch_commits(self.branch))
+            commit = next(self.ds.repo.get_branch_commits(self.branch))
         except:
             return None
         return commit.committed_date
@@ -162,7 +162,7 @@ class DsModel(object):
     def branch(self):
         if self._branch is None:
             try:
-                self._branch = self.repo.git_get_active_branch()
+                self._branch = self.repo.get_active_branch()
             except:
                 return None
         return self._branch
@@ -176,7 +176,7 @@ class DsModel(object):
     @property
     def info(self):
         if self._info is None and isinstance(self.repo, AnnexRepo):
-            self._info = self.repo.annex_repo_info()
+            self._info = self.repo.repo_info()
         return self._info
 
     @property
@@ -267,7 +267,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
-         for sm in topds.get_dataset_handles(recursive=recursive)]
+         for sm in topds.get_subdatasets(recursive=recursive)]
          if recursive else [])
     dsms = list(map(DsModel, dss))
 
@@ -347,7 +347,8 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         providers = Providers.from_config_files()
         provider = providers.get_provider(loc)
         if not provider:
-            raise ValueError("don't know how to deal with this url %s -- no downloader defined.  Specify just s3cmd config file instead")
+            raise ValueError("don't know how to deal with this url %s -- no downloader defined.  "
+                             "Specify just s3cmd config file instead")
         bucket = provider.authenticator.authenticate(bucket_name, provider.credential)
 
     info = []
@@ -407,7 +408,7 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
                         content = digest.hexdigest()
                     else:
                         raise ValueError(list_content)
-                    #content = "[S3: OK]"
+                    # content = "[S3: OK]"
                 except S3ResponseError as err:
                     content = err.message
                 finally:

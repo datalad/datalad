@@ -13,7 +13,7 @@ from os.path import join as opj, exists
 
 from ...pipeline import run_pipeline, FinishPipeline
 
-from ...nodes.annex import Annexificator, initiate_handle
+from ...nodes.annex import Annexificator, initiate_dataset
 
 from ....support.stats import ActivityStats
 from ....support.gitrepo import GitRepo
@@ -33,8 +33,8 @@ from ....distribution.dataset import Dataset
 from ....distribution.dataset import Dataset
 from ....consts import CRAWLER_META_CONFIG_PATH
 
-from ..openfmri import collection_pipeline as ofcpipeline
 from datalad.api import crawl
+from ..openfmri import superdataset_pipeline as ofcpipeline
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
@@ -53,11 +53,11 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 )
 @serve_path_via_http
 @with_tempfile
-def test_openfmri_collection_pipeline1(ind, topurl, outd):
-    # XXX since below pipeline is called directly, this setting of template= is not used!
-    list(initiate_handle(
+def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
+
+    list(initiate_dataset(
         template="openfmri",
-        template_func="collection_pipeline",
+        template_func="superdataset_pipeline",
         path=outd,
     )())
 
@@ -69,10 +69,13 @@ def test_openfmri_collection_pipeline1(ind, topurl, outd):
 
     # TODO: replace below command with the one listing subdatasets
     subdatasets = ['ds000001', 'ds000002']
-    eq_(Dataset(outd).get_dataset_handles(fulfilled=True), subdatasets)
+    eq_(Dataset(outd).get_subdatasets(fulfilled=True), subdatasets)
 
     # Check that crawling configuration was created for every one of those
     for sub in subdatasets:
         repo = GitRepo(opj(outd, sub))
         assert(not repo.dirty)
         assert(exists(opj(repo.path, CRAWLER_META_CONFIG_PATH)))
+
+    # TODO: check that configuration for the crawler is up to the standard
+    # Ideally should also crawl some fake datasets I guess

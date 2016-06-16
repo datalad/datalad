@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Interface for crawling a webpage and push extracted data into a handle"""
+"""Interface for crawling a webpage and push extracted data into a dataset"""
 
 __docformat__ = 'restructuredtext'
 
@@ -23,37 +23,37 @@ lgr = getLogger('datalad.api.crawl')
 from .. import cfg
 
 class Crawl(Interface):
-    """Crawl online resource to create or update a handle.
+    """Crawl online resource to create or update a dataset.
 
     Examples:
 
-      $ datalad crawl  # within a handle having .datalad/crawl/crawl.cfg
+      $ datalad crawl  # within a dataset having .datalad/crawl/crawl.cfg
     """
     _params_ = dict(
         dry_run=Parameter(
             args=("-n", "--dry-run"),
             action="store_true",
-            doc="""Flag if file manipulations to be invoked (e.g., adding to git/annex).
+            doc="""flag if file manipulations to be invoked (e.g., adding to git/annex).
             If not, commands are only printed to the stdout"""),
         is_pipeline=Parameter(
             args=("--is-pipeline",),
             action="store_true",
-            doc="""Flag if provided file is a Python script which defines pipeline()"""),
+            doc="""flag if provided file is a Python script which defines pipeline()"""),
         is_template=Parameter(
             args=("-t", "--is-template"),
             action="store_true",
-            doc="""Flag if provided value is the name of the template to use"""),
+            doc="""flag if provided value is the name of the template to use"""),
         chdir=Parameter(
             args=("-C", "--chdir"),
             constraints=EnsureStr() | EnsureNone(),
-            doc="""Directory to chdir to for crawling"""),
+            doc="""directory to chdir to for crawling"""),
         path=Parameter(
             args=('path',),
             metavar='file',
             nargs='?',
             constraints=EnsureStr() | EnsureNone(),
-            doc="""Configuration (or pipeline if --is-pipeline) file defining crawling, or a directory
-                of a handle on which to perform crawling using its standard crawling specification"""),
+            doc="""configuration (or pipeline if --is-pipeline) file defining crawling, or a directory
+                of a dataset on which to perform crawling using its standard crawling specification"""),
     )
 
     @staticmethod
@@ -81,7 +81,7 @@ class Crawl(Interface):
 
             if path is None:
 
-                # get config from the current repository/handle
+                # get config from the current repository/dataset
                 if is_pipeline:
                     raise ValueError("You must specify the file if --pipeline")
                 # Let's see if there is a config or pipeline in this repo

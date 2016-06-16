@@ -6,28 +6,28 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Information about data providers
+"""Data providers - bind downloaders and credentials together
 """
 
-import re
 from glob import glob
+from logging import getLogger
 from six import iteritems
+
+import re
+from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
 
-from os.path import dirname, abspath, join as pathjoin
-
-from ..dochelpers import exc_str
-from ..support.configparserinc import SafeConfigParserWithIncludes
-from ..ui import ui
-from ..utils import auto_repr
-from ..utils import assure_list_from_str
-
 from .base import NoneAuthenticator, NotImplementedAuthenticator
+from .credentials import Credential
 from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
+from .http import HTTPDownloader
 from .s3 import S3Authenticator, S3Downloader
+from ..support.configparserinc import SafeConfigParserWithIncludes
+from ..utils import assure_list_from_str
+from ..utils import auto_repr
 
-from logging import getLogger
 lgr = getLogger('datalad.downloaders.providers')
+
 
 def resolve_url_to_name(d, url):
     """Given a directory (e.g. of SiteInformation._items or Credential._items)
@@ -41,72 +41,6 @@ def resolve_url_to_name(d, url):
                     return k
     return None
 
-
-
-from ..support.keyring_ import keyring
-
-@auto_repr
-class Credential(object):
-    TYPES = {
-        'user_password': ('user', 'password'),
-        'aws-s3': ('key_id', 'secret_id')
-    }
-
-    def __init__(self, name, type, url):
-        self.name = name
-        if not type in self.TYPES:
-            raise ValueError("I do not know type %s credential. Known: %s"
-                             % (type, self.TYPES.keys()))
-        self.type = type
-        self.url = url
-
-    def _ask_field_value(self, f):
-        return ui.question(f,
-                           title="You need to authenticate with %r credentials." % self.name
-                                 + " %s provides information on how to gain access"
-                                   % self.url if self.url else '',
-                           hidden=True)
-    # TODO: I guess it, or subclasses depending on the type
-    def enter_new(self):
-        # Use ui., request credential fields corresponding to the type
-        # TODO: this is duplication with __call__
-        for f in self.TYPES[self.type]:
-            v = self._ask_field_value(f)
-            keyring.set_password(self.uid, f, v)
-        pass
-
-    @property
-    def uid(self):
-        return "datalad-%s" % (self.name)
-
-    @property
-    def is_known(self):
-        uid = self.uid
-        try:
-            return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
-        except Exception as exc:
-            lgr.warning("Failed to query keyring: %s" % exc_str(exc))
-            return False
-
-    # should implement corresponding handling (get/set) via keyring module
-    def __call__(self):
-        # TODO: redo not stupid way
-        uid = self.uid
-        credentials = {}
-        for f in self.TYPES[self.type]:
-            v = keyring.get_password(uid, f)
-            while v is None:  # was not known
-                v = self._ask_field_value(f)
-            keyring.set_password(uid, f, v)
-            credentials[f] = v
-
-        #values = [keyring.get_password(uid, f) for f in fields]
-        #if not all(values):
-        # TODO: Fancy form
-        return credentials
-
-
-from .http import HTTPDownloader
 
 @auto_repr
 class Provider(object):
@@ -233,7 +167,7 @@ class Providers(object):
         """Would load information about related/possible websites requiring authentication from
 
         - codebase (for now) datalad/downloaders/configs/providers.cfg
-        - current handle .datalad/providers/
+        - current dataset .datalad/providers/
         - user dir  ~/.config/datalad/providers/
         - system-wide datalad installation/config /etc/datalad/providers/
 
@@ -261,7 +195,7 @@ class Providers(object):
         for section in config.sections():
             if ':' in section:
                 type_, name = section.split(':', 1)
-                assert(type_ in {'provider', 'credential'})
+                assert type_ in {'provider', 'credential'}, "we know only providers and credentials, got type %s" % type_
                 items = {
                     o: config.get(section, o) for o in config.options(section)
                 }

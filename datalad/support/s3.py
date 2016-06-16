@@ -48,12 +48,13 @@ def _get_bucket_connection(credential):
     # with different resources. Thus for now just making an option which
     # one to use
     # do full shebang with entering credentials
-    from ..downloaders.providers import Credential
+    from ..downloaders.credentials import Credential
     credential = Credential(credential, "aws-s3", None)
     if not credential.is_known:
         credential.enter_new()
     creds = credential()
     return boto.connect_s3(creds["key_id"], creds["secret_id"])
+
 
 class VersionedFilesPool(object):
     """Just a helper which would help to create versioned files in the bucket"""

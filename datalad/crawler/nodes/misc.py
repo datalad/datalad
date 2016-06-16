@@ -12,8 +12,10 @@
 import inspect
 import os
 import re
+import stat
 
-from os.path import curdir, join as opj, split as ops
+from stat import ST_MODE, S_IEXEC, S_IXOTH, S_IXGRP
+from os.path import curdir, isdir, isabs, exists, join as opj, split as ops
 from six import iteritems, string_types
 
 from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
@@ -25,8 +27,74 @@ from ...utils import auto_repr
 from ...utils import find_files as _find_files
 
 from logging import getLogger
+from nose.tools import eq_, assert_raises
 
 lgr = getLogger('datalad.crawler.nodes')
+
+@auto_repr
+class fix_permissions(object):
+    """A node used to check the permissions of a file and set the executable bit
+
+    """
+
+    def __init__(self, file_re='.*', executable=False, input='filename', path=None):
+        """
+            Parameters
+            ----------
+            file_re : str, optional
+              Regular expression str to which the filename must match
+            executable : boolean, optional
+              If false, sets file to allow no one to execute. If true, sets file
+              to be executable to those already allowed to read it
+            input : str, optional
+              Key which holds value that is the filename or absolute path in data
+            path : str, optional
+              If absolute path is not specifed in data, path must be expressed
+              here
+
+            """
+        self.file_re = file_re
+        self.executable = executable
+        self.input = input
+        self.path = path
+
+    def __call__(self, data):
+        filename = data.get(self.input)
+
+        # check that file matches regex
+        if not filename.endswith(self.file_re):
+            yield data
+            return  # early termination since nothing to do
+
+        # check that absolute path exists
+        if not isabs(filename):
+            path = self.path or data.get('path')
+            if path:
+                filename = opj(path, filename)
+
+        # check existance of file and that path is not a dir
+        if exists(filename) and not isdir(filename):
+            per = oct(os.stat(filename)[ST_MODE])[-3:]
+            st = os.stat(filename)
+
+            permissions = [S_IEXEC, S_IXGRP, S_IXOTH]
+
+            if self.executable:
+                # make is executable for those that can read it
+                for i, scope in enumerate(permissions):
+                    if per[i] == '6' or '4':
+                        os.chmod(filename, st.st_mode | scope)
+                        st = os.stat(filename)
+
+            else:
+                # strip everyone away from executing
+                current = stat.S_IMODE(os.lstat(filename).st_mode)
+                os.chmod(filename, current & ~S_IEXEC & ~S_IXGRP & ~S_IXOTH)
+
+            nper = oct(os.stat(filename)[ST_MODE])[-3:]
+            lgr.debug('Changing permissions for file %s from %s to %s', filename, per, nper)
+
+        yield data
 
 
 @auto_repr
@@ -34,7 +102,6 @@ class Sink(object):
     """A rudimentary node to sink/collect all the data passed into it
     """
 
-    # TODO: add argument for selection of fields of data to keep
     def __init__(self, keys=None, output=None, ignore_prefixes=['datalad_']):
         """
         Parameters
@@ -46,26 +113,29 @@ class Sink(object):
           data
         ignore_prefixes : list, optional
           Keys with which prefixes to ignore.  By default all 'datalad_' ignored
+
         """
         self.data = []
         self.keys = keys
         self.output = output
         self.ignore_prefixes = ignore_prefixes or []
 
-    def get_values(self, *keys):
+    def get_values(self, keys):
         return [[d[k] for k in keys] for d in self.data]
 
     def __call__(self, data):
-        # ??? for some reason didn't work when I made entire thing a list
         if self.keys:
-            raise NotImplementedError("Jason will do it")
+                    self.data.append({key: data[key] for key in self.keys if key in data})
+
         else:
             data_ = {k: v
                      for k, v in data.items()
                      if not any(k.startswith(p) for p in self.ignore_prefixes)}
             self.data.append(data_)
+
         if self.output:
             data = updated(data, {self.output: self.data})
+
         yield data
 
     def clean(self):
@@ -185,6 +255,7 @@ class _act_if(object):
     def __call__(self, data):
         comp = re.search if self.re else lambda x, y: x == y
         matched = True
+        # finds if all match
         for k, v in iteritems(self.values):
             if not (k in data and comp(v, data[k])):
                 # do nothing and pass the data further
@@ -197,7 +268,7 @@ class _act_if(object):
         else:
             yield data
 
-    def _act(self):
+    def _act(self, data):
         raise NotImplementedError
 
 

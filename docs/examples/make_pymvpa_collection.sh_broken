@@ -20,9 +20,9 @@ set -eu
 #    --description "Collection of datasets useful for PyMVPA demonstrations and tutorials"
 #cd ..
 #
-## create a new handle and add metadata to it
-#echo "I: creating MNIST handle"
-#datalad create-handle mnist
+## create a new dataset and add metadata to it
+#echo "I: creating MNIST dataset"
+#datalad create-dataset mnist
 #(
 #    cd mnist
 #    git annex addurl --pathdepth -1 --fast "http://data.pymvpa.org/datasets/mnist/mnist.hdf5"
@@ -35,26 +35,26 @@ set -eu
 #        # TODO --doi "10.1109/5.726791"
 #)
 #
-## add the handle to the collection
-#datalad add-handle mnist pymvpa
+## add the dataset to the collection
+#datalad add-dataset mnist pymvpa
 #
 #echo "I: adding haxby2001"
 ## Haxby 2001 -- the main demo dataset
-#datalad add-handle http://data.pymvpa.org/datasets/haxby2001/.git pymvpa haxby2001
+#datalad add-dataset http://data.pymvpa.org/datasets/haxby2001/.git pymvpa haxby2001
 #
 #echo "I: adding tutorial_data"
-#datalad add-handle http://data.pymvpa.org/datasets/tutorial_data/.git pymvpa tutorial_data
+#datalad add-dataset http://data.pymvpa.org/datasets/tutorial_data/.git pymvpa tutorial_data
 #
 ## Forrest gump dataset, although not yet used in PyMVPA stock materials,
 ## analysis scripts use PyMVPA heavily so it is a worthwhile addition
 ##
-## As long as we don't want to change anything in the handle/annex, but just
+## As long as we don't want to change anything in the dataset/annex, but just
 ## include it in the collection, we don't need to install it at all.
-## Instead, just add the remote location as a handle to the collection.
-## Note: This still allows for adding metadata for that handle to the collection.
+## Instead, just add the remote location as a dataset to the collection.
+## Note: This still allows for adding metadata for that dataset to the collection.
 ## Metadata added this way, is available via this very collection only, though.
 #echo "I: adding forrest_gump dataset"
-#datalad add-handle http://psydata.ovgu.de/forrest_gump/.git pymvpa forrest_gump
+#datalad add-dataset http://psydata.ovgu.de/forrest_gump/.git pymvpa forrest_gump
 #
 #
 ## TODO: publish as http://collections.datalad.org/pymvpa

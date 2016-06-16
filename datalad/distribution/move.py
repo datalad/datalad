@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for moving a handle
+"""High-level interface for moving dataset content
 
 """
 
@@ -21,16 +21,16 @@ from datalad.interface.base import Interface
 
 
 class Move(Interface):
-    """Move a handle."""
+    """Move dataset content."""
 
     _params_ = dict(
-        handle=Parameter(
-            args=('handle',),
+        path=Parameter(
+            args=('path',),
             nargs='?',
-            doc="name of or path to the handle to be updated",
+            doc="name of or path to the content to be updated",
             constraints=EnsureStr() | EnsureNone()))
 
     @staticmethod
-    def __call__(handle=curdir):
+    def __call__(path=curdir):
 
         raise NotImplementedError("TODO")

@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Proxy basic file operations (such as open) to obtain files automagically upon I/O
+"""Proxy basic file operations (e.g. open) to auto-obtain files upon I/O
 """
 
 import sys
@@ -108,7 +108,7 @@ class AutomagicIO(object):
                     mode = kwargs['mode']
 
                 if 'r' in mode:
-                    self._handle_auto_get(file)
+                    self._dataset_auto_get(file)
                 else:
                     lgr.debug("Skipping operation on %s since mode=%r", file, mode)
         except _EarlyExit:
@@ -130,7 +130,7 @@ class AutomagicIO(object):
         return self._proxy_open_name_mode('h5py.File', self._h5py_File,
                                           *args, **kwargs)
 
-    def _handle_auto_get(self, filepath):
+    def _dataset_auto_get(self, filepath):
         """Verify that filepath is under annex, and if so and not present - get it"""
 
         if not self._autoget:
@@ -162,7 +162,7 @@ class AutomagicIO(object):
         # either it has content
         if (under_annex or under_annex is None) and not annex.file_has_content(filepath):
             lgr.info("File %s has no content -- retrieving", filepath)
-            annex.annex_get(filepath, log_online=self._log_online)
+            annex.get(filepath, log_online=self._log_online)
 
     def activate(self):
         # Some beasts (e.g. tornado used by IPython) override outputs, and

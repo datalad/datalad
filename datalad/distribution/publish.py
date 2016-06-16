@@ -18,9 +18,8 @@ import logging
 from os import curdir
 from os.path import join as opj, abspath, exists, relpath
 
-from six import string_types
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf
+from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
@@ -34,7 +33,7 @@ lgr = logging.getLogger('datalad.distribution.publish')
 
 
 class Publish(Interface):
-    """publish a handle.
+    """Publish (e.g. to a web server) a dataset(s)
 
     This is basic implementation for testing purposes
     """
@@ -42,7 +41,7 @@ class Publish(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to perform the publish operation on. If
+            doc="""specify the dataset to perform the publish operation on.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
@@ -57,49 +56,20 @@ class Publish(Interface):
             doc="path/name of the dataset component to publish",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
-        # Note: add remote currently disabled in publish
-        # dest_url=Parameter(
-        #     args=('--dest-url',),
-        #     doc="""The URL of the dataset sibling named by `dest`. This URL has
-        #     to be accessible to anyone, who is supposed to have access to the
-        #     published dataset later on.\n
-        #     If you want to publish with `recursive`, it is expected, that you
-        #     pass a template for building the URLs of all (sub)datasets to be
-        #     published by using placeholders.\n
-        #     List of currently available placeholders:\n
-        #     %%NAME\tthe name of the dataset, where slashes are replaced by
-        #     dashes.\nThis option is ignored if there is already a configured
-        #     sibling dataset under the name given by `dest`.""",
-        #     nargs="?",
-        #     constraints=EnsureStr() | EnsureNone()),
-        # dest_pushurl=Parameter(
-        #     args=('--dest-pushurl',),
-        #     doc="""In case the `dest_url` cannot be used to publish to the
-        #     dataset sibling, this option specifies a URL to be used for the
-        #     actual publication operation.""",
-        #     constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="Recursively publish all components of the dataset."),
+            doc="recursively publish all components of the dataset"),
         with_data=Parameter(
             args=("--with-data",),
             doc="shell pattern",
-            constraints=EnsureListOf(string_types) | EnsureNone(),
+            constraints=EnsureStr() | EnsureNone(),
             nargs='*'),)
 
     @staticmethod
     @datasetmethod(name='publish')
     def __call__(dataset=None, dest=None, path=None,
-                 # Note: add remote currently disabled in publish
-                 # dest_url=None, dest_pushurl=None,
                  with_data=None, recursive=False):
-
-        # Note: add remote currently disabled in publish
-        # if dest is None and (dest_url is not None
-        #                        or dest_pushurl is not None):
-        #     raise ValueError("""insufficient information for adding the
-        #     destination as a sibling (needs at least a name)""")
 
         # shortcut
         ds = dataset
@@ -114,9 +84,6 @@ class Publish(Interface):
                     dataset=ds,
                     dest=dest,
                     path=p,
-                    # Note: add remote currently disabled in publish
-                    # dest_url=dest_url,
-                    # dest_pushurl=dest_pushurl,
                     with_data=with_data,
                     recursive=recursive) for p in path]
 
@@ -148,9 +115,6 @@ class Publish(Interface):
                     lgr.debug("Hand over to submodule %s" % subds.path)
                     return subds.publish(dest=dest,
                                          path=relpath(path, start=subds.path),
-                                         # Note: add remote currently disabled in publish
-                                         # dest_url=dest_url,
-                                         # dest_pushurl=dest_pushurl,
                                          with_data=with_data,
                                          recursive=recursive)
 
@@ -179,7 +143,7 @@ class Publish(Interface):
             try:
                 std_out, std_err = \
                     ds.repo._git_custom_command('',
-                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.git_get_active_branch())],
+                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.get_active_branch())],
                                                 expect_fail=True)
             except CommandError as e:
                 if e.code == 1 and e.stdout == "":
@@ -202,7 +166,7 @@ class Publish(Interface):
             std_out, std_err = \
                 ds.repo._git_custom_command('',
                                             ["git", "config", "--get",
-                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.git_get_active_branch())],
+                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.get_active_branch())],
                                             expect_fail=True)
         except CommandError as e:
             if e.code == 1 and e.stdout == "":
@@ -212,69 +176,21 @@ class Publish(Interface):
                 raise
 
         # is `dest` an already known remote?
-        if dest_resolved not in ds.repo.git_get_remotes():
+        if dest_resolved not in ds.repo.get_remotes():
             # unknown remote
             raise ValueError("No sibling '%s' found." % dest_resolved)
-
-            # Note: add remote currently disabled in publish
-            # if dest_url is None:
-            #     raise ValueError("No sibling '%s' found. Provide `dest-url`"
-            #                      " to register it." % dest_resolved)
-            # lgr.info("Sibling %s unknown. Registering ...")
-            #
-            # # Fill in URL-Template:
-            # remote_url = dest_url.replace("%NAME", basename(ds.path))
-            # # TODO: handle_name.replace("/", "-")) instead of basename()
-            # #       - figure it out ;)
-            # #       - either a datasets needs to discover superdatasets in
-            # #         order to get it's relative path to provide a name
-            # #       - or: We need a different approach on the templates
-            #
-            # # Add the remote
-            # ds.repo.git_remote_add(dest_resolved, remote_url)
-            # if dest_pushurl:
-            #     # Fill in template:
-            #     remote_url_push = \
-            #         dest_pushurl.replace("%NAME", basename(ds.path))
-            #     # TODO: Different way of replacing %NAME; See above
-            #
-            #     # Modify push url:
-            #     ds.repo._git_custom_command('',
-            #                                 ["git", "remote",
-            #                                  "set-url",
-            #                                  "--push", dest_resolved,
-            #                                  remote_url_push])
-            # lgr.info("Added sibling '%s'." % dest)
-            # lgr.debug("Added remote '%s':\n %s (fetch)\n%s (push)." %
-            #           (dest_resolved, remote_url,
-            #            remote_url_push if dest_pushurl else remote_url))
-        # Note: add remote currently disabled in publish
-        # else:
-        #     # known remote: parameters dest-url-* currently invalid.
-        #     # This may change to adapt the existing remote.
-        #     if dest_url:
-        #         lgr.warning("Sibling '%s' already exists for dataset '%s'. "
-        #                     "Ignoring dest-url %s." %
-        #                     (dest_resolved, ds.path, dest_url))
-        #     if dest_pushurl:
-        #         lgr.warning("Sibling '%s' already exists for dataset '%s'. "
-        #                     "Ignoring dest-pushurl %s." %
-        #                     (dest_resolved, ds.path, dest_pushurl))
 
         # Figure out, what to publish
         if path is None or path == ds.path:
             # => publish the dataset itself
             # push local state:
-            # TODO: Rework git_push in GitRepo
-            cmd = ['git', 'push']
-            if set_upstream:
-                # no upstream branch yet
-                cmd.append("--set-upstream")
-            cmd += [dest_resolved, ds.repo.git_get_active_branch()]
-            ds.repo._git_custom_command('', cmd)
+            ds.repo.push(remote=dest_resolved,
+                         refspec=ds.repo.get_active_branch(),
+                         set_upstream=set_upstream)
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.git_push("%s +git-annex:git-annex" % dest_resolved)
+                ds.repo.push(remote=dest_resolved,
+                             refspec="+git-annex:git-annex")
 
             # TODO: if with_data is a shell pattern, we get a list, when called
             # from shell, right?
@@ -283,26 +199,18 @@ class Publish(Interface):
                 ds.repo._git_custom_command('', ["git", "annex", "copy"] +
                                             with_data + ["--to", dest_resolved])
 
-            if recursive and ds.get_dataset_handles() != []:
+            if recursive and ds.get_subdatasets() != []:
                 results = [ds]
-                # Note: add remote currently disabled in publish
-                # modify URL templates:
-                # if dest_url:
-                #     dest_url = dest_url.replace('%NAME', basename(ds.path) + '-%NAME')
-                # if dest_pushurl:
-                #     dest_pushurl = dest_pushurl.replace('%NAME', basename(ds.path) + '-%NAME')
-                for subds in ds.get_dataset_handles():
-                    results.append(Dataset(opj(ds.path,
-                                              subds)).publish(
-                        dest=dest,
-                        # Note: use `dest` instead of `dest_resolved` in case
-                        # dest was None, so subdatasets would use their default
-                        # as well
-                        # Note: add remote currently disabled in publish
-                        # dest_url=dest_url,
-                        # dest_pushurl=dest_pushurl,
-                        with_data=with_data,
-                        recursive=recursive))
+                for subds in ds.get_subdatasets():
+                    results.append(
+                        Dataset(
+                            opj(ds.path, subds)).publish(
+                                dest=dest,
+                                # Note: use `dest` instead of `dest_resolved`
+                                # in case dest was None, so subdatasets would
+                                # use their default as well
+                                with_data=with_data,
+                                recursive=recursive))
                 return results
 
             return ds

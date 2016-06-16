@@ -9,13 +9,16 @@
 
 import inspect
 from nose import SkipTest
-from ..matches import *
 from datalad.tests.utils import ok_, eq_, assert_raises
+from datalad.tests.utils import skip_if_scrapy_without_selector
+skip_if_scrapy_without_selector()
+from ..matches import *
 
 try:
     import scrapy
 except ImportError:
     raise SkipTest("Needs scrapy")
+
 
 class sample1:
     # there could be some html normalization effects, so using " within for now
@@ -72,6 +75,7 @@ def test_match_basic():
     yield _test_match_basic, css_match, 'a'
     yield _test_match_basic, a_href_match, '.*'
 
+
 def test_a_href_match_basic():
     m = a_href_match('.*')
 
@@ -94,6 +98,7 @@ def test_a_href_match_basic():
     eq_([u['url'] for u in hits],
         ['http://w.example.com:888/', 'http://w.example.com:888/d/buga/duga/du', 'http://example.com'])
 
+
 def test_a_href_match_pattern1():
     m = a_href_match('.*buga/(?P<custom>.*)/.*')
 
@@ -103,6 +108,7 @@ def test_a_href_match_pattern1():
     eq_(hit['url'], 'buga/duga/du')
     eq_(hit['custom'], 'duga')
 
+
 def test_a_href_match_pattern2():
     m = a_href_match('.*(?P<custom>.a).*')
 
@@ -110,6 +116,7 @@ def test_a_href_match_pattern2():
     eq_(len(hits), 2)
     eq_([u['url'] for u in hits], ['buga/duga/du', 'http://example.com'])
     eq_([u['custom'] for u in hits], ['ga', 'xa'])
+
 
 def test_a_href_match_pattern3():
     # that we would match if top url was provided as well

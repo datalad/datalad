@@ -12,11 +12,9 @@ Contents:
    :maxdepth: 2
 
    usecases/index
+   crawler/index
+   cmdline
    modref
-
->>> import datalad
->>> print(datalad.__version__)
-0.0.3.dev0
 
 Indices and tables
 ==================

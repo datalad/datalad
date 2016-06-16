@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for uninstalling a handle
+"""High-level interface for uninstalling dataset content
 
 """
 
@@ -28,7 +28,8 @@ lgr = logging.getLogger('datalad.distribution.uninstall')
 
 
 class Uninstall(Interface):
-    """Uninstall a dataset component or entire datasets."""
+    """Uninstall a dataset component or entire dataset(s)
+    """
 
     # TODO: It's not actually clear yet, what are the actual meanings of
     # uninstall (including options) and what exactly are the methods to
@@ -65,12 +66,12 @@ class Uninstall(Interface):
             constraints=EnsureStr() | EnsureNone()),
         data_only=Parameter(
             args=("--data-only",),
-            doc="If set, only data is uninstalled, but the handles are kept.",
+            doc="if set, only data is uninstalled, but the handles are kept",
             action="store_true"),
         recursive=Parameter(
             args=("-r", "--recursive"),
-            doc="""If set, uninstall recursively, including all subdatasets.
-            The value of `data` is used for recursive uninstallation, too.""",
+            doc="""if set, uninstall recursively, including all subdatasets.
+            The value of `data` is used for recursive uninstallation, too""",
             action="store_true"))
 
     @staticmethod
@@ -161,7 +162,7 @@ class Uninstall(Interface):
             lgr.info("Nothing found to uninstall at %s" % path)
             return
 
-        if relativepath in ds.get_dataset_handles(recursive=True):
+        if relativepath in ds.get_subdatasets(recursive=True):
             # it's a submodule
             # --recursive required or implied?
             raise NotImplementedError("TODO: uninstall submodule %s from "
@@ -190,7 +191,7 @@ class Uninstall(Interface):
 
             # it's an annexed file
             if data_only:
-                ds.repo.annex_drop([path])
+                ds.repo.drop([path])
                 return path
             else:
                 raise NotImplementedError("TODO: fully uninstall file %s "
@@ -207,13 +208,12 @@ class Uninstall(Interface):
                 # a subdataset
                 _untracked_or_within_submodule = True
 
-
         if _file_in_git:
             if data_only:
                 raise ValueError("%s is not a file handle. Removing its "
                                  "data only doesn't make sense." % path)
             else:
-                return ds.repo.git_remove([relativepath])
+                return ds.repo.remove([relativepath])
 
         elif _untracked_or_within_submodule:
             subds = get_containing_subdataset(ds, relativepath)

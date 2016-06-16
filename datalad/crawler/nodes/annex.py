@@ -6,13 +6,14 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Nodes to interact with annex -- initiate a new handle or operate with existing one
+"""Nodes to interact with annex -- initiate a new dataset or operate with existing one
 
 via Annexificator class, which could be used to add files, checkout branches etc
 """
 
 import os
 import time
+from os import listdir
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os.path import isdir, islink
@@ -65,10 +66,10 @@ _run = _runner.run
 
 # TODO: make use of datalad_stats
 @auto_repr
-class initiate_handle(object):
-    """Action to initiate a handle following one of the known templates
+class initiate_dataset(object):
+    """Action to initiate a dataset following one of the known templates
     """
-    def __init__(self, template, handle_name=None,  # collection_name=None,
+    def __init__(self, template, dataset_name=None,
                  path=None, branch=None, backend=None,
                  template_func=None,
                  data_fields=[], add_fields={}, existing=None):
@@ -76,16 +77,14 @@ class initiate_handle(object):
         Parameters
         ----------
         template : str
-          Which template (probably matching the collection name) to use.
+          Which template (probably matching the superdataset name) to use.
           TODO: refer to specs of template that it might understand some
           arguments encoded, such as #func=custom_pipeline
-        handle_name : str
-          Name of the handle. If None, reacts on 'handle_name' in data
-        collection_name : str, optional
-          If None and not present in data, template is taken
+        dataset_name : str
+          Name of the dataset. If None, reacts on 'dataset_name' in data
         path : str, optional
-          Path were to initiate the handle.  If not specified, would use
-          default path for all new handles (DATALAD_CRAWL_COLLECTIONSPATH)
+          Path were to initiate the dataset.  If not specified, would use
+          default path for all new datasets (DATALAD_CRAWL_COLLECTIONSPATH)
         branch : str, optional
           Which branch to initialize
         backend : str, optional
@@ -94,20 +93,19 @@ class initiate_handle(object):
           having a relatively small limit for a maximum path size
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
-          the handle crawling options -- would be passed into the corresponding
+          the dataset crawling options -- would be passed into the corresponding
           crawler template
         add_fields : dict, optional
           Dictionary of additional fields to store in the crawler configuration
           to be passed into the template
         existing : ('skip', 'raise', 'adjust', 'replace', 'crawl'), optional
-          Behavior if encountering existing handle
+          Behavior if encountering existing dataset
         """
         # TODO: add_fields might not be flexible enough for storing more elaborate
         # configurations for e.g. "basic" template
         self.template = template
         self.template_func = template_func
-        self.handle_name = handle_name
-        ## self.collection_name = collection_name
+        self.dataset_name = dataset_name
         self.data_fields = data_fields
         self.add_fields = add_fields
         self.existing = existing
@@ -116,14 +114,14 @@ class initiate_handle(object):
         # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
         self.backend = backend
 
-    def _initiate_handle(self, path, name):
-        lgr.info("Initiating handle %s" % name)
+    def _initiate_dataset(self, path, name):
+        lgr.info("Initiating dataset %s" % name)
         if self.branch is not None:
             # Because all the 'create' magic is stuffed into the constructor ATM
             # we need first initiate a git repository
             git_repo = GitRepo(path, create=True)
             # since we are initiatializing, that branch shouldn't exist yet, thus --orphan
-            git_repo.git_checkout(self.branch, options="--orphan")
+            git_repo.checkout(self.branch, options="--orphan")
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creater"
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
@@ -138,7 +136,7 @@ class initiate_handle(object):
             put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
         return repo
 
-    def _save_crawl_config(self, handle_path, data):
+    def _save_crawl_config(self, dataset_path, data):
         kwargs = {f: data[f] for f in self.data_fields}
         if self.template_func:
             kwargs['func'] = self.template_func
@@ -146,42 +144,42 @@ class initiate_handle(object):
         kwargs.update(self.add_fields)
         return initiate_pipeline_config(
             template=self.template,
-            path=handle_path,
+            path=dataset_path,
             kwargs=kwargs,
             commit=True
         )
 
     def __call__(self, data={}):
-        # figure out directory where create such a handle
-        handle_name = self.handle_name or data.get('handle_name', None)
-        handle_path = opj(os.curdir, handle_name) \
+        # figure out directory where create such a dataset
+        dataset_name = self.dataset_name or data.get('dataset_name', None)
+        dataset_path = opj(os.curdir, dataset_name) \
             if self.path is None \
             else self.path
 
-        data_updated = updated(data, {'handle_path': handle_path,
-                                      'handle_name': handle_name})
-        lgr.debug("Request to initialize a handle %s at %s", handle_name, handle_path)
+        data_updated = updated(data, {'dataset_path': dataset_path,
+                                      'dataset_name': dataset_name})
+        lgr.debug("Request to initialize a dataset %s at %s", dataset_name, dataset_path)
         init = True
-        if exists(handle_path):
-            # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
-            # TODO: config crawl.collection.crawl_new = false|true
+        if exists(dataset_path):
+            # TODO: config crawl.subdataset.existing = skip|raise|replace|crawl|adjust
+            # TODO: config crawl.subdataset.crawl_new = false|true
             existing = self.existing or 'skip'
             if existing == 'skip':
-                lgr.info("Skipping handle %s since already exists" % handle_name)
+                lgr.info("Skipping dataset %s since already exists" % dataset_name)
                 yield data_updated
                 return
             elif existing == 'raise':
-                raise RuntimeError("%s already exists" % handle_path)
+                raise RuntimeError("%s already exists" % dataset_path)
             elif existing == 'replace':
-                _call(rmtree, handle_path)
+                _call(rmtree, dataset_path)
             elif existing == 'adjust':
                 # E.g. just regenerate configs/meta
                 init = False
             else:  # TODO: 'crawl'  ;)
                 raise ValueError(self.existing)
         if init:
-            _call(self._initiate_handle, handle_path, handle_name)
-        _call(self._save_crawl_config, handle_path, data)
+            _call(self._initiate_dataset, dataset_path, dataset_name)
+        _call(self._save_crawl_config, dataset_path, data)
 
         yield data_updated
 
@@ -238,16 +236,22 @@ class Annexificator(object):
         # TODO: commented out to ease developing for now
         #self.repo = _call(AnnexRepo, path, **kwargs)
         # TODO: backend -- should be fetched from the config I guess... or should we
-        # give that duty to the handle initialization routine to change default backend?
+        # give that duty to the dataset initialization routine to change default backend?
         # Well -- different annexifiers might have different ideas for the backend, but
         # then those could be overriden via options
+
+        if exists(path):
+            if not exists(opj(path, '.git')):
+                if (len(listdir(path))) and (not allow_dirty):
+                    raise RuntimeError("Directory %s is not empty." % path)
+
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
 
-        git_remotes = self.repo.git_get_remotes()
+        git_remotes = self.repo.get_remotes()
         if special_remotes:
             for remote in special_remotes:
                 if remote not in git_remotes:
-                    self.repo.annex_initremote(
+                    self.repo.init_remote(
                             remote,
                             ['encryption=none', 'type=external', 'autoenable=true',
                              'externaltype=%s' % remote])
@@ -269,7 +273,7 @@ class Annexificator(object):
 
     # def add(self, filename, url=None):
     #     # TODO: modes
-    #     self.repo.annex_addurl_to_file(filename, url, batch=True #, TODO  backend
+    #     self.repo.add_url_to_file(filename, url, batch=True #, TODO  backend
     #                                    )
     #     raise NotImplementedError()
     #
@@ -369,8 +373,8 @@ class Annexificator(object):
             # So we have only filename
             assert(fpath)
             # Just add into git directly for now
-            # TODO: tune  annex_add so we could use its json output, and may be even batch it
-            out_json = _call(self.repo.annex_add, fpath, options=self.options)
+            # TODO: tune  add so we could use its json output, and may be even batch it
+            out_json = _call(self.repo.add, fpath, options=self.options)
         # elif self.mode == 'full':
         #     # Since addurl ignores annex.largefiles we need first to download that file and then
         #     # annex add it
@@ -380,12 +384,12 @@ class Annexificator(object):
         #         # Just to feed into _call for dry-run
         #         filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
         #         assert(filepath_downloaded == filepath)
-        #         self.repo.annex_add(fpath, options=self.options)
+        #         self.repo.add(fpath, options=self.options)
         #         # and if the file ended up under annex, and not directly under git -- addurl
         #         # TODO: better function which explicitly checks if file is under annex or either under git
         #         if self.repo.file_has_content(fpath):
         #             stats.add_annex += 1
-        #             self.repo.annex_addurl_to_file(fpath, url, batch=True)
+        #             self.repo.add_url_to_file(fpath, url, batch=True)
         #         else:
         #             stats.add_git += 1
         #     _call(_download_and_git_annex_add, url, fpath)
@@ -417,7 +421,7 @@ class Annexificator(object):
             if self.mode == 'full' and remote_status and remote_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
                          % (naturalsize(remote_status.size), url))
-            out_json = _call(self.repo.annex_addurl_to_file, fpath, url, options=annex_options, batch=True)
+            out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
             added_to_annex = 'key' in out_json
 
             if self.mode == 'full' or not added_to_annex:
@@ -456,9 +460,9 @@ class Annexificator(object):
         # db_filename = self.db.get_filename(url)
         # if filename is not None and filename != db_filename:
         #     # need to download new
-        #     self.repo.annex_addurls
+        #     self.repo.add_urls
         #     # remove old
-        #     self.repo.git_remove([db_filename])
+        #     self.repo.remove([db_filename])
         #     self.db.set_filename(url, filename)
         # # figure out if we need to download it
         # #if self.mode in ('relaxed', 'fast'):
@@ -574,7 +578,7 @@ class Annexificator(object):
             list(self.finalize()(data))
             # statusdb is valid only within the same branch
             self._statusdb = None
-            existing_branches = self.repo.git_get_branches()
+            existing_branches = self.repo.get_branches()
             if must_exist is not None:
                 assert must_exist == (branch in existing_branches)
             if branch not in existing_branches:
@@ -582,17 +586,17 @@ class Annexificator(object):
                 if parent is None:
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
-                    self.repo.git_checkout(branch, options="--orphan")
+                    self.repo.checkout(branch, options="--orphan")
                     if self.repo.dirty:
-                        self.repo.git_remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
+                        self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
                     lgr.info("Checking out %s into a new branch %s" % (parent, branch))
-                    self.repo.git_checkout(parent, options="-b %s" % branch)
+                    self.repo.checkout(parent, options="-b %s" % branch)
             else:
                 lgr.info("Checking out an existing branch %s" % (branch))
-                self.repo.git_checkout(branch)
+                self.repo.checkout(branch)
             yield updated(data, {"git_branch": branch})
         return switch_branch
 
@@ -626,18 +630,18 @@ class Annexificator(object):
         def merge_branch(data):
 
             if target_branch is not None:
-                orig_branch = self.repo.git_get_active_branch()
+                orig_branch = self.repo.get_active_branch()
                 target_branch_ = target_branch
                 list(self.switch_branch(target_branch_)(data))
             else:
                 orig_branch = None
-                target_branch_ = self.repo.git_get_active_branch()
+                target_branch_ = self.repo.get_active_branch()
 
             if self.repo.dirty:
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
 
-            last_merged_checksum = self.repo.git_get_merge_base([target_branch_, branch])
-            if last_merged_checksum == self.repo.git_get_hexsha(branch):
+            last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
+            if last_merged_checksum == self.repo.get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
                 skip_no_changes_ = skip_no_changes
                 if skip_no_changes is None:
@@ -649,7 +653,7 @@ class Annexificator(object):
 
             if one_commit_at_a_time:
                 all_to_merge = list(
-                        self.repo.git_get_branch_commits(
+                        self.repo.get_branch_commits(
                                 branch,
                                 limit='left-only',
                                 stop=last_merged_checksum,
@@ -664,14 +668,14 @@ class Annexificator(object):
 
             for to_merge in all_to_merge:
                 # we might have switched away to orig_branch
-                if self.repo.git_get_active_branch() != target_branch_:
-                    self.repo.git_checkout(target_branch_)
+                if self.repo.get_active_branch() != target_branch_:
+                    self.repo.checkout(target_branch_)
                 if strategy is None:
-                    self.repo.git_merge(to_merge, options=options)
+                    self.repo.merge(to_merge, options=options)
                 elif strategy == 'theirs':
-                    self.repo.git_merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
+                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
                     self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
-                    self.repo.annex_add('.', options=self.options)  # so everything is staged to be committed
+                    self.repo.add('.', options=self.options)  # so everything is staged to be committed
                 else:
                     raise NotImplementedError(strategy)
 
@@ -685,7 +689,7 @@ class Annexificator(object):
                     if stats:
                         stats.merges.append([branch, target_branch_])
                 if orig_branch is not None:
-                    self.repo.git_checkout(orig_branch)
+                    self.repo.checkout(orig_branch)
                 yield data
         return merge_branch
 
@@ -721,7 +725,7 @@ class Annexificator(object):
         self.repo._git_custom_command(fpaths, ["git", "reset"])
 
     def _stage(self, fpaths):
-        self.repo.git_add(fpaths)
+        self.repo.add(fpaths, git=True)
         # self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
 
     def _get_status(self):
@@ -767,7 +771,7 @@ class Annexificator(object):
         def _commit_versions(data):
             self._precommit()  # so that all batched annexes stop
 
-            # figure out versions for all files (so we could handle conflicts with existing
+            # figure out versions for all files (so we could dataset conflicts with existing
             # non versioned)
             # TODO:  we need to care only about staged (and unstaged?) files ATM!
             # So let's do it.  And use separate/new Git repo since we are doing manual commits through
@@ -831,7 +835,7 @@ class Annexificator(object):
                 #new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
                 new_versions = versions
                 # if we have "new_versions" smallest one smaller than previous -- we got a problem!
-                # TODO: how to handle ==? which could be legit if more stuff was added for the same
+                # TODO: how to dataset ==? which could be legit if more stuff was added for the same
                 # version?  but then if we already tagged with that -- we would need special handling
 
             if new_versions:
@@ -994,7 +998,7 @@ class Annexificator(object):
             stats = data.get('datalad_stats', None)
             if self.repo.dirty:  # or self.tracker.dirty # for dry run
                 lgr.info("Repository found dirty -- adding and committing")
-                _call(self.repo.annex_add, '.', options=self.options)  # so everything is committed
+                _call(self.repo.add, '.', options=self.options)  # so everything is committed
 
                 stats_str = ('\n\n' + stats.as_str(mode='full')) if stats else ''
                 _call(self._commit, "%s%s" % (', '.join(self._states), stats_str), options=["-a"])
@@ -1065,7 +1069,7 @@ class Annexificator(object):
                     files_str = ": " + ', '.join(obsolete) if len(obsolete) < 10 else ""
                     lgr.info('Removing %d obsolete files%s' % (len(obsolete), files_str))
                     stats = data.get('datalad_stats', None)
-                    _call(self.repo.git_remove, obsolete)
+                    _call(self.repo.remove, obsolete)
                     if stats:
                         _call(stats.increment, 'removed', len(obsolete))
                     for filepath in obsolete:
@@ -1085,23 +1089,23 @@ class Annexificator(object):
         # TODO: not sure if we should may be check if exists, and skip/just complain if not
         if stats:
             _call(stats.increment, 'removed')
-        _call(self.repo.git_remove, filename)
+        _call(self.repo.remove, filename)
         yield data
 
-    def initiate_handle(self, *args, **kwargs):
-        """Thin proxy to initiate_handle node which initiates handle as a subhandle to current annexificator
+    def initiate_dataset(self, *args, **kwargs):
+        """Thin proxy to initiate_dataset node which initiates dataset as a subdataset to current annexificator
         """
-        def _initiate_handle(data):
-            for data_ in initiate_handle(*args, **kwargs)(data):
-                # Also "register" as a sub-handle if not yet registered
+        def _initiate_dataset(data):
+            for data_ in initiate_dataset(*args, **kwargs)(data):
+                # Also "register" as a sub-dataset if not yet registered
                 ds = Dataset(self.repo.path)
-                # TODO:  rename handle_  into dataset_
-                if data['handle_name'] not in ds.get_dataset_handles():
+                # TODO:  rename dataset_  into dataset_
+                if data['dataset_name'] not in ds.get_subdatasets():
                     out = install(
                             dataset=ds,
-                            path=data_['handle_path'],
-                            source=data_['handle_path'],
+                            path=data_['dataset_path'],
+                            source=data_['dataset_path'],
                             )
                     # TODO: reconsider adding smth to data_ to be yielded"
                 yield data_
-        return _initiate_handle
+        return _initiate_dataset
