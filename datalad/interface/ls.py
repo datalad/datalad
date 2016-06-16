@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 import sys
 import time
 from os.path import exists, lexists, join as opj, abspath, isabs
-from os.path import curdir, isfile, islink, isdir, dirname
+from os.path import curdir, isfile, islink, isdir, dirname, basename, split
 from os import readlink, listdir, lstat
 
 from six.moves.urllib.request import urlopen, Request
@@ -383,24 +383,12 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         print(ds_str)
 
 
-def repo(path):
-    """returns repository class the path is associated with
+def fs_extract(node):
+    """extract required info from FsModel based filesystem node and returns it as a dictionary"""
 
-    useful for getting repository specific information about the path"""
-    if exists(opj(path, ".git", "annex")):
-        return AnnexRepo(path)
-    elif exists(opj(path, ".git")):
-        return GitRepo(path)
-    else:
-        return None
-
-
-def JsonFormatter(path, repo, type_, size, date):
-    """formats node info into a json array element"""
-    pretty_size = humanize.naturalsize(size)
-    pretty_date = time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(date))
-    json_fmt = u'{\"path\": \"%s\", \"repo\": \"%s\", \"type\": \"%s\", \"size\": \"%s\", \"date\": \"%s\"}'
-    return json_fmt % (path, repo.path, type_, pretty_size, pretty_date)
+    pretty_size = humanize.naturalsize(node.size)
+    pretty_date = time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(node.date))
+    return {"path": node._path, "repo": node.repo.path, "type": node.type_, "size": pretty_size, "date": pretty_date}
 
 
 def _flatten(listoflists):
@@ -417,29 +405,33 @@ def _flatten(listoflists):
         return listoflists
 
 
-def _fs_traverse(loc, recursive=False):
-    """takes a root path and returns a (recursive) list of nodes in the directory tree
+def leaf_name(path):
+    head, tail = split(abspath(path))
+    return tail or basename(head)
 
+
+def fs_traverse(loc, repo, recursive=False):
+    """takes a root path, traverses through its nodes and returns a dictionary of relevant features attached to each node
+
+    extracts and returns a (recursive) list of nodes in the directory tree
     does not traverse into git or annex directories
     """
-    # if node is a file, symlink or under git or git_annex
-    if isfile(loc) or islink(loc) or isdir(opj(loc, ".git")) or isdir(opj(loc, ".git", "annex")):
-        return [loc]
-    # else if plain directory
-    elif isdir(loc):
-        f = [loc]
+
+    fs = {leaf_name(leaf_name(loc)): fs_extract(FsModel(loc, repo))}
+    # if node a plain directory, i.e not a file, symlink, git or git_annex repository
+    if isdir(loc) and not (isfile(loc) or islink(loc) or isdir(opj(loc, ".git")) or isdir(opj(loc, ".git", "annex"))):
         if recursive:
-            f.extend(_flatten(_fs_traverse(opj(loc, node), recursive=recursive) for node in listdir(loc)))
+            fs.update({leaf_name(node): fs_traverse(opj(loc, node), repo, recursive=recursive)
+                      for node in listdir(loc)})
         else:
-            f.extend([opj(loc, node) for node in listdir(loc)])
-        return f
+            fs.update({leaf_name(node): opj(loc, node) for node in listdir(loc)})
+    return fs
 
 
 def _ls_web(loc, fast=False, recursive=False, all=False):
     from ..distribution.dataset import Dataset
-    isabs_loc = isabs(loc)
-    topdir = '' if isabs_loc else abspath(curdir)
 
+    # find all sub-datasets under path passed and attach Dataset class to each
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
@@ -447,33 +439,20 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
         if recursive else [])
     dsms = list(map(DsModel, dss))
 
-    # adjust path strings
-    fs = []
-    for ds_model in dsms:
-        path = ds_model.path[len(topdir) + 1 if topdir else 0:]
-        if not path:
-            path = '.'
-        ds_model.path = path
+    # traverse directory of each submodule at loc passed by userto create dict of dicts
+    fs = {}
+    for ds in dsms:
+        # unwrap top git directory and traverse each node and extract relevant properties
+        fs[leaf_name(ds.path)] = {leaf_name(subdir): fs_traverse(opj(ds.path, subdir), ds, recursive=recursive)
+                                  for subdir in listdir(ds.path) if '.git' not in subdir}
 
-        # unwrap top git directory and run traversal on each non .git node
-        fs.append(_flatten([path, [_fs_traverse(subdir, recursive=True)
-                                   for subdir in listdir(path)
-                                   if '.git' not in subdir]]))
+    import json
+    print json.dumps(fs)  # convert dictionary to json and print to stdout
 
-    # create git/annex repo object once for each submodule in current tree
-    repo_ = [repo(fss[0]) for fss in fs]
-    # attach the FSModel to each node in the traversed fs tree
-    fsm = [FsModel(node, repo_[fs.index(fss)]) for fss in fs for node in fss]
-    # format directory tree into a json array
-    print '[' + JsonFormatter(fsm[0]._path, fsm[0].repo, fsm[0].type_, fsm[0].size, fsm[0].date)
-    for item in fsm[1:]:
-        print ', ' + JsonFormatter(item._path, item.repo, item.type_, item.size, item.date)
-    print ']'
 
 #
 # S3 listing
 #
-
 def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_content=False):
     """List S3 bucket content"""
     if loc.startswith('s3://'):
