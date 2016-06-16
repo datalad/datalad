@@ -152,12 +152,8 @@ class Update(Interface):
                     # we have no remote given, therefore
                     # check for tracking branch's remote:
 
-                    cfg_reader = repo.repo.config_reader()
-                    sct = "branch \"{0}\"".format(repo.get_active_branch())
-                    track_remote = cfg_reader.get_value(
-                        section=sct, option="remote",
-                        default="DATALAD_DEFAULT")
-                    if track_remote != "DATALAD_DEFAULT":
+                    track_remote, track_branch = repo.get_tracking_branch()
+                    if track_remote:
                         # we have a "tracking remote"
                         repo.fetch(remote=track_remote, refspec="git-annex")
 
