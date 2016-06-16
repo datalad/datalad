@@ -41,7 +41,7 @@ def test_update_simple(origin, src_path, dst_path):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True,
                   create=True).checkout("master")
     # forget we cloned it (provide no 'origin' anymore), which should lead to
@@ -52,7 +52,7 @@ def test_update_simple(origin, src_path, dst_path):
     dest = install(path=dst_path, source=src_path, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in dest.get_dataset_handles(recursive=True):
+    for subds in dest.get_subdatasets(recursive=True):
         AnnexRepo(opj(dst_path, subds), init=True,
                   create=True).checkout("master")
     # test setup done;

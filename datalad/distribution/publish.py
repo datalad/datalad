@@ -199,9 +199,9 @@ class Publish(Interface):
                 ds.repo._git_custom_command('', ["git", "annex", "copy"] +
                                             with_data + ["--to", dest_resolved])
 
-            if recursive and ds.get_dataset_handles() != []:
+            if recursive and ds.get_subdatasets() != []:
                 results = [ds]
-                for subds in ds.get_dataset_handles():
+                for subds in ds.get_subdatasets():
                     results.append(
                         Dataset(
                             opj(ds.path, subds)).publish(

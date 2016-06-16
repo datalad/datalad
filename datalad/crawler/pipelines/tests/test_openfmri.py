@@ -16,7 +16,7 @@ from ...nodes.matches import *
 from ...pipeline import run_pipeline, FinishPipeline
 
 from ...nodes.misc import Sink, assign, range_node, interrupt_if
-from ...nodes.annex import Annexificator, initiate_handle
+from ...nodes.annex import Annexificator, initiate_dataset
 from ...pipeline import load_pipeline_from_module
 
 from ....support.stats import ActivityStats
@@ -132,12 +132,12 @@ def __test_basic_openfmri_dataset_pipeline_with_annex(path):
     dataset_name = 'ds%06d' % dataset_index
     dataset_url = 'https://openfmri.org/dataset/' + dataset_name
     # needs to be a non-existing directory
-    handle_path = opj(path, dataset_name)
-    # we need to pre-initiate handle
-    list(initiate_handle('openfmri', dataset_index, path=handle_path)())
+    dataset_path = opj(path, dataset_name)
+    # we need to pre-initiate dataset
+    list(initiate_dataset('openfmri', dataset_index, path=dataset_path)())
 
     annex = Annexificator(
-        handle_path,
+        dataset_path,
         create=False,  # must be already initialized etc
         options=["-c", "annex.largefiles=exclude=*.txt and exclude=README"])
 
@@ -190,9 +190,9 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @with_tempfile
 def test_openfmri_pipeline1(ind, topurl, outd):
 
-    list(initiate_handle(
+    list(initiate_dataset(
         template="openfmri",
-        handle_name='dataladtest-ds666',
+        dataset_name='dataladtest-ds666',
         path=outd,
         data_fields=['dataset'])({'dataset': 'ds666'}))
 
@@ -207,7 +207,7 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     eq_(set(repo.get_branches()), branches)
     # We do not have custom changes in master yet, so it just follows incoming-processed atm
     # eq_(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
-    # Since we did initiate_handle -- now we have separate master!
+    # Since we did initiate_dataset -- now we have separate master!
     assert_not_equal(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
     # and that one is different from incoming
     assert_not_equal(repo.get_hexsha('incoming'), repo.get_hexsha('incoming-processed'))
@@ -374,9 +374,9 @@ test_openfmri_pipeline1.tags = ['integration']
 def test_openfmri_pipeline2(ind, topurl, outd):
     # no versioned files -- should still work! ;)
 
-    list(initiate_handle(
+    list(initiate_dataset(
         template="openfmri",
-        handle_name='dataladtest-ds666',
+        dataset_name='dataladtest-ds666',
         path=outd,
         data_fields=['dataset'])({'dataset': 'ds666'}))
 
@@ -391,7 +391,7 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     eq_(set(repo.get_branches()), branches)
     # We do not have custom changes in master yet, so it just follows incoming-processed atm
     # eq_(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
-    # Since we did initiate_handle -- now we have separate master!
+    # Since we did initiate_dataset -- now we have separate master!
     assert_not_equal(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
     # and that one is different from incoming
     assert_not_equal(repo.get_hexsha('incoming'), repo.get_hexsha('incoming-processed'))

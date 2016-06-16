@@ -13,7 +13,7 @@ from os.path import join as opj, exists
 
 from ...pipeline import run_pipeline, FinishPipeline
 
-from ...nodes.annex import Annexificator, initiate_handle
+from ...nodes.annex import Annexificator, initiate_dataset
 
 from ....support.stats import ActivityStats
 from ....support.gitrepo import GitRepo
@@ -53,7 +53,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @with_tempfile
 def test_openfmri_collection_pipeline1(ind, topurl, outd):
 
-    list(initiate_handle(
+    list(initiate_dataset(
         template="openfmri_collection",
         path=outd,
     )())
@@ -65,7 +65,7 @@ def test_openfmri_collection_pipeline1(ind, topurl, outd):
 
     # TODO: replace below command with the one listing subdatasets
     subdatasets = ['ds000001', 'ds000002']
-    eq_(Dataset(outd).get_dataset_handles(fulfilled=True), subdatasets)
+    eq_(Dataset(outd).get_subdatasets(fulfilled=True), subdatasets)
 
     # Check that crawling configuration was created for every one of those
     for sub in subdatasets:
