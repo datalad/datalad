@@ -69,7 +69,7 @@ _run = _runner.run
 class initiate_dataset(object):
     """Action to initiate a dataset following one of the known templates
     """
-    def __init__(self, template, dataset_name=None,  # collection_name=None,
+    def __init__(self, template, dataset_name=None,
                  path=None, branch=None, backend=None,
                  template_func=None,
                  data_fields=[], add_fields={}, existing=None):
@@ -77,13 +77,11 @@ class initiate_dataset(object):
         Parameters
         ----------
         template : str
-          Which template (probably matching the collection name) to use.
+          Which template (probably matching the superdataset name) to use.
           TODO: refer to specs of template that it might understand some
           arguments encoded, such as #func=custom_pipeline
         dataset_name : str
           Name of the dataset. If None, reacts on 'dataset_name' in data
-        collection_name : str, optional
-          If None and not present in data, template is taken
         path : str, optional
           Path were to initiate the dataset.  If not specified, would use
           default path for all new datasets (DATALAD_CRAWL_COLLECTIONSPATH)
@@ -107,7 +105,6 @@ class initiate_dataset(object):
         # configurations for e.g. "basic" template
         self.template = template
         self.dataset_name = dataset_name
-        ## self.collection_name = collection_name
         self.data_fields = data_fields
         self.add_fields = add_fields
         self.existing = existing
@@ -161,8 +158,8 @@ class initiate_dataset(object):
         lgr.debug("Request to initialize a dataset %s at %s", dataset_name, dataset_path)
         init = True
         if exists(dataset_path):
-            # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
-            # TODO: config crawl.collection.crawl_new = false|true
+            # TODO: config crawl.subdataset.existing = skip|raise|replace|crawl|adjust
+            # TODO: config crawl.subdataset.crawl_new = false|true
             existing = self.existing or 'skip'
             if existing == 'skip':
                 lgr.info("Skipping dataset %s since already exists" % dataset_name)

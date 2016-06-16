@@ -32,7 +32,7 @@ TOPURL = "https://openfmri.org/dataset/"
 
 # define a pipeline factory function accepting necessary keyword arguments
 # Should have no strictly positional arguments
-def collection_pipeline(url=TOPURL, **kwargs):
+def superdataset_pipeline(url=TOPURL, **kwargs):
     annex = Annexificator()
     lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
     return [

@@ -32,7 +32,7 @@ from ....tests.utils import ok_file_under_git
 from ....distribution.dataset import Dataset
 from ....consts import CRAWLER_META_CONFIG_PATH
 
-from ..openfmri import collection_pipeline as ofcpipeline
+from ..openfmri import superdataset_pipeline as ofcpipeline
 
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
@@ -51,10 +51,11 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 )
 @serve_path_via_http
 @with_tempfile
-def test_openfmri_collection_pipeline1(ind, topurl, outd):
+def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
 
     list(initiate_dataset(
-        template="openfmri_collection",
+        template="openfmri",
+        template_func="superdataset_pipeline",
         path=outd,
     )())
 
@@ -72,3 +73,6 @@ def test_openfmri_collection_pipeline1(ind, topurl, outd):
         repo = GitRepo(opj(outd, sub))
         assert(not repo.dirty)
         assert(exists(opj(repo.path, CRAWLER_META_CONFIG_PATH)))
+
+    # TODO: check that configuration for the crawler is up to the standard
+    # Ideally should also crawl some fake datasets I guess

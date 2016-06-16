@@ -25,7 +25,7 @@ from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.crcns")
 
 
-def collection_pipeline():
+def superdataset_pipeline():
     lgr.info("Creating a CRCNS collection pipeline")
     # Should return a list representing a pipeline
     annex = Annexificator()

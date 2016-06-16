@@ -1,7 +1,7 @@
 datalad metadata
 ================
 
-This was somehwat cool in the past -- ignore in the present.
+**This was somehwat cool in the past -- ignore in the present. Kept for future references**
 
 This is a documentation on datalad's approach to metadata. Especially on how
 the metadata representation currently looks like.
