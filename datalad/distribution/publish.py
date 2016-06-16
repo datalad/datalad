@@ -153,18 +153,6 @@ class Publish(Interface):
             ds.repo.push(remote=dest_resolved,
                          refspec="+git-annex:git-annex")
 
-        if recursive:
-            # TODO:
-            # probably not a recursive call to publish, but just push them;
-            # then do everything regarding `with_data` after the pushes.
-            #
-            # But then - consider note from previous implementation (true recursion):
-            #
-            # Note: use `dest` instead of `dest_resolved` in case
-            # dest was None, so subdatasets would use their default
-            # as well
-            raise NotImplementedError
-
         if with_data:
             lgr.info("Publishing data of dataset {0} ...".format(ds))
             for file_ in with_data:
@@ -199,6 +187,13 @@ class Publish(Interface):
                     else:
                         lgr.info("Publishing data of {0} ...".format(file_))
                         ds.repo.copy_to(file_, dest_resolved)
+
+        if recursive:
+            for path in ds.get_dataset_handles():
+                Dataset(path).publish(dest=dest,
+                                      with_data=with_data,
+                                      recursive=recursive)
+
 
         # TODO:
         # return values
