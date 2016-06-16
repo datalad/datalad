@@ -168,6 +168,10 @@ def get_disposition_filename(data):
 
 class _act_if(object):
     """Base class for nodes which would act if input data matches specified values
+
+    Should generally be not used directly.  If used directly,
+    no action is taken, besides possibly regexp matched groups
+    populating the `data`
     """
 
     def __init__(self, values, re=False, negate=False):
@@ -210,11 +214,14 @@ class _act_if(object):
                   else self._act_match)(data_):
             yield v
 
+    # By default, nothing really is done -- so just produce the same
+    # data.  Sub-classes will provide specific custom actions in one
+    # or another case
     def _act_mismatch(self, data):
-        raise NotImplementedError
+        return [data]
 
     def _act_match(self, data):
-        raise NotImplementedError
+        return [data]
 
 
 @auto_repr
@@ -224,9 +231,6 @@ class interrupt_if(_act_if):
     def _act_mismatch(self, data):
         raise FinishPipeline
 
-    def _act_match(self, data):
-        return [data]
-
 
 @auto_repr
 class skip_if(_act_if):
@@ -235,17 +239,12 @@ class skip_if(_act_if):
     def _act_mismatch(self, data):
         return []  # nothing will be yielded etc
 
-    def _act_match(self, data):
-        return [data]
-
 
 @auto_repr
 class continue_if(_act_if):
-    """Continue if matched"""
+    """Continue if matched
 
-    # ?????
-    def _act_mismatch(self, data):
-        return [data]
+    An inverse of skip_if"""
 
     def _act_match(self, data):
         return []

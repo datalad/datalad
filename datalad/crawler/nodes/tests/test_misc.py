@@ -123,7 +123,7 @@ def test__act_if():
 
     # matched = true
     gen = _act_if(values)
-    assert_raises(NotImplementedError, list, gen(datamatch))
+    eq_(list(gen(datamatch)), [datamatch])
 
     # matched = false
     genfal = _act_if(values, re=True, negate=False)
