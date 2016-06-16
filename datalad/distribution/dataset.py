@@ -60,6 +60,9 @@ class Dataset(object):
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
 
+    def __eq__(self, other):
+        return self.path == other.path
+
     @property
     def path(self):
         """path to the dataset"""

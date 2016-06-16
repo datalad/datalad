@@ -142,6 +142,8 @@ class Publish(Interface):
             # unknown remote
             raise ValueError("No sibling '%s' found." % dest_resolved)
 
+        lgr.info("Publishing dataset {0} to sibling {1} "
+                 "...".format(ds, dest_resolved))
         # we now know where to push to:
         ds.repo.push(remote=dest_resolved,
                      refspec=ds.repo.get_active_branch(),
@@ -164,12 +166,39 @@ class Publish(Interface):
             raise NotImplementedError
 
         if with_data:
-            # TODO:
-            # it's a list
-            # per item resolve (sub)dataset and annex copy --to
-            # - what to do if item is not an annexed file? Just skip, I think
-            #   => check how annex fails in that case
-            raise NotImplementedError
+            lgr.info("Publishing data of dataset {0} ...".format(ds))
+            for file_ in with_data:
+                try:
+                    subds = get_containing_subdataset(ds, file_)
+                    lgr.debug("Resolved dataset for {0}: {1}".format(file_,
+                                                                     subds))
+                except ValueError as e:
+                    if "path {0} not in dataset.".format(file_) in str(e):
+                        # file_ is not in ds; this might be an invalid item to
+                        # publish or it belongs to a superdataset, which called
+                        # us recursively, so we are not responsible for that
+                        # item
+                        # => just skip
+                        subds = None
+                        lgr.debug("No (sub)dataset found for item {0}".format(
+                            file_))
+                    else:
+                        raise
+                if subds and subds == ds:
+                    # we want to annex copy file_
+                    # are we able to?
+                    # What do we need to check
+                    # (not in annex, is a directory, ...)? When to skip or fail?
+                    # What to spit out?
+                    # For now just call annex copy and later care for how to
+                    # deal with failing
+                    if not isinstance(ds.repo, AnnexRepo):
+                        raise RuntimeError(
+                            "Cannot publish content of something, that is not "
+                            "part of an annex. ({0})".format(file_))
+                    else:
+                        lgr.info("Publishing data of {0} ...".format(file_))
+                        ds.repo.copy_to(file_, dest_resolved)
 
         # TODO:
         # return values

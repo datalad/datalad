@@ -177,6 +177,7 @@ class AnnexRepo(GitRepo):
                                                               option=opt)
                         except NoOptionError:
                             write = True
+                            cfg_string_old = ""
                         if cfg_string_old != cfg_string:
                             lgr.warning("Found conflicting annex-ssh-options "
                                         "for remote '{0}':\n{1}\n"
@@ -1144,6 +1145,32 @@ class AnnexRepo(GitRepo):
 
     # TODO: we probably need to override get_file_content, since it returns the
     # symlink's target instead of the actual content.
+
+    @normalize_paths(match_return_type=False)  # get a list even in case of a single item
+    def copy_to(self, files, remote):
+        """Copy the actual content of `files` to `remote`
+
+        Parameters
+        ----------
+        files
+        remote
+        """
+
+        if remote not in self.get_remotes():
+            raise ValueError("Unknown remote '{0}'.".format(remote))
+
+        # in case something can't be copied,
+        # raise exceptions (see get_file_key()):
+        if not all(self.get_file_key(file_) for file_ in files):
+            # something went wrong
+            # invalid files should raise from within get_file_key, so we
+            # shouldn't get here
+            raise RuntimeError("Unexpected failure while retrieving keys for "
+                               "list:\n{0}".format(files))
+
+        self._run_annex_command('copy',
+                                annex_options=[files,
+                                               '--to=%s' % remote])
 
 
 # TODO: Why was this commented out?
