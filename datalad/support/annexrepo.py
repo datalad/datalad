@@ -1169,8 +1169,7 @@ class AnnexRepo(GitRepo):
                                "list:\n{0}".format(files))
 
         self._run_annex_command('copy',
-                                annex_options=[files,
-                                               '--to=%s' % remote])
+                                annex_options=files + ['--to=%s' % remote])
 
 
 # TODO: Why was this commented out?

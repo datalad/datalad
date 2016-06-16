@@ -82,7 +82,7 @@ class Publish(Interface):
             metavar='PATH',
             doc="path(s) to file handle(s) to publish including their actual "
                 "content",
-            constraints=EnsureListOf(string_types) | EnsureNone(),
+            constraints=EnsureStr() | EnsureNone(),
             nargs='*'),)
 
     @staticmethod
