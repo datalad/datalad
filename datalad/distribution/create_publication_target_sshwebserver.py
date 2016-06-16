@@ -182,7 +182,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         datasets = dict()
         datasets[basename(ds.path)] = ds
         if recursive:
-            for subds in ds.get_dataset_handles(recursive=True):
+            for subds in ds.get_subdatasets(recursive=True):
                 sub_path = opj(ds.path, subds)
                 # TODO: when enhancing Dataset/*Repo classes and therefore
                 # adapt to moved code, make proper distinction between name and

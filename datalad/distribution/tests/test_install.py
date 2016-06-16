@@ -116,7 +116,7 @@ def test_create(path):
     ok_(subds1.is_installed())
     ok_clean_git(sub_path_1, annex=False)
     # wasn't installed into ds:
-    assert_not_in("sub", ds.get_dataset_handles())
+    assert_not_in("sub", ds.get_subdatasets())
 
     # add it inplace:
     added_subds = ds.install("sub", source=sub_path_1)
@@ -125,11 +125,11 @@ def test_create(path):
     eq_(added_subds.path, sub_path_1)
     assert_true(isdir(opj(added_subds.path, '.git')))
     # will not list it unless committed
-    assert_not_in("sub", ds.get_dataset_handles())
+    assert_not_in("sub", ds.get_subdatasets())
     ds.save("added submodule")
     # will still not list it, because without a single commit, it doesn't enter
     # the index
-    assert_not_in("sub", ds.get_dataset_handles())
+    assert_not_in("sub", ds.get_subdatasets())
     # now for reals
     open(opj(added_subds.path, 'somecontent'), 'w').write('stupid')
     # next one will auto-annex the new file
@@ -140,11 +140,11 @@ def test_create(path):
     # intended behaviour. I think so.
     # MIH: Now it need a flag to perform this (see #546)
     ds.save('submodule with content', auto_add_changes=True)
-    # assert_not_in("sub", ds.get_dataset_handles())
+    # assert_not_in("sub", ds.get_subdatasets())
     # # we need to install the submodule again in the parent
     # # an actual final commit is not required
     # added_subds = ds.install("sub", source=sub_path_1)
-    assert_in("sub", ds.get_dataset_handles())
+    assert_in("sub", ds.get_subdatasets())
 
     # next one directly created within ds:
     sub_path_2 = opj(path, "sub2")
@@ -246,9 +246,9 @@ def test_install_into_dataset(source, top_path):
     assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
     # unless committed the subds should not show up in the parent
     # this is the same behavior that 'git submodule status' implements
-    assert_not_in('sub', ds.get_dataset_handles())
+    assert_not_in('sub', ds.get_subdatasets())
     ds.save('addsub')
-    assert_in('sub', ds.get_dataset_handles())
+    assert_in('sub', ds.get_subdatasets())
 
 
 @with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
@@ -296,7 +296,7 @@ def test_install_missing_arguments():
 def test_install_recursive(src, path):
     ds = install(path=path, source=src, recursive=True)
     ok_(ds.is_installed())
-    for sub in ds.get_dataset_handles(recursive=True):
+    for sub in ds.get_subdatasets(recursive=True):
         ok_(Dataset(opj(path, sub)).is_installed(), "Not installed: %s" % opj(path, sub))
 
 # TODO: Is there a way to test result renderer?

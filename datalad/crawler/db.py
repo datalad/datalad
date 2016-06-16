@@ -14,7 +14,7 @@ from six import itervalues
 import json
 
 class URLDB(object):
-    """Database collating urls for the content across all handles
+    """Database collating urls for the content across all datasets
 
     Schema: TODO, but needs for sure
 

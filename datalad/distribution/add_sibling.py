@@ -115,7 +115,7 @@ class AddSibling(Interface):
             ds_basename: {'repo': ds.repo}
         }
         if recursive:
-            for subds in ds.get_dataset_handles(recursive=True):
+            for subds in ds.get_subdatasets(recursive=True):
                 sub_path = opj(ds.path, subds)
                 repos[ds_basename + '/' + subds] = {
 #                repos[subds] = {

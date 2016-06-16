@@ -1,5 +1,5 @@
 #!/bin/bash
-# This generates arbitrarily large bogus collection with the specified in the command line number of handles
+# This generates arbitrarily large bogus collection with the specified in the command line number of datasets
 # which have some random very short description, author and license
 
 set -eu
@@ -20,7 +20,7 @@ for i in `seq 1 $n`; do
 	h=bogus$i-$n
 	[ ! -d $h ] || { echo "I: $h exists, skipping"; continue; }
     echo "I: creating $h"
-	/usr/bin/time datalad --dbg create-handle $h
+	/usr/bin/time datalad --dbg create-dataset $h
 	( cd $h;
 	  git annex addurl "http://www.onerussian.com/tmp/banner.png" --file "Banner for $h"
 	  git commit -m "Our banner for $h"
@@ -33,7 +33,7 @@ for i in `seq 1 $n`; do
 `rword` `rword` `rword`
 "
 	  cd ..
-	  echo "I: adding a handle"
-	  /usr/bin/time datalad --dbg add-handle $h $c
+	  echo "I: adding a dataset"
+	  /usr/bin/time datalad --dbg add-dataset $h $c
 	)
 done

@@ -11,7 +11,7 @@ Files organization
     - `cmdline/` - helpers for accessing `interface/` functionality from
      command line
     - `crawler/` - functionality for crawling (online) resources and creating
-      or updating handles and collections based on the scraped/downloaded data
+      or updating datasets and collections based on the scraped/downloaded data
         - `nodes/` processing elements which are used in the pipeline
         - `pipelines/` pipelines generators, to produce pipelines to be ran
         - `pipeline.py` pipeline runner

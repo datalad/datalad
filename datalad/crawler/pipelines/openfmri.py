@@ -39,8 +39,8 @@ def collection_pipeline(url=TOPURL, **kwargs):
         crawl_url(url),
         a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9a-z]*)))/*$"),
         # https://openfmri.org/dataset/ds000001/
-        assign({'handle_name': '%(dataset)s'}, interpolate=True),
-        annex.initiate_handle(
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_dataset(
             template="openfmri",
             data_fields=['dataset'],
             # let's all specs and modifications reside in master
@@ -119,7 +119,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
                                      'verify': True}),
                 annex,
             ],
-            # TODO: describe_handle
+            # TODO: describe_dataset
             # Now some true magic -- possibly multiple commits, 1 per each detected new version!
             annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])', unversioned='default', default='1.0.0'),
         ],

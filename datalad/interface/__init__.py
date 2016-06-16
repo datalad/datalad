@@ -32,8 +32,8 @@ _group_dataset = (
          'CreatePublicationTargetSSHWebserver',
          'create-publication-target-sshwebserver'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.modify_subhandle_urls', 'ModifySubhandleURLs',
-         'modify-subhandle-urls'),
+        ('datalad.distribution.modify_subdataset_urls', 'ModifySubdatasetURLs',
+         'modify-subdataset-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
     ])

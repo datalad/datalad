@@ -96,10 +96,10 @@ def test_register_sibling(remote, path):
 
 
 @with_testrepos('.*nested_submodule.*', flavors=['local'])
-def test_get_dataset_handles(path):
+def test_get_subdatasets(path):
     ds = Dataset(path)
-    eq_(set(ds.get_dataset_handles()), {'subdataset'})
-    eq_(set(ds.get_dataset_handles(recursive=True)),
+    eq_(set(ds.get_subdatasets()), {'subdataset'})
+    eq_(set(ds.get_subdatasets(recursive=True)),
         {'subdataset/subsubdataset', 'subdataset/subsubdataset/sub1',
          'subdataset/subsubdataset/sub2', 'subdataset/sub1',
          'subdataset/sub2', 'subdataset'})
@@ -169,10 +169,10 @@ def test_subdatasets(path):
     # from scratch
     ds = Dataset(path)
     assert_false(ds.is_installed())
-    eq_(ds.get_dataset_handles(), None)
+    eq_(ds.get_subdatasets(), None)
     ds = ds.create()
     assert_true(ds.is_installed())
-    eq_(ds.get_dataset_handles(), [])
+    eq_(ds.get_subdatasets(), [])
     # create some file and commit it
     open(os.path.join(ds.path, 'test'), 'w').write('some')
     ds.install(path='test')
@@ -181,16 +181,16 @@ def test_subdatasets(path):
     # add a subdataset
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
-    subdss = ds.get_dataset_handles()
+    subdss = ds.get_subdatasets()
     eq_(len(subdss), 1)
     eq_(os.path.join(path, subdss[0]), subds.path)
-    eq_(subds.path, ds.get_dataset_handles(absolute=True)[0])
-    eq_(subdss, ds.get_dataset_handles(recursive=True))
-    eq_(subdss, ds.get_dataset_handles(fulfilled=True))
+    eq_(subds.path, ds.get_subdatasets(absolute=True)[0])
+    eq_(subdss, ds.get_subdatasets(recursive=True))
+    eq_(subdss, ds.get_subdatasets(fulfilled=True))
     # don't have that right now
-    assert_raises(NotImplementedError, ds.get_dataset_handles, pattern='sub*')
+    assert_raises(NotImplementedError, ds.get_subdatasets, pattern='sub*')
     ds.save("with subds", version_tag=2)
     ds.recall_state(1)
     assert_true(ds.is_installed())
-    eq_(ds.get_dataset_handles(), [])
+    eq_(ds.get_subdatasets(), [])
     # TODO actual submodule checkout is still there
