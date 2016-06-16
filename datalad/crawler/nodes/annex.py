@@ -71,7 +71,7 @@ class initiate_dataset(object):
     """
     def __init__(self, template, dataset_name=None,
                  path=None, branch=None, backend=None,
-                 template_func=None,
+                 template_func=None, template_kwargs=None,
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
@@ -80,7 +80,11 @@ class initiate_dataset(object):
           Which template (probably matching the superdataset name) to use.
           TODO: refer to specs of template that it might understand some
           arguments encoded, such as #func=custom_pipeline
-        dataset_name : str
+        template_func : str, optional
+          Explicitly specify the function name within template module
+        template_kwargs: dict, optional
+          Keyword arguments to pass into the `template_func`.
+        dataset_name : str, optional
           Name of the dataset. If None, reacts on 'dataset_name' in data
         path : str, optional
           Path were to initiate the dataset.  If not specified, would use
@@ -105,6 +109,7 @@ class initiate_dataset(object):
         # configurations for e.g. "basic" template
         self.template = template
         self.template_func = template_func
+        self.template_kwargs = template_kwargs
         self.dataset_name = dataset_name
         self.data_fields = data_fields
         self.add_fields = add_fields
@@ -137,15 +142,16 @@ class initiate_dataset(object):
         return repo
 
     def _save_crawl_config(self, dataset_path, data):
-        kwargs = {f: data[f] for f in self.data_fields}
-        if self.template_func:
-            kwargs['func'] = self.template_func
+        kwargs = self.template_kwargs or {}
+        # update with those from data
+        kwargs.update({f: data[f] for f in self.data_fields})
         # additional options given as a dictionary
         kwargs.update(self.add_fields)
         return initiate_pipeline_config(
             template=self.template,
+            template_func=self.template_func,
+            template_kwargs=kwargs,
             path=dataset_path,
-            kwargs=kwargs,
             commit=True
         )
 

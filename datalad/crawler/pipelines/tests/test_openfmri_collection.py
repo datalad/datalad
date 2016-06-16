@@ -58,6 +58,7 @@ def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
     list(initiate_dataset(
         template="openfmri",
         template_func="superdataset_pipeline",
+        template_kwargs={'url': topurl},
         path=outd,
     )())
 

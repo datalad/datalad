@@ -317,9 +317,10 @@ def _compare_dicts(d1, d2):
     return added, changed, removed, maybe_changed
 
 
-def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
+def initiate_pipeline_config(template, template_func=None, template_kwargs=None,
+                             path=curdir, commit=False):
     """
-    TODO
+    TODO Gergana ;)
     """
     lgr.debug("Creating crawler configuration for template %s under %s",
               template, path)
@@ -334,7 +335,10 @@ def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
     cfg_.add_section(CRAWLER_PIPELINE_SECTION)
 
     cfg_.set(CRAWLER_PIPELINE_SECTION, 'template', template)
-    for k, v in (kwargs or {}).items():
+    if template_func:
+        cfg_.set(CRAWLER_PIPELINE_SECTION, 'func', template_func)
+
+    for k, v in (template_kwargs or {}).items():
         cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
 
     with open(crawl_config, 'w') as f:
