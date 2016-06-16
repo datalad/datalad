@@ -88,7 +88,6 @@ class Publish(Interface):
     @staticmethod
     @datasetmethod(name='publish')
     def __call__(dataset=None, dest=None, with_data=None, recursive=False):
-
         # shortcut
         ds = dataset
 

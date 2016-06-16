@@ -45,8 +45,8 @@ if PY2:
 class Runner(object):
     """Provides a wrapper for calling functions and commands.
 
-    An object of this class provides a methods calls shell commands or python
-    functions, allowing for protocolling the calls and output handling.
+    An object of this class provides a methods that calls shell commands or
+    python functions, allowing for protocolling the calls and output handling.
 
     Outputs (stdout and stderr) can be either logged or streamed to system's
     stdout/stderr during execution.

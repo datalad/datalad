@@ -47,5 +47,10 @@ def test_save(path):
     ds.save("modified new_file.tst", auto_add_changes=True)
     ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))
 
+    files = ['one.txt', 'two.txt']
+    for fn in files:
+        with open(opj(path, fn), "w") as f:
+            f.write(fn)
 
-#TODO: define, fix and test what to do regarding auto_add in a mixed repository!
+    ds.save("set of new files", files=[opj(path, f) for f in files])
+    ok_clean_git(path, annex=isinstance(ds.repo, AnnexRepo))

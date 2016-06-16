@@ -44,6 +44,4 @@ Miscellaneous commands
    generated/man/datalad-create-test-dataset
    generated/man/datalad-download-url
    generated/man/datalad-ls
-   generated/man/datalad-pull
-   generated/man/datalad-push
    generated/man/datalad-test
