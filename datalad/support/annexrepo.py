@@ -1152,15 +1152,24 @@ class AnnexRepo(GitRepo):
 
         Parameters
         ----------
-        files
-        remote
-        log_online
+        files: str or list of str
+            path(s) to copy
+        remote: str
+            name of remote to copy `files` to
+        log_online: bool
             see get()
+
+        Returns
+        -------
+        list of str
+           files successfully copied
         """
 
         if remote not in self.get_remotes():
             raise ValueError("Unknown remote '{0}'.".format(remote))
 
+        # TODO: May be collect exceptions, and create some kind of failure
+        #       summary?
         # in case something can't be copied,
         # raise exceptions (see get_file_key()):
         if not all(self.get_file_key(file_) for file_ in files):
@@ -1170,10 +1179,27 @@ class AnnexRepo(GitRepo):
             raise RuntimeError("Unexpected failure while retrieving keys for "
                                "list:\n{0}".format(files))
 
-        self._run_annex_command('copy',
-                                annex_options=files + ['--to=%s' % remote],
-                                log_stdout=True, log_stderr=not log_online,
-                                log_online=log_online, expect_stderr=True)
+        # Note:
+        # - annex copy fails, if `files` was a single item, that doesn't exist
+        # - files not in annex or not even in git don't yield a non-zero exit,
+        #   but are ignored
+        # - in case of multiple items, annex would silently skip those files
+        # - we raised before even calling annex copy anyway
+        # => we don't catch exceptions when calling annex copy
+        # TODO: Is this, what we want? May be we don't want to raise at all and
+        #       just rely on annex' silent skipping and report success via
+        #       return value instead.
+        # Note:
+        # As of now, there is no --json option for annex copy. Use it once this
+        # changed.
+        std_out, std_err = self._run_annex_command(
+                'copy',
+                annex_options=files + ['--to=%s' % remote],
+                log_stdout=True, log_stderr=not log_online,
+                log_online=log_online, expect_stderr=True)
+
+        return [line.split()[1] for line in std_out.splitlines()
+                if line.startswith('copy ') and line.endswith('ok')]
 
 
 # TODO: Why was this commented out?
