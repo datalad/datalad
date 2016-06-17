@@ -317,9 +317,10 @@ def _compare_dicts(d1, d2):
     return added, changed, removed, maybe_changed
 
 
-def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
+def initiate_pipeline_config(template, template_func=None, template_kwargs=None,
+                             path=curdir, commit=False):
     """
-    TODO
+    TODO Gergana ;)
     """
     lgr.debug("Creating crawler configuration for template %s under %s",
               template, path)
@@ -334,7 +335,10 @@ def initiate_pipeline_config(template, path=curdir, kwargs=None, commit=False):
     cfg_.add_section(CRAWLER_PIPELINE_SECTION)
 
     cfg_.set(CRAWLER_PIPELINE_SECTION, 'template', template)
-    for k, v in (kwargs or {}).items():
+    if template_func:
+        cfg_.set(CRAWLER_PIPELINE_SECTION, 'func', template_func)
+
+    for k, v in (template_kwargs or {}).items():
         cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
 
     with open(crawl_config, 'w') as f:
@@ -465,7 +469,7 @@ def load_pipeline_from_config(path):
         func = pipeline1
         _kwarg1 = 1
 
-    which would instantial pipeline from standard.py module by calling
+    which would instantiate a pipeline from standard.py module by calling
     `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
 
         [crawl:pipeline]
