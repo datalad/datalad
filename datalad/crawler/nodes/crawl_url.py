@@ -59,13 +59,13 @@ class crawl_url(object):
         self._output = output
         self._seen = set()
         self._providers = Providers.from_config_files()
-        # Partially to overcome stuck redirect
+        # partially to overcome stuck redirect
         # https://github.com/kennethreitz/requests/issues/2997
         self._redirects_cache = {} if cache_redirects else None
         self.failed = failed
 
     def reset(self):
-        """Reset cache of seen urls"""
+        """Reset cache of seen URLs"""
         self._seen = set()
 
     def _visit_url(self, url, data):
@@ -161,7 +161,7 @@ def parse_checksums(digest=None):
         urlsplit = url.split('/')
         topurl = '/'.join(urlsplit[:-1])
         if digest is None:
-            # deduce from url's file extension
+            # deduce from URL's file extension
             filename = urlsplit[-1]
             base, ext = splitext(filename)
             digest_ = ext if ext else digest

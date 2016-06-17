@@ -23,31 +23,31 @@ class URLDB(object):
     - last_checked (if online)
     - last_verified (when verified to contain the content according to the checksums
 
-    allow to query by any known checksum
+    Allow to query by any known checksum
     """
 
     __metaclass__ = ABCMeta
 
     @abstractmethod
     def __contains__(self, url):
-        """Return True if DB knows about this URL """
+        """Return True if DB knows about this URL"""
         pass
 
     @abstractmethod
     def __getitem__(self, url):
-        """Given url, return file names where it was downloaded"""
+        """Given URL, return file names where it was downloaded"""
         pass
 
 
 class JsonURLDB(URLDB):
-    """Mimic original dict-based urldb which was dumped to a json file
+    """Mimic original dict-based urldb which was dumped to a json file,
 
     but which also had "public_incoming" mapping to map from incoming
-    filenames to "public".  Following changes would be done programmatically now
+    file names to "public".  Following changes would be done programmatically now
     and we will track only "incoming"
 
     So internally it is just a dictionary of "fpath: url_info" where url_info is
-    a dict containing mtime, size, and url
+    a dict containing mtime, size, and URL
     """
 
     __db_version__ = '0.1'
@@ -135,7 +135,7 @@ class DBNode(object):
         yield data
 
     def skip_existing_file(self, data):
-        # Hm... we could have file known AND existing or not.... TODO
+        # TODO: Hm... we could have file known AND existing or not....
         filename = data['filename']   # TODO: filepath probably??
         if filename in self.db and lexists(filename):
             return
@@ -148,10 +148,10 @@ class DBNode(object):
                                  'fileaction': 'remove' })
 
     def check_url(self, data):
-        """Check URL for being modified etc"""
+        """Check URL for being modified, etc"""
         url = data['url']
         filename = data['filename']
-        # Get information about that url
+        # get information about that url
         url_stamp = self._url_stamper(url)
         old_url_stamp = self.db.get(filename)
         yield data

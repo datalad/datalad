@@ -54,7 +54,7 @@ THE SOFTWARE.
 def setup_parser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False):
-    # Delay since can be a heavy import
+    # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
         get_cmdline_command_name, alter_interface_docs_for_cmdline
     # setup cmdline args parser
@@ -226,11 +226,11 @@ def main(args=None):
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
     elif cmdlineargs.common_debug:
-        # So we could see/stop clearly at the point of failure
+        # so we could see/stop clearly at the point of failure
         setup_exceptionhook()
         ret = cmdlineargs.func(cmdlineargs)
     else:
-        # Otherwise - guard and only log the summary. Postmortem is not
+        # otherwise - guard and only log the summary. Postmortem is not
         # as convenient if being caught in this ultimate except
         try:
             ret = cmdlineargs.func(cmdlineargs)
