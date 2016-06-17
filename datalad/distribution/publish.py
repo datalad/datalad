@@ -56,6 +56,8 @@ class Publish(Interface):
     #        upstream set up before, so you can use just "datalad publish" next
     #        time.
 
+    # TODO: Doc!
+
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
@@ -79,8 +81,10 @@ class Publish(Interface):
         path=Parameter(
             args=("path",),
             metavar='PATH',
-            doc="path(s) to file handle(s) to publish including their actual "
-                "content",
+            doc="path(s), that may point to file handle(s) to publish including "
+                "their actual content or to subdataset(s) to be published. If a "
+                "file handle is published with its data, this implicitly means "
+                "to also publish the (sub)dataset it belongs to.",
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),)
 
