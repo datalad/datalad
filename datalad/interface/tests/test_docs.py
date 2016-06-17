@@ -16,7 +16,7 @@ from datalad.interface.base import dedent_docstring
 from datalad.interface.base import alter_interface_docs_for_api
 from datalad.interface.base import alter_interface_docs_for_cmdline
 from datalad.tests.utils import assert_true, assert_false, assert_in, \
-    assert_not_in
+    assert_not_in, eq_
 
 
 demo_doc = """\
@@ -95,4 +95,13 @@ def test_alter_interface_docs_for_cmdline():
     assert_not_in('Python', alt)
     # args
     altarg = alter_interface_docs_for_cmdline(demo_argdoc)
-    # TO BE CONTINUED
+    # RST role markup
+    eq_(alter_interface_docs_for_cmdline(':murks:`me and my buddies`'),
+        'me and my buddies')
+    # spread across lines
+    eq_(alter_interface_docs_for_cmdline(':term:`Barbara\nStreisand`'),
+        'Barbara\nStreisand')
+    # multiple on one line
+    eq_(alter_interface_docs_for_cmdline(
+        ':term:`one` bla bla :term:`two` bla'),
+        'one bla bla two bla')

@@ -179,22 +179,20 @@ class RegexpType(object):
 
 # TODO: useful also outside of cmdline, move to support/
 from os import curdir
+
+
 def get_repo_instance(path=curdir, class_=None):
     """Returns an instance of appropriate datalad repository for path.
-
     Check whether a certain path is inside a known type of repository and
     returns an instance representing it. May also check for a certain type
     instead of detecting the type of repository.
-
     Parameters
     ----------
     path: str
       path to check; default: current working directory
-
     class_: class
       if given, check whether path is inside a repository, that can be
       represented as an instance of the passed class.
-
     Raises
     ------
     RuntimeError, in case cwd is not inside a known repository.
@@ -244,18 +242,6 @@ def get_repo_instance(path=curdir, class_=None):
         raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
     else:
         raise RuntimeError("No datalad repository found in %s" % abspath_)
-
-
-# Do some centralizing of things needed by the datalad API:
-# TODO: Maybe there should be a dedicated class for the master collection.
-# For now, just use helper functions to clean up the implementations of the API.
-# Design decisions about this also depend on redesigning the handle/collection
-# classes (Metadata class => Backends => Repos).
-# The local master used by datalad is not a technically special
-# collection, but a collection with a special purpose for its "user",
-# who is datalad. So, deriving a class from Collection(Repo) and making common
-# tasks methods of this class might be an option either way. Also it might become
-# handy, once we decide to have several "masters" (user-level, sys-level, etc.)
 
 
 from appdirs import AppDirs

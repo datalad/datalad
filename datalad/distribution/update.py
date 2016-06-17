@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for updating a handle
+"""High-level interface for updating a dataset
 
 """
 
@@ -110,7 +110,7 @@ class Update(Interface):
         if recursive:
             repos_to_update += [GitRepo(opj(ds.path, sub_path))
                                 for sub_path in
-                                ds.get_dataset_handles(recursive=True)]
+                                ds.get_subdatasets(recursive=True)]
 
         for repo in repos_to_update:
             # get all remotes:
@@ -130,7 +130,7 @@ class Update(Interface):
                 lgr.debug("Found multiple remotes:\n%s" % remotes)
                 raise NotImplementedError("No merge strategy for multiple "
                                           "remotes implemented yet.")
-            lgr.info("Updating handle '%s' ..." % repo.path)
+            lgr.info("Updating dataset '%s' ..." % repo.path)
 
             # fetch remote(s):
             repo.fetch(remote=name, all_=fetch_all)

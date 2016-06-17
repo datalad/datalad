@@ -35,7 +35,6 @@ from datalad.dochelpers import exc_str
 from datalad.utils import auto_repr
 from datalad.utils import on_windows
 from datalad.cmd import GitRunner
-from datalad.support.network import RI, URL, SSHRI
 
 # imports from same module:
 from .gitrepo import GitRepo
@@ -47,6 +46,7 @@ from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
+from .network import is_ssh
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -163,9 +163,7 @@ class AnnexRepo(GitRepo):
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
                 if url is not None:
-                    ri = RI(url)
-                    if isinstance(ri, SSHRI) \
-                            or (isinstance(ri, URL) and ri.scheme == 'ssh'):
+                    if is_ssh(url):
                         c = ssh_manager.get_connection(url)
                         writer = self.repo.config_writer()
                         writer.set_value("remote \"%s\"" % r,
@@ -220,7 +218,7 @@ class AnnexRepo(GitRepo):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
         super(AnnexRepo, self).add_remote(name, url, options)
-        if url.startswith('ssh:'):
+        if is_ssh(url):
             c = ssh_manager.get_connection(url)
             writer = self.repo.config_writer()
             writer.set_value("remote \"%s\"" % name,

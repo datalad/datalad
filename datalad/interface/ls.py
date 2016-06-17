@@ -267,7 +267,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
-         for sm in topds.get_dataset_handles(recursive=recursive)]
+         for sm in topds.get_subdatasets(recursive=recursive)]
          if recursive else [])
     dsms = list(map(DsModel, dss))
 

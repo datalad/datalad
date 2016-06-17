@@ -47,6 +47,7 @@ from datalad.utils import swallow_logs
 # imports from same module:
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .network import is_ssh
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -826,7 +827,7 @@ class GitRepo(object):
                 rm.config_reader.get('fetchurl'
                                      if rm.config_reader.has_option('fetchurl')
                                      else 'url')
-            if fetch_url.startswith('ssh:'):
+            if is_ssh(fetch_url):
                 cnct = ssh_manager.get_connection(fetch_url)
                 cnct.open()
                 # TODO: with git <= 2.3 keep old mechanism:
@@ -869,7 +870,7 @@ class GitRepo(object):
             remote.config_reader.get(
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
-        if fetch_url.startswith('ssh:'):
+        if is_ssh(fetch_url):
             cnct = ssh_manager.get_connection(fetch_url)
             cnct.open()
             # TODO: with git <= 2.3 keep old mechanism:
@@ -916,7 +917,7 @@ class GitRepo(object):
                 rm.config_reader.get('pushurl'
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
-            if push_url.startswith('ssh:'):
+            if is_ssh(push_url):
                 cnct = ssh_manager.get_connection(push_url)
                 cnct.open()
                 # TODO: with git <= 2.3 keep old mechanism:
@@ -1124,6 +1125,17 @@ class GitRepo(object):
             cmd.append('--init')
         cmd += ['--', path]
         self._git_custom_command('', cmd)
+
+    def tag(self, tag):
+        """Assign a tag to current commit
+
+        Parameters
+        ----------
+        tag : str
+          Custom tag label.
+        """
+        # TODO later to be extended with tagging particular commits and signing
+        self._git_custom_command('', 'git tag "{0}"'.format(tag))
 
 # TODO
 # remove submodule

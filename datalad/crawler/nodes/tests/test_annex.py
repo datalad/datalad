@@ -11,7 +11,7 @@ from os import listdir
 from os.path import join as opj, exists, lexists
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
 
-from ..annex import initiate_handle
+from ..annex import initiate_dataset
 from ..annex import Annexificator
 from ....tests.utils import assert_equal, assert_in
 from ....tests.utils import assert_raises
@@ -46,26 +46,26 @@ def test_annexificator_no_git_if_dirty(outdir):
 
 @with_tempfile(mkdir=True)
 @with_tempfile()
-def test_initiate_handle(path, path2):
-    handle_path = opj(path, 'test')
-    datas = list(initiate_handle('template', 'testhandle', path=handle_path)())
+def test_initiate_dataset(path, path2):
+    dataset_path = opj(path, 'test')
+    datas = list(initiate_dataset('template', 'testdataset', path=dataset_path)())
     assert_equal(len(datas), 1)
     data = datas[0]
-    eq_(data['handle_path'], handle_path)
-    crawl_cfg = opj(handle_path, CRAWLER_META_CONFIG_PATH)
+    eq_(data['dataset_path'], dataset_path)
+    crawl_cfg = opj(dataset_path, CRAWLER_META_CONFIG_PATH)
     ok_(exists, crawl_cfg)
     pipeline = load_pipeline_from_config(crawl_cfg)
 
     # by default we should initiate to MD5E backend
     fname = 'test.dat'
-    f = opj(handle_path, fname)
+    f = opj(dataset_path, fname)
     annex = put_file_under_git(f, content="test", annexed=True)
     eq_(annex.get_file_backend(f), 'MD5E')
 
     # and even if we clone it -- nope -- since persistence is set by Annexificator
     # so we don't need to explicitly to commit it just in master since that might
     # not be the branch we will end up working in
-    annex2 = AnnexRepo(path2, url=handle_path)
+    annex2 = AnnexRepo(path2, url=dataset_path)
     annex3 = put_file_under_git(path2, 'test2.dat', content="test2", annexed=True)
     eq_(annex3.get_file_backend('test2.dat'), 'MD5E')
 
