@@ -14,6 +14,7 @@ Contents:
    usecases/index
    crawler/index
    cmdline
+   glossary
    modref
 
 Indices and tables
