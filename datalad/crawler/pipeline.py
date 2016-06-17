@@ -462,15 +462,20 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
 
 def load_pipeline_from_config(path):
     """Given a path to the pipeline configuration file, instantiate a pipeline
+    
     Typical example description
+    
         [crawl:pipeline]
         pipeline = standard
         func = pipeline1
         _kwarg1 = 1
+   
     which would instantiate a pipeline from standard.py module by calling
     `standard.pipeline1` with `_kwarg1='1'`.  This definition is identical to
+    
         [crawl:pipeline]
         pipeline = standard?func=pipeline1&_kwarg1=1
+   
     so that theoretically we could specify basic pipelines completely within
     a URL
     """
