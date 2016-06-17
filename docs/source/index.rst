@@ -8,6 +8,7 @@ Concepts and technologies
    :maxdepth: 2
 
    background
+   related
    usecases/index
    glossary
 
