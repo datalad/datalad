@@ -41,7 +41,7 @@ class Create(Interface):
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
         description=Parameter(
-            args=("-d", "--description",),
+            args=("-D", "--description",),
             doc="""short description that humans can use to identify the
             repository/location, e.g. "Precious data on my laptop.""""",
             nargs=1),
