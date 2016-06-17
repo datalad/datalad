@@ -65,7 +65,18 @@ def extract_readme(data):
 
 
 def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
-    """Pipeline to crawl/annex an openfmri dataset"""
+    """Pipeline to crawl/annex an openfmri dataset
+
+    Parameters
+    ----------
+    dataset: str
+      Id of the OpenfMRI dataset (e.g. ds000001)
+    versioned_urls: bool, optional
+      Request versioned URLs.  OpenfMRI bucket is versioned, but if
+      original data resides elsewhere, set to False
+    topurl: str, optional
+      Top level URL to the datasets.
+    """
 
     dataset_url = '%s%s' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)

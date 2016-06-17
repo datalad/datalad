@@ -186,6 +186,7 @@ def get_repo_instance(path=curdir, class_=None):
     Check whether a certain path is inside a known type of repository and
     returns an instance representing it. May also check for a certain type
     instead of detecting the type of repository.
+
     Parameters
     ----------
     path: str
@@ -193,6 +194,7 @@ def get_repo_instance(path=curdir, class_=None):
     class_: class
       if given, check whether path is inside a repository, that can be
       represented as an instance of the passed class.
+
     Raises
     ------
     RuntimeError, in case cwd is not inside a known repository.
