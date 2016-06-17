@@ -7,6 +7,7 @@ Concepts and technologies
 .. toctree::
    :maxdepth: 2
 
+   background
    usecases/index
    glossary
 
