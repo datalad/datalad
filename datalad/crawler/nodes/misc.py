@@ -312,7 +312,7 @@ def _string_as_list(x):
 def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **orig_kwargs):
     """Generate a node out of an arbitrary function
 
-    If provided function returns a generator, each item ia returned separately
+    If provided function returns a generator, each item is returned separately
 
     Parameters
     ----------
