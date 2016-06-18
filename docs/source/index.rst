@@ -1,6 +1,11 @@
 Datalad |---| data management and distribution suite: Documentation
 *******************************************************************
 
+.. toctree::
+   :maxdepth: 1
+
+   acknowledgements
+
 Concepts and technologies
 =========================
 
