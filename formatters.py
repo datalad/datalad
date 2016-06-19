@@ -250,22 +250,26 @@ def cmdline_example_to_rst(src, out=None, ref=None):
     for line in src:
         if line.startswith('#% EXAMPLE START'):
             inexample = True
+            incodeblock = False
             continue
         if line.startswith('#% EXAMPLE END'):
             break
         if not inexample:
             continue
         if line.startswith('#%'):
-            incodeblock = False
-            out.write(line[3:])
+            incodeblock = not incodeblock
+            if incodeblock:
+                out.write('\n.. code-block:: sh\n\n')
+            continue
+        if not incodeblock and line.startswith('#'):
+            out.write(line[(min(2, len(line) - 1)):])
             continue
         if incodeblock:
             out.write('  %s' % line)
             continue
-        # normal line
+        if not len(line.strip()):
+            continue
         else:
-            if len(line.strip()):
-                incodeblock = True
-                out.write('\n.. code-block:: sh\n\n  %s' % line)
+            raise RuntimeError("this should not happen")
 
     return out
