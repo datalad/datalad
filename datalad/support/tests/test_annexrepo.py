@@ -946,7 +946,6 @@ def test_annex_copy_to(origin, clone):
     assert_raises(IOError, repo.copy_to, "doesnt_exist.dat", "target")
     assert_raises(FileInGitError, repo.copy_to, "INFO.txt", "target")
     assert_raises(ValueError, repo.copy_to, "test-annex.dat", "invalid_target")
-    assert_raises(FileInGitError, repo.copy_to, ["INFO.txt", "test-annex.dat"], "target")
 
     # test-annex.dat has no content to copy yet:
     eq_(repo.copy_to("test-annex.dat", "target"), [])
@@ -954,3 +953,4 @@ def test_annex_copy_to(origin, clone):
     repo.get("test-annex.dat")
     # now it has:
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
+    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), ["test-annex.dat"])
