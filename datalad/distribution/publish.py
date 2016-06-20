@@ -86,11 +86,16 @@ class Publish(Interface):
                 "file handle is published with its data, this implicitly means "
                 "to also publish the (sub)dataset it belongs to.",
             constraints=EnsureStr() | EnsureNone(),
-            nargs='*'),)
+            nargs='*'),
+        to_annex=Parameter(
+            args=("--to-annex",),
+            doc="options passed to 'annex copy'",
+            constraints=EnsureStr() | EnsureNone(),))
 
     @staticmethod
     @datasetmethod(name='publish')
-    def __call__(dataset=None, to=None, path=None, recursive=False):
+    def __call__(dataset=None, to=None, path=None, recursive=False,
+                 to_annex=None):
 
         # shortcut
         ds = dataset
@@ -214,14 +219,16 @@ class Publish(Interface):
 
             results.append(ds)
 
-            if publish_files:
+            if publish_files or to_annex:
                 if not isinstance(ds.repo, AnnexRepo):
                     raise RuntimeError(
                         "Cannot publish content of something, that is not "
                         "part of an annex. ({0})".format(ds))
 
                 lgr.info("Publishing data of dataset {0} ...".format(ds))
-                results += ds.repo.copy_to(publish_files, dest_resolved)
+                results += ds.repo.copy_to(files=publish_files,
+                                           remote=dest_resolved,
+                                           options=to_annex)
 
         for dspath in expl_subs:
             # these datasets need to be pushed regardless of additional paths
@@ -238,7 +245,8 @@ class Publish(Interface):
             results += publish_subs[d]['dataset'].publish(
                 to=to,
                 path=publish_subs[d]['files'],
-                recursive=recursive)
+                recursive=recursive,
+                to_annex=to_annex)
 
         return results
 

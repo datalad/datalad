@@ -1148,7 +1148,7 @@ class AnnexRepo(GitRepo):
     # symlink's target instead of the actual content.
 
     @normalize_paths(match_return_type=False)  # get a list even in case of a single item
-    def copy_to(self, files, remote, log_online=True):
+    def copy_to(self, files, remote, options=None, log_online=True):
         """Copy the actual content of `files` to `remote`
 
         Parameters
@@ -1165,6 +1165,11 @@ class AnnexRepo(GitRepo):
         list of str
            files successfully copied
         """
+
+        # TODO: full support of annex copy options would lead to `files` being
+        # optional. This means to check for whether files or certain options are
+        # given and fail or just pass everything as is and try to figure out,
+        # what was going on when catching CommandError
 
         if remote not in self.get_remotes():
             raise ValueError("Unknown remote '{0}'.".format(remote))
@@ -1184,12 +1189,15 @@ class AnnexRepo(GitRepo):
         #   but are ignored
         # - in case of multiple items, annex would silently skip those files
 
+        annex_options = files + ['--to=%s' % remote]
+        if options:
+            annex_options.extend(shlex.split(options))
         # Note:
         # As of now, there is no --json option for annex copy. Use it once this
         # changed.
         std_out, std_err = self._run_annex_command(
                 'copy',
-                annex_options=files + ['--to=%s' % remote],
+                annex_options=annex_options,
                 log_stdout=True, log_stderr=not log_online,
                 log_online=log_online, expect_stderr=True)
 
