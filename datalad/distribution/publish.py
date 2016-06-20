@@ -205,6 +205,13 @@ class Publish(Interface):
                 ds.repo.push(remote=dest_resolved,
                              refspec="+git-annex:git-annex")
 
+            # we need to fetch
+            # TODO
+            # Note: This is about a gitpython issue as well as something about
+            # annex -> might mean, that we need to do it in case we pushed an annex branch only.
+            # Apparently, we can annex copy new files only, after this fetch. Figure it out!
+            ds.repo.fetch(remote=dest_resolved)
+
             results.append(ds)
 
             if publish_files:
