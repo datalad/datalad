@@ -77,14 +77,18 @@ class Publish(Interface):
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="recursively publish all subdatasets of the dataset"),
+            doc="recursively publish all subdatasets of the dataset. In order "
+                "to recursivley publish with all data, use '.' as `path` in "
+                "combination with `recursive`"),
         path=Parameter(
             args=("path",),
             metavar='PATH',
             doc="path(s), that may point to file handle(s) to publish including "
                 "their actual content or to subdataset(s) to be published. If a "
                 "file handle is published with its data, this implicitly means "
-                "to also publish the (sub)dataset it belongs to",
+                "to also publish the (sub)dataset it belongs to. '.' as a path "
+                "is treated in a special way in the sense, that it is passed "
+                "to subdatasets in case `recursive` is also given.",
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),
         annex_copy_opts=Parameter(
@@ -137,9 +141,18 @@ class Publish(Interface):
         publish_subs = dict()  # collect what to publish from subdatasets
         if recursive:
             for subds_path in ds.get_subdatasets(fulfilled=True):
-                # we can recursively publish only, if there actually
-                # is something
-                expl_subs.add(subds_path)
+                if '.' in path:
+                    # we explicitly are passing '.' to subdatasets in case of
+                    # `recursive`. Therefore these datasets are going into
+                    # `publish_subs`, instead of `expl_subs`:
+                    sub = Dataset(opj(ds.path, subds_path))
+                    publish_subs[sub.path] = dict()
+                    publish_subs[sub.path]['dataset'] = sub
+                    publish_subs[sub.path]['files'] = ['.']
+                else:
+                    # we can recursively publish only, if there actually
+                    # is something
+                    expl_subs.add(subds_path)
 
         if not path:
             # publish `ds` itself, if nothing else is given:
@@ -162,6 +175,10 @@ class Publish(Interface):
                         publish_files.append(p)
                     else:
                         # p belongs to subds `d`
+                        if not publish_subs[d.path]:
+                            publish_subs[d.path] = dict()
+                        if not publish_subs[d.d.path]['files']:
+                            publish_subs[d.d.path]['files'] = list()
                         publish_subs[d.path]['dataset'] = d
                         publish_subs[d.path]['files'].append(p)
 
@@ -243,11 +260,15 @@ class Publish(Interface):
 
         for d in publish_subs:
             # recurse into subdatasets
+
+            # TODO: need to fetch. see above
+            publish_subs[d]['dataset'].repo.fetch(remote=to)
+
             results += publish_subs[d]['dataset'].publish(
                 to=to,
                 path=publish_subs[d]['files'],
                 recursive=recursive,
-                to_annex=annex_copy_opts)
+                annex_copy_opts=annex_copy_opts)
 
         return results
 
