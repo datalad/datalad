@@ -150,6 +150,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
                     existing='archive-suffix',
                     strip_leading_dirs=True,
                     leading_dirs_depth=1,
+                    delete=True,
                     exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
                     # overwrite=True,
                     # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball

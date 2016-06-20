@@ -187,6 +187,7 @@ def _test_add_archive_content_tar(direct, repo_path):
     output_addarchive = list(
         annex.add_archive_content(
             existing='archive-suffix',
+            delete=True,
             strip_leading_dirs=True,)(output_add[0]))
     assert_equal(output_addarchive,
                  [{'datalad_stats': ActivityStats(add_annex=1, add_git=1, files=3, renamed=2),
@@ -204,6 +205,7 @@ def _test_add_archive_content_tar(direct, repo_path):
 def test_add_archive_content_tar():
     for direct in (True, False):
         yield _test_add_archive_content_tar, direct
+
 
 @assert_cwd_unchanged()
 @with_tempfile(mkdir=True)
