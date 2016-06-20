@@ -43,8 +43,7 @@ class Create(Interface):
         description=Parameter(
             args=("-D", "--description",),
             doc="""short description that humans can use to identify the
-            repository/location, e.g. "Precious data on my laptop.""""",
-            nargs=1),
+            repository/location, e.g. "Precious data on my laptop."""""),
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""flag that if given a plain Git repository will be created

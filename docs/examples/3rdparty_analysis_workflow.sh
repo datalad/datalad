@@ -277,7 +277,7 @@ datalad create-publication-target-sshwebserver --recursive $SERVER_URL public
 # Bob can publish his version to it.
 #%
 
-datalad publish -r public
+datalad publish -r --to public .
 
 #%
 # This command can be repeated as often as desired. Datalad checks the state

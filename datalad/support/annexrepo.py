@@ -23,6 +23,7 @@ from os.path import exists
 from os.path import islink
 from os.path import realpath
 from os.path import lexists
+from os.path import isdir
 from subprocess import Popen, PIPE
 from functools import wraps
 
@@ -165,12 +166,30 @@ class AnnexRepo(GitRepo):
                 if url is not None:
                     if is_ssh(url):
                         c = ssh_manager.get_connection(url)
-                        writer = self.repo.config_writer()
-                        writer.set_value("remote \"%s\"" % r,
-                                         "annex-ssh-options",
-                                         "-o ControlMaster=auto"
-                                         " -S %s" % c.ctrl_path)
-                        writer.release()
+                        cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
+                        sct = "remote \"%s\"" % r
+                        opt = "annex-ssh-options"
+                        reader = self.repo.config_reader()
+
+                        # we write only, if there's nothing already
+                        write = False
+                        try:
+                            cfg_string_old = reader.get_value(section=sct,
+                                                              option=opt)
+                        except NoOptionError:
+                            write = True
+                            cfg_string_old = None
+                        if cfg_string_old and cfg_string_old != cfg_string:
+                            lgr.warning("Found conflicting annex-ssh-options "
+                                        "for remote '{0}':\n{1}\n"
+                                        "Did not touch it.".format(
+                                            r, cfg_string_old))
+                            continue
+                        if write:
+                            writer = self.repo.config_writer()
+                            writer.set_value(section=sct, option=opt,
+                                             value=cfg_string)
+                            writer.release()
 
         self.always_commit = always_commit
         if fix_it:
@@ -1127,6 +1146,63 @@ class AnnexRepo(GitRepo):
 
     # TODO: we probably need to override get_file_content, since it returns the
     # symlink's target instead of the actual content.
+
+    @normalize_paths(match_return_type=False)  # get a list even in case of a single item
+    def copy_to(self, files, remote, options=None, log_online=True):
+        """Copy the actual content of `files` to `remote`
+
+        Parameters
+        ----------
+        files: str or list of str
+            path(s) to copy
+        remote: str
+            name of remote to copy `files` to
+        log_online: bool
+            see get()
+
+        Returns
+        -------
+        list of str
+           files successfully copied
+        """
+
+        # TODO: full support of annex copy options would lead to `files` being
+        # optional. This means to check for whether files or certain options are
+        # given and fail or just pass everything as is and try to figure out,
+        # what was going on when catching CommandError
+
+        if remote not in self.get_remotes():
+            raise ValueError("Unknown remote '{0}'.".format(remote))
+
+        # In case of single path, 'annex copy' will fail, if it cannot copy it.
+        # With multiple files, annex will just skip the ones, it cannot deal
+        # with. We'll do the same and report back what was successful
+        # (see return value).
+        # Therefore raise telling exceptions before even calling annex:
+        if len(files) == 1:
+            if not isdir(files[0]):
+                self.get_file_key(files[0])
+
+        # Note:
+        # - annex copy fails, if `files` was a single item, that doesn't exist
+        # - files not in annex or not even in git don't yield a non-zero exit,
+        #   but are ignored
+        # - in case of multiple items, annex would silently skip those files
+
+        annex_options = files + ['--to=%s' % remote]
+        if options:
+            annex_options.extend(shlex.split(options))
+        # Note:
+        # As of now, there is no --json option for annex copy. Use it once this
+        # changed.
+        std_out, std_err = self._run_annex_command(
+                'copy',
+                annex_options=annex_options,
+                log_stdout=True, log_stderr=not log_online,
+                log_online=log_online, expect_stderr=True)
+
+        return [line.split()[1] for line in std_out.splitlines()
+                if line.startswith('copy ') and line.endswith('ok')]
 
 
 # TODO: Why was this commented out?

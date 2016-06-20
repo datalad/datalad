@@ -934,3 +934,24 @@ def test_repo_version(path):
     ok_clean_git(path, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
     eq_(version, 6)
+
+
+@with_testrepos('.*annex.*', flavors=['clone'])
+@with_tempfile(mkdir=True)
+def test_annex_copy_to(origin, clone):
+    repo = AnnexRepo(origin, create=False)
+    remote = AnnexRepo(clone, origin, create=True)
+    repo.add_remote("target", clone)
+
+    assert_raises(IOError, repo.copy_to, "doesnt_exist.dat", "target")
+    assert_raises(FileInGitError, repo.copy_to, "INFO.txt", "target")
+    assert_raises(ValueError, repo.copy_to, "test-annex.dat", "invalid_target")
+
+    # test-annex.dat has no content to copy yet:
+    eq_(repo.copy_to("test-annex.dat", "target"), [])
+
+    repo.get("test-annex.dat")
+    # now it has:
+    eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
+    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), ["test-annex.dat"])
+
