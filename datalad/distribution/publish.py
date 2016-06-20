@@ -130,7 +130,7 @@ class Publish(Interface):
         expl_subs = set()      # subdatasets to publish explicitly
         publish_subs = dict()  # collect what to publish from subdatasets
         if recursive:
-            for subds_path in ds.get_dataset_handles():
+            for subds_path in ds.get_subdatasets():
                 expl_subs.add(subds_path)
 
         if path is None:
@@ -138,7 +138,7 @@ class Publish(Interface):
             publish_this = True
         else:
             for p in path:
-                if p in ds.get_dataset_handles():
+                if p in ds.get_subdatasets():
                     # p is a subdataset, that needs to be published itself
                     expl_subs.add(p)
                 else:
@@ -247,4 +247,5 @@ class Publish(Interface):
             else:
                 msg += "File: %s\n" % item
         ui.message(msg)
+
 

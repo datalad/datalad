@@ -267,7 +267,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
-         for sm in topds.get_dataset_handles(recursive=recursive)]
+         for sm in topds.get_subdatasets(recursive=recursive)]
          if recursive else [])
     dsms = list(map(DsModel, dss))
 
@@ -277,6 +277,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         if not path:
             path = '.'
         ds_model.path = path
+    dsms = sorted(dsms, key=lambda m: m.path)
 
     maxpath = max(len(ds_model.path) for ds_model in dsms)
     path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes

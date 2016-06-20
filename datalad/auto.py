@@ -108,7 +108,7 @@ class AutomagicIO(object):
                     mode = kwargs['mode']
 
                 if 'r' in mode:
-                    self._handle_auto_get(file)
+                    self._dataset_auto_get(file)
                 else:
                     lgr.debug("Skipping operation on %s since mode=%r", file, mode)
         except _EarlyExit:
@@ -130,7 +130,7 @@ class AutomagicIO(object):
         return self._proxy_open_name_mode('h5py.File', self._h5py_File,
                                           *args, **kwargs)
 
-    def _handle_auto_get(self, filepath):
+    def _dataset_auto_get(self, filepath):
         """Verify that filepath is under annex, and if so and not present - get it"""
 
         if not self._autoget:

@@ -155,7 +155,7 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             # attempt left-overs.
             continue
         lgr.debug("Update cloned subdataset {0} in parent".format(subds))
-        if sm_path in ds.get_dataset_handles(absolute=False, recursive=False):
+        if sm_path in ds.get_subdatasets(absolute=False, recursive=False):
             ds.repo.update_submodule(sm_path, init=True)
         else:
             # submodule is brand-new and previously unknown
@@ -211,7 +211,7 @@ def get_containing_subdataset(ds, path):
         #       - have dedicated exception
         raise ValueError("path {0} not in dataset {1}.".format(path, ds))
 
-    for subds in ds.get_dataset_handles():
+    for subds in ds.get_subdatasets():
         common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
         if common.endswith(sep) and common == _with_sep(subds):
             return Dataset(path=opj(ds.path, common))
@@ -225,9 +225,9 @@ class Install(Interface):
     """Install a dataset component or entire dataset(s).
 
     This command can make arbitrary content available in a dataset. This
-    includes the fulfillment of existing dataset handles or file handles
-    in a dataset, as well as the adding such handles for content available
-    locally or remotely.
+    includes the fulfillment of existing :term:`subdataset` or file handles in
+    a dataset, as well as the addition of subdatasets and such handles for
+    content available locally or subdataset remotely.
     """
 
     _params_ = dict(
@@ -252,7 +252,7 @@ class Install(Interface):
         # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(
             args=("-r", "--recursive"),
-            constraints=EnsureChoice('handles', 'data') | EnsureBool(),
+            constraints=EnsureChoice('datasets', 'data') | EnsureBool(),
             doc="""if set, all content is installed recursively, including
             content of any subdatasets"""),
         add_data_to_git=Parameter(
@@ -589,7 +589,7 @@ class Install(Interface):
                 raise InsufficientArgumentsError(
                     "insufficient information for installation: the "
                     "installation target {0} doesn't exists, isn't a "
-                    "known handle of dataset {1}, and no `source` "
+                    "known part of dataset {1}, and no `source` "
                     "information was provided.".format(path, ds))
 
             if not source:
@@ -597,7 +597,7 @@ class Install(Interface):
                 raise InsufficientArgumentsError(
                     "insufficient information for installation: the "
                     "installation target {0} doesn't exists, isn't a "
-                    "known handle of dataset {1}, and no `source` "
+                    "known part of dataset {1}, and no `source` "
                     "information was provided.".format(path, ds))
 
             source_path = expandpath(source)

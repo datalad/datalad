@@ -41,7 +41,7 @@ def test_publish_simple(origin, src_path, dst_path):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     # forget we cloned it (provide no 'origin' anymore), which should lead to
     # setting tracking branch to target:
@@ -102,7 +102,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 
     # create plain git at target:
@@ -160,7 +160,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 #     source = install(path=src_path, source=origin, recursive=True)
 #     # TODO: For now, circumnavigate the detached head issue.
 #     # Figure out, what to do.
-#     for subds in source.get_dataset_handles(recursive=True):
+#     for subds in source.get_subdatasets(recursive=True):
 #         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 #
 #     # first, try publishing from super dataset using `path`
@@ -202,7 +202,7 @@ def test_publish_with_data(origin, src_path, dst_path):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
     source.repo.get('test-annex.dat')
 
@@ -242,7 +242,7 @@ def test_publish_with_data(origin, src_path, dst_path):
 #     source = install(path=src_path, source=origin, recursive=True)
 #     # TODO: For now, circumnavigate the detached head issue.
 #     # Figure out, what to do.
-#     for subds in source.get_dataset_handles(recursive=True):
+#     for subds in source.get_subdatasets(recursive=True):
 #         AnnexRepo(opj(src_path, subds), init=True, create=True).checkout("master")
 #     source.repo.get('test-annex.dat')
 #

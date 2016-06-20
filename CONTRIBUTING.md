@@ -11,7 +11,7 @@ Files organization
     - `cmdline/` - helpers for accessing `interface/` functionality from
      command line
     - `crawler/` - functionality for crawling (online) resources and creating
-      or updating handles and collections based on the scraped/downloaded data
+      or updating datasets and collections based on the scraped/downloaded data
         - `nodes/` processing elements which are used in the pipeline
         - `pipelines/` pipelines generators, to produce pipelines to be ran
         - `pipeline.py` pipeline runner
@@ -131,10 +131,16 @@ Documentation
 
 ### Docstrings
 
-We use [NumPy standard] for docstrings.  If you are using PyCharm, set your
-project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
+We use [NumPy standard] for the description of parameters docstrings.  If you are using
+PyCharm, set your project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
 
 [NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
+
+In addition, we follow the guidelines of [Restructured Text] with the additional features and treatments
+provided by [Sphinx].
+
+[Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
+[Sphinx]: http://www.sphinx-doc.org/en/stable/
 
 Additional Hints
 ----------------
@@ -269,17 +275,17 @@ Various hints for developers
 
 ### Useful tools
 
-- while performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
+- While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
   for quick logging of various health stats in a separate terminal window:
   
         dstat -c --top-cpu -d --top-bio --top-latency --net
 
-- to monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
-  just plug it in the middle of your pipe
+- To monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
+  just plug it in the middle of your pipe.
 
-- for remote debugging epdb could be used (avail in pip) by using
+- For remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
-  `python -c "import epdb; epdb.connect()"`
+  `python -c "import epdb; epdb.connect()".`
 
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
