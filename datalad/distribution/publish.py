@@ -135,8 +135,8 @@ class Publish(Interface):
                 # is something
                 expl_subs.add(subds_path)
 
-        if path is None:
-            # publish `ds` itself
+        if not path:
+            # publish `ds` itself, if nothing else is given:
             publish_this = True
         else:
             for p in path:
