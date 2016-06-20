@@ -133,9 +133,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     assert_is_instance(res, list)
     for item in res:
         assert_is_instance(item, Dataset)
-    eq_(res[0].path, src_path)
-    eq_(res[1].path, sub1.path)
-    eq_(res[2].path, sub2.path)
+    eq_({res[0].path, res[1].path, res[2].path},
+        {src_path, sub1.path, sub2.path})
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
@@ -219,7 +218,7 @@ def test_publish_with_data(origin, src_path, dst_path):
     source.repo.fetch("target")
 
     res = publish(dataset=source, to="target", path=['test-annex.dat'])
-    eq_(res, [source])
+    eq_(res, [source, 'test-annex.dat'])
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
