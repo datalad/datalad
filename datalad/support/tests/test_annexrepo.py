@@ -936,7 +936,7 @@ def test_repo_version(path):
     eq_(version, 6)
 
 
-@with_testrepos('.*annex.*', flavors=['local'])
+@with_testrepos('.*annex.*', flavors=['clone'])
 @with_tempfile(mkdir=True)
 def test_annex_copy_to(origin, clone):
     repo = AnnexRepo(origin, create=False)
