@@ -94,7 +94,7 @@ datalad create-publication-target-sshwebserver --recursive $SERVER_URL public
 
 # push
 # BUG: the following asks 4 times for a password
-datalad publish -r public
+datalad publish -r --to public
 
 #% EXAMPLE END
 

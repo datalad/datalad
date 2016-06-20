@@ -221,12 +221,12 @@ class Publish(Interface):
             # therefore force it.
             # TODO: There might be a better solution to avoid two calls of
             # publish() on the very same Dataset instance
-            results += Dataset(dspath).publish(dest=to, recursive=recursive)
+            results += Dataset(dspath).publish(to=to, recursive=recursive)
 
         for d in publish_subs:
             # recurse into subdatasets
             results += publish_subs[d]['dataset'].publish(
-                dest=to,
+                to=to,
                 path=publish_subs[d]['files'],
                 recursive=recursive)
 

@@ -53,7 +53,7 @@ def test_publish_simple(origin, src_path, dst_path):
     source.repo.add_remote("target", dst_path)
 
     res = publish(dataset=source, to="target")
-    eq_(res, source)
+    eq_(res, [source])
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
@@ -171,8 +171,8 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 #     source_sub.repo.add_remote("target", target_1)
 #
 #     res = publish(dataset=source_super, to="target", path="sub1")
-#     assert_is_instance(res, Dataset)
-#     eq_(res.path, source_sub.path)
+#     assert_is_instance(res, list)
+#     eq_(res.path, [source_sub.path])
 #
 #     eq_(list(GitRepo(target_1, create=False).get_branch_commits("master")),
 #         list(source_sub.repo.get_branch_commits("master")))
@@ -185,7 +185,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 #     source_sub.repo.add_remote("target2", target_2)
 #
 #     res = publish(dataset=source_sub, to="target2")
-#     eq_(res, source_sub)
+#     eq_(res, [source_sub])
 #
 #     eq_(list(GitRepo(target_2, create=False).get_branch_commits("master")),
 #         list(source_sub.repo.get_branch_commits("master")))
