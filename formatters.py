@@ -252,6 +252,8 @@ def cmdline_example_to_rst(src, out=None, ref=None):
             inexample = True
             incodeblock = False
             continue
+        if not inexample:
+            continue
         if line.startswith('#% EXAMPLE END'):
             break
         if not inexample:
