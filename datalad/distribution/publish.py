@@ -141,7 +141,7 @@ class Publish(Interface):
         publish_subs = dict()  # collect what to publish from subdatasets
         if recursive:
             for subds_path in ds.get_subdatasets(fulfilled=True):
-                if '.' in path:
+                if path and '.' in path:
                     # we explicitly are passing '.' to subdatasets in case of
                     # `recursive`. Therefore these datasets are going into
                     # `publish_subs`, instead of `expl_subs`:
