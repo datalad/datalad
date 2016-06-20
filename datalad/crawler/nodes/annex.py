@@ -979,7 +979,7 @@ class Annexificator(object):
             # TODO: may be adjust annex_options
             annex = add_archive_content(
                 archive, annex=self.repo,
-                delete=True, key=False, commit=commit, allow_dirty=True,
+                key=False, commit=commit, allow_dirty=True,
                 annex_options=self.options,
                 stats=stats,
                 **aac_kwargs
