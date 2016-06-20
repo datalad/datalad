@@ -27,6 +27,9 @@ class FileStatus(object):
         self.filename = filename
 
     def __eq__(self, other):
+        # If other is still None, we must be different
+        if not other:
+            return False
         # Disallow comparison of empty ones
         if self.size is None and self.mtime is None and self.filename is None:
             return NotImplemented
