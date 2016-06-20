@@ -89,6 +89,7 @@ class Publish(Interface):
             nargs='*'),
         annex_copy_opts=Parameter(
             args=("--annex-copy-opts",),
+            metavar='OPT_STR',  # better name?
             doc="options passed to 'annex copy'",
             constraints=EnsureStr() | EnsureNone(),))
 
