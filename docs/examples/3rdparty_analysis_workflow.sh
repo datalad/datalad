@@ -93,7 +93,7 @@ SERVER_URL="localhost:$(readlink -f $(mktemp --tmpdir -u -d datalad_demo_testpub
 datalad create-publication-target-sshwebserver --recursive $SERVER_URL public
 
 # push
-datalad publish -r --to public
+datalad publish -r --to public *
 
 #% EXAMPLE END
 

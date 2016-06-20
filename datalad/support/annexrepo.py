@@ -23,6 +23,7 @@ from os.path import exists
 from os.path import islink
 from os.path import realpath
 from os.path import lexists
+from os.path import isdir
 from subprocess import Popen, PIPE
 from functools import wraps
 
@@ -1168,27 +1169,21 @@ class AnnexRepo(GitRepo):
         if remote not in self.get_remotes():
             raise ValueError("Unknown remote '{0}'.".format(remote))
 
-        # TODO: May be collect exceptions, and create some kind of failure
-        #       summary?
-        # in case something can't be copied,
-        # raise exceptions (see get_file_key()):
-        if not all(self.get_file_key(file_) for file_ in files):
-            # something went wrong
-            # invalid files should raise from within get_file_key, so we
-            # shouldn't get here
-            raise RuntimeError("Unexpected failure while retrieving keys for "
-                               "list:\n{0}".format(files))
+        # In case of single path, 'annex copy' will fail, if it cannot copy it.
+        # With multiple files, annex will just skip the ones, it cannot deal
+        # with. We'll do the same and report back what was successful
+        # (see return value).
+        # Therefore raise telling exceptions before even calling annex:
+        if len(files) == 1:
+            if not isdir(files[0]):
+                self.get_file_key(files[0])
 
         # Note:
         # - annex copy fails, if `files` was a single item, that doesn't exist
         # - files not in annex or not even in git don't yield a non-zero exit,
         #   but are ignored
         # - in case of multiple items, annex would silently skip those files
-        # - we raised before even calling annex copy anyway
-        # => we don't catch exceptions when calling annex copy
-        # TODO: Is this, what we want? May be we don't want to raise at all and
-        #       just rely on annex' silent skipping and report success via
-        #       return value instead.
+
         # Note:
         # As of now, there is no --json option for annex copy. Use it once this
         # changed.
