@@ -13,7 +13,7 @@ ALICES_HOME=$(readlink -f $(mktemp -d datalad_demo.XXXX))
 #% ============================
 #%
 #% This example shows how datalad can be used to obtain a 3rd-party dataset and
-#% use it as input for an analysis. Moreover, it demonstrates how two local
+#% use it as input for analysis. Moreover, it demonstrates how two local
 #% collaborators can contribute to this analysis, each using their own copy
 #% of the dataset, but at the same time, being able to easily share their results
 #% back and forth.
@@ -26,12 +26,13 @@ git config --global --add user.name Bob
 git config --global --add user.email bob@example.com
 
 # will become: datalad create myanalysis --description "my phd in a day"
-datalad install myanalysis
+datalad create myanalysis
 
 
 cd myanalysis
 
 datalad install --source https://github.com/psychoinformatics-de/studyforrest-data-structural.git src/forrest_structural
+#datalad install --source /tmp/studyforrest-data-structural src/forrest_structural
 
 mkdir code
 
@@ -42,16 +43,14 @@ echo "nib-ls src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" > 
 
 datalad install --recursive yes --add-data-to-git code
 
-# will become: datalad make-memory-engram
-git commit -m "Initial analysis setup"
+datalad save -m "Initial analysis setup"
 
 bash code/get_required_data.sh
 bash code/run_analysis.sh
 
 datalad install result.txt
 
-# will become: datalad make-memory-engram
-git commit -m "First analysis results"
+datalad save -m "First analysis results"
 
 
 # 1. use case: lab colleague wants to work in the same analysis, on the same machine/cluster
@@ -76,25 +75,26 @@ echo "file -L src/forrest_structural/sub-*/anat/sub-*_T1w.nii.gz > result.txt" >
 
 bash code/run_analysis.sh ||true
 
-git annex unlock
+datalad unlock
 bash code/run_analysis.sh
-git commit -a -m "Alice always helps"
+datalad save -a -m "Alice always helps"
 
 
 HOME=$BOBS_HOME
 cd ~/myanalysis
 datalad add-sibling alice $ALICES_HOME/bobs_analysis
 
-# datalad update failes:
-#% datalad update alice
-#2016-06-09 13:59:52,338 [INFO   ] Updating handle '/tmp/datalad_demo.PU2F/myanalysis' ... (update.py:125)
-#2016-06-09 13:59:52,391 [ERROR  ] Failed to run ['git', '-c', 'receive.autogc=0', '-c', 'gc.auto=0', 'config', '--get', 'branch.master.remote'] under '/tmp/datalad_demo.PU2F/myanalysis'. Exit code=1. out= err= (cmd.py:295)
-#
-git pull alice master
-git fetch alice
-git annex merge
+datalad update alice --merge
 
 datalad install result.txt
+
+# total satisfaction is achieved -> public
+SERVER_URL="localhost:$(readlink -f $(mktemp --tmpdir -u -d datalad_demo_testpub.XXXX))"
+datalad create-publication-target-sshwebserver --recursive $SERVER_URL public
+
+# push
+# BUG: the following asks 4 times for a password
+datalad publish -r public
 
 #% EXAMPLE END
 

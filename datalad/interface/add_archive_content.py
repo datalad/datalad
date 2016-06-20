@@ -148,8 +148,8 @@ class AddArchiveContent(Interface):
         delete_after=Parameter(
             args=("--delete-after",),
             action="store_true",
-            doc="""extract under a temporary directory, git-annex add, and delete after.
-             To be used to "index" files within annex without actually creating corresponding
+            doc="""extract under a temporary directory, git-annex add, and delete after.  To
+             be used to "index" files within annex without actually creating corresponding
              files under git.  Note that `annex dropunused` would later remove that load"""),
 
         # TODO: interaction with archives cache whenever we make it persistent across runs

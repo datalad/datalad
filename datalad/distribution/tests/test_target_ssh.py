@@ -110,7 +110,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True,
                   create=False).checkout("master")
 

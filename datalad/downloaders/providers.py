@@ -168,7 +168,7 @@ class Providers(object):
         """Would load information about related/possible websites requiring authentication from
 
         - codebase (for now) datalad/downloaders/configs/providers.cfg
-        - current handle .datalad/providers/
+        - current dataset .datalad/providers/
         - user dir  ~/.config/datalad/providers/
         - system-wide datalad installation/config /etc/datalad/providers/
 

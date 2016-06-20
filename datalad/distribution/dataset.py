@@ -133,9 +133,9 @@ class Dataset(object):
             lgr.warning("Remote '%s' already exists. Ignore.")
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
-    def get_dataset_handles(self, pattern=None, fulfilled=None, absolute=False,
+    def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                             recursive=False):
-        """Get names/paths of all known dataset_handles (subdatasets),
+        """Get names/paths of all known dataset_datasets (subdatasets),
         optionally matching a specific name pattern.
 
 
@@ -148,8 +148,7 @@ class Dataset(object):
         absolute : bool
           If True, absolute paths will be returned.
         recursive : bool
-          If True, recurse into all subdatasets and report their dataset
-          handles too.
+          If True, recurse into all subdatasets and report them too.
 
         Returns
         -------
@@ -192,7 +191,7 @@ class Dataset(object):
                 sdspath = opj(self._path, sm)
                 rsm.extend(
                     [opj(sm, sdsh)
-                     for sdsh in Dataset(sdspath).get_dataset_handles(
+                     for sdsh in Dataset(sdspath).get_subdatasets(
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
                          recursive=recursive)])
             submodules = rsm
@@ -220,26 +219,6 @@ class Dataset(object):
 #          (paths)
 #        """
 #        raise NotImplementedError("TODO")
-
-    # TODO maybe needs to get its own interface
-    def remember_state(self, message, auto_add_changes=True, version=None):
-        """
-        Parameters
-        ----------
-        auto_add_changes: bool
-        message: str
-        update_superdataset: bool
-        version: str
-        """
-        if not self.is_installed():
-            raise RuntimeError(
-                "cannot remember a state when a dataset is not yet installed")
-        repo = self.repo
-        if auto_add_changes:
-            repo.add('.')
-        repo.commit(message)
-        if version:
-            repo._git_custom_command('', 'git tag "{0}"'.format(version))
 
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state

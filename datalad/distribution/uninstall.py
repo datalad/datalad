@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for uninstalling a handle
+"""High-level interface for uninstalling dataset content
 
 """
 
@@ -28,7 +28,8 @@ lgr = logging.getLogger('datalad.distribution.uninstall')
 
 
 class Uninstall(Interface):
-    """Uninstall a dataset component or entire datasets."""
+    """Uninstall a dataset component or entire dataset(s)
+    """
 
     # TODO: It's not actually clear yet, what are the actual meanings of
     # uninstall (including options) and what exactly are the methods to
@@ -161,7 +162,7 @@ class Uninstall(Interface):
             lgr.info("Nothing found to uninstall at %s" % path)
             return
 
-        if relativepath in ds.get_dataset_handles(recursive=True):
+        if relativepath in ds.get_subdatasets(recursive=True):
             # it's a submodule
             # --recursive required or implied?
             raise NotImplementedError("TODO: uninstall submodule %s from "

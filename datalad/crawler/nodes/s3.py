@@ -157,6 +157,7 @@ class crawl_s3(object):
             kf(k, 'version_id') != 'null',
             isinstance(k, DeleteMarker)
         )
+
         versions_sorted = sorted(all_versions, key=cmp)  # attrgetter('last_modified'))
         # print '\n'.join(map(str, [cmp(k) for k in versions_sorted]))
 
@@ -191,10 +192,10 @@ class crawl_s3(object):
         e_prev = None
         ncommits = self.ncommits or 0
 
-        # Adding None so we could deal with the last commit within the loop without duplicating
+        # adding None so we could deal with the last commit within the loop without duplicating
         # logic later outside
         def update_versiondb(e, force=False):
-            # This way we could recover easier after a crash
+            # this way we could recover easier after a crash
             # TODO: config crawl.crawl_s3.versiondb.saveaftereach=True
             if e is not None and (force or True):
                 versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
@@ -204,14 +205,14 @@ class crawl_s3(object):
                  filename = _strip_prefix(filename, self.prefix)
 
             if filename in staged or e is None:
-                # We should finish this one and commit
+                # we should finish this one and commit
                 if staged:
                     if self.versionfx and e_prev is not None:
                         version = self.versionfx(e_prev)
                         if version not in stats.versions:
                             stats.versions.append(version)
                     if versions_db:
-                        # Save current "version" DB so we would know where to pick up from
+                        # save current "version" DB so we would know where to pick up from
                         # upon next rerun.  Record should contain
                         # last_modified, name, versionid
                         # TODO?  what if e_prev was a DeleteMarker???
