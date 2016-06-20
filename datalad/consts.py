@@ -11,7 +11,7 @@
 
 from os.path import join
 
-# directory containing prepared metadata of a handle repository:
+# directory containing prepared metadata of a dataset repository:
 HANDLE_META_DIR = ".datalad"
 CRAWLER_META_DIR = join(HANDLE_META_DIR, 'crawl')
 CRAWLER_META_CONFIG_FILENAME = 'crawl.cfg'

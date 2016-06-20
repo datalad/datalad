@@ -47,6 +47,7 @@ from datalad.utils import swallow_logs
 # imports from same module:
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
+from .network import is_ssh
 
 # shortcuts
 _curdirsep = curdir + sep
@@ -460,7 +461,19 @@ class GitRepo(object):
         files = _remove_empty_items(files)
         if files:
             try:
-                self.cmd_call_wrapper(self.repo.index.add, files, write=True)
+
+                self._git_custom_command(files, ['git', 'add'])
+
+                # Note: as opposed to git cmdline, force is True by default in
+                #       gitpython, which would lead to add things, that are
+                #       ignored or excluded otherwise
+                # 2. Note: There is an issue with globbing (like adding '.'),
+                #       which apparently doesn't care for 'force' and therefore
+                #       adds '.git/...'. May be it's expanded at the wrong
+                #       point in time or sth. like that.
+                # For now, use direct call to git add.
+                #self.cmd_call_wrapper(self.repo.index.add, files, write=True,
+                #                      force=False)
                 # TODO: May be make use of 'fprogress'-option to indicate
                 # progress
                 # But then, we don't have it for git-annex add, anyway.
@@ -814,7 +827,7 @@ class GitRepo(object):
                 rm.config_reader.get('fetchurl'
                                      if rm.config_reader.has_option('fetchurl')
                                      else 'url')
-            if fetch_url.startswith('ssh:'):
+            if is_ssh(fetch_url):
                 cnct = ssh_manager.get_connection(fetch_url)
                 cnct.open()
                 # TODO: with git <= 2.3 keep old mechanism:
@@ -857,7 +870,7 @@ class GitRepo(object):
             remote.config_reader.get(
                 'fetchurl' if remote.config_reader.has_option('fetchurl')
                 else 'url')
-        if fetch_url.startswith('ssh:'):
+        if is_ssh(fetch_url):
             cnct = ssh_manager.get_connection(fetch_url)
             cnct.open()
             # TODO: with git <= 2.3 keep old mechanism:
@@ -904,7 +917,7 @@ class GitRepo(object):
                 rm.config_reader.get('pushurl'
                                      if rm.config_reader.has_option('pushurl')
                                      else 'url')
-            if push_url.startswith('ssh:'):
+            if is_ssh(push_url):
                 cnct = ssh_manager.get_connection(push_url)
                 cnct.open()
                 # TODO: with git <= 2.3 keep old mechanism:
@@ -1112,6 +1125,51 @@ class GitRepo(object):
             cmd.append('--init')
         cmd += ['--', path]
         self._git_custom_command('', cmd)
+
+    def tag(self, tag):
+        """Assign a tag to current commit
+
+        Parameters
+        ----------
+        tag : str
+          Custom tag label.
+        """
+        # TODO later to be extended with tagging particular commits and signing
+        self._git_custom_command('', 'git tag "{0}"'.format(tag))
+
+    def get_tracking_branch(self, branch=None):
+        """Get the tracking branch for `branch` if there is any.
+
+        Parameters
+        ----------
+        branch: str
+            local branch to look up. If none is given, active branch is used.
+
+        Returns
+        -------
+        tuple
+            (remote or None, refspec or None) of the tracking branch
+        """
+        if branch is None:
+            branch = self.get_active_branch()
+
+        cfg_reader = self.repo.config_reader()
+        sct = "branch \"{0}\"".format(branch)
+        track_remote = cfg_reader.get_value(section=sct,
+                                            option="remote",
+                                            default="DATALAD_DEFAULT")
+        if track_remote == "DATALAD_DEFAULT":
+            # we have no "tracking remote"
+            track_remote = None
+        track_branch = cfg_reader.get_value(section=sct,
+                                            option="merge",
+                                            default="DATALAD_DEFAULT")
+        if track_branch == "DATALAD_DEFAULT":
+            # we have no tracking branch
+            track_branch = None
+
+        return track_remote, track_branch
+
 
 # TODO
 # remove submodule

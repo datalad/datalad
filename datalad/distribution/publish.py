@@ -15,144 +15,114 @@ __docformat__ = 'restructuredtext'
 
 import logging
 
-from os import curdir
-from os.path import join as opj, abspath, exists, relpath
+from os.path import join as opj
 
 from six import string_types
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureListOf
-from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
-    FileNotInAnnexError
 from datalad.interface.base import Interface
-from datalad.distribution.dataset import EnsureDataset, Dataset, \
-    datasetmethod, resolve_path
-from datalad.distribution.install import get_containing_subdataset
-from datalad.cmd import CommandError
+from datalad.support.param import Parameter
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureListOf
+from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.utils import getpwd
+
+from .dataset import EnsureDataset
+from .dataset import Dataset
+from .dataset import datasetmethod
+from .install import get_containing_subdataset
+
 
 lgr = logging.getLogger('datalad.distribution.publish')
 
 
 class Publish(Interface):
-    """publish a handle.
+    """Publish a dataset (e.g. to a web server)
 
-    This is basic implementation for testing purposes
+    This makes the current state of a dataset available to a sibling of the
+    dataset. That sibling needs to be known to the dataset before.
+    `create_publication_target` commands are meant to set up such a sibling, but
+    generally you can publish to any sibling added to a dataset.
+    Publishing may or may not include subdatasets.
+    By default file handles are published without their actual content,
+    but they can be published including the content, of course.
+
     """
+    # TODO: Figure out, how to tell about tracking branch/upstream
+    #      (and the respective remote)
+    #      - it is used, when no destination is given
+    #      - it is configured to be the given destination, if there was no
+    #        upstream set up before, so you can use just "datalad publish" next
+    #        time.
+
+    # TODO: Doc!
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
-            doc="""specify the dataset to perform the publish operation on.  If
-            no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory and/or the `path` given""",
+            metavar='DATASET',
+            doc="""specify the dataset to publish. If no dataset is given, an
+            attempt is made to identify the dataset based on the current
+            working directory""",
             constraints=EnsureDataset() | EnsureNone()),
-        dest=Parameter(
-            args=("dest",),
-            doc="""url, local path, or sibling name identifying the publication
-            target""",
-            nargs="?",
+        to=Parameter(
+            args=("--to",),
+            metavar='DEST',
+            doc="""sibling name identifying the publication target. If no
+            destination is given an attempt is made to identify the target based
+            on the dataset's configuration""",
+            # TODO: See TODO at top of class!
             constraints=EnsureStr() | EnsureNone()),
-        path=Parameter(
-            args=("path",),
-            doc="path/name of the dataset component to publish",
-            nargs="*",
-            constraints=EnsureStr() | EnsureNone()),
-        # Note: add remote currently disabled in publish
-        # dest_url=Parameter(
-        #     args=('--dest-url',),
-        #     doc="""the URL of the dataset sibling named by `dest`.  This URL has
-        #     to be accessible to anyone, who is supposed to have access to the
-        #     published dataset later on.\n
-        #     If you want to publish with `recursive`, it is expected, that you
-        #     pass a template for building the URLs of all (sub)datasets to be
-        #     published by using placeholders.\n
-        #     List of currently available placeholders:\n
-        #     %%NAME\tthe name of the dataset, where slashes are replaced by
-        #     dashes.\nThis option is ignored if there is already a configured
-        #     sibling dataset under the name given by `dest`.""",
-        #     nargs="?",
-        #     constraints=EnsureStr() | EnsureNone()),
-        # dest_pushurl=Parameter(
-        #     args=('--dest-pushurl',),
-        #     doc="""in case the `dest_url` cannot be used to publish to the
-        #     dataset sibling, this option specifies a URL to be used for the
-        #     actual publication operation""",
-        #     constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="recursively publish all components of the dataset"),
-        with_data=Parameter(
-            args=("--with-data",),
-            doc="shell pattern",
-            constraints=EnsureListOf(string_types) | EnsureNone(),
-            nargs='*'),)
+            doc="recursively publish all subdatasets of the dataset. In order "
+                "to recursivley publish with all data, use '.' as `path` in "
+                "combination with `recursive`"),
+        path=Parameter(
+            args=("path",),
+            metavar='PATH',
+            doc="path(s), that may point to file handle(s) to publish including "
+                "their actual content or to subdataset(s) to be published. If a "
+                "file handle is published with its data, this implicitly means "
+                "to also publish the (sub)dataset it belongs to. '.' as a path "
+                "is treated in a special way in the sense, that it is passed "
+                "to subdatasets in case `recursive` is also given.",
+            constraints=EnsureStr() | EnsureNone(),
+            nargs='*'),
+        annex_copy_opts=Parameter(
+            args=("--annex-copy-opts",),
+            metavar='OPT_STR',  # better name?
+            doc="options passed to 'annex copy'",
+            constraints=EnsureStr() | EnsureNone(),))
 
     @staticmethod
     @datasetmethod(name='publish')
-    def __call__(dataset=None, dest=None, path=None,
-                 # Note: add remote currently disabled in publish
-                 # dest_url=None, dest_pushurl=None,
-                 with_data=None, recursive=False):
-
-        # Note: add remote currently disabled in publish
-        # if dest is None and (dest_url is not None
-        #                        or dest_pushurl is not None):
-        #     raise ValueError("""insufficient information for adding the
-        #     destination as a sibling (needs at least a name)""")
+    def __call__(dataset=None, to=None, path=None, recursive=False,
+                 annex_copy_opts=None):
 
         # shortcut
         ds = dataset
 
         if ds is not None and not isinstance(ds, Dataset):
             ds = Dataset(ds)
-        if not path:
-            path = curdir
 
-        elif isinstance(path, list):
-            return [Publish.__call__(
-                    dataset=ds,
-                    dest=dest,
-                    path=p,
-                    # Note: add remote currently disabled in publish
-                    # dest_url=dest_url,
-                    # dest_pushurl=dest_pushurl,
-                    with_data=with_data,
-                    recursive=recursive) for p in path]
-
-        # resolve the location against the provided dataset
-        if path is not None:
-            path = resolve_path(path, ds)
-
-        lgr.info("Publishing {0}".format(path))
-
-        # if we have no dataset given, figure out which one we need to operate
-        # on, based on the resolved location (that is now guaranteed to
-        # be specified
         if ds is None:
-            # try to find a dataset at or above the location
-            dspath = GitRepo.get_toppath(abspath(path))
-            if dspath is None:
-                # no top-level dataset found, use path as such
-                dspath = path
+            # try CWD:
+            dspath = GitRepo.get_toppath(getpwd())
+            if not dspath:
+                raise InsufficientArgumentsError("No dataset found")
             ds = Dataset(dspath)
-        lgr.debug("Resolved dataset for publication: {0}".format(ds))
-        assert(ds is not None)
 
-        # it might still be about a subdataset of ds:
-        if path is not None:
-            relativepath = relpath(path, start=ds.path)
-            subds = get_containing_subdataset(ds, relativepath)
-            if subds.path != ds.path:
-                    # path belongs to a subdataset; hand it over
-                    lgr.debug("Hand over to submodule %s" % subds.path)
-                    return subds.publish(dest=dest,
-                                         path=relpath(path, start=subds.path),
-                                         # Note: add remote currently disabled in publish
-                                         # dest_url=dest_url,
-                                         # dest_pushurl=dest_pushurl,
-                                         with_data=with_data,
-                                         recursive=recursive)
+        # Note: This logic means, we have to be within a dataset or explicitly
+        #       pass a dataset in order to call publish. Even if we don't want
+        #       to publish this dataset itself, but subdataset(s) only.
+        #       Since we need to resolve paths against a dataset, another
+        #       approach would complicate the matter. Consider '-C' and
+        #       '--dataset' options before complaining ;)
+        assert(ds is not None)
+        lgr.debug("Resolved dataset for publication: {0}".format(ds))
 
         # now, we know, we have to operate on ds. So, ds needs to be installed,
         # since we cannot publish anything from a not installed dataset,
@@ -163,108 +133,93 @@ class Publish(Interface):
                              "{0}.".format(ds.path))
         assert(ds.repo is not None)
 
-        # TODO: For now we can deal with a sibling(remote) name given by `dest`
-        # only. Figure out, when to allow for passing a local path or URL
-        # directly and what to do in that case.
+        # figure out, what to publish from what (sub)dataset:
+        publish_this = False   # whether to publish `ds`
+        publish_files = []     # which files to publish by `ds`
 
-        # Note: we need an upstream remote, if there's none given. We could
-        # wait for git push to complain, but we need to explicitly figure it
-        # out for pushing annex branch anyway and we might as well fail right
-        # here.
-
-        # keep original dest in case it's None for passing to recursive calls:
-        dest_resolved = dest
-        if dest is None:
-            # check for tracking branch's remote:
-            try:
-                std_out, std_err = \
-                    ds.repo._git_custom_command('',
-                                                ["git", "config", "--get", "branch.{active_branch}.remote".format(active_branch=ds.repo.get_active_branch())],
-                                                expect_fail=True)
-            except CommandError as e:
-                if e.code == 1 and e.stdout == "":
-                    std_out = None
+        expl_subs = set()      # subdatasets to publish explicitly
+        publish_subs = dict()  # collect what to publish from subdatasets
+        if recursive:
+            for subds_path in ds.get_subdatasets(fulfilled=True):
+                if path and '.' in path:
+                    # we explicitly are passing '.' to subdatasets in case of
+                    # `recursive`. Therefore these datasets are going into
+                    # `publish_subs`, instead of `expl_subs`:
+                    sub = Dataset(opj(ds.path, subds_path))
+                    publish_subs[sub.path] = dict()
+                    publish_subs[sub.path]['dataset'] = sub
+                    publish_subs[sub.path]['files'] = ['.']
                 else:
-                    raise
-            if std_out:
-                dest_resolved = std_out.strip()
-            else:
-                # we have no remote given and no upstream => fail
-                raise RuntimeError("No known default target for "
-                                   "publication and none given.")
+                    # we can recursively publish only, if there actually
+                    # is something
+                    expl_subs.add(subds_path)
 
-        # upstream branch needed for update (merge) and subsequent push,
-        # in case there is no.
-        set_upstream = False
-        try:
-            # Note: tracking branch actually defined bei entry "merge"
-            # PLUS entry "remote"
-            std_out, std_err = \
-                ds.repo._git_custom_command('',
-                                            ["git", "config", "--get",
-                                             "branch.{active_branch}.merge".format(active_branch=ds.repo.get_active_branch())],
-                                            expect_fail=True)
-        except CommandError as e:
-            if e.code == 1 and e.stdout == "":
+        if not path:
+            # publish `ds` itself, if nothing else is given:
+            publish_this = True
+        else:
+            for p in path:
+                if p in ds.get_subdatasets():
+                    # p is a subdataset, that needs to be published itself
+                    expl_subs.add(p)
+                else:
+                    try:
+                        d = get_containing_subdataset(ds, p)
+                    except ValueError as e:
+                        # p is not in ds => skip:
+                        lgr.warning(str(e) + " - Skipped.")
+                        continue
+                    if d == ds:
+                        # p needs to be published from ds
+                        publish_this = True
+                        publish_files.append(p)
+                    else:
+                        # p belongs to subds `d`
+                        if not publish_subs[d.path]:
+                            publish_subs[d.path] = dict()
+                        if not publish_subs[d.d.path]['files']:
+                            publish_subs[d.d.path]['files'] = list()
+                        publish_subs[d.path]['dataset'] = d
+                        publish_subs[d.path]['files'].append(p)
+
+        results = []
+
+        if publish_this:
+
+            # Note: we need an upstream remote, if there's none given. We could
+            # wait for git push to complain, but we need to explicitly figure it
+            # out for pushing annex branch anyway and we might as well fail
+            # right here.
+
+            track_remote, track_branch = ds.repo.get_tracking_branch()
+
+            # keep `to` in case it's None for passing to recursive calls:
+            dest_resolved = to
+            if to is None:
+                if track_remote:
+                    dest_resolved = track_remote
+                else:
+                    # we have no remote given and no upstream => fail
+                    raise InsufficientArgumentsError(
+                        "No known default target for "
+                        "publication and none given.")
+
+            # upstream branch needed for update (merge) and subsequent push,
+            # in case there is no.
+            if track_branch is None:
                 # no tracking branch yet:
                 set_upstream = True
             else:
-                raise
+                set_upstream = False
 
-        # is `dest` an already known remote?
-        if dest_resolved not in ds.repo.get_remotes():
-            # unknown remote
-            raise ValueError("No sibling '%s' found." % dest_resolved)
+            # is `to` an already known remote?
+            if dest_resolved not in ds.repo.get_remotes():
+                # unknown remote
+                raise ValueError("No sibling '%s' found." % dest_resolved)
 
-            # Note: add remote currently disabled in publish
-            # if dest_url is None:
-            #     raise ValueError("No sibling '%s' found. Provide `dest-url`"
-            #                      " to register it." % dest_resolved)
-            # lgr.info("Sibling %s unknown. Registering ...")
-            #
-            # # Fill in URL-Template:
-            # remote_url = dest_url.replace("%NAME", basename(ds.path))
-            # # TODO: handle_name.replace("/", "-")) instead of basename()
-            # #       - figure it out ;)
-            # #       - either a datasets needs to discover superdatasets in
-            # #         order to get it's relative path to provide a name
-            # #       - or: We need a different approach on the templates
-            #
-            # # Add the remote
-            # ds.repo.add_remote(dest_resolved, remote_url)
-            # if dest_pushurl:
-            #     # Fill in template:
-            #     remote_url_push = \
-            #         dest_pushurl.replace("%NAME", basename(ds.path))
-            #     # TODO: Different way of replacing %NAME; See above
-            #
-            #     # Modify push url:
-            #     ds.repo._git_custom_command('',
-            #                                 ["git", "remote",
-            #                                  "set-url",
-            #                                  "--push", dest_resolved,
-            #                                  remote_url_push])
-            # lgr.info("Added sibling '%s'." % dest)
-            # lgr.debug("Added remote '%s':\n %s (fetch)\n%s (push)." %
-            #           (dest_resolved, remote_url,
-            #            remote_url_push if dest_pushurl else remote_url))
-        # Note: add remote currently disabled in publish
-        # else:
-        #     # known remote: parameters dest-url-* currently invalid.
-        #     # This may change to adapt the existing remote.
-        #     if dest_url:
-        #         lgr.warning("Sibling '%s' already exists for dataset '%s'. "
-        #                     "Ignoring dest-url %s." %
-        #                     (dest_resolved, ds.path, dest_url))
-        #     if dest_pushurl:
-        #         lgr.warning("Sibling '%s' already exists for dataset '%s'. "
-        #                     "Ignoring dest-pushurl %s." %
-        #                     (dest_resolved, ds.path, dest_pushurl))
-
-        # Figure out, what to publish
-        if path is None or path == ds.path:
-            # => publish the dataset itself
-            # push local state:
+            lgr.info("Publishing dataset {0} to sibling {1} "
+                     "...".format(ds, dest_resolved))
+            # we now know where to push to:
             ds.repo.push(remote=dest_resolved,
                          refspec=ds.repo.get_active_branch(),
                          set_upstream=set_upstream)
@@ -273,56 +228,64 @@ class Publish(Interface):
                 ds.repo.push(remote=dest_resolved,
                              refspec="+git-annex:git-annex")
 
-            # TODO: if with_data is a shell pattern, we get a list, when called
-            # from shell, right?
-            # => adapt the following and check constraints to allow for that
-            if with_data:
-                ds.repo._git_custom_command('', ["git", "annex", "copy"] +
-                                            with_data + ["--to", dest_resolved])
+            # we need to fetch
+            # TODO
+            # Note: This is about a gitpython issue as well as something about
+            # annex -> might mean, that we need to do it in case we pushed an annex branch only.
+            # Apparently, we can annex copy new files only, after this fetch. Figure it out!
+            ds.repo.fetch(remote=dest_resolved)
 
-            if recursive and ds.get_dataset_handles() != []:
-                results = [ds]
-                # Note: add remote currently disabled in publish
-                # modify URL templates:
-                # if dest_url:
-                #     dest_url = dest_url.replace('%NAME', basename(ds.path) + '-%NAME')
-                # if dest_pushurl:
-                #     dest_pushurl = dest_pushurl.replace('%NAME', basename(ds.path) + '-%NAME')
-                for subds in ds.get_dataset_handles():
-                    results.append(Dataset(opj(ds.path,
-                                              subds)).publish(
-                        dest=dest,
-                        # Note: use `dest` instead of `dest_resolved` in case
-                        # dest was None, so subdatasets would use their default
-                        # as well
-                        # Note: add remote currently disabled in publish
-                        # dest_url=dest_url,
-                        # dest_pushurl=dest_pushurl,
-                        with_data=with_data,
-                        recursive=recursive))
-                return results
+            results.append(ds)
 
-            return ds
+            if publish_files or annex_copy_opts:
+                if not isinstance(ds.repo, AnnexRepo):
+                    raise RuntimeError(
+                        "Cannot publish content of something, that is not "
+                        "part of an annex. ({0})".format(ds))
 
-        elif exists(path):
-            # At this point `path` is not referencing a (sub)dataset.
-            # An annexed file is the only thing left, that `path` might be
-            # validly pointing to. Anything else we can't handle currently.
-            if isinstance(ds.repo, AnnexRepo):
-                try:
-                    if ds.repo.get_file_key(relativepath):
-                        # file is in annex, publish it
-                        ds.repo._run_annex_command('copy',
-                                                   annex_options=[path,
-                                                                  '--to=%s' % dest_resolved])
-                        return path
-                except (FileInGitError, FileNotInAnnexError):
-                    pass
-            # `path` can't be published
-            lgr.warning("Don't know how to publish %s." % path)
-            return None
+                lgr.info("Publishing data of dataset {0} ...".format(ds))
+                results += ds.repo.copy_to(files=publish_files,
+                                           remote=dest_resolved,
+                                           options=annex_copy_opts)
 
-        else:
-            # nothing to publish found
-            lgr.warning("Nothing to publish found at %s." % path)
-            return None
+        for dspath in expl_subs:
+            # these datasets need to be pushed regardless of additional paths
+            # pointing inside them
+            # due to API, this may not happen when calling publish with paths,
+            # therefore force it.
+            # TODO: There might be a better solution to avoid two calls of
+            # publish() on the very same Dataset instance
+            results += Dataset(opj(ds.path, dspath)).publish(
+                to=to, recursive=recursive)
+
+        for d in publish_subs:
+            # recurse into subdatasets
+
+            # TODO: need to fetch. see above
+            publish_subs[d]['dataset'].repo.fetch(remote=to)
+
+            results += publish_subs[d]['dataset'].publish(
+                to=to,
+                path=publish_subs[d]['files'],
+                recursive=recursive,
+                annex_copy_opts=annex_copy_opts)
+
+        return results
+
+    @staticmethod
+    def result_renderer_cmdline(res):
+        from datalad.ui import ui
+        if not res:
+            ui.message("Nothing was published")
+            return
+        msg = "{n} {obj} published:\n".format(
+            obj='items were' if len(res) > 1 else 'item was',
+            n=len(res))
+        for item in res:
+            if isinstance(item, Dataset):
+                msg += "Dataset: %s\n" % item.path
+            else:
+                msg += "File: %s\n" % item
+        ui.message(msg)
+
+

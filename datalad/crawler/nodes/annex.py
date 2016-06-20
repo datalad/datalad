@@ -6,9 +6,9 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Nodes to interact with annex -- initiate a new handle or operate with existing one
+"""Nodes to interact with annex -- initiate a new dataset or operate with existing one
 
-via Annexificator class, which could be used to add files, checkout branches etc
+via Annexificator class, which could be used to add files, checkout branches, etc
 """
 
 import os
@@ -57,6 +57,7 @@ from ..dbs.files import PhysicalFileStatusesDB, JsonFileStatusesDB
 from ..dbs.versions import SingleVersionDB
 
 from logging import getLogger
+
 lgr = getLogger('datalad.crawl.annex')
 
 _runner = get_runner()
@@ -66,27 +67,30 @@ _run = _runner.run
 
 # TODO: make use of datalad_stats
 @auto_repr
-class initiate_handle(object):
-    """Action to initiate a handle following one of the known templates
+class initiate_dataset(object):
+    """Action to initiate a dataset following one of the known templates
     """
-    def __init__(self, template, handle_name=None,  # collection_name=None,
+
+    def __init__(self, template, dataset_name=None,
                  path=None, branch=None, backend=None,
-                 template_func=None,
+                 template_func=None, template_kwargs=None,
                  data_fields=[], add_fields={}, existing=None):
         """
         Parameters
         ----------
         template : str
-          Which template (probably matching the collection name) to use.
+          Which template (probably matching the superdataset name) to use.
           TODO: refer to specs of template that it might understand some
           arguments encoded, such as #func=custom_pipeline
-        handle_name : str
-          Name of the handle. If None, reacts on 'handle_name' in data
-        collection_name : str, optional
-          If None and not present in data, template is taken
+        template_func : str, optional
+          Explicitly specify the function name within template module
+        template_kwargs: dict, optional
+          Keyword arguments to pass into the `template_func`.
+        dataset_name : str, optional
+          Name of the dataset. If None, reacts on 'dataset_name' in data
         path : str, optional
-          Path were to initiate the handle.  If not specified, would use
-          default path for all new handles (DATALAD_CRAWL_COLLECTIONSPATH)
+          Path were to initiate the dataset.  If not specified, would use
+          default path for all new datasets (DATALAD_CRAWL_COLLECTIONSPATH)
         branch : str, optional
           Which branch to initialize
         backend : str, optional
@@ -95,19 +99,21 @@ class initiate_handle(object):
           having a relatively small limit for a maximum path size
         data_fields : list or tuple of str, optional
           Additional fields from data to store into configuration for
-          the handle crawling options -- would be passed into the corresponding
+          the dataset crawling options -- would be passed into the corresponding
           crawler template
         add_fields : dict, optional
           Dictionary of additional fields to store in the crawler configuration
           to be passed into the template
         existing : ('skip', 'raise', 'adjust', 'replace', 'crawl'), optional
-          Behavior if encountering existing handle
+          Behavior if encountering existing dataset
         """
         # TODO: add_fields might not be flexible enough for storing more elaborate
         # configurations for e.g. "basic" template
+
         self.template = template
-        self.handle_name = handle_name
-        ## self.collection_name = collection_name
+        self.template_func = template_func
+        self.template_kwargs = template_kwargs
+        self.dataset_name = dataset_name
         self.data_fields = data_fields
         self.add_fields = add_fields
         self.existing = existing
@@ -116,83 +122,87 @@ class initiate_handle(object):
         # TODO: backend -> backends (https://github.com/datalad/datalad/issues/358)
         self.backend = backend
 
-    def _initiate_handle(self, path, name):
-        lgr.info("Initiating handle %s" % name)
+    def _initiate_dataset(self, path, name):
+        lgr.info("Initiating dataset %s" % name)
         if self.branch is not None:
-            # Because all the 'create' magic is stuffed into the constructor ATM
-            # we need first initiate a git repository
+            # because all the 'create' magic is stuffed into the constructor ATM
+            # we need first to initiate a git repository
             git_repo = GitRepo(path, create=True)
-            # since we are initiatializing, that branch shouldn't exist yet, thus --orphan
+            # since we are initiating, that branch shouldn't exist yet, thus --orphan
             git_repo.checkout(self.branch, options="--orphan")
             # TODO: RF whenevever create becomes a dedicated factory/method
-            # and/or branch becomes an option for the "creater"
+            # and/or branch becomes an option for the "creator"
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
         repo = AnnexRepo(
-             path,
-             direct=cfg.getboolean('crawl', 'init direct', default=False),
-             #  name=name,
-             backend=backend,
-             create=True)
+            path,
+            direct=cfg.getboolean('crawl', 'init direct', default=False),
+            #  name=name,
+            backend=backend,
+            create=True)
         # TODO: centralize
         if backend:
             put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
         return repo
 
-    def _save_crawl_config(self, handle_path, data):
-        kwargs = {f: data[f] for f in self.data_fields}
+    def _save_crawl_config(self, dataset_path, data):
+        kwargs = self.template_kwargs or {}
+        # update with those from data
+        kwargs.update({f: data[f] for f in self.data_fields})
         # additional options given as a dictionary
         kwargs.update(self.add_fields)
         return initiate_pipeline_config(
             template=self.template,
-            path=handle_path,
-            kwargs=kwargs,
+            template_func=self.template_func,
+            template_kwargs=kwargs,
+            path=dataset_path,
             commit=True
         )
 
     def __call__(self, data={}):
-        # figure out directory where create such a handle
-        handle_name = self.handle_name or data.get('handle_name', None)
-        handle_path = opj(os.curdir, handle_name) \
+        # figure out directory where create such a dataset
+        dataset_name = self.dataset_name or data.get('dataset_name', None)
+        dataset_path = opj(os.curdir, dataset_name) \
             if self.path is None \
             else self.path
 
-        data_updated = updated(data, {'handle_path': handle_path,
-                                      'handle_name': handle_name})
-        lgr.debug("Request to initialize a handle %s at %s", handle_name, handle_path)
+        data_updated = updated(data, {'dataset_path': dataset_path,
+                                      'dataset_name': dataset_name})
+        lgr.debug("Request to initialize a dataset %s at %s", dataset_name, dataset_path)
         init = True
-        if exists(handle_path):
-            # TODO: config crawl.collection.existing = skip|raise|replace|crawl|adjust
-            # TODO: config crawl.collection.crawl_new = false|true
+        if exists(dataset_path):
+            # TODO: config crawl.subdataset.existing = skip|raise|replace|crawl|adjust
+            # TODO: config crawl.subdataset.crawl_new = false|true
             existing = self.existing or 'skip'
             if existing == 'skip':
-                lgr.info("Skipping handle %s since already exists" % handle_name)
+                lgr.info("Skipping dataset %s since already exists" % dataset_name)
                 yield data_updated
                 return
             elif existing == 'raise':
-                raise RuntimeError("%s already exists" % handle_path)
+                raise RuntimeError("%s already exists" % dataset_path)
             elif existing == 'replace':
-                _call(rmtree, handle_path)
+                _call(rmtree, dataset_path)
             elif existing == 'adjust':
                 # E.g. just regenerate configs/meta
                 init = False
             else:  # TODO: 'crawl'  ;)
                 raise ValueError(self.existing)
         if init:
-            _call(self._initiate_handle, handle_path, handle_name)
-        _call(self._save_crawl_config, handle_path, data)
+            _call(self._initiate_dataset, dataset_path, dataset_name)
+        _call(self._save_crawl_config, dataset_path, data)
 
         yield data_updated
 
 
 class Annexificator(object):
-    """A helper which would encapsulate operation of adding new content to git/annex repo
+    """A helper which would encapsulate the operation of adding new content to git/annex repo
 
-    If 'filename' field was not found in the data, filename from the url
+    If 'filename' field was not found in the data, filename from the URL
     gets taken.
 
     'path' field of data (if present) is used to define path within the subdirectory.
     Should be relative. If absolute found -- ValueError is raised
     """
+
     def __init__(self, path=None, mode='full', options=None,
                  special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
@@ -209,9 +219,9 @@ class Annexificator(object):
         mode : str of {'full', 'fast', 'relaxed'}
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
-          annex modes where no actual download is performed and files' keys are their urls
+          annex modes where no actual download is performed and the files' keys are their URLs
         special_remotes : list, optional
-          List of custom special remotes to initialize and enable by default.
+          List of custom special remotes to initialize and enable by default
         yield_non_updated : bool, optional
           Either to yield original data (with filepath) if load was not updated in annex
         auto_finalize : bool, optional
@@ -220,13 +230,13 @@ class Annexificator(object):
           carrying out the operation
         statusdb : {'json', 'fileattr'}, optional
           DB of file statuses which will be used to figure out if remote load has changed.
-          If None, no statusdb will be used so Annexificator will process every given url
-          as if it lead to new content.  'json' -- JsonFileStatusesDB will
-          be used which will store information about each provided file/url into a json file.
-          'fileattr' -- PhysicalFileStatusesDB will be used to decide based on
-          information in annex and file(s) mtime on the disk.
-          Note that statusdb "lives" within branch, so switch_branch would drop existing DB (which
-          should get committed within the branch) and would create a new one if db is requested
+          If None, no statusdb will be used so Annexificator will process every given URL
+          as if it leads to new content.  'json' -- JsonFileStatusesDB will
+          be used which will store information about each provided file/url into a JSON file.
+          'fileattr' -- PhysicalFileStatusesDB will be used to decide based on information in
+          annex and file(s) mtime on the disk.
+          Note that statusdb "lives" within the branch, so switch_branch would drop existing DB (which
+          should get committed within the branch) and would create a new one if DB is requested
           again.
         **kwargs : dict, optional
           to be passed into AnnexRepo
@@ -234,9 +244,9 @@ class Annexificator(object):
         if path is None:
             path = realpath(curdir)
         # TODO: commented out to ease developing for now
-        #self.repo = _call(AnnexRepo, path, **kwargs)
+        # self.repo = _call(AnnexRepo, path, **kwargs)
         # TODO: backend -- should be fetched from the config I guess... or should we
-        # give that duty to the handle initialization routine to change default backend?
+        # give that duty to the dataset initialization routine to change default backend?
         # Well -- different annexifiers might have different ideas for the backend, but
         # then those could be overriden via options
 
@@ -252,9 +262,9 @@ class Annexificator(object):
             for remote in special_remotes:
                 if remote not in git_remotes:
                     self.repo.init_remote(
-                            remote,
-                            ['encryption=none', 'type=external', 'autoenable=true',
-                             'externaltype=%s' % remote])
+                        remote,
+                        ['encryption=none', 'type=external', 'autoenable=true',
+                         'externaltype=%s' % remote])
 
         self.mode = mode
         self.options = options or []
@@ -269,7 +279,6 @@ class Annexificator(object):
 
         self.statusdb = statusdb
         self._statusdb = None  # actual DB to be instantiated later
-
 
     # def add(self, filename, url=None):
     #     # TODO: modes
@@ -303,10 +312,9 @@ class Annexificator(object):
                              "Please adjust pipeline to provide one" % url)
         return filename
 
-
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
-        # Some checks
-        assert(self.mode is not None)
+        # some checks
+        assert (self.mode is not None)
         stats = data.get('datalad_stats', ActivityStats())
 
         url = data.get('url')
@@ -320,12 +328,12 @@ class Annexificator(object):
 
         # since filename could have come from url -- let's update with it
         updated_data = updated(data, {'filename': ops(fpath)[1],
-                                      #TODO? 'filepath': filepath
+                                      # TODO? 'filepath': filepath
                                       })
         remote_status = None
         if self.statusdb is not None and self._statusdb is None:
             if isinstance(self.statusdb, string_types):
-                # Initiate the DB
+                # initiate the DB
                 self._statusdb = {
                     'json': JsonFileStatusesDB,
                     'fileattr': PhysicalFileStatusesDB}[self.statusdb](annex=self.repo)
@@ -339,7 +347,7 @@ class Annexificator(object):
             # request status since we would need it in either mode
             remote_status = data['url_status'] if 'url_status' in data else downloader.get_status(url)
             if lexists(filepath):
-                # Check if URL provides us updated content.  If not -- we should do nothing
+                # check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT
                 #        may be for S3 support where statusdb would only record most recent
                 #        modification time
@@ -352,7 +360,8 @@ class Annexificator(object):
 
                 # TODO: what if the file came from another url bearing the same mtime and size????
                 #       unlikely but possible.  We would need to provide URL for comparison(s)
-                if self.mode == 'relaxed' or (statusdb is not None and not statusdb.is_different(fpath, remote_status, url)):
+                if self.mode == 'relaxed' or (
+                        statusdb is not None and not statusdb.is_different(fpath, remote_status, url)):
                     # TODO:  check if remote_status < local_status, i.e. mtime jumped back
                     # and if so -- warning or may be according to some config setting -- skip
                     # e.g. config.get('crawl', 'new_older_files') == 'skip'
@@ -360,7 +369,7 @@ class Annexificator(object):
                               url, filepath, remote_status)
                     stats.skipped += 1
                     if self.yield_non_updated:
-                        yield updated_data  # There might be more to it!
+                        yield updated_data  # there might be more to it!
                     return
         else:
             # just to mark file as still of interest to us so it doesn't get wiped out later
@@ -369,21 +378,21 @@ class Annexificator(object):
                 statusdb.get(fpath)
 
         if not url:
-            lgr.debug("Adding %s to annex without url being provided" % (filepath))
-            # So we have only filename
-            assert(fpath)
-            # Just add into git directly for now
+            lgr.debug("Adding %s to annex without url being provided" % filepath)
+            # so we have only filename
+            assert fpath
+            # just add into git directly for now
             # TODO: tune  add so we could use its json output, and may be even batch it
             out_json = _call(self.repo.add, fpath, options=self.options)
         # elif self.mode == 'full':
-        #     # Since addurl ignores annex.largefiles we need first to download that file and then
+        #     # since addurl ignores annex.largefiles we need first to download that file and then
         #     # annex add it
         #     # see http://git-annex.branchable.com/todo/make_addurl_respect_annex.largefiles_option
-        #     lgr.debug("Downloading %s into %s and adding to annex" % (url, filepath))
+        #     lgr.debug("Downloading %s into %s and adding to annex", url, filepath)
         #     def _download_and_git_annex_add(url, fpath):
         #         # Just to feed into _call for dry-run
         #         filepath_downloaded = downloader.download(url, filepath, overwrite=True, stats=stats)
-        #         assert(filepath_downloaded == filepath)
+        #         assert filepath_downloaded == filepath
         #         self.repo.add(fpath, options=self.options)
         #         # and if the file ended up under annex, and not directly under git -- addurl
         #         # TODO: better function which explicitly checks if file is under annex or either under git
@@ -408,7 +417,7 @@ class Annexificator(object):
             if lexists(filepath):
                 lgr.debug("Removing %s since it exists before fetching a new copy" % filepath)
                 if isdir(filepath):
-                    # If directory - tricky, since we would want then to check if no
+                    # if directory - tricky, since we would want then to check if no
                     # staged changes under
                     _call(self._check_no_staged_changes_under_dir, filepath, stats=stats)
                     _call(rmtree, filepath)
@@ -425,22 +434,23 @@ class Annexificator(object):
             added_to_annex = 'key' in out_json
 
             if self.mode == 'full' or not added_to_annex:
-                # we need to adjust our download stats since addurl doesn't do that and we do not use our downloaders here
+                # we need to adjust our download stats since addurl doesn't do that and we do
+                # not use our downloaders here
                 _call(stats.increment, 'downloaded')
                 _call(stats.increment, 'downloaded_size', _call(lambda: os.stat(filepath).st_size))
 
         # file might have been added but really not changed anything (e.g. the same README was generated)
         # TODO:
-        #if out_json:  # if not try -- should be here!
+        # if out_json:  # if not try -- should be here!
         _call(stats.increment, 'add_annex' if 'key' in out_json else 'add_git')
 
         # TODO!!:  sanity check that no large files are added to git directly!
 
-        # So we have downloaded the beast
-        # Since annex doesn't care to set mtime for the symlink itself we better set it outselves
+        # so we have downloaded the beast
+        # since annex doesn't care to set mtime for the symlink itself, we better set it ourselves
         if lexists(filepath):  # and islink(filepath):
             if remote_status:
-                # Set mtime of the symlink or git-added file itself
+                # set mtime of the symlink or git-added file itself
                 # utime dereferences!
                 # _call(os.utime, filepath, (time.time(), remote_status.mtime))
                 # *nix only!  TODO
@@ -449,7 +459,7 @@ class Annexificator(object):
                 if statusdb:
                     _call(statusdb.set, filepath, remote_status)
             else:
-                # we still need to inform db about this file so later it would signal to remove it
+                # we still need to inform DB about this file so later it would signal to remove it
                 # if we no longer care about it
                 if statusdb:
                     _call(statusdb.set, filepath)
@@ -492,13 +502,13 @@ class Annexificator(object):
     def _check_non_existing_filepath(self, filepath, stats=None):
         """Helper to verify that we can safely save into the target path
 
-        For instance we can't save into a file d/file if d is a file, not
+        For instance, we can't save into a file d/file if d is a file, not
         a directory
         """
-        # if file doesn't exist we need to verify that there is no conflicts
+        # if file doesn't exist we need to verify that there are no conflicts
         dirpath, name = ops(filepath)
         if dirpath:
-            # we need to assure that either that directory exists or directories
+            # we need to assure that either the directory exists or directories
             # on the way to it exist and are not a file by some chance
             while dirpath:
                 if lexists(dirpath):
@@ -559,7 +569,7 @@ class Annexificator(object):
         return fpath
 
     def switch_branch(self, branch, parent=None, must_exist=None):
-        """Node generator to switch branch, returns actual node
+        """Node generator to switch branches, returns actual node
 
         Parameters
         ----------
@@ -572,6 +582,7 @@ class Annexificator(object):
           If None, doesn't matter.  If True, would fail if branch does not exist.  If
           False, would fail if branch already exists
         """
+
         def switch_branch(data):
             """Switches to the branch %s""" % branch
             # if self.repo.dirty
@@ -588,7 +599,7 @@ class Annexificator(object):
                     lgr.info("Checking out a new detached branch %s" % (branch))
                     self.repo.checkout(branch, options="--orphan")
                     if self.repo.dirty:
-                        self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc  TEST/fix
+                        self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
@@ -598,11 +609,12 @@ class Annexificator(object):
                 lgr.info("Checking out an existing branch %s" % (branch))
                 self.repo.checkout(branch)
             yield updated(data, {"git_branch": branch})
+
         return switch_branch
 
     def merge_branch(self, branch, target_branch=None,
                      strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
-        """Merge a branch into a current branch
+        """Merge a branch into the current branch
 
         Parameters
         ----------
@@ -616,16 +628,16 @@ class Annexificator(object):
           'theirs' with commit=False can be used to prepare data from that branch for
           processing by further steps in the pipeline
         commit: bool, optional
-          Either to commit when merge is complete
+          Either to commit when merge is complete or not
         one_commit_at_at_time: bool, optional
-          Either to generate
+          Either to generate or not
         skip_no_changes: None or bool, optional
-          Either to not perform any action if there is no changes from previous merge
+          Either to not perform any action if there are no changes from previous merge
           point. If None, config TODO will be consulted with default of being True (i.e. skip
           if no changes)
         """
         # TODO: support merge of multiple branches at once
-        assert(strategy in (None, 'theirs'))
+        assert (strategy in (None, 'theirs'))
 
         def merge_branch(data):
 
@@ -653,16 +665,16 @@ class Annexificator(object):
 
             if one_commit_at_a_time:
                 all_to_merge = list(
-                        self.repo.get_branch_commits(
-                                branch,
-                                limit='left-only',
-                                stop=last_merged_checksum,
-                                value='hexsha'))[::-1]
+                    self.repo.get_branch_commits(
+                        branch,
+                        limit='left-only',
+                        stop=last_merged_checksum,
+                        value='hexsha'))[::-1]
             else:
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
-            plmerges = "s" if nmerges>1 else ""
+            plmerges = "s" if nmerges > 1 else ""
             lgr.info("Initiating %(nmerges)d merge%(plmerges)s of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
 
@@ -684,13 +696,14 @@ class Annexificator(object):
                         msg = branch if (nmerges == 1) else ("%s (%s)" % (branch, to_merge))
                         self._commit("Merged %s using strategy %s" % (msg, strategy), options=["-a"])
                 else:
-                    # Record into our activity stats
+                    # record into our activity stats
                     stats = data.get('datalad_stats', None)
                     if stats:
                         stats.merges.append([branch, target_branch_])
                 if orig_branch is not None:
                     self.repo.checkout(orig_branch)
                 yield data
+
         return merge_branch
 
     def _precommit(self):
@@ -706,10 +719,9 @@ class Annexificator(object):
                 put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backends[0],
                                    annexed=False)
 
-
-    # At least use repo._git_custom_command
+    # at least use repo._git_custom_command
     def _commit(self, msg=None, options=[]):
-        # We need a custom commit due to "fancy" merges and GitPython
+        # we need a custom commit due to "fancy" merges and GitPython
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
         # and apparently not actively developed
@@ -717,8 +729,8 @@ class Annexificator(object):
             options = options + ["-m", msg]
         self._precommit()  # so that all batched annexes stop
         self.repo._git_custom_command([], ["git", "commit"] + options)
-        #self.repo.commit(msg)
-        #self.repo.repo.git.commit(options)
+        # self.repo.commit(msg)
+        # self.repo.repo.git.commit(options)
 
     def _unstage(self, fpaths):
         # self.repo.cmd_call_wrapper.run(["git", "reset"] + fpaths)
@@ -734,7 +746,7 @@ class Annexificator(object):
         https://github.com/gitpython-developers/GitPython/issues/379#issuecomment-180101921
         is resolved
         """
-        #out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
+        # out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
         out, err = self.repo._git_custom_command([], ["git", "status", "--porcelain"])
         assert not err
         staged, notstaged, untracked, deleted = [], [], [], []
@@ -750,7 +762,7 @@ class Annexificator(object):
                  ' M': notstaged,
                  ' D': deleted,
                  }[act].append(fname)
-                # for the purpose of this use we don't even want MM or anything else
+                # for the purpose of this use, we don't even want MM or anything else
             except KeyError:
                 raise RuntimeError("git status %r not yet supported. TODO" % act)
         return staged, notstaged, untracked, deleted
@@ -768,10 +780,11 @@ class Annexificator(object):
         **kwargs: dict, optional
           Passed to get_versions
         """
+
         def _commit_versions(data):
             self._precommit()  # so that all batched annexes stop
 
-            # figure out versions for all files (so we could handle conflicts with existing
+            # figure out versions for all files (so we could dataset conflicts with existing
             # non versioned)
             # TODO:  we need to care only about staged (and unstaged?) files ATM!
             # So let's do it.  And use separate/new Git repo since we are doing manual commits through
@@ -794,10 +807,11 @@ class Annexificator(object):
             # notstaged = process_diff(repo.index.diff(None))
             staged, notstaged, untracked, deleted = self._get_status()
 
-            # Verify that everything is under control!
-            assert(not notstaged)  # not handling atm, although should be safe I guess just needs logic to not unstage them
-            assert(not untracked)  # not handling atm
-            assert(not deleted)  # not handling atm
+            # verify that everything is under control!
+            assert (not notstaged)  # not handling atm, although should be safe I guess just needs logic
+            # to not unstage them
+            assert (not untracked)  # not handling atm
+            assert (not deleted)  # not handling atm
             if not staged:
                 return  # nothing to be done -- so we wash our hands off entirely
 
@@ -826,16 +840,17 @@ class Annexificator(object):
                 version_keys = list(versions.keys())
                 if prev_version not in versions_db.versions:
                     # shouldn't happen
-                    raise RuntimeError("previous version %s not found among known to DB: %s" % (prev_version, versions_db.versions.keys()))
+                    raise RuntimeError(
+                        "previous version %s not found among known to DB: %s" % (prev_version, versions_db.versions.keys()))
                 # all new versions must be greater than the previous version
                 # since otherwise it would mean that we are complementing previous version and it might be
                 # a sign of a problem
-                assert(all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
+                assert (all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
                 # old implementation when we didn't have entire versions db stored
-                #new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
+                # new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
                 new_versions = versions
                 # if we have "new_versions" smallest one smaller than previous -- we got a problem!
-                # TODO: how to handle ==? which could be legit if more stuff was added for the same
+                # TODO: how to dataset ==? which could be legit if more stuff was added for the same
                 # version?  but then if we already tagged with that -- we would need special handling
 
             if new_versions:
@@ -889,13 +904,14 @@ class Annexificator(object):
                 nfpaths = len(vfpaths)
                 lgr.debug("Staging %d files for version %s", nfpaths, version)
                 nunstaged -= nfpaths
-                assert(nfpaths >= 0)
-                assert(nunstaged >= 0)
+                assert (nfpaths >= 0)
+                assert (nunstaged >= 0)
                 _call(self._stage, vfpaths)
 
                 # RF: with .finalize() to avoid code duplication etc
                 # ??? what to do about stats and states?  reset them or somehow tune/figure it out?
-                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d" % (iversion+1, nnew_versions, version, nunstaged)
+                vmsg = "Multi-version commit #%d/%d: %s. Remaining unstaged: %d" % (
+                iversion + 1, nnew_versions, version, nunstaged)
 
                 if stats:
                     _call(stats.reset)
@@ -906,16 +922,16 @@ class Annexificator(object):
                 # unless we update data, no need to yield multiple times I guess
                 # but shouldn't hurt
                 yield data
-            assert(nunstaged == 0)  # we at the end committed all of them!
+            assert (nunstaged == 0)  # we at the end committed all of them!
 
         return _commit_versions
-
 
     def remove_other_versions(self, name=None, overlay=False):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
         """
+
         def _remove_other_versions(data):
             if overlay:
                 raise NotImplementedError(overlay)
@@ -932,7 +948,7 @@ class Annexificator(object):
             for version, fpaths in iteritems(versions_db.versions):
                 # we do not care about non-versioned or current version
                 if version is None or current_version == version:
-                    continue   # skip current version
+                    continue  # skip current version
                 for fpath, vfpath in iteritems(fpaths):
                     vfpathfull = opj(self.repo.path, vfpath)
                     if lexists(vfpathfull):
@@ -943,9 +959,10 @@ class Annexificator(object):
                 stats.versions.append(current_version)
 
             yield data
+
         return _remove_other_versions
 
-    #TODO: @borrow_kwargs from api_add_...
+    # TODO: @borrow_kwargs from api_add_...
     def add_archive_content(self, commit=False, **aac_kwargs):
         """
 
@@ -954,6 +971,7 @@ class Annexificator(object):
         aac_kwargs: dict, optional
            Options to pass into api.add_archive_content
         """
+
         def _add_archive_content(data):
             # if no stats -- they will be brand new each time :-/
             stats = data.get('datalad_stats', ActivityStats())
@@ -961,18 +979,18 @@ class Annexificator(object):
             # TODO: may be adjust annex_options
             annex = add_archive_content(
                 archive, annex=self.repo,
-                delete=True, key=False, commit=commit, allow_dirty=True,
+                key=False, commit=commit, allow_dirty=True,
                 annex_options=self.options,
                 stats=stats,
                 **aac_kwargs
             )
             self._states.add("Added files from extracted archives")
-            assert(annex is self.repo)   # must be the same annex, and no new created
+            assert (annex is self.repo)  # must be the same annex, and no new one created
             # to propagate statistics from this call into commit msg since we commit=False here
             # we update data with stats which gets a new instance if wasn't present
             yield updated(data, {'datalad_stats': stats})
-        return _add_archive_content
 
+        return _add_archive_content
 
     # TODO: either separate out commit or allow to pass a custom commit msg?
     def finalize(self, tag=False, existing_tag=None, cleanup=False):
@@ -988,11 +1006,12 @@ class Annexificator(object):
           Also `last_version` is provided as the last one from stats.versions (None
           if empty)
         existing_tag: None or '+suffix', optional
-          What to do if tag already exists, if None -- warning is issued. If `+suffix`
+          What to do if tag already exists, if None, warning is issued. If `+suffix`,
           +0, +1, +2 ... are tried until available one is found.
         cleanup: bool, optional
           Either to perform cleanup operations, such as 'git gc' and 'datalad clean'
         """
+
         def _finalize(data):
             self._precommit()
             stats = data.get('datalad_stats', None)
@@ -1022,7 +1041,8 @@ class Annexificator(object):
                     if tag_ in tags:
                         # TODO: config.tag.allow_override
                         if existing_tag == '+suffix':
-                            lgr.warning("There is already a tag %s in the repository. Delete it first if you want it updated" % tag_)
+                            lgr.warning(
+                                "There is already a tag %s in the repository. Delete it first if you want it updated" % tag_)
                             tag_ = None
                         elif existing_tag is None:
                             suf = 1
@@ -1035,7 +1055,8 @@ class Annexificator(object):
                             tag_ = tag__
                         else:
                             raise ValueError(existing_tag)
-                    self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (__version__, stats_str))
+                    self.repo.repo.create_tag(tag_, message="Automatically crawled and tagged by datalad %s.%s" % (
+                        __version__, stats_str))
 
             if cleanup:
                 total_stats = stats.get_total()
@@ -1052,14 +1073,16 @@ class Annexificator(object):
 
             self._states = set()
             yield data
+
         return _finalize
 
     def remove_obsolete(self):
-        """Remove obsolete files which were not referenced in queries to db
+        """Remove obsolete files which were not referenced in queries to DB
 
         Note that it doesn't reset any state within statusdb upon call, so shouldn't be
         called multiple times for the same state.
         """
+
         # made as a class so could be reset
         class _remove_obsolete(object):
             def __call__(self_, data):
@@ -1075,6 +1098,7 @@ class Annexificator(object):
                     for filepath in obsolete:
                         statusdb.remove(filepath)
                 yield data
+
             def reset(self_):
                 if self._statusdb:
                     self._statusdb.reset()
@@ -1092,20 +1116,22 @@ class Annexificator(object):
         _call(self.repo.remove, filename)
         yield data
 
-    def initiate_handle(self, *args, **kwargs):
-        """Thin proxy to initiate_handle node which initiates handle as a subhandle to current annexificator
+    def initiate_dataset(self, *args, **kwargs):
+        """Thin proxy to initiate_dataset node which initiates dataset as a subdataset to current annexificator
         """
-        def _initiate_handle(data):
-            for data_ in initiate_handle(*args, **kwargs)(data):
-                # Also "register" as a sub-handle if not yet registered
+
+        def _initiate_dataset(data):
+            for data_ in initiate_dataset(*args, **kwargs)(data):
+                # Also "register" as a sub-dataset if not yet registered
                 ds = Dataset(self.repo.path)
-                # TODO:  rename handle_  into dataset_
-                if data['handle_name'] not in ds.get_dataset_handles():
+                # TODO:  rename dataset_  into dataset_
+                if data['dataset_name'] not in ds.get_subdatasets():
                     out = install(
-                            dataset=ds,
-                            path=data_['handle_path'],
-                            source=data_['handle_path'],
-                            )
+                        dataset=ds,
+                        path=data_['dataset_path'],
+                        source=data_['dataset_path'],
+                    )
                     # TODO: reconsider adding smth to data_ to be yielded"
                 yield data_
-        return _initiate_handle
+
+        return _initiate_dataset

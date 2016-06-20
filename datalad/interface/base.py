@@ -110,6 +110,12 @@ def alter_interface_docs_for_cmdline(docs):
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
+    # remove :role:`...` RST markup for cmdline docs
+    docs = re.sub(
+        r':\S+:`[^`]*`[\\]*',
+        lambda match: ':'.join(match.group(0).split(':')[2:]).strip('`\\'),
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
     # remove None constraint. In general, `None` on the cmdline means don't
     # give option at all, but specifying `None` explicitly is practically
     # impossible
@@ -217,7 +223,7 @@ class Interface(object):
                     param.constraints.long_description())
                 if cdoc[0] == '(' and cdoc[-1] == ')':
                     cdoc = cdoc[1:-1]
-                help += ' Constraints: %s.' % cdoc
+                help += '  Constraints: %s' % cdoc
             if defaults_idx >= 0:
                 help += " [Default: %r]" % (defaults[defaults_idx],)
             # create the parameter, using the constraint instance for type

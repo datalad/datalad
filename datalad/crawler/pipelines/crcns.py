@@ -25,7 +25,7 @@ from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.crcns")
 
 
-def collection_pipeline():
+def superdataset_pipeline():
     lgr.info("Creating a CRCNS collection pipeline")
     # Should return a list representing a pipeline
     annex = Annexificator()
@@ -39,8 +39,8 @@ def collection_pipeline():
         # them all
         a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
         # http://crcns.org/data-sets/vc/pvc-1
-        assign({'handle_name': '%(dataset)s'}, interpolate=True),
-        annex.initiate_handle(
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_dataset(
             template="crcns",
             data_fields=['dataset_category', 'dataset'],
             # branch='incoming',  # there will be archives etc
@@ -117,6 +117,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
                     existing='archive-suffix',
                     # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
                     strip_leading_dirs=True,
+                    delete=True,
                     leading_dirs_consider=['crcns.*', dataset],
                     leading_dirs_depth=2,
                     exclude='.*__MACOSX.*',  # some junk penetrates

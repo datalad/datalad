@@ -52,7 +52,7 @@ def test_target_ssh_simple(origin, src_path, target_path):
     assert_in("local_target", source.repo.get_remotes())
     eq_("ssh://localhost", source.repo.get_remote_url("local_target"))
     # should NOT be able to push now, since url isn't correct:
-    assert_raises(GitCommandError, publish, dataset=source, dest="local_target")
+    assert_raises(GitCommandError, publish, dataset=source, to="local_target")
 
     # do it again without force:
     with assert_raises(RuntimeError) as cm:
@@ -97,7 +97,7 @@ def test_target_ssh_simple(origin, src_path, target_path):
             source.repo.get_remote_url("local_target", push=True))
 
         # now, push should work:
-        publish(dataset=source, dest="local_target")
+        publish(dataset=source, to="local_target")
 
 
 @skip_ssh
@@ -110,7 +110,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(src_path, subds), init=True,
                   create=False).checkout("master")
 

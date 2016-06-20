@@ -9,8 +9,10 @@
 
 import inspect
 from nose import SkipTest
-from ..matches import *
 from datalad.tests.utils import ok_, eq_, assert_raises
+from datalad.tests.utils import skip_if_scrapy_without_selector
+skip_if_scrapy_without_selector()
+from ..matches import *
 
 try:
     import scrapy

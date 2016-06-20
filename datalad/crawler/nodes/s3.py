@@ -118,10 +118,10 @@ class crawl_s3(object):
         # for now will be inefficient -- fetch all, sort, proceed
         from operator import attrgetter
         all_versions = bucket.list_versions(self.prefix)
-        # Comparison becomes tricky whenever as if in our test bucket we have a collection
-        # of rapid changes within the same ms, so they couldn't be sorted by last_modified, so we resolve based
-        # on them being marked latest, or not being null (as could happen originally), and placing Delete after creation
-        # In real life last_modified should be enough, but life can be as tough as we made it for 'testing'
+        # Comparison becomes tricky whenever in our test bucket we have a collection
+        # of rapid changes within the same ms, so they couldn't be sorted by last_modified. We resolve based on
+        # them being marked latest, or not being null (as could happen originally), and placing Delete after creation.
+        # In real life, last_modified should be enough, but life can be as tough as we made it for 'testing'
         cmp = lambda k: (k.last_modified, k.name, k.is_latest, k.version_id != 'null', isinstance(k, DeleteMarker))
         versions_sorted = sorted(all_versions, key=cmp)  # attrgetter('last_modified'))
         # print '\n'.join(map(str, [cmp(k) for k in versions_sorted]))
@@ -157,24 +157,24 @@ class crawl_s3(object):
         e_prev = None
         ncommits = self.ncommits or 0
 
-        # Adding None so we could deal with the last commit within the loop without duplicating
+        # adding None so we could deal with the last commit within the loop without duplicating
         # logic later outside
         def update_versiondb(e, force=False):
-            # This way we could recover easier after a crash
+            # this way we could recover easier after a crash
             # TODO: config crawl.crawl_s3.versiondb.saveaftereach=True
             if force or True:
                 versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
         for e in versions_sorted + [None]:
             filename = e.name if e is not None else None
             if filename in staged or e is None:
-                # We should finish this one and commit
+                # we should finish this one and commit
                 if staged:
                     if self.versionfx and e_prev is not None:
                         version = self.versionfx(e_prev)
                         if version not in stats.versions:
                             stats.versions.append(version)
                     if versions_db:
-                        # Save current "version" DB so we would know where to pick up from
+                        # save current "version" DB so we would know where to pick up from
                         # upon next rerun.  Record should contain
                         # last_modified, name, versionid
                         # TODO?  what if e_prev was a DeleteMarker???

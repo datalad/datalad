@@ -11,7 +11,7 @@ Files organization
     - `cmdline/` - helpers for accessing `interface/` functionality from
      command line
     - `crawler/` - functionality for crawling (online) resources and creating
-      or updating handles and collections based on the scraped/downloaded data
+      or updating datasets and collections based on the scraped/downloaded data
         - `nodes/` processing elements which are used in the pipeline
         - `pipelines/` pipelines generators, to produce pipelines to be ran
         - `pipeline.py` pipeline runner
@@ -131,10 +131,16 @@ Documentation
 
 ### Docstrings
 
-We use [NumPy standard] for docstrings.  If you are using PyCharm, set your
-project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
+We use [NumPy standard] for the description of parameters docstrings.  If you are using
+PyCharm, set your project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
 
 [NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
+
+In addition, we follow the guidelines of [Restructured Text] with the additional features and treatments
+provided by [Sphinx].
+
+[Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
+[Sphinx]: http://www.sphinx-doc.org/en/stable/
 
 Additional Hints
 ----------------
@@ -269,28 +275,28 @@ Various hints for developers
 
 ### Useful tools
 
-- while performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
+- While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
   for quick logging of various health stats in a separate terminal window:
   
         dstat -c --top-cpu -d --top-bio --top-latency --net
 
-- to monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
-  just plug it in the middle of your pipe
+- To monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
+  just plug it in the middle of your pipe.
 
-- for remote debugging epdb could be used (avail in pip) by using
+- For remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
-  `python -c "import epdb; epdb.connect()"`
+  `python -c "import epdb; epdb.connect()".`
 
 - We are using codecov which has extensions for the popular browsers
   (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
 
-### Useful Flags
+### Useful Environment Variables
+Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
+
 - *DATALAD_LOGLEVEL*: 
   Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
 - *DATALAD_TESTS_KEEPTEMP*: 
   Function rmtemp will not remove temporary file/directory created for testing if this flag is set
-- *DATALAD_HELP2MAN*: 
-  Setting this flag converts *datalad --help* command into a man page appropriate format
 - *DATALAD_EXC_STR_TBLIMIT*: 
   This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
   It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
@@ -303,10 +309,28 @@ Various hints for developers
 - *DATALAD_TESTS_SSH*: 
   Skips SSH tests if this flag is **not** set
 - *DATALAD_LOGTRACEBACK*: 
-  Runs TraceBack function with collide set to True, if this flag is set to 'collide' 
+  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
   This replaces any common prefix between current traceback log and previous invocation with "..."
 - *DATALAD_TESTS_NOTEARDOWN*: 
   Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
+- *DATALAD_USECASSETTE*:
+  Specifies the location of the file to record network transactions by the VCR module.
+  Currently used by when testing custom special remotes
 - *DATALAD_CMD_PROTOCOL*: 
+  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
+  'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
+  Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
 - *DATALAD_CMD_PROTOCOL_PREFIX*: 
-- *DATALAD_PROTOCOL_REMOTE*: 
+  Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
+- *DATALAD_PROTOCOL_REMOTE*:
+  Binary flag to specify whether to test protocol interactions of custom remote with annex
+- *DATALAD_LOG_TIMESTAMP*:
+  Used to add timestamp to datalad logs
+- *DATALAD_RUN_CMDLINE_TESTS*:
+  Binary flag to specify if shell testing using shunit2 to be carried out
+- *DATALAD_TEMP_FS*:
+  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
+- *DATALAD_TEMP_FS_SIZE*:
+  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
+- *DATALAD_NONLO*:
+  Specifies network interfaces to bring down/up for testing. Currently used by travis.

@@ -23,6 +23,7 @@ from os.path import exists
 from os.path import islink
 from os.path import realpath
 from os.path import lexists
+from os.path import isdir
 from subprocess import Popen, PIPE
 from functools import wraps
 
@@ -46,6 +47,7 @@ from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
+from .network import is_ssh
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -161,15 +163,33 @@ class AnnexRepo(GitRepo):
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
-                # XXX replace with proper test for ssh location identifier
-                if url is not None and url.startswith('ssh:'):
-                    c = ssh_manager.get_connection(url)
-                    writer = self.repo.config_writer()
-                    writer.set_value("remote \"%s\"" % r,
-                                     "annex-ssh-options",
-                                     "-o ControlMaster=auto"
-                                     " -S %s" % c.ctrl_path)
-                    writer.release()
+                if url is not None:
+                    if is_ssh(url):
+                        c = ssh_manager.get_connection(url)
+                        cfg_string = "-o ControlMaster=auto -S %s" % c.ctrl_path
+                        sct = "remote \"%s\"" % r
+                        opt = "annex-ssh-options"
+                        reader = self.repo.config_reader()
+
+                        # we write only, if there's nothing already
+                        write = False
+                        try:
+                            cfg_string_old = reader.get_value(section=sct,
+                                                              option=opt)
+                        except NoOptionError:
+                            write = True
+                            cfg_string_old = None
+                        if cfg_string_old and cfg_string_old != cfg_string:
+                            lgr.warning("Found conflicting annex-ssh-options "
+                                        "for remote '{0}':\n{1}\n"
+                                        "Did not touch it.".format(
+                                            r, cfg_string_old))
+                            continue
+                        if write:
+                            writer = self.repo.config_writer()
+                            writer.set_value(section=sct, option=opt,
+                                             value=cfg_string)
+                            writer.release()
 
         self.always_commit = always_commit
         if fix_it:
@@ -217,7 +237,7 @@ class AnnexRepo(GitRepo):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
         super(AnnexRepo, self).add_remote(name, url, options)
-        if url.startswith('ssh:'):
+        if is_ssh(url):
             c = ssh_manager.get_connection(url)
             writer = self.repo.config_writer()
             writer.set_value("remote \"%s\"" % name,
@@ -468,7 +488,7 @@ class AnnexRepo(GitRepo):
         ----------
         git_cmd: str
             the actual git command
-        **kwargs: dict, optional
+        `**kwargs`: dict, optional
             passed to _run_annex_command
 
         Returns
@@ -848,15 +868,15 @@ class AnnexRepo(GitRepo):
         list of list of unicode  or dict
             if output == 'descriptions', contains a list of descriptions of remotes
             per each input file, describing the remote for each remote, which
-            was found by git-annex whereis, like:
+            was found by git-annex whereis, like::
 
-            u'me@mycomputer:~/where/my/repo/is [origin]' or
-            u'web' or
-            u'me@mycomputer:~/some/other/clone'
+                u'me@mycomputer:~/where/my/repo/is [origin]' or
+                u'web' or
+                u'me@mycomputer:~/some/other/clone'
 
             if output == 'uuids', returns a list of uuids.
             if output == 'full', returns a dictionary with filenames as keys
-            and values a detailed record, e.g.
+            and values a detailed record, e.g.::
 
                 {'00000000-0000-0000-0000-000000000001': {
                   'description': 'web',
@@ -1124,6 +1144,66 @@ class AnnexRepo(GitRepo):
     def fsck(self):
         self._run_annex_command('fsck')
 
+    # TODO: we probably need to override get_file_content, since it returns the
+    # symlink's target instead of the actual content.
+
+    @normalize_paths(match_return_type=False)  # get a list even in case of a single item
+    def copy_to(self, files, remote, options=None, log_online=True):
+        """Copy the actual content of `files` to `remote`
+
+        Parameters
+        ----------
+        files: str or list of str
+            path(s) to copy
+        remote: str
+            name of remote to copy `files` to
+        log_online: bool
+            see get()
+
+        Returns
+        -------
+        list of str
+           files successfully copied
+        """
+
+        # TODO: full support of annex copy options would lead to `files` being
+        # optional. This means to check for whether files or certain options are
+        # given and fail or just pass everything as is and try to figure out,
+        # what was going on when catching CommandError
+
+        if remote not in self.get_remotes():
+            raise ValueError("Unknown remote '{0}'.".format(remote))
+
+        # In case of single path, 'annex copy' will fail, if it cannot copy it.
+        # With multiple files, annex will just skip the ones, it cannot deal
+        # with. We'll do the same and report back what was successful
+        # (see return value).
+        # Therefore raise telling exceptions before even calling annex:
+        if len(files) == 1:
+            if not isdir(files[0]):
+                self.get_file_key(files[0])
+
+        # Note:
+        # - annex copy fails, if `files` was a single item, that doesn't exist
+        # - files not in annex or not even in git don't yield a non-zero exit,
+        #   but are ignored
+        # - in case of multiple items, annex would silently skip those files
+
+        annex_options = files + ['--to=%s' % remote]
+        if options:
+            annex_options.extend(shlex.split(options))
+        # Note:
+        # As of now, there is no --json option for annex copy. Use it once this
+        # changed.
+        std_out, std_err = self._run_annex_command(
+                'copy',
+                annex_options=annex_options,
+                log_stdout=True, log_stderr=not log_online,
+                log_online=log_online, expect_stderr=True)
+
+        return [line.split()[1] for line in std_out.splitlines()
+                if line.startswith('copy ') and line.endswith('ok')]
+
 
 # TODO: Why was this commented out?
 # @auto_repr
@@ -1236,31 +1316,31 @@ class BatchedAnnex(object):
             lgr.warning("Restarting the process due to previous failure")
             self._initialize()
 
-    def __call__(self, input_):
+    def __call__(self, cmds):
         """
 
         Parameters
         ----------
-        input_ : str or tuple or list of (str or tuple)
+        cmds : str or tuple or list of (str or tuple)
         output_proc : callable
           To provide handling
 
         Returns
         -------
         str or list
-          Output received from annex.  list in case if input_ was a list
+          Output received from annex.  list in case if cmds was a list
         """
         # TODO: add checks -- may be process died off and needs to be reinitiated
         if not self._process:
             self._initialize()
 
-        input_multiple = isinstance(input_, list)
+        input_multiple = isinstance(cmds, list)
         if not input_multiple:
-            input_ = [input_]
+            cmds = [cmds]
 
         output = []
 
-        for entry in input_:
+        for entry in cmds:
             if not isinstance(entry, string_types):
                 entry = ' '.join(entry)
             entry = entry + '\n'
