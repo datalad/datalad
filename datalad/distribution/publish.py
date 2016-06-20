@@ -71,7 +71,7 @@ class Publish(Interface):
             metavar='DEST',
             doc="""sibling name identifying the publication target. If no
             destination is given an attempt is made to identify the target based
-            on the dataset's configuration.""",
+            on the dataset's configuration""",
             # TODO: See TODO at top of class!
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
@@ -84,18 +84,18 @@ class Publish(Interface):
             doc="path(s), that may point to file handle(s) to publish including "
                 "their actual content or to subdataset(s) to be published. If a "
                 "file handle is published with its data, this implicitly means "
-                "to also publish the (sub)dataset it belongs to.",
+                "to also publish the (sub)dataset it belongs to",
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),
-        to_annex=Parameter(
-            args=("--to-annex",),
+        annex_copy_opts=Parameter(
+            args=("--annex-copy-opts",),
             doc="options passed to 'annex copy'",
             constraints=EnsureStr() | EnsureNone(),))
 
     @staticmethod
     @datasetmethod(name='publish')
     def __call__(dataset=None, to=None, path=None, recursive=False,
-                 to_annex=None):
+                 annex_copy_opts=None):
 
         # shortcut
         ds = dataset
@@ -219,7 +219,7 @@ class Publish(Interface):
 
             results.append(ds)
 
-            if publish_files or to_annex:
+            if publish_files or annex_copy_opts:
                 if not isinstance(ds.repo, AnnexRepo):
                     raise RuntimeError(
                         "Cannot publish content of something, that is not "
@@ -228,7 +228,7 @@ class Publish(Interface):
                 lgr.info("Publishing data of dataset {0} ...".format(ds))
                 results += ds.repo.copy_to(files=publish_files,
                                            remote=dest_resolved,
-                                           options=to_annex)
+                                           options=annex_copy_opts)
 
         for dspath in expl_subs:
             # these datasets need to be pushed regardless of additional paths
@@ -246,7 +246,7 @@ class Publish(Interface):
                 to=to,
                 path=publish_subs[d]['files'],
                 recursive=recursive,
-                to_annex=to_annex)
+                to_annex=annex_copy_opts)
 
         return results
 
