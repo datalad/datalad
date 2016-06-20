@@ -130,7 +130,9 @@ class Publish(Interface):
         expl_subs = set()      # subdatasets to publish explicitly
         publish_subs = dict()  # collect what to publish from subdatasets
         if recursive:
-            for subds_path in ds.get_subdatasets():
+            for subds_path in ds.get_subdatasets(fulfilled=True):
+                # we can recursively publish only, if there actually
+                # is something
                 expl_subs.add(subds_path)
 
         if path is None:
@@ -221,7 +223,8 @@ class Publish(Interface):
             # therefore force it.
             # TODO: There might be a better solution to avoid two calls of
             # publish() on the very same Dataset instance
-            results += Dataset(dspath).publish(to=to, recursive=recursive)
+            results += Dataset(opj(ds.path, dspath)).publish(
+                to=to, recursive=recursive)
 
         for d in publish_subs:
             # recurse into subdatasets
