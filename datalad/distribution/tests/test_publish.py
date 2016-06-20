@@ -52,7 +52,7 @@ def test_publish_simple(origin, src_path, dst_path):
     target.checkout("TMP", "-b")
     source.repo.add_remote("target", dst_path)
 
-    res = publish(dataset=source, dest="target")
+    res = publish(dataset=source, to="target")
     eq_(res, source)
 
     ok_clean_git(src_path, annex=False)
@@ -61,8 +61,8 @@ def test_publish_simple(origin, src_path, dst_path):
         list(source.repo.get_branch_commits("master")))
 
     # don't fail when doing it again
-    res = publish(dataset=source, dest="target")
-    eq_(res, source)
+    res = publish(dataset=source, to="target")
+    eq_(res, [source])
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
@@ -72,7 +72,7 @@ def test_publish_simple(origin, src_path, dst_path):
         list(source.repo.get_branch_commits("git-annex")))
 
     # 'target/master' should be tracking branch at this point, so
-    # try publishing without `dest`:
+    # try publishing without `to`:
 
     # some modification:
     with open(opj(src_path, 'test_mod_file'), "w") as f:
@@ -82,7 +82,7 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_clean_git(src_path, annex=False)
 
     res = publish(dataset=source)
-    eq_(res, source)
+    eq_(res, [source])
 
     ok_clean_git(dst_path, annex=False)
     eq_(list(target.get_branch_commits("master")),
@@ -112,7 +112,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # subdatasets have no remote yet, so recursive publishing should fail:
     with assert_raises(ValueError) as cm:
-        publish(dataset=source, dest="target", recursive=True)
+        publish(dataset=source, to="target", recursive=True)
     assert_in("No sibling 'target' found.", str(cm.exception))
 
     # now, set up targets for the submodules:
@@ -126,7 +126,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
     sub2.add_remote("target", sub2_pub)
 
     # publish recursively
-    res = publish(dataset=source, dest="target", recursive=True)
+    res = publish(dataset=source, to="target", recursive=True)
 
     # testing result list
     # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
@@ -170,7 +170,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 #     target.checkout("TMP", "-b")
 #     source_sub.repo.add_remote("target", target_1)
 #
-#     res = publish(dataset=source_super, dest="target", path="sub1")
+#     res = publish(dataset=source_super, to="target", path="sub1")
 #     assert_is_instance(res, Dataset)
 #     eq_(res.path, source_sub.path)
 #
@@ -184,7 +184,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 #     target.checkout("TMP", "-b")
 #     source_sub.repo.add_remote("target2", target_2)
 #
-#     res = publish(dataset=source_sub, dest="target2")
+#     res = publish(dataset=source_sub, to="target2")
 #     eq_(res, source_sub)
 #
 #     eq_(list(GitRepo(target_2, create=False).get_branch_commits("master")),
@@ -218,8 +218,8 @@ def test_publish_with_data(origin, src_path, dst_path):
     # Is there an option for push, that prevents GitPython from failing?
     source.repo.fetch("target")
 
-    res = publish(dataset=source, dest="target", with_data=['test-annex.dat'])
-    eq_(res, source)
+    res = publish(dataset=source, to="target", path=['test-annex.dat'])
+    eq_(res, [source])
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
@@ -254,8 +254,8 @@ def test_publish_with_data(origin, src_path, dst_path):
 #     source.repo.add_remote("target", dst_path)
 #
 #     # directly publish a file handle, not the dataset itself:
-#     res = publish(dataset=source, dest="target", path="test-annex.dat")
-#     eq_(res, opj(source.path, 'test-annex.dat'))
+#     res = publish(dataset=source, to="target", path="test-annex.dat")
+#     eq_(res, [opj(source.path, 'test-annex.dat')])
 #
 #     # only file was published, not the dataset itself:
 #     assert_not_in("master", target.get_branches())

@@ -92,8 +92,6 @@ class Publish(Interface):
     @datasetmethod(name='publish')
     def __call__(dataset=None, to=None, path=None, recursive=False):
 
-        import pdb; pdb.set_trace()
-
         # shortcut
         ds = dataset
 
