@@ -123,7 +123,8 @@ class Uninstall(Interface):
                     dataset=ds,
                     path=p,
                     data_only=data_only,
-                    recursive=recursive) for p in path]
+                    recursive=recursive,
+                    fast=fast) for p in path]
 
         # resolve the target location against the provided dataset
         if path is not None:
@@ -135,11 +136,12 @@ class Uninstall(Interface):
         # on, based on the resolved target location (that is now guaranteed to
         # be specified
         if ds is None:
-            # try to find a dataset at or above the installation target
+            # try to find a dataset at or above the uninstallation target
             dspath = GitRepo.get_toppath(abspath(path))
             if dspath is None:
-                # no top-level dataset found, use path as such
-                dspath = path
+                # no top-level dataset found, nothing to uninstall from
+                raise ValueError("No dataset found to uninstall %s from." %
+                                 path)
             ds = Dataset(dspath)
         assert(ds is not None)
 
@@ -163,12 +165,21 @@ class Uninstall(Interface):
 
         if not path or path == ds.path:
             # uninstall the dataset `ds`
-            # TODO: what to consider?
-            #   - whether it is a submodule of another dataset
-            #   - `data_only` ?
-            #   - `recursive`
-            #   - what to return in what case (data_only)?
-            raise NotImplementedError("TODO: Uninstall dataset %s" % ds.path)
+            # we install things INTO a dataset and therefore we can uninstall
+            # FROM a dataset only
+            # => need to find a dataset  to uninstall this one from:
+            dspath = GitRepo.get_toppath(abspath(opj(ds.path, pardir)))
+            if dspath is None:
+                # ds is not part of another dataset
+                # TODO: Do we want to just rm -rf instead of raising?
+                #       Or do it with --force or sth?
+                raise ValueError("No dataset found to uninstall %s from." %
+                                 path)
+            return Uninstall.__call__(dataset=Dataset(dspath),
+                                      path=relpath(ds.path, start=dspath),
+                                      data_only=data_only,
+                                      recursive=recursive,
+                                      fast=fast)
 
         # needed by the logic below
         assert(isabs(path))
@@ -225,7 +236,8 @@ class Uninstall(Interface):
                                 dataset=subds,
                                 path=r_sub,
                                 data_only=data_only,
-                                recursive=True)
+                                recursive=True,
+                                fast=fast)
                     except ValueError as e:
                         if "is not installed" in str(e):
                             # ignore not installed subdatasets in recursion
