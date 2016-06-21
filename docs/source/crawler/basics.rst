@@ -27,5 +27,22 @@ a modified dictionary as its output once.
    or modified.  To help with creation of a new shallow copy with some fields
    adjusted, use :func:`~datalad.utils.updated`.
 
-Pipeline
---------
+Pipelines
+---------
+
+A pipeline is a series of functions gathered into a list. Each function take the
+output of its predecessor as its own input. The first function in the pipeline
+would need to be provided with input. The simplest pipeline could look like
+
+>>> def pipeline():
+...     [
+...     crawl_url('http://map.org/datasets'),
+...     a_href_match(".*.mat"),
+...     annex
+...     ]
+
+which crawls in a website, which is provided as input to the first function, then
+matches to all files that end in `.mat`, and those files are lastly inputted to
+the annex functions which simply annexes them. There can also be subpiplines within
+a pipeline, which are also denoted by `[]`. Two subpipelines that exist on top of
+one another, will take in the same input, but process it with different functions.
