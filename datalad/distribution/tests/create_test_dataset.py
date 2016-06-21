@@ -34,8 +34,15 @@ from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows
+from datalad.tests.utils import with_tempfile, assert_raises
 
 lgr = logging.getLogger('datalad.distribution.tests')
+
+
+@with_tempfile(mkdir=True)
+def test_create(outdir):
+    from datalad.api import create
+    assert_raises(ValueError, create, outdir, description='Precious data', no_annex=True)
 
 
 def _parse_spec(spec):
