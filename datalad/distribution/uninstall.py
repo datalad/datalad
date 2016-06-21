@@ -167,10 +167,15 @@ class Uninstall(Interface):
             return
 
         if relativepath in ds.get_subdatasets(recursive=True):
-            # it's a submodule
-            # --recursive required or implied?
-            raise NotImplementedError("TODO: uninstall submodule %s from "
-                                      "dataset %s" % (relativepath, ds.path))
+            # TODO: recursive?
+            #       => deinit has no recursive option itself.
+
+            if data_only:
+                # git submodule deinit
+                raise NotImplementedError("TODO: git submodule deinit %s" % relativepath)
+            else:
+                # git rm
+                raise NotImplementedError("TODO git rm %s" % relativepath)
 
         if isdir(path):
             if data_only:
