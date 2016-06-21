@@ -20,6 +20,13 @@ a modified dictionary as its output once.
 >>> next(add1_node({'input': 1}))
 {'input': 2}
 
+.. Generators::
+    Generators may be one of many things including, but not limited to: nodes,
+    independent functions, or as methods of a class. Generators may yield a
+    dictionary, an error message, or any number of Python variable. These
+    variables may be yielded once or multiple times. A generator may also
+    return as a function does, but it must yield first.
+
 .. note::
 
    Nodes should not have side-effects, i.e. they should not modify input data,
@@ -30,19 +37,30 @@ a modified dictionary as its output once.
 Pipelines
 ---------
 
-A pipeline is a series of functions gathered into a list. Each function take the
-output of its predecessor as its own input. The first function in the pipeline
-would need to be provided with input. The simplest pipeline could look like
+A pipeline is a series of generators ordered into a list. Each generator takes
+the output of its predecessor as its own input. The first function in the pipeline
+would need to be provided with specific input. The simplest pipeline could look like
 
 >>> def pipeline():
 ...     [
 ...     crawl_url('http://map.org/datasets'),
-...     a_href_match(".*.mat"),
+...     a_href_match(".*\.mat"),
 ...     annex
 ...     ]
 
-which crawls in a website, which is provided as input to the first function, then
-matches to all files that end in `.mat`, and those files are lastly inputted to
-the annex functions which simply annexes them. There can also be subpiplines within
-a pipeline, which are also denoted by `[]`. Two subpipelines that exist on top of
-one another, will take in the same input, but process it with different functions.
+which crawls in a website and is provided as input to the first function. `a_href_match`
+then works to output all files that end in `.mat`, and those files are lastly inputted to
+`annex` which simply annexes them.
+
+.. note::
+    Since pipelines depend heavily on generators, these generators must yield in order
+    for an output to be produced. If a generator fails to yield, then the pipeline
+    can no longer continue and it stopped at that generator.
+
+Subpipelines
+------------
+
+A subpipline is a pipeline that lives within a greater pipeline and is also denoted by `[]`.
+Two subpipelines that exist on top of one another will take in the same input, but process it
+with different generators. This functionality allows for the same input to be handled in two
+or more (depending on the number of subpipelines) different manners. 
