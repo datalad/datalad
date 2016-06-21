@@ -176,6 +176,8 @@ class Uninstall(Interface):
             # don't know what to do yet
             # in git vs. untracked?
             # recursive?
+            # => git rm -r
+            # => data-only?
             raise NotImplementedError("TODO: uninstall directory %s from "
                                       "dataset %s" % (path, ds.path))
 
@@ -185,12 +187,14 @@ class Uninstall(Interface):
                 if ds.repo.get_file_key(relativepath):
                     # it's an annexed file
                     if data_only:
+                        # drop content
                         ds.repo.drop([relativepath])
                         return path
                     else:
-                        raise NotImplementedError("TODO: fully uninstall file %s "
-                                          "(annex) from dataset %s" %
-                                          (path, ds.path))
+                        # remove from repo
+                        ds.repo.remove(relativepath)
+                        return path
+
             except FileInGitError:
                 # file directly in git
                 _file_in_git = True
