@@ -76,11 +76,18 @@ class Uninstall(Interface):
             args=("-r", "--recursive"),
             doc="""if set, uninstall recursively, including all subdatasets.
             The value of `data` is used for recursive uninstallation, too""",
-            action="store_true"))
+            action="store_true"),
+        fast=Parameter(
+            args=("--fast",),
+            doc="when uninstalling (sub-)datasets, don't try uninstalling its "
+                "data first. Warning: This will silently ignore any issue "
+                "regarding the uninstallation of contained data.",
+            action="store_true",))
 
     @staticmethod
     @datasetmethod(name='uninstall')
-    def __call__(dataset=None, path=None, data_only=False, recursive=False):
+    def __call__(dataset=None, path=None, data_only=False, recursive=False,
+                 fast=False):
 
         # Note: copy logic from install to resolve dataset and path:
         # shortcut
@@ -96,7 +103,6 @@ class Uninstall(Interface):
                     "insufficient information for uninstallation (needs at "
                     "least a dataset or a path")
         elif isinstance(path, list):
-            # TODO: not sure. might be possible to deal with that list directly
             return [Uninstall.__call__(
                     dataset=ds,
                     path=p,
@@ -167,46 +173,67 @@ class Uninstall(Interface):
             return
 
         if relativepath in ds.get_subdatasets(recursive=True):
-            # TODO: recursive?
-            #       => deinit has no recursive option itself.
+            # we want to uninstall a subdataset
             subds = Dataset(opj(ds.path, relativepath))
             if not subds.is_installed():
                 raise ValueError("%s is not installed. Can't uninstall." %
                                  subds.path)
-            if data_only:
-                # de-initialize this subdataset
-                if recursive:
-                    # git submodule deinit doesn't provide a recursive option.
-                    # So we need to recurse on our own:
-                    results = []
-                    for r_sub in subds.get_subdatasets():
-                        try:
-                            res = Uninstall.__call__(
-                                    dataset=subds,
-                                    path=r_sub,
-                                    data_only=True,
-                                    recursive=True)
-                        except ValueError as e:
-                            if "is not installed" in str(e):
-                                # ignore not installed subdatasets in recursion
-                                continue
-                            else:
-                                raise
-                        if isinstance(res, list):
-                            results.extend(res)
+
+            results = []
+            if data_only or not fast:
+                # uninstall data of subds
+                if isinstance(subds.repo, AnnexRepo):
+                    # todo: correct return values
+                    ds.repo.drop(relativepath)
+                    results.append(relativepath)
+                    if data_only and not recursive:
+                        # all done
+                        return results
+                else:
+                    # can't do anything
+                    if recursive:
+                        lgr.warning("Can't uninstall data of %s. No annex." %
+                                    subds.path)
+                    elif data_only:
+                        raise ValueError("Can't uninstall data of %s. "
+                                         "No annex." % subds.path)
+                    else:
+                        # we want to uninstall the subds and have a meaningless
+                        # 'not fast' => just ignore
+                        pass
+
+            if recursive:
+                for r_sub in subds.get_subdatasets():
+                    try:
+                        res = Uninstall.__call__(
+                                dataset=subds,
+                                path=r_sub,
+                                data_only=data_only,
+                                recursive=True)
+                    except ValueError as e:
+                        if "is not installed" in str(e):
+                            # ignore not installed subdatasets in recursion
+                            continue
                         else:
-                            results.append(res)
-                    # recursion done, uninstall subds:
-                    lgr.debug("deinit submodule %s from %s" %
-                              (relativepath, ds.path))
-                    # TODO: Move to GitRepo
-                    ds.repo._git_custom_command('', ['git', 'submodule',
-                                                     'deinit', relativepath])
-                    results.append(subds)
-                    return results
-            else:
-                # git rm
-                raise NotImplementedError("TODO git rm %s" % relativepath)
+                            raise
+                    if isinstance(res, list):
+                        results.extend(res)
+                    else:
+                        results.append(res)
+
+                if not data_only:
+                    # uninstall subds itself
+                    # currently this is interpreted as deinitializing the
+                    # submodule
+                    # TODO: figure out when to completely remove it
+                    #       (another command, an additional option?)
+
+                    # Note: submodule deinit will fail, if the submodule has a
+                    # .git dir. Since this is, what we expect, we need to move
+                    # it to git's default place within the superproject's .git
+                    # dir, in order to cleanly deinit and be able to reinit
+                    # again later on.
+                    raise NotImplementedError("TODO: deinit submodule %s" % subds.path)
 
         if isdir(path):
             if data_only:
