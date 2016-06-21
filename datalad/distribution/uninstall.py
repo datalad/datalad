@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import logging
 from os.path import join as opj, abspath, exists, isabs, relpath, pardir, isdir
+from os.path import islink
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
@@ -79,7 +80,7 @@ class Uninstall(Interface):
 
     @staticmethod
     @datasetmethod(name='uninstall')
-    def __call__(dataset=None, path=None, data_only=True, recursive=False):
+    def __call__(dataset=None, path=None, data_only=False, recursive=False):
 
         # Note: copy logic from install to resolve dataset and path:
         # shortcut
@@ -160,7 +161,7 @@ class Uninstall(Interface):
                 ds, relativepath))
 
         # figure out, what path actually is pointing to:
-        if not exists(path):
+        if not exists(path) and not islink(path):
             # nothing there, nothing to uninstall
             lgr.info("Nothing found to uninstall at %s" % path)
             return
