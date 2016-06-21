@@ -169,10 +169,41 @@ class Uninstall(Interface):
         if relativepath in ds.get_subdatasets(recursive=True):
             # TODO: recursive?
             #       => deinit has no recursive option itself.
-
+            subds = Dataset(opj(ds.path, relativepath))
+            if not subds.is_installed():
+                raise ValueError("%s is not installed. Can't uninstall." %
+                                 subds.path)
             if data_only:
-                # git submodule deinit
-                raise NotImplementedError("TODO: git submodule deinit %s" % relativepath)
+                # de-initialize this subdataset
+                if recursive:
+                    # git submodule deinit doesn't provide a recursive option.
+                    # So we need to recurse on our own:
+                    results = []
+                    for r_sub in subds.get_subdatasets():
+                        try:
+                            res = Uninstall.__call__(
+                                    dataset=subds,
+                                    path=r_sub,
+                                    data_only=True,
+                                    recursive=True)
+                        except ValueError as e:
+                            if "is not installed" in str(e):
+                                # ignore not installed subdatasets in recursion
+                                continue
+                            else:
+                                raise
+                        if isinstance(res, list):
+                            results.extend(res)
+                        else:
+                            results.append(res)
+                    # recursion done, uninstall subds:
+                    lgr.debug("deinit submodule %s from %s" %
+                              (relativepath, ds.path))
+                    # TODO: Move to GitRepo
+                    ds.repo._git_custom_command('', ['git', 'submodule',
+                                                     'deinit', relativepath])
+                    results.append(subds)
+                    return results
             else:
                 # git rm
                 raise NotImplementedError("TODO git rm %s" % relativepath)
