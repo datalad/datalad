@@ -173,13 +173,20 @@ class Uninstall(Interface):
                                       "dataset %s" % (relativepath, ds.path))
 
         if isdir(path):
-            # don't know what to do yet
-            # in git vs. untracked?
-            # recursive?
-            # => git rm -r
-            # => data-only?
-            raise NotImplementedError("TODO: uninstall directory %s from "
-                                      "dataset %s" % (path, ds.path))
+            if data_only:
+                if isinstance(ds.repo, AnnexRepo):
+                    # TODO: Return value for ANnexRepo.drop()!
+                    return ds.repo.drop(relativepath)
+                else:
+                    raise ValueError("%s is not in annex. Removing its "
+                                 "data only doesn't make sense." % path)
+            else:
+                # git rm -r
+                # TODO: Move to GitRepo and integrate with remove()
+                std_out, std_err = ds.repo._git_custom_command(
+                    relativepath, ['git', 'rm', '-r'])
+                return [line.split()[1][1:-1] for line in std_out.splitlines()
+                        if line.startswith('rm')]
 
         # we know, it's an existing file
         if isinstance(ds.repo, AnnexRepo):
