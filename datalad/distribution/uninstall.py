@@ -280,4 +280,18 @@ class Uninstall(Interface):
             # it wasn't installed, so we cannot uninstall it
             raise ValueError("Cannot uninstall %s" % path)
 
-
+    @staticmethod
+    def result_renderer_cmdline(res):
+        from datalad.ui import ui
+        if not res:
+            ui.message("Nothing was uninstalled")
+            return
+        msg = "{n} {obj} uninstalled:\n".format(
+            obj='items were' if len(res) > 1 else 'item was',
+            n=len(res))
+        for item in res:
+            if isinstance(item, Dataset):
+                msg += "Dataset: %s\n" % item.path
+            else:
+                msg += "File: %s\n" % item
+        ui.message(msg)
