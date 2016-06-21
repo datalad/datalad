@@ -21,11 +21,11 @@ a modified dictionary as its output once.
 {'input': 2}
 
 .. Generators::
-    Generators may be one of many things including, but not limited to: nodes,
-    independent functions, or as methods of a class. Generators may yield a
-    dictionary, an error message, or any number of Python variable. These
-    variables may be yielded once or multiple times. A generator may also
-    return as a function does, but it must yield first.
+    Generators may have been created from various different code, including,
+    but not limited to, nodes or independent functions as long as they yield.
+    Generators may yield a dictionary, an error message, or any number of Python
+    variables. These variables may be yielded once or multiple times. A generator
+    may also return as a function does, but it must yield first.
 
 .. note::
 
@@ -48,14 +48,14 @@ would need to be provided with specific input. The simplest pipeline could look 
 ...     annex
 ...     ]
 
-which crawls in a website and is provided as input to the first function. `a_href_match`
-then works to output all files that end in `.mat`, and those files are lastly inputted to
-`annex` which simply annexes them.
+in which the first generator (method of a class) is provided an input and crawls a website.
+`a_href_match` then works to output all files that end in `.mat`, and those files are
+lastly inputted to `annex` which simply annexes them.
 
 .. note::
     Since pipelines depend heavily on generators, these generators must yield in order
     for an output to be produced. If a generator fails to yield, then the pipeline
-    can no longer continue and it stopped at that generator.
+    can no longer continue and it is stopped at that generator.
 
 Subpipelines
 ------------
@@ -63,4 +63,8 @@ Subpipelines
 A subpipline is a pipeline that lives within a greater pipeline and is also denoted by `[]`.
 Two subpipelines that exist on top of one another will take in the same input, but process it
 with different generators. This functionality allows for the same input to be handled in two
-or more (depending on the number of subpipelines) different manners. 
+or more (depending on the number of subpipelines) different manners.
+
+TODO: 'FinishPipeline` exception here
+`FinishPipeline <http://docs.datalad.org/en/latest/generated/datalad.crawler.pipeline.html
+#datalad.crawler.pipeline.FinishPipeline>`_
