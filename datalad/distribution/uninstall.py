@@ -17,6 +17,7 @@ from os.path import join as opj, abspath, exists, isabs, relpath, pardir, isdir
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
     FileNotInAnnexError
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
@@ -55,12 +56,14 @@ class Uninstall(Interface):
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
+            metavar="DATASET",
             doc="""specify the dataset to perform the uninstall operation on.
             If no dataset is given, an attempt is made to identify the dataset
             based on the current working directory and/or the `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
+            metavar="PATH",
             doc="path/name of the component to be uninstalled",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
@@ -88,7 +91,7 @@ class Uninstall(Interface):
         if not path:
             if ds is None:
                 # no dataset, no target location, nothing to do
-                raise ValueError(
+                raise InsufficientArgumentsError(
                     "insufficient information for uninstallation (needs at "
                     "least a dataset or a path")
         elif isinstance(path, list):
@@ -178,7 +181,15 @@ class Uninstall(Interface):
         # we know, it's an existing file
         if isinstance(ds.repo, AnnexRepo):
             try:
-                ds.repo.get_file_key(relativepath)
+                if ds.repo.get_file_key(relativepath):
+                    # it's an annexed file
+                    if data_only:
+                        ds.repo.drop([relativepath])
+                        return path
+                    else:
+                        raise NotImplementedError("TODO: fully uninstall file %s "
+                                          "(annex) from dataset %s" %
+                                          (path, ds.path))
             except FileInGitError:
                 # file directly in git
                 _file_in_git = True
@@ -189,14 +200,6 @@ class Uninstall(Interface):
                 # a subdataset
                 _untracked_or_within_submodule = True
 
-            # it's an annexed file
-            if data_only:
-                ds.repo.drop([path])
-                return path
-            else:
-                raise NotImplementedError("TODO: fully uninstall file %s "
-                                          "(annex) from dataset %s" %
-                                          (path, ds.path))
         else:
             # plain git repo
             if relativepath in ds.repo.get_indexed_files():
