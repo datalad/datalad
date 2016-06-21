@@ -23,36 +23,52 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod, resolve_path
-from datalad.distribution.install import get_containing_subdataset
+from datalad.distribution.install import get_containing_subdataset, get_git_dir
 from datalad.interface.base import Interface
+from datalad.utils import assure_dir, on_windows
 
 lgr = logging.getLogger('datalad.distribution.uninstall')
+
+
+def _move_gitdir(ds, relativepath):
+
+    # relativepath is expected to point to a submodule of ds:
+    assert(relativepath in ds.get_subdatasets())
+    path = opj(ds.path, relativepath)
+    src_dotgit = get_git_dir(path)
+
+    # expect the actual git dir to be within submodule:
+    assert(src_dotgit == '.git')
+
+    # move .git to superrepo's .git/modules, remove .git, create
+    # .git-file/symlink
+
+    ds_git_dir = get_git_dir(ds.path)
+    moved_git_dir = opj(ds.path, ds_git_dir, "modules", relativepath)
+    assure_dir(moved_git_dir)
+    from os import rename, listdir, rmdir, symlink
+    for dot_git_entry in listdir(src_dotgit):
+        rename(opj(src_dotgit, dot_git_entry),
+               opj(moved_git_dir, dot_git_entry))
+    assert not listdir(src_dotgit)
+    rmdir(src_dotgit)
+
+    # TODO: symlink or whatever annex does, since annexes beneath
+    #       might break
+    #       - figure out, what annex does in direct mode
+    #         and/or on windows
+    #       - for now use .git file on windows and symlink otherwise
+    target_path = relpath(moved_git_dir, start=path)
+    if not on_windows:
+        symlink(target_path, opj(path, ".git"))
+    else:
+        with open(opj(path, ".git"), "w") as f:
+            f.write("gitdir: {moved}\n".format(moved=target_path))
 
 
 class Uninstall(Interface):
     """Uninstall a dataset component or entire dataset(s)
     """
-
-    # TODO: It's not actually clear yet, what are the actual meanings of
-    # uninstall (including options) and what exactly are the methods to
-    # uninstall certain components.
-
-    # uninstall should be the opposite of install, obviously. that means:
-    #   - we uninstall FROM a dataset as opposed to install INTO a dataset
-    #   - any operation possible by install should be possible to be reverted
-    #     by uninstall
-
-    # If we want to uninstall something "completely", --recursive is implied.
-    # Do we require the user to nevertheless explicitly use `recursive`?
-
-    # possible components to uninstall:
-    #   - submodule (checked out or not checked out) (fulfilled, unfulfilled)
-    #   - annex'ed files with no content
-    #   - annex'ed files with content
-    #   - files in git
-    #   - untracked files ? Do we want to deal with them at all?
-    #   - directories (empty or not)? May be not, since we cannot install a
-    #     directory, or can we?
 
     _params_ = dict(
         dataset=Parameter(
@@ -233,7 +249,14 @@ class Uninstall(Interface):
                     # it to git's default place within the superproject's .git
                     # dir, in order to cleanly deinit and be able to reinit
                     # again later on.
-                    raise NotImplementedError("TODO: deinit submodule %s" % subds.path)
+                    _move_gitdir(ds, relativepath)
+
+                    # TODO: Move to GitRepo and provide proper return value
+                    ds.repo._git_custom_command(relativepath,
+                                                ['git', 'submodule', 'deinit'])
+                    results.append(subds)
+
+            return results
 
         if isdir(path):
             if data_only:
