@@ -41,7 +41,12 @@ A pipeline is a series of generators ordered into a list. Each generator takes
 the output of its predecessor as its own input. The first function in the pipeline
 would need to be provided with specific input. The simplest pipeline could look like
 
+>>> from datalad.crawler.nodes.crawl_url import crawl_url
+>>> from datalad.crawler.nodes.matches import a_href_match
+>>> from datalad.crawler.nodes.annex import Annexificator
+
 >>> def pipeline():
+        annex = Annexificator()
 ...     [
 ...     crawl_url('http://map.org/datasets'),
 ...     a_href_match(".*\.mat"),
