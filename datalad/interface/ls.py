@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import sys
 import time
+import json
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir, isfile, islink, isdir, dirname, basename, split
 from os import readlink, listdir, lstat
@@ -387,9 +388,10 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
 def fs_extract(node):
     """extract required info from FsModel based filesystem node and returns it as a dictionary"""
 
-    pretty_size = humanize.naturalsize(node.size)
-    pretty_date = time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(node.date))
-    return {"path": node._path, "repo": node.repo.path, "type": node.type_, "size": pretty_size, "date": pretty_date}
+    pretty_size = humanize.naturalsize(node.size) if node.size else -1
+    pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
+    name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
+    return {"name": name, "path": node._path, "repo": node.repo.path, "type": node.type_, "size": pretty_size, "date": pretty_date}
 
 
 def _flatten(listoflists):
@@ -407,8 +409,20 @@ def _flatten(listoflists):
 
 
 def leaf_name(path):
+    """takes a relative or absolute path and returns name of node at that location"""
     head, tail = split(abspath(path))
     return tail or basename(head)
+
+
+def ignored(path):
+    """if node is in the ignorelist return True
+
+    ignore list includes hidden files and paths containing git or git annex folders
+    """
+    if isdir(opj(path, ".git")) or isdir(opj(path, ".git", "annex")):
+        return True
+    if '.' == leaf_name(path)[0]:
+        return True
 
 
 def fs_traverse(loc, repo, recursive=False):
@@ -418,14 +432,18 @@ def fs_traverse(loc, repo, recursive=False):
     does not traverse into git or annex directories
     """
 
-    fs = {leaf_name(leaf_name(loc)): fs_extract(FsModel(loc, repo))}
-    # if node a plain directory, i.e not a file, symlink, git or git_annex repository
-    if isdir(loc) and not (isfile(loc) or islink(loc) or isdir(opj(loc, ".git")) or isdir(opj(loc, ".git", "annex"))):
-        if recursive:
-            fs.update({leaf_name(node): fs_traverse(opj(loc, node), repo, recursive=recursive)
-                      for node in listdir(loc)})
-        else:
-            fs.update({leaf_name(node): opj(loc, node) for node in listdir(loc)})
+    fs = fs_extract(FsModel(loc, repo))
+
+    # if node a plain directory, i.e not git or git_annex repository or
+    if isdir(loc) and recursive and not ignored(loc):
+        subdir = fs_extract(FsModel(loc, repo))
+        subdir["nodes"] = [fs_extract(FsModel(loc, repo))]
+        subdir["nodes"][0]["name"] = ".."
+        subdir["nodes"].extend([fs_traverse(opj(loc, node), repo, recursive=recursive)
+                                for node in listdir(loc) if not ignored(opj(loc, node))])
+        with open(opj(loc, '.dir.json'), 'w') as f:
+            json.dump(subdir, f)
+
     return fs
 
 
@@ -436,19 +454,18 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
-         for sm in topds.get_dataset_handles(recursive=recursive)]
+         for sm in topds.get_subdatasets(recursive=recursive)]
         if recursive else [])
     dsms = list(map(DsModel, dss))
 
     # traverse directory of each submodule at loc passed by userto create dict of dicts
-    fs = {}
     for ds in dsms:
+        fs = fs_extract(FsModel(opj(ds.path, "/"), ds))
         # unwrap top git directory and traverse each node and extract relevant properties
-        fs[leaf_name(ds.path)] = {leaf_name(subdir): fs_traverse(opj(ds.path, subdir), ds, recursive=recursive)
-                                  for subdir in listdir(ds.path) if '.git' not in subdir}
-
-    import json
-    print json.dumps(fs)  # convert dictionary to json and print to stdout
+        fs["nodes"] = [fs_traverse(opj(ds.path, subdir), ds, recursive=recursive)
+                       for subdir in listdir(ds.path) if '.' != leaf_name(subdir)[0]]
+        with open(opj(ds.path, '.dir.json'), 'w') as f:
+            json.dump(fs, f)  # convert dictionary to json and print to stdout
 
 
 #
