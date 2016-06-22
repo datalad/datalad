@@ -47,6 +47,7 @@ from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
+from .exceptions import InsufficientArgumentsError
 from .network import is_ssh
 
 lgr = logging.getLogger('datalad.annex')
@@ -778,7 +779,20 @@ class AnnexRepo(GitRepo):
         ----------
         files: list of str
         """
+
+        # annex drop takes either files or options
+        # --all, --unused, --key, or --incomplete
+        # for now, most simple test; to be replaced by a more general solution
+        # (exception thrown by _run_annex_command)
+        if not files and \
+                (not options or
+                 not any([o in options for o in
+                          ["--all", "--unused", "--key", "--incomplete"]])):
+            raise InsufficientArgumentsError("drop() requires at least to "
+                                             "specify 'files' or 'options'")
+
         options = options[:] if options else []
+        files = files[:] if files else []
 
         output_lines = []
         if key:
@@ -796,7 +810,6 @@ class AnnexRepo(GitRepo):
 
         return [line.split()[1] for line in output_lines
                 if line.startswith('drop') and line.endswith('ok')]
-
 
     def drop_key(self, keys, options=None, batch=False):
         """Drops the content of annexed files from this repository referenced by keys
