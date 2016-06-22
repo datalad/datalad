@@ -68,6 +68,8 @@ def _move_gitdir(ds, relativepath):
 
 class Uninstall(Interface):
     """Uninstall a dataset component or entire dataset(s)
+
+
     """
 
     _params_ = dict(
@@ -108,6 +110,7 @@ class Uninstall(Interface):
         # Note: copy logic from install to resolve dataset and path:
         # shortcut
         ds = dataset
+        results = []
 
         if ds is not None and not isinstance(ds, Dataset):
             ds = Dataset(ds)
@@ -119,12 +122,19 @@ class Uninstall(Interface):
                     "insufficient information for uninstallation (needs at "
                     "least a dataset or a path")
         elif isinstance(path, list):
-            return [Uninstall.__call__(
-                    dataset=ds,
-                    path=p,
-                    data_only=data_only,
-                    recursive=recursive,
-                    fast=fast) for p in path]
+            for p in path:
+                r = Uninstall.__call__(
+                        dataset=ds,
+                        path=p,
+                        data_only=data_only,
+                        recursive=recursive,
+                        fast=fast)
+                if r:
+                    if isinstance(r, list):
+                        results.extend(r)
+                    else:
+                        results.append(r)
+            return results
 
         # resolve the target location against the provided dataset
         if path is not None:
@@ -206,7 +216,6 @@ class Uninstall(Interface):
                 raise ValueError("%s is not installed. Can't uninstall." %
                                  subds.path)
 
-            results = []
             if data_only or not fast:
                 # uninstall data of subds
                 if isinstance(subds.repo, AnnexRepo):
@@ -244,10 +253,11 @@ class Uninstall(Interface):
                             continue
                         else:
                             raise
-                    if isinstance(res, list):
-                        results.extend(res)
-                    else:
-                        results.append(res)
+                    if res:
+                        if isinstance(res, list):
+                            results.extend(res)
+                        else:
+                            results.append(res)
 
                 if not data_only:
                     # uninstall subds itself
@@ -336,7 +346,8 @@ class Uninstall(Interface):
                 return subds.uninstall(
                     path=relpath(path, start=subds.path),
                     data_only=data_only,
-                    recursive=recursive)
+                    recursive=recursive,
+                    fast=fast)
 
             # this must be an untracked/existing something
             # it wasn't installed, so we cannot uninstall it
