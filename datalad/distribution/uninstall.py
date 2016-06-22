@@ -13,6 +13,8 @@
 __docformat__ = 'restructuredtext'
 
 import logging
+import glob
+
 from os.path import join as opj, abspath, exists, isabs, relpath, pardir, isdir
 from os.path import islink
 from datalad.support.gitrepo import GitRepo
@@ -231,7 +233,7 @@ class Uninstall(Interface):
             if data_only or not fast:
                 # uninstall data of subds
                 if isinstance(subds.repo, AnnexRepo):
-                    results.extend(ds.repo.drop(relativepath))
+                    results.extend(subds.repo.drop(glob.glob1(subds.path, '*')))
                     if data_only and not recursive:
                         # all done
                         return results

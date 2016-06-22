@@ -982,6 +982,13 @@ def test_annex_drop(src, dst):
     eq_(result[0], testkey)
     eq_(len(result), 1)
 
+    # insufficient arguments:
+    assert_raises(TypeError, ar.drop)
+    assert_raises(InsufficientArgumentsError, ar.drop, [], options=["--jobs=5"])
+    assert_raises(InsufficientArgumentsError, ar.drop, [])
+
+    # too much arguments:
+    assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
 
 @with_testrepos('basic_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
