@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+    <head>
+	<meta charset="UTF-8">
+	<link rel="stylesheet" type="text/css" href="/assets/jquery.dataTables.min.css">
+	<style type="text/css" class="init">
+	 td.dir {font-weight: bold; color: #00A1CB; }
+	 td.git {font-weight: bold; color: #00BA88; }
+	 td.annex {font-weight: bold; color: #EC6C20; }
+	 td.broken {color:#E53B51; }
+	 td.link {color: #FFD03C;  }
+	 td.file {color: #67CDDC;  }
+	</style>
+	<script type="text/javascript" charset="utf8" src="/assets/jquery-1.12.3.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="/assets/jquery.dataTables.min.js"></script>
+    </head>
+    <body>
+	<table id="directory" class="display" width="100%" cellspacing="0"></table>
+	<script>
+	 function directory(url) {
+	     var table = $('#directory').DataTable( {
+		 "async": true,    //async get json
+		 "paging": false,  //ensure scrolling instead of pages
+		 "ajax": {         //specify url to get json from ajax
+		     "url": url,
+		     "dataSrc": "nodes"
+		 },
+		 "columns": [      //select columns and their names from json
+		     { "data": "name", title: "Name" },
+		     { "data": "size", title: "Size" },
+		     { "data": "date", title: "Date" },
+		     { "data": "path", title: "Path" },
+		     { "data": "type", title: "Type" },
+		 ],
+		 //update css of row based on type of node
+		 "createdRow": function ( row, data, index ) {
+		     if ( data.type == 'dir' ) {
+			 $('td', row).eq(0).addClass('dir');
+			 $('td', row).eq(1).addClass('dir');
+			 $('td', row).eq(2).addClass('dir');
+		     }
+		     else if ( data.type == 'git' ) {
+			 $('td', row).eq(0).addClass('git');
+			 $('td', row).eq(1).addClass('git');
+			 $('td', row).eq(2).addClass('git');
+		     }
+		     else if ( data.type == 'annex' ) {
+			 $('td', row).eq(0).addClass('annex');
+			 $('td', row).eq(1).addClass('annex');
+			 $('td', row).eq(2).addClass('annex');
+		     }
+		     else if ( data.type == 'broken-link' ) {
+			 $('td', row).eq(0).addClass('broken');
+			 $('td', row).eq(1).addClass('broken');
+			 $('td', row).eq(2).addClass('broken');
+		     }
+		     else if ( data.type == 'link' ) {
+			 $('td', row).eq(0).addClass('link');
+			 $('td', row).eq(1).addClass('link');
+			 $('td', row).eq(2).addClass('link');
+		     }
+		     else if ( data.type == 'file' ) {
+			 $('td', row).eq(0).addClass('file');
+			 $('td', row).eq(1).addClass('file');
+			 $('td', row).eq(2).addClass('file');
+		     }
+		 },
+		 // add click handlers to each row(cell) once table initialised
+		 "initComplete": function () {
+		     var api = this.api();
+		     api.$('tr').click( function () {           		                   // on clicking a row element
+			 var data = table.row( this ).data();                                      // extract its data json from table
+			 if (data.type == 'dir' || data.type == 'git' || data.type == 'annex') {   // if clicked row of directory type
+			     api.destroy();                                                        // destroys original table to allow creation of new one
+			     directory(url.replace('.dir.json', data.name + '/.dir.json'));        // construct url of json in clicked directory(row(cell))
+			 }
+		     });
+		 }
+	     });
+
+	     table.columns([3,4]).visible(false, false);
+	     
+	     return table;
+	 }
+	 $(document).ready(function() {
+	     var table = directory("datasets/ds000001/.dir.json");
+	     
+	 });
+	</script>
+    </body>
+</html>
