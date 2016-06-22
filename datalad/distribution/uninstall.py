@@ -31,14 +31,27 @@ lgr = logging.getLogger('datalad.distribution.uninstall')
 
 
 def _move_gitdir(ds, relativepath):
+    """Move .git directory of submodule `relativepath` into .git/modules of `ds`
+
+    After moving, this will create a .git file in the submodule instead.
+
+    Parameters
+    ds: Dataset
+    relativepath: str
+
+    """
 
     # relativepath is expected to point to a submodule of ds:
     assert(relativepath in ds.get_subdatasets())
+
     path = opj(ds.path, relativepath)
     src_dotgit = get_git_dir(path)
 
     # expect the actual git dir to be within submodule:
     assert(src_dotgit == '.git')
+
+    # get actual path to the .git to be moved:
+    src_git_dir = opj(path, src_dotgit)
 
     # move .git to superrepo's .git/modules, remove .git, create
     # .git-file/symlink
@@ -46,24 +59,23 @@ def _move_gitdir(ds, relativepath):
     ds_git_dir = get_git_dir(ds.path)
     moved_git_dir = opj(ds.path, ds_git_dir, "modules", relativepath)
     assure_dir(moved_git_dir)
-    from os import rename, listdir, rmdir, symlink
-    for dot_git_entry in listdir(src_dotgit):
-        rename(opj(src_dotgit, dot_git_entry),
+    from os import rename, listdir, rmdir
+    for dot_git_entry in listdir(src_git_dir):
+        rename(opj(src_git_dir, dot_git_entry),
                opj(moved_git_dir, dot_git_entry))
-    assert not listdir(src_dotgit)
-    rmdir(src_dotgit)
+    assert not listdir(src_git_dir)
+    rmdir(src_git_dir)
 
-    # TODO: symlink or whatever annex does, since annexes beneath
-    #       might break
-    #       - figure out, what annex does in direct mode
-    #         and/or on windows
-    #       - for now use .git file on windows and symlink otherwise
+    # write .git file
+    # Note: Annex would need a symlink instead to not break sub-submodules. But
+    #       as of version 2.7.0 git itself doesn't deal correctly with
+    #       .git-symlinks when deinitializing a submodule. Instead, it will
+    #       still complain about a .git dir present in the submodule.
+    #       Since by now this is about deinitializing only, we go for the .git
+    #       file and don't care for possible sub-annexes.
     target_path = relpath(moved_git_dir, start=path)
-    if not on_windows:
-        symlink(target_path, opj(path, ".git"))
-    else:
-        with open(opj(path, ".git"), "w") as f:
-            f.write("gitdir: {moved}\n".format(moved=target_path))
+    with open(opj(path, ".git"), "w") as f:
+        f.write("gitdir: {moved}\n".format(moved=target_path))
 
 
 class Uninstall(Interface):
@@ -240,6 +252,7 @@ class Uninstall(Interface):
 
             if recursive:
                 for r_sub in subds.get_subdatasets():
+                    lgr.debug("Uninstalling subdataset %s ..." % r_sub)
                     try:
                         res = Uninstall.__call__(
                                 dataset=subds,
@@ -250,6 +263,8 @@ class Uninstall(Interface):
                     except ValueError as e:
                         if "is not installed" in str(e):
                             # ignore not installed subdatasets in recursion
+                            lgr.debug("Subdataset %s not installed. Skipped." %
+                                      r_sub)
                             continue
                         else:
                             raise
@@ -259,24 +274,27 @@ class Uninstall(Interface):
                         else:
                             results.append(res)
 
-                if not data_only:
-                    # uninstall subds itself
-                    # currently this is interpreted as deinitializing the
-                    # submodule
-                    # TODO: figure out when to completely remove it
-                    #       (another command, an additional option?)
+            if not data_only:
+                # uninstall subds itself
+                # currently this is interpreted as deinitializing the
+                # submodule
+                # TODO: figure out when to completely remove it
+                #       (another command, an additional option?)
 
-                    # Note: submodule deinit will fail, if the submodule has a
-                    # .git dir. Since this is, what we expect, we need to move
-                    # it to git's default place within the superproject's .git
-                    # dir, in order to cleanly deinit and be able to reinit
-                    # again later on.
-                    _move_gitdir(ds, relativepath)
+                # Note: submodule deinit will fail, if the submodule has a
+                # .git dir. Since this is what we expect, we need to move
+                # it to git's default place within the superproject's
+                # .git/modules dir, in order to cleanly deinit and be able to
+                # reinit again later on.
+                lgr.debug("Move .git directory of %s into .git/modules of %s." %
+                          (relativepath, ds))
+                _move_gitdir(ds, relativepath)
 
-                    # TODO: Move to GitRepo and provide proper return value
-                    ds.repo._git_custom_command(relativepath,
-                                                ['git', 'submodule', 'deinit'])
-                    results.append(subds)
+                lgr.debug("Deinit submodule %s in %s" % (relativepath, ds))
+                # TODO: Move to GitRepo and provide proper return value
+                ds.repo._git_custom_command(relativepath,
+                                            ['git', 'submodule', 'deinit'])
+                results.append(subds)
 
             return results
 
