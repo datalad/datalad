@@ -71,5 +71,6 @@ with different generators. This functionality allows for the same input to be ha
 or more (depending on the number of subpipelines) different manners.
 
 TODO: 'FinishPipeline` exception here
-`FinishPipeline <http://docs.datalad.org/en/latest/generated/datalad.crawler.pipeline.html
-#datalad.crawler.pipeline.FinishPipeline>`_
+:exception:`~datalad.crawler.pipeline.FinishPipeline`
+
+
