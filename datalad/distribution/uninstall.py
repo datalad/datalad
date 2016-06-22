@@ -231,9 +231,7 @@ class Uninstall(Interface):
             if data_only or not fast:
                 # uninstall data of subds
                 if isinstance(subds.repo, AnnexRepo):
-                    # todo: correct return values
-                    ds.repo.drop(relativepath)
-                    results.append(relativepath)
+                    results.extend(ds.repo.drop(relativepath))
                     if data_only and not recursive:
                         # all done
                         return results
@@ -301,7 +299,6 @@ class Uninstall(Interface):
         if isdir(path):
             if data_only:
                 if isinstance(ds.repo, AnnexRepo):
-                    # TODO: Return value for ANnexRepo.drop()!
                     return ds.repo.drop(relativepath)
                 else:
                     raise ValueError("%s is not in annex. Removing its "
@@ -321,8 +318,7 @@ class Uninstall(Interface):
                     # it's an annexed file
                     if data_only:
                         # drop content
-                        ds.repo.drop([relativepath])
-                        return path
+                        return ds.repo.drop([relativepath])
                     else:
                         # remove from repo
                         ds.repo.remove(relativepath)

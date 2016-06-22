@@ -246,7 +246,6 @@ class AnnexRepo(GitRepo):
                              " -S %s" % c.ctrl_path)
             writer.release()
 
-
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
 
@@ -781,14 +780,23 @@ class AnnexRepo(GitRepo):
         """
         options = options[:] if options else []
 
+        output_lines = []
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
             options = options + ['--key']
             for k in files:
-                self._run_annex_command('drop', annex_options=options + [k])
+                std_out, std_err = \
+                    self._run_annex_command('drop', annex_options=options + [k])
+                output_lines.extend(std_out.splitlines())
         else:
-            self._run_annex_command('drop', annex_options=options + files)
+            std_out, std_err = \
+                self._run_annex_command('drop', annex_options=options + files)
+            output_lines.extend(std_out.splitlines())
+
+        return [line.split()[1] for line in output_lines
+                if line.startswith('drop') and line.endswith('ok')]
+
 
     def drop_key(self, keys, options=None, batch=False):
         """Drops the content of annexed files from this repository referenced by keys
