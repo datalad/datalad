@@ -1137,6 +1137,40 @@ class GitRepo(object):
         # TODO later to be extended with tagging particular commits and signing
         self._git_custom_command('', 'git tag "{0}"'.format(tag))
 
+    def get_tracking_branch(self, branch=None):
+        """Get the tracking branch for `branch` if there is any.
+
+        Parameters
+        ----------
+        branch: str
+            local branch to look up. If none is given, active branch is used.
+
+        Returns
+        -------
+        tuple
+            (remote or None, refspec or None) of the tracking branch
+        """
+        if branch is None:
+            branch = self.get_active_branch()
+
+        cfg_reader = self.repo.config_reader()
+        sct = "branch \"{0}\"".format(branch)
+        track_remote = cfg_reader.get_value(section=sct,
+                                            option="remote",
+                                            default="DATALAD_DEFAULT")
+        if track_remote == "DATALAD_DEFAULT":
+            # we have no "tracking remote"
+            track_remote = None
+        track_branch = cfg_reader.get_value(section=sct,
+                                            option="merge",
+                                            default="DATALAD_DEFAULT")
+        if track_branch == "DATALAD_DEFAULT":
+            # we have no tracking branch
+            track_branch = None
+
+        return track_remote, track_branch
+
+
 # TODO
 # remove submodule
 # status?

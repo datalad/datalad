@@ -30,8 +30,10 @@ from ....tests.utils import use_cassette
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import ok_file_under_git
 from ....distribution.dataset import Dataset
+from ....distribution.dataset import Dataset
 from ....consts import CRAWLER_META_CONFIG_PATH
 
+from datalad.api import crawl
 from ..openfmri import superdataset_pipeline as ofcpipeline
 
 from logging import getLogger
@@ -56,13 +58,15 @@ def test_openfmri_superdataset_pipeline1(ind, topurl, outd):
     list(initiate_dataset(
         template="openfmri",
         template_func="superdataset_pipeline",
+        template_kwargs={'url': topurl},
         path=outd,
     )())
 
     with chpwd(outd):
-        pipeline = ofcpipeline(url=topurl)
-        out = run_pipeline(pipeline)
-    eq_(out, [{'datalad_stats': ActivityStats()}])
+        crawl()
+        #pipeline = ofcpipeline(url=topurl)
+        #out = run_pipeline(pipeline)
+    #eq_(out, [{'datalad_stats': ActivityStats()}])
 
     # TODO: replace below command with the one listing subdatasets
     subdatasets = ['ds000001', 'ds000002']

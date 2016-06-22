@@ -207,7 +207,9 @@ def get_containing_subdataset(ds, path):
     """
 
     if is_explicit_path(path) and not path.startswith(ds.path):
-        raise ValueError("path {0} not in dataset.".format(path))
+        # TODO: - move to dataset class
+        #       - have dedicated exception
+        raise ValueError("path {0} not in dataset {1}.".format(path, ds))
 
     for subds in ds.get_subdatasets():
         common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
@@ -223,9 +225,9 @@ class Install(Interface):
     """Install a dataset component or entire dataset(s).
 
     This command can make arbitrary content available in a dataset. This
-    includes the fulfillment of existing subdataset or file handles
-    in a dataset, as well as the addition of sudatasets and such handles for
-    content available locally or remotely.
+    includes the fulfillment of existing :term:`subdataset` or file handles in
+    a dataset, as well as the addition of subdatasets and such handles for
+    content available locally or subdataset remotely.
     """
 
     _params_ = dict(

@@ -14,7 +14,7 @@ __docformat__ = 'restructuredtext'
 # argument spec template
 #<name> = (
 #    <id_as_positional>, <id_as_option>
-#    {<ArgusmentParser.add_arguments_kwargs>}
+#    {<ArgumentParser.add_arguments_kwargs>}
 #)
 
 from ..cmdline.helpers import HelpAction, LogLevelAction
