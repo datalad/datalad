@@ -9,10 +9,12 @@
 
 """
 
+from os import listdir
 from os.path import join as opj
 from os.path import exists
 
 from datalad.api import uninstall
+from datalad.api import install
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.tests.utils import ok_
 from datalad.tests.utils import eq_
@@ -20,8 +22,7 @@ from datalad.tests.utils import with_testrepos
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_file_under_git
-from datalad.tests.utils import swallow_logs
-from datalad.tests.utils import assert_in
+from datalad.tests.utils import with_tempfile
 
 from ..dataset import Dataset
 
@@ -83,11 +84,34 @@ def test_uninstall_git_file(path):
     eq_(res, ['INFO.txt'])
 
 
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_uninstall_subdataset(src, dst):
+
+    ds = install(path=dst, source=src, recursive=True)
+    ok_(ds.is_installed())
+    for subds_path in ds.get_subdatasets():
+        subds = Dataset(opj(ds.path, subds_path))
+        ok_(subds.is_installed())
+
+        annexed_files = subds.repo.get_annexed_files()
+        subds.repo.get(annexed_files)
+
+        # uninstall data of subds:
+        res = ds.uninstall(path=subds_path, data_only=True)
+        ok_(all([f in res for f in annexed_files]))
+        ok_(all([not i for i in subds.repo.file_has_content(annexed_files)]))
+
+    for subds_path in ds.get_subdatasets():
+        # uninstall subds itself:
+        res = ds.uninstall(path=subds_path)
+        subds = Dataset(opj(ds.path, subds_path))
+        eq_(res[0], subds)
+        ok_(not subds.is_installed())
+        eq_(listdir(subds.path), [])
+
+
 def test_uninstall_dataset():
-    raise SkipTest("TODO")
-
-
-def test_uninstall_subdataset():
     raise SkipTest("TODO")
 
 
