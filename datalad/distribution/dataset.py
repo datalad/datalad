@@ -164,7 +164,7 @@ class Dataset(object):
 
         repo = self.repo
         if repo is None:
-            return
+            return []
 
         # check whether we have anything in the repo. if not go home early
         if not repo.repo.head.is_valid():

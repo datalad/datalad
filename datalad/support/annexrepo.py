@@ -47,6 +47,7 @@ from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
+from .exceptions import InsufficientArgumentsError
 from .network import is_ssh
 
 lgr = logging.getLogger('datalad.annex')
@@ -245,7 +246,6 @@ class AnnexRepo(GitRepo):
                              "-o ControlMaster=auto"
                              " -S %s" % c.ctrl_path)
             writer.release()
-
 
     def __repr__(self):
         return "<AnnexRepo path=%s (%s)>" % (self.path, type(self))
@@ -779,16 +779,37 @@ class AnnexRepo(GitRepo):
         ----------
         files: list of str
         """
-        options = options[:] if options else []
 
+        # annex drop takes either files or options
+        # --all, --unused, --key, or --incomplete
+        # for now, most simple test; to be replaced by a more general solution
+        # (exception thrown by _run_annex_command)
+        if not files and \
+                (not options or
+                 not any([o in options for o in
+                          ["--all", "--unused", "--key", "--incomplete"]])):
+            raise InsufficientArgumentsError("drop() requires at least to "
+                                             "specify 'files' or 'options'")
+
+        options = options[:] if options else []
+        files = files[:] if files else []
+
+        output_lines = []
         if key:
             # we can't drop multiple in 1 line, and there is no --batch yet, so
             # one at a time
             options = options + ['--key']
             for k in files:
-                self._run_annex_command('drop', annex_options=options + [k])
+                std_out, std_err = \
+                    self._run_annex_command('drop', annex_options=options + [k])
+                output_lines.extend(std_out.splitlines())
         else:
-            self._run_annex_command('drop', annex_options=options + files)
+            std_out, std_err = \
+                self._run_annex_command('drop', annex_options=options + files)
+            output_lines.extend(std_out.splitlines())
+
+        return [line.split()[1] for line in output_lines
+                if line.startswith('drop') and line.endswith('ok')]
 
     def drop_key(self, keys, options=None, batch=False):
         """Drops the content of annexed files from this repository referenced by keys
@@ -975,7 +996,9 @@ class AnnexRepo(GitRepo):
         """
         # TODO: Review!
 
-        out, err = self._run_annex_command('find')
+        out, err = self._run_annex_command('find',
+                                           annex_options=['--include', "*"])
+        # TODO: JSON
         return out.splitlines()
 
     def precommit(self):
@@ -1009,8 +1032,12 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()  # since might interfere
         if self.is_direct_mode():
-            self.proxy('git rm ' + ('--force ' if force else '') +
-                       ' '.join(files))
+            stdout, stderr = self.proxy('git rm ' +
+                                        ('--force ' if force else '') +
+                                        ' '.join(files))
+            # output per removed file is expected to be "rm 'PATH'":
+            r_list = [line.strip()[4:-1] for line in stdout.splitlines()]
+
             # yoh gives up -- for some reason sometimes it remains,
             # so if we force -- we mean it!
             if force:
@@ -1018,9 +1045,12 @@ class AnnexRepo(GitRepo):
                     filepath = opj(self.path, f)
                     if lexists(filepath):
                         unlink(filepath)
+                        r_list.append(f)
+            return r_list
         else:
-            super(AnnexRepo, self).remove(files, force=force,
-                                          normalize_paths=False, **kwargs)
+            return super(AnnexRepo, self).remove(files, force=force,
+                                                 normalize_paths=False,
+                                                 **kwargs)
 
     def get_contentlocation(self, key, batch=False):
         """Get location of the key content
