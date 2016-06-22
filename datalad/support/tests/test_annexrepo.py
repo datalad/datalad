@@ -955,3 +955,29 @@ def test_annex_copy_to(origin, clone):
     eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
     eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), ["test-annex.dat"])
 
+
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
+@with_tempfile
+def test_annex_drop(src, dst):
+    ar = AnnexRepo(dst, src)
+    testfile = 'test-annex.dat'
+    assert_false(ar.file_has_content(testfile))
+    ar.get(testfile)
+    ok_(ar.file_has_content(testfile))
+
+    # drop file by name:
+    result = ar.drop([testfile])
+    assert_false(ar.file_has_content(testfile))
+    ok_(isinstance(result, list))
+    eq_(result[0], testfile)
+    eq_(len(result), 1)
+
+    ar.get(testfile)
+
+    # drop file by key:
+    testkey = ar.get_file_key(testfile)
+    result = ar.drop([testkey], key=True)
+    assert_false(ar.file_has_content(testfile))
+    ok_(isinstance(result, list))
+    eq_(result[0], testkey)
+    eq_(len(result), 1)

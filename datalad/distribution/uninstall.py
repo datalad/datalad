@@ -196,7 +196,7 @@ class Uninstall(Interface):
                 # TODO: Do we want to just rm -rf instead of raising?
                 #       Or do it with --force or sth?
                 raise ValueError("No dataset found to uninstall %s from." %
-                                 path)
+                                 ds.path)
             return Uninstall.__call__(dataset=Dataset(dspath),
                                       path=relpath(ds.path, start=dspath),
                                       data_only=data_only,
@@ -350,7 +350,8 @@ class Uninstall(Interface):
                 raise ValueError("%s is not a file handle. Removing its "
                                  "data only doesn't make sense." % path)
             else:
-                return ds.repo.remove([relativepath])
+                ds.repo.remove([relativepath])
+                return [relativepath]
 
         elif _untracked_or_within_submodule:
             subds = get_containing_subdataset(ds, relativepath)
