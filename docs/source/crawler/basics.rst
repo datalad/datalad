@@ -21,11 +21,10 @@ a modified dictionary as its output once.
 {'input': 2}
 
 .. Generators::
-    Generators may have been created from various different code, including,
-    but not limited to, nodes or independent functions as long as they yield.
-    Generators may yield a dictionary, an error message, or any number of Python
-    variables. These variables may be yielded once or multiple times. A generator
-    may also return as a function does, but it must yield first.
+
+    Nodes are generators which yield a dictionary zero, one, or multiple times.
+    For more on generators, reference the Python documentation on `Generators
+    <https://docs.python.org/2/tutorial/classes.html#generators>`_
 
 .. note::
 
@@ -38,29 +37,30 @@ Pipelines
 ---------
 
 A pipeline is a series of generators ordered into a list. Each generator takes
-the output of its predecessor as its own input. The first function in the pipeline
+the output of its predecessor as its own input. The first node in the pipeline
 would need to be provided with specific input. The simplest pipeline could look like
 
 >>> from datalad.crawler.nodes.crawl_url import crawl_url
 >>> from datalad.crawler.nodes.matches import a_href_match
 >>> from datalad.crawler.nodes.annex import Annexificator
 
->>> def pipeline():
-        annex = Annexificator()
+... annex = Annexificator()
+>>> pipeline =
 ...     [
 ...     crawl_url('http://map.org/datasets'),
 ...     a_href_match(".*\.mat"),
 ...     annex
 ...     ]
 
-in which the first generator (method of a class) is provided an input and crawls a website.
+in which the first node (method of a class) is provided with input and crawls a website.
 `a_href_match` then works to output all files that end in `.mat`, and those files are
-lastly inputted to `annex` which simply annexes them.
+lastly inputted to `annex`, another node, which simply annexes them.
 
 .. note::
-    Since pipelines depend heavily on generators, these generators must yield in order
+
+    Since pipelines depend heavily on nodes, these nodes must yield in order
     for an output to be produced. If a generator fails to yield, then the pipeline
-    can no longer continue and it is stopped at that generator.
+    can no longer continue and it is stopped at that node.
 
 Subpipelines
 ------------
