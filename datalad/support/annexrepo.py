@@ -486,7 +486,7 @@ class AnnexRepo(GitRepo):
 
         Parameters
         ----------
-        git_cmd: str
+        git_cmd: list of str
             the actual git command
         `**kwargs`: dict, optional
             passed to _run_annex_command
@@ -497,22 +497,14 @@ class AnnexRepo(GitRepo):
             output of the command call
         """
 
-        cmd_str = "git annex proxy -- %s" % git_cmd
-        # TODO: By now git_cmd is expected to be string.
-        # Figure out how to deal with a list here. Especially where and how to
-        # treat paths.
-
         if not self.is_direct_mode():
-            lgr.warning("proxy() called in indirect mode: %s" % cmd_str)
-            raise CommandNotAvailableError(cmd=cmd_str,
+            lgr.warning("proxy() called in indirect mode: %s" % git_cmd)
+            raise CommandNotAvailableError(cmd="git annex proxy",
                                            msg="Proxy doesn't make sense"
                                                " if not in direct mode.")
         # Temporarily use shlex, until calls use lists for git_cmd
         return self._run_annex_command('proxy',
-                                       annex_options=['--'] +
-                                                     shlex.split(
-                                                         git_cmd,
-                                                         posix=not on_windows),
+                                       annex_options=['--'] + git_cmd,
                                        **kwargs)
 
     @normalize_path
@@ -1017,7 +1009,7 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()
         if self.is_direct_mode():
-            self.proxy('git commit -m "%s"' % msg, expect_stderr=True)
+            self.proxy(['git', 'commit',  '-m', msg], expect_stderr=True)
         else:
             super(AnnexRepo, self).commit(msg)
 
@@ -1032,9 +1024,10 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()  # since might interfere
         if self.is_direct_mode():
-            stdout, stderr = self.proxy('git rm ' +
-                                        ('--force ' if force else '') +
-                                        ' '.join(files))
+            # TODO: kwargs!
+            stdout, stderr = self.proxy(['git', 'rm'] +
+                                        (['--force'] if force else []) +
+                                        files)
             # output per removed file is expected to be "rm 'PATH'":
             r_list = [line.strip()[4:-1] for line in stdout.splitlines()]
 
