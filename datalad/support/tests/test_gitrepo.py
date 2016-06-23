@@ -822,3 +822,25 @@ def test_submodule_deinit(path):
     top_repo.deinit_submodule('sub1', force=True)
 
     ok_(not top_repo.repo.submodule('sub1').module_exists())
+
+
+def test_kwargs_to_options():
+
+    class Some(object):
+
+        @kwargs_to_options(split_single_char_options=True)
+        def f_decorated_split(self, options=None):
+            return options
+
+        @kwargs_to_options(split_single_char_options=False,
+                           target_kw='another')
+        def f_decorated_no_split(self, another=None):
+            return another
+
+    res = Some().f_decorated_split(C="/some/path", m=3, b=True, more_fancy=['one', 'two'])
+    ok_(isinstance(res, list))
+    eq_(res, ['-C', "/some/path", '-b', '-m', '3',
+              '--more-fancy=one', '--more-fancy=two'])
+
+    res = Some().f_decorated_no_split(f='some')
+    eq_(res, ['-fsome'])

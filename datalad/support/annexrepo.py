@@ -53,33 +53,6 @@ from .network import is_ssh
 lgr = logging.getLogger('datalad.annex')
 
 
-def kwargs_to_options(func):
-    """Decorator to provide convenient way to pass options to command calls.
-
-    Any keyword argument "foo='bar'" translates to " --foo=bar".
-    All of these are collected in a list and then passed to keyword argument
-    `options` of the decorated function.
-
-    Note
-    ----
-
-    This is meant to especially decorate the methods of AnnexRepo-class and
-    therefore returns a class method.
-    """
-
-    @wraps(func)
-    def newfunc(self, *args, **kwargs):
-        option_list = []
-        for key in kwargs:
-            option_list.extend([" --%s=%s" % (key, kwargs.get(key))])
-
-        return func(self, *args, options=option_list)
-    return newfunc
-
-# TODO: Depending on decision about options, implement common annex-options,
-# like --force and specific ones for all annex commands
-
-
 class AnnexRepo(GitRepo):
     """Representation of an git-annex repository.
 

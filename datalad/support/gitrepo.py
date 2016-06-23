@@ -64,10 +64,36 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # Didn't work as expected on a first try. Probably there is a neatier way to
 # log Exceptions from git commands.
 
-# TODO: Check whether it makes sense to unify passing of options in a way
-# similar to paths. See options_decorator in annexrepo.py
-# Note: GitPython is doing something similar already with **kwargs.
-# TODO: Figure this out in detail.
+
+@optional_args
+def kwargs_to_options(func, split_single_char_options=True,
+                      target_kw='options'):
+    """Decorator to provide convenient way to pass options to command calls.
+
+    Parameters
+    ----------
+    func: Callable
+        function to decorate
+    split_single_char_options: bool
+        whether or not to split key and value of single char keyword arguments
+        into two subsequent entries of the list
+    target_kw: str
+        keyword argument to pass the generated list of cmdline arguments to
+
+    Returns
+    -------
+    Callable
+    """
+
+    @wraps(func)
+    def newfunc(self, *args, **kwargs):
+        t_kwargs = dict()
+        t_kwargs[target_kw] = \
+            gitpy.Git().transform_kwargs(
+                        split_single_char_options=split_single_char_options,
+                        **kwargs)
+        return func(self, *args, **t_kwargs)
+    return newfunc
 
 
 def _normalize_path(base_dir, path):
