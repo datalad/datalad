@@ -40,7 +40,7 @@ def test_add_sibling(origin, repo_path):
     source = install(path=repo_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
     # Figure out, what to do.
-    for subds in source.get_dataset_handles(recursive=True):
+    for subds in source.get_subdatasets(recursive=True):
         AnnexRepo(opj(repo_path, subds), init=True,
                   create=True).checkout("master")
 

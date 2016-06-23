@@ -788,3 +788,17 @@ def test_git_custom_calls(path, path2):
         assert_in("fatal: Not a git repository", str(cm.exception))
 
     # TODO: How to test 'env'?
+
+
+@with_testrepos(flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_get_tracking_branch(o_path, c_path):
+
+    clone = GitRepo(c_path, o_path)
+    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch())
+
+    clone.checkout('new_branch', '-b')
+    eq_((None, None), clone.get_tracking_branch())
+
+    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch('master'))
+

@@ -12,8 +12,10 @@
 import inspect
 import os
 import re
+import stat
 
-from os.path import curdir, join as opj, split as ops
+from stat import ST_MODE, S_IEXEC, S_IXOTH, S_IXGRP
+from os.path import curdir, isdir, isabs, exists, join as opj, split as ops
 from six import iteritems, string_types
 
 from datalad.support.network import get_url_disposition_filename, get_url_straight_filename
@@ -29,6 +31,71 @@ from nose.tools import eq_, assert_raises
 
 lgr = getLogger('datalad.crawler.nodes')
 
+@auto_repr
+class fix_permissions(object):
+    """A node used to check the permissions of a file and set the executable bit
+
+    """
+
+    def __init__(self, file_re='.*', executable=False, input='filename', path=None):
+        """
+            Parameters
+            ----------
+            file_re : str, optional
+              Regular expression str to which the filename must match
+            executable : boolean, optional
+              If false, sets file to allow no one to execute. If true, sets file
+              to be executable to those already allowed to read it
+            input : str, optional
+              Key which holds value that is the filename or absolute path in data
+            path : str, optional
+              If absolute path is not specifed in data, path must be expressed
+              here
+
+            """
+        self.file_re = file_re
+        self.executable = executable
+        self.input = input
+        self.path = path
+
+    def __call__(self, data):
+        filename = data.get(self.input)
+
+        # check that file matches regex
+        if not filename.endswith(self.file_re):
+            yield data
+            return  # early termination since nothing to do
+
+        # check that absolute path exists
+        if not isabs(filename):
+            path = self.path or data.get('path')
+            if path:
+                filename = opj(path, filename)
+
+        # check existance of file and that path is not a dir
+        if exists(filename) and not isdir(filename):
+            per = oct(os.stat(filename)[ST_MODE])[-3:]
+            st = os.stat(filename)
+
+            permissions = [S_IEXEC, S_IXGRP, S_IXOTH]
+
+            if self.executable:
+                # make is executable for those that can read it
+                for i, scope in enumerate(permissions):
+                    if per[i] == '6' or '4':
+                        os.chmod(filename, st.st_mode | scope)
+                        st = os.stat(filename)
+
+            else:
+                # strip everyone away from executing
+                current = stat.S_IMODE(os.lstat(filename).st_mode)
+                os.chmod(filename, current & ~S_IEXEC & ~S_IXGRP & ~S_IXOTH)
+
+            nper = oct(os.stat(filename)[ST_MODE])[-3:]
+            lgr.debug('Changing permissions for file %s from %s to %s', filename, per, nper)
+
+        yield data
+
 
 @auto_repr
 class Sink(object):
@@ -40,7 +107,7 @@ class Sink(object):
         Parameters
         ----------
         keys : list of str, optional
-          List of keys to store.  If not specified -- entire dictionaries stored
+          List of keys to store.  If not specified -- entire dictionaries are stored
         output : str, optional
           If specified, it will be the key in the yielded data to contain all sunk
           data
@@ -83,7 +150,6 @@ class rename(object):
 
     def __init__(self, assignments):
         """
-
         Use OrderedDict when order of remapping matters
         """
         assert (isinstance(assignments, dict))
@@ -124,7 +190,7 @@ class sub(object):
 class assign(object):
     """Class node to provide assignment of items in data
 
-    With "interpolate" it allows for
+    With "interpolate" it allows for insertion of values
 
     """
 
@@ -176,7 +242,7 @@ class _act_if(object):
           Key/value pairs to compare arrived data against.  Would raise
           FinishPipeline if all keys have matched target values
         re: bool, optional
-          If specified values to be treated as regular expression to be
+          If specified values are to be treated as regular expression to be
           searched
         negate: bool, optional
           Reverses, so acts (skips, etc) if no match
@@ -246,7 +312,7 @@ def _string_as_list(x):
 def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **orig_kwargs):
     """Generate a node out of an arbitrary function
 
-    If provided function returns a generator, each item returned separately
+    If provided function returns a generator, each item is returned separately
 
     Parameters
     ----------
@@ -278,14 +344,14 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
         for return_value in out:
             if outputs:
                 outputs_ = _string_as_list(outputs)
-                # we need to place it into copy of data
+                # we need to place it into the copy of data
                 data_ = data.copy()
                 if len(outputs_) > 1:
                     # we were requested to have multiple outputs,
-                    # then function should have provided matching multiple values
+                    # then the function should have provided matching multiple values
                     assert (len(return_value) == len(outputs_))
                 else:
-                    return_value = [return_value]  # for uniformicity
+                    return_value = [return_value]  # for uniformity
 
                 for k, v in zip(outputs_, return_value):
                     data_[k] = v
@@ -296,10 +362,10 @@ def func_to_node(func, data_args=(), data_kwargs=(), kwargs={}, outputs=(), **or
                 yield data
 
     in_args = list(_string_as_list(data_args)) + list(_string_as_list(data_kwargs))
-    func_node.__doc__ = """Function %s wrapped into a node
+    func_node.__doc__ = """Function %s wrapped into a node.
 
 It expects %s keys to be provided in the data and output will be assigned to %s
-keys in the output.%s
+keys in the output %s
 """ % (
         func.__name__ if hasattr(func, '__name__') else '',
         ', '.join(in_args) if in_args else "no",
@@ -331,7 +397,7 @@ class find_files(object):
         dirs: bool, optional
           Either to match directories
         fail_if_none: bool, optional
-          Fail if none file matched throughout the life-time of this object, i.e.
+          Fail if no file matched throughout the life-time of this object, i.e.
           counts through multiple runs (if any run had files matched -- it is ok
           to have no matched files on subsequent run)
         """
@@ -365,7 +431,7 @@ class switch(object):
         key: str
         mapping: dict
         default: node or pipeline, optional
-          node or pipeline to use if no mapping was found
+          Node or pipeline to use if no mapping was found
         missing: ('raise', 'stop', 'skip'), optional
           If value is missing in the mapping or key is missing in data
           (yeah, not differentiating atm), and no default is provided:

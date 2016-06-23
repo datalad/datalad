@@ -17,7 +17,7 @@ from ..nodes.matches import *
 from ..pipeline import run_pipeline, FinishPipeline
 
 from ..nodes.misc import Sink, assign, range_node, interrupt_if
-from ..nodes.annex import Annexificator, initiate_handle
+from ..nodes.annex import Annexificator
 from ..pipeline import load_pipeline_from_module
 
 from ...support.stats import ActivityStats

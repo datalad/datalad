@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # This script is intended to be executed on a server; it prepares a simple
-# directory structure with repositories for a collection and its handles.
+# directory structure with repositories for a dataset and its subdatasets.
 # It initializes them with git and (if available) git-annex. It returns
 # a number of useful status messages on the target via stdout.
 #

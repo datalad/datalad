@@ -34,33 +34,32 @@ class Create(Interface):
     _params_ = dict(
         loc=Parameter(
             args=("loc",),
-            doc="""location where the dataset shall be  created. If `None`,
+            doc="""location where the dataset shall be  created.  If `None`,
             is given a dataset will be created in the current working
-            directory.""",
+            directory""",
             nargs='?',
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
         description=Parameter(
-            args=("-d", "--description",),
-            doc="""Short description that humans can use to identify the
-            repository/location, e.g. "Precious data on my laptop.""",
-            nargs=1),
+            args=("-D", "--description",),
+            doc="""short description that humans can use to identify the
+            repository/location, e.g. "Precious data on my laptop."""""),
         no_annex=Parameter(
             args=("--no-annex",),
-            doc="""Flag that if given a plain Git repository will be created
-            without any annex.""",
+            doc="""flag that if given a plain Git repository will be created
+            without any annex""",
             action='store_false'),
         annex_version=Parameter(
             args=("--annex-version",),
-            doc="""Select particular annex repository version. The list of
-            supported versions depends on the available git-annex version.""",
+            doc="""select particular annex repository version.  The list of
+            supported versions depends on the available git-annex version""",
             constraints=EnsureDType(int) | EnsureNone()),
         annex_backend=Parameter(
             args=("--annex-backend",),
             # not listing choices here on purpose to avoid future bugs
-            doc="""Set default hashing backend used by the new dataset.
+            doc="""set default hashing backend used by the new dataset.
             For a list of supported backends see the git-annex
-            documentation.""",
+            documentation""",
             nargs=1),
     )
 
@@ -69,6 +68,9 @@ class Create(Interface):
     def __call__(
             loc=None, description=None, no_annex=False, annex_version=None,
             annex_backend='MD5E'):
+        if description and no_annex:
+            raise ValueError("Incompatible arguments: cannot specify description for "
+                             "annex repo and declaring no annex repo.")
         if loc is None:
             loc = os.curdir
         elif isinstance(loc, Dataset):

@@ -45,7 +45,7 @@ class HelpAction(argparse.Action):
         else:
             helpstr = parser.format_help()
         # better for help2man
-        # For main command -- should be different sections. And since we are in
+        # for main command -- should be different sections. And since we are in
         # heavy output messaging mode...
         if "commands for dataset operations" in helpstr.lower():
             opt_args_str = '*Global options*'
@@ -55,14 +55,14 @@ class HelpAction(argparse.Action):
                              'Usage: datalad [global-opts] command [command-opts]\n\n',
                              helpstr,
                              flags=re.MULTILINE | re.DOTALL)
-            # And altogether remove section with long list of commands
+            # and altogether remove sections with long list of commands
             helpstr = re.sub(r'positional arguments:\s*\n\s*{.*}\n', '', helpstr)
         else:
             opt_args_str = "*Options*"
             pos_args_str = "*Arguments*"
         helpstr = re.sub(r'optional arguments:', opt_args_str, helpstr)
         helpstr = re.sub(r'positional arguments:', pos_args_str, helpstr)
-        # convert all heading to have the first character uppercase
+        # convert all headings to have the first character uppercase
         headpat = re.compile(r'^([a-z])(.*):$',  re.MULTILINE)
         helpstr = re.subn(
             headpat,
@@ -167,7 +167,7 @@ queue
 class RegexpType(object):
     """Factory for creating regular expression types for argparse
 
-    DEPRECATED AFAIK -- now things are in the config file...
+    DEPRECATED AFAIK -- now things are in the config file,
     but we might provide a mode where we operate solely from cmdline
     """
     def __call__(self, string):
@@ -179,9 +179,10 @@ class RegexpType(object):
 
 # TODO: useful also outside of cmdline, move to support/
 from os import curdir
+
+
 def get_repo_instance(path=curdir, class_=None):
     """Returns an instance of appropriate datalad repository for path.
-
     Check whether a certain path is inside a known type of repository and
     returns an instance representing it. May also check for a certain type
     instead of detecting the type of repository.
@@ -190,7 +191,6 @@ def get_repo_instance(path=curdir, class_=None):
     ----------
     path: str
       path to check; default: current working directory
-
     class_: class
       if given, check whether path is inside a repository, that can be
       represented as an instance of the passed class.
@@ -244,18 +244,6 @@ def get_repo_instance(path=curdir, class_=None):
         raise RuntimeError("No %s repository found in %s" % (type_, abspath_))
     else:
         raise RuntimeError("No datalad repository found in %s" % abspath_)
-
-
-# Do some centralizing of things needed by the datalad API:
-# TODO: May be there should be a dedicated class for the master collection.
-# For now just use helper functions to clean up the implementations of the API.
-# Design decision about this also depends on redesigning the handle/collection
-# classes (Metadata class => Backends => Repos).
-# The local master used by datalad is not a technically special
-# collection, but a collection with a special purpose for its "user",
-# who is datalad. So, deriving a class from Collection(Repo) and make common
-# tasks methods of this class might be an option either way. Also might become
-# handy, once we decide to have several "masters" (user-level, sys-level, etc.)
 
 
 from appdirs import AppDirs

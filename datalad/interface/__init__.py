@@ -32,8 +32,10 @@ _group_dataset = (
          'CreatePublicationTargetSSHWebserver',
          'create-publication-target-sshwebserver'),
         ('datalad.distribution.add_sibling', 'AddSibling', 'add-sibling'),
-        ('datalad.distribution.modify_subhandle_urls', 'ModifySubhandleURLs',
-         'modify-subhandle-urls'),
+        ('datalad.distribution.modify_subdataset_urls', 'ModifySubdatasetURLs',
+         'modify-subdataset-urls'),
+        ('datalad.interface.unlock', 'Unlock', 'unlock'),
+        ('datalad.interface.save', 'Save', 'save'),
     ])
 
 _group_misc = (
@@ -41,8 +43,6 @@ _group_misc = (
     [
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.crawl', 'Crawl'),
-        ('datalad.interface.pull', 'Pull'),
-        ('datalad.interface.push', 'Push'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',

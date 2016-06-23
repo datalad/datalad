@@ -60,6 +60,9 @@ class Dataset(object):
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
 
+    def __eq__(self, other):
+        return self.path == other.path
+
     @property
     def path(self):
         """path to the dataset"""
@@ -133,9 +136,9 @@ class Dataset(object):
             lgr.warning("Remote '%s' already exists. Ignore.")
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
-    def get_dataset_handles(self, pattern=None, fulfilled=None, absolute=False,
+    def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                             recursive=False):
-        """Get names/paths of all known dataset_handles (subdatasets),
+        """Get names/paths of all known dataset_datasets (subdatasets),
         optionally matching a specific name pattern.
 
 
@@ -148,8 +151,7 @@ class Dataset(object):
         absolute : bool
           If True, absolute paths will be returned.
         recursive : bool
-          If True, recurse into all subdatasets and report their dataset
-          handles too.
+          If True, recurse into all subdatasets and report them too.
 
         Returns
         -------
@@ -162,7 +164,7 @@ class Dataset(object):
 
         repo = self.repo
         if repo is None:
-            return
+            return []
 
         # check whether we have anything in the repo. if not go home early
         if not repo.repo.head.is_valid():
@@ -192,7 +194,7 @@ class Dataset(object):
                 sdspath = opj(self._path, sm)
                 rsm.extend(
                     [opj(sm, sdsh)
-                     for sdsh in Dataset(sdspath).get_dataset_handles(
+                     for sdsh in Dataset(sdspath).get_subdatasets(
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
                          recursive=recursive)])
             submodules = rsm
