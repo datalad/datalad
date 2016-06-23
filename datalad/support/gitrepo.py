@@ -813,7 +813,7 @@ class GitRepo(object):
         cmd_options.update({'with_exceptions': with_exceptions,
                             'with_extended_output': True})
 
-        # TODO: GIT_COMMON_OPTIONS!
+        # TODO: _GIT_COMMON_OPTIONS!
 
         with self.repo.git.custom_environment(**env):
             try:
@@ -1230,6 +1230,17 @@ class GitRepo(object):
             url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+
+    def deinit_submodule(self, path, **kwargs):
+        """
+        Parameters
+        ----------
+        path
+        """
+
+        kwargs['insert_kwargs_after'] = 'deinit'
+        self._gitpy_custom_call('submodule', ['deinit', path],
+                                cmd_options=kwargs)
 
     def update_submodule(self, path, mode='checkout', init=False):
         """Update a registered submodule.

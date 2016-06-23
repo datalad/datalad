@@ -802,3 +802,23 @@ def test_get_tracking_branch(o_path, c_path):
 
     eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch('master'))
 
+
+@with_testrepos('submodule_annex', flavors=['clone'])
+def test_submodule_deinit(path):
+
+    top_repo = GitRepo(path, create=False)
+    eq_(['sub1', 'sub2'], [s.name for s in top_repo.get_submodules()])
+    top_repo.update_submodule('sub1', init=True)
+    top_repo.update_submodule('sub2', init=True)
+    ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+
+    # modify submodule:
+    with open(opj(top_repo.path, 'sub1', 'file_ut.dat'), "w") as f:
+        f.write("some content")
+
+    assert_raises(GitCommandError, top_repo.deinit_submodule, 'sub1')
+
+    # using force should work:
+    top_repo.deinit_submodule('sub1', force=True)
+
+    ok_(not top_repo.repo.submodule('sub1').module_exists())
