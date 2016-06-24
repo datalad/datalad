@@ -42,6 +42,7 @@ from .gitrepo import GitRepo
 from .gitrepo import normalize_path
 from .gitrepo import normalize_paths
 from .gitrepo import GitCommandError
+from .gitrepo import to_options
 from .exceptions import CommandNotAvailableError
 from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
@@ -68,7 +69,6 @@ class AnnexRepo(GitRepo):
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
-    # TODO: pass description
     def __init__(self, path, url=None, runner=None,
                  direct=False, backend=None, always_commit=True, create=True, init=False,
                  batch_size=None, version=None, description=None):
@@ -412,14 +412,17 @@ class AnnexRepo(GitRepo):
         -------
         list of dict
         """
+
+        options = options[:] if options else []
+
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
         if git:
             # add to git instead of annex
-            # TODO: `options` currently unused in case of git
             if self.is_direct_mode():
-                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + files
+                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
+                           files
                 self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
                 # TODO: use options with git_add instead!
             else:
@@ -431,8 +434,6 @@ class AnnexRepo(GitRepo):
             return_list = [{u'file': f, u'success': True} for f in files]
 
         else:
-            options = options[:] if options else []
-
             return_list = list(self._run_annex_command_json(
                 'add', args=options + files, backend=backend))
 
@@ -995,10 +996,11 @@ class AnnexRepo(GitRepo):
         files
         force: bool, optional
         """
+
         self.precommit()  # since might interfere
         if self.is_direct_mode():
-            # TODO: kwargs!
             stdout, stderr = self.proxy(['git', 'rm'] +
+                                        to_options(**kwargs) +
                                         (['--force'] if force else []) +
                                         files)
             # output per removed file is expected to be "rm 'PATH'":

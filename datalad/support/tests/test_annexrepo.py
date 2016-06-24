@@ -331,7 +331,6 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
         assert_equal(info2_[cur_subfile]['size'], 10)
 
 
-
 @with_testrepos('.*annex.*', flavors=['local', 'network'])
 @with_tempfile
 def test_AnnexRepo_migrating_backends(src, dst):
@@ -539,9 +538,7 @@ def test_AnnexRepo_commit(src, path):
     filename = opj(path, get_most_obscure_supported_name())
     with open(filename, 'w') as f:
         f.write("File to add to git")
-    # TODO: Ths wrong now, since add will annex_add in that case
-    # => assertions insufficient!
-    ds.add(filename)
+    ds.add(filename, git=True)
 
     if ds.is_direct_mode():
         assert_raises(AssertionError, ok_clean_git_annex_proxy, path)
