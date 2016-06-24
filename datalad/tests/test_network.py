@@ -33,7 +33,6 @@ from ..support.network import _split_colon
 from ..support.network import is_url
 from ..support.network import is_datalad_compat_ri
 from ..support.network import get_local_file_url
-from ..support.network import get_local_path_from_ri
 from ..support.network import is_ssh
 
 def test_same_website():
@@ -222,8 +221,15 @@ def test_url_samples():
     #https://en.wikipedia.org/wiki/File_URI_scheme
     _check_ri("file://host", URL, scheme='file', hostname='host')
     _check_ri("file://host/path/sp1", URL, scheme='file', hostname='host', path='/path/sp1')
-    _check_ri("file://localhost/path/sp1", URL, localpath='/path/sp1',
-              scheme='file', hostname='localhost', path='/path/sp1')
+    # stock libraries of Python aren't quite ready for ipv6
+    ipv6address = '2001:db8:85a3::8a2e:370:7334'
+    _check_ri("file://%s/path/sp1" % ipv6address, URL,
+              scheme='file', hostname=ipv6address, path='/path/sp1')
+    for lh in ('localhost', '::1', '', '127.3.4.155'):
+        _check_ri("file://%s/path/sp1" % lh, URL, localpath='/path/sp1',
+                  scheme='file', hostname=lh, path='/path/sp1')
+    _check_ri('http://[1fff:0:a88:85a3::ac1f]:8001/index.html', URL,
+              scheme='http', hostname='1fff:0:a88:85a3::ac1f', port=8001, path='/index.html')
     _check_ri("file:///path/sp1", URL, localpath='/path/sp1', scheme='file', path='/path/sp1')
     # we don't do any magical comprehension for home paths/drives for windows
     # of file:// urls, thus leaving /~ and /c: for now:
@@ -275,6 +281,9 @@ def test_url_samples():
         # but we store original str
         eq_(str(weired_url), weired_str)
         neq_(weired_url.as_str(), weired_str)
+
+
+    raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
 
 
 def _test_url_quote_path(cls, clskwargs, target_url):
@@ -376,19 +385,6 @@ def test_get_local_file_url_linux():
     eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')
     eq_(get_local_file_url('/a~'), 'file:///a%7E')
     eq_(get_local_file_url('/a b/'), 'file:///a%20b/')
-
-
-def test_get_local_path_from_ri():
-    assert_raises(ValueError, get_local_path_from_ri, 'http://some')
-    assert_raises(ValueError, get_local_path_from_ri, 'file://elsewhere/some')
-    # invalid URL -- is it?  just that 'hostname' is some and no path
-    assert_raises(ValueError, get_local_path_from_ri, 'file://some')
-    eq_(get_local_path_from_ri('file:///some'), '/some')
-    eq_(get_local_path_from_ri('file://localhost/some'), '/some')
-    eq_(get_local_path_from_ri('file://::1/some'), '/some')
-    eq_(get_local_path_from_ri('file://127.3.4.155/some'), '/some')
-
-    raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
 
 
 def test_is_ssh():

@@ -32,7 +32,6 @@ from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows, swallow_logs
 from datalad.support.network import RI
-from datalad.support.network import get_local_path_from_ri
 from datalad.support.network import is_url, is_datalad_compat_ri
 from datalad.utils import rmtree
 
@@ -296,18 +295,15 @@ class Install(Interface):
 
         # resolve the target location (if local) against the provided dataset
         if path is not None:
+            # Should work out just fine for regular paths, so no additional
+            # conditioning is necessary
             path_ri = RI(path)
-            # make sure it is not a URL, `resolve_path` cannot handle that
-            if is_datalad_compat_ri(path_ri):
-                try:
-                    # Wouldn't work for SSHRI ATM, see TODO within SSHRI
-                    path = get_local_path_from_ri(path_ri)
-                    path = resolve_path(path, ds)
-                except ValueError:
-                    # URL doesn't point to a local something
-                    pass
-            else:
-                path = resolve_path(path, ds)
+            try:
+                # Wouldn't work for SSHRI ATM, see TODO within SSHRI
+                path = resolve_path(path_ri.localpath, ds)
+            except ValueError:
+                # URL doesn't point to a local something
+                pass
 
         # any `path` argument that point to something local now resolved and
         # is no longer a URL

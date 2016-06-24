@@ -525,7 +525,11 @@ class URL(RI):
             netloc += '@'
         netloc += fields['hostname']
         if fields['port']:
-            netloc += ':%s' % fields['port']
+            if fields['hostname'].count(':') >= 2:
+                # ipv6 -- need to enclose in []
+                netloc = '[%s]:%s' % (netloc, fields['port'])
+            else:
+                netloc += ':%s' % fields['port']
 
         pr_fields = {
             f: fields[f]
@@ -549,11 +553,34 @@ class URL(RI):
             lgr.warning("ParseResults contains params %r, which will be ignored"
                         % (pr.params,))
 
+        hostname_port = pr.netloc.split('@')[-1]
+        is_ipv6 = hostname_port.count(':') >= 2
         # can't use just pr._asdict since we care to ask those properties
         # such as .port , .hostname etc
         # Forcing '' instead of None since those properties (.hostname), .password,
         # .username return None if not available and we decided to uniformize
-        return {f: (getattr(pr, f) or '') for f in cls._FIELDS}
+        if is_ipv6:
+            rem = re.match('\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
+            if rem:
+                hostname, port = rem.groups()
+                port = int(port)
+            else:
+                hostname, port = hostname_port, ''
+
+            def _getattr(pr, f):
+                """Helper for custom handling in case of ipv6 addresses which blows
+                stock ParseResults logic"""
+                if f == 'port':
+                    # for now not supported at all, so
+                    return port
+                elif f == 'hostname':
+                    return hostname
+                else:
+                    return getattr(pr, f)
+        else:
+            _getattr = getattr
+
+        return {f: (_getattr(pr, f) or '') for f in cls._FIELDS}
 
     #
     # Access helpers
@@ -798,26 +825,3 @@ def get_local_file_url(fname):
         # TODO:  need to fix for all the encoding etc
         furl = str(URL(scheme='file', path=fname))
     return furl
-
-
-def get_local_path_from_ri(ri):
-    """Given an RI (or its string representation) return a local path, where possible.
-
-    Raises `ValueError` if not possible, for example, if the URL
-    scheme is different, or if the `host` isn't empty or 'localhost'
-
-    The returned path is always absolute.
-
-    Raises
-    ------
-    ValueError
-      If provided resource identifier does not point to a locally resolvable
-      resource
-    """
-    if not isinstance(ri, RI):
-        try:
-            ri = RI(ri)
-        except Exception as e:
-            raise ValueError("Cannot resole %s as an RI: %s" % (ri, exc_str(e)))
-
-    return ri.localpath
