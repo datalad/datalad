@@ -193,17 +193,6 @@ def test_AnnexRepo_is_under_annex(batch, direct, src, annex_path):
     assert_true(ar.is_under_annex("test-annex.dat", batch=batch))
 
 
-def test_AnnexRepo_options_decorator():
-
-    @kwargs_to_options
-    def decorated(self, whatever, options=[]):
-        return options
-
-    # Order is not guaranteed so use sets
-    assert_equal(set(decorated(1, 2, someoption='first', someotheroption='second')),
-                 {' --someoption=first', ' --someotheroption=second'})
-
-
 @with_tree(tree=(('about.txt', 'Lots of abouts'),
                  ('about2.txt', 'more abouts'),
                  ('d', {'sub.txt': 'more stuff'})))
