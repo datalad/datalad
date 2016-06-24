@@ -701,15 +701,21 @@ def parse_url_opts(url):
 
 # TODO: should we just define URL.good_for_git or smth like that? ;)
 # although git also understands regular paths
-def is_url(s):
-    """Returns whether a string looks like something what datalad should treat as a URL
+def is_url(ri):
+    """Returns whether argument looks like something what datalad should treat as a URL
 
     This includes ssh "urls" which git understands.
+
+    Parameters
+    ----------
+    ri : str or RI
+      The resource identifier (as a string or RI) to "analyze"
     """
-    try:
-        ri = RI(s)
-    except:
-        return False
+    if not isinstance(ri, RI):
+        try:
+            ri = RI(ri)
+        except:
+            return False
     return isinstance(ri, (URL, SSHRI))
 
 

@@ -343,6 +343,10 @@ def test_is_url():
     nok_(is_url(''))
     nok_(is_url(' '))
 
+    # we can pass RI instance directly
+    ok_(is_url(RI('file://localhost/some')))
+    nok_(is_url(RI('relative')))
+
 
 def test_get_local_file_url_linux():
     eq_(get_local_file_url('/a'), 'file:///a')
