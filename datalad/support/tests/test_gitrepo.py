@@ -868,3 +868,8 @@ def test_to_options():
                         annex_options=to_options(JSON=True),
                         options=to_options(unused=True)),
         ['git', '-C', '/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
+
+    eq_(Some().cmd_func(git_options=to_options(C="/some/where", split_single_char_options=False),
+                        annex_options=to_options(JSON=True),
+                        options=to_options(unused=True)),
+        ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])

@@ -627,6 +627,7 @@ class GitRepo(object):
             msg = "Commit"  # there is no good default
         if options:
             raise NotImplementedError
+        self.precommit()
         lgr.debug("Committing with msg=%r" % msg)
         self.cmd_call_wrapper(self.repo.index.commit, msg)
         #
@@ -1280,10 +1281,15 @@ class GitRepo(object):
         self._git_custom_command('', cmd)
 
     def deinit_submodule(self, path, **kwargs):
-        """
+        """Deinit a submodule
+
+
         Parameters
         ----------
-        path
+        path: str
+            path to the submodule; relative to `self.path`
+        kwargs:
+            see `__init__`
         """
 
         kwargs['insert_kwargs_after'] = 'deinit'
