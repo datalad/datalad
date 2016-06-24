@@ -31,8 +31,9 @@ from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows, swallow_logs
-from datalad.support.network import get_local_path_from_url
-from datalad.support.network import is_url
+from datalad.support.network import RI
+from datalad.support.network import get_local_path_from_ri
+from datalad.support.network import is_url, is_datalad_compat_ri
 from datalad.utils import rmtree
 
 lgr = logging.getLogger('datalad.distribution.install')
@@ -121,6 +122,9 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         clone_urls.append('{0}/{1}{2}'.format(
             remote_url, sm_path, url_suffix))
     # attempt: configured submodule URL
+    # TODO: consider supporting DataLadRI here?  or would confuse
+    #  git and we wouldn't want that (i.e. not allow pure git clone
+    #  --recursive)
     if sm_url.startswith('/') or is_url(sm_url):
         # this seems to be an absolute location -> take as is
         clone_urls.append(sm_url)
@@ -290,12 +294,14 @@ class Install(Interface):
                         source=source,
                         recursive=recursive) for p in path]
 
-        # resolve the target location against the provided dataset
+        # resolve the target location (if local) against the provided dataset
         if path is not None:
+            path_ri = RI(path)
             # make sure it is not a URL, `resolve_path` cannot handle that
-            if is_url(path):
+            if is_datalad_compat_ri(path_ri):
                 try:
-                    path = get_local_path_from_url(path)
+                    # Wouldn't work for SSHRI ATM, see TODO within SSHRI
+                    path = get_local_path_from_ri(path_ri)
                     path = resolve_path(path, ds)
                 except ValueError:
                     # URL doesn't point to a local something

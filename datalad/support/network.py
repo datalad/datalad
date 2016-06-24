@@ -28,6 +28,7 @@ from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
 
 from datalad.utils import on_windows
+from datalad.dochelpers import exc_str
 
 from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
@@ -410,6 +411,11 @@ class RI(object):
         obj._str = ri_str
         return obj
 
+    @property
+    def localpath(self):
+        # by default RIs point to remote locations
+        raise ValueError("%s points to remote location" % self)
+
     # Apparently doesn't quite play nicely with multiple inheritence for MixIn'
     # of regexp based URLs
     #@abstractmethod
@@ -575,6 +581,18 @@ class URL(RI):
     def fragment_dict(self):
         return self._parse_qs(self.fragment)
 
+    @property
+    def localpath(self):
+        if self.scheme != 'file':
+            raise ValueError(
+                "Non 'file://' URL cannot be resolved to a local path")
+        hostname = self.hostname
+        if not (hostname in (None, '', 'localhost', '::1') \
+                or hostname.startswith('127.')):
+            raise ValueError("file:// URL does not point to 'localhost'")
+        return self.path
+
+
 
 class PathRI(RI):
     """RI pointing to a (local) file/directory"""
@@ -584,6 +602,10 @@ class PathRI(RI):
     @classmethod
     def _str_to_fields(cls, url_str):
         return dict(path=url_str)
+
+    @property
+    def localpath(self):
+        return self.path
 
 
 class RegexBasedURLMixin(object):
@@ -646,6 +668,9 @@ class SSHRI(RI, RegexBasedURLMixin):
         fields['path'] = escape_ssh_path(fields['path'])
         return url_fmt.format(**fields)
 
+    # TODO:
+    # we can "support" localhost:path as localpaths
+
 
 class DataLadRI(RI, RegexBasedURLMixin):
     """RI pointing to datasets within central DataLad super-dataset"""
@@ -702,7 +727,7 @@ def parse_url_opts(url):
 # TODO: should we just define URL.good_for_git or smth like that? ;)
 # although git also understands regular paths
 def is_url(ri):
-    """Returns whether argument looks like something what datalad should treat as a URL
+    """Returns whether argument is a resource identifier what datalad should treat as a URL
 
     This includes ssh "urls" which git understands.
 
@@ -717,6 +742,20 @@ def is_url(ri):
         except:
             return False
     return isinstance(ri, (URL, SSHRI))
+
+
+# TODO: RF to remove duplication
+def is_datalad_compat_ri(ri):
+    """Returns whether argument is a resource identifier what datalad should treat as a URL
+
+    including its own DataLadRI
+    """
+    if not isinstance(ri, RI):
+        try:
+            ri = RI(ri)
+        except:
+            return False
+    return isinstance(ri, (URL, SSHRI, DataLadRI))
 
 
 # TODO: better name? additionally may be move to SSHRI.is_valid() or sth.
@@ -761,19 +800,24 @@ def get_local_file_url(fname):
     return furl
 
 
-def get_local_path_from_url(url):
-    """If given a file:// URL, returns a local path, if possible.
+def get_local_path_from_ri(ri):
+    """Given an RI (or its string representation) return a local path, where possible.
 
     Raises `ValueError` if not possible, for example, if the URL
     scheme is different, or if the `host` isn't empty or 'localhost'
 
     The returned path is always absolute.
+
+    Raises
+    ------
+    ValueError
+      If provided resource identifier does not point to a locally resolvable
+      resource
     """
-    urlparts = urlsplit(url)
-    if not urlparts.scheme == 'file':
-        raise ValueError(
-            "Non 'file://' URL cannot be resolved to a local path")
-    if not (urlparts.netloc in ('', 'localhost', '::1') \
-            or urlparts.netloc.startswith('127.')):
-        raise ValueError("file:// URL does not point to 'localhost'")
-    return urlunquote(urlparts.path)
+    if not isinstance(ri, RI):
+        try:
+            ri = RI(ri)
+        except Exception as e:
+            raise ValueError("Cannot resole %s as an RI: %s" % (ri, exc_str(e)))
+
+    return ri.localpath
