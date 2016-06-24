@@ -414,36 +414,41 @@ def leaf_name(path):
     return tail or basename(head)
 
 
-def ignored(path):
-    """if node is in the ignorelist return True
+def ignored(path, only_hidden=False):
+    """if path is in the ignorelist return True
 
-    ignore list includes hidden files and paths containing git or git annex folders
+    ignore list includes hidden files and git or annex maintained folders
+    when only_hidden set, only ignores hidden files and folders not git or annex maintained folders
     """
-    if isdir(opj(path, ".git")) or isdir(opj(path, ".git", "annex")):
+    if (isdir(opj(path, ".git")) or isdir(opj(path, ".git", "annex"))) and not only_hidden:
         return True
-    if '.' == leaf_name(path)[0]:
+    if '.' == leaf_name(path)[0] or leaf_name(path) == 'index.html':
         return True
 
 
 def fs_traverse(loc, repo, recursive=False):
     """takes a root path, traverses through its nodes and returns a dictionary of relevant features attached to each node
 
-    extracts and returns a (recursive) list of nodes in the directory tree
+    extracts and returns a (recursive) list of directory info at loc
     does not traverse into git or annex directories
     """
-
     fs = fs_extract(FsModel(loc, repo))
 
-    # if node a plain directory, i.e not git or git_annex repository or
-    if isdir(loc) and recursive and not ignored(loc):
-        subdir = fs_extract(FsModel(loc, repo))
-        subdir["nodes"] = [fs_extract(FsModel(loc, repo))]
-        subdir["nodes"][0]["name"] = ".."
-        subdir["nodes"].extend([fs_traverse(opj(loc, node), repo, recursive=recursive)
-                                for node in listdir(loc) if not ignored(opj(loc, node))])
-        with open(opj(loc, '.dir.json'), 'w') as f:
-            json.dump(subdir, f)
+    if isdir(loc):                                       # if node is a directory
+        fs["nodes"] = [fs_extract(FsModel(loc, repo))]   # store its info in dict
+        fs["nodes"][0]["name"] = ".."                    # and replace its name with ".." to emulate unix syntax
 
+        for node in listdir(loc):
+            if not ignored(opj(loc, node), only_hidden=True):
+                # append info on nodes children to its dictionary
+                fs["nodes"].extend([fs_extract(FsModel(opj(loc, node), repo))])
+
+            if recursive and isdir(opj(loc, node)) and not ignored(opj(loc, node)):
+                # if recursive, create info dictionary of each child directory
+                subdir = fs_traverse(opj(loc, node), repo, recursive=recursive)
+                # and write to json in child's directory
+                with open(opj(loc, node, '.dir.json'), 'w') as f:
+                    json.dump(subdir, f)
     return fs
 
 
@@ -458,14 +463,16 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
         if recursive else [])
     dsms = list(map(DsModel, dss))
 
-    # traverse directory of each submodule at loc passed by userto create dict of dicts
+    # for each submodule at loc passed by user
     for ds in dsms:
-        fs = fs_extract(FsModel(opj(ds.path, "/"), ds))
-        # unwrap top git directory and traverse each node and extract relevant properties
-        fs["nodes"] = [fs_traverse(opj(ds.path, subdir), ds, recursive=recursive)
-                       for subdir in listdir(ds.path) if '.' != leaf_name(subdir)[0]]
+        # (recursively) traverse each submodule
+        fs = fs_traverse(opj(ds.path, ""), ds, recursive=recursive)
+        # if its the root submodule remove parent node info ("..") from it
+        if ds.path == abspath(loc):
+            fs["nodes"].pop(0)
+        # store directory info of the submodule level in fs hierarchy as json
         with open(opj(ds.path, '.dir.json'), 'w') as f:
-            json.dump(fs, f)  # convert dictionary to json and print to stdout
+            json.dump(fs, f)
 
 
 #
