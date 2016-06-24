@@ -32,6 +32,7 @@ from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows, swallow_logs
 from datalad.support.network import RI
+from datalad.support.network import DataLadRI
 from datalad.support.network import is_url, is_datalad_compat_ri
 from datalad.utils import rmtree
 
@@ -43,7 +44,19 @@ def _with_sep(path):
     return path + sep if not path.endswith(sep) else path
 
 
-def _installationpath_from_url(url):
+def _get_git_url_from_source(source):
+    """Return URL for cloning associated with a source specification
+
+    For now just resolves DataLadRIs
+    """
+    source_ri = RI(source)
+    if isinstance(source_ri, DataLadRI):
+        # we have got our DataLadRI as the source, so expand it
+        source = source_ri.as_git_url()
+    return source
+
+
+def _get_installationpath_from_url(url):
     """Returns a relative path derived from the trailing end of a URL
 
     This can be used to determine an installation path of a Dataset
@@ -312,7 +325,7 @@ class Install(Interface):
         # on, based on the resolved target location (that is now guaranteed to
         # be specified, but only if path isn't a URL (anymore) -> special case,
         # handles below
-        if ds is None and path is not None and not is_url(path):
+        if ds is None and path is not None and not is_datalad_compat_ri(path):
             # try to find a dataset at or above the installation target
             dspath = GitRepo.get_toppath(abspath(path))
             if dspath is None:
@@ -324,7 +337,7 @@ class Install(Interface):
             # no dataset, no source
             # this could be a shortcut install call, where the first
             # arg identifies the source
-            if is_url(path) or os.path.exists(path):
+            if is_datalad_compat_ri(path) or os.path.exists(path):
                 # we have an actual URL -> this should be the source
                 # OR
                 # it is not a URL, but it exists locally
@@ -336,15 +349,18 @@ class Install(Interface):
 
         lgr.debug("Resolved installation target: {0}".format(path))
 
-        if ds is None and path is None and source is not None:
+        # Possibly do conversion from source into a git-friendly url
+        source_url = _get_git_url_from_source(source)
+
+        if ds is None and path is None and source_url is not None:
             # we got nothing but a source. do something similar to git clone
-            # and derive the path from the source and continue
+            # and derive the path from the source_url and continue
             lgr.debug(
                 "Neither dataset not target installation path provided. "
                 "Assuming installation of a remote dataset. "
                 "Deriving destination path from given source {0}".format(
-                    source))
-            ds = Dataset(_installationpath_from_url(source))
+                    source_url))
+            ds = Dataset(_get_installationpath_from_url(source_url))
 
         if not path and ds is None:
             # no dataset, no target location, nothing to do
@@ -354,7 +370,10 @@ class Install(Interface):
 
         assert(ds is not None)
 
-        lgr.info("Installing {0}".format(path if path else ds))
+        lgr.info("Installing {0}{1}".format(
+            path if path else ds,
+            " from %s" % source_url if source_url else ""
+        ))
 
         vcs = ds.repo
         if vcs is None:
@@ -363,25 +382,25 @@ class Install(Interface):
             existed = ds.path and exists(ds.path)
 
             # We possibly need to consider /.git URL
-            candidate_sources = [source]
-            if source and not source.rstrip('/').endswith('/.git'):
-                candidate_sources.append('{0}/.git'.format(source.rstrip('/')))
+            candidate_source_urls = [source_url]
+            if source_url and not source_url.rstrip('/').endswith('/.git'):
+                candidate_source_urls.append('{0}/.git'.format(source_url.rstrip('/')))
 
-            for source_ in candidate_sources:
+            for source_url_ in candidate_source_urls:
                 try:
-                    lgr.debug("Retrieving a dataset from URL: {0}".format(source_))
+                    lgr.debug("Retrieving a dataset from URL: {0}".format(source_url_))
                     with swallow_logs():
-                        vcs = Install._get_new_vcs(ds, source_)
+                        vcs = Install._get_new_vcs(ds, source_url_)
                     break  # do not bother with other sources if succeeded
                 except GitCommandError:
-                    lgr.debug("Failed to retrieve from URL: {0}".format(source_))
+                    lgr.debug("Failed to retrieve from URL: {0}".format(source_url_))
                     if not existed and ds.path and exists(ds.path):
                         lgr.debug("Wiping out unsuccessful clone attempt at {}".format(ds.path))
                         rmtree(ds.path)
-                    if source_ == candidate_sources[-1]:
+                    if source_url_ == candidate_source_urls[-1]:
                         # Re-raise if failed even with the last candidate
                         lgr.debug("Unable to establish repository instance at {0} from {1}"
-                                  "".format(ds.path, candidate_sources))
+                                  "".format(ds.path, candidate_source_urls))
                         raise
 
         assert(ds.repo)  # is automagically re-evaluated in the .repo property

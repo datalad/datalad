@@ -15,11 +15,15 @@ from os.path import join as opj, abspath, isdir
 from os.path import exists
 from os.path import realpath
 
+from mock import patch
+
 from ..dataset import Dataset
 from datalad.api import create
 from datalad.api import install
+from datalad.consts import DATASETS_TOPURL
 from datalad.distribution.install import get_containing_subdataset
-from datalad.distribution.install import _installationpath_from_url
+from datalad.distribution.install import _get_installationpath_from_url
+from datalad.distribution.install import _get_git_url_from_source
 from datalad.utils import chpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.exceptions import FileInGitError
@@ -37,6 +41,7 @@ from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_cwd_unchanged, skip_if_on_windows
 from datalad.tests.utils import assure_dict_from_str, assure_list_from_str
 from datalad.tests.utils import ok_generator
+from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
@@ -60,7 +65,13 @@ def test_installationpath_from_url():
               'http://example.com/lastbit',
               'http://example.com/lastbit.git',
               ):
-        assert_equal(_installationpath_from_url(p), 'lastbit')
+        assert_equal(_get_installationpath_from_url(p), 'lastbit')
+
+
+def test_get_git_url_from_source():
+    eq_(_get_git_url_from_source('///subds'), DATASETS_TOPURL + 'subds')
+    eq_(_get_git_url_from_source('http://example.com'), 'http://example.com')
+    assert_raises(NotImplementedError, _get_git_url_from_source, '//custom/subds')
 
 
 @with_tree(tree={'test.txt': 'whatever'})
@@ -281,6 +292,27 @@ def test_install_subdataset(src, path):
     # we shouldn't be able silently ignore attempt to provide source while
     # "installing" file under git
     assert_raises(FileInGitError, ds.install, opj('sub2', 'INFO.txt'), source="http://bogusbogus")
+
+
+@with_tree(tree={
+    'ds': {'test.txt': 'some'},
+    })
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_install_dataladri(src, topurl, path):
+    # make plain git repo
+    ds_path = opj(src, 'ds')
+    gr = GitRepo(ds_path, create=True)
+    gr.add('test.txt')
+    gr.commit('demo')
+    Runner(cwd=gr.path)(['git', 'update-server-info'])
+    # now install it somewhere else
+    with patch('datalad.support.network.DATASETS_TOPURL', topurl), \
+        swallow_logs():
+        ds = install(path=path, source='///ds')
+    eq_(ds.path, path)
+    ok_clean_git(path, annex=False)
+    ok_file_has_content(opj(path, 'test.txt'), 'some')
 
 
 def test_install_list():

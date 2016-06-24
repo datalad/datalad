@@ -28,7 +28,7 @@ from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
 
 from datalad.utils import on_windows
-from datalad.dochelpers import exc_str
+from datalad.consts import DATASETS_TOPURL
 
 from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
@@ -713,6 +713,18 @@ class DataLadRI(RI, RegexBasedURLMixin):
 
     def as_str(self):
         return "//{remote}/{path}".format(**self._fields)
+
+    def as_git_url(self):
+        """Dereference /// into original URLs which could be used by git for cloning
+
+        Returns
+        -------
+        str
+          URL string to reference the DataLadRI from its /// form
+        """
+        if self.remote:
+            raise NotImplementedError("not supported ATM to reference additional remotes")
+        return "{}{}".format(DATASETS_TOPURL, self.path)
 
 
 def _split_colon(s, maxsplit=1):
