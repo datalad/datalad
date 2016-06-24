@@ -844,3 +844,27 @@ def test_kwargs_to_options():
 
     res = Some().f_decorated_no_split(f='some')
     eq_(res, ['-fsome'])
+
+
+def test_to_options():
+
+    class Some(object):
+
+        def cmd_func(self, git_options=None, annex_options=None, options=None):
+
+            git_options = git_options[:] if git_options else []
+            annex_options = annex_options[:] if annex_options else []
+            options = options[:] if options else []
+
+            faked_cmd_call = ['git'] + git_options + ['annex'] + \
+                             annex_options + ['my_cmd'] + options
+
+            return faked_cmd_call
+
+    eq_(Some().cmd_func(options=to_options(m="bla", force=True)),
+        ['git', 'annex', 'my_cmd', '--force', '-m', 'bla'])
+
+    eq_(Some().cmd_func(git_options=to_options(C="/some/where"),
+                        annex_options=to_options(JSON=True),
+                        options=to_options(unused=True)),
+        ['git', '-C', '/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])

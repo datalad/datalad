@@ -85,6 +85,8 @@ def kwargs_to_options(func, split_single_char_options=True,
     Callable
     """
 
+    # TODO: don't overwrite options, but join
+
     @wraps(func)
     def newfunc(self, *args, **kwargs):
         t_kwargs = dict()
@@ -94,6 +96,26 @@ def kwargs_to_options(func, split_single_char_options=True,
                         **kwargs)
         return func(self, *args, **t_kwargs)
     return newfunc
+
+
+def to_options(**kwargs):
+    """Transform keyword arguments into a list of cmdline options
+
+    Parameters
+    ----------
+    split_single_char_options: bool
+
+    kwargs:
+
+    Returns
+    -------
+    list
+    """
+    # TODO: borrow_docs!
+
+    split = kwargs.pop('split_single_char_options', True)
+    return gitpy.Git().transform_kwargs(split_single_char_options=split,
+                                        **kwargs)
 
 
 def _normalize_path(base_dir, path):
