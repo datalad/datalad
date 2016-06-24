@@ -366,6 +366,7 @@ def test_is_url():
     ok_(is_url('like@sshlogin'))  # actually we do allow ssh:implicit urls ATM
     nok_(is_url(''))
     nok_(is_url(' '))
+    nok_(is_url(123))  # stuff of other types wouldn't be considered a URL
 
     # we can pass RI instance directly
     ok_(is_url(RI('file://localhost/some')))
@@ -378,6 +379,7 @@ def test_is_datalad_compat_ri():
     ok_(is_datalad_compat_ri('///localhost/some'))
     nok_(is_datalad_compat_ri('relative'))
     nok_(is_datalad_compat_ri('.///localhost/some'))
+    nok_(is_datalad_compat_ri(123))
 
 
 def test_get_local_file_url_linux():
