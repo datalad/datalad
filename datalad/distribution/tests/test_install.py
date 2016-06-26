@@ -299,6 +299,23 @@ def test_install_recursive(src, path):
     for sub in ds.get_subdatasets(recursive=True):
         ok_(Dataset(opj(path, sub)).is_installed(), "Not installed: %s" % opj(path, sub))
 
+
+@with_testrepos('submodule_annex', flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_install_recursive_with_data(src, path):
+
+    # now again; with data:
+    ds = install(path=path, source=src, recursive='data')
+    ok_(ds.is_installed())
+    if isinstance(ds.repo, AnnexRepo):
+        ok_(all(ds.repo.file_has_content(ds.repo.get_annexed_files())))
+    for sub in ds.get_subdatasets(recursive=True):
+        subds = Dataset(opj(path, sub))
+        ok_(subds.is_installed(), "Not installed: %s" % opj(path, sub))
+        if isinstance(subds.repo, AnnexRepo):
+            ok_(all(subds.repo.file_has_content(subds.repo.get_annexed_files())))
+
+
 # TODO: Is there a way to test result renderer?
 #  MIH: cmdline tests have run_main() which capture the output.
 
