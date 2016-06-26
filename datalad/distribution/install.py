@@ -393,6 +393,8 @@ class Install(Interface):
             # TODO: For now 'recursive' means just submodules.
             # See --with-data vs. -- recursive and figure it out
             if recursive:
+                if recursive == "data" and isinstance(ds.repo, AnnexRepo):
+                    ds.repo.get('.')
                 for sm in ds.repo.get_submodules():
                     _install_subds_from_flexible_source(
                         ds, sm.path, sm.url, recursive=recursive)
