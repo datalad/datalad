@@ -7,7 +7,7 @@
 	 td.dir {font-weight: bold; color: #00A1CB; }
 	 td.git {font-weight: bold; color: #00BA88; }
 	 td.annex {font-weight: bold; color: #EC6C20; }
-	 td.broken {color:#E53B51; }
+	 td.broken-link {color:#E53B51; }
 	 td.link {color: #FFD03C;  }
 	 td.file {color: #67CDDC;  }
 	</style>
@@ -18,6 +18,7 @@
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.10.5/jquery.dataTables.min.js"></script>
 	<script>
 	 function directory(url) {
+	     // construct path to metadata json based on directory to be rendered argument passed in url
 	     var url = (getParameterByName('dir') ? getParameterByName('dir') + ".dir.json": ".dir.json");
 
 	     var table = $('#directory').DataTable( {
@@ -34,38 +35,10 @@
 		     { "data": "path", title: "Path" },
 		     { "data": "type", title: "Type" },
 		 ],
-		 //update css of row based on type of node
+		 //update css of visible columns in each row based on their node type
 		 "createdRow": function ( row, data, index ) {
-		     if ( data.type == 'dir' ) {
-			 $('td', row).eq(0).addClass('dir');
-			 $('td', row).eq(1).addClass('dir');
-			 $('td', row).eq(2).addClass('dir');
-		     }
-		     else if ( data.type == 'git' ) {
-			 $('td', row).eq(0).addClass('git');
-			 $('td', row).eq(1).addClass('git');
-			 $('td', row).eq(2).addClass('git');
-		     }
-		     else if ( data.type == 'annex' ) {
-			 $('td', row).eq(0).addClass('annex');
-			 $('td', row).eq(1).addClass('annex');
-			 $('td', row).eq(2).addClass('annex');
-		     }
-		     else if ( data.type == 'broken-link' ) {
-			 $('td', row).eq(0).addClass('broken');
-			 $('td', row).eq(1).addClass('broken');
-			 $('td', row).eq(2).addClass('broken');
-		     }
-		     else if ( data.type == 'link' ) {
-			 $('td', row).eq(0).addClass('link');
-			 $('td', row).eq(1).addClass('link');
-			 $('td', row).eq(2).addClass('link');
-		     }
-		     else if ( data.type == 'file' ) {
-			 $('td', row).eq(0).addClass('file');
-			 $('td', row).eq(1).addClass('file');
-			 $('td', row).eq(2).addClass('file');
-		     }
+		     for(i = 0; i < 2; i++)
+			 $('td', row).eq(i).addClass(data.type);
 		 },
 		 // add click handlers to each row(cell) once table initialised
 		 "initComplete": function () {
@@ -73,19 +46,17 @@
 		     api.$('tr').click( function () {           		                   // on clicking a row element
 			 var data = table.row( this ).data();                                      // extract its data json from table
 			 if (data.type == 'dir' || data.type == 'git' || data.type == 'annex') {   // if clicked row of directory type
-			     // update url to load json from specified directory
+			     // update url to load json from selected directory
 			     window.location.search = '?dir=' + (data.name == ".." ? parent_url(url).replace('.dir.json', ''): url.replace('.dir.json', data.name + '/'));
 			 }
 		     });
 		 }
 	     });
-
-	     table.columns([3,4]).visible(false, false);
-	     
+	     table.columns([3,4]).visible(false, false);  //hide complete path and file type columns
 	     return table;
 	 }
 
-	 // construct parent url path
+	 // construct parent path of url passed
 	 function parent_url(url) {  url_array = url.split(/[\\/]/);  url_array.splice(-2,1);  return url_array.join('/');  }
 
 	 //extract GET parameters from URL
@@ -101,8 +72,7 @@
 	 }
 
 	 $(document).ready(function() {
-	     //get dir parameter from url to visit required directory's json
-	     var table = directory();
+	     var table = directory();   // construct table based on files in directory and their metadata
 	 });
 	</script>
     </body>
