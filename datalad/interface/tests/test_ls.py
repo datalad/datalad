@@ -45,7 +45,7 @@ def test_ls_repos(toppath):
     AnnexRepo(toppath + '2', create=True)
     repos = glob(toppath + '*')
 
-    for args in (repos, repos + ["bogus"]):
+    for args in (repos, repos + ["/some/bogus/file"]):
         for recursive in [False, True]:
             # in both cases shouldn't fail
             with swallow_outputs() as cmo:
