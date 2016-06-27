@@ -69,10 +69,23 @@ def test_installationpath_from_url():
 
 
 def test_get_git_url_from_source():
-    eq_(_get_git_url_from_source('///subds'), DATASETS_TOPURL + 'subds')
-    eq_(_get_git_url_from_source('http://example.com'), 'http://example.com')
-    assert_raises(NotImplementedError, _get_git_url_from_source, '//custom/subds')
 
+    # resolves datalad RIs:
+    eq_(_get_git_url_from_source('///subds'), DATASETS_TOPURL + 'subds')
+    assert_raises(NotImplementedError, _get_git_url_from_source,
+                  '//custom/subds')
+
+    # doesn't harm others:
+    eq_(_get_git_url_from_source('http://example.com'), 'http://example.com')
+    eq_(_get_git_url_from_source('/absolute/path'), '/absolute/path')
+    eq_(_get_git_url_from_source('file://localhost/some'),
+        'file://localhost/some')
+    eq_(_get_git_url_from_source('localhost/another/path'),
+        'localhost/another/path')
+    eq_(_get_git_url_from_source('user@someho.st/mydir'),
+        'user@someho.st/mydir')
+    eq_(_get_git_url_from_source('ssh://somewhe.re/else'),
+        'ssh://somewhe.re/else')
 
 @with_tree(tree={'test.txt': 'whatever'})
 def test_get_containing_subdataset(path):
