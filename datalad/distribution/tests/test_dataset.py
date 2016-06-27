@@ -169,7 +169,7 @@ def test_subdatasets(path):
     # from scratch
     ds = Dataset(path)
     assert_false(ds.is_installed())
-    eq_(ds.get_subdatasets(), None)
+    eq_(ds.get_subdatasets(), [])
     ds = ds.create()
     assert_true(ds.is_installed())
     eq_(ds.get_subdatasets(), [])

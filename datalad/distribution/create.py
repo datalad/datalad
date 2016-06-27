@@ -68,6 +68,9 @@ class Create(Interface):
     def __call__(
             loc=None, description=None, no_annex=False, annex_version=None,
             annex_backend='MD5E'):
+        if description and no_annex:
+            raise ValueError("Incompatible arguments: cannot specify description for "
+                             "annex repo and declaring no annex repo.")
         if loc is None:
             loc = os.curdir
         elif isinstance(loc, Dataset):

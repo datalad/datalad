@@ -25,6 +25,9 @@ matrix:
     # must operate nicely with those env variables set
     - http_proxy=
     - https_proxy=
+  - python: 2.7
+    env:
+    - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
   - python: 3.3
   - python: 3.4
   # Those aren't yet ready since lxml Ibelieve fails to install

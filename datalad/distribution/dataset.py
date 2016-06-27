@@ -27,7 +27,7 @@ lgr = logging.getLogger('datalad.dataset')
 def resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
-    Any explicit path (absolute or relative) is return as an absolute path.
+    Any explicit path (absolute or relative) is returned as an absolute path.
     In case of an explicit relative path, the current working directory is
     used as a reference. Any non-explicit relative path is resolved against
     as dataset location, i.e. considered relative to the location of the
@@ -164,7 +164,7 @@ class Dataset(object):
 
         repo = self.repo
         if repo is None:
-            return
+            return []
 
         # check whether we have anything in the repo. if not go home early
         if not repo.repo.head.is_valid():
