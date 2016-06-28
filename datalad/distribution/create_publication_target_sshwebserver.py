@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-from os.path import join as opj, abspath, basename, relpath, normpath
+from os.path import join as opj, abspath, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
 
 from datalad.support.network import RI, URL, SSHRI
@@ -28,6 +28,7 @@ from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
 from datalad import ssh_manager
+from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -291,6 +292,28 @@ class CreatePublicationTargetSSHWebserver(Interface):
                      opj(path, ".git/hooks/post-update")])
             except CommandError as e:
                 lgr.error("Failed to enable post update hook.\n"
+                          "Error: %s" % e.message)
+
+            # add json creator command to post-update hook:
+            try:
+                json_command = "exec datalad ls -r --json file " + path
+                ssh(["echo", json_command, ">>", opj(path, ".git/hooks/post-update")])
+            except CommandError as e:
+                lgr.error("Failed to add json creation command to post update hook.\n"
+                          "Error: %s" % e.message)
+
+            # get html for dataset rendering from local datalad repo:
+            try:
+                import datalad
+                html_path = opj(dirname(datalad.__file__), "resources/website/index.html")
+                scp_target = sshri.hostname + ":" + sshri.path
+                if sshri.port:
+                    Runner().run(['scp', '-P', sshri.port, html_path, scp_target])
+                else:
+                    Runner().run(['scp', html_path, scp_target])
+
+            except CommandError as e:
+                lgr.error("Failed to get html from local datalad repository. Unable to setup web interface.\n"
                           "Error: %s" % e.message)
 
             # initially update server info "manually":
