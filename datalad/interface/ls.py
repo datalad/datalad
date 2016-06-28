@@ -13,10 +13,10 @@ __docformat__ = 'restructuredtext'
 
 import sys
 import time
-import json
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir, isfile, islink, isdir, dirname, basename, split
-from os import readlink, listdir, lstat
+from os import readlink, listdir, lstat, remove
+from json import dump, dumps
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
@@ -78,19 +78,21 @@ class Ls(Interface):
             are after""",
             default=None
         ),
-        web=Parameter(
-            args=("-w", "--web"),
-            action="store_true",
-            doc="list the content state of the dataset as json for web rendering",
+        json=Parameter(
+            choices=('file', 'display', 'delete'),
+            doc="""metadata json of dataset for creating web user interface.
+            display: prints jsons to stdout or
+            file: writes each subdir metadata to json file in subdir of dataset or
+            delete: deletes all metadata json files in dataset""",
         ),
     )
 
     @staticmethod
-    def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False, web=False):
+    def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False, json=None):
 
         kw = dict(fast=fast, recursive=recursive, all=all)
         if isinstance(loc, list):
-            return [Ls.__call__(loc_, config_file=config_file, list_content=list_content, web=web, **kw)
+            return [Ls.__call__(loc_, config_file=config_file, list_content=list_content, json=json, **kw)
                     for loc_ in loc]
 
         # TODO: do some clever handling of kwargs as to remember what were defaults
@@ -102,7 +104,7 @@ class Ls(Interface):
             return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
         elif lexists(loc):  # and lexists(opj(loc, '.git')):
             # TODO: use some helper like is_dataset_path ??
-            return _ls_web(loc, **kw) if web else _ls_dataset(loc, **kw)
+            return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
         else:
             #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
             # TODO: unify all the output here -- _ls functions should just return something
@@ -426,7 +428,7 @@ def ignored(path, only_hidden=False):
         return True
 
 
-def fs_traverse(loc, repo, recursive=False):
+def fs_traverse(loc, repo, recursive=False, json=None):
     """takes a root path, traverses through its nodes and returns a dictionary of relevant features attached to each node
 
     extracts and returns a (recursive) list of directory info at loc
@@ -445,14 +447,24 @@ def fs_traverse(loc, repo, recursive=False):
 
             if recursive and isdir(opj(loc, node)) and not ignored(opj(loc, node)):
                 # if recursive, create info dictionary of each child directory
-                subdir = fs_traverse(opj(loc, node), repo, recursive=recursive)
-                # and write to json in child's directory
-                with open(opj(loc, node, '.dir.json'), 'w') as f:
-                    json.dump(subdir, f)
+                subdir = fs_traverse(opj(loc, node), repo, recursive=recursive, json=json)
+
+                # and write to json in child's directory, json flag set to 'file'
+                if json == 'file':
+                    with open(opj(loc, node, '.dir.json'), 'w') as f:
+                        dump(subdir, f)
+                # else if json flag set to delete, remove .dir.json of current directory
+                elif json == 'delete':
+                    if exists(opj(loc, node, '.dir.json')):
+                        remove(opj(loc, node, '.dir.json'))
+                # else dump json to stdout
+                elif json == 'display':
+                    print opj(loc, node) + ':\n' + ''.join(['-' for i in xrange(len(opj(loc, node)))])
+                    print dumps(subdir) + '\n'
     return fs
 
 
-def _ls_web(loc, fast=False, recursive=False, all=False):
+def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
     from ..distribution.dataset import Dataset
 
     # find all sub-datasets under path passed and attach Dataset class to each
@@ -466,13 +478,23 @@ def _ls_web(loc, fast=False, recursive=False, all=False):
     # for each submodule at loc passed by user
     for ds in dsms:
         # (recursively) traverse each submodule
-        fs = fs_traverse(opj(ds.path, ""), ds, recursive=recursive)
+        fs = fs_traverse(opj(ds.path, ""), ds, recursive=recursive, json=json)
         # if its the root submodule remove parent node info ("..") from it
         if ds.path == abspath(loc):
             fs["nodes"].pop(0)
+
         # store directory info of the submodule level in fs hierarchy as json
-        with open(opj(ds.path, '.dir.json'), 'w') as f:
-            json.dump(fs, f)
+        if json == 'file':
+            with open(opj(ds.path, '.dir.json'), 'w') as f:
+                dump(fs, f)
+        # else if json flag set to delete, remove root .dir.json of the current submodule
+        elif json == 'delete':
+            if exists(opj(ds.path, '.dir.json')):
+                remove(opj(ds.path, '.dir.json'))
+        # else dump its json to stdout
+        elif json == 'display':
+            print opj(ds.path) + ':\n' + ''.join(['-' for i in xrange(len(ds.path))])
+            print dumps(fs)
 
 
 #
