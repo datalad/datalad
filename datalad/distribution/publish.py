@@ -219,14 +219,29 @@ class Publish(Interface):
 
             lgr.info("Publishing dataset {0} to sibling {1} "
                      "...".format(ds, dest_resolved))
+
             # we now know where to push to:
-            ds.repo.push(remote=dest_resolved,
-                         refspec=ds.repo.get_active_branch(),
-                         set_upstream=set_upstream)
+            push_result = ds.repo.push(remote=dest_resolved,
+                                       refspec=ds.repo.get_active_branch(),
+                                       set_upstream=set_upstream)
+
+            from git.remote import PushInfo as PI
+            for push_info in push_result:
+                if push_info.flags & PI.ERROR == PI.ERROR:
+                    lgr.error(push_info.summary)
+                else:
+                    lgr.info(push_info.summary)
+
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.push(remote=dest_resolved,
-                             refspec="+git-annex:git-annex")
+                push_result = ds.repo.push(remote=dest_resolved,
+                                           refspec="+git-annex:git-annex")
+                for push_info in push_result:
+                    if push_info.flags & PI.ERROR == PI.ERROR:
+                        lgr.error(push_info.summary)
+                    else:
+                        lgr.info(push_info.summary)
+
 
             # we need to fetch
             # TODO

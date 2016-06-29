@@ -945,11 +945,13 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    rm.push(refspec=refspec, progress=progress, **kwargs)
+                    pi_list = rm.push(refspec=refspec, progress=progress,
+                                      **kwargs)
                     # TODO: progress +kwargs
             else:
-                rm.push(refspec=refspec, progress=progress, **kwargs)
+                pi_list = rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
+        return pi_list
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
