@@ -43,6 +43,7 @@ from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import swallow_logs
+from datalad.utils import updated
 
 # imports from same module:
 from .exceptions import CommandError
@@ -113,9 +114,7 @@ def to_options(**kwargs):
     """
     # TODO: borrow_docs!
 
-    split = kwargs.pop('split_single_char_options', True)
-    return gitpy.Git().transform_kwargs(split_single_char_options=split,
-                                        **kwargs)
+    return gitpy.Git().transform_kwargs(**kwargs)
 
 
 def _normalize_path(base_dir, path):
@@ -1292,7 +1291,7 @@ class GitRepo(object):
             see `__init__`
         """
 
-        kwargs['insert_kwargs_after'] = 'deinit'
+        kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
         self._gitpy_custom_call('submodule', ['deinit', path],
                                 cmd_options=kwargs)
 

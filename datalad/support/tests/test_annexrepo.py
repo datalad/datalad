@@ -124,6 +124,16 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
     ar.set_direct_mode(True)
     ok_clean_git_annex_proxy(path=annex_path)
 
+    # annex proxy raises in indirect mode:
+    try:
+        ar.set_direct_mode(False)
+        assert_raises(CommandNotAvailableError, ar.proxy, ['git', 'status'])
+    except CommandNotAvailableError:
+        # we can't switch to indirect
+        pass
+
+
+
 
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)

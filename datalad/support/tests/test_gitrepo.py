@@ -784,8 +784,8 @@ def test_git_custom_calls(path, path2):
     # Note: 'path2' doesn't contain a git repository
     with assert_raises(GitCommandError) as cm:
         repo._gitpy_custom_call('status', git_options={'C': path2})
-        assert_in("git -C %s status" % path2, str(cm.exception))
-        assert_in("fatal: Not a git repository", str(cm.exception))
+    assert_in("git -C %s status" % path2, str(cm.exception))
+    assert_in("fatal: Not a git repository", str(cm.exception))
 
     # TODO: How to test 'env'?
 
