@@ -855,10 +855,10 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                    return rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
-                rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                return rm.fetch(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
@@ -898,10 +898,11 @@ class GitRepo(object):
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
                     GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                remote.pull(refspec=refspec, progress=progress, **kwargs)
+                return remote.pull(refspec=refspec, progress=progress,
+                                      **kwargs)
                 # TODO: progress +kwargs
         else:
-            remote.pull(refspec=refspec, progress=progress, **kwargs)
+            return remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
     def push(self, remote=None, refspec=None, progress=None, all_=False,
@@ -945,13 +946,12 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    pi_list = rm.push(refspec=refspec, progress=progress,
-                                      **kwargs)
+                    return rm.push(refspec=refspec, progress=progress,
+                                   **kwargs)
                     # TODO: progress +kwargs
             else:
-                pi_list = rm.push(refspec=refspec, progress=progress, **kwargs)
+                return rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
-        return pi_list
 
     def get_remote_url(self, name, push=False):
         """Get the url of a remote.
