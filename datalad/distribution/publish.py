@@ -39,11 +39,15 @@ lgr = logging.getLogger('datalad.distribution.publish')
 
 def _log_push_info(pi_list):
     from git.remote import PushInfo as PI
-    for push_info in pi_list:
-        if (push_info.flags & PI.ERROR) == PI.ERROR:
-            lgr.error(push_info.summary)
-        else:
-            lgr.info(push_info.summary)
+
+    if pi_list:
+        for push_info in pi_list:
+            if (push_info.flags & PI.ERROR) == PI.ERROR:
+                lgr.error(push_info.summary)
+            else:
+                lgr.info(push_info.summary)
+    else:
+        lgr.warning("Nothing was pushed.")
 
 
 class Publish(Interface):
