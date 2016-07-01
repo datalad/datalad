@@ -20,6 +20,7 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
+from datalad.interface.common_opts import git_opts, annex_opts, annex_init_opts
 
 lgr = logging.getLogger('datalad.distribution.create')
 
@@ -44,6 +45,11 @@ class Create(Interface):
             args=("-D", "--description",),
             doc="""short description that humans can use to identify the
             repository/location, e.g. "Precious data on my laptop."""""),
+        add_to_super=Parameter(
+            args=("--add-to-super",),
+            doc="""add the created dataset as a component it's super
+            dataset, if such exists""",
+            action="store_true"),
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""flag that if given a plain Git repository will be created
@@ -61,13 +67,28 @@ class Create(Interface):
             For a list of supported backends see the git-annex
             documentation""",
             nargs=1),
+        git_opts=git_opts,
+        annex_opts=annex_opts,
+        annex_init_opts=annex_init_opts,
     )
 
     @staticmethod
     @datasetmethod(name='create', dataset_argname='loc')
     def __call__(
-            loc=None, description=None, no_annex=False, annex_version=None,
-            annex_backend='MD5E'):
+            loc=None,
+            description=None,
+            add_to_super=False,
+            no_annex=False,
+            annex_version=None,
+            annex_backend='MD5E',
+            git_opts=None,
+            annex_opts=None,
+            annex_init_opts=None):
+        # if add_to_super:
+        #   find parent ds and call its create_subdataset() which calls this
+        #   function again, with add_to_super=False and afterwards added the
+        #   new subdataset to itself
+
         if description and no_annex:
             raise ValueError("Incompatible arguments: cannot specify description for "
                              "annex repo and declaring no annex repo.")
