@@ -73,14 +73,18 @@ class Parameter(object):
         string or list of strings (if indent is None)
         """
         paramsdoc = '%s' % name
-        if not self.constraints is None:
+        sdoc = None
+        if self.constraints is not None:
             sdoc = self.constraints.short_description()
-            if not sdoc is None:
-                if sdoc[0] == '(' and sdoc[-1] == ')':
-                    sdoc = sdoc[1:-1]
-                paramsdoc += " : %s" % sdoc
-                if has_default:
-                    paramsdoc += ", optional"
+        elif 'action' in self.cmd_kwargs \
+                and self.cmd_kwargs['action'] in ("store_true", "store_false"):
+            sdoc = 'bool'
+        if not sdoc is None:
+            if sdoc[0] == '(' and sdoc[-1] == ')':
+                sdoc = sdoc[1:-1]
+            paramsdoc += " : %s" % sdoc
+            if has_default:
+                paramsdoc += ", optional"
         paramsdoc = [paramsdoc]
 
         doc = self._doc
