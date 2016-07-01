@@ -52,6 +52,11 @@ annex_init_opts = Parameter(
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :cmd:`git annex init` calls""")
 
+annex_add_opts = Parameter(
+    args=("--annex-add-opts",),
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :cmd:`git annex add` calls""")
+
 annex_get_opts = Parameter(
     args=("--annex-get-opts",),
     constraints=EnsureStr() | EnsureNone(),

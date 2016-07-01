@@ -17,6 +17,8 @@ from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.distribution.dataset import EnsureDataset, datasetmethod
 from datalad.support.param import Parameter
+from datalad.interface.common_opts import recursion_flag, recursion_limit, \
+    git_opts, annex_opts, annex_add_opts
 
 lgr = logging.getLogger('datalad.distribution.add')
 
@@ -44,15 +46,29 @@ class Add(Interface):
             args=("-s", "--source",),
             doc="url or local path of the to be added component's source",
             constraints=EnsureStr() | EnsureNone()),
-        add_data_to_git=Parameter(
-            args=("--add-data-to-git",),
+        to_git=Parameter(
+            args=("--to-git",),
             action='store_true',
             doc="""flag whether to add data directly to Git, instead of
             tracking data identity only.  Usually this is not desired,
             as it inflates dataset sizes and impacts flexibility of data
-            transport"""))
+            transport"""),
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
+        git_opts=git_opts,
+        annex_opts=annex_opts,
+        annex_add_opts=annex_add_opts)
 
     @staticmethod
     @datasetmethod(name='add')
-    def __call__(dataset=None, path=None, source=None, add_data_to_git=False):
+    def __call__(
+            dataset=None,
+            path=None,
+            source=None,
+            to_git=False,
+            recursive=False,
+            recursion_limit=None,
+            git_opts=None,
+            annex_opts=None,
+            annex_add_opts=None):
         raise NotImplementedError
