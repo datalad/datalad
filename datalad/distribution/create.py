@@ -20,7 +20,8 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
-from datalad.interface.common_opts import git_opts, annex_opts, annex_init_opts
+from datalad.interface.common_opts import git_opts, annex_opts, \
+    annex_init_opts, dataset_description
 
 lgr = logging.getLogger('datalad.distribution.create')
 
@@ -41,10 +42,7 @@ class Create(Interface):
             nargs='?',
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
-        description=Parameter(
-            args=("-D", "--description",),
-            doc="""short description that humans can use to identify the
-            repository/location, e.g. "Precious data on my laptop."""""),
+        description=dataset_description,
         add_to_super=Parameter(
             args=("--add-to-super",),
             doc="""add the created dataset as a component it's super

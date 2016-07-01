@@ -14,6 +14,11 @@ __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
 
+dataset_description = Parameter(
+    args=("-D", "--description",),
+    doc="""short description of this dataset instance that humans can use to
+    identify the repository/location, e.g. "Precious data on my laptop.""")
+
 git_opts = Parameter(
     args=("--git-opts",),
     doc="""options string to be passed to :cmd:`git` calls""")
