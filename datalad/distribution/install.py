@@ -29,6 +29,9 @@ from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
+from datalad.interface.common_opts import recursion_flag, recursion_limit, \
+    dataset_description, add_to_superdataset, git_opts, annex_opts, \
+    annex_init_opts
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows, swallow_logs
 from datalad.support.network import RI
@@ -238,12 +241,8 @@ def get_containing_subdataset(ds, path):
 # install of existing submodule; recursive call; source should not be None!
 
 class Install(Interface):
-    """Install a dataset component or entire dataset(s).
+    """Install a dataset or subdataset.
 
-    This command can make arbitrary content available in a dataset. This
-    includes the fulfillment of existing :term:`subdataset` or file handles in
-    a dataset, as well as the addition of subdatasets and such handles for
-    content available locally or subdataset remotely.
     """
 
     _params_ = dict(
@@ -265,24 +264,32 @@ class Install(Interface):
             args=("-s", "--source",),
             doc="url or local path of the installation source",
             constraints=EnsureStr() | EnsureNone()),
-        # TODO this probably needs --with-data and --recursive as a plain boolean
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            constraints=EnsureChoice('datasets', 'data') | EnsureBool(),
-            doc="""if set, all content is installed recursively, including
-            content of any subdatasets"""),
-        add_data_to_git=Parameter(
-            args=("--add-data-to-git",),
-            action='store_true',
-            doc="""flag whether to add data directly to Git, instead of
-            tracking data identity only.  Usually this is not desired,
-            as it inflates dataset sizes and impacts flexibility of data
-            transport"""))
+        get_data=Parameter(
+            args=("-g", "--get-data",),
+            action="store_true",
+            doc="""if given, obtain all data content too"""),
+        description=dataset_description,
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
+        add_to_super=add_to_superdataset,
+        git_opts=git_opts,
+        annex_opts=annex_opts,
+        annex_init_opts=annex_init_opts)
 
     @staticmethod
     @datasetmethod(name='install')
-    def __call__(dataset=None, path=None, source=None, recursive=False,
-                 add_data_to_git=False):
+    def __call__(
+            dataset=None,
+            path=None,
+            source=None,
+            get_data=False,
+            description=None,
+            recursive=False,
+            recursion_limit=None,
+            add_to_super=False,
+            git_opts=None,
+            annex_opts=None,
+            annex_init_opts=None):
         lgr.debug("Installation attempt started")
         # shortcut
         ds = dataset

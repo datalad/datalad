@@ -13,21 +13,46 @@
 __docformat__ = 'restructuredtext'
 
 from datalad.support.param import Parameter
+from datalad.support.constraints import EnsureInt, EnsureNone, EnsureStr
 
 dataset_description = Parameter(
     args=("-D", "--description",),
+    constraints=EnsureStr() | EnsureNone(),
     doc="""short description of this dataset instance that humans can use to
     identify the repository/location, e.g. "Precious data on my laptop.""")
 
+recursion_flag = Parameter(
+    args=("-r", "--recursive",),
+    action="store_true",
+    doc="""if set, recursive into potential subdataset""")
+
+recursion_limit = Parameter(
+    args=("--recursion-limit",),
+    metavar="LEVELS",
+    constraints=EnsureInt() | EnsureNone(),
+    doc="""limit recursion into subdataset to the given number of levels""")
+
+add_to_superdataset = Parameter(
+    args=("--add-to-super",),
+    doc="""add the new dataset as a component to a super dataset""",
+    action="store_true")
+
 git_opts = Parameter(
     args=("--git-opts",),
-    doc="""options string to be passed to :cmd:`git` calls""")
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :cmd:`git` calls""")
 
 annex_opts = Parameter(
     args=("--annex-opts",),
-    doc="""options string to be passed to :cmd:`git annex` calls""")
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :cmd:`git annex` calls""")
 
 annex_init_opts = Parameter(
     args=("--annex-init-opts",),
-    doc="""options string to be passed to :cmd:`git annex init` calls""")
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :cmd:`git annex init` calls""")
 
+annex_get_opts = Parameter(
+    args=("--annex-get-opts",),
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :cmd:`git annex get` calls""")

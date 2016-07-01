@@ -21,7 +21,7 @@ from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
 from datalad.interface.common_opts import git_opts, annex_opts, \
-    annex_init_opts, dataset_description
+    annex_init_opts, dataset_description, add_to_superdataset
 
 lgr = logging.getLogger('datalad.distribution.create')
 
@@ -43,11 +43,7 @@ class Create(Interface):
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
         description=dataset_description,
-        add_to_super=Parameter(
-            args=("--add-to-super",),
-            doc="""add the created dataset as a component it's super
-            dataset, if such exists""",
-            action="store_true"),
+        add_to_super=add_to_superdataset,
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""flag that if given a plain Git repository will be created
@@ -60,6 +56,7 @@ class Create(Interface):
             constraints=EnsureDType(int) | EnsureNone()),
         annex_backend=Parameter(
             args=("--annex-backend",),
+            constraints=EnsureStr() | EnsureNone(),
             # not listing choices here on purpose to avoid future bugs
             doc="""set default hashing backend used by the new dataset.
             For a list of supported backends see the git-annex
