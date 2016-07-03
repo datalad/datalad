@@ -426,13 +426,14 @@ def ignored(path, only_hidden=False):
         return True
     if '.' == leaf_name(path)[0] or leaf_name(path) == 'index.html':
         return True
+    return False
 
 
 def fs_traverse(loc, repo, recursive=False, json=None):
     """takes a root path, traverses through its nodes and returns a dictionary of relevant features attached to each node
 
     extracts and returns a (recursive) list of directory info at loc
-    does not traverse into git or annex directories
+    does not traverse into annex, git or hidden directories
     """
     fs = fs_extract(FsModel(loc, repo))
 

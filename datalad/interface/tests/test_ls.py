@@ -17,13 +17,15 @@ from glob import glob
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from ...api import ls
-from ...utils import swallow_outputs
+from ...utils import swallow_outputs, swallow_logs
 from ...tests.utils import assert_equal, assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
+from ...tests.utils import with_tree
+from datalad.interface.ls import ignored, fs_traverse, _ls_json
+from os.path import exists, lexists, join as opj, abspath, isabs
 
 from datalad.downloaders.tests.utils import get_test_providers
-
 
 @use_cassette('test_ls_s3')
 def test_ls_s3():
@@ -56,3 +58,71 @@ def test_ls_repos(toppath):
                 assert_in('master', cmo.out)
                 if "bogus" in args:
                     assert_in('unknown', cmo.out)
+
+
+@with_tree(
+    tree={'dir': {'file1.txt': '123', 'file2.txt': '456'},
+          '.hidden': {'.hidden_file': '121'}})
+def test_ignored(topdir):
+    # create annex, git repos
+    AnnexRepo(opj(topdir, 'annexdir'), create=True)
+    GitRepo(opj(topdir, 'gitdir'), create=True)
+
+    # non-git or annex should not be ignored
+    assert_equal(ignored(topdir), False)
+    # git, annex and hidden nodes should be ignored
+    for subdir in ["annexdir", "gitdir", ".hidden"]:
+        assert_equal(ignored(opj(topdir, subdir)), True)
+    # ignore only hidden nodes(not git or annex repos) flag should work
+    assert_equal(ignored(opj(topdir, "annexdir"), only_hidden=True), False)
+
+
+@with_tree(
+    tree={'dir': {'.fgit': {'ab.txt': '123'},
+                  'subdir': {'file1.txt': '123', 'file2.txt': '456'},
+                  'subgit': {'fgit.txt': '987'}},
+          '.hidden': {'.hidden_file': '121'}})
+def test_fs_traverse(topdir):
+    from datalad.distribution.dataset import Dataset
+    AnnexRepo(opj(topdir, 'annexdir'), create=True)
+    GitRepo(opj(topdir, 'gitdir'), create=True)
+    GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
+
+    with swallow_logs() as log, swallow_outputs() as cmo:
+        fs = fs_traverse(topdir, Dataset(topdir), recursive=True, json='display')
+        # fs_traverse logs should contain all not ignored subdirectories
+        for subdir in [opj(topdir, "dir"), opj(topdir, 'dir', 'subdir')]:
+            assert_in("Subdir: " + subdir, log.out)
+
+        # fs_traverse should return a dictionary
+        assert_equal(isinstance(fs, dict), True)
+        # containing the toplevel directories including annex, git-annex folders
+        assert_equal(([True for item in fs["nodes"] if ('gitdir' and 'annexdir') == item['name']]), [True])
+        # fs_traverse stdout contains subdirectory
+        assert_in(('file2.txt' and 'dir'), cmo.out)
+
+
+@with_tree(
+    tree={'dir': {'.fgit': {'ab.txt': '123'},
+                  'subdir': {'file1.txt': '123', 'file2.txt': '456'},
+                  'subgit': {'fgit.txt': '987'}},
+          '.hidden': {'.hidden_file': '121'}})
+def test_ls_json(topdir):
+    annex = AnnexRepo(topdir, create=True)
+    AnnexRepo(opj(topdir, 'annexdir'), create=True)
+    git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
+    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)
+    annex.add(opj(topdir, 'dir', 'subgit'), commit=True)
+    annex.add(opj(topdir, 'dir'), commit=True)
+    annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])
+
+    with swallow_logs(), swallow_outputs():
+        for state in ['file', 'delete']:
+            _ls_json(topdir, json=state, recursive=True)
+            # directories that should have json files created and deleted
+            for subdir in ['dir', opj('dir', 'subdir')]:
+                assert_equal(exists(opj(topdir, subdir, '.dir.json')), True if state == 'file' else False)
+
+            # directories that should not have json files created
+            for subdir in ['.hidden', opj('dir', 'subgit')]:
+                assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
