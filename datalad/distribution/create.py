@@ -27,12 +27,12 @@ lgr = logging.getLogger('datalad.distribution.create')
 
 
 class Create(Interface):
-    """Create a new dataset.
+    """Create a new dataset from scratch.
 
-    This command initializes a new dataset at a given location, or the current
-    directory. The new dataset can optionally be registered in an existing
-    superdataset (the new dataset's path needs to be located within the
-    superdataset for that, and the superdataset will be detected
+    This command initializes a new :term:`dataset` at a given location, or the
+    current directory. The new dataset can optionally be registered in an
+    existing :term:`superdataset` (the new dataset's path needs to be located
+    within the superdataset for that, and the superdataset will be detected
     automatically). It is recommended to provide a brief description to label
     the dataset's nature *and* location, e.g. "Michael's music on black
     laptop". This helps humans to identify data locations in distributed
@@ -42,6 +42,9 @@ class Create(Interface):
     Plain Git repositories can be created via the :option:`no-annex` flag.
     However, the result will not be a full dataset, and, consequently, not all
     features are supported (e.g. a description).
+
+    To create a local version of a remote dataset use the
+    :func:`~datalad.api.install` command instead.
     """
 
     _params_ = dict(
