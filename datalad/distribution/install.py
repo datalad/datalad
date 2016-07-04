@@ -243,6 +243,20 @@ def get_containing_subdataset(ds, path):
 class Install(Interface):
     """Install a dataset or subdataset.
 
+    This command creates a local :term:`sibling` of an existing dataset, while
+    optionally recursing into potential subdatasets, and downloading all
+    referenced data. The new dataset can be optionally registered in an
+    existing :term:`superdataset` (the new dataset's path needs to be located
+    within the superdataset for that, and the superdataset will be detected
+    automatically). It is recommended to provide a brief description to label
+    the dataset's nature *and* location, e.g. "Michael's music on black
+    laptop". This helps humans to identify data locations in distributed
+    scenarios.  By default an identifier comprised of user and machine name,
+    plus path will be generated.
+
+    When only partial dataset content shall be obtained, it is recommended to
+    use this command without the :option:`get-data` flag, followed by a
+    :func:`~datalad.api.get` operation to obtain the desired data.
     """
 
     _params_ = dict(
@@ -250,19 +264,21 @@ class Install(Interface):
             args=("-d", "--dataset"),
             doc="""specify the dataset to perform the install operation on.  If
             no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory and/or the `path` given""",
+            in a parent directory of the current working directory and/or the
+            `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             doc="""path/name of the installation target.  If no `source` is
             provided, and no `dataset` is given or detected, this is
             interpreted as the source URL of a dataset and a destination
-            path will be derived from the URL similar to 'git clone'""",
+            path will be derived from the URL similar to :command:`git
+            clone`""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
-            doc="url or local path of the installation source",
+            doc="URL or local path of the installation source",
             constraints=EnsureStr() | EnsureNone()),
         get_data=Parameter(
             args=("-g", "--get-data",),
