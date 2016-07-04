@@ -29,16 +29,28 @@ lgr = logging.getLogger('datalad.distribution.create')
 class Create(Interface):
     """Create a new dataset.
 
-    This command initializes a new repository at a given location, or the
-    current directory.
+    This command initializes a new dataset at a given location, or the current
+    directory. The new dataset can optionally be registered in an existing
+    superdataset (the new dataset's path needs to be located within the
+    superdataset for that, and the superdataset will be detected
+    automatically). It is recommended to provide a brief description to label
+    the dataset's nature *and* location, e.g. "Michael's music on black
+    laptop". This helps humans to identify data locations in distributed
+    scenarios.  By default an identifier comprised of user and machine name,
+    plus path will be generated.
+
+    Plain Git repositories can be created via the :option:`no-annex` flag.
+    However, the result will not be a full dataset, and, consequently, not all
+    features are supported (e.g. a description).
     """
 
     _params_ = dict(
-        loc=Parameter(
-            args=("loc",),
-            doc="""location where the dataset shall be  created.  If `None`,
-            is given a dataset will be created in the current working
-            directory""",
+        path=Parameter(
+            args=("path",),
+            doc="""path where the dataset shall be created, directories
+            will be created as necessary. If no location is provided, a dataset
+            will be created in the current working directory. Either way the
+            command will error if the target directory is not empty.""",
             nargs='?',
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
@@ -50,20 +62,24 @@ class Create(Interface):
             action="store_true"),
         no_annex=Parameter(
             args=("--no-annex",),
-            doc="""flag that if given a plain Git repository will be created
-            without any annex""",
+            doc="""if set, a plain Git repository will be created without any
+            annex""",
             action='store_false'),
         annex_version=Parameter(
             args=("--annex-version",),
-            doc="""select particular annex repository version.  The list of
-            supported versions depends on the available git-annex version""",
+            doc="""select a particular annex repository version. The
+            list of supported versions depends on the available git-annex
+            version. This should be left untouched, unless you know what
+            you are doing""",
             constraints=EnsureDType(int) | EnsureNone()),
         annex_backend=Parameter(
             args=("--annex-backend",),
             # not listing choices here on purpose to avoid future bugs
             doc="""set default hashing backend used by the new dataset.
             For a list of supported backends see the git-annex
-            documentation""",
+            documentation. The default is optimized for maximum compatibility
+            of datasets across platforms (especially those with limited
+            path lengths)""",
             nargs=1),
         git_opts=git_opts,
         annex_opts=annex_opts,
@@ -71,9 +87,9 @@ class Create(Interface):
     )
 
     @staticmethod
-    @datasetmethod(name='create', dataset_argname='loc')
+    @datasetmethod(name='create', dataset_argname='path')
     def __call__(
-            loc=None,
+            path=None,
             description=None,
             add_to_super=False,
             no_annex=False,
