@@ -243,20 +243,27 @@ def get_containing_subdataset(ds, path):
 class Install(Interface):
     """Install a dataset or subdataset.
 
-    This command creates a local :term:`sibling` of an existing dataset, while
-    optionally recursing into potential subdatasets, and downloading all
-    referenced data. The new dataset can be optionally registered in an
-    existing :term:`superdataset` (the new dataset's path needs to be located
-    within the superdataset for that, and the superdataset will be detected
-    automatically). It is recommended to provide a brief description to label
-    the dataset's nature *and* location, e.g. "Michael's music on black
-    laptop". This helps humans to identify data locations in distributed
-    scenarios.  By default an identifier comprised of user and machine name,
-    plus path will be generated.
+    This command creates a local :term:`sibling` of an existing dataset from a
+    (remote) location identified via a URL or path, or by the name of a
+    registered subdataset. Optional recursion into potential subdatasets, and
+    download of all referenced data is supported. The new dataset can be
+    optionally registered in an existing :term:`superdataset` (the new
+    dataset's path needs to be located within the superdataset for that, and
+    the superdataset will be detected automatically). It is recommended to
+    provide a brief description to label the dataset's nature *and* location,
+    e.g. "Michael's music on black laptop". This helps humans to identify data
+    locations in distributed scenarios.  By default an identifier comprised of
+    user and machine name, plus path will be generated.
 
     When only partial dataset content shall be obtained, it is recommended to
     use this command without the :option:`get-data` flag, followed by a
     :func:`~datalad.api.get` operation to obtain the desired data.
+
+    .. note::
+      Power-user info: This command uses :command:`git clone`, and
+      :command:`git annex init` to prepare the dataset. Registering to a
+      superdataset is performed via a :command:`git submodule add` operation
+      in the discovered superdataset.
     """
 
     _params_ = dict(

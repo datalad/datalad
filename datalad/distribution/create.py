@@ -45,6 +45,12 @@ class Create(Interface):
 
     To create a local version of a remote dataset use the
     :func:`~datalad.api.install` command instead.
+
+    .. note::
+      Power-user info: This command uses :command:`git init`, and
+      :command:`git annex init` to prepare the new dataset. Registering to a
+      superdataset is performed via a :command:`git submodule add` operation
+      in the discovered superdataset.
     """
 
     _params_ = dict(
