@@ -150,6 +150,11 @@ def alter_interface_docs_for_cmdline(docs):
         '`\S*`',
         lambda match: match.group(0).strip('`').upper(),
         docs)
+    # clean up sphinx API refs
+    docs = re.sub(
+        '\~datalad\.api\.\S*',
+        lambda match: "`{0}`".format(match.group(0)[13:]),
+        docs)
     return docs
 
 
