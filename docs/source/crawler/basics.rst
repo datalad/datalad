@@ -22,7 +22,7 @@ a modified dictionary as its output once.
 
 Nodes are generators which yield a dictionary zero, one, or multiple times
 and yield a dictionary. For more on generators, reference the Python documentation
-on `Generators<https://docs.python.org/2/tutorial/classes.html#generators>`_
+on `Generators <https://docs.python.org/2/tutorial/classes.html#generators>`_.
 
 .. note::
 
@@ -42,9 +42,8 @@ like
 >>> from datalad.crawler.nodes.crawl_url import crawl_url
 >>> from datalad.crawler.nodes.matches import a_href_match
 >>> from datalad.crawler.nodes.annex import Annexificator
-
-... annex = Annexificator()
->>> pipeline =
+>>> annex = Annexificator(allow_dirty=True)  # so we could demo right within
+>>> pipeline = \
 ...     [
 ...     crawl_url('http://map.org/datasets'),
 ...     a_href_match(".*\.mat"),
@@ -70,6 +69,6 @@ with different generators. This functionality allows for the same input to be ha
 or more (depending on the number of subpipelines) different manners.
 
 TODO: 'FinishPipeline` exception here
-:exception:`~datalad.crawler.pipeline.FinishPipeline`
+:exc:`~datalad.crawler.pipeline.FinishPipeline`
 
 
