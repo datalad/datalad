@@ -39,12 +39,14 @@ class Create(Interface):
     scenarios.  By default an identifier comprised of user and machine name,
     plus path will be generated.
 
-    Plain Git repositories can be created via the :option:`no-annex` flag.
-    However, the result will not be a full dataset, and, consequently, not all
-    features are supported (e.g. a description).
+    Plain Git repositories can be created via the [PY: `no_annex` PY][CMD: --no-annex CMD] flag.
+    However, the result will not be a full dataset, and, consequently,
+    not all features are supported (e.g. a description).
 
+    || REFLOW >>
     To create a local version of a remote dataset use the
     :func:`~datalad.api.install` command instead.
+    << REFLOW ||
 
     .. note::
       Power-user info: This command uses :command:`git init`, and
@@ -56,6 +58,7 @@ class Create(Interface):
     _params_ = dict(
         path=Parameter(
             args=("path",),
+            metavar='PATH',
             doc="""path where the dataset shall be created, directories
             will be created as necessary. If no location is provided, a dataset
             will be created in the current working directory. Either way the
