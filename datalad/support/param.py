@@ -97,7 +97,11 @@ class Parameter(object):
             cdoc = self.constraints.long_description()
             if cdoc[0] == '(' and cdoc[-1] == ')':
                 cdoc = cdoc[1:-1]
-            doc += ' Constraints: %s.' % cdoc
+            addinfo = ''
+            if 'nargs' in self.cmd_kwargs \
+                    and not self.cmd_kwargs['nargs'] == '?':
+                addinfo = 'list expected, each '
+            doc += ' Constraints: %s%s.' % (addinfo, cdoc)
         if has_default:
             doc += " [Default: %r]" % (default,)
         # Explicitly deal with multiple spaces, for some reason
