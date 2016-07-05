@@ -20,11 +20,9 @@ a modified dictionary as its output once.
 >>> next(add1_node({'input': 1}))
 {'input': 2}
 
-.. Generators::
-
-    Nodes are generators which yield a dictionary zero, one, or multiple times.
-    For more on generators, reference the Python documentation on `Generators
-    <https://docs.python.org/2/tutorial/classes.html#generators>`_
+Nodes are generators which yield a dictionary zero, one, or multiple times
+and yield a dictionary. For more on generators, reference the Python documentation
+on `Generators<https://docs.python.org/2/tutorial/classes.html#generators>`_
 
 .. note::
 
@@ -38,7 +36,8 @@ Pipelines
 
 A pipeline is a series of generators ordered into a list. Each generator takes
 the output of its predecessor as its own input. The first node in the pipeline
-would need to be provided with specific input. The simplest pipeline could look like
+would need to be provided with specific input. The simplest pipeline could look
+like
 
 >>> from datalad.crawler.nodes.crawl_url import crawl_url
 >>> from datalad.crawler.nodes.matches import a_href_match
