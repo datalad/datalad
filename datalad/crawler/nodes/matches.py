@@ -41,6 +41,7 @@ class ExtractorMatch(object):
                  allow_multiple=False, xpaths=None, csss=None, min_count=None,
                  max_count=None):
         """"""
+        # TODO: define arguments
         self._query = query
         # allow_multiple concerns only extraction of additional xpaths and csss
         self._allow_multiple = allow_multiple
