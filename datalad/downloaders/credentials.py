@@ -150,7 +150,7 @@ class Credential(object):
     def delete(self):
         """Deletes credential values from the keyring"""
         for f in self._FIELDS:
-            self._keyring.delete(self.fname, f)
+            self._keyring.delete(self.name, f)
 
 
 class UserPassword(Credential):
@@ -209,7 +209,9 @@ class CompositeCredential(Credential):
         self._FIELDS = credentials[0]._FIELDS
         # the rest with index suffix, but storing themselves in the same keyring
         for iC, C in enumerate(self._CREDENTIAL_CLASSES[1:]):
-            credentials.append(C(name="%s:%d" % (self.name, iC+1), url=None, keyring=self._keyring))
+            credentials.append(
+                C(name="%s:%d" % (self.name, iC+1), url=None, keyring=self._keyring)
+            )
         self._credentials = credentials
 
         super(CompositeCredential, self)._prepare()
