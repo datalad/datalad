@@ -28,14 +28,18 @@ demo_doc = """\
     pong ping pong ping pong ping pong.
 
     || CMDLINE >>
+    || REFLOW >>
     Something for the cmdline only
     Multiline!
+    << REFLOW ||
     << CMDLINE ||
 
     || PYTHON >>
 
+    || REFLOW >>
     Some Python-only bits
     Multiline!
+    << REFLOW ||
 
     << PYTHON ||
 
@@ -83,6 +87,8 @@ def test_alter_interface_docs_for_api():
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('CMD', alt)
     assert_not_in('PY', alt)
+    assert_not_in('REFLOW', alt)
+    assert_in("Some Python-only bits Multiline!", alt)
 
 
 def test_alter_interface_docs_for_cmdline():
@@ -93,6 +99,8 @@ def test_alter_interface_docs_for_cmdline():
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('PY', alt)
     assert_not_in('CMD', alt)
+    assert_not_in('REFLOW', alt)
+    assert_in("Something for the cmdline only Multiline!", alt)
     # args
     altarg = alter_interface_docs_for_cmdline(demo_argdoc)
     # RST role markup
