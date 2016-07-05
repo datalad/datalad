@@ -39,25 +39,30 @@ add_to_superdataset = Parameter(
 
 git_opts = Parameter(
     args=("--git-opts",),
+    metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git` calls""")
 
 annex_opts = Parameter(
     args=("--annex-opts",),
+    metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex` calls""")
 
 annex_init_opts = Parameter(
     args=("--annex-init-opts",),
+    metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex init` calls""")
 
 annex_add_opts = Parameter(
     args=("--annex-add-opts",),
+    metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex add` calls""")
 
 annex_get_opts = Parameter(
     args=("--annex-get-opts",),
+    metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex get` calls""")
