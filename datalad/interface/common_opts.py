@@ -24,7 +24,7 @@ dataset_description = Parameter(
 recursion_flag = Parameter(
     args=("-r", "--recursive",),
     action="store_true",
-    doc="""if set, recursive into potential subdataset""")
+    doc="""if set, recurse into potential subdataset""")
 
 recursion_limit = Parameter(
     args=("--recursion-limit",),
@@ -66,3 +66,9 @@ annex_get_opts = Parameter(
     metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex get` calls""")
+
+annex_copy_opts = Parameter(
+    args=("--annex-copy-opts",),
+    metavar='STRING',
+    constraints=EnsureStr() | EnsureNone(),
+    doc="""option string to be passed to :command:`git annex copy` calls""")
