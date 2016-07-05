@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import sys
 import re
+import textwrap
 
 from ..ui import ui
 
@@ -98,6 +99,11 @@ def alter_interface_docs_for_api(docs):
         lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
+    docs = re.sub(
+        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(1)),
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
     return docs
 
 
@@ -155,6 +161,17 @@ def alter_interface_docs_for_cmdline(docs):
         '\~datalad\.api\.\S*',
         lambda match: "`{0}`".format(match.group(0)[13:]),
         docs)
+    # Remove RST paragraph markup
+    docs = re.sub(
+        r'^.. \S+::',
+        lambda match: match.group(0)[3:-2].upper(),
+        docs,
+        flags=re.MULTILINE)
+    docs = re.sub(
+        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(1)),
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
     return docs
 
 
