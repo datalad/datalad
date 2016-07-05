@@ -1,20 +1,21 @@
 # DataLad
 
-DataLad aims to deliver a data distribution.  Original motive was to provide
-a platform for harvesting data from online portals and
-exposing collected data in a readily-usable form from [Git-annex]
-repositories, while fetching data load from the original data providers.
+DataLad aims to make data management and data distribution more accessible.  To
+do that it stands on the shoulders of Git and Git-annex to deliver a
+decentralized system for data exchange. This includes automated ingestion of
+data from online portals, and exposing it in readily usable form as Git(-annex)
+repositories, so-called datasets. The actual data storage and permission
+management, however, remains with the original data providers.
 
 # Status
 
-It is currently in a heavy initial development mode to establish core
-functionality which could be used by others.  Codebase is
-rapidly growing, functionality is usable for many use-cases but not
-yet officially released to public since its organization and
-configuration will be a subject for a considerable reorganization and
-standardization.  Primary purpose of the development is to catch major
-use-cases and try to address them to get a better understanding of the
-ultimate specs and design.
+DataLad is under rapid development to establish core functionality.  The while
+the code base is still growing the focus is increasingly shifting towards
+robust and safe operation with a sensible API. There has been no major public
+release yet, as organization and configuration are still subject of
+considerable reorganization and standardization. However, DataLad is, in fact,
+usable today and user feedback is always welcome.
+
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) if you are interested in
 internals and/or contributing to the project.
