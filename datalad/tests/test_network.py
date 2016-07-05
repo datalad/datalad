@@ -17,6 +17,7 @@ from .utils import swallow_logs
 from .utils import assert_re_in
 from .utils import assert_in
 from .utils import get_most_obscure_supported_name
+from .utils import SkipTest
 
 from ..support.network import same_website, dlurljoin
 from ..support.network import get_tld
@@ -30,8 +31,8 @@ from ..support.network import DataLadRI
 from ..support.network import URL
 from ..support.network import _split_colon
 from ..support.network import is_url
+from ..support.network import is_datalad_compat_ri
 from ..support.network import get_local_file_url
-from ..support.network import get_local_path_from_url
 from ..support.network import is_ssh
 
 def test_same_website():
@@ -121,7 +122,7 @@ def test_url_eq():
     neq_(str(URL(hostname='x')), str(SSHRI(hostname='x')))
 
 
-def _check_ri(ri, cls, exact_str=True, **fields):
+def _check_ri(ri, cls, exact_str=True, localpath=None, **fields):
     """just a helper to carry out few checks on urls"""
     with swallow_logs(new_level=logging.WARNING) as cml:
         ri_ = cls(**fields)
@@ -138,6 +139,13 @@ def _check_ri(ri, cls, exact_str=True, **fields):
     nok_(set(fields).difference(set(cls._FIELDS)))
     for f, v in fields.items():
         eq_(getattr(ri_, f), v)
+
+    if localpath:
+        eq_(ri_.localpath, localpath)
+    else:
+        # if not given -- must be a remote url, should raise exception
+        with assert_raises(ValueError):
+            ri_.localpath
 
 
 def test_url_base():
@@ -213,17 +221,28 @@ def test_url_samples():
     #https://en.wikipedia.org/wiki/File_URI_scheme
     _check_ri("file://host", URL, scheme='file', hostname='host')
     _check_ri("file://host/path/sp1", URL, scheme='file', hostname='host', path='/path/sp1')
-    _check_ri("file:///path/sp1", URL, scheme='file', path='/path/sp1')
-    _check_ri("file:///~/path/sp1", URL, scheme='file', path='/~/path/sp1', exact_str=False)
-    _check_ri("file:///%7E/path/sp1", URL, scheme='file', path='/~/path/sp1')
+    # stock libraries of Python aren't quite ready for ipv6
+    ipv6address = '2001:db8:85a3::8a2e:370:7334'
+    _check_ri("file://%s/path/sp1" % ipv6address, URL,
+              scheme='file', hostname=ipv6address, path='/path/sp1')
+    for lh in ('localhost', '::1', '', '127.3.4.155'):
+        _check_ri("file://%s/path/sp1" % lh, URL, localpath='/path/sp1',
+                  scheme='file', hostname=lh, path='/path/sp1')
+    _check_ri('http://[1fff:0:a88:85a3::ac1f]:8001/index.html', URL,
+              scheme='http', hostname='1fff:0:a88:85a3::ac1f', port=8001, path='/index.html')
+    _check_ri("file:///path/sp1", URL, localpath='/path/sp1', scheme='file', path='/path/sp1')
+    # we don't do any magical comprehension for home paths/drives for windows
+    # of file:// urls, thus leaving /~ and /c: for now:
+    _check_ri("file:///~/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1', exact_str=False)
+    _check_ri("file:///%7E/path/sp1", URL, localpath='/~/path/sp1', scheme='file', path='/~/path/sp1')
     # not sure but let's check
-    _check_ri("file:///c:/path/sp1", URL, scheme='file', path='/c:/path/sp1', exact_str=False)
+    _check_ri("file:///c:/path/sp1", URL, localpath='/c:/path/sp1', scheme='file', path='/c:/path/sp1', exact_str=False)
 
     # and now implicit paths or actually they are also "URI references"
-    _check_ri("f", PathRI, path='f')
-    _check_ri("f/s1", PathRI, path='f/s1')
-    _check_ri("/f", PathRI, path='/f')
-    _check_ri("/f/s1", PathRI, path='/f/s1')
+    _check_ri("f", PathRI, localpath='f', path='f')
+    _check_ri("f/s1", PathRI, localpath='f/s1', path='f/s1')
+    _check_ri("/f", PathRI, localpath='/f', path='/f')
+    _check_ri("/f/s1", PathRI, localpath='/f/s1', path='/f/s1')
 
     # some github ones, just to make sure
     _check_ri("git://host/user/proj", URL, scheme="git", hostname="host", path="/user/proj")
@@ -234,7 +253,8 @@ def test_url_samples():
     _check_ri('weired_url:/', SSHRI, hostname='weired_url', path='/')
     _check_ri('example.com:/', SSHRI, hostname='example.com', path='/')
     _check_ri('example.com:path/sp1', SSHRI, hostname='example.com', path='path/sp1')
-    _check_ri('example.com/path/sp1\:fname', PathRI, path='example.com/path/sp1\:fname')
+    _check_ri('example.com/path/sp1\:fname', PathRI, localpath='example.com/path/sp1\:fname',
+              path='example.com/path/sp1\:fname')
     # ssh is as stupid as us, so we will stay "Consistently" dumb
     """
     $> ssh example.com/path/sp1:fname
@@ -261,6 +281,9 @@ def test_url_samples():
         # but we store original str
         eq_(str(weired_url), weired_str)
         neq_(weired_url.as_str(), weired_str)
+
+
+    raise SkipTest("TODO: file://::1/some does complain about parsed version dropping ::1")
 
 
 def _test_url_quote_path(cls, clskwargs, target_url):
@@ -325,6 +348,7 @@ def test_url_dicts():
 def test_get_url_path_on_fileurls():
     eq_(URL('file:///a').path, '/a')
     eq_(URL('file:///a/b').path, '/a/b')
+    eq_(URL('file:///a/b').localpath, '/a/b')
     eq_(URL('file:///a/b#id').path, '/a/b')
     eq_(URL('file:///a/b?whatever').path, '/a/b')
 
@@ -342,6 +366,20 @@ def test_is_url():
     ok_(is_url('like@sshlogin'))  # actually we do allow ssh:implicit urls ATM
     nok_(is_url(''))
     nok_(is_url(' '))
+    nok_(is_url(123))  # stuff of other types wouldn't be considered a URL
+
+    # we can pass RI instance directly
+    ok_(is_url(RI('file://localhost/some')))
+    nok_(is_url(RI('relative')))
+
+
+# TODO: RF with test_is_url to avoid duplication
+def test_is_datalad_compat_ri():
+    ok_(is_datalad_compat_ri('file://localhost/some'))
+    ok_(is_datalad_compat_ri('///localhost/some'))
+    nok_(is_datalad_compat_ri('relative'))
+    nok_(is_datalad_compat_ri('.///localhost/some'))
+    nok_(is_datalad_compat_ri(123))
 
 
 def test_get_local_file_url_linux():
@@ -349,17 +387,6 @@ def test_get_local_file_url_linux():
     eq_(get_local_file_url('/a/b/c'), 'file:///a/b/c')
     eq_(get_local_file_url('/a~'), 'file:///a%7E')
     eq_(get_local_file_url('/a b/'), 'file:///a%20b/')
-
-
-def test_get_local_path_from_url():
-    assert_raises(ValueError, get_local_path_from_url, 'http://some')
-    assert_raises(ValueError, get_local_path_from_url, 'file://elsewhere/some')
-    # invalid URL -- is it?  just that 'hostname' is some and no path
-    assert_raises(ValueError, get_local_path_from_url, 'file://some')
-    eq_(get_local_path_from_url('file:///some'), '/some')
-    eq_(get_local_path_from_url('file://localhost/some'), '/some')
-    eq_(get_local_path_from_url('file://::1/some'), '/some')
-    eq_(get_local_path_from_url('file://127.3.4.155/some'), '/some')
 
 
 def test_is_ssh():

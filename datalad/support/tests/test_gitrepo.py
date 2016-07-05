@@ -717,3 +717,16 @@ def test_get_added_files_commit_msg():
     eq_(f([]), 'No files were added')
     eq_(f(["f1"]), 'Added 1 file\n\nFiles:\nf1')
     eq_(f(["f1", "f2"]), 'Added 2 files\n\nFiles:\nf1\nf2')
+
+
+@with_testrepos(flavors=['local'])
+@with_tempfile(mkdir=True)
+def test_get_tracking_branch(o_path, c_path):
+
+    clone = GitRepo(c_path, o_path)
+    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch())
+
+    clone.checkout('new_branch', '-b')
+    eq_((None, None), clone.get_tracking_branch())
+
+    eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch('master'))

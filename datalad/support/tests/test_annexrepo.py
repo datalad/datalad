@@ -934,3 +934,91 @@ def test_repo_version(path):
     ok_clean_git(path, annex=True)
     version = annex.repo.config_reader().get_value('annex', 'version')
     eq_(version, 6)
+
+
+@with_testrepos('.*annex.*', flavors=['clone'])
+@with_tempfile(mkdir=True)
+def test_annex_copy_to(origin, clone):
+    repo = AnnexRepo(origin, create=False)
+    remote = AnnexRepo(clone, origin, create=True)
+    repo.add_remote("target", clone)
+
+    assert_raises(IOError, repo.copy_to, "doesnt_exist.dat", "target")
+    assert_raises(FileInGitError, repo.copy_to, "INFO.txt", "target")
+    assert_raises(ValueError, repo.copy_to, "test-annex.dat", "invalid_target")
+
+    # test-annex.dat has no content to copy yet:
+    eq_(repo.copy_to("test-annex.dat", "target"), [])
+
+    repo.get("test-annex.dat")
+    # now it has:
+    eq_(repo.copy_to("test-annex.dat", "target"), ["test-annex.dat"])
+    eq_(repo.copy_to(["INFO.txt", "test-annex.dat"], "target"), ["test-annex.dat"])
+
+
+@with_testrepos('.*annex.*', flavors=['local', 'network'])
+@with_tempfile
+def test_annex_drop(src, dst):
+    ar = AnnexRepo(dst, src)
+    testfile = 'test-annex.dat'
+    assert_false(ar.file_has_content(testfile))
+    ar.get(testfile)
+    ok_(ar.file_has_content(testfile))
+
+    # drop file by name:
+    result = ar.drop([testfile])
+    assert_false(ar.file_has_content(testfile))
+    ok_(isinstance(result, list))
+    eq_(result[0], testfile)
+    eq_(len(result), 1)
+
+    ar.get(testfile)
+
+    # drop file by key:
+    testkey = ar.get_file_key(testfile)
+    result = ar.drop([testkey], key=True)
+    assert_false(ar.file_has_content(testfile))
+    ok_(isinstance(result, list))
+    eq_(result[0], testkey)
+    eq_(len(result), 1)
+
+    # insufficient arguments:
+    assert_raises(TypeError, ar.drop)
+    assert_raises(InsufficientArgumentsError, ar.drop, [], options=["--jobs=5"])
+    assert_raises(InsufficientArgumentsError, ar.drop, [])
+
+    # too much arguments:
+    assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
+
+@with_testrepos('basic_annex', flavors=['clone'])
+@with_tempfile(mkdir=True)
+def test_annex_remove(path1, path2):
+    ar1 = AnnexRepo(path1, create=False)
+    ar2 = AnnexRepo(path2, path1, create=True, direct=True)
+
+    for repo in (ar1, ar2):
+        file_list = repo.get_annexed_files()
+        assert len(file_list) >= 1
+        # remove a single file
+        out = repo.remove(file_list[0])
+        assert_not_in(file_list[0], repo.get_annexed_files())
+        eq_(out[0], file_list[0])
+
+        with open(opj(repo.path, "rm-test.dat"), "w") as f:
+            f.write("whatever")
+
+        # add it
+        repo.add("rm-test.dat")
+
+        # remove without '--force' should fail, due to staged changes:
+        if repo.is_direct_mode():
+            assert_raises(CommandError, repo.remove, "rm-test.dat")
+        else:
+            assert_raises(GitCommandError, repo.remove, "rm-test.dat")
+        assert_in("rm-test.dat", repo.get_annexed_files())
+
+        # now force:
+        out = repo.remove("rm-test.dat", force=True)
+        assert_not_in("rm-test.dat", repo.get_annexed_files())
+        eq_(out[0], "rm-test.dat")
+

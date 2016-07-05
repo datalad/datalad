@@ -124,7 +124,40 @@ we outline the workflow used by the developers:
 Development environment
 -----------------------
 
-See [README.md:Dependencies](README.md#Dependencies).
+Although we now support Python 3 (>= 3.3), primarily we still use Python 2.7
+and thus instructions below are for python 2.7 deployments.  Replace `python-{`
+with `python{,3}-{` to also install dependencies for Python 3 (e.g., if you would
+like to develop and test through tox).
+
+See [README.md:Dependencies](README.md#Dependencies) for basic information
+about installation of datalad itself.
+On Debian-based systems we recommend to enable [NeuroDebian](http://neuro.debian.net)
+since we use it to provide backports of recent fixed external modules we depend upon:
+
+```sh
+apt-get install -y -q git git-annex-standalone
+apt-get install -y -q patool python-scrapy python-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,requests,setuptools,six}
+```
+
+and additionally, for development we suggest to use tox and new
+versions of dependencies from pypy:
+
+```sh
+apt-get install -y -q python-{dev,httpretty,testtools,nose,pip,vcr,virtualenv} python-tox
+# Some libraries which might be needed for installing via pip
+apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
+```
+
+some of which you could also install from PyP?i using pip  (prior installation of those libraries listed above
+might be necessary)
+
+```sh
+pip install -r requirements.txt
+```
+
+and you will need to install recent git-annex using appropriate for your
+OS means (for Debian/Ubuntu, once again, just use NeuroDebian).
+
 
 Documentation
 -------------

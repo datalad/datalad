@@ -494,7 +494,6 @@ class GitRepo(object):
                 msg = self._get_added_files_commit_msg(files)
             self.commit(msg=msg)
 
-    # TODO: like add melt in
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
         """Remove files.
@@ -503,6 +502,8 @@ class GitRepo(object):
         ----------
         files: str
           list of paths to remove
+        kwargs:
+          see `__init__`
 
         Returns
         -------
@@ -511,6 +512,26 @@ class GitRepo(object):
         """
 
         files = _remove_empty_items(files)
+
+        # todo: we are able to remove objects, not necessarily specified by a
+        #       path (see below). We may want to make this available at some
+        #       point.
+        # Multiple types of items are supported which may be be freely mixed.
+        #
+        #     - path string
+        #         Remove the given path at all stages. If it is a directory, you must
+        #         specify the r=True keyword argument to remove all file entries
+        #         below it. If absolute paths are given, they will be converted
+        #         to a path relative to the git repository directory containing
+        #         the working tree
+        #
+        #         The path string may include globs, such as *.c.
+        #
+        #     - Blob Object
+        #         Only the path portion is used in this case.
+        #
+        #     - BaseIndexEntry or compatible type
+        #         The only relevant information here Yis the path. The stage is ignored.
 
         return self.repo.index.remove(files, working_tree=True, **kwargs)
 
@@ -822,6 +843,7 @@ class GitRepo(object):
         else:
             remotes_to_fetch = [self.repo.remote(remote)]
 
+        fi_list = []
         for rm in remotes_to_fetch:
             fetch_url = \
                 rm.config_reader.get('fetchurl'
@@ -834,10 +856,10 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                    fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                     # TODO: progress +kwargs
             else:
-                rm.fetch(refspec=refspec, progress=progress, **kwargs)
+                fi_list += rm.fetch(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
 
         # TODO: fetch returns a list of FetchInfo instances. Make use of it.
@@ -877,10 +899,11 @@ class GitRepo(object):
             #       with remote.repo.git.custom_environment(GIT_SSH="wrapper_script"):
             with remote.repo.git.custom_environment(
                     GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                remote.pull(refspec=refspec, progress=progress, **kwargs)
+                return remote.pull(refspec=refspec, progress=progress,
+                                      **kwargs)
                 # TODO: progress +kwargs
         else:
-            remote.pull(refspec=refspec, progress=progress, **kwargs)
+            return remote.pull(refspec=refspec, progress=progress, **kwargs)
             # TODO: progress +kwargs
 
     def push(self, remote=None, refspec=None, progress=None, all_=False,
@@ -912,6 +935,7 @@ class GitRepo(object):
         else:
             remotes_to_push = [self.repo.remote(remote)]
 
+        pi_list = []
         for rm in remotes_to_push:
             push_url = \
                 rm.config_reader.get('pushurl'
@@ -924,10 +948,11 @@ class GitRepo(object):
                 #       with rm.repo.git.custom_environment(GIT_SSH="wrapper_script"):
                 with rm.repo.git.custom_environment(
                         GIT_SSH_COMMAND="ssh -S %s" % cnct.ctrl_path):
-                    rm.push(refspec=refspec, progress=progress, **kwargs)
+                    pi_list += rm.push(refspec=refspec, progress=progress,
+                                   **kwargs)
                     # TODO: progress +kwargs
             else:
-                rm.push(refspec=refspec, progress=progress, **kwargs)
+                pi_list += rm.push(refspec=refspec, progress=progress, **kwargs)
                 # TODO: progress +kwargs
 
     def get_remote_url(self, name, push=False):
@@ -1136,6 +1161,40 @@ class GitRepo(object):
         """
         # TODO later to be extended with tagging particular commits and signing
         self._git_custom_command('', 'git tag "{0}"'.format(tag))
+
+    def get_tracking_branch(self, branch=None):
+        """Get the tracking branch for `branch` if there is any.
+
+        Parameters
+        ----------
+        branch: str
+            local branch to look up. If none is given, active branch is used.
+
+        Returns
+        -------
+        tuple
+            (remote or None, refspec or None) of the tracking branch
+        """
+        if branch is None:
+            branch = self.get_active_branch()
+
+        cfg_reader = self.repo.config_reader()
+        sct = "branch \"{0}\"".format(branch)
+        track_remote = cfg_reader.get_value(section=sct,
+                                            option="remote",
+                                            default="DATALAD_DEFAULT")
+        if track_remote == "DATALAD_DEFAULT":
+            # we have no "tracking remote"
+            track_remote = None
+        track_branch = cfg_reader.get_value(section=sct,
+                                            option="merge",
+                                            default="DATALAD_DEFAULT")
+        if track_branch == "DATALAD_DEFAULT":
+            # we have no tracking branch
+            track_branch = None
+
+        return track_remote, track_branch
+
 
 # TODO
 # remove submodule

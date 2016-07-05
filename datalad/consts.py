@@ -24,3 +24,5 @@ ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
 
 ARCHIVES_TEMP_DIR = join('.git', 'datalad', 'tmp', 'archives')
+
+DATASETS_TOPURL = "http://datasets.datalad.org/"

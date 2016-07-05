@@ -43,8 +43,7 @@ class Create(Interface):
         description=Parameter(
             args=("-D", "--description",),
             doc="""short description that humans can use to identify the
-            repository/location, e.g. "Precious data on my laptop.""""",
-            nargs=1),
+            repository/location, e.g. "Precious data on my laptop."""""),
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""flag that if given a plain Git repository will be created
@@ -69,6 +68,9 @@ class Create(Interface):
     def __call__(
             loc=None, description=None, no_annex=False, annex_version=None,
             annex_backend='MD5E'):
+        if description and no_annex:
+            raise ValueError("Incompatible arguments: cannot specify description for "
+                             "annex repo and declaring no annex repo.")
         if loc is None:
             loc = os.curdir
         elif isinstance(loc, Dataset):

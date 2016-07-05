@@ -34,24 +34,29 @@ set -u
 HOME=IS_MY_CASTLE
 
 #% EXAMPLE START
-
-#% A simple start (on the command line)
-#% ====================================
-
-#% Lorem ipsum
+#
+# A simple start (on the command line)
+# ====================================
+#
+# Lorem ipsum
+#%
 
 datalad install http://the.world.com
 
-#% Epilog -- with multiline rubish sdoifpwjefw
-#% vsdokvpsokdvpsdkv spdokvpskdvpoksd
-#% pfdsvja329u0fjpdsv sdpf9p93qk
+#%
+# Epilog -- with multiline rubish sdoifpwjefw
+# vsdokvpsokdvpsdkv spdokvpskdvpoksd
+# pfdsvja329u0fjpdsv sdpf9p93qk
+#%
 
 datalad imagine --too \\
         --much \\
         --too say \\
         yes=no
 
-#% The result is not comprehensible.
+#%
+# The result is not comprehensible.
+#%
 
 #% EXAMPLE END
 

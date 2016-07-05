@@ -29,6 +29,7 @@ from six.moves.urllib.parse import urlencode
 from six.moves.urllib.error import URLError
 
 from datalad.utils import on_windows
+from datalad.consts import DATASETS_TOPURL
 
 from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
@@ -415,6 +416,11 @@ class RI(object):
         obj._str = ri_str
         return obj
 
+    @property
+    def localpath(self):
+        # by default RIs point to remote locations
+        raise ValueError("%s points to remote location" % self)
+
     # Apparently doesn't quite play nicely with multiple inheritence for MixIn'
     # of regexp based URLs
     #@abstractmethod
@@ -524,7 +530,11 @@ class URL(RI):
             netloc += '@'
         netloc += fields['hostname']
         if fields['port']:
-            netloc += ':%s' % fields['port']
+            if fields['hostname'].count(':') >= 2:
+                # ipv6 -- need to enclose in []
+                netloc = '[%s]:%s' % (netloc, fields['port'])
+            else:
+                netloc += ':%s' % fields['port']
 
         pr_fields = {
             f: fields[f]
@@ -548,11 +558,34 @@ class URL(RI):
             lgr.warning("ParseResults contains params %r, which will be ignored"
                         % (pr.params,))
 
+        hostname_port = pr.netloc.split('@')[-1]
+        is_ipv6 = hostname_port.count(':') >= 2
         # can't use just pr._asdict since we care to ask those properties
         # such as .port , .hostname etc
         # Forcing '' instead of None since those properties (.hostname), .password,
         # .username return None if not available and we decided to uniformize
-        return {f: (getattr(pr, f) or '') for f in cls._FIELDS}
+        if is_ipv6:
+            rem = re.match('\[(?P<hostname>.*)\]:(?P<port>\d+)', hostname_port)
+            if rem:
+                hostname, port = rem.groups()
+                port = int(port)
+            else:
+                hostname, port = hostname_port, ''
+
+            def _getattr(pr, f):
+                """Helper for custom handling in case of ipv6 addresses which blows
+                stock ParseResults logic"""
+                if f == 'port':
+                    # for now not supported at all, so
+                    return port
+                elif f == 'hostname':
+                    return hostname
+                else:
+                    return getattr(pr, f)
+        else:
+            _getattr = getattr
+
+        return {f: (_getattr(pr, f) or '') for f in cls._FIELDS}
 
     #
     # Access helpers
@@ -580,6 +613,18 @@ class URL(RI):
     def fragment_dict(self):
         return self._parse_qs(self.fragment)
 
+    @property
+    def localpath(self):
+        if self.scheme != 'file':
+            raise ValueError(
+                "Non 'file://' URL cannot be resolved to a local path")
+        hostname = self.hostname
+        if not (hostname in (None, '', 'localhost', '::1') \
+                or hostname.startswith('127.')):
+            raise ValueError("file:// URL does not point to 'localhost'")
+        return self.path
+
+
 
 class PathRI(RI):
     """RI pointing to a (local) file/directory"""
@@ -589,6 +634,10 @@ class PathRI(RI):
     @classmethod
     def _str_to_fields(cls, url_str):
         return dict(path=url_str)
+
+    @property
+    def localpath(self):
+        return self.path
 
 
 class RegexBasedURLMixin(object):
@@ -651,6 +700,9 @@ class SSHRI(RI, RegexBasedURLMixin):
         fields['path'] = escape_ssh_path(fields['path'])
         return url_fmt.format(**fields)
 
+    # TODO:
+    # we can "support" localhost:path as localpaths
+
 
 class DataLadRI(RI, RegexBasedURLMixin):
     """RI pointing to datasets within central DataLad super-dataset"""
@@ -666,6 +718,18 @@ class DataLadRI(RI, RegexBasedURLMixin):
 
     def as_str(self):
         return "//{remote}/{path}".format(**self._fields)
+
+    def as_git_url(self):
+        """Dereference /// into original URLs which could be used by git for cloning
+
+        Returns
+        -------
+        str
+          URL string to reference the DataLadRI from its /// form
+        """
+        if self.remote:
+            raise NotImplementedError("not supported ATM to reference additional remotes")
+        return "{}{}".format(DATASETS_TOPURL, self.path)
 
 
 def _split_colon(s, maxsplit=1):
@@ -706,16 +770,36 @@ def parse_url_opts(url):
 
 # TODO: should we just define URL.good_for_git or smth like that? ;)
 # although git also understands regular paths
-def is_url(s):
-    """Returns whether a string looks like something what datalad should treat as a URL
+def is_url(ri):
+    """Returns whether argument is a resource identifier what datalad should treat as a URL
 
     This includes ssh "urls" which git understands.
+
+    Parameters
+    ----------
+    ri : str or RI
+      The resource identifier (as a string or RI) to "analyze"
     """
-    try:
-        ri = RI(s)
-    except:
-        return False
+    if not isinstance(ri, RI):
+        try:
+            ri = RI(ri)
+        except:
+            return False
     return isinstance(ri, (URL, SSHRI))
+
+
+# TODO: RF to remove duplication
+def is_datalad_compat_ri(ri):
+    """Returns whether argument is a resource identifier what datalad should treat as a URL
+
+    including its own DataLadRI
+    """
+    if not isinstance(ri, RI):
+        try:
+            ri = RI(ri)
+        except:
+            return False
+    return isinstance(ri, (URL, SSHRI, DataLadRI))
 
 
 # TODO: better name? additionally may be move to SSHRI.is_valid() or sth.
@@ -758,21 +842,3 @@ def get_local_file_url(fname):
         # TODO:  need to fix for all the encoding etc
         furl = str(URL(scheme='file', path=fname))
     return furl
-
-
-def get_local_path_from_url(url):
-    """If given a file:// URL, returns a local path, if possible.
-
-    Raises `ValueError` if not possible, for example, if the URL
-    scheme is different, or if the `host` isn't empty or 'localhost'
-
-    The returned path is always absolute.
-    """
-    urlparts = urlsplit(url)
-    if not urlparts.scheme == 'file':
-        raise ValueError(
-            "Non 'file://' URL cannot be resolved to a local path")
-    if not (urlparts.netloc in ('', 'localhost', '::1') \
-            or urlparts.netloc.startswith('127.')):
-        raise ValueError("file:// URL does not point to 'localhost'")
-    return urlunquote(urlparts.path)
