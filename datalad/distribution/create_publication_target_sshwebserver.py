@@ -285,32 +285,25 @@ class CreatePublicationTargetSSHWebserver(Interface):
                             "You will not be able to push to checked out "
                             "branch." % path)
 
-            # enable post-update hook:
+            # create post_update script
+            lgr.info("Enabling git post-update hook ...")
             try:
-                ssh(["mv",
-                     opj(path, ".git/hooks/post-update.sample"),
-                     opj(path, ".git/hooks/post-update")])
-            except CommandError as e:
-                lgr.error("Failed to enable post update hook.\n"
-                          "Error: %s" % e.message)
-
-            # add json creator command to post-update hook:
-            try:
-                json_command = "exec datalad ls -r --json file " + path
-                ssh(["echo", json_command, ">>", opj(path, ".git/hooks/post-update")])
+                json_command = '"datalad ls -r --json file ' + path + '"'
+                virtualenv = 'source /home/debanjum/datalad/.env/bin/activate'  # NOT_SCALABLE! custom virtualenv path
+                for post_update_hook in ['"#!/bin/bash"', '"git update-server-info"', virtualenv, json_command]:
+                    ssh(["echo", post_update_hook, '>>', opj(path, '.git/hooks/post-update')])
+                ssh(["chmod", '+x', opj(path, '.git/hooks/post-update')])  # make the script executable
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % e.message)
 
             # get html for dataset rendering from local datalad repo:
+            lgr.info("Uploading web interface ...")
             try:
                 import datalad
-                html_path = opj(dirname(datalad.__file__), "resources/website/index.html")
+                html = opj(dirname(datalad.__file__), "resources/website/index.html")
                 scp_target = sshri.hostname + ":" + sshri.path
-                if sshri.port:
-                    Runner().run(['scp', '-P', sshri.port, html_path, scp_target])
-                else:
-                    Runner().run(['scp', html_path, scp_target])
+                Runner().run(['scp', '-P', sshri.port, html, scp_target] if sshri.port else ['scp', html, scp_target])
 
             except CommandError as e:
                 lgr.error("Failed to get html from local datalad repository. Unable to setup web interface.\n"
