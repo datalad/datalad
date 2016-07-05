@@ -396,20 +396,6 @@ def fs_extract(node):
     return {"name": name, "path": node._path, "repo": node.repo.path, "type": node.type_, "size": pretty_size, "date": pretty_date}
 
 
-def _flatten(listoflists):
-    """flattens a multi-level lists"""
-    if isinstance(listoflists, list):
-        flatlist = []
-        for item in listoflists:
-            if isinstance(item, list):
-                flatlist.extend(_flatten(item))
-            else:
-                flatlist.append(item)
-        return flatlist
-    else:
-        return listoflists
-
-
 def leaf_name(path):
     """takes a relative or absolute path and returns name of node at that location"""
     head, tail = split(abspath(path))
@@ -427,6 +413,21 @@ def ignored(path, only_hidden=False):
     if '.' == leaf_name(path)[0] or leaf_name(path) == 'index.html':
         return True
     return False
+
+
+def fs_render(root, subdir, json=None):
+    """takes root, subdir to render and based on json option passed renders to file, stdout or deletes json at root"""
+    # store directory info of the submodule level in fs hierarchy as json
+    if json == 'file':
+        with open(opj(root, '.dir.json'), 'w') as f:
+            dump(subdir, f)
+    # else if json flag set to delete, remove .dir.json of current directory
+    elif json == 'delete':
+        if exists(opj(root, '.dir.json')):
+            remove(opj(root, '.dir.json'))
+    # else dump json to stdout
+    elif json == 'display':
+        print dumps(subdir) + '\n'
 
 
 def fs_traverse(loc, repo, recursive=False, json=None):
@@ -449,19 +450,9 @@ def fs_traverse(loc, repo, recursive=False, json=None):
             if recursive and isdir(opj(loc, node)) and not ignored(opj(loc, node)):
                 # if recursive, create info dictionary of each child directory
                 subdir = fs_traverse(opj(loc, node), repo, recursive=recursive, json=json)
-
-                # and write to json in child's directory, json flag set to 'file'
-                if json == 'file':
-                    with open(opj(loc, node, '.dir.json'), 'w') as f:
-                        dump(subdir, f)
-                # else if json flag set to delete, remove .dir.json of current directory
-                elif json == 'delete':
-                    if exists(opj(loc, node, '.dir.json')):
-                        remove(opj(loc, node, '.dir.json'))
-                # else dump json to stdout
-                elif json == 'display':
-                    print opj(loc, node) + ':\n' + ''.join(['-' for i in xrange(len(opj(loc, node)))])
-                    print dumps(subdir) + '\n'
+                # run renderer on subdirectory(subdir) at location(loc) with json option set by user
+                lgr.info('Subdir: ' + opj(loc, node))
+                fs_render(opj(loc, node), subdir, json=json)
     return fs
 
 
@@ -484,18 +475,9 @@ def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
         if ds.path == abspath(loc):
             fs["nodes"].pop(0)
 
-        # store directory info of the submodule level in fs hierarchy as json
-        if json == 'file':
-            with open(opj(ds.path, '.dir.json'), 'w') as f:
-                dump(fs, f)
-        # else if json flag set to delete, remove root .dir.json of the current submodule
-        elif json == 'delete':
-            if exists(opj(ds.path, '.dir.json')):
-                remove(opj(ds.path, '.dir.json'))
-        # else dump its json to stdout
-        elif json == 'display':
-            print opj(ds.path) + ':\n' + ''.join(['-' for i in xrange(len(ds.path))])
-            print dumps(fs)
+        # run renderer on submodule(fs) at ds.path with json option set by user
+        lgr.info('Submodule: ' + opj(ds.path))
+        fs_render(ds.path, fs, json=json)
 
 
 #
