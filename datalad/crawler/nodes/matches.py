@@ -40,6 +40,7 @@ class ExtractorMatch(object):
     def __init__(self, query, input='response', output='match', pop_input=False,
                  allow_multiple=False, xpaths=None, csss=None, min_count=None,
                  max_count=None):
+        """"""
         self._query = query
         # allow_multiple concerns only extraction of additional xpaths and csss
         self._allow_multiple = allow_multiple
