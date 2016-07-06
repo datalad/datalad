@@ -76,6 +76,8 @@ def test_create_curdir(path):
     #
     # Note: The latter might be a conflict of gitpython in-memory index being
     # committed, while the actual change to be committed was on disk?
+    #
+    # Note 2: Might be solved by empty commit!
 
     # For now, just check .gitmodules:
     with open(opj(path, ".gitmodules"), "r") as f:
