@@ -17,6 +17,8 @@ import logging
 from os.path import join as opj
 
 from datalad.interface.base import Interface
+from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
+    recursion_limit, git_opts, annex_opts
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.exceptions import CommandError
@@ -33,14 +35,31 @@ lgr = logging.getLogger('datalad.distribution.update')
 
 
 class Update(Interface):
-    """Update a dataset from a sibling.
+    """Update a dataset from a known :term:`sibling`.
 
+    This command obtains saved states of either one or all known dataset
+    sibling(s) and makes them available locally. Optionally, subdatasets
+    can be updated recursively.
+
+    By default, the current state of the local dataset is not altered, but
+    an automatic merge of obtained updates can be requested. In this case,
+    it is also possible, to obtain data content updates for all files with
+    available content prior to the update.
+
+    .. note::
+      Power-user info: This command uses :command:`git fetch`, :command:`git merge`, and
+      :command:`git annex copy` to update a dataset. Update source locations
+      are either configured remote Git repositories, or git-annex special
+      remotes.
     """
 
     _params_ = dict(
-        name=Parameter(
-            args=("name",),
-            doc="""name of the sibling to update from""",
+        sibling=Parameter(
+            args=("sibling",),
+            metavar="SIBLING NAME",
+            doc="""name of a known sibling to update from. If none is provided,
+            an attempt is made to identify one based on the dataset's
+            configuration (i.e. a set up tracking branch)""",
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
@@ -55,12 +74,6 @@ class Update(Interface):
             doc="merge changes from sibling `name` or the remote branch, "
                 "configured to be the tracking branch if no sibling was "
                 "given", ),
-        # TODO: How to document it without using the term 'tracking branch'?
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            action="store_true",
-            doc="""if set this updates all possibly existing subdatasets,
-             too"""),
         fetch_all=Parameter(
             args=("--fetch-all",),
             action="store_true",
@@ -68,13 +81,26 @@ class Update(Interface):
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
-            doc="TODO"), )
+            doc="TODO"),
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
+        git_opts=git_opts,
+        annex_opts=annex_opts,
+        annex_copy_opts=annex_copy_opts)
 
     @staticmethod
     @datasetmethod(name='update')
-    def __call__(name=None, dataset=None,
-                 merge=False, recursive=False, fetch_all=False,
-                 reobtain_data=False):
+    def __call__(
+            sibling=None,
+            dataset=None,
+            merge=False,
+            recursive=False,
+            fetch_all=False,
+            reobtain_data=False,
+            recursion_limit=None,
+            git_opts=None,
+            annex_opts=None,
+            annex_copy_opts=None):
         """
         """
         # TODO: Is there an 'update filehandle' similar to install and publish?
