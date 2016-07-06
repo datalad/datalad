@@ -29,6 +29,8 @@ from ..dochelpers import exc_str
 from ..support.s3 import get_key_url
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
+from ..distribution.dataset import Dataset
+from datalad.cmd import Runner
 
 from logging import getLogger
 lgr = getLogger('datalad.api.ls')
@@ -208,7 +210,7 @@ class FsModel(DsModel):
     def __init__(self, path, repo=None):
         self._path = path  # fs path to the node, can be overridden
         self._info = None
-        self.repo = repo  # an object of the parent repository class the node is associated with
+        self.repo = DsModel(Dataset(path)) if self.type_ == 'annex' else repo  # parent repository associated with node
         self._branch = None
 
     @property
@@ -236,17 +238,20 @@ class FsModel(DsModel):
         if not type_:
             return -1
         if 'annex' == type_:
-            return self.annex_local_size
+            if self.annex_local_size:
+                return self.annex_local_size
+            else:
+                return Runner().run(['du', '-s', self._path])[0].split('\t')[0]
         elif 'git' == type_:
             return self.git_local_size
         elif 'file' == type_:
             return lstat(self._path).st_size
-        elif 'broken-link' == type_:
-            return 0
-        elif 'link' == type_:
-            return lstat(self.symlink).st_size
+        elif type_ in ['link', 'link-broken']:
+            if self.repo.repo.is_under_annex(self._path):
+                return self.repo.repo.info(self._path, batch=True)['size']
+            return 0 if type_ == 'broken-link' else lstat(self.symlink).st_size
         elif 'dir' == type_:
-            return lstat(self._path).st_size  # add du -s command for plain dir
+            return Runner().run(['du', '-s', self._path])[0].split('\t')[0]  # lstat(self._path).st_size
         else:
             return -1
 
@@ -254,9 +259,9 @@ class FsModel(DsModel):
     def type_(self):
         """outputs the node type
 
-        Types: link, broken-link, file, dir, annex-repo, git-repo"""
+        Types: link, link-broken, file, dir, annex-repo, git-repo"""
         if islink(self.path):
-            return 'broken-link' if not self.symlink else 'link'
+            return 'link-broken' if not self.symlink else 'link'
         elif isfile(self.path):
             return 'file'
         elif exists(opj(self.path, ".git", "annex")):
@@ -348,7 +353,6 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
 # from joblib import Parallel, delayed
 
 def _ls_dataset(loc, fast=False, recursive=False, all=False):
-    from ..distribution.dataset import Dataset
     isabs_loc = isabs(loc)
     topdir = '' if isabs_loc else abspath(curdir)
 
@@ -387,9 +391,11 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         print(ds_str)
 
 
-def fs_extract(node):
-    """extract required info from FsModel based filesystem node and returns it as a dictionary"""
+def fs_extract(nodepath, repo):
+    """extract required info of nodepath with its associated parent repository and returns it as a dictionary"""
 
+    # Create FsModel from filesystem nodepath and its associated parent repository
+    node = FsModel(nodepath, repo)
     pretty_size = humanize.naturalsize(node.size) if node.size else -1
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
@@ -436,29 +442,28 @@ def fs_traverse(loc, repo, recursive=False, json=None):
     extracts and returns a (recursive) list of directory info at loc
     does not traverse into annex, git or hidden directories
     """
-    fs = fs_extract(FsModel(loc, repo))
+    fs = fs_extract(loc, repo)
 
-    if isdir(loc):                                       # if node is a directory
-        fs["nodes"] = [fs_extract(FsModel(loc, repo))]   # store its info in dict
-        fs["nodes"][0]["name"] = ".."                    # and replace its name with ".." to emulate unix syntax
+    if isdir(loc):                                # if node is a directory
+        fs["nodes"] = [fs_extract(loc, repo)]     # store its info in dict
+        fs["nodes"][0]["name"] = ".."             # and replace its name with ".." to emulate unix syntax
 
         for node in listdir(loc):
-            if not ignored(opj(loc, node), only_hidden=True):
+            nodepath = opj(loc, node)
+            if not ignored(nodepath, only_hidden=True):
                 # append info on nodes children to its dictionary
-                fs["nodes"].extend([fs_extract(FsModel(opj(loc, node), repo))])
+                fs["nodes"].extend([fs_extract(nodepath, repo)])
 
-            if recursive and isdir(opj(loc, node)) and not ignored(opj(loc, node)):
+            if recursive and isdir(nodepath) and not ignored(nodepath):
                 # if recursive, create info dictionary of each child directory
-                subdir = fs_traverse(opj(loc, node), repo, recursive=recursive, json=json)
+                subdir = fs_traverse(nodepath, repo, recursive=recursive, json=json)
                 # run renderer on subdirectory(subdir) at location(loc) with json option set by user
                 lgr.info('Subdir: ' + opj(loc, node))
-                fs_render(opj(loc, node), subdir, json=json)
+                fs_render(nodepath, subdir, json=json)
     return fs
 
 
 def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
-    from ..distribution.dataset import Dataset
-
     # find all sub-datasets under path passed and attach Dataset class to each
     topds = Dataset(loc)
     dss = [topds] + (
