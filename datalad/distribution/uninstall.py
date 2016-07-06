@@ -307,11 +307,7 @@ class Uninstall(Interface):
                                  "data only doesn't make sense." % path)
             else:
                 # git rm -r
-                # TODO: Move to GitRepo and integrate with remove()
-                std_out, std_err = ds.repo._git_custom_command(
-                    relativepath, ['git', 'rm', '-r'])
-                return [line.split()[1][1:-1] for line in std_out.splitlines()
-                        if line.startswith('rm')]
+                return ds.repo.remove(relativepath, r=True)
 
         # we know, it's an existing file
         if isinstance(ds.repo, AnnexRepo):

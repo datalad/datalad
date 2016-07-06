@@ -227,6 +227,7 @@ def test_install_recursive_with_data(src, path):
 # TODO: Is there a way to test result renderer?
 #  MIH: cmdline tests have run_main() which capture the output.
 
+
 @with_tree(tree={'file.txt': '123'})
 @serve_path_via_http
 @with_tempfile

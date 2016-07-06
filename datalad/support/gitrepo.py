@@ -43,6 +43,7 @@ from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
 from datalad.utils import swallow_logs
+from datalad.utils import updated
 
 # imports from same module:
 from .exceptions import CommandError
@@ -64,10 +65,56 @@ default_git_odbt = gitpy.GitCmdObjectDB
 # Didn't work as expected on a first try. Probably there is a neatier way to
 # log Exceptions from git commands.
 
-# TODO: Check whether it makes sense to unify passing of options in a way
-# similar to paths. See options_decorator in annexrepo.py
-# Note: GitPython is doing something similar already with **kwargs.
-# TODO: Figure this out in detail.
+
+@optional_args
+def kwargs_to_options(func, split_single_char_options=True,
+                      target_kw='options'):
+    """Decorator to provide convenient way to pass options to command calls.
+
+    Parameters
+    ----------
+    func: Callable
+        function to decorate
+    split_single_char_options: bool
+        whether or not to split key and value of single char keyword arguments
+        into two subsequent entries of the list
+    target_kw: str
+        keyword argument to pass the generated list of cmdline arguments to
+
+    Returns
+    -------
+    Callable
+    """
+
+    # TODO: don't overwrite options, but join
+
+    @wraps(func)
+    def newfunc(self, *args, **kwargs):
+        t_kwargs = dict()
+        t_kwargs[target_kw] = \
+            gitpy.Git().transform_kwargs(
+                        split_single_char_options=split_single_char_options,
+                        **kwargs)
+        return func(self, *args, **t_kwargs)
+    return newfunc
+
+
+def to_options(**kwargs):
+    """Transform keyword arguments into a list of cmdline options
+
+    Parameters
+    ----------
+    split_single_char_options: bool
+
+    kwargs:
+
+    Returns
+    -------
+    list
+    """
+    # TODO: borrow_docs!
+
+    return gitpy.Git().transform_kwargs(**kwargs)
 
 
 def _normalize_path(base_dir, path):
@@ -320,7 +367,8 @@ class GitRepo(object):
     # default_git_odbt but still allows for faster testing etc.
     # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
-    def __init__(self, path, url=None, runner=None, create=True, git_opts=None):
+    def __init__(self, path, url=None, runner=None, create=True, git_opts=None,
+                 **kwargs):
         """Creates representation of git repository at `path`.
 
         If `url` is given, a clone is created at `path`.
@@ -340,6 +388,25 @@ class GitRepo(object):
           creates `path`, if it doesn't exist.
           If set to false, an exception is raised in case `path` doesn't exist
           or doesn't contain a git repository.
+        git_opts: TODO
+        kwargs:
+          keyword arguments serving as additional options to the git-init
+          command. Therefore, it makes sense only if called with `create`.
+
+          Generally, this way of passing options to the git executable is
+          (or will be) used a lot in this class. It's a transformation of
+          python-style keyword arguments (or a `dict`) to command line arguments,
+          provided by GitPython.
+
+          A single character keyword will be prefixed by '-', multiple characters
+          by '--'. An underscore in the keyword becomes a dash. The value of the
+          keyword argument is used as the value for the corresponding command
+          line argument. Assigning a boolean creates a flag.
+
+          Examples:
+          no_commit=True => --no-commit
+          C='/my/path'   => -C /my/path
+
         """
 
         if git_opts:
@@ -386,7 +453,8 @@ class GitRepo(object):
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
                                                   mkdir=True,
-                                                  odbt=default_git_odbt)
+                                                  odbt=default_git_odbt,
+                                                  **kwargs)
             except GitCommandError as e:
                 lgr.error(str(e))
                 raise
@@ -564,6 +632,7 @@ class GitRepo(object):
             msg = "Commit"  # there is no good default
         if options:
             raise NotImplementedError
+        self.precommit()
         lgr.debug("Committing with msg=%r" % msg)
         self.cmd_call_wrapper(self.repo.index.commit, msg)
         #
@@ -593,6 +662,7 @@ class GitRepo(object):
         branch: str, optional
         """
         # TODO: support not only a branch but any treeish
+        #       Note: repo.tree(treeish).hexsha
         if branch is None:
             return self.repo.active_branch.object.hexsha
         for b in self.repo.branches:
@@ -727,6 +797,101 @@ class GitRepo(object):
         else:
             return content_str.splitlines()
         # TODO: keep splitlines?
+
+    def _gitpy_custom_call(self, cmd, cmd_args=None, cmd_options=None,
+                           git_options=None, env=None,
+
+                           # 'old' options for Runner; not sure yet, which of
+                           # them are actually still needed:
+                           log_stdout=True, log_stderr=True, log_online=False,
+                           expect_stderr=True, cwd=None,
+                           shell=None, expect_fail=False):
+
+        """Helper to call GitPython's wrapper for git calls.
+
+        The used instance of `gitpy.Git` is bound to the repository,
+        which determines its working directory.
+        This is used for adhoc implementation of a git command and to
+        demonstrate how to use it in more specific implementations.
+
+        Note
+        ----
+        Aims to replace the use of datalad's `Runner` class for direct git
+        calls. (Currently the `_git_custom_command()` method).
+        Therefore mimicking its behaviour during RF'ing.
+
+        Parameters
+        ----------
+        cmd: str
+          the native git command to call
+        cmd_args: list of str
+          arguments to the git command
+        cmd_options: dict
+          options for the command as key, value pair
+          (this transformation, needs some central place to document)
+        git_options: dict
+          options for the git executable as key, value pair
+          (see above)
+        env: dict
+          environment vaiables to temporarily set for this call
+
+        TODO
+        ----
+        Example
+
+        Returns
+        -------
+        (stdout, stderr)
+        """
+
+        # TODO: Reconsider when to log/stream what (stdout, stderr) and/or
+        # fully implement the behaviour of `Runner`
+
+        if log_online:
+            raise NotImplementedError("option 'log_online' not implemented yet")
+        with_exceptions = not expect_fail
+        if cwd:
+            # the gitpy.cmd.Git instance, bound to this repository doesn't allow
+            # to explicitly set the working dir, except for using os.getcwd
+            raise NotImplementedError("working dir is a read-only property")
+
+        _tmp_shell = gitpy.cmd.Git.USE_SHELL
+        gitpy.cmd.Git.USE_SHELL = shell
+
+        if env is None:
+            env = {}
+        if git_options is None:
+            git_options = {}
+        if cmd_options is None:
+            cmd_options = {}
+        cmd_options.update({'with_exceptions': with_exceptions,
+                            'with_extended_output': True})
+
+        # TODO: _GIT_COMMON_OPTIONS!
+
+        with self.repo.git.custom_environment(**env):
+            try:
+                status, std_out, std_err = \
+                    self.repo.git(**git_options).__getattr__(cmd)(
+                        cmd_args, **cmd_options)
+            except GitCommandError as e:
+                # For now just reraise. May be raise CommandError instead
+                raise
+            finally:
+                gitpy.cmd.Git.USE_SHELL = _tmp_shell
+
+        if not expect_stderr and std_err:
+            lgr.error("Unexpected output on stderr: %s" % std_err)
+            raise CommandError
+        if log_stdout:
+            for line in std_out.splitlines():
+                lgr.debug("stdout| " + line)
+        if log_stderr:
+            for line in std_err.splitlines():
+                lgr.log(level=logging.DEBUG if expect_stderr else logging.ERROR,
+                        msg="stderr| " + line)
+
+        return std_out, std_err
 
     @normalize_paths(match_return_type=False)
     def _git_custom_command(self, files, cmd_str,
@@ -1123,6 +1288,22 @@ class GitRepo(object):
             url = path
         cmd += [url, path]
         self._git_custom_command('', cmd)
+
+    def deinit_submodule(self, path, **kwargs):
+        """Deinit a submodule
+
+
+        Parameters
+        ----------
+        path: str
+            path to the submodule; relative to `self.path`
+        kwargs:
+            see `__init__`
+        """
+
+        kwargs = updated(kwargs, {'insert_kwargs_after': 'deinit'})
+        self._gitpy_custom_call('submodule', ['deinit', path],
+                                cmd_options=kwargs)
 
     def update_submodule(self, path, mode='checkout', init=False):
         """Update a registered submodule.
