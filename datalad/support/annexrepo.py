@@ -70,8 +70,9 @@ class AnnexRepo(GitRepo):
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True, create=True, init=False,
-                 batch_size=None, version=None, description=None):
+                 direct=False, backend=None, always_commit=True, create=True,
+                 init=False, batch_size=None, version=None, description=None,
+                 git_opts=None, annex_opts=None, annex_init_opts=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -114,6 +115,10 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        if git_opts or annex_opts or annex_init_opts:
+            raise NotImplementedError("TODO")
+
         fix_it = False
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
