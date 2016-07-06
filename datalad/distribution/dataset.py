@@ -204,6 +204,45 @@ class Dataset(object):
         else:
             return submodules
 
+    def create_subdataset(self, path, name=None,
+                          description=None,
+                          no_annex=False,
+                          annex_version=None,
+                          annex_backend='MD5E',
+                          git_opts=None,
+                          annex_opts=None,
+                          annex_init_opts=None):
+
+        # TODO: use `name` for subdatasets. (not necessarily equals `path`)
+        # TODO: check whether path is in self?
+        subds = Dataset(path)
+
+        # create the dataset
+        # TODO: Does this require circular import (from datalad.api, which
+        #       imports dataset?)
+        subds.create(description=description,
+                     no_annex=no_annex,
+                     annex_version=annex_version,
+                     annex_backend=annex_backend,
+                     git_opts=git_opts,
+                     annex_opts=annex_opts,
+                     annex_init_opts=annex_init_opts,
+                     # Note:
+                     # adding to the superdataset is what we are doing herein!
+                     # add_to_super=True would lead to calling ourselves again
+                     # and again
+                     # While this is somewhat ugly, the issue behind this is a
+                     # necessarily slightly different logic of `create` in
+                     # comparison to other toplevel functions, which operate on
+                     # an existing dataset and possibly on subdatasets.
+                     # With `create` we suddenly need to operate on a
+                     # superdataset, if add_to_super is True.
+                     add_to_super=False)
+
+        # TODO: add it as a submodule
+        raise NotImplementedError("TODO")
+
+
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
 #        name pattern.

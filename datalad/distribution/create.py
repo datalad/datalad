@@ -10,18 +10,30 @@
 
 """
 
-__docformat__ = 'restructuredtext'
-
 import logging
 import os
-from datalad.distribution.dataset import Dataset, datasetmethod, EnsureDataset
+
+from os.path import join as opj
+
 from datalad.interface.base import Interface
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureDType
+from datalad.interface.common_opts import git_opts
+from datalad.interface.common_opts import annex_opts
+from datalad.interface.common_opts import annex_init_opts
+from datalad.interface.common_opts import dataset_description
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.constraints import EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
-from datalad.interface.common_opts import git_opts, annex_opts, \
-    annex_init_opts, dataset_description
+from datalad.utils import getpwd
+
+from .dataset import Dataset
+from .dataset import datasetmethod
+from .dataset import EnsureDataset
+
+
+__docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.create')
 
@@ -110,25 +122,66 @@ class Create(Interface):
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None):
-        # if add_to_super:
-        #   find parent ds and call its create_subdataset() which calls this
-        #   function again, with add_to_super=False and afterwards added the
-        #   new subdataset to itself
+            # TODO: name? (technically not equal to path)
 
-        if description and no_annex:
-            raise ValueError("Incompatible arguments: cannot specify description for "
-                             "annex repo and declaring no annex repo.")
-        if loc is None:
-            loc = os.curdir
-        elif isinstance(loc, Dataset):
-            loc = loc.path
-        if no_annex:
-            lgr.info("Creating a new git repo at %s", loc)
-            vcs = GitRepo(loc, url=None, create=True)
+        if path:
+            if isinstance(path, Dataset):
+                ds = path
+            else:
+                ds = Dataset(path)  # TODO: Is there a need to resolve path?
         else:
-            # always come with annex when created from scratch
-            lgr.info("Creating a new annex repo at %s", loc)
-            vcs = AnnexRepo(
-                loc, url=None, create=True, backend=annex_backend,
-                version=annex_version, description=description)
-        return Dataset(loc)
+            ds = Dataset(getpwd())
+
+        if add_to_super:
+            sds_path = GitRepo.get_toppath(opj(ds.path, os.pardir))
+            if sds_path is None:
+                raise ValueError("No super dataset found for dataset %s" % ds)
+
+            return Dataset(sds_path).create_subdataset(
+                ds.path,
+                description=description,
+                no_annex=no_annex,
+                annex_version=annex_version,
+                annex_backend=annex_backend,
+                git_opts=git_opts,
+                annex_opts=annex_opts,
+                annex_init_opts=annex_init_opts)
+
+        else:
+            if no_annex:
+                if description:
+                    raise ValueError("Incompatible arguments: cannot specify "
+                                     "description for annex repo and declaring "
+                                     "no annex repo.")
+                if annex_opts:
+                    raise ValueError("Incompatible arguments: cannot specify "
+                                     "options for annex and declaring no "
+                                     "annex repo.")
+                if annex_init_opts:
+                    raise ValueError("Incompatible arguments: cannot specify "
+                                     "options for annex init and declaring no "
+                                     "annex repo.")
+
+                lgr.info("Creating a new git repo at %s", ds.path)
+                vcs = GitRepo(ds.path, url=None, create=True,
+                              git_opts=git_opts)
+            else:
+                # always come with annex when created from scratch
+                lgr.info("Creating a new annex repo at %s", ds.path)
+                vcs = AnnexRepo(ds.path, url=None, create=True,
+                                backend=annex_backend,
+                                version=annex_version,
+                                description=description,
+                                git_opts=git_opts,
+                                annex_opts=annex_opts,
+                                annex_init_opts=annex_init_opts)
+
+            return ds
+
+    @staticmethod
+    def result_renderer_cmdline(res):
+        from datalad.ui import ui
+        if res is None:
+            ui.message("Nothing was created")
+        elif isinstance(res, Dataset):
+            ui.message("Created dataset at %s." % res.path)
