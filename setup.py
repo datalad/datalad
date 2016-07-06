@@ -47,7 +47,7 @@ if dist[0] == 'debian' and dist[1].split('.', 1)[0] == '7':
 requires = {
     'core': [
         'appdirs',
-        'GitPython>=2.0',
+        'GitPython>=2.0.3',
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
