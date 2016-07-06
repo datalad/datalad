@@ -175,7 +175,9 @@ class Create(Interface):
                                 git_opts=git_opts,
                                 annex_opts=annex_opts,
                                 annex_init_opts=annex_init_opts)
-
+            # TODO: empty commit!
+            # vcs.commit( ... allow-empty ..)
+            
             return ds
 
     @staticmethod

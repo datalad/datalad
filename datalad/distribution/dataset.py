@@ -244,7 +244,6 @@ class Dataset(object):
         return _install_subds_inplace(ds=self, path=subds.path,
                                       relativepath=relpath(subds.path, self.path))
 
-
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
 #        name pattern.
