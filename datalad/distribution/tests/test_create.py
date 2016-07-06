@@ -58,7 +58,29 @@ from datalad.tests.utils import swallow_logs
 def test_create_curdir(path):
     with chpwd(path, mkdir=True):
         create()
-    ok_(Dataset(path).is_installed())
+    ds = Dataset(path)
+    ok_(ds.is_installed())
+
+    # simple addition to create and add a subdataset
+    # TODO: Move this test
+
+    subds = Dataset(opj(path, "some/what/deeper")).create(add_to_super=True)
+    ok_(isinstance(subds, Dataset))
+    ok_(subds.is_installed())
+
+    # TODO:
+    # ds.get_subdatasets() doesn't work yet, since index.head is invalid.
+    # When committing, this changes to
+    # "InvalidGitRepositoryError: Gitmodule path u'some/what/deeper' did not
+    # exist in revision of parent commit HEAD"
+    #
+    # Note: The latter might be a conflict of gitpython in-memory index being
+    # committed, while the actual change to be committed was on disk?
+
+    # For now, just check .gitmodules:
+    with open(opj(path, ".gitmodules"), "r") as f:
+        lines = f.readlines()
+        assert_in("[submodule \"some/what/deeper\"]" + os.linesep, lines)
 
 
 @with_tempfile

@@ -218,8 +218,6 @@ class Dataset(object):
         subds = Dataset(path)
 
         # create the dataset
-        # TODO: Does this require circular import (from datalad.api, which
-        #       imports dataset?)
         subds.create(description=description,
                      no_annex=no_annex,
                      annex_version=annex_version,
@@ -239,8 +237,12 @@ class Dataset(object):
                      # superdataset, if add_to_super is True.
                      add_to_super=False)
 
-        # TODO: add it as a submodule
-        raise NotImplementedError("TODO")
+        # add it as a submodule
+        # TODO: clean that part and move it in here (Dataset)
+        from .install import _install_subds_inplace
+        from os.path import relpath
+        return _install_subds_inplace(ds=self, path=subds.path,
+                                      relativepath=relpath(subds.path, self.path))
 
 
 #    def get_file_handles(self, pattern=None, fulfilled=None):
