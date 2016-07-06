@@ -990,6 +990,7 @@ def test_annex_drop(src, dst):
     # too much arguments:
     assert_raises(CommandError, ar.drop, ['.'], options=['--all'])
 
+
 @with_testrepos('basic_annex', flavors=['clone'])
 @with_tempfile(mkdir=True)
 def test_annex_remove(path1, path2):
