@@ -19,7 +19,7 @@
 	<script>
 	 function directory(url) {
 	     // construct path to metadata json based on directory to be rendered argument passed in url
-	     var url = (getParameterByName('dir') ? getParameterByName('dir') + ".dir.json": ".dir.json");
+	     var url = (getParameterByName('dir') ? getParameterByName('dir') + ".dir.json": url_exists(url) ? url : ".dir.json");
 
 	     var table = $('#directory').DataTable( {
 		 "async": true,    //async get json
@@ -28,16 +28,17 @@
 		     "url": url,
 		     "dataSrc": "nodes"
 		 },
+	         "order": [[ 3, "asc" ]],
 		 "columns": [      //select columns and their names from json
 		     { "data": "name", title: "Name" },
-		     { "data": "size", title: "Size" },
-		     { "data": "date", title: "Date" },
-		     { "data": "path", title: "Path" },
+                     { "data": "date", title: "Date" },
+                     { "data": "size", title: "Size" },
 		     { "data": "type", title: "Type" },
-		 ],
+                     { "data": "path", title: "Path" },
+	         ],
 		 //update css of visible columns in each row based on their node type
 		 "createdRow": function ( row, data, index ) {
-		     for(i = 0; i < 3; i++)
+		     for(i = 0; i < 4; i++)
 			 $('td', row).eq(i).addClass(data.type);
 		 },
 		 // add click handlers to each row(cell) once table initialised
@@ -46,15 +47,21 @@
 		     api.$('tr').click( function () {           		                   // on clicking a row element
 			 var data = table.row( this ).data();                                      // extract its data json from table
 			 if (data.type == 'dir' || data.type == 'git' || data.type == 'annex') {   // if clicked row of directory type
-			     // update url to load json from selected directory
-			     window.location.search = '?dir=' + (data.name == ".." ? parent_url(url).replace('.dir.json', ''): url.replace('.dir.json', data.name + '/'));
+                            // update url to load json from selected directory
+                            window.location.search = '?dir=' + (data.name == ".." ? parent_url(url).replace('.dir.json', ''): url.replace('.dir.json', data.name + '/'));
 			 }
+			 else if (data.type == 'file' || data.type == 'link') {
+			    // update url to load json from selected directory
+                            window.location.assign(url.replace('.dir.json', data.name))
+	               }
 		     });
 		 }
 	     });
-	     table.columns([3,4]).visible(false, false);  //hide complete path and file type columns
+	     table.columns([4]).visible(false);  //hide complete path and file type columns
 	     return table;
 	 }
+	 // check if url exists
+	 function url_exists(url) { var http = new XMLHttpRequest();  http.open('HEAD', url, false);  http.send();  return http.status!=404; }
 
 	 // construct parent path of url passed
 	 function parent_url(url) {  url_array = url.split(/[\\/]/);  url_array.splice(-2,1);  return url_array.join('/');  }
