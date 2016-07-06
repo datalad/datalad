@@ -15,6 +15,8 @@ import logging
 from os.path import join as opj
 
 from datalad.interface.base import Interface
+from datalad.interface.common_opts import annex_copy_opts, recursion_flag, \
+    recursion_limit, git_opts, annex_opts
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
@@ -47,16 +49,17 @@ def _log_push_info(pi_list):
 
 
 class Publish(Interface):
-    """Publish a dataset (e.g. to a web server)
+    """Publish a dataset to a known :term:`sibling`.
 
-    This makes the current state of a dataset available to a sibling of the
-    dataset. That sibling needs to be known to the dataset before.
-    `create_publication_target` commands are meant to set up such a sibling, but
-    generally you can publish to any sibling added to a dataset.
-    Publishing may or may not include subdatasets.
-    By default file handles are published without their actual content,
-    but they can be published including the content, of course.
+    This makes the last saved state of a dataset available to a sibling
+    or special remote data store of the dataset which must already exist
+    and be known to the dataset.
 
+    .. note::
+      Power-user info: This command uses :command:`git push`, and :command:`git annex copy`
+      to publish a dataset. Publication targets are either configured remote
+      Git repositories, or git-annex special remotes (if their support data
+      upload).
     """
     # TODO: Figure out, how to tell about tracking branch/upstream
     #      (and the respective remote)
@@ -77,18 +80,13 @@ class Publish(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         to=Parameter(
             args=("--to",),
-            metavar='DEST',
+            metavar='LABEL',
             doc="""sibling name identifying the publication target. If no
-            destination is given an attempt is made to identify the target based
-            on the dataset's configuration""",
+            destination is given an attempt is made to identify the target
+            based on the dataset's configuration (i.e. a set up tracking
+            branch)""",
             # TODO: See TODO at top of class!
             constraints=EnsureStr() | EnsureNone()),
-        recursive=Parameter(
-            args=("-r", "--recursive"),
-            action="store_true",
-            doc="recursively publish all subdatasets of the dataset. In order "
-                "to recursively publish with all data, use '.' as `path` in "
-                "combination with `recursive`"),
         since=Parameter(
             args=("--since",),
             constraints=EnsureStr() | EnsureNone(),
@@ -114,16 +112,27 @@ class Publish(Interface):
                 "to subdatasets in case `recursive` is also given.",
             constraints=EnsureStr() | EnsureNone(),
             nargs='*'),
-        annex_copy_opts=Parameter(
-            args=("--annex-copy-opts",),
-            metavar='OPT_STR',  # better name?
-            doc="options passed to 'annex copy'",
-            constraints=EnsureStr() | EnsureNone(),))
+        recursive=recursion_flag,
+        recursion_limit=recursion_limit,
+        git_opts=git_opts,
+        annex_opts=annex_opts,
+        annex_copy_opts=annex_copy_opts
+    )
 
     @staticmethod
     @datasetmethod(name='publish')
-    def __call__(path=None, dataset=None, to=None, recursive=False, since=None,
-                 skip_failing=False, annex_copy_opts=None):
+    def __call__(
+            path=None,
+            dataset=None,
+            to=None,
+            since=None,
+            skip_failing=False,
+            recursive=False,
+            recursion_limit=None,
+            git_opts=None,
+            annex_opts=None,
+            annex_copy_opts=None):
+        # shortcut
         ds = require_dataset(dataset, check_installed=True, purpose='publication')
         assert(ds.repo is not None)
 
