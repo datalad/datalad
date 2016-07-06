@@ -141,9 +141,9 @@ class Update(Interface):
         for repo in repos_to_update:
             # get all remotes:
             remotes = repo.get_remotes()
-            if name and name not in remotes:
+            if sibling and sibling not in remotes:
                 lgr.warning("'%s' not known to dataset %s.\nSkipping" %
-                            (name, repo.path))
+                            (sibling, repo.path))
                 continue
 
             # Currently '--merge' works for single remote only:
@@ -152,14 +152,14 @@ class Update(Interface):
             #         tracking branch
             #       - we also can fetch all remotes independently on whether or
             #         not we merge a certain remote
-            if not name and len(remotes) > 1 and merge:
+            if not sibling and len(remotes) > 1 and merge:
                 lgr.debug("Found multiple remotes:\n%s" % remotes)
                 raise NotImplementedError("No merge strategy for multiple "
                                           "remotes implemented yet.")
             lgr.info("Updating dataset '%s' ..." % repo.path)
 
             # fetch remote(s):
-            repo.fetch(remote=name, all_=fetch_all)
+            repo.fetch(remote=sibling, all_=fetch_all)
 
             # if `repo` is an annex and we didn't fetch the entire remote
             # anyway, explicitly fetch git-annex branch:
@@ -169,10 +169,10 @@ class Update(Interface):
             # what we want? Do we want to specify a refspec instead?
 
             if knows_annex(repo.path) and not fetch_all:
-                if name:
+                if sibling:
                     # we are updating from a certain remote, so git-annex branch
                     # should be updated from there as well:
-                    repo.fetch(remote=name, refspec="git-annex")
+                    repo.fetch(remote=sibling, refspec="git-annex")
                     # TODO: what does failing here look like?
                 else:
                     # we have no remote given, therefore
@@ -191,8 +191,8 @@ class Update(Interface):
                 # We need a "tracking remote" but custom refspec to fetch from
                 # that remote
                 cmd_list = ["git", "pull"]
-                if name:
-                    cmd_list.append(name)
+                if sibling:
+                    cmd_list.append(sibling)
                     # branch needed, if not default remote
                     # => TODO: use default remote/tracking branch to compare
                     #          (see above, where git-annex is fetched)
