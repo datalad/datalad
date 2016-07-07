@@ -618,9 +618,9 @@ class GitRepo(object):
         Parameters
         ----------
         msg: str
-            commit-message
-        options:
-            to be implemented. See options_decorator in annexrepo.
+          commit-message
+        options: list of str
+          cmdline options for git-commit
         """
 
         # TODO: for some commits we explicitly do not want a message since
@@ -629,17 +629,16 @@ class GitRepo(object):
         # convert to string anyways.... bleh
         if not msg:
             msg = "Commit"  # there is no good default
-        if options:
-            raise NotImplementedError
         self.precommit()
-        lgr.debug("Committing with msg=%r" % msg)
-        self.cmd_call_wrapper(self.repo.index.commit, msg)
-        #
-        #  Was blaming of too much state causes side-effects while interlaving with
-        #  git annex cmds so this snippet if to use outside git call
-        #self._git_custom_command([], ['git', 'commit'] + \
-        #                         (["-m", msg] if msg else []) + \
-        #                         (options if options else []))
+        if options:
+            # we can't pass all possible options to gitpython's implementation
+            # of commit. Therefore we need a direct call to git:
+            cmd = ['git', 'commit', "-m", msg] + options
+            lgr.debug("Committing via direct call of git: %s" % cmd)
+            self._git_custom_command([], cmd)
+        else:
+            lgr.debug("Committing with msg=%r" % msg)
+            self.cmd_call_wrapper(self.repo.index.commit, msg)
 
     def get_indexed_files(self):
         """Get a list of files in git's index

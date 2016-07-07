@@ -979,18 +979,23 @@ class AnnexRepo(GitRepo):
         self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    def commit(self, msg):
+    def commit(self, msg=None, options=None):
         """
 
         Parameters
         ----------
         msg: str
+        options: list of str
+          cmdline options for git-commit
         """
         self.precommit()
         if self.is_direct_mode():
-            self.proxy(['git', 'commit',  '-m', msg], expect_stderr=True)
+            if not msg:
+                msg = "Commit"  # may be --allow-empty-message instead?
+            self.proxy(['git', 'commit',  '-m', msg] +
+                       (options if options else []), expect_stderr=True)
         else:
-            super(AnnexRepo, self).commit(msg)
+            super(AnnexRepo, self).commit(msg, options)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
