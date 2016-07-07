@@ -69,8 +69,13 @@ def test_composite_credential1():
     # basic test of composite credential
     keyring = MemoryKeyring()
     cred = _CCred1("name", keyring=keyring)
+    # When queried, does the chain
     assert_equal(cred(), {'user': 'user1_1', 'password': 'password1_2'})
+    # But the "Front" credential is exposed to the user
+    assert_equal(cred.get('user'), 'user1')
     assert_equal(keyring.get('name', 'user'), 'user1')
+    assert_raises(ValueError, cred.get, 'unknown_field')
+    assert_equal(cred.get('password'), 'password1')
     assert_equal(keyring.get('name', 'password'), 'password1')
     # ATM composite credential stores "derived" ones unconditionally in the
     # keyring as well

@@ -46,7 +46,9 @@ def get_version_for_key(k, fmt='0.0.%Y%m%d'):
     # format it
     return time.strftime(fmt, time.gmtime(t))
 
+
 def _strip_prefix(s, prefix):
+    """A helper to strip the prefix from the string if present"""
     return s[len(prefix):] if s and s.startswith(prefix) else s
 
 

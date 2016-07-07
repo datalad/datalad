@@ -58,9 +58,9 @@ def collection_pipeline(prefix=None):
                    # 'remove': annex.remove,
                    'annex':  annex,
                    'directory': [
-                       # for initiate_handle we should replicate filename as handle_name, prefix
+                       # for initiate_dataset we should replicate filename as handle_name, prefix
                        assign({'prefix': '%(filename)s/', 'handle_name': '%(filename)s'}, interpolate=True),
-                       annex.initiate_handle(
+                       annex.initiate_dataset(
                            template='openfmri_s3',
                            data_fields=['prefix'],
                        )

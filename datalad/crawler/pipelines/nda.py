@@ -51,13 +51,13 @@ def collection_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
                    # 'remove': annex.remove,
                    'annex':  annex,
                    'directory': [
-                       # for initiate_handle we should replicate filename as handle_name, prefix
+                       # for initiate_dataset we should replicate filename as handle_name, prefix
                        assign({
                            'prefix': sprefix + '%(filename)s/',
                            'bucket': bucket,
                            'handle_name': '%(filename)s'
                        }, interpolate=True),
-                       annex.initiate_handle(
+                       annex.initiate_dataset(
                            template='nda',
                            data_fields=['bucket', 'prefix'],
                        )
@@ -69,7 +69,7 @@ def collection_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
 
 
 def bucket_pipeline(bucket=DEFAULT_BUCKET, prefix=None):
-    """Pipeline to crawl/annex an entire openfmri bucket"""
+    """Pipeline to crawl/annex NDA bucket"""
 
     lgr.info("Creating a pipeline for the NDA bucket")
     annex = Annexificator(
