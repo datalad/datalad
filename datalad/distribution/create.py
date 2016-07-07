@@ -12,6 +12,9 @@
 
 import logging
 
+from os import listdir
+from os.path import isdir
+
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import git_opts
 from datalad.interface.common_opts import annex_opts
@@ -73,10 +76,15 @@ class Create(Interface):
             doc="""path where the dataset shall be created, directories
             will be created as necessary. If no location is provided, a dataset
             will be created in the current working directory. Either way the
-            command will error if the target directory is not empty.""",
+            command will error if the target directory is not empty.
+            Use `force` to create a dataset in a non-empty directory.""",
             nargs='?',
             # put dataset 2nd to avoid useless conversion
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
+        force=Parameter(
+            args=("-f", "--force",),
+            doc="""enforce creation of a dataset in a non-empty directory""",
+            action='store_false'),
         description=dataset_description,
         add_to_super=add_to_superdataset,
         name=Parameter(
@@ -117,6 +125,7 @@ class Create(Interface):
     @datasetmethod(name='create', dataset_argname='path')
     def __call__(
             path=None,
+            force=False,
             description=None,
             add_to_super=False,
             name=None,
@@ -134,6 +143,12 @@ class Create(Interface):
                 ds = Dataset(path)  # TODO: Is there a need to resolve path?
         else:
             ds = Dataset(getpwd())
+
+        # don't create in non-empty directory without `force`:
+        if isdir(ds.path) and listdir(ds.path) != [] and not force:
+            raise ValueError("Cannot create dataset in directory %s "
+                             "(not empty). Use option 'force' in order to "
+                             "ignore this and enforce creation." % ds.path)
 
         if add_to_super:
             sds = ds.get_superdataset()
