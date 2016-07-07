@@ -238,12 +238,29 @@ def get_containing_subdataset(ds, path):
 # install of existing submodule; recursive call; source should not be None!
 
 class Install(Interface):
-    """Install a dataset component or entire dataset(s).
+    """Install a dataset or subdataset.
 
-    This command can make arbitrary content available in a dataset. This
-    includes the fulfillment of existing :term:`subdataset` or file handles in
-    a dataset, as well as the addition of subdatasets and such handles for
-    content available locally or subdataset remotely.
+    This command creates a local :term:`sibling` of an existing dataset from a
+    (remote) location identified via a URL or path, or by the name of a
+    registered subdataset. Optional recursion into potential subdatasets, and
+    download of all referenced data is supported. The new dataset can be
+    optionally registered in an existing :term:`superdataset` (the new
+    dataset's path needs to be located within the superdataset for that, and
+    the superdataset will be detected automatically). It is recommended to
+    provide a brief description to label the dataset's nature *and* location,
+    e.g. "Michael's music on black laptop". This helps humans to identify data
+    locations in distributed scenarios.  By default an identifier comprised of
+    user and machine name, plus path will be generated.
+
+    When only partial dataset content shall be obtained, it is recommended to
+    use this command without the :option:`get-data` flag, followed by a
+    :func:`~datalad.api.get` operation to obtain the desired data.
+
+    .. note::
+      Power-user info: This command uses :command:`git clone`, and
+      :command:`git annex init` to prepare the dataset. Registering to a
+      superdataset is performed via a :command:`git submodule add` operation
+      in the discovered superdataset.
     """
 
     _params_ = dict(
@@ -251,19 +268,21 @@ class Install(Interface):
             args=("-d", "--dataset"),
             doc="""specify the dataset to perform the install operation on.  If
             no dataset is given, an attempt is made to identify the dataset
-            based on the current working directory and/or the `path` given""",
+            in a parent directory of the current working directory and/or the
+            `path` given""",
             constraints=EnsureDataset() | EnsureNone()),
         path=Parameter(
             args=("path",),
             doc="""path/name of the installation target.  If no `source` is
             provided, and no `dataset` is given or detected, this is
             interpreted as the source URL of a dataset and a destination
-            path will be derived from the URL similar to 'git clone'""",
+            path will be derived from the URL similar to :command:`git
+            clone`""",
             nargs="*",
             constraints=EnsureStr() | EnsureNone()),
         source=Parameter(
             args=("-s", "--source",),
-            doc="url or local path of the installation source",
+            doc="URL or local path of the installation source",
             constraints=EnsureStr() | EnsureNone()),
         # TODO this probably needs --with-data and --recursive as a plain boolean
         recursive=Parameter(

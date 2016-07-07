@@ -367,7 +367,8 @@ class GitRepo(object):
     # default_git_odbt but still allows for faster testing etc.
     # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
-    def __init__(self, path, url=None, runner=None, create=True, **kwargs):
+    def __init__(self, path, url=None, runner=None, create=True,
+                 git_opts=None, **kwargs):
         """Creates representation of git repository at `path`.
 
         If `url` is given, a clone is created at `path`.
@@ -406,6 +407,9 @@ class GitRepo(object):
           C='/my/path'   => -C /my/path
 
         """
+
+        if git_opts:
+            raise NotImplementedError("TODO")
 
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
@@ -446,7 +450,8 @@ class GitRepo(object):
         if create and not exists(opj(path, '.git')):
             try:
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path, True,
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
+                                                  mkdir=True,
                                                   odbt=default_git_odbt,
                                                   **kwargs)
             except GitCommandError as e:

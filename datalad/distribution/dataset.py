@@ -24,6 +24,8 @@ from datalad.utils import swallow_logs
 lgr = logging.getLogger('datalad.dataset')
 
 
+# TODO: use the same piece for resolving paths against Git/AnnexRepo instances
+#       (see normalize_path)
 def resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
@@ -203,6 +205,47 @@ class Dataset(object):
             return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
+
+    def create_subdataset(self, path, name=None,
+                          description=None,
+                          no_annex=False,
+                          annex_version=None,
+                          annex_backend='MD5E',
+                          git_opts=None,
+                          annex_opts=None,
+                          annex_init_opts=None):
+
+        # TODO: use `name` for subdatasets. (not necessarily equals `path`)
+        # TODO: check whether path is in self?
+        subds = Dataset(path)
+
+        # create the dataset
+        subds.create(description=description,
+                     no_annex=no_annex,
+                     annex_version=annex_version,
+                     annex_backend=annex_backend,
+                     git_opts=git_opts,
+                     annex_opts=annex_opts,
+                     annex_init_opts=annex_init_opts,
+                     # Note:
+                     # adding to the superdataset is what we are doing herein!
+                     # add_to_super=True would lead to calling ourselves again
+                     # and again
+                     # While this is somewhat ugly, the issue behind this is a
+                     # necessarily slightly different logic of `create` in
+                     # comparison to other toplevel functions, which operate on
+                     # an existing dataset and possibly on subdatasets.
+                     # With `create` we suddenly need to operate on a
+                     # superdataset, if add_to_super is True.
+                     add_to_super=False)
+
+        # add it as a submodule
+        # TODO: clean that part and move it in here (Dataset)
+        #       or call install to add the thing inplace
+        from .install import _install_subds_inplace
+        from os.path import relpath
+        return _install_subds_inplace(ds=self, path=subds.path,
+                                      relativepath=relpath(subds.path, self.path))
 
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
