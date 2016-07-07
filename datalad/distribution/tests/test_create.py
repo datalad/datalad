@@ -54,44 +54,51 @@ from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import swallow_logs
 
 
+@with_tempfile(mkdir=True)
 @with_tempfile
-def test_create_curdir(path):
+def test_create_raises(path, outside_path):
+
+    ds = Dataset(path)
+    # no superdataset to add to:
+    assert_raises(ValueError, ds.create, add_to_super=True)
+    # incompatible arguments (annex only):
+    assert_raises(ValueError, ds.create, no_annex=True, description='some')
+    assert_raises(ValueError, ds.create, no_annex=True, annex_opts=['some'])
+    assert_raises(ValueError, ds.create, no_annex=True, annex_init_opts=['some'])
+
+    with open(opj(path, "somefile.tst"), 'w') as f:
+        f.write("some")
+    # non-empty without force:
+    assert_raises(ValueError, ds.create, force=False)
+    # non-empty with force:
+    ds.create(force=True)
+    # create sub outside of super:
+    assert_raises(ValueError, ds.create_subdataset, outside_path)
+
+
+@with_tempfile
+@with_tempfile
+def test_create_curdir(path, path2):
     with chpwd(path, mkdir=True):
         create()
     ds = Dataset(path)
     ok_(ds.is_installed())
+    ok_clean_git(ds.path, annex=True)
 
-    # simple addition to create and add a subdataset
-    # TODO: Move this test
-
-    subds = Dataset(opj(path, "some/what/deeper")).create(add_to_super=True)
-    ok_(isinstance(subds, Dataset))
-    ok_(subds.is_installed())
-    ok_clean_git(subds.path, annex=True)
-
-    # subdataset is known to superdataset:
-    assert_in("some/what/deeper", ds.get_subdatasets())
-    # but wasn't committed:
-    ok_(ds.repo.dirty)
-
-    ok_(subds.get_superdataset() == ds)
+    with chpwd(path2, mkdir=True):
+        create(no_annex=True)
+    ds = Dataset(path2)
+    ok_(ds.is_installed())
+    ok_clean_git(ds.path, annex=False)
 
 
 @with_tempfile
 def test_create(path):
-    # install doesn't create anymore
-    assert_raises(RuntimeError, Dataset(path).install)
-    # only needs a path
-    ds = create(path, no_annex=True)
+    ds = Dataset(path)
+    ds.create(description="funny")
     ok_(ds.is_installed())
-    ok_clean_git(path, annex=False)
-    ok_(isinstance(ds.repo, GitRepo))
+    ok_clean_git(ds.path, annex=True)
 
-    ds = create(path, description="funny")
-    ok_(ds.is_installed())
-    ok_clean_git(path, annex=False)
-    # any dataset created from scratch has an annex
-    ok_(isinstance(ds.repo, AnnexRepo))
     # check default backend
     assert_equal(
         ds.repo.repo.config_reader().get_value("annex", "backends"),
@@ -103,40 +110,38 @@ def test_create(path):
     assert_in('funny [here]', cmlout[0])
 
 
-    sub_path_1 = opj(path, "sub")
-    subds1 = create(sub_path_1)
-    ok_(subds1.is_installed())
-    ok_clean_git(sub_path_1, annex=False)
-    # wasn't installed into ds:
-    assert_not_in("sub", ds.get_subdatasets())
+@with_tempfile
+def test_create_sub(path):
 
-    # add it inplace:
-    added_subds = ds.install("sub", source=sub_path_1)
-    ok_(added_subds.is_installed())
-    ok_clean_git(sub_path_1, annex=False)
-    eq_(added_subds.path, sub_path_1)
-    assert_true(isdir(opj(added_subds.path, '.git')))
-    ok_(ds.repo.dirty)  # not committed yet
-    assert_in("sub", ds.get_subdatasets())
-    ds.save("added submodule")
-    # now for reals
-    open(opj(added_subds.path, 'somecontent'), 'w').write('stupid')
-    # next one will auto-annex the new file
-    added_subds.save('initial commit', auto_add_changes=True)
-    # as the submodule never entered the index, even this one won't work
-    # ben: it currently does, since 'save' was changed to call git add as well
-    # as git annex add. Therefore outcommenting. Please review, whether this is
-    # intended behaviour. I think so.
-    # MIH: Now it need a flag to perform this (see #546)
-    ds.save('submodule with content', auto_add_changes=True)
-    # assert_not_in("sub", ds.get_subdatasets())
-    # # we need to install the submodule again in the parent
-    # # an actual final commit is not required
-    # added_subds = ds.install("sub", source=sub_path_1)
-    assert_in("sub", ds.get_subdatasets())
+    ds = Dataset(path)
+    ds.create()
 
-    # next one directly created within ds:
-    sub_path_2 = opj(path, "sub2")
-    # installing something without a source into a dataset at a path
-    # that has no present content should not work
-    assert_raises(InsufficientArgumentsError, install, ds, path=sub_path_2)
+    # 1. create sub and add to super:
+    subds = Dataset(opj(path, "some/what/deeper")).create(add_to_super=True)
+    ok_(isinstance(subds, Dataset))
+    ok_(subds.is_installed())
+    ok_clean_git(subds.path, annex=True)
+
+    # subdataset is known to superdataset:
+    assert_in("some/what/deeper", ds.get_subdatasets())
+    # but wasn't committed:
+    ok_(ds.repo.dirty)
+
+    # subds finds superdataset
+    ok_(subds.get_superdataset() == ds)
+
+    # 2. create sub without adding to super:
+    subds2 = Dataset(opj(path, "someother")).create()
+    ok_(isinstance(subds2, Dataset))
+    ok_(subds2.is_installed())
+    ok_clean_git(subds2.path, annex=True)
+
+    # unknown to superdataset:
+    assert_not_in("someother", ds.get_subdatasets())
+
+    # 3. create sub via super:
+    subds3 = ds.create_subdataset("third", no_annex=True)
+    ok_(isinstance(subds3, Dataset))
+    ok_(subds3.is_installed())
+    ok_clean_git(subds3.path, annex=False)
+    assert_in("third", ds.get_subdatasets())
