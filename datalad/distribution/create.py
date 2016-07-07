@@ -84,16 +84,15 @@ class Create(Interface):
         force=Parameter(
             args=("-f", "--force",),
             doc="""enforce creation of a dataset in a non-empty directory""",
-            action='store_false'),
+            action='store_true'),
         description=dataset_description,
         add_to_super=add_to_superdataset,
         name=Parameter(
-            args=("name",),
+            args=("--name",),
             metavar='NAME',
             doc="""name of the dataset within the namespace of it's superdataset.
             By default its path relative to the superdataset is used. Used only
             together with `add_to_super`.""",
-            nargs='?',
             constraints=EnsureStr() | EnsureNone()),
         no_annex=Parameter(
             args=("--no-annex",),
