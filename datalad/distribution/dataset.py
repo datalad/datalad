@@ -248,8 +248,6 @@ class Dataset(object):
           the newly created dataset
         """
 
-        # TODO: use `name` for subdatasets. (not necessarily equals `path`)
-
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
         if not path.startswith(self.path):
@@ -283,7 +281,8 @@ class Dataset(object):
         from .install import _install_subds_inplace
         from os.path import relpath
         return _install_subds_inplace(ds=self, path=subds.path,
-                                      relativepath=relpath(subds.path, self.path))
+                                      relativepath=relpath(subds.path, self.path),
+                                      name=name)
 
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
