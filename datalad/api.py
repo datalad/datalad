@@ -16,13 +16,12 @@ def _generate_func_api():
        API from them
     """
     from importlib import import_module
-    from .interface.base import update_docstring_with_parameters as _update_docstring
-    from .interface.base import get_interface_groups as _get_interface_groups
-    from .interface.base import get_api_name as _get_api_name
-    from .interface.base import alter_interface_docs_for_api \
-        as _alter_interface_docs_for_api
+    from .interface.base import update_docstring_with_parameters
+    from .interface.base import get_interface_groups
+    from .interface.base import get_api_name
+    from .interface.base import alter_interface_docs_for_api
 
-    for grp_name, grp_descr, interfaces in _get_interface_groups():
+    for grp_name, grp_descr, interfaces in get_interface_groups():
         for intfspec in interfaces:
             # turn the interface spec into an instance
             mod = import_module(intfspec[0], package='datalad')
@@ -31,14 +30,14 @@ def _generate_func_api():
 
             # FIXME no longer using an interface class instance
             # convert the parameter SPEC into a docstring for the function
-            _update_docstring(
+            update_docstring_with_parameters(
                 intf.__call__, spec,
-                prefix=_alter_interface_docs_for_api(
+                prefix=alter_interface_docs_for_api(
                     intf.__doc__),
-                suffix=_alter_interface_docs_for_api(
+                suffix=alter_interface_docs_for_api(
                     intf.__call__.__doc__)
             )
-            globals()[_get_api_name(intfspec)] = intf.__call__
+            globals()[get_api_name(intfspec)] = intf.__call__
 
 
 def _fix_datasetmethod_docs():
