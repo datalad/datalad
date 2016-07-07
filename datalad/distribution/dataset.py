@@ -45,8 +45,6 @@ def resolve_path(path, ds=None):
         return abspath(path)
     if ds is None:
         # no dataset given, use CWD as reference
-        # TODO: Check whether we should use PWD instead of CWD here. Is it done
-        # by abspath?
         return abspath(path)
     else:
         return normpath(opj(ds.path, path))
@@ -56,7 +54,8 @@ class Dataset(object):
     __slots__ = ['_path', '_repo']
 
     def __init__(self, path):
-        self._path = abspath(path)
+        from install import _with_sep
+        self._path = _with_sep(abspath(path))
         self._repo = None
 
     def __repr__(self):
@@ -206,7 +205,8 @@ class Dataset(object):
         else:
             return submodules
 
-    def create_subdataset(self, path, name=None,
+    def create_subdataset(self, path,
+                          name=None,
                           description=None,
                           no_annex=False,
                           annex_version=None,
@@ -214,9 +214,47 @@ class Dataset(object):
                           git_opts=None,
                           annex_opts=None,
                           annex_init_opts=None):
+        """Create a subdataset within this dataset
+
+        Creates a new dataset at `path` and adds it as a subdataset to `self`.
+        `path` is required to point to a location inside the dataset `self`.
+
+        Parameters
+        ----------
+        path: str
+          path to the subdataset to be created
+        name: str
+          name of the subdataset
+        description: str
+          a human-readable description of the dataset, that helps to identify it.
+
+          Note: Doesn't work with `no_annex`
+        no_annex: bool
+          whether or not to create a pure git repository
+        annex_version: str
+          version of annex repository to be used
+        annex_backend: str
+          backend to be used by annex for computing file keys
+        git_opts: list of str
+          cmdline options to be passed to the git executable
+        annex_opts: list of str
+          cmdline options to be passed to git-annex
+        annex_init_opts: list of str
+          cmdline options to be passed to git-annex-init
+
+        Returns
+        -------
+        Dataset
+          the newly created dataset
+        """
 
         # TODO: use `name` for subdatasets. (not necessarily equals `path`)
-        # TODO: check whether path is in self?
+
+        # get absolute path (considering explicit vs relative):
+        path = resolve_path(path, self)
+        if not path.startswith(self.path):
+            raise ValueError("path %s outside dataset %s" % (path, self))
+
         subds = Dataset(path)
 
         # create the dataset
