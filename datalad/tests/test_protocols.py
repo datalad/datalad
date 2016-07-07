@@ -105,8 +105,12 @@ def test_ExecutionTimeProtocol(path1, path2):
     extracted_path = timer_protocol[2]['command'][1].split(',')[0][7:-1]
     assert_equal(normpath(extracted_path), normpath(path2))
 
-    assert_in("kwargs={'odbt': <class 'git.db.GitCmdObjectDB'>, 'mkdir': True}",
-              timer_protocol[2]['command'][2])
+    # kwargs needs to be in protocol, but order isn't relevant:
+    ok_(("kwargs={'odbt': <class 'git.db.GitCmdObjectDB'>, 'mkdir': True}"
+        in timer_protocol[2]['command'][2]) or
+        ("kwargs={'mkdir': True, 'odbt': <class 'git.db.GitCmdObjectDB'>}"
+        in timer_protocol[2]['command'][2]))
+
     ok_(timer_protocol[2]['end'] >= timer_protocol[2]['start'])
     ok_(timer_protocol[2]['duration'] >= 0)
 
