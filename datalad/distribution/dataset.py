@@ -54,8 +54,7 @@ class Dataset(object):
     __slots__ = ['_path', '_repo']
 
     def __init__(self, path):
-        from install import _with_sep
-        self._path = _with_sep(abspath(path))
+        self._path = abspath(path)
         self._repo = None
 
     def __repr__(self):
@@ -250,7 +249,8 @@ class Dataset(object):
 
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
-        if not path.startswith(self.path):
+        from install import _with_sep
+        if not path.startswith(_with_sep(self.path)):
             raise ValueError("path %s outside dataset %s" % (path, self))
 
         subds = Dataset(path)
