@@ -328,6 +328,20 @@ class Dataset(object):
         """
         return self.path is not None and self.repo is not None
 
+    def get_superdataset(self):
+        """Get the dataset's superdataset
+
+        Returns
+        -------
+        Dataset or None
+        """
+        from os import pardir
+        sds_path = GitRepo.get_toppath(opj(self.path, pardir))
+        if sds_path is None:
+            return None
+        else:
+            return Dataset(sds_path)
+
 
 @optional_args
 def datasetmethod(f, name=None, dataset_argname='dataset'):

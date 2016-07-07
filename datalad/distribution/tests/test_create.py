@@ -74,6 +74,8 @@ def test_create_curdir(path):
     # but wasn't committed:
     ok_(ds.repo.dirty)
 
+    ok_(subds.get_superdataset() == ds)
+
 
 @with_tempfile
 def test_create(path):

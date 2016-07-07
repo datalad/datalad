@@ -11,9 +11,6 @@
 """
 
 import logging
-import os
-
-from os.path import join as opj
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import git_opts
@@ -139,11 +136,11 @@ class Create(Interface):
             ds = Dataset(getpwd())
 
         if add_to_super:
-            sds_path = GitRepo.get_toppath(opj(ds.path, os.pardir))
-            if sds_path is None:
+            sds = ds.get_superdataset()
+            if sds is None:
                 raise ValueError("No super dataset found for dataset %s" % ds)
 
-            return Dataset(sds_path).create_subdataset(
+            return sds.create_subdataset(
                 ds.path,
                 name=name,
                 description=description,
