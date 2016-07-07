@@ -249,7 +249,7 @@ class Dataset(object):
 
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
-        from install import _with_sep
+        from .install import _with_sep
         if not path.startswith(_with_sep(self.path)):
             raise ValueError("path %s outside dataset %s" % (path, self))
 
