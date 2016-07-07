@@ -10,15 +10,26 @@
 
 """
 
-__docformat__ = 'restructuredtext'
-
 import logging
 from datalad.interface.base import Interface
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.distribution.dataset import EnsureDataset, datasetmethod
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import git_opts
+from datalad.interface.common_opts import annex_opts
+from datalad.interface.common_opts import annex_add_opts
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.interface.common_opts import recursion_flag, recursion_limit, \
-    git_opts, annex_opts, annex_add_opts
+from datalad.support.gitrepo import GitRepo
+from datalad.utils import getpwd
+
+
+from .dataset import EnsureDataset
+from .dataset import datasetmethod
+from .dataset import Dataset
+
+
+__docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.add')
 
@@ -106,4 +117,21 @@ class Add(Interface):
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None):
+
+        if dataset:
+            if not isinstance(dataset, Dataset):
+                dataset = Dataset(dataset)  # TODO: Is there a need to resolve path?
+        else:
+            dspath = GitRepo.get_toppath(getpwd())
+            if dspath:
+                dataset = Dataset(dspath)
+            else:
+                # not resolved from CWD; need to derive from path(s) or just fail?
+                pass
+
         raise NotImplementedError
+
+
+
+    # Note: considering dataset.py:resolve_path, I think we should fail if we are not within a dataset instead of tryng to derive from given path(s).
+
