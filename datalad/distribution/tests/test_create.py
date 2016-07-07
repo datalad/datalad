@@ -116,12 +116,9 @@ def test_create(path):
     ok_clean_git(sub_path_1, annex=False)
     eq_(added_subds.path, sub_path_1)
     assert_true(isdir(opj(added_subds.path, '.git')))
-    # will not list it unless committed
-    assert_not_in("sub", ds.get_subdatasets())
+    ok_(ds.repo.dirty)  # not committed yet
+    assert_in("sub", ds.get_subdatasets())
     ds.save("added submodule")
-    # will still not list it, because without a single commit, it doesn't enter
-    # the index
-    assert_not_in("sub", ds.get_subdatasets())
     # now for reals
     open(opj(added_subds.path, 'somecontent'), 'w').write('stupid')
     # next one will auto-annex the new file

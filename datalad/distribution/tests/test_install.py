@@ -196,10 +196,6 @@ def test_install_into_dataset(source, top_path):
     ok_clean_git(subds.path, annex=False)
     # top is not:
     assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
-    # unless committed the subds should not show up in the parent
-    # this is the same behavior that 'git submodule status' implements
-    assert_not_in('sub', ds.get_subdatasets())
-    ds.save('addsub')
     assert_in('sub', ds.get_subdatasets())
 
 
