@@ -28,23 +28,15 @@ demo_doc = """\
     pong ping pong ping pong ping pong.
 
     || CMDLINE >>
-<<<<<<< HEAD
     || REFLOW >>
     Something for the cmdline only
     Multiline!
     << REFLOW ||
-=======
-    Something for the cmdline only
-    Multiline!
->>>>>>> origin/master
     << CMDLINE ||
 
     || PYTHON >>
 
-<<<<<<< HEAD
     || REFLOW >>
-=======
->>>>>>> origin/master
     Some Python-only bits
     Multiline!
     << REFLOW ||
