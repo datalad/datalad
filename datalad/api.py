@@ -50,7 +50,7 @@ def _fix_datasetmethod_docs():
         except AttributeError:
             continue
         orig__doc__ = func.__func__.__doc__
-        if orig__doc__ and orig__doc__.strip():
+        if orig__doc__ and orig__doc__.strip():  # pragma: no cover
             raise RuntimeError(
                 "No meaningful docstring should have been assigned before now. Got %r"
                 % orig__doc__
