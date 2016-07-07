@@ -14,6 +14,7 @@ __docformat__ = 'restructuredtext'
 
 import sys
 import re
+import textwrap
 
 from ..ui import ui
 
@@ -78,14 +79,29 @@ def alter_interface_docs_for_api(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| Command line use only \>\>.*\<\< Command line use only \|\|',
+        '\|\| CMDLINE \>\>.*\<\< CMDLINE \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     # clean cmdline in-line bits
     docs = re.sub(
-        '\[CMD:\s.*CMD\]',
+        '\[CMD:\s.*\sCMD\]',
         '',
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    docs = re.sub(
+        '\[PY:\s(.*)\sPY\]',
+        lambda match: match.group(1),
+        docs,
+        flags=re.MULTILINE)
+    docs = re.sub(
+        '\|\| PYTHON \>\>(.*)\<\< PYTHON \|\|',
+        lambda match: match.group(1),
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    docs = re.sub(
+        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(1)),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     return docs
@@ -100,14 +116,24 @@ def alter_interface_docs_for_cmdline(docs):
     docs = dedent_docstring(docs)
     # clean cmdline sections
     docs = re.sub(
-        '\|\| Python use only \>\>.*\<\< Python use only \|\|',
+        '\|\| PYTHON \>\>.*\<\< PYTHON \|\|',
         '',
         docs,
         flags=re.MULTILINE | re.DOTALL)
     # clean cmdline in-line bits
     docs = re.sub(
-        '\[PY:\s.*PY\]',
+        '\[PY:\s.*\sPY\]',
         '',
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
+    docs = re.sub(
+        '\[CMD:\s(.*)\sCMD\]',
+        lambda match: match.group(1),
+        docs,
+        flags=re.MULTILINE)
+    docs = re.sub(
+        '\|\| CMDLINE \>\>(.*)\<\< CMDLINE \|\|',
+        lambda match: match.group(1),
         docs,
         flags=re.MULTILINE | re.DOTALL)
     # remove :role:`...` RST markup for cmdline docs
@@ -130,6 +156,22 @@ def alter_interface_docs_for_cmdline(docs):
         '`\S*`',
         lambda match: match.group(0).strip('`').upper(),
         docs)
+    # clean up sphinx API refs
+    docs = re.sub(
+        '\~datalad\.api\.\S*',
+        lambda match: "`{0}`".format(match.group(0)[13:]),
+        docs)
+    # Remove RST paragraph markup
+    docs = re.sub(
+        r'^.. \S+::',
+        lambda match: match.group(0)[3:-2].upper(),
+        docs,
+        flags=re.MULTILINE)
+    docs = re.sub(
+        '\|\| REFLOW \>\>\n(.*)\<\< REFLOW \|\|',
+        lambda match: textwrap.fill(match.group(1)),
+        docs,
+        flags=re.MULTILINE | re.DOTALL)
     return docs
 
 
