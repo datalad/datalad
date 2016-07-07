@@ -27,6 +27,7 @@ from datalad.support.constraints import EnsureDType
 from datalad.support.param import Parameter
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.gitrepo import GitRepo
+from datalad.support.gitrepo import to_options
 from datalad.utils import getpwd
 
 from .dataset import Dataset
@@ -173,8 +174,9 @@ class Create(Interface):
                                 git_opts=git_opts,
                                 annex_opts=annex_opts,
                                 annex_init_opts=annex_init_opts)
-            # TODO: empty commit!
-            # vcs.commit( ... allow-empty ..)
+
+            vcs.commit(msg="datalad initial commit",
+                       options=to_options(allow_empty=True))
             
             return ds
 

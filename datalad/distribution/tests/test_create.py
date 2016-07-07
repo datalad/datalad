@@ -67,22 +67,12 @@ def test_create_curdir(path):
     subds = Dataset(opj(path, "some/what/deeper")).create(add_to_super=True)
     ok_(isinstance(subds, Dataset))
     ok_(subds.is_installed())
+    ok_clean_git(subds.path, annex=True)
 
-    # TODO:
-    # ds.get_subdatasets() doesn't work yet, since index.head is invalid.
-    # When committing, this changes to
-    # "InvalidGitRepositoryError: Gitmodule path u'some/what/deeper' did not
-    # exist in revision of parent commit HEAD"
-    #
-    # Note: The latter might be a conflict of gitpython in-memory index being
-    # committed, while the actual change to be committed was on disk?
-    #
-    # Note 2: Might be solved by empty commit!
-
-    # For now, just check .gitmodules:
-    with open(opj(path, ".gitmodules"), "r") as f:
-        lines = f.readlines()
-        assert_in("[submodule \"some/what/deeper\"]" + os.linesep, lines)
+    # subdataset is known to superdataset:
+    assert_in("some/what/deeper", ds.get_subdatasets())
+    # but wasn't committed:
+    ok_(ds.repo.dirty)
 
 
 @with_tempfile
