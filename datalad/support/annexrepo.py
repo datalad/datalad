@@ -126,7 +126,7 @@ class AnnexRepo(GitRepo):
         fix_it = False
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
-                                            create=create)
+                                            create=create, git_opts=git_opts)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "

@@ -226,7 +226,6 @@ class Dataset(object):
           name of the subdataset
         description: str
           a human-readable description of the dataset, that helps to identify it.
-
           Note: Doesn't work with `no_annex`
         no_annex: bool
           whether or not to create a pure git repository
