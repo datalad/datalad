@@ -297,6 +297,9 @@ def datasetmethod(f, name=None, dataset_argname='dataset'):
         return f(**kwargs)
 
     setattr(Dataset, name, apply_func)
+    # So we could post-hoc later adjust the documentation string which is assigned
+    # within .api
+    apply_func.__orig_func__ = f
     return f
 
 

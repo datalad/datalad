@@ -10,6 +10,7 @@
 
 import re
 from nose.tools import assert_true, assert_false
+from datalad.tests.utils import assert_in
 
 
 def test_basic_setup():
@@ -23,3 +24,6 @@ def test_basic_setup():
     # make sure all helper utilities do not pollute the namespace
     # and we end up only with __...__ attributes
     assert_false(list(filter(lambda s: s.startswith('_') and not re.match('__.*__', s), dir(api))))
+
+    assert_in('Parameters', api.Dataset.install.__doc__)
+    assert_in('Parameters', api.Dataset.create.__doc__)
