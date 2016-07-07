@@ -23,6 +23,7 @@ _group_dataset = (
         # src module can be relative, but has to be relative to the main 'datalad' package
         ('datalad.distribution.create', 'Create'),
         ('datalad.distribution.install', 'Install'),
+        ('datalad.distribution.get', 'Get'),
         ('datalad.distribution.publish', 'Publish'),
         ('datalad.distribution.uninstall', 'Uninstall'),
         # N/I ATM
