@@ -53,7 +53,7 @@ def test_unlock_raises(path, path2, path3):
                   unlock, dataset=None, path=[path2, path3])
 
     # let's be in a dataset,which is no annex:
-    create(loc=path, no_annex=True)
+    create(path=path, no_annex=True)
     ds = Dataset(path)
     assert_raises(ValueError, ds.unlock)
 

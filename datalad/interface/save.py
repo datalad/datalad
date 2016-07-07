@@ -39,25 +39,30 @@ class Save(Interface):
     Optionally, an additional tag, such as a version, can be assigned to the
     saved state. Such tag enables straightforward retrieval of past versions
     at a later point in time.
+
+    .. note::
+      Power-user info: This command uses :command:`git add`, :command:`git annex add`, :command:`git commit`,
+      and :command:`git tag` to save and annotate the state of a dataset.
     """
 
     _params_ = dict(
         dataset=Parameter(
             args=("-d", "--dataset"),
+            metavar='PATH',
             doc=""""specify the dataset to save. If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory.""",
             constraints=EnsureDataset() | EnsureNone()),
         files=Parameter(
             args=("files",),
-            metavar='FILES',
-            doc="""list of files to consider. If given, only changes made
-            to those files are recorded in the new state.""",
+            metavar='FILE/DIRECTORY',
+            doc="""list of files and/or directories to consider. If given, only
+            changes made to those files are recorded in the new state.""",
             nargs='*',
             constraints=EnsureStr() | EnsureNone()),
         message=Parameter(
             args=("-m", "--message",),
-            metavar='MESSAGE',
+            metavar='STRING',
             doc="""a message to annotate the saved state.""",
             constraints=EnsureStr() | EnsureNone()),
         auto_add_changes=Parameter(
