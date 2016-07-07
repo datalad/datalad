@@ -117,7 +117,11 @@ class AnnexRepo(GitRepo):
         """
 
         if git_opts or annex_opts or annex_init_opts:
-            raise NotImplementedError("TODO")
+            lgr.warning("TODO: options passed to git, git-annex and/or "
+                        "git-annex-init are currently ignored.\n"
+                        "options received:\n"
+                        "git: %s\ngit-annex: %s\ngit-annex-init: %s" %
+                        (git_opts, annex_opts, annex_init_opts))
 
         fix_it = False
         try:

@@ -409,7 +409,8 @@ class GitRepo(object):
         """
 
         if git_opts:
-            raise NotImplementedError("TODO")
+            lgr.warning("TODO: options passed to git are currently ignored.\n"
+                        "options received: %s" % git_opts)
 
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
