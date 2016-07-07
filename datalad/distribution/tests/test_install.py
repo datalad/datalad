@@ -91,7 +91,7 @@ def test_get_git_url_from_source():
 @with_tree(tree={'test.txt': 'whatever'})
 def test_get_containing_subdataset(path):
 
-    ds = create(path)
+    ds = create(path, force=True)
     ds.install(path='test.txt')
     ds.save("Initial commit")
     subds = ds.install("sub", source=path)
@@ -138,7 +138,7 @@ def test_install_plain_git(src, path):
                  'dir': {'testindir': 'someother',
                          'testindir2': 'none'}})
 def test_install_files(path):
-    ds = create(path)
+    ds = create(path, force=True)
     # install a single file
     eq_(ds.install('test.txt'), opj(path, 'test.txt'))
     # install it again, should given same result
