@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html>
     <head>
-	<meta charset="UTF-8">
+        <meta charset="UTF-8">
+        <title>Datalad Repository</title>
+        <link rel="shortcut icon" type="image/x-icon" href="http://datalad.org/pics/favicon-16x16.png" />
 	<link rel="stylesheet" type="text/css" href="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.10.5/css/jquery.dataTables.css">
-	<style type="text/css" class="init">
+        <style type="text/css" class="init">
+          body{
+           max-width: 1200px;
+           margin: 2em auto;
+         }
 	 td.dir {font-weight: bold; color: #00A1CB; }
 	 td.git {font-weight: bold; color: #00BA88; }
 	 td.annex {font-weight: bold; color: #EC6C20; }
@@ -13,6 +19,7 @@
 	</style>
     </head>
     <body>
+        <h1><img src='http://datalad.org/pics/favicon.svg' width="24">Datalad Repository</h1>
 	<table id="directory" class="display" width="100%" cellspacing="0"></table>
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.12.3.min.js"></script>
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.10.5/jquery.dataTables.min.js"></script>
@@ -28,17 +35,19 @@
 		     "url": url,
 		     "dataSrc": "nodes"
 		 },
-	         "order": [[ 3, "asc" ]],
+	         "order": [[ 4, "asc" ], [ 0, 'asc' ]],
 		 "columns": [      //select columns and their names from json
-		     { "data": "name", title: "Name" },
-                     { "data": "date", title: "Date" },
-                     { "data": "size", title: "Size" },
-		     { "data": "type", title: "Type" },
-                     { "data": "path", title: "Path" },
+		     { data: "name", title: "Name" },
+                     { data: "date", title: "Last Modified", className: "dt-center", width: "20%" },
+                     { data: "size", title: "Size", className: "dt-center" },
+		     { data: null, title: "Description", className: "dt-center", render: function(data) { return '';}},
+		     { data: "type", title: "Type", className: "dt-center" },
+                     { data: "path", title: "Path", className: "dt-center" },
 	         ],
-		 //update css of visible columns in each row based on their node type
 		 "createdRow": function ( row, data, index ) {
-		     for(i = 0; i < 4; i++)
+		     if (data.type == 'dir' || data.type == 'git' || data.type == 'annex')   // if row is a directory append '/' to name cell
+			 $('td', row).eq(0).html($('td', row).eq(0).html()+'/');
+		     for(i = 0; i < 4; i++)                                                  // attach css based on node-type to visible columns of each row
 			 $('td', row).eq(i).addClass(data.type);
 		 },
 		 // add click handlers to each row(cell) once table initialised
@@ -57,7 +66,7 @@
 		     });
 		 }
 	     });
-	     table.columns([4]).visible(false);  //hide complete path and file type columns
+	     table.columns([4,5]).visible(false);  //hide complete path and file type columns
 	     return table;
 	 }
 	 // check if url exists

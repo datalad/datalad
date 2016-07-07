@@ -215,13 +215,13 @@ class FsModel(DsModel):
 
     @property
     def symlink(self):
-        """if symlink returns path the symlink points to else returns False"""
+        """if symlink returns path the symlink points to else returns None"""
         if islink(self._path):                    # if symlink
             target_path = readlink(self._path)    # find link target
             # convert to absolute path if not
             target_path = opj(dirname(self._path), target_path) if not isabs(target_path) else target_path
-            return target_path if exists(target_path) else False
-        return False
+            return target_path if exists(target_path) else None
+        return None
 
     @property
     def date(self):
@@ -261,7 +261,7 @@ class FsModel(DsModel):
 
         Types: link, link-broken, file, dir, annex-repo, git-repo"""
         if islink(self.path):
-            return 'link-broken' if not self.symlink else 'link'
+            return 'link' if self.symlink else 'link-broken'
         elif isfile(self.path):
             return 'file'
         elif exists(opj(self.path, ".git", "annex")):
