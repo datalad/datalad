@@ -82,6 +82,13 @@ class Create(Interface):
             constraints=EnsureStr() | EnsureDataset() | EnsureNone()),
         description=dataset_description,
         add_to_super=add_to_superdataset,
+        name=Parameter(
+            args=("name",),
+            metavar='NAME',
+            doc="""name of the dataset within the namespace of it's superdataset.
+            By default its path relative to the superdataset is used. Used only
+            together with `add_to_super`.""",
+            constraints=EnsureStr() | EnsureNone()),
         no_annex=Parameter(
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any
@@ -115,13 +122,13 @@ class Create(Interface):
             path=None,
             description=None,
             add_to_super=False,
+            name=None,
             no_annex=False,
             annex_version=None,
             annex_backend='MD5E',
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None):
-            # TODO: name? (technically not equal to path)
 
         if path:
             if isinstance(path, Dataset):
@@ -138,6 +145,7 @@ class Create(Interface):
 
             return Dataset(sds_path).create_subdataset(
                 ds.path,
+                name=name,
                 description=description,
                 no_annex=no_annex,
                 annex_version=annex_version,
