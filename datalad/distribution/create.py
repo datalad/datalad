@@ -140,7 +140,12 @@ class Create(Interface):
             if isinstance(path, Dataset):
                 ds = path
             else:
-                ds = Dataset(path)  # TODO: Is there a need to resolve path?
+                # this means we are not bound to a Dataset instance.
+                # Therefore there is no difference between a relative path and
+                # an "explicit" path. Both are based on CWD, since there is no
+                # repo or dataset it is passed to. Hence `path` doesn't need to
+                # be resolved.
+                ds = Dataset(path)
         else:
             ds = Dataset(getpwd())
 
