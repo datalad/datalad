@@ -24,6 +24,8 @@ from datalad.utils import swallow_logs
 lgr = logging.getLogger('datalad.dataset')
 
 
+# TODO: use the same piece for resolving paths against Git/AnnexRepo instances
+#       (see normalize_path)
 def resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
@@ -239,6 +241,7 @@ class Dataset(object):
 
         # add it as a submodule
         # TODO: clean that part and move it in here (Dataset)
+        #       or call install to add the thing inplace
         from .install import _install_subds_inplace
         from os.path import relpath
         return _install_subds_inplace(ds=self, path=subds.path,
