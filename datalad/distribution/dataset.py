@@ -335,6 +335,10 @@ class Dataset(object):
         -------
         Dataset or None
         """
+
+        # TODO: return only if self is subdataset of the superdataset
+        #       (meaning: registered as submodule)?
+
         from os import pardir
         sds_path = GitRepo.get_toppath(opj(self.path, pardir))
         if sds_path is None:
