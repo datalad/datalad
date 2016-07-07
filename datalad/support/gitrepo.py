@@ -623,17 +623,18 @@ class GitRepo(object):
           cmdline options for git-commit
         """
 
-        # TODO: for some commits we explicitly do not want a message since
-        # it would be coming from e.g. staged merge. But it is not clear
-        # what gitpython would do about it. doc says that it would
-        # convert to string anyways.... bleh
         if not msg:
-            msg = "Commit"  # there is no good default
+            if options:
+                if "--allow-empty-message" not in options:
+                        options.append("--allow-empty-message")
+                else:
+                    options = ["--allow-empty-message"]
+
         self.precommit()
         if options:
             # we can't pass all possible options to gitpython's implementation
             # of commit. Therefore we need a direct call to git:
-            cmd = ['git', 'commit', "-m", msg] + options
+            cmd = ['git', 'commit'] + (["-m", msg] if msg else []) + options
             lgr.debug("Committing via direct call of git: %s" % cmd)
             self._git_custom_command([], cmd)
         else:

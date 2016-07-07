@@ -991,8 +991,13 @@ class AnnexRepo(GitRepo):
         self.precommit()
         if self.is_direct_mode():
             if not msg:
-                msg = "Commit"  # may be --allow-empty-message instead?
-            self.proxy(['git', 'commit',  '-m', msg] +
+                if options:
+                    if "--allow-empty-message" not in options:
+                        options.append("--allow-empty-message")
+                else:
+                    options = ["--allow-empty-message"]
+
+            self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
                        (options if options else []), expect_stderr=True)
         else:
             super(AnnexRepo, self).commit(msg, options)
