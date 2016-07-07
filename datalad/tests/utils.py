@@ -148,7 +148,7 @@ def ok_clean_git_annex_proxy(path):
     chpwd(path)
 
     try:
-        out = ar.proxy("git status")
+        out = ar.proxy(['git', 'status'])
     except CommandNotAvailableError as e:
         raise SkipTest
     finally:

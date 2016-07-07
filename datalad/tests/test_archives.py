@@ -163,7 +163,7 @@ def _test_get_leading_directory(ea, return_value, target_value, kwargs={}):
 
 
 def test_get_leading_directory():
-    ea = ExtractedArchive('bogus', 'bogus')
+    ea = ExtractedArchive('/some/bogus', '/some/bogus')
     yield _test_get_leading_directory, ea, [], None
     yield _test_get_leading_directory, ea, ['file.txt'], None
     yield _test_get_leading_directory, ea, ['file.txt', opj('d', 'f')], None

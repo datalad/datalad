@@ -27,17 +27,21 @@ demo_doc = """\
     ping pong ping pong ping pong. Ping pong ping pong ping pong ping pong. Ping
     pong ping pong ping pong ping pong.
 
-    || Command line use only >>
-    Something for the cmdline only CMDONLY
+    || CMDLINE >>
+    || REFLOW >>
+    Something for the cmdline only
     Multiline!
-    << Command line use only ||
+    << REFLOW ||
+    << CMDLINE ||
 
-    || Python use only >>
+    || PYTHON >>
 
-    Some Python-only bits PYONLY
+    || REFLOW >>
+    Some Python-only bits
     Multiline!
+    << REFLOW ||
 
-    << Python use only ||
+    << PYTHON ||
 
     And an example for in-line markup: [PY: just for Python PY] and
     the other one [CMD: just for the command line CMD]. End of demo.
@@ -82,7 +86,9 @@ def test_alter_interface_docs_for_api():
     assert_false(alt_l[0].startswith(' '))
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('CMD', alt)
-    assert_not_in('Command line', alt)
+    assert_not_in('PY', alt)
+    assert_not_in('REFLOW', alt)
+    assert_in("Some Python-only bits Multiline!", alt)
 
 
 def test_alter_interface_docs_for_cmdline():
@@ -92,7 +98,9 @@ def test_alter_interface_docs_for_cmdline():
     assert_false(alt_l[0].startswith(' '))
     assert_false(alt_l[-1].startswith(' '))
     assert_not_in('PY', alt)
-    assert_not_in('Python', alt)
+    assert_not_in('CMD', alt)
+    assert_not_in('REFLOW', alt)
+    assert_in("Something for the cmdline only Multiline!", alt)
     # args
     altarg = alter_interface_docs_for_cmdline(demo_argdoc)
     # RST role markup

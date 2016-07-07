@@ -43,13 +43,14 @@ class Ls(Interface):
     --------
 
       $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
-      $ datalad ls .                             # to list current dataset
+      $ datalad ls                               # to list current dataset
     """
 
     _params_ = dict(
         loc=Parameter(
-            doc="URL to list, e.g. s3:// url",
-            nargs="+",
+            doc="URL or path to list, e.g. s3://...",
+            metavar='PATH/URL',
+            nargs="*",
             constraints=EnsureStr() | EnsureNone(),
         ),
         recursive=Parameter(
@@ -91,6 +92,9 @@ class Ls(Interface):
 
     @staticmethod
     def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False, json=None):
+        if isinstance(loc, list) and not len(loc):
+            # nothing given, CWD assumed -- just like regular ls
+            loc = '.'
 
         kw = dict(fast=fast, recursive=recursive, all=all)
         if isinstance(loc, list):

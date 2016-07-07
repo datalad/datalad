@@ -17,7 +17,7 @@ from glob import glob
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from ...api import ls
-from ...utils import swallow_outputs, swallow_logs
+from ...utils import swallow_outputs, swallow_logs, chpwd
 from ...tests.utils import assert_equal, assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
@@ -47,7 +47,7 @@ def test_ls_repos(toppath):
     AnnexRepo(toppath + '2', create=True)
     repos = glob(toppath + '*')
 
-    for args in (repos, repos + ["bogus"]):
+    for args in (repos, repos + ["/some/bogus/file"]):
         for recursive in [False, True]:
             # in both cases shouldn't fail
             with swallow_outputs() as cmo:
@@ -126,3 +126,18 @@ def test_ls_json(topdir):
             # directories that should not have json files created
             for subdir in ['.hidden', opj('dir', 'subgit')]:
                 assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
+
+
+@with_tempfile
+def test_ls_noarg(toppath):
+    # smoke test pretty much
+    AnnexRepo(toppath, create=True)
+
+    # this test is pointless for now and until ls() actually returns
+    # something
+    with swallow_outputs():
+        ls_out = ls(toppath)
+        with chpwd(toppath):
+            assert_equal(ls_out, ls([]))
+            assert_equal(ls_out, ls('.'))
+

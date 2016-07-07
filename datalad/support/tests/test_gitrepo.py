@@ -77,6 +77,15 @@ def test_GitRepo_instance_from_not_existing(path, path2):
 
 
 @with_tempfile
+def test_GitRepo_init_options(path):
+    # passing an option, not explicitly defined in GitRepo class:
+    gr = GitRepo(path, create=True, bare=True)
+
+    cfg = gr.repo.config_reader()
+    ok_(cfg.get_value(section="core", option="bare"))
+
+
+@with_tempfile
 @with_tempfile
 def test_GitRepo_equals(path1, path2):
 
@@ -719,6 +728,68 @@ def test_get_added_files_commit_msg():
     eq_(f(["f1", "f2"]), 'Added 2 files\n\nFiles:\nf1\nf2')
 
 
+@with_tempfile(mkdir=True)
+@with_tempfile(mkdir=True)
+def test_git_custom_calls(path, path2):
+    # we need a GitRepo instance
+    repo = GitRepo(path, create=True)
+    with open(opj(path, "cc_test.dat"), 'w') as f:
+        f.write("test_git_custom_calls")
+
+    out, err = repo._gitpy_custom_call('add', 'cc_test.dat')
+
+    # actually executed:
+    assert_in("cc_test.dat", repo.get_indexed_files())
+    ok_(repo.dirty)
+
+    # call using cmd_options:
+    out, err = repo._gitpy_custom_call('commit',
+                                       cmd_options={'m': 'added file'})
+    ok_clean_git(path, annex=False)
+    # check output:
+    assert_in("1 file changed", out)
+    assert_in("cc_test.dat", out)
+    eq_('', err)
+
+    # impossible 'add' call should raise ...
+    assert_raises(GitCommandError, repo._gitpy_custom_call,
+                  'add', 'not_existing', expect_fail=False)
+    # .. except we expect it to fail:
+    repo._gitpy_custom_call('add', 'not_existing', expect_fail=True)
+
+    # log outputs:
+    with swallow_logs(new_level=logging.DEBUG) as cm:
+        out, err = repo._gitpy_custom_call('status',
+                                           log_stdout=True,
+                                           log_stderr=True)
+
+        assert_in("On branch master", out)
+        assert_in("nothing to commit, working directory clean", out)
+        eq_("", err)
+        for line in out.splitlines():
+            assert_in("stdout| " + line, cm.out)
+
+    # don't log outputs:
+    with swallow_logs(new_level=logging.DEBUG) as cm:
+        out, err = repo._gitpy_custom_call('status',
+                                           log_stdout=False,
+                                           log_stderr=False)
+
+        assert_in("On branch master", out)
+        assert_in("nothing to commit, working directory clean", out)
+        eq_("", err)
+        eq_("", cm.out)
+
+    # use git_options:
+    # Note: 'path2' doesn't contain a git repository
+    with assert_raises(GitCommandError) as cm:
+        repo._gitpy_custom_call('status', git_options={'C': path2})
+    assert_in("git -C %s status" % path2, str(cm.exception))
+    assert_in("fatal: Not a git repository", str(cm.exception))
+
+    # TODO: How to test 'env'?
+
+
 @with_testrepos(flavors=['local'])
 @with_tempfile(mkdir=True)
 def test_get_tracking_branch(o_path, c_path):
@@ -730,3 +801,75 @@ def test_get_tracking_branch(o_path, c_path):
     eq_((None, None), clone.get_tracking_branch())
 
     eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch('master'))
+
+
+@with_testrepos('submodule_annex', flavors=['clone'])
+def test_submodule_deinit(path):
+
+    top_repo = GitRepo(path, create=False)
+    eq_(['sub1', 'sub2'], [s.name for s in top_repo.get_submodules()])
+    top_repo.update_submodule('sub1', init=True)
+    top_repo.update_submodule('sub2', init=True)
+    ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
+
+    # modify submodule:
+    with open(opj(top_repo.path, 'sub1', 'file_ut.dat'), "w") as f:
+        f.write("some content")
+
+    assert_raises(GitCommandError, top_repo.deinit_submodule, 'sub1')
+
+    # using force should work:
+    top_repo.deinit_submodule('sub1', force=True)
+
+    ok_(not top_repo.repo.submodule('sub1').module_exists())
+
+
+def test_kwargs_to_options():
+
+    class Some(object):
+
+        @kwargs_to_options(split_single_char_options=True)
+        def f_decorated_split(self, options=None):
+            return options
+
+        @kwargs_to_options(split_single_char_options=False,
+                           target_kw='another')
+        def f_decorated_no_split(self, another=None):
+            return another
+
+    res = Some().f_decorated_split(C="/some/path", m=3, b=True, more_fancy=['one', 'two'])
+    ok_(isinstance(res, list))
+    eq_(res, ['-C', "/some/path", '-b', '-m', '3',
+              '--more-fancy=one', '--more-fancy=two'])
+
+    res = Some().f_decorated_no_split(f='some')
+    eq_(res, ['-fsome'])
+
+
+def test_to_options():
+
+    class Some(object):
+
+        def cmd_func(self, git_options=None, annex_options=None, options=None):
+
+            git_options = git_options[:] if git_options else []
+            annex_options = annex_options[:] if annex_options else []
+            options = options[:] if options else []
+
+            faked_cmd_call = ['git'] + git_options + ['annex'] + \
+                             annex_options + ['my_cmd'] + options
+
+            return faked_cmd_call
+
+    eq_(Some().cmd_func(options=to_options(m="bla", force=True)),
+        ['git', 'annex', 'my_cmd', '--force', '-m', 'bla'])
+
+    eq_(Some().cmd_func(git_options=to_options(C="/some/where"),
+                        annex_options=to_options(JSON=True),
+                        options=to_options(unused=True)),
+        ['git', '-C', '/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
+
+    eq_(Some().cmd_func(git_options=to_options(C="/some/where", split_single_char_options=False),
+                        annex_options=to_options(JSON=True),
+                        options=to_options(unused=True)),
+        ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
