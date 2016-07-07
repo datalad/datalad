@@ -93,6 +93,7 @@ class Create(Interface):
             doc="""name of the dataset within the namespace of it's superdataset.
             By default its path relative to the superdataset is used. Used only
             together with `add_to_super`.""",
+            nargs='?',
             constraints=EnsureStr() | EnsureNone()),
         no_annex=Parameter(
             args=("--no-annex",),
