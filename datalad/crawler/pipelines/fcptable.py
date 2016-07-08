@@ -9,6 +9,7 @@ from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import sub
 from ..nodes.misc import func_to_node
+from ..nodes.misc import get_disposition_filename
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE
@@ -72,14 +73,12 @@ class find_dataset(object):
         dataset: str
             Id of the FCP Table dataset (e.g. Baltimore)
         """
-
         self.dataset = dataset
 
     def __call__(self, data):
 
         for title, tar in zip(xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data),
                               xpath_match('//*/tr [@class="tableDownload"]/td/a/text()')(data)):
-
             if title['match'] == self.dataset:
                 data['title'] = title['match']
                 data['tar'] = tar['match']
@@ -94,20 +93,50 @@ def pipeline(dataset):
                                    "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
                                    " and exclude=CHANGES* and exclude=README*"
                                    " and exclude=*.[mc] and exclude=dataset*.json"
-                                   " and (exclude=*.txt or include=*/*.txt)"
-                                   " and (exclude=*.json or include=*/*.json)"
-                                   " and (exclude=*.tsv or include=*/*.tsv)"
+                                   " and exclude=*.txt"
+                                   " and exclude=*.json"
+                                   " and exclude=*.tsv"
                                    ])
-
+    # FCP Table has no versioning, so no changelog either
     return [
-        crawl_url(TOPURL),
-        assign({'dataset': dataset}),
-        sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
-        find_dataset(dataset),
+        annex.switch_branch('incoming'),
         [
-            extract_readme,
-            annex,
-        ]
+            crawl_url(TOPURL),
+            [
+                assign({'dataset': dataset}),
+                sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
+                find_dataset(dataset),
+
+            ],
+            [  # README
+                extract_readme,
+                annex,
+            ],
+            [  # and collect all URLs pointing to tarballs
+                a_href_match('http://www.nitrc.org/frs/downloadlink.php/[0-9999]', min_count=1),
+                get_disposition_filename,
+                annex,
+            ],
+        ],
+        annex.remove_obsolete(),
+        [
+            annex.switch_branch('incoming-processed'),
+            annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False)
+            [
+               {'loop': True},
+               find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),
+               annex.add_archive_content(
+                   existing='archive-suffix',
+                   strip_leading_dirs=True,
+                   leading_dirs_depth=1,
+                   delete=True,
+                   exclude=['(^|%s)\._' % os.path.sep],
+               ),
+            ],
+            annex.switch_branch('master'),
+            annex.merge_branch('incoming-processed', commit=True),
+            annex.finalize(tag=True),
+        ],
+        annex.switch_branch('master'),
+        annex.finalize(cleanup=True),
     ]
-
-
