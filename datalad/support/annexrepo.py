@@ -30,6 +30,7 @@ from functools import wraps
 from six import string_types
 from six.moves import filter
 from six.moves.configparser import NoOptionError
+from six.moves.configparser import NoSectionError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
@@ -297,7 +298,7 @@ class AnnexRepo(GitRepo):
 
         try:
             return self.repo.config_reader().get_value("annex", "direct")
-        except NoOptionError as e:
+        except (NoOptionError, NoSectionError):
             # If .git/config lacks an entry "direct",
             # it's actually indirect mode.
             return False
@@ -325,7 +326,7 @@ class AnnexRepo(GitRepo):
         try:
             return self.repo.config_reader().get_value("annex",
                                                        "crippledfilesystem")
-        except NoOptionError as e:
+        except (NoOptionError, NoSectionError):
             # If .git/config lacks an entry "crippledfilesystem",
             # it's actually not crippled.
             return False
