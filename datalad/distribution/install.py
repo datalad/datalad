@@ -180,12 +180,12 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
         return subds
 
 
-def _install_subds_inplace(ds, path, relativepath):
+def _install_subds_inplace(ds, path, relativepath, name=None):
     """Register an existing repository in the repo tree as a submodule"""
     # FLOW GUIDE EXIT POINT
     # this is an existing repo and must be in-place turned into
     # a submodule of this dataset
-    ds.repo.add_submodule(relativepath, url=None)
+    ds.repo.add_submodule(relativepath, url=None, name=name)
     _fixup_submodule_dotgit_setup(ds, relativepath)
     # return newly added submodule as a dataset
     return Dataset(path)

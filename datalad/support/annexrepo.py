@@ -70,8 +70,9 @@ class AnnexRepo(GitRepo):
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True, create=True, init=False,
-                 batch_size=None, version=None, description=None):
+                 direct=False, backend=None, always_commit=True, create=True,
+                 init=False, batch_size=None, version=None, description=None,
+                 git_opts=None, annex_opts=None, annex_init_opts=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -114,10 +115,18 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        if git_opts or annex_opts or annex_init_opts:
+            lgr.warning("TODO: options passed to git, git-annex and/or "
+                        "git-annex-init are currently ignored.\n"
+                        "options received:\n"
+                        "git: %s\ngit-annex: %s\ngit-annex-init: %s" %
+                        (git_opts, annex_opts, annex_init_opts))
+
         fix_it = False
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
-                                            create=create)
+                                            create=create, git_opts=git_opts)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "
@@ -974,18 +983,28 @@ class AnnexRepo(GitRepo):
         self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    def commit(self, msg):
+    def commit(self, msg=None, options=None):
         """
 
         Parameters
         ----------
         msg: str
+        options: list of str
+          cmdline options for git-commit
         """
         self.precommit()
         if self.is_direct_mode():
-            self.proxy(['git', 'commit',  '-m', msg], expect_stderr=True)
+            if not msg:
+                if options:
+                    if "--allow-empty-message" not in options:
+                        options.append("--allow-empty-message")
+                else:
+                    options = ["--allow-empty-message"]
+
+            self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
+                       (options if options else []), expect_stderr=True)
         else:
-            super(AnnexRepo, self).commit(msg)
+            super(AnnexRepo, self).commit(msg, options)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):

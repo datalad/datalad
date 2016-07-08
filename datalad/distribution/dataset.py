@@ -24,6 +24,8 @@ from datalad.utils import swallow_logs
 lgr = logging.getLogger('datalad.dataset')
 
 
+# TODO: use the same piece for resolving paths against Git/AnnexRepo instances
+#       (see normalize_path)
 def resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
@@ -43,8 +45,6 @@ def resolve_path(path, ds=None):
         return abspath(path)
     if ds is None:
         # no dataset given, use CWD as reference
-        # TODO: Check whether we should use PWD instead of CWD here. Is it done
-        # by abspath?
         return abspath(path)
     else:
         return normpath(opj(ds.path, path))
@@ -204,6 +204,85 @@ class Dataset(object):
         else:
             return submodules
 
+    def create_subdataset(self, path,
+                          name=None,
+                          description=None,
+                          no_annex=False,
+                          annex_version=None,
+                          annex_backend='MD5E',
+                          git_opts=None,
+                          annex_opts=None,
+                          annex_init_opts=None):
+        """Create a subdataset within this dataset
+
+        Creates a new dataset at `path` and adds it as a subdataset to `self`.
+        `path` is required to point to a location inside the dataset `self`.
+
+        Parameters
+        ----------
+        path: str
+          path to the subdataset to be created
+        name: str
+          name of the subdataset
+        description: str
+          a human-readable description of the dataset, that helps to identify it.
+          Note: Doesn't work with `no_annex`
+        no_annex: bool
+          whether or not to create a pure git repository
+        annex_version: str
+          version of annex repository to be used
+        annex_backend: str
+          backend to be used by annex for computing file keys
+        git_opts: list of str
+          cmdline options to be passed to the git executable
+        annex_opts: list of str
+          cmdline options to be passed to git-annex
+        annex_init_opts: list of str
+          cmdline options to be passed to git-annex-init
+
+        Returns
+        -------
+        Dataset
+          the newly created dataset
+        """
+
+        # get absolute path (considering explicit vs relative):
+        path = resolve_path(path, self)
+        from .install import _with_sep
+        if not path.startswith(_with_sep(self.path)):
+            raise ValueError("path %s outside dataset %s" % (path, self))
+
+        subds = Dataset(path)
+
+        # create the dataset
+        subds.create(description=description,
+                     no_annex=no_annex,
+                     annex_version=annex_version,
+                     annex_backend=annex_backend,
+                     git_opts=git_opts,
+                     annex_opts=annex_opts,
+                     annex_init_opts=annex_init_opts,
+                     # Note:
+                     # adding to the superdataset is what we are doing herein!
+                     # add_to_super=True would lead to calling ourselves again
+                     # and again
+                     # While this is somewhat ugly, the issue behind this is a
+                     # necessarily slightly different logic of `create` in
+                     # comparison to other toplevel functions, which operate on
+                     # an existing dataset and possibly on subdatasets.
+                     # With `create` we suddenly need to operate on a
+                     # superdataset, if add_to_super is True.
+                     add_to_super=False)
+
+        # add it as a submodule
+        # TODO: clean that part and move it in here (Dataset)
+        #       or call install to add the thing inplace
+        from .install import _install_subds_inplace
+        from os.path import relpath
+        return _install_subds_inplace(ds=self, path=subds.path,
+                                      relativepath=relpath(subds.path, self.path),
+                                      name=name)
+
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
 #        name pattern.
@@ -247,6 +326,24 @@ class Dataset(object):
         bool
         """
         return self.path is not None and self.repo is not None
+
+    def get_superdataset(self):
+        """Get the dataset's superdataset
+
+        Returns
+        -------
+        Dataset or None
+        """
+
+        # TODO: return only if self is subdataset of the superdataset
+        #       (meaning: registered as submodule)?
+
+        from os import pardir
+        sds_path = GitRepo.get_toppath(opj(self.path, pardir))
+        if sds_path is None:
+            return None
+        else:
+            return Dataset(sds_path)
 
 
 @optional_args
