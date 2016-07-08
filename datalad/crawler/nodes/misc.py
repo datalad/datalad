@@ -169,7 +169,7 @@ class rename(object):
 class sub(object):
     """Apply re.sub regular expression substitutions to specified items"""
 
-    def __init__(self, subs):
+    def __init__(self, subs, ok_missing=False):
         """
 
         Parameters
@@ -177,11 +177,14 @@ class sub(object):
         subs: dict of key -> dict of pattern -> replacement
         """
         self.subs = subs
+        self.ok_missing = ok_missing
 
     def __call__(self, data):
         data = data.copy()
         for key, subs in self.subs.items():
             for from_, to_ in subs.items():
+                if key not in data and self.ok_missing:
+                    continue
                 data[key] = re.sub(from_, to_, data[key])
         yield data
 
@@ -231,6 +234,10 @@ def get_disposition_filename(data):
 
 class _act_if(object):
     """Base class for nodes which would act if input data matches specified values
+
+    Should generally be not used directly.  If used directly,
+    no action is taken, besides possibly regexp matched groups
+    populating the `data`
     """
 
     def __init__(self, values, re=False, negate=False):
@@ -242,8 +249,9 @@ class _act_if(object):
           Key/value pairs to compare arrived data against.  Would raise
           FinishPipeline if all keys have matched target values
         re: bool, optional
-          If specified values are to be treated as regular expression to be
-          searched
+          If specified, values are to be treated as regular expression to be
+          searched. If re and expression includes groups, those will also
+          populate yielded data
         negate: bool, optional
           Reverses, so acts (skips, etc) if no match
         """
@@ -252,30 +260,41 @@ class _act_if(object):
         self.negate = negate
 
     def __call__(self, data):
+        #import ipdb; ipdb.set_trace()
         comp = re.search if self.re else lambda x, y: x == y
         matched = True
         # finds if all match
+        data_ = data.copy()
         for k, v in iteritems(self.values):
-            if not (k in data and comp(v, data[k])):
+            res = k in data and comp(v, data[k])
+            if not res:
                 # do nothing and pass the data further
                 matched = False
                 break
+            if self.re:
+                assert(res)
+                data_.update(res.groupdict())
 
-        if matched != self.negate:
-            for v in self._act(data):
-                yield v
-        else:
-            yield data
+        for v in (self._act_mismatch
+                  if matched != self.negate
+                  else self._act_match)(data_):
+            yield v
 
-    def _act(self, data):
-        raise NotImplementedError
+    # By default, nothing really is done -- so just produce the same
+    # data.  Sub-classes will provide specific custom actions in one
+    # or another case
+    def _act_mismatch(self, data):
+        return [data]
+
+    def _act_match(self, data):
+        return [data]
 
 
 @auto_repr
 class interrupt_if(_act_if):
     """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
 
-    def _act(self, data):
+    def _act_mismatch(self, data):
         raise FinishPipeline
 
 
@@ -283,8 +302,18 @@ class interrupt_if(_act_if):
 class skip_if(_act_if):
     """Skip (do not yield anything) further pipeline processing whenever obtained data matches provided value(s)"""
 
-    def _act(self, data):
+    def _act_mismatch(self, data):
         return []  # nothing will be yielded etc
+
+
+@auto_repr
+class continue_if(_act_if):
+    """Continue if matched
+
+    An inverse of skip_if"""
+
+    def _act_match(self, data):
+        return []
 
 
 @auto_repr
@@ -467,6 +496,10 @@ class switch(object):
                 return
             elif self.missing == 'stop':
                 return
+
+        if pipeline is None:
+            yield data
+            return
 
         if not isinstance(pipeline, PIPELINE_TYPES):
             # it was a node, return its output
