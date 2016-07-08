@@ -19,7 +19,7 @@ import tempfile
 
 from datalad.utils import get_tempfile_kwargs
 import os
-from os.path import join as opj, exists
+from os.path import join as opj, exists, isabs, abspath
 from datalad.distribution.dataset import Dataset
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureInt
@@ -55,7 +55,9 @@ def _parse_spec(spec):
 def _makeds(path, levels, ds=None):
     # we apparently can't import api functionality within api
     from datalad.api import install
-
+    # To simplify managing all the file paths etc
+    if not isabs(path):
+        path = abspath(path)
     # make it a git (or annex??) repository... ok - let's do randomly one or another ;)
     RepoClass = GitRepo if random.randint(0, 1) else AnnexRepo
     lgr.info("Generating repo of class %s under %s", RepoClass, path)

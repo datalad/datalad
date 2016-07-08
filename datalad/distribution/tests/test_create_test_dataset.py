@@ -16,6 +16,7 @@ from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_
 from datalad.tests.utils import ok_clean_git
 from datalad.utils import swallow_logs
+from datalad.utils import chpwd
 from datalad.distribution.create_test_dataset import _parse_spec
 
 from nose.tools import eq_
@@ -41,3 +42,11 @@ def test_create_test_dataset():
     for ds in dss:
         ok_clean_git(ds, annex=False)  # soem of them are annex but we just don't check
         ok_(len(glob(opj(ds, 'file*'))))
+
+
+@with_tempfile(mkdir=True)
+def test_create_test_dataset_new_relpath(topdir):
+    from datalad.api import create_test_dataset
+    with swallow_logs(), chpwd(topdir):
+        dss = create_test_dataset('testds', spec='1')
+    eq_(len(dss), 1)
