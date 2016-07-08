@@ -19,30 +19,15 @@ import tempfile
 
 from datalad.utils import get_tempfile_kwargs
 import os
-from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
-    exists, islink, sep
-from datalad.distribution.dataset import Dataset, datasetmethod, \
-    resolve_path, EnsureDataset
+from os.path import join as opj, exists
+from datalad.distribution.dataset import Dataset
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone, EnsureInt, \
-    EnsureBool
+from datalad.support.constraints import EnsureStr, EnsureNone, EnsureInt
 from datalad.support.gitrepo import GitRepo
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
-    FileNotInAnnexError
+from datalad.support.annexrepo import AnnexRepo
 from datalad.interface.base import Interface
-from datalad.cmd import CommandError
-from datalad.cmd import Runner
-from datalad.utils import expandpath, knows_annex, assure_dir, \
-    is_explicit_path, on_windows
-from datalad.tests.utils import with_tempfile, assert_raises
 
 lgr = logging.getLogger('datalad.distribution.tests')
-
-
-@with_tempfile(mkdir=True)
-def test_create(outdir):
-    from datalad.api import create
-    assert_raises(ValueError, create, outdir, description='Precious data', no_annex=True)
 
 
 def _parse_spec(spec):
@@ -65,12 +50,6 @@ def _parse_spec(spec):
             raise ValueError("Must have only min-max at level %d" % ilevel)
         out.append((min_, max_))
     return out
-
-
-def test_parse_spec():
-    from nose.tools import eq_
-    eq_(_parse_spec('0/3/-1'), [(0, 0), (3, 3), (0, 1)])
-    eq_(_parse_spec('4-10'), [(4, 10)])
 
 
 def _makeds(path, levels, ds=None):
@@ -153,7 +132,7 @@ class CreateTestDataset(Interface):
             random.seed(seed)
         if path is None:
             kw = get_tempfile_kwargs({}, prefix="ds")
-            path = tempfile.mktemp(mkdir=True, **kw)
+            path = tempfile.mkdtemp(**kw)
         else:
             # so we don't override anything
             assert not exists(path)
@@ -170,7 +149,7 @@ class CreateTestDataset(Interface):
         if not len(res):
             ui.message("No repos were created... oops")
             return
-        items= '\n'.join(map(str, res))
+        items = '\n'.join(map(str, res))
         msg = "{n} installed {obj} available at\n{items}".format(
             obj='items are' if len(res) > 1 else 'item is',
             n=len(res),
