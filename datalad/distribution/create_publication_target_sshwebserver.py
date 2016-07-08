@@ -288,11 +288,17 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # create post_update script
             lgr.info("Enabling git post-update hook ...")
             try:
-                json_command = '"datalad ls -r --json file ' + path + '"'
+                json_command = 'datalad ls -r --json file ' + str(path)
                 virtualenv = 'source /home/debanjum/datalad/.env/bin/activate'  # NOT_SCALABLE! custom virtualenv path
-                for post_update_hook in ['"#!/bin/bash"', '"git update-server-info"', virtualenv, json_command]:
-                    ssh(["echo", post_update_hook, '>>', opj(path, '.git/hooks/post-update')])
-                ssh(["chmod", '+x', opj(path, '.git/hooks/post-update')])  # make the script executable
+                tempf = Runner().run(['mktemp'])[0].split('\n')[0]
+                hook_loc = sshri.hostname + ":" + opj(path, '.git/hooks/post-update')
+
+                with open(tempf, 'a') as f:  # create post_update hook script in local tempfile
+                    for post_update_cmd in ['#!/bin/bash', 'git update-server-info', virtualenv, json_command]:
+                        f.write(post_update_cmd + '\n')
+                # upload hook to dataset
+                Runner().run(['scp', '-P', sshri.port, tempf, hook_loc] if sshri.port else ['scp', tempf, hook_loc])
+                ssh(["chmod", '+x', opj(path, '.git/hooks/post-update')])  # make it executable
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % e.message)
