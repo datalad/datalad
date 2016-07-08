@@ -131,6 +131,7 @@ class Add(Interface):
 
         raise NotImplementedError
 
+    # Note: addurl --file=...    existing =< "record that it can be downloaded from there" => test,whether it chekcs content
 
 
     # Note: considering dataset.py:resolve_path, I think we should fail if we are not within a dataset instead of tryng to derive from given path(s).
