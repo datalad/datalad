@@ -36,6 +36,7 @@ _group_dataset = (
          'modify-subdataset-urls'),
         ('datalad.interface.unlock', 'Unlock', 'unlock'),
         ('datalad.interface.save', 'Save', 'save'),
+        ('datalad.distribution.metadata', 'MetaData', 'metadata'),
     ])
 
 _group_misc = (

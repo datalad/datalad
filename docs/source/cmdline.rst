@@ -31,6 +31,7 @@ Dataset operations
    generated/man/datalad-update
    generated/man/datalad-save
    generated/man/datalad-unlock
+   generated/man/datalad-metadata
 
 Miscellaneous commands
 ======================
