@@ -208,6 +208,7 @@ class Annexificator(object):
                  allow_dirty=False, yield_non_updated=False,
                  auto_finalize=True,
                  statusdb=None,
+                 skip_problematic=False,
                  **kwargs):
         """
 
@@ -238,6 +239,9 @@ class Annexificator(object):
           Note that statusdb "lives" within the branch, so switch_branch would drop existing DB (which
           should get committed within the branch) and would create a new one if DB is requested
           again.
+        skip_problematic: bool, optional
+          If True, it would not raise an exception if e.g. url is 404 or forbidden -- then just
+          nothing is yielded, and effectively that entry is skipped
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -279,6 +283,7 @@ class Annexificator(object):
 
         self.statusdb = statusdb
         self._statusdb = None  # actual DB to be instantiated later
+        self.skip_problematic = skip_problematic
 
     # def add(self, filename, url=None):
     #     # TODO: modes
@@ -345,7 +350,12 @@ class Annexificator(object):
             downloader = self._providers.get_provider(url).get_downloader(url)
 
             # request status since we would need it in either mode
-            remote_status = data['url_status'] if 'url_status' in data else downloader.get_status(url)
+            try:
+                remote_status = data['url_status'] if 'url_status' in data else downloader.get_status(url)
+            except Exception:
+                if self.skip_problematic:
+                    return
+                raise
             if lexists(filepath):
                 # check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT
@@ -725,6 +735,11 @@ class Annexificator(object):
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
         # and apparently not actively developed
+        msg = str(msg).strip()
+        if not msg:
+            # we need to provide some commit msg, could may be deduced from current status
+            # TODO
+            msg = "a commit"
         if msg is not None:
             options = options + ["-m", msg]
         self._precommit()  # so that all batched annexes stop
@@ -1121,6 +1136,8 @@ class Annexificator(object):
         """
 
         def _initiate_dataset(data):
+            # TODO: actually ATM is not that thin and forces to us to use Annexificator
+            # which forces meta-dataset to become an annex, not pure git repo...
             for data_ in initiate_dataset(*args, **kwargs)(data):
                 # Also "register" as a sub-dataset if not yet registered
                 ds = Dataset(self.repo.path)

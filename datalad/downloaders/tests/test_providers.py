@@ -14,6 +14,7 @@ from ...tests.utils import eq_
 from ...tests.utils import assert_in
 from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
+from ...tests.utils import assert_raises
 
 
 def test_Providers_OnStockConfiguration():
@@ -66,3 +67,6 @@ def test_Providers_default_ones():
     assert(isinstance(crap_provider, Provider))
 
 
+def test_Providers_process_credential():
+    # If uknown type -- raises ValueError
+    assert_raises(ValueError, Providers._process_credential, 'cred', {'type': '_unknown_'})

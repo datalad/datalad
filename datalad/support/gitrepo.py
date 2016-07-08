@@ -367,7 +367,8 @@ class GitRepo(object):
     # default_git_odbt but still allows for faster testing etc.
     # May be eventually we would make it switchable _GIT_COMMON_OPTIONS = []
 
-    def __init__(self, path, url=None, runner=None, create=True, **kwargs):
+    def __init__(self, path, url=None, runner=None, create=True,
+                 git_opts=None, **kwargs):
         """Creates representation of git repository at `path`.
 
         If `url` is given, a clone is created at `path`.
@@ -406,6 +407,10 @@ class GitRepo(object):
           C='/my/path'   => -C /my/path
 
         """
+
+        if git_opts:
+            lgr.warning("TODO: options passed to git are currently ignored.\n"
+                        "options received: %s" % git_opts)
 
         self.path = abspath(normpath(path))
         self.cmd_call_wrapper = runner or GitRunner(cwd=self.path)
@@ -446,7 +451,8 @@ class GitRepo(object):
         if create and not exists(opj(path, '.git')):
             try:
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
-                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path, True,
+                self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
+                                                  mkdir=True,
                                                   odbt=default_git_odbt,
                                                   **kwargs)
             except GitCommandError as e:
@@ -613,28 +619,28 @@ class GitRepo(object):
         Parameters
         ----------
         msg: str
-            commit-message
-        options:
-            to be implemented. See options_decorator in annexrepo.
+          commit-message
+        options: list of str
+          cmdline options for git-commit
         """
 
-        # TODO: for some commits we explicitly do not want a message since
-        # it would be coming from e.g. staged merge. But it is not clear
-        # what gitpython would do about it. doc says that it would
-        # convert to string anyways.... bleh
         if not msg:
-            msg = "Commit"  # there is no good default
-        if options:
-            raise NotImplementedError
+            if options:
+                if "--allow-empty-message" not in options:
+                        options.append("--allow-empty-message")
+                else:
+                    options = ["--allow-empty-message"]
+
         self.precommit()
-        lgr.debug("Committing with msg=%r" % msg)
-        self.cmd_call_wrapper(self.repo.index.commit, msg)
-        #
-        #  Was blaming of too much state causes side-effects while interlaving with
-        #  git annex cmds so this snippet if to use outside git call
-        #self._git_custom_command([], ['git', 'commit'] + \
-        #                         (["-m", msg] if msg else []) + \
-        #                         (options if options else []))
+        if options:
+            # we can't pass all possible options to gitpython's implementation
+            # of commit. Therefore we need a direct call to git:
+            cmd = ['git', 'commit'] + (["-m", msg] if msg else []) + options
+            lgr.debug("Committing via direct call of git: %s" % cmd)
+            self._git_custom_command([], cmd)
+        else:
+            lgr.debug("Committing with msg=%r" % msg)
+            self.cmd_call_wrapper(self.repo.index.commit, msg)
 
     def get_indexed_files(self):
         """Get a list of files in git's index

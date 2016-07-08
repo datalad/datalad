@@ -19,6 +19,7 @@ from ..misc import get_url_filename
 from ..misc import range_node
 from ..misc import interrupt_if
 from ..misc import skip_if
+from ..misc import continue_if
 from ..misc import func_to_node
 from ..misc import sub
 from ..misc import find_files
@@ -171,7 +172,7 @@ def test__act_if():
 
     # matched = true
     gen = _act_if(values)
-    assert_raises(NotImplementedError, list, gen(datamatch))
+    eq_(list(gen(datamatch)), [datamatch])
 
     # matched = false
     genfal = _act_if(values, re=True, negate=False)
@@ -224,6 +225,23 @@ def test_skip_if():
 
     eq_(list(skip_if({'v1': 'ye.$'})(tdict)), [tdict])
     eq_(list(skip_if({'v1': 'ye.$'}, re=True)(tdict)), [])
+
+
+def test_continue_if():
+    d = {'v1': 'done'}
+    n = continue_if(d)
+    #eq_(list(n(d)), [d])
+    eq_(list(n(dict(v1='not done'))), [])
+    eq_(list(n(dict(v1='done', someother=123))), [dict(v1='done', someother=123)])
+
+    tdict = dict(v1='not yet', someother=123)
+    # and that we would interrupt while matching multiple values
+    eq_(list(n(tdict)), [])
+    eq_(list(continue_if(tdict)(tdict)), [tdict])
+
+    # regexp
+    eq_(list(continue_if({'v1': '^(?P<negate>not +)yet$'}, re=True)(tdict)),
+        [updated(tdict, {'negate': 'not '})])
 
 
 def test_skip_if_negate():
