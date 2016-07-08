@@ -149,6 +149,7 @@ def test_GitRepo_remove(path):
 
     eq_(set(gr.remove('*', r=True, f=True)), {'file2', 'd2/f1', 'd2/f2'})
 
+
 @assert_cwd_unchanged
 @with_tempfile
 def test_GitRepo_commit(path):
@@ -162,6 +163,13 @@ def test_GitRepo_commit(path):
     gr.commit("Testing GitRepo.commit().")
     ok_clean_git(path, annex=False, untracked=[])
 
+    with open(opj(path, filename), 'w') as f:
+        f.write("changed content")
+
+    gr.add(filename)
+    gr.commit("commit with options", options=to_options(dry_run=True))
+    # wasn't actually committed:
+    ok_(gr.repo.is_dirty())
 
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile

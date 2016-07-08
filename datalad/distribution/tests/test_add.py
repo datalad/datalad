@@ -42,7 +42,7 @@ def test_insufficient_args():
                  'dir': {'testindir': 'someother',
                          'testindir2': 'none'}})
 def test_install_files(path):
-    ds = create(path)
+    ds = create(path, force=True)
     # install a single file
     eq_(ds.add('test.txt'), opj(path, 'test.txt'))
     # install it again, should given same result
