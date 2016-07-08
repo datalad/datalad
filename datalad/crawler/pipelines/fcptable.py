@@ -20,7 +20,7 @@ TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
 
 def superdataset_pipeline(url=TOPURL):
-    annex = Annexificator(allow_dirty=True)
+    annex = Annexificator()
     lgr.info("Creating a FCP collection pipeline")
     return [
         crawl_url(url),
@@ -88,7 +88,7 @@ class find_dataset(object):
 
 def pipeline(dataset):
     lgr.info("Creating a pipeline for the FCP Table dataset %s" % dataset)
-    annex = Annexificator(create=False, statusdb='json', allow_dirty=True, special_remotes=[ARCHIVES_SPECIAL_REMOTE],
+    annex = Annexificator(create=False, statusdb='json', special_remotes=[ARCHIVES_SPECIAL_REMOTE],
                           options=["-c",
                                    "annex.largefiles="
                                    "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
