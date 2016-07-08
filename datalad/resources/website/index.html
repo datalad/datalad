@@ -53,6 +53,10 @@
 		 // add click handlers to each row(cell) once table initialised
 		 "initComplete": function () {
 		     var api = this.api();
+		     // remove '../' row if in top dataset
+		     if(table.row(0).data().path.endsWith(window.location.pathname) && table.row(0).data().name=='..') 
+		     {  table.row(0).remove().draw();  }                                           // remove '../' from the top dataset
+		     // add click handlers
 		     api.$('tr').click( function () {           		                   // on clicking a row element
 			 var data = table.row( this ).data();                                      // extract its data json from table
 			 if (data.type == 'dir' || data.type == 'git' || data.type == 'annex') {   // if clicked row of directory type

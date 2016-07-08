@@ -480,10 +480,6 @@ def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
     for ds in dsms:
         # (recursively) traverse each submodule
         fs = fs_traverse(opj(ds.path, ""), ds, recursive=recursive, json=json)
-        # if its the root submodule remove parent node info ("..") from it
-        if ds.path == abspath(loc):
-            fs["nodes"].pop(0)
-
         # run renderer on submodule(fs) at ds.path with json option set by user
         lgr.info('Submodule: ' + opj(ds.path))
         fs_render(ds.path, fs, json=json)
