@@ -50,11 +50,11 @@ def extract_readme(data):
 
             with open("README.txt", "w") as fi:
                 fi.write("""\
-        FCP1000 sub-dataset %(dataset)s
-        ------------------------
+FCP1000 sub-dataset %(dataset)s
+------------------------
 
-        Author(s): %(PI)s
-        Details: %(details)s
+Author(s): %(PI)s
+Details: %(details)s
         """ % data)
 
             lgr.info("Generated README.txt")
@@ -109,3 +109,5 @@ def pipeline(dataset):
             annex,
         ]
     ]
+
+
