@@ -48,9 +48,10 @@ class Provider(object):
     """
     # TODO: we might need a lazy loading of the submodules which would provide
     # specific downloaders while importing needed Python modules "on demand"
-    DOWNLOADERS = {'http': HTTPDownloader,
-                   'https': HTTPDownloader,
-                   's3': S3Downloader,
+    DOWNLOADERS = {'http': {'class': HTTPDownloader, 'dependencies': {'requests'}},
+                   'https': {'class': HTTPDownloader, 'dependencies': {'requests'}},
+                   'ftp': {'class': HTTPDownloader, 'dependencies': {'requests', 'boto'}},
+                   's3': {'class': S3Downloader, 'dependencies': {'boto'}}
                     # ... TODO
                   }
 
@@ -88,7 +89,7 @@ class Provider(object):
     def _get_downloader_class(cls, url):
         key = cls.get_scheme_from_url(url)
         if key in cls.DOWNLOADERS:
-            return cls.DOWNLOADERS[key]
+            return cls.DOWNLOADERS[key]['class']
         else:
             raise ValueError("Do not know how to handle url %s for scheme %s. Known: %s"
                              % (url, key, cls.DOWNLOADERS.keys()))

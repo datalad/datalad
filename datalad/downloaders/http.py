@@ -14,6 +14,7 @@ import re
 import requests
 import requests.auth
 
+import io
 from six import PY3
 from six import BytesIO
 
@@ -36,6 +37,13 @@ from .base import DownloadError, AccessDeniedError, AccessFailedError, Unhandled
 from logging import getLogger
 from ..log import LoggerHelper
 lgr = getLogger('datalad.http')
+
+try:
+    import requests_ftp
+    requests_ftp.monkeypatch_session()
+except ImportError as e:
+    lgr.debug("Failed to import requests_ftp, thus no ftp support: %s" % exc_str(e))
+    pass
 
 if lgr.getEffectiveLevel() <= 1:
     # Let's also enable requests etc debugging
@@ -329,7 +337,23 @@ class HTTPDownloader(BaseDownloader):
             # must use .raw to be able avoiding decoding/decompression while downloading
             # to a file
             chunk_size_ = min(chunk_size, size) if size is not None else chunk_size
-            for chunk in response.raw.stream(chunk_size_, decode_content=return_content):
+
+            # XXX With requests_ftp BytesIO is provided as response.raw for ftp urls,
+            # which has no .stream, so let's do ducktyping and provide our custom stream
+            # via BufferedReader for such cases, while maintaining the rest of code
+            # intact.  TODO: figure it all out, since doesn't scale for any sizeable download
+            if not hasattr(response.raw, 'stream'):
+                def _stream():
+                    buf = io.BufferedReader(response.raw)
+                    v = True
+                    while v:
+                        v = buf.read(chunk_size_)
+                        yield v
+                stream = _stream()
+            else:
+                stream = response.raw.stream(chunk_size_, decode_content=return_content)
+
+            for chunk in stream:
                 if chunk:  # filter out keep-alive new chunks
                     chunk_len = len(chunk)
                     if size is not None and total + chunk_len > size:

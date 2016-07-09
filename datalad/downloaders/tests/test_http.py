@@ -38,6 +38,7 @@ except ImportError:
     httpretty = NoHTTPPretty()
 
 from mock import patch
+from ...tests.utils import SkipTest
 from ...tests.utils import assert_in
 from ...tests.utils import assert_not_in
 from ...tests.utils import assert_equal
@@ -180,7 +181,9 @@ def check_download_external_url(url, failed_str, success_str, d):
     # Verify status
     status = downloader.get_status(url)
     assert(isinstance(status, FileStatus))
-    assert(status.mtime)
+    if not url.startswith('ftp://'):
+        # TODO introduce support for mtime into requests_ftp?
+        assert(status.mtime)
     assert(status.size)
     # TODO -- more and more specific
 
@@ -196,6 +199,17 @@ def test_authenticate_external_portals():
           "failed", \
           "2000 1005 2000 3000"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
+
+
+def test_download_ftp():
+    try:
+        import requests_ftp
+    except ImportError:
+        raise SkipTest("need requests_ftp")  # TODO - make it not ad-hoc
+    yield check_download_external_url, \
+          "ftp://ftp.gnu.org/README", \
+          None, \
+          "This is ftp.gnu.org"
 
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
