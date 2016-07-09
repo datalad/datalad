@@ -25,6 +25,7 @@ from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
+from ...tests.utils import skip_if_no_network
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -201,6 +202,7 @@ def test_authenticate_external_portals():
 test_authenticate_external_portals.tags = ['external-portal', 'network']
 
 
+@skip_if_no_network
 def test_download_ftp():
     try:
         import requests_ftp
