@@ -26,45 +26,49 @@ if PY3:
 
 def test_external_versions_basic():
     ev = ExternalVersions()
-    assert_equal(ev._versions, {})
-    assert_equal(ev['datalad'], __version__)
+    our_module = 'datalad'
+    assert_equal(ev.versions, {})
+    assert_equal(ev[our_module], __version__)
     # and it could be compared
-    assert_greater_equal(ev['datalad'], __version__)
-    assert_greater(ev['datalad'], '0.1')
-    assert_equal(list(ev.keys()), ['datalad'])
-    assert_true('datalad' in ev)
+    assert_greater_equal(ev[our_module], __version__)
+    assert_greater(ev[our_module], '0.1')
+    assert_equal(list(ev.keys()), [our_module])
+    assert_true(our_module in ev)
     assert_false('unknown' in ev)
 
     # StrictVersion might remove training .0
-    version_str = str(ev['datalad']) \
-        if isinstance(ev['datalad'], StrictVersion) \
+    version_str = str(ev[our_module]) \
+        if isinstance(ev[our_module], StrictVersion) \
         else __version__
-    assert_equal(ev.dumps(), "Versions: datalad=%s" % version_str)
+    assert_equal(ev.dumps(), "Versions: %s=%s" % (our_module, version_str))
 
     # For non-existing one we get None
-    assert_equal(ev['dataladnonexisting'], None)
+    assert_equal(ev['custom__nonexisting'], None)
     # and nothing gets added to _versions for nonexisting
-    assert_equal(set(ev._versions.keys()), {'datalad'})
+    assert_equal(set(ev.versions.keys()), {our_module})
 
     # but if it is a module without version, we get it set to UNKNOWN
     assert_equal(ev['os'], ev.UNKNOWN)
     # And get a record on that inside
-    assert_equal(ev._versions.get('os'), ev.UNKNOWN)
+    assert_equal(ev.versions.get('os'), ev.UNKNOWN)
     # And that thing is "True", i.e. present
     assert(ev['os'])
     # but not comparable with anything besides itself (was above)
     assert_raises(TypeError, cmp, ev['os'], '0')
     assert_raises(TypeError, assert_greater, ev['os'], '0')
 
-    # # And we can get versions based on modules themselves
-    # from datalad.tests import mod
-    # assert_equal(ev[mod], mod.__version__)
-    #
-    # # Check that we can get a copy of the versions
-    # versions_dict = ev.versions
-    # versions_dict['datalad'] = "0.0.1"
-    # assert_equal(versions_dict['datalad'], "0.0.1")
-    # assert_equal(ev['datalad'], __version__)
+    return
+    # Code below is from original duecredit, and we don't care about
+    # testing this one
+    # And we can get versions based on modules themselves
+    from datalad.tests import mod
+    assert_equal(ev[mod], mod.__version__)
+
+    # Check that we can get a copy of the versions
+    versions_dict = ev.versions
+    versions_dict[our_module] = "0.0.1"
+    assert_equal(versions_dict[our_module], "0.0.1")
+    assert_equal(ev[our_module], __version__)
 
 
 def test_external_versions_unknown():
@@ -98,8 +102,8 @@ def test_external_versions_popular_packages():
 def test_custom_versions():
     ev = ExternalVersions()
     assert(ev['annex'] > '6.20160101')  # annex must be present and recentish
-    assert_equal(set(ev._versions.keys()), {'annex'})
+    assert_equal(set(ev.versions.keys()), {'annex'})
 
     ev.CUSTOM = {'bogus': lambda: 1/0}
     assert_equal(ev['bogus'], None)
-    assert_equal(set(ev._versions.keys()), {'annex'})
+    assert_equal(set(ev.versions.keys()), {'annex'})

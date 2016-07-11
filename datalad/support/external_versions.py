@@ -43,12 +43,14 @@ def _get_annex_version():
 
 
 class ExternalVersions(object):
-    """Helper to figure out/use versions of the external modules.
+    """Helper to figure out/use versions of the externals (modules, cmdline tools, etc).
 
     It maintains a dictionary of `distuil.version.StrictVersion`s to make
     comparisons easy.  If version string doesn't conform the StrictVersion
-    LooseVersion will be used.  If version can't be deduced for the module,
-    'None' is assigned
+    LooseVersion will be used.  If version can't be deduced for the external,
+    `UnknownVersion()` is assigned.  If external is not present (can't be
+    imported, or custom check throws exception), None is returned without
+    storing it, so later call will re-evaluate fully
     """
 
     UNKNOWN = UnknownVersion()
