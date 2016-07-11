@@ -8,51 +8,117 @@
 """Test add action
 
 """
-from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
-    exists, islink, sep, realpath
 
+from os import pardir
+from os.path import join as opj
 
-from ..dataset import Dataset
 from datalad.api import create
 from datalad.api import add
-from datalad.api import install
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.exceptions import FileInGitError
-
-from nose.tools import ok_, eq_, assert_false
-from datalad.tests.utils import with_tempfile, assert_in, with_tree,\
-    with_testrepos, assert_equal, assert_true
+from datalad.tests.utils import ok_
+from datalad.tests.utils import eq_
+from datalad.tests.utils import with_tempfile
+from datalad.tests.utils import with_tree
 from datalad.tests.utils import SkipTest
-from datalad.tests.utils import ok_file_has_content
-from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
-from datalad.tests.utils import ok_startswith
-from datalad.tests.utils import skip_if_no_module
-from datalad.tests.utils import ok_clean_git
-from datalad.tests.utils import serve_path_via_http
-from datalad.tests.utils import swallow_outputs
-from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_in
+from datalad.utils import chpwd
+
+from ..dataset import Dataset
 
 
-def test_insufficient_args():
-    raise SkipTest("TODO")
+@with_tempfile(mkdir=True)
+def test_add_insufficient_args(path):
+    # no argument:
     assert_raises(InsufficientArgumentsError, add)
+    # no `path`, no `source`:
+    assert_raises(InsufficientArgumentsError, add, dataset=path)
+    # not in a dataset, no dataset given:
+    with chpwd(path):
+        assert_raises(InsufficientArgumentsError, add, path="some")
+
+    ds = Dataset(path)
+    ds.create()
+    assert_raises(ValueError, ds.add, opj(pardir, 'path', 'outside'))
+    assert_raises(ValueError, ds.add, opj('not', 'existing'))
 
 
+tree_arg = dict(tree={'test.txt': 'some',
+                 'test_annex.txt': 'some annex',
+                 'test1.dat': 'test file 1',
+                 'test2.dat': 'test file 2',
+                 'dir': {'testindir': 'someother',
+                         'testindir2': 'none'}})
 
 
-# add a file
-#   git <=> annex
-# add several files
-#   git <=> annex
-# add a dir
+@with_tree(**tree_arg)
+def test_add_files(path):
+    ds = Dataset(path)
+    ds.create(force=True)
 
-# ### path(s) inside subdatasets:
-# add recursive <=> non-recursive
-# recursion limit
+    test_list_1 = ['test_annex.dat']
+    test_list_2 = ['test.txt']
+    test_list_3 = ['test1.dat', 'test2.dat']
+    test_list_4 = [opj('dir', 'testindir'), opj('dir', 'testindir2')]
+    all_files = test_list_1 + test_list_2 + test_list_3 + test_list_4
+    unstaged = set(all_files)
+    staged = set()
+
+    for arg in [(test_list_1[0], False),
+                (test_list_2[0], True),
+                (test_list_3, False),
+                (test_list_4, False)]:
+        # special case 4: give the dir:
+        if arg[0] == test_list_4:
+            result = ds.add('dir', to_git=arg[1])
+        else:
+            result = ds.add(arg[0], to_git=arg[1])
+        eq_(result, arg[0])
+        # added, but not committed:
+        ok_(ds.repo.dirty)
+
+        # get sets for comparison:
+        annexed = set(ds.repo.get_annexed_files())
+        indexed = set(ds.repo.get_indexed_files())
+        if isinstance(arg[0], list):
+            for x in arg[0]:
+                unstaged.remove(x)
+            staged += set(arg[0])
+        else:
+            unstaged.remove(arg[0])
+            staged += {arg[0]}
+
+        # added, but nothing else was:
+        ok_(staged.issubset(indexed if arg[1] else annexed))
+        ok_(staged.isdisjoint(annexed if arg[1] else indexed))
+        ok_(set(unstaged).isdisjoint(set(annexed)))
+        ok_(set(unstaged).isdisjoint(set(indexed)))
 
 
-# path => list
+@with_tree(**tree_arg)
+def test_add_recursive(path):
+    ds = Dataset(path)
+    ds.create(force=True)
+    ds.create_subdataset('dir', force=True)
+
+    # fail without recursive:
+    assert_raises(ValueError, ds.add, opj('dir', 'testindir'), recursive=False)
+    # fail with recursion limit too low:
+    assert_raises(ValueError, ds.add, opj('dir', 'testindir'),
+                  recursive=True, recursion_limit=0)
+
+    ds.add(opj('dir', 'testindir'), recursive=True)
+    assert_in('testindir', Dataset(opj(path, 'dir')).repo.get_annexed_files())
+
+    ds.add(opj('dir', 'testindir2'), recursive=True, to_git=True)
+    assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
+
+
+def test_add_source():
+    # ???
+    raise SkipTest("TODO")
+#
+# source <=> path paired by order
 #
 # source => RI  => addurl
 #
@@ -68,73 +134,5 @@ def test_insufficient_args():
 
 
 
-@with_tree(tree={'test.txt': 'some',
-                 'dir': {'testindir': 'someother',
-                         'testindir2': 'none'}})
-def test_add_files(path):
-    raise SkipTest("TODO")
-
-    ds = create(path, force=True)
-    # install a single file
-    eq_(ds.add('test.txt'), opj(path, 'test.txt'))
-    # install it again, should given same result
-    eq_(ds.add('test.txt'), opj(path, 'test.txt'))
-    # install multiple files in a dir
-    eq_(ds.add('dir'),
-        [opj(path, 'dir', 'testindir'),
-         opj(path, 'dir', 'testindir2')])
-    # TODO: check git
 
 
-@with_testrepos(flavors=['local-url', 'network', 'local'])
-@with_tempfile
-def test_install_into_dataset(source, top_path):
-    raise SkipTest("TODO")
-
-    ds = create(top_path)
-    subds = ds.add(path="sub", source=source)
-    assert_true(isdir(opj(subds.path, '.git')))
-    ok_(subds.is_installed())
-    # sub is clean:
-    ok_clean_git(subds.path, annex=False)
-    # top is not:
-    assert_raises(AssertionError, ok_clean_git, ds.path, annex=False)
-    # unless committed the subds should not show up in the parent
-    # this is the same behavior that 'git submodule status' implements
-    assert_not_in('sub', ds.get_subdatasets())
-    ds.save('addsub')
-    assert_in('sub', ds.get_subdatasets())
-
-
-@with_testrepos('submodule_annex', flavors=['local', 'local-url', 'network'])
-@with_tempfile(mkdir=True)
-def test_install_subdataset(src, path):
-    raise SkipTest("TODO")
-
-    # get the superdataset:
-    ds = install(path=path, source=src)
-
-    # subdataset not installed:
-    subds = Dataset(opj(path, 'sub1'))
-    assert_false(subds.is_installed())
-
-    # install it:
-    ds.add('sub1')
-    assert_true(isdir(opj(subds.path, '.git')))
-
-    ok_(subds.is_installed())
-    # Verify that it is the correct submodule installed and not
-    # new repository initiated
-    assert_equal(set(subds.repo.get_indexed_files()),
-                 {'test.dat', 'INFO.txt', 'test-annex.dat'})
-
-    # Now the obnoxious install an annex file within not yet
-    # initialized repository!
-    with swallow_outputs():  # progress bar
-        ds.add(opj('sub2', 'test-annex.dat'))
-    subds2 = Dataset(opj(path, 'sub2'))
-    assert(subds2.is_installed())
-    assert(subds2.repo.file_has_content('test-annex.dat'))
-    # we shouldn't be able silently ignore attempt to provide source while
-    # "installing" file under git
-    assert_raises(FileInGitError, ds.add, opj('sub2', 'INFO.txt'), source="http://bogusbogus")
