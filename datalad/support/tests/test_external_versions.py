@@ -2,15 +2,15 @@
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
-#   See COPYING file distributed along with the duecredit package for the
+#   See COPYING file distributed along with the datalad package for the
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
 from os import linesep
 
-from ..version import __version__
-from ..versions import ExternalVersions, StrictVersion
+from ...version import __version__
+from ..external_versions import ExternalVersions, StrictVersion
 
 from nose.tools import assert_true, assert_false
 from nose.tools import assert_equal, assert_greater_equal, assert_greater
@@ -23,27 +23,28 @@ if PY3:
     def cmp(a, b):
         return (a > b) - (a < b)
 
+
 def test_external_versions_basic():
     ev = ExternalVersions()
     assert_equal(ev._versions, {})
-    assert_equal(ev['duecredit'], __version__)
+    assert_equal(ev['datalad'], __version__)
     # and it could be compared
-    assert_greater_equal(ev['duecredit'], __version__)
-    assert_greater(ev['duecredit'], '0.1')
-    assert_equal(list(ev.keys()), ['duecredit'])
-    assert_true('duecredit' in ev)
+    assert_greater_equal(ev['datalad'], __version__)
+    assert_greater(ev['datalad'], '0.1')
+    assert_equal(list(ev.keys()), ['datalad'])
+    assert_true('datalad' in ev)
     assert_false('unknown' in ev)
 
     # StrictVersion might remove training .0
-    version_str = str(ev['duecredit']) \
-        if isinstance(ev['duecredit'], StrictVersion) \
+    version_str = str(ev['datalad']) \
+        if isinstance(ev['datalad'], StrictVersion) \
         else __version__
-    assert_equal(ev.dumps(), "Versions: duecredit=%s" % version_str)
+    assert_equal(ev.dumps(), "Versions: datalad=%s" % version_str)
 
     # For non-existing one we get None
-    assert_equal(ev['duecreditnonexisting'], None)
+    assert_equal(ev['dataladnonexisting'], None)
     # and nothing gets added to _versions for nonexisting
-    assert_equal(set(ev._versions.keys()), {'duecredit'})
+    assert_equal(set(ev._versions.keys()), {'datalad'})
 
     # but if it is a module without version, we get it set to UNKNOWN
     assert_equal(ev['os'], ev.UNKNOWN)
@@ -55,15 +56,15 @@ def test_external_versions_basic():
     assert_raises(TypeError, cmp, ev['os'], '0')
     assert_raises(TypeError, assert_greater, ev['os'], '0')
 
-    # And we can get versions based on modules themselves
-    from duecredit.tests import mod
-    assert_equal(ev[mod], mod.__version__)
-
-    # Check that we can get a copy of the versions
-    versions_dict = ev.versions
-    versions_dict['duecredit'] = "0.0.1"
-    assert_equal(versions_dict['duecredit'], "0.0.1")
-    assert_equal(ev['duecredit'], __version__)
+    # # And we can get versions based on modules themselves
+    # from datalad.tests import mod
+    # assert_equal(ev[mod], mod.__version__)
+    #
+    # # Check that we can get a copy of the versions
+    # versions_dict = ev.versions
+    # versions_dict['datalad'] = "0.0.1"
+    # assert_equal(versions_dict['datalad'], "0.0.1")
+    # assert_equal(ev['datalad'], __version__)
 
 
 def test_external_versions_unknown():
