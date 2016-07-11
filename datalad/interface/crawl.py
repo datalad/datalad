@@ -56,8 +56,9 @@ class Crawl(Interface):
                 of a dataset on which to perform crawling using its standard crawling specification"""),
     )
 
+
     @staticmethod
-    def __call__(path=None, dry_run=False, is_pipeline=False, is_template=False, chdir=None):
+    def __call__(path=None, dry_run=False, is_pipeline=False, is_template=False, chdir=None, init=False):
         from datalad.crawler.pipeline import (
             load_pipeline_from_config, load_pipeline_from_module,
             get_repo_pipeline_config_path, get_repo_pipeline_script_path
@@ -94,6 +95,7 @@ class Crawl(Interface):
 
             if not path:
                 raise RuntimeError("Cannot locate crawler config or pipeline file")
+
 
             if is_pipeline:
                 lgr.info("Loading pipeline definition from %s" % path)
