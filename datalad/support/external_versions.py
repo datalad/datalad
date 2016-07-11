@@ -14,6 +14,10 @@ from six import string_types
 
 from distutils.version import StrictVersion, LooseVersion
 
+from datalad.dochelpers import exc_str
+from datalad.log import lgr
+
+
 # To depict an unknown version, which can't be compared by mistake etc
 class UnknownVersion:
     """For internal use
@@ -28,6 +32,16 @@ class UnknownVersion:
         raise TypeError("UNKNOWN version is not comparable")
 
 
+#
+# Custom handlers
+#
+
+def _get_annex_version():
+    """Return version of annex available"""
+    from datalad.cmd import Runner
+    return Runner().run('git annex version --raw'.split())[0]
+
+
 class ExternalVersions(object):
     """Helper to figure out/use versions of the external modules.
 
@@ -38,6 +52,10 @@ class ExternalVersions(object):
     """
 
     UNKNOWN = UnknownVersion()
+
+    CUSTOM = {
+        'annex': _get_annex_version
+    }
 
     def __init__(self):
         self._versions = {}
@@ -73,17 +91,31 @@ class ExternalVersions(object):
             modname = module
             module = None
 
+        # Early returns None so we do not store prev result for  them
+        # and allow users to install things at run time, so later check
+        # doesn't pick it up from the _versions
         if modname not in self._versions:
-            if module is None:
-                if modname not in sys.modules:
-                    try:
-                        module = __import__(modname)
-                    except ImportError:
-                        return None
-                else:
-                    module = sys.modules[modname]
-
-            self._versions[modname] = self._deduce_version(module)
+            version = None   # by default -- not present
+            if modname in self.CUSTOM:
+                try:
+                    version = self.CUSTOM[modname]()
+                except Exception as exc:
+                    lgr.debug("Failed to deduce version of %s due to %s"
+                              % (modname, exc_str(exc)))
+                    return None
+            else:
+                if module is None:
+                    if modname not in sys.modules:
+                        try:
+                            module = __import__(modname)
+                        except ImportError:
+                            lgr.debug("Module %s seems to be not present" % modname)
+                            return None
+                    else:
+                        module = sys.modules[modname]
+                if module:
+                    version = self._deduce_version(module)
+            self._versions[modname] = version
 
         return self._versions.get(modname, self.UNKNOWN)
 

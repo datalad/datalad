@@ -93,3 +93,13 @@ def test_external_versions_popular_packages():
     # more of a smoke test
     assert_false(linesep in ev.dumps())
     assert_true(ev.dumps(indent=True).endswith(linesep))
+
+
+def test_custom_versions():
+    ev = ExternalVersions()
+    assert(ev['annex'] > '6.20160101')  # annex must be present and recentish
+    assert_equal(set(ev._versions.keys()), {'annex'})
+
+    ev.CUSTOM = {'bogus': lambda: 1/0}
+    assert_equal(ev['bogus'], None)
+    assert_equal(set(ev._versions.keys()), {'annex'})
