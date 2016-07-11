@@ -26,6 +26,7 @@ from ..http import HTTPDownloader
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
+from ...tests.utils import with_testsui
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -333,6 +334,42 @@ def test_HTMLFormAuthenticator_httpretty(d):
 
     # Unsuccesfull scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
+
+
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+@with_testsui(responses=['yes'])  # will request to reentry it
+def test_HTMLFormAuthenticator_httpretty_authfail404(d):
+    # mimic behavior of nersc which 404s but provides feedback whenever
+    # credentials are incorrect.  In our case we should fail properly
+    credential = FakeCredential1(name='test', url=None)
+
+    was_called = []
+
+    def request_post_callback(request, uri, headers):
+        post_params = request.parsed_body
+        if post_params['password'][0] == 'testpassword2':
+            was_called.append('404')
+            return 404, headers, "Really 404"
+        else:
+            was_called.append('failed')
+            return 404, headers, "Failed"
+
+    httpretty.register_uri(httpretty.POST, url, body=request_post_callback)
+
+    # Also we want to test how would it work if cookie is available (may be)
+    authenticator = HTMLFormAuthenticator(dict(username="{user}",
+                                               password="{password}",
+                                               submit="CustomLogin"),
+                                          failure_re="Failed")
+
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    # first one goes with regular DownloadError -- was 404 with not matching content
+    assert_raises(DownloadError, downloader.download, url, path=d)
+    assert_equal(was_called, ['failed', '404'])
 
 
 class FakeCredential2(UserPassword):
