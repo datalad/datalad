@@ -103,6 +103,13 @@ def test_get_subdatasets(path):
         {'subdataset/subsubdataset', 'subdataset/subsubdataset/sub1',
          'subdataset/subsubdataset/sub2', 'subdataset/sub1',
          'subdataset/sub2', 'subdataset'})
+    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=0)),
+        set([]))
+    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=1)),
+        {'subdataset'})
+    eq_(set(ds.get_subdatasets(recursive=True, recursion_limit=2)),
+        {'subdataset', 'subdataset/subsubdataset', 'subdataset/sub1',
+         'subdataset/sub2'})
     # TODO:  More Flavors!
 
 

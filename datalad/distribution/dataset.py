@@ -137,7 +137,8 @@ class Dataset(object):
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
-                            recursive=False):
+                        recursive=False, recursion_limit=None):
+
         """Get names/paths of all known dataset_datasets (subdatasets),
         optionally matching a specific name pattern.
 
@@ -152,13 +153,18 @@ class Dataset(object):
           If True, absolute paths will be returned.
         recursive : bool
           If True, recurse into all subdatasets and report them too.
-
+        recursion_limit: int
+          If not None, set the number of subdataset levels to recurse into.
         Returns
         -------
         list(Dataset paths) or None
           None is return if there is not repository instance yet. For an
           existing repository with no subdatasets an empty list is returned.
         """
+
+        if recursion_limit is not None and (recursion_limit <= 0):
+            return []
+
         if pattern is not None:
             raise NotImplementedError
 
@@ -187,7 +193,7 @@ class Dataset(object):
 
         # expand list with child submodules. keep all paths relative to parent
         # and convert jointly at the end
-        if recursive:
+        if recursive and (recursion_limit is None or recursion_limit > 1):
             rsm = []
             for sm in submodules:
                 rsm.append(sm)
@@ -196,7 +202,9 @@ class Dataset(object):
                     [opj(sm, sdsh)
                      for sdsh in Dataset(sdspath).get_subdatasets(
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
-                         recursive=recursive)])
+                         recursive=recursive,
+                         recursion_limit=(recursion_limit - 1)
+                         if recursion_limit is not None else None)])
             submodules = rsm
 
         if absolute:
