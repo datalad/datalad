@@ -54,5 +54,25 @@ class CrawlInit(Interface):
 
     @staticmethod
     def __call__(template=None, func=None, args=[]):
-        with open("crawl.cfg", 'w') as f:
-            f.write
+
+        if template and func:
+            with open("crawl.cfg", 'w') as f:
+                f.write("""\
+[crawl:pipeline]
+template = %s
+func = %s
+                        """ % (template, func))
+            lgr.info("Generated crawl.cfg with provided template and func")
+
+        if template and not func:
+            if args[0]:
+                with open("crawl.cfg", 'w') as f:
+                    f.write("""\
+[crawl:pipeline]
+template = %s
+_dataset = %s
+                                    """ % (template, args[0]))
+                lgr.info("Generated crawl.cfg with provided template and dataset name")
+
+
+
