@@ -103,7 +103,7 @@ def test_custom_versions():
     ev = ExternalVersions()
     assert(ev['cmd:annex'] > '6.20160101')  # annex must be present and recentish
     assert_equal(set(ev.versions.keys()), {'cmd:annex'})
-    assert(ev['cmd:git'] > '2')  # git must be present and recentish
+    assert(ev['cmd:git'] > '1.7')  # git must be present and recentish
     assert_equal(set(ev.versions.keys()), {'cmd:annex', 'cmd:git'})
 
     ev.CUSTOM = {'bogus': lambda: 1/0}
