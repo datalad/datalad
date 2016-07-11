@@ -30,6 +30,7 @@ from ..dochelpers import borrowkwargs
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
 
+
 @auto_repr
 class BaseDownloader(object):
     """Base class for the downloaders"""

@@ -132,7 +132,16 @@ class HTTPBaseAuthenticator(Authenticator):
         response = self._post_credential(credentials, post_url, session)
 
         err_prefix = "Authentication to %s failed: " % post_url
-        check_response_status(response, err_prefix, session=session)
+        try:
+            check_response_status(response, err_prefix, session=session)
+        except DownloadError:
+            # It might have happened that the return code was 'incorrect'
+            # and we did get some feedback, which we could analyze to
+            # figure out actual problem.  E.g. in case of nersc of crcns
+            # it returns 404 (not found) with text in the html
+            if response is not None and response.text:
+                self.check_for_auth_failure(response.text, err_prefix)
+            raise
 
         response_text = response.text
         self.check_for_auth_failure(response_text, err_prefix)

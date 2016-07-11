@@ -703,6 +703,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     return newfunc
 with_testrepos.__test__ = False
 
+
 @optional_args
 def with_fake_cookies_db(func, cookies={}):
     """mock original cookies db with a fake one for the duration of the test
