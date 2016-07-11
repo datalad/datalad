@@ -325,12 +325,17 @@ class HTTPDownloader(BaseDownloader):
 
         return False
 
-    def _get_download_details(self, url, chunk_size=1024**2, allow_redirects=True):
+    def _get_download_details(self, url, chunk_size=1024**2,
+                              allow_redirects=True, use_redirected_url=True):
         # TODO: possibly make chunk size adaptive
         response = self._session.get(url, stream=True, allow_redirects=allow_redirects)
         check_response_status(response, session=self._session)
         headers = response.headers
         target_size = int(headers.get('Content-Length', '0').strip()) or None
+        if use_redirected_url and response.url and response.url != url:
+            lgr.debug("URL %s was redirected to %s and thus the later will be used"
+                      % (url, response.url))
+            url = response.url
         # Consult about filename.  Since we already have headers,
         # should not result in an additional request
         url_filename = get_url_filename(url, headers=headers)
