@@ -8,7 +8,6 @@ from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import sub
-from ..nodes.misc import func_to_node
 from ..nodes.misc import get_disposition_filename
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
