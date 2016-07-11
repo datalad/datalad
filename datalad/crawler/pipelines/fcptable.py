@@ -37,12 +37,13 @@ def superdataset_pipeline(url=TOPURL):
 
 
 def extract_readme(data):
+
     if lexists("README.txt"):
         os.unlink("README.txt")
 
     for title, detail in zip(xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data),
                              xpath_match('//*[@class="tableHdr"]/td|strong/text()')(data)):
-        if title['match'] == data['title']:
+        if title['match'] == data['dataset']:
             print detail['match']
             pi = (re.search(('<br>.*<br>'), detail['match'])).group()
             cleaner = re.compile('<.*?>')
@@ -106,11 +107,11 @@ def pipeline(dataset):
                 assign({'dataset': dataset}),
                 sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
                 find_dataset(dataset),
+                [  # README
+                    extract_readme,
+                    annex,
+                ],
 
-            ],
-            [  # README
-                extract_readme,
-                annex,
             ],
             [  # and collect all URLs pointing to tarballs
                 a_href_match('http://www.nitrc.org/frs/downloadlink.php/[0-9999]', min_count=1),
@@ -121,7 +122,7 @@ def pipeline(dataset):
         annex.remove_obsolete(),
         [
             annex.switch_branch('incoming-processed'),
-            annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False)
+            annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False),
             [
                {'loop': True},
                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),
