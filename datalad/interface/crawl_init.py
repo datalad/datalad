@@ -11,9 +11,9 @@
 __docformat__ = 'restructuredtext'
 
 
-
-from os.path import exists, isdir
 from .base import Interface
+from os.path import exists, isdir, curdir
+from os.path import join as opj
 from datalad import cfg
 from datalad.config import ConfigManager
 from datalad.consts import CRAWLER_META_CONFIG_PATH, CRAWLER_META_DIR
@@ -22,33 +22,37 @@ from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
 from datalad.crawler.pipeline import initiate_pipeline_config
 
 from logging import getLogger
-lgr = getLogger('datalad.api.crawl')
-
-from .. import cfg
+lgr = getLogger('datalad.api.crawl_init')
 
 
 class CrawlInit(Interface):
     """
-    Create a template based off of cmdline arguments specified by user
+    Allows user to specify template and function to generate a pipelinne
 
-    Examples:
+    Example:
 
-    $ datalad crawl --init \
-        url=http://example.com \
-        a_href_match=.*\.(tar.*|dat)) \
-          # within a dataset having no .datalad/crawl/crawl.cfg
+    $ datalad crawl-init \
+        --template openfmri \
+        --func
     """
     _params_ = dict(
-        init=Parameter(
-            args=("--init",),
-            action="store_true",
-            doc="""flag if user can provide arguments needed for template to initate .datalad/crawl/crawl.cfg"""),
+        template=Parameter(
+            args=("-t", "--template"),
+            action="store",
+            constraints=EnsureStr() | EnsureNone(),
+            doc="""flag if template is specified by user"""),
+        func=Parameter(
+            args=("-f", "--func"),
+            doc="""flag if function is specified by user"""),
+        args=Parameter(
+            args=("args",),
+            nargs="*",
+            metavar="key=value",
+            # TODO constraints=EnsureKeyValuePairs() | EnsureNone(),
+            doc="""keyword arguments to pass into the template function generating actual pipeline"""),
     )
 
     @staticmethod
-    def __call__(path=None, dry_run=False, is_pipeline=False, is_template=False, chdir=None, init=False):
-
-        if init:
-            url = input("URL: ")
-            a_href_match = input("a_href_match: ")
-            extract_tarballs = input("extract_tarballs: ")
+    def __call__(template=None, func=None, args=[]):
+        with open("crawl.cfg", 'w') as f:
+            f.write
