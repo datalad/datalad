@@ -17,6 +17,8 @@ from distutils.version import StrictVersion, LooseVersion
 from datalad.dochelpers import exc_str
 from datalad.log import lgr
 
+__all__ = ['UnknownVersion', 'ExternalVersions', 'external_versions']
+
 
 # To depict an unknown version, which can't be compared by mistake etc
 class UnknownVersion:
@@ -35,28 +37,39 @@ class UnknownVersion:
 #
 # Custom handlers
 #
+from datalad.cmd import Runner
+_runner = Runner()
+
 
 def _get_annex_version():
-    """Return version of annex available"""
-    from datalad.cmd import Runner
-    return Runner().run('git annex version --raw'.split())[0]
+    """Return version of available git-annex"""
+    return _runner.run('git annex version --raw'.split())[0]
+
+
+def _get_git_version():
+    """Return version of available git"""
+    return _runner.run('git version'.split())[0].split()[-1]
 
 
 class ExternalVersions(object):
     """Helper to figure out/use versions of the externals (modules, cmdline tools, etc).
+
+    To avoid collision between names of python modules and command line tools,
+    prepend names for command line tools with `cmd:`.
 
     It maintains a dictionary of `distuil.version.StrictVersion`s to make
     comparisons easy.  If version string doesn't conform the StrictVersion
     LooseVersion will be used.  If version can't be deduced for the external,
     `UnknownVersion()` is assigned.  If external is not present (can't be
     imported, or custom check throws exception), None is returned without
-    storing it, so later call will re-evaluate fully
+    storing it, so later call will re-evaluate fully.
     """
 
     UNKNOWN = UnknownVersion()
 
     CUSTOM = {
-        'annex': _get_annex_version
+        'cmd:annex': _get_annex_version,
+        'cmd:git': _get_git_version
     }
 
     def __init__(self):
