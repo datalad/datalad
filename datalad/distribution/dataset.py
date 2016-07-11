@@ -214,6 +214,7 @@ class Dataset(object):
 
     def create_subdataset(self, path,
                           name=None,
+                          force=False,
                           description=None,
                           no_annex=False,
                           annex_version=None,
@@ -232,6 +233,8 @@ class Dataset(object):
           path to the subdataset to be created
         name: str
           name of the subdataset
+        force: bool
+          enforce creation of a subdataset in a non-empty directory
         description: str
           a human-readable description of the dataset, that helps to identify it.
           Note: Doesn't work with `no_annex`
@@ -263,7 +266,8 @@ class Dataset(object):
         subds = Dataset(path)
 
         # create the dataset
-        subds.create(description=description,
+        subds.create(force=force,
+                     description=description,
                      no_annex=no_annex,
                      annex_version=annex_version,
                      annex_backend=annex_backend,

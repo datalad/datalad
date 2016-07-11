@@ -162,6 +162,7 @@ class Create(Interface):
 
             return sds.create_subdataset(
                 ds.path,
+                force=force,
                 name=name,
                 description=description,
                 no_annex=no_annex,

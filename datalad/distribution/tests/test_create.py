@@ -40,12 +40,17 @@ def test_create_raises(path, outside_path):
 
     with open(opj(path, "somefile.tst"), 'w') as f:
         f.write("some")
-    # non-empty without force:
+    # non-empty without `force`:
     assert_raises(ValueError, ds.create, force=False)
-    # non-empty with force:
+    # non-empty with `force`:
     ds.create(force=True)
     # create sub outside of super:
     assert_raises(ValueError, ds.create_subdataset, outside_path)
+
+    # create a sub:
+    ds.create_subdataset('sub')
+    # fail when doing it again without `force`:
+    assert_raises(ValueError, ds.create_subdataset, 'sub')
 
 
 @with_tempfile
