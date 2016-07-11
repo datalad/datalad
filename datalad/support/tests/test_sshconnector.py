@@ -10,13 +10,13 @@
 """
 
 import os
-from os.path import exists, join as opj
+from os.path import exists, isdir, join as opj
 
 from nose.tools import ok_, assert_is_instance
 
 from datalad.support.sshconnector import SSHConnection, SSHManager
 from datalad.tests.utils import assert_raises, eq_
-from datalad.tests.utils import skip_ssh
+from datalad.tests.utils import skip_ssh, with_tempfile
 
 
 @skip_ssh
@@ -74,3 +74,26 @@ def test_ssh_manager_close():
 
     ok_(not exists(opj(manager.socket_dir, 'localhost')))
     ok_(not exists(opj(manager.socket_dir, 'datalad-test')))
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile
+def test_ssh_copy(sourcedir, sourcefile):
+    remote_url = "ssh://localhost"
+    manager = SSHManager()
+    ssh = manager.get_connection(remote_url)
+    ssh.open()
+
+    # copy tempfile to remote_url:target
+    target = sourcefile + ".copy"
+    ssh.copy(sourcefile, opj(remote_url, target))
+    # check if target exists on remote_url(=localhost)
+    ok_(exists(target))
+
+    # copy tempdir to remote_url:target
+    targetdir = sourcedir + ".copy"
+    ssh.copy(sourcedir, opj(remote_url, targetdir))
+    # check if source directory copied to remote_url(=localhost)
+    ok_(isdir(targetdir))
+
+    ssh.close()

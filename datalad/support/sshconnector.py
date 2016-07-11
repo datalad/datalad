@@ -16,6 +16,7 @@ git calls to a ssh remote without the need to reauthenticate.
 import logging
 from subprocess import Popen
 from shlex import split as sh_split
+from os.path import isdir
 
 from datalad.support.network import RI, is_ssh
 
@@ -117,6 +118,28 @@ class SSHConnection(object):
                 pass
             else:
                 raise
+
+    def copy(self, source, destination):
+        """Copies source file/folder to destination on the remote.
+
+        Parameters
+        ----------
+        source: str
+          file/folder path to copy from on local
+        destination: str
+          file/folder path to copy to on remote
+
+        Returns
+        -------
+        str
+          stdout, stderr of the copy operation.
+        """
+
+        self.scp_prefix = ["scp", "-o", "ControlPath=" + self.ctrl_path]
+        if isdir(source):  # add recursive flag if directory to be copied
+            self.scp_prefix = self.scp_prefix + ["-r"]
+        scp_cmd = self.scp_prefix + [source, self.host + ":" + destination]
+        return self.runner.run(scp_cmd, expect_fail=True, expect_stderr=True)
 
 
 @auto_repr
