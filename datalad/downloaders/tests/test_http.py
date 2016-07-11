@@ -20,11 +20,12 @@ from datalad.downloaders.tests.utils import get_test_providers
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
-from ..credentials import Credential
+from ..credentials import UserPassword
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
+from ...tests.utils import skip_if_no_network
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -38,6 +39,7 @@ except ImportError:
     httpretty = NoHTTPPretty()
 
 from mock import patch
+from ...tests.utils import SkipTest
 from ...tests.utils import assert_in
 from ...tests.utils import assert_not_in
 from ...tests.utils import assert_equal
@@ -54,9 +56,11 @@ from ...tests.utils import skip_if
 from ...tests.utils import without_http_proxy
 from ...support.status import FileStatus
 
+
 def test_docstring():
     doc = HTTPDownloader.__init__.__doc__
     assert_in("\ncredential: Credential", doc)
+
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
@@ -73,8 +77,10 @@ def fake_open(write_=None):
         return myfile
     return myopen
 
+
 def _raise_IOError(*args, **kwargs):
     raise IOError("Testing here")
+
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
@@ -176,7 +182,9 @@ def check_download_external_url(url, failed_str, success_str, d):
     # Verify status
     status = downloader.get_status(url)
     assert(isinstance(status, FileStatus))
-    assert(status.mtime)
+    if not url.startswith('ftp://'):
+        # TODO introduce support for mtime into requests_ftp?
+        assert(status.mtime)
     assert(status.size)
     # TODO -- more and more specific
 
@@ -192,6 +200,19 @@ def test_authenticate_external_portals():
           "failed", \
           "2000 1005 2000 3000"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
+
+
+@skip_if_no_network
+def test_download_ftp():
+    try:
+        import requests_ftp
+    except ImportError:
+        raise SkipTest("need requests_ftp")  # TODO - make it not ad-hoc
+    yield check_download_external_url, \
+          "ftp://ftp.gnu.org/README", \
+          None, \
+          "This is ftp.gnu.org"
+
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
 @with_tree(tree={'file.dat': '1'})
@@ -228,7 +249,7 @@ def test_get_status_from_headers():
 # is wrong!
 
 
-class FakeCredential1(Credential):
+class FakeCredential1(UserPassword):
     """Credential to test scenarios."""
     _fixed_credentials = [
         {'user': 'testlogin', 'password': 'testpassword'},
@@ -246,7 +267,7 @@ class FakeCredential1(Credential):
 url = "http://example.com/crap.txt"
 test_cookie = 'somewebsite=testcookie'
 
-#@skip_httpretty_on_problematic_pythons
+
 @skip_if(not httpretty, "no httpretty")
 @without_http_proxy
 @httpretty.activate
@@ -255,7 +276,7 @@ test_cookie = 'somewebsite=testcookie'
 def test_HTMLFormAuthenticator_httpretty(d):
     fpath = opj(d, 'crap.txt')
 
-    credential = FakeCredential1(name='test', type='user_password', url=None)
+    credential = FakeCredential1(name='test', url=None)
     credentials = credential()
 
     def request_post_callback(request, uri, headers):
@@ -314,7 +335,7 @@ def test_HTMLFormAuthenticator_httpretty(d):
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
 
 
-class FakeCredential2(Credential):
+class FakeCredential2(UserPassword):
     """Credential to test scenarios."""
     _fixed_credentials = {'user': 'testlogin', 'password': 'testpassword'}
     def is_known(self):
@@ -333,7 +354,7 @@ class FakeCredential2(Credential):
 def test_HTMLFormAuthenticator_httpretty_2(d):
     fpath = opj(d, 'crap.txt')
 
-    credential = FakeCredential2(name='test', type='user_password', url=None)
+    credential = FakeCredential2(name='test', url=None)
     credentials = credential()
     authenticator = HTMLFormAuthenticator(dict(username="{user}",
                                                password="{password}",
@@ -386,5 +407,3 @@ def test_HTMLFormAuthenticator_httpretty_2(d):
     with open(fpath) as f:
         content = f.read()
         assert_equal(content, "correct body")
-
-

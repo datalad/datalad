@@ -18,6 +18,7 @@ from ..interface.base import Interface, get_api_name, get_cmdline_command_name
 
 from ..utils import swallow_outputs
 from .utils import assert_re_in
+from .utils import assert_in
 
 
 class Demo(Interface):
@@ -66,6 +67,11 @@ def test_param():
     assert_true("convertible to type 'int'" in autodoc)
     assert_true('must be a string' in autodoc)
     assert_true('int or str' in autodoc)
+
+    with assert_raises(ValueError) as cmr:
+        Parameter(unknown_arg=123)
+    assert_in('Detected unknown argument(s) for the Parameter: unknown_arg',
+              str(cmr.exception))
 
 
 def test_interface():

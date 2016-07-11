@@ -30,6 +30,7 @@ from functools import wraps
 from six import string_types
 from six.moves import filter
 from six.moves.configparser import NoOptionError
+from six.moves.configparser import NoSectionError
 
 from datalad import ssh_manager
 from datalad.dochelpers import exc_str
@@ -42,6 +43,7 @@ from .gitrepo import GitRepo
 from .gitrepo import normalize_path
 from .gitrepo import normalize_paths
 from .gitrepo import GitCommandError
+from .gitrepo import to_options
 from .exceptions import CommandNotAvailableError
 from .exceptions import CommandError
 from .exceptions import FileNotInAnnexError
@@ -51,33 +53,6 @@ from .exceptions import InsufficientArgumentsError
 from .network import is_ssh
 
 lgr = logging.getLogger('datalad.annex')
-
-
-def kwargs_to_options(func):
-    """Decorator to provide convenient way to pass options to command calls.
-
-    Any keyword argument "foo='bar'" translates to " --foo=bar".
-    All of these are collected in a list and then passed to keyword argument
-    `options` of the decorated function.
-
-    Note
-    ----
-
-    This is meant to especially decorate the methods of AnnexRepo-class and
-    therefore returns a class method.
-    """
-
-    @wraps(func)
-    def newfunc(self, *args, **kwargs):
-        option_list = []
-        for key in kwargs:
-            option_list.extend([" --%s=%s" % (key, kwargs.get(key))])
-
-        return func(self, *args, options=option_list)
-    return newfunc
-
-# TODO: Depending on decision about options, implement common annex-options,
-# like --force and specific ones for all annex commands
 
 
 class AnnexRepo(GitRepo):
@@ -95,10 +70,10 @@ class AnnexRepo(GitRepo):
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
 
-    # TODO: pass description
     def __init__(self, path, url=None, runner=None,
-                 direct=False, backend=None, always_commit=True, create=True, init=False,
-                 batch_size=None, version=None, description=None):
+                 direct=False, backend=None, always_commit=True, create=True,
+                 init=False, batch_size=None, version=None, description=None,
+                 git_opts=None, annex_opts=None, annex_init_opts=None):
         """Creates representation of git-annex repository at `path`.
 
         AnnexRepo is initialized by giving a path to the annex.
@@ -141,10 +116,18 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        if git_opts or annex_opts or annex_init_opts:
+            lgr.warning("TODO: options passed to git, git-annex and/or "
+                        "git-annex-init are currently ignored.\n"
+                        "options received:\n"
+                        "git: %s\ngit-annex: %s\ngit-annex-init: %s" %
+                        (git_opts, annex_opts, annex_init_opts))
+
         fix_it = False
         try:
             super(AnnexRepo, self).__init__(path, url, runner=runner,
-                                            create=create)
+                                            create=create, git_opts=git_opts)
         except GitCommandError as e:
             if create and "Clone succeeded, but checkout failed." in str(e):
                 lgr.warning("Experienced issues while cloning. "
@@ -315,7 +298,7 @@ class AnnexRepo(GitRepo):
 
         try:
             return self.repo.config_reader().get_value("annex", "direct")
-        except NoOptionError as e:
+        except (NoOptionError, NoSectionError):
             # If .git/config lacks an entry "direct",
             # it's actually indirect mode.
             return False
@@ -343,7 +326,7 @@ class AnnexRepo(GitRepo):
         try:
             return self.repo.config_reader().get_value("annex",
                                                        "crippledfilesystem")
-        except NoOptionError as e:
+        except (NoOptionError, NoSectionError):
             # If .git/config lacks an entry "crippledfilesystem",
             # it's actually not crippled.
             return False
@@ -439,14 +422,17 @@ class AnnexRepo(GitRepo):
         -------
         list of dict
         """
+
+        options = options[:] if options else []
+
         # Note: As long as we support direct mode, one should not call
         # super().add() directly. Once direct mode is gone, we might remove
         # `git` parameter and call GitRepo's add() instead.
         if git:
             # add to git instead of annex
-            # TODO: `options` currently unused in case of git
             if self.is_direct_mode():
-                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + files
+                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
+                           files
                 self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
                 # TODO: use options with git_add instead!
             else:
@@ -458,8 +444,6 @@ class AnnexRepo(GitRepo):
             return_list = [{u'file': f, u'success': True} for f in files]
 
         else:
-            options = options[:] if options else []
-
             return_list = list(self._run_annex_command_json(
                 'add', args=options + files, backend=backend))
 
@@ -486,7 +470,7 @@ class AnnexRepo(GitRepo):
 
         Parameters
         ----------
-        git_cmd: str
+        git_cmd: list of str
             the actual git command
         `**kwargs`: dict, optional
             passed to _run_annex_command
@@ -497,22 +481,14 @@ class AnnexRepo(GitRepo):
             output of the command call
         """
 
-        cmd_str = "git annex proxy -- %s" % git_cmd
-        # TODO: By now git_cmd is expected to be string.
-        # Figure out how to deal with a list here. Especially where and how to
-        # treat paths.
-
         if not self.is_direct_mode():
-            lgr.warning("proxy() called in indirect mode: %s" % cmd_str)
-            raise CommandNotAvailableError(cmd=cmd_str,
+            lgr.warning("proxy() called in indirect mode: %s" % git_cmd)
+            raise CommandNotAvailableError(cmd="git annex proxy",
                                            msg="Proxy doesn't make sense"
                                                " if not in direct mode.")
         # Temporarily use shlex, until calls use lists for git_cmd
         return self._run_annex_command('proxy',
-                                       annex_options=['--'] +
-                                                     shlex.split(
-                                                         git_cmd,
-                                                         posix=not on_windows),
+                                       annex_options=['--'] + git_cmd,
                                        **kwargs)
 
     @normalize_path
@@ -1008,18 +984,28 @@ class AnnexRepo(GitRepo):
         self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    def commit(self, msg):
+    def commit(self, msg=None, options=None):
         """
 
         Parameters
         ----------
         msg: str
+        options: list of str
+          cmdline options for git-commit
         """
         self.precommit()
         if self.is_direct_mode():
-            self.proxy('git commit -m "%s"' % msg, expect_stderr=True)
+            if not msg:
+                if options:
+                    if "--allow-empty-message" not in options:
+                        options.append("--allow-empty-message")
+                else:
+                    options = ["--allow-empty-message"]
+
+            self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
+                       (options if options else []), expect_stderr=True)
         else:
-            super(AnnexRepo, self).commit(msg)
+            super(AnnexRepo, self).commit(msg, options)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
@@ -1030,11 +1016,13 @@ class AnnexRepo(GitRepo):
         files
         force: bool, optional
         """
+
         self.precommit()  # since might interfere
         if self.is_direct_mode():
-            stdout, stderr = self.proxy('git rm ' +
-                                        ('--force ' if force else '') +
-                                        ' '.join(files))
+            stdout, stderr = self.proxy(['git', 'rm'] +
+                                        to_options(**kwargs) +
+                                        (['--force'] if force else []) +
+                                        files)
             # output per removed file is expected to be "rm 'PATH'":
             r_list = [line.strip()[4:-1] for line in stdout.splitlines()]
 

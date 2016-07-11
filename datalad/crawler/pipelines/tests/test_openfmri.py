@@ -434,3 +434,17 @@ def test_openfmri_pipeline2(ind, topurl, outd):
 
     check_dropall_get(repo)
 test_openfmri_pipeline2.tags = ['integration']
+
+
+from ..openfmri_s3 import collection_pipeline, pipeline
+
+
+# TODO: RF to provide a generic/reusable test for this
+@with_tempfile(mkdir=True)
+def test_smoke_pipelines(d):
+    # Just to verify that we can correctly establish the pipelines
+    AnnexRepo(d, create=True)
+    with chpwd(d):
+        with swallow_logs():
+            for p in [pipeline('bogus'), collection_pipeline()]:
+                ok_(len(p) > 1)

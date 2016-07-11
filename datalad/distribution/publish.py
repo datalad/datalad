@@ -37,6 +37,19 @@ from .install import get_containing_subdataset
 lgr = logging.getLogger('datalad.distribution.publish')
 
 
+def _log_push_info(pi_list):
+    from git.remote import PushInfo as PI
+
+    if pi_list:
+        for push_info in pi_list:
+            if (push_info.flags & PI.ERROR) == PI.ERROR:
+                lgr.error(push_info.summary)
+            else:
+                lgr.info(push_info.summary)
+    else:
+        lgr.warning("Nothing was pushed.")
+
+
 class Publish(Interface):
     """Publish a dataset (e.g. to a web server)
 
@@ -219,14 +232,16 @@ class Publish(Interface):
 
             lgr.info("Publishing dataset {0} to sibling {1} "
                      "...".format(ds, dest_resolved))
+
             # we now know where to push to:
-            ds.repo.push(remote=dest_resolved,
-                         refspec=ds.repo.get_active_branch(),
-                         set_upstream=set_upstream)
+            _log_push_info(ds.repo.push(remote=dest_resolved,
+                                        refspec=ds.repo.get_active_branch(),
+                                        set_upstream=set_upstream))
+
             # push annex branch:
             if isinstance(ds.repo, AnnexRepo):
-                ds.repo.push(remote=dest_resolved,
-                             refspec="+git-annex:git-annex")
+                _log_push_info(ds.repo.push(remote=dest_resolved,
+                                            refspec="+git-annex:git-annex"))
 
             # we need to fetch
             # TODO

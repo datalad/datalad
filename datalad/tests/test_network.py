@@ -34,6 +34,8 @@ from ..support.network import is_url
 from ..support.network import is_datalad_compat_ri
 from ..support.network import get_local_file_url
 from ..support.network import is_ssh
+from ..support.network import iso8601_to_epoch
+
 
 def test_same_website():
     ok_(same_website("http://a.b", "http://a.b/2014/01/xxx/"))
@@ -394,9 +396,9 @@ def test_is_ssh():
     ssh_locators = ["ssh://host",
                     "ssh://host/some/where",
                     "user@host:path/sp1",
-                    "user@host:/absloute/path/sp1",
+                    "user@host:/absolute/path/sp1",
                     "host:path/sp1",
-                    "host:/absloute/path/sp1",
+                    "host:/absolute/path/sp1",
                     "user@host"]
     for ri in ssh_locators:
         ok_(is_ssh(ri), "not considered ssh (string): %s" % ri)
@@ -411,3 +413,14 @@ def test_is_ssh():
     for ri in non_ssh_locators:
         ok_(not is_ssh(ri), "considered ssh (string): %s" % ri)
         ok_(not is_ssh(RI(ri)), "considered ssh (RI): %s" % ri)
+
+
+def test_iso8601_to_epoch():
+    epoch = 1467901515
+    eq_(iso8601_to_epoch('2016-07-07T14:25:15+00:00'), epoch)
+    # zone information is actually not used
+    eq_(iso8601_to_epoch('2016-07-07T14:25:15+11:00'), epoch)
+    eq_(iso8601_to_epoch('2016-07-07T14:25:15Z'), epoch)
+    eq_(iso8601_to_epoch('2016-07-07T14:25:15'), epoch)
+
+    eq_(iso8601_to_epoch('2016-07-07T14:25:14'), epoch-1)

@@ -18,7 +18,7 @@ from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
-from .credentials import Credential
+from .credentials import CREDENTIAL_TYPES
 from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
 from .http import HTTPDownloader
 from .s3 import S3Authenticator, S3Downloader
@@ -48,9 +48,10 @@ class Provider(object):
     """
     # TODO: we might need a lazy loading of the submodules which would provide
     # specific downloaders while importing needed Python modules "on demand"
-    DOWNLOADERS = {'http': HTTPDownloader,
-                   'https': HTTPDownloader,
-                   's3': S3Downloader,
+    DOWNLOADERS = {'http': {'class': HTTPDownloader, 'dependencies': {'requests'}},
+                   'https': {'class': HTTPDownloader, 'dependencies': {'requests'}},
+                   'ftp': {'class': HTTPDownloader, 'dependencies': {'requests', 'boto'}},
+                   's3': {'class': S3Downloader, 'dependencies': {'boto'}}
                     # ... TODO
                   }
 
@@ -88,7 +89,7 @@ class Provider(object):
     def _get_downloader_class(cls, url):
         key = cls.get_scheme_from_url(url)
         if key in cls.DOWNLOADERS:
-            return cls.DOWNLOADERS[key]
+            return cls.DOWNLOADERS[key]['class']
         else:
             raise ValueError("Do not know how to handle url %s for scheme %s. Known: %s"
                              % (url, key, cls.DOWNLOADERS.keys()))
@@ -131,6 +132,7 @@ class Providers(object):
         'http_basic_auth': HTTPBasicAuthAuthenticator,
         'http_digest_auth': HTTPDigestAuthAuthenticator,
         'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
+        'nda-s3': S3Authenticator,
         'xnat': NotImplementedAuthenticator,
         'none': NoneAuthenticator,
     }
@@ -265,8 +267,10 @@ class Providers(object):
     def _process_credential(cls, name, items):
         assert 'type' in items, "Credential must specify type.  Missing in %s" % name
         cred_type = items.pop('type')
-        return Credential(name=name, type=cred_type, url=items.pop('url', None))
-
+        if not cred_type in CREDENTIAL_TYPES:
+            raise ValueError("I do not know type %s credential. Known: %s"
+                             % (cred_type, CREDENTIAL_TYPES.keys()))
+        return CREDENTIAL_TYPES[cred_type](name=name, url=items.pop('url', None))
 
     def get_provider(self, url, only_nondefault=False):
         """Given a URL returns matching provider
