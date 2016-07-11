@@ -464,6 +464,11 @@ def fs_traverse(loc, repo, recursive=False, json=None):
                 # run renderer on subdirectory(subdir) at location(loc) with json option set by user
                 lgr.info('Subdir: ' + opj(loc, node))
                 fs_render(nodepath, subdir, json=json)
+
+        # update current node size by summing sizes of all its 1st level children
+        total_size = reduce(lambda size, node: size + int(FsModel(node['path'], repo).size), fs['nodes'][1:], 0)
+        fs["size"], fs["nodes"][0]["size"] = [humanize.naturalsize(total_size)]*2
+
     return fs
 
 
