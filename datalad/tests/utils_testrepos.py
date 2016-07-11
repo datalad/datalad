@@ -16,6 +16,7 @@ from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
 from ..cmd import Runner
 from ..support.network import get_local_file_url
+from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
 
@@ -97,8 +98,8 @@ class BasicAnnexTestRepo(TestRepo):
 
     def create_info_file(self):
         runner = Runner()
-        annex_version = runner.run("git annex version")[0].split()[2]
-        git_version = runner.run("git --version")[0].split()[2]
+        annex_version = external_versions['cmd:annex']
+        git_version = external_versions['cmd:git']
         self.create_file('INFO.txt',
                          "git: %s\n"
                          "annex: %s\n"
@@ -120,7 +121,7 @@ class BasicGitTestRepo(TestRepo):
 
     def create_info_file(self):
         runner = Runner()
-        git_version = runner.run("git --version")[0].split()[2]
+        git_version = external_versions['cmd:git']
         self.create_file('INFO.txt',
                          "git: %s\n"
                          "datalad: %s\n"
