@@ -43,7 +43,6 @@ def extract_readme(data):
     for title, detail in zip(xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data),
                              xpath_match('//*[@class="tableHdr"]/td|strong/text()')(data)):
         if title['match'] == data['dataset']:
-            print detail['match']
             pi = (re.search(('<br>.*<br>'), detail['match'])).group()
             cleaner = re.compile('<.*?>')
             data['PI'] = re.sub(cleaner, '', pi)
