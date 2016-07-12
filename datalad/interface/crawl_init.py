@@ -27,9 +27,9 @@ lgr = getLogger('datalad.api.crawl_init')
 
 class CrawlInit(Interface):
     """
-    Allows user to specify template and function to generate a pipelinne
+    Allows user to specify template and function to generate a pipeline
 
-    Example:
+    Examples:
 
     $ datalad crawl-init \
         --template openfmri \
@@ -70,17 +70,9 @@ class CrawlInit(Interface):
             cfg_.set('crawl:pipeline', 'func', func)
 
         if args:
-            for var in args:
-                variable = var.split('=', 1)
-
-
-
-
-
-
-
-
-
+            for item in args:
+                variable, name = item.split('=', 1)
+                cfg_.set('crawl:pipeline', '_'+variable, name)
 
         cfg_.write(open(curdir + '/.datalad/crawl/crawl.cfg'))
         lgr.info("Generated crawl.cfg with provided flags and keyword arguments")
