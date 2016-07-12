@@ -370,7 +370,8 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
         return ofpipeline(*args,  **kwargs)
 
     with chpwd(clonedir), patch.object(openfmri, 'pipeline', _pipeline):
-        crawl()  # we should be able to recrawl without doing anything
+        output, stats = crawl()  # we should be able to recrawl without doing anything
+        ok_(stats, ActivityStats(files=5, skipped=4, add_git=1, urls=4))
 
 test_openfmri_pipeline1.tags = ['integration']
 
