@@ -81,7 +81,10 @@ def setup_parser(
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
-            help="do not catch exceptions and show exception traceback")
+            help="enter Python debugger when uncaught exception happens")
+        parser.add_argument(
+            '--idbg', action='store_true', dest='common_idebug',
+            help="enter IPython debugger when uncaught exception happens")
     parser.add_argument(
         '-C', action='append', dest='change_path', metavar='PATH',
         help="""run as if datalad was started in <path> instead
@@ -225,9 +228,9 @@ def main(args=None):
         args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
-    elif cmdlineargs.common_debug:
+    elif cmdlineargs.common_debug or cmdlineargs.common_idebug:
         # so we could see/stop clearly at the point of failure
-        setup_exceptionhook()
+        setup_exceptionhook(ipython=cmdlineargs.common_idebug)
         ret = cmdlineargs.func(cmdlineargs)
     else:
         # otherwise - guard and only log the summary. Postmortem is not

@@ -607,8 +607,8 @@ def swallow_logs(new_level=None):
 #
 # Additional handlers
 #
-_sys_excepthook = sys.excepthook # Just in case we ever need original one
-def setup_exceptionhook():
+_sys_excepthook = sys.excepthook  # Just in case we ever need original one
+def setup_exceptionhook(ipython=False):
     """Overloads default sys.excepthook with our exceptionhook handler.
 
        If interactive, our exceptionhook handler will invoke
@@ -616,19 +616,20 @@ def setup_exceptionhook():
     """
 
     def _datalad_pdb_excepthook(type, value, tb):
+        import traceback
+        traceback.print_exception(type, value, tb)
+        print()
         if is_interactive():
-            import traceback, pdb
-            traceback.print_exception(type, value, tb)
-            print()
+            import pdb
             pdb.post_mortem(tb)
-        else:
-            lgr.warn("We cannot setup exception hook since not in interactive mode")
-            # we are in interactive mode or we don't have a tty-like
-            # device, so we call the default hook
-            #sys.__excepthook__(type, value, tb)
-            _sys_excepthook(type, value, tb)
 
-    sys.excepthook = _datalad_pdb_excepthook
+    if ipython:
+        from IPython.core import ultratb
+        sys.excepthook = ultratb.FormattedTB(mode='Verbose',
+                                             # color_scheme='Linux',
+                                             call_pdb=is_interactive())
+    else:
+        sys.excepthook = _datalad_pdb_excepthook
 
 
 def assure_dir(*args):
