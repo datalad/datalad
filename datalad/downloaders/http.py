@@ -340,6 +340,8 @@ class HTTPDownloader(BaseDownloader):
         # should not result in an additional request
         url_filename = get_url_filename(url, headers=headers)
 
+        headers['Url-Filename'] = url_filename
+
         def _downloader(f=None, pbar=None, size=None):
             total = 0
             return_content = f is None
@@ -406,7 +408,8 @@ class HTTPDownloader(BaseDownloader):
         HTTP_HEADERS_TO_STATUS = {
             'Content-Length': int,
             'Content-Disposition': str,
-            'Last-Modified': rfc2822_to_epoch
+            'Last-Modified': rfc2822_to_epoch,
+            'Url-Filename': str,
         }
         # Allow for webserver to return them in other casing
         HTTP_HEADERS_TO_STATUS_lower = {s.lower(): (s, t) for s, t in HTTP_HEADERS_TO_STATUS.items()}
@@ -424,4 +427,5 @@ class HTTPDownloader(BaseDownloader):
             size=status.get('Content-Length'),
             mtime=status.get('Last-Modified'),
             filename=get_response_disposition_filename(status.get('Content-Disposition'))
+                     or status.get('Url-Filename')
         )

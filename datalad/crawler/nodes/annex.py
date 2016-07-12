@@ -262,13 +262,23 @@ class Annexificator(object):
         self.repo = AnnexRepo(path, always_commit=False, **kwargs)
 
         git_remotes = self.repo.get_remotes()
+        # TODO: move under AnnexRepo with proper testing etc
+        repo_info_repos = [v for k, v in self.repo.repo_info().items()
+                           if k.endswith(' repositories')]
+        annex_remotes = {r['description']: r for r in sum(repo_info_repos, [])}
         if special_remotes:
             for remote in special_remotes:
                 if remote not in git_remotes:
-                    self.repo.init_remote(
-                        remote,
-                        ['encryption=none', 'type=external', 'autoenable=true',
-                         'externaltype=%s' % remote])
+                    if remote in annex_remotes:
+                        # Already known - needs only enabling
+                        lgr.info("Enabling existing special remote %s" % remote)
+                        self.repo.enable_remote(remote)
+                    else:
+                        lgr.info("Initiating special remote %s" % remote)
+                        self.repo.init_remote(
+                            remote,
+                            ['encryption=none', 'type=external', 'autoenable=true',
+                             'externaltype=%s' % remote])
 
         self.mode = mode
         self.options = options or []
@@ -606,7 +616,7 @@ class Annexificator(object):
 
         return fpath
 
-    def switch_branch(self, branch, parent=None, must_exist=None):
+    def switch_branch(self, branch, parent=None, must_exist=None, allow_remote=True):
         """Node generator to switch branches, returns actual node
 
         Parameters
@@ -619,6 +629,8 @@ class Annexificator(object):
         must_exist : bool or None, optional
           If None, doesn't matter.  If True, would fail if branch does not exist.  If
           False, would fail if branch already exists
+        allow_remote : bool, optional
+          If not exists locally, will try to find one among remote ones
         """
 
         def switch_branch(data):
@@ -630,8 +642,22 @@ class Annexificator(object):
             existing_branches = self.repo.get_branches()
             if must_exist is not None:
                 assert must_exist == (branch in existing_branches)
+
+            # TODO: this should be a part of the gitrepo logic
+            if branch not in existing_branches and allow_remote:
+                remote_branches = self.repo.get_remote_branches()
+                remotes = sorted(set([b.split('/', 1)[0] for b in remote_branches]))
+                for r in ['origin'] + remotes:  # ok if origin tested twice
+                    remote_branch = "%s/%s" % (r, branch)
+                    if remote_branch in remote_branches:
+                        lgr.info("Did not find branch %r locally. Checking out remote one %r"
+                                 % (branch, remote_branch))
+                        self.repo.checkout(remote_branch, options='--track')
+                        # refresh the list -- same check will come again
+                        existing_branches = self.repo.get_branches()
+                        break
+
             if branch not in existing_branches:
-                # TODO: this should be a part of the gitrepo logic
                 if parent is None:
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
