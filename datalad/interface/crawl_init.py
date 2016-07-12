@@ -37,7 +37,7 @@ class CrawlInit(Interface):
 
     $ datalad crawl-init \
         --template fcptable \
-        args=[{'dataset': 'Baltimore'}]
+        dataset=Baltimore tarballs=True
     """
     _params_ = dict(
         template=Parameter(
@@ -63,17 +63,24 @@ class CrawlInit(Interface):
         cfg_.remove_section('general')
         cfg_.add_section('crawl:pipeline')
 
-
-        if template and func:
+        if template:
             cfg_.set('crawl:pipeline', 'template', template)
+
+        if func:
             cfg_.set('crawl:pipeline', 'func', func)
 
-            lgr.info("Generated crawl.cfg with provided template and func")
+        if args:
+            for var in args:
+                variable = var.split('=', 1)
 
 
-        if template and not func:
-            if not args:
+
+
+
+
+
+
 
 
         cfg_.write(open(curdir + '/.datalad/crawl/crawl.cfg'))
-
+        lgr.info("Generated crawl.cfg with provided flags and keyword arguments")
