@@ -76,12 +76,17 @@ class find_dataset(object):
 
     def __call__(self, data):
 
+        #import pdb; pdb.set_trace()
+        found_any = False
         for title, tar in zip(xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data),
                               xpath_match('//*/tr [@class="tableDownload"]/td/a/text()')(data)):
             if title['match'] == self.dataset:
                 data['title'] = title['match']
-                data['tar'] = tar['match']
+                data['url'] = tar['match']
                 yield data
+                found_any = True
+        if not found_any:
+            raise RuntimeError("Failed to find a cell for the dataset %s" % self.dataset)
 
 
 def pipeline(dataset):
