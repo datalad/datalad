@@ -157,7 +157,6 @@ class RepoBasedModel(object):
         except:
             return None
 
-
     @property
     def date(self):
         """Date of the last commit
@@ -461,7 +460,7 @@ def fs_render(root, subdir, json=None):
             remove(opj(root, '.dir.json'))
     # else dump json to stdout
     elif json == 'display':
-        print dumps(subdir) + '\n'
+        print(dumps(subdir) + '\n')
 
 
 def fs_traverse(path, repo, recursive=False, json=None):
