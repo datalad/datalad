@@ -129,27 +129,24 @@ from datalad.support.annexrepo import GitRepo
 
 
 @auto_repr
-class DsModel(object):
+class RepoBasedModel(object):
+    """A base class for models which have some .repo available"""
 
-    __slots__ = ['ds', '_info', '_path', '_branch']
+    __slots__ = ['_info', '_branch']
 
-    def __init__(self, ds):
-        self.ds = ds
-        self._info = None
-        self._path = None  # can be overriden
+    def __init__(self):
+        # lazy evaluation variables
         self._branch = None
+        self._info = None
 
     @property
-    def path(self):
-        return self.ds.path if self._path is None else self._path
-
-    @path.setter
-    def path(self, v):
-        self._path = v
-
-    @property
-    def repo(self):
-        return self.ds.repo
+    def branch(self):
+        if self._branch is None:
+            try:
+                self._branch = self.repo.get_active_branch()
+            except:
+                return None
+        return self._branch
 
     @property
     def describe(self):
@@ -159,6 +156,7 @@ class DsModel(object):
             return describe.strip()
         except:
             return None
+
 
     @property
     def date(self):
@@ -173,21 +171,6 @@ class DsModel(object):
     @property
     def clean(self):
         return not self.repo.dirty
-
-    @property
-    def branch(self):
-        if self._branch is None:
-            try:
-                self._branch = self.repo.get_active_branch()
-            except:
-                return None
-        return self._branch
-
-    @property
-    def type(self):
-        if not exists(self.ds.path):
-            return None
-        return {False: 'git', True: 'annex'}[isinstance(self.repo, AnnexRepo)]
 
     @property
     def info(self):
@@ -205,17 +188,56 @@ class DsModel(object):
         info = self.info
         return info['local annex size'] if info else None
 
+    @property
+    def type(self):
+        return {False: 'git', True: 'annex'}[isinstance(self.repo, AnnexRepo)]
+
 
 @auto_repr
-class FsModel(DsModel):
+class DsModel(RepoBasedModel):
 
-    __slots__ = ['_path', '_info', 'repo']
+    __slots__ = RepoBasedModel.__slots__ + ['ds', '_path']
+
+    def __init__(self, ds):
+        super(DsModel, self).__init__()
+        self.ds = ds
+        # TODO:  theoretically should not be overriden and generally just be present in the ds
+        self._path = None  # can be overriden
+
+    @property
+    def path(self):
+        return self.ds.path if self._path is None else self._path
+
+    @path.setter
+    def path(self, v):
+        self._path = v
+
+    @property
+    def repo(self):
+        return self.ds.repo
+
+    @property
+    def type(self):
+        if not exists(self.path):
+            return None
+        return super(DsModel, self).type
+
+
+@auto_repr
+class FsModel(RepoBasedModel):
+
+    __slots__ = ['_path', 'repo'] + RepoBasedModel.__slots__
 
     def __init__(self, path, repo=None):
+        super(FsModel, self).__init__()
         self._path = path  # fs path to the node, can be overridden
-        self._info = None
-        self.repo = DsModel(Dataset(path)) if self.type_ == 'annex' else repo  # parent repository associated with node
-        self._branch = None
+        self.repo = repo  # parent repository associated with node
+        # of value only if it was annex
+        # self.dsmodel = DsModel(Dataset(path)) if self.type_ == 'annex' else None
+
+    @property
+    def path(self):
+        return self._path
 
     @property
     def symlink(self):
@@ -250,9 +272,9 @@ class FsModel(DsModel):
         elif type_ in ['file', 'link', 'link-broken']:
             size = ondisk_size = 0 \
                 if type_ == 'broken-link' \
-                else lstat(self.symlink).st_size
-            if self.repo.repo.is_under_annex(self._path):
-                size = self.repo.repo.info(self._path, batch=True)['size']
+                else lstat(self.symlink or self._path).st_size
+            if isinstance(self.repo, AnnexRepo) and self.repo.is_under_annex(self._path):
+                size = self.repo.info(self._path, batch=True)['size']
             # TODO: all the ondisk_size handling to report both
             return size
         elif 'dir' == type_:
@@ -287,6 +309,7 @@ class FsModel(DsModel):
             return int(size[1])
         except:
             return lstat(self._path).st_size
+
 
 import string
 import humanize
