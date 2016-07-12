@@ -10,7 +10,7 @@
 """
 
 import os
-from os.path import exists, isdir, join as opj
+from os.path import exists, isdir, getmtime, join as opj
 
 from nose.tools import ok_, assert_is_instance
 
@@ -79,22 +79,31 @@ def test_ssh_manager_close():
 @skip_ssh
 @with_tempfile(mkdir=True)
 @with_tempfile(content="one")
-def test_ssh_copy(sourcedir, sourcefile):
+@with_tempfile(content="two")
+def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
+
     remote_url = 'ssh://localhost'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
     ssh.open()
 
-    # copy tempfile to remote_url:target
-    target = sourcefile + '.copy'
-    ssh.copy(sourcefile, opj(remote_url, target))
-    # check if target exists on remote_url(=localhost)
-    ok_(exists(target))
+    # copy tempfile list to remote_url:sourcedir
+    sourcefiles = [sourcefile1, sourcefile2]
+    ssh.copy(sourcefiles, opj(remote_url, sourcedir))
 
-    # copy tempdir to remote_url:target
+    # recursive copy tempdir to remote_url:targetdir
     targetdir = sourcedir + '.copy'
-    ssh.copy(sourcedir, opj(remote_url, targetdir), recursive=True)
-    # check if source directory copied to remote_url(=localhost)
+    ssh.copy(sourcedir, opj(remote_url, targetdir), recursive=True, preserve_attrs=True)
+
+    # check if sourcedir copied to remote_url:targetdir
     ok_(isdir(targetdir))
+    # check if scp preserved source directory attributes
+    # if source_mtime=1.12s, scp -p sets target_mtime = 1.0s, test that
+    eq_(getmtime(targetdir), int(getmtime(sourcedir)) + 0.0)
+
+    # check if targetfiles exist in remote_url:targetdir,
+    # this implies file(s) and recursive directory copying pass
+    for targetfile in sourcefiles:
+        ok_(exists(opj(targetdir, targetfile)))
 
     ssh.close()

@@ -125,13 +125,13 @@ class SSHConnection(object):
             else:
                 raise
 
-    def copy(self, source, destination, recursive=False):
+    def copy(self, source, destination, recursive=False, preserve_attrs=False):
         """Copies source file/folder to destination on the remote.
 
         Parameters
         ----------
-        source: str
-          file/folder path to copy from on local
+        source: str or list
+          file/folder path(s) to copy from on local
         destination: str
           file/folder path to copy to on remote
 
@@ -141,8 +141,18 @@ class SSHConnection(object):
           stdout, stderr of the copy operation.
         """
 
+        # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
         scp_options = self.ctrl_options + ["-r"] if recursive else self.ctrl_options
-        scp_cmd = ["scp"] + scp_options + [source, self.host + ":" + destination]
+        scp_options += ["-p"] if preserve_attrs else []
+        scp_cmd = ["scp"] + scp_options
+
+        # add source filepath(s) to scp command
+        scp_cmd += source if isinstance(source, list) \
+            else sh_split(source, posix=not on_windows)
+
+        # add destination path
+        scp_cmd += [self.host + ":" + destination]
+        lgr.info("%s" % ' '.join(scp_cmd))
         return self.runner.run(scp_cmd, expect_fail=True, expect_stderr=True)
 
 
