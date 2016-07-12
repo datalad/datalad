@@ -76,17 +76,17 @@ class find_dataset(object):
 
     def __call__(self, data):
 
-        #import pdb; pdb.set_trace()
-        found_any = False
-        for title, tar in zip(xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data),
-                              xpath_match('//*/tr [@class="tableDownload"]/td/a/text()')(data)):
-            if title['match'] == self.dataset:
-                data['title'] = title['match']
-                data['url'] = tar['match']
+        titles = [x['match'] for x in xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data)]
+        tar_tds = [x['match'] for x in xpath_match('//*/tr [@class="tableDownload"]/td')(data)]
+        if len(titles) != len(tar_tds):
+            assert tar_tds[-1] == '<td></td>'
+        for title, tar in zip(titles, tar_tds):
+            if title == self.dataset:
+                data['title'] = title
+                data['response'] = tar
                 yield data
-                found_any = True
-        if not found_any:
-            raise RuntimeError("Failed to find a cell for the dataset %s" % self.dataset)
+                return
+        raise RuntimeError("Failed to find a cell for the dataset %s" % self.dataset)
 
 
 def pipeline(dataset):
@@ -115,10 +115,9 @@ def pipeline(dataset):
                     annex,
                 ],
 
-            ],
-            [  # and collect all URLs pointing to tarballs
+                # and collect all URLs pointing to tarballs
                 a_href_match('http://www.nitrc.org/frs/downloadlink.php/[0-9999]', min_count=1),
-                get_disposition_filename,
+                #  get_disposition_filename,
                 annex,
             ],
         ],
