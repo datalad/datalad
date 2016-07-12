@@ -9,6 +9,9 @@
 # now with some recursive structure of directories
 
 from ..s3 import crawl_s3
+from ..s3 import _strip_prefix
+from ..s3 import get_key_url
+
 from ..misc import switch
 from ..annex import Annexificator
 from ...pipeline import run_pipeline
@@ -179,7 +182,7 @@ def test_crawl_s3_file_to_directory(path):
 
     # with auto_finalize (default), Annexificator will finalize whenever it runs into a conflict
     pipeline = [
-        crawl_s3('datalad-test1-dirs-versioned', repo=annex.repo),
+        crawl_s3('datalad-test1-dirs-versioned', repo=annex.repo, recursive=True),
     #    annex
         switch('datalad_action',
                {
@@ -199,3 +202,34 @@ def test_crawl_s3_file_to_directory(path):
     eq_(total_stats,
         # Deletions come as 'files' as well atm
         ActivityStats(files=3, downloaded=3, overwritten=2, urls=3, add_annex=3, downloaded_size=12, versions=['0.0.20160303']))
+
+
+def test_strip_prefix():
+    eq_(_strip_prefix('', ''), '')
+    eq_(_strip_prefix('abab', 'ab'), 'ab')
+    eq_(_strip_prefix('cabab', 'ab'), 'cabab')
+    eq_(_strip_prefix('', 'ab'), '')
+    eq_(_strip_prefix('ab', 'ab'), '')
+
+
+def test_crawl_s3_prefix():
+    # verify correct handling of prefix while defining the node
+    node = crawl_s3('datalad-test0-versioned')
+    eq_(node.prefix, None)
+
+    with swallow_logs() as cml:
+        node = crawl_s3('datalad-test0-versioned', prefix="dir")
+        assert_in('adding /', cml.out)
+    eq_(node.prefix, 'dir/')
+
+
+def test_get_key_url():
+    # Just to provide necessary structure
+    class e:
+        name = 'e'
+        version_id = '123'
+        class bucket:
+            name = "bucket"
+
+    eq_(get_key_url(e), 'http://bucket.s3.amazonaws.com/e?versionId=123')
+    eq_(get_key_url(e, versioned=False), 'http://bucket.s3.amazonaws.com/e')

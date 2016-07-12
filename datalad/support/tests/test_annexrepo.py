@@ -10,6 +10,8 @@
 
 """
 
+from os import mkdir
+
 from six.moves.urllib.parse import urljoin
 from six.moves.urllib.parse import urlsplit
 from shutil import copyfile
@@ -93,6 +95,24 @@ def test_AnnexRepo_is_direct_mode(path):
 
     # by default annex should be in direct mode on crippled filesystem and
     # on windows:
+    if ar.is_crippled_fs() or on_windows:
+        assert_true(dm)
+    else:
+        assert_false(dm)
+
+
+@with_tempfile()
+def test_AnnexRepo_is_direct_mode_gitrepo(path):
+    repo = GitRepo(path, create=True)
+    # artificially make .git/annex so no annex section gets initialized
+    # in .git/config.  We did manage somehow to make this happen (via publish)
+    # but didn't reproduce yet, so just creating manually
+    mkdir(opj(repo.path, '.git', 'annex'))
+    ar = AnnexRepo(path, init=False, create=False)
+    # It is unlikely though that annex would be in direct mode (requires explicit)
+    # annex magic, without having annex section under .git/config
+    dm = ar.is_direct_mode()
+
     if ar.is_crippled_fs() or on_windows:
         assert_true(dm)
     else:

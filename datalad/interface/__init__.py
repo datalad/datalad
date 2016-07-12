@@ -50,6 +50,6 @@ _group_misc = (
          'add-archive-content'),
         ('datalad.interface.download_url', 'DownloadURL', 'download-url'),
         # very optional ones
-        ('datalad.distribution.tests.create_test_dataset', 'CreateTestDataset',
+        ('datalad.distribution.create_test_dataset', 'CreateTestDataset',
          'create-test-dataset'),
     ])
