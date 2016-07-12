@@ -11,6 +11,8 @@
 """
 
 import logging
+import os
+
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
 from datalad.interface.common_opts import recursion_limit
@@ -21,6 +23,7 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
+from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import getpwd
 
 
@@ -91,6 +94,7 @@ class Add(Interface):
             args=("-s", "--source",),
             metavar='URL/PATH',
             doc="url or local path of the to be added component's source",
+            action="append",
             constraints=EnsureStr() | EnsureNone()),
         to_git=Parameter(
             args=("--to-git",),
@@ -118,21 +122,85 @@ class Add(Interface):
             annex_opts=None,
             annex_add_opts=None):
 
+        # parameter constraints:
+        if not path and not source:
+            raise InsufficientArgumentsError("insufficient information for "
+                                             "adding: requires at least a path "
+                                             "or a source.")
+        if path and not isinstance(path, list):
+            path = [path]
+        if source and not isinstance(source, list):
+            source = [source]
+
+        # resolve dataset:
         if dataset:
             if not isinstance(dataset, Dataset):
-                dataset = Dataset(dataset)  # TODO: Is there a need to resolve path?
+                dataset = Dataset(dataset)
         else:
             dspath = GitRepo.get_toppath(getpwd())
             if dspath:
                 dataset = Dataset(dspath)
             else:
-                # not resolved from CWD; need to derive from path(s) or just fail?
-                pass
+                raise InsufficientArgumentsError("insufficient information for "
+                                                 "adding: no dataset given and "
+                                                 "none found.")
+        assert isinstance(dataset, Dataset)
+
+        # list to collect parameters for actual git/git-annex calls:
+        # (dataset, path, source)
+        call_tuples = []
+
+
+        resolved_paths = None
+        if path:
+            # resolve path(s) and assign the respective (sub)dataset:
+            from .dataset import resolve_path
+            from .install import get_containing_subdataset
+
+            resolved_paths = [resolve_path(p, dataset) for p in path]
+
+            for p in resolved_paths:
+
+                # Note, that `get_containing_subdataset` raises if `p` is
+                # outside `dataset`, but it returns `dataset`, if `p` is inside
+                # a subdataset not included by `recursion_limit`. In the latter
+                # case, the git calls will fail instead.
+                # We could check for this right here and fail early, but this
+                # would lead to the need to discover the entire hierarchy no
+                # matter if actually required.
+                r_ds = get_containing_subdataset(dataset, p,
+                                                 recursive=recursive,
+                                                 recursion_limit=recursion_limit)
+                call_tuples.append((r_ds, p, None))
+
+        # TODO: RF: Dataset.get_subdatasets to return Dataset instances!
+        # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
+        # TODO: RF: get_containing_subdatasets => Dataset (+ recursion_limit)
+
+
+
+        # TODO: Move
+        if source and resolved_paths:
+            # items in source lead to 'annex addurl' and
+            # we have explicit target(s) for these
+            # extract source-target pairs:
+            num_pairs = min([len(resolved_paths), len(source)])
+            url_targets = resolved_paths[:num_pairs]
+            url_sources = source[:num_pairs]
+            resolved_paths = resolved_paths[num_pairs:]
+            source = source[num_pairs:]
+
+            # now, `resolved_paths` or `source` might have remaining elements to be
+            # treated as if they were passed without the other parameter
+
+        # (remaining) resolved path(s) have no source => need to exists
+
+
 
         raise NotImplementedError
 
-    # Note: addurl --file=...    existing =< "record that it can be downloaded from there" => test,whether it chekcs content
+    # Note: addurl --file=...    existing <= "record that it can be downloaded from there" => test,whether it chekcs content
 
 
-    # Note: considering dataset.py:resolve_path, I think we should fail if we are not within a dataset instead of tryng to derive from given path(s).
+
 
