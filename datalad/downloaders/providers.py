@@ -23,6 +23,7 @@ from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestA
 from .http import HTTPDownloader
 from .s3 import S3Authenticator, S3Downloader
 from ..support.configparserinc import SafeConfigParserWithIncludes
+from ..support.external_versions import external_versions
 from ..utils import assure_list_from_str
 from ..utils import auto_repr
 
@@ -48,10 +49,10 @@ class Provider(object):
     """
     # TODO: we might need a lazy loading of the submodules which would provide
     # specific downloaders while importing needed Python modules "on demand"
-    DOWNLOADERS = {'http': {'class': HTTPDownloader, 'dependencies': {'requests'}},
-                   'https': {'class': HTTPDownloader, 'dependencies': {'requests'}},
-                   'ftp': {'class': HTTPDownloader, 'dependencies': {'requests', 'boto'}},
-                   's3': {'class': S3Downloader, 'dependencies': {'boto'}}
+    DOWNLOADERS = {'http': {'class': HTTPDownloader, 'externals': {'requests'}},
+                   'https': {'class': HTTPDownloader, 'externals': {'requests'}},
+                   'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
+                   's3': {'class': S3Downloader, 'externals': {'boto'}}
                     # ... TODO
                   }
 
@@ -89,7 +90,15 @@ class Provider(object):
     def _get_downloader_class(cls, url):
         key = cls.get_scheme_from_url(url)
         if key in cls.DOWNLOADERS:
-            return cls.DOWNLOADERS[key]['class']
+            entry = cls.DOWNLOADERS[key]
+            klass = entry['class']
+            for ext in entry.get('externals', set()):
+                if external_versions[ext] is None:
+                    raise RuntimeError(
+                        "For using %s downloader, you need '%s' dependency "
+                        "which seems to be missing" % (klass, ext)
+                    )
+            return klass
         else:
             raise ValueError("Do not know how to handle url %s for scheme %s. Known: %s"
                              % (url, key, cls.DOWNLOADERS.keys()))

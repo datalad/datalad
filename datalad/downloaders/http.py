@@ -325,15 +325,22 @@ class HTTPDownloader(BaseDownloader):
 
         return False
 
-    def _get_download_details(self, url, chunk_size=1024**2, allow_redirects=True):
+    def _get_download_details(self, url, chunk_size=1024**2,
+                              allow_redirects=True, use_redirected_url=True):
         # TODO: possibly make chunk size adaptive
         response = self._session.get(url, stream=True, allow_redirects=allow_redirects)
         check_response_status(response, session=self._session)
         headers = response.headers
         target_size = int(headers.get('Content-Length', '0').strip()) or None
+        if use_redirected_url and response.url and response.url != url:
+            lgr.debug("URL %s was redirected to %s and thus the later will be used"
+                      % (url, response.url))
+            url = response.url
         # Consult about filename.  Since we already have headers,
         # should not result in an additional request
         url_filename = get_url_filename(url, headers=headers)
+
+        headers['Url-Filename'] = url_filename
 
         def _downloader(f=None, pbar=None, size=None):
             total = 0
@@ -401,7 +408,8 @@ class HTTPDownloader(BaseDownloader):
         HTTP_HEADERS_TO_STATUS = {
             'Content-Length': int,
             'Content-Disposition': str,
-            'Last-Modified': rfc2822_to_epoch
+            'Last-Modified': rfc2822_to_epoch,
+            'Url-Filename': str,
         }
         # Allow for webserver to return them in other casing
         HTTP_HEADERS_TO_STATUS_lower = {s.lower(): (s, t) for s, t in HTTP_HEADERS_TO_STATUS.items()}
@@ -419,4 +427,5 @@ class HTTPDownloader(BaseDownloader):
             size=status.get('Content-Length'),
             mtime=status.get('Last-Modified'),
             filename=get_response_disposition_filename(status.get('Content-Disposition'))
+                     or status.get('Url-Filename')
         )
