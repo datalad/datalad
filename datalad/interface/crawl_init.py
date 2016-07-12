@@ -33,7 +33,11 @@ class CrawlInit(Interface):
 
     $ datalad crawl-init \
         --template openfmri \
-        --func
+        --func superdataset_pipeline
+
+    $ datalad crawl-init \
+        --template fcptable \
+        args=[{'dataset': 'Baltimore'}]
     """
     _params_ = dict(
         template=Parameter(
@@ -43,6 +47,7 @@ class CrawlInit(Interface):
             doc="""flag if template is specified by user"""),
         func=Parameter(
             args=("-f", "--func"),
+            action="store",
             doc="""flag if function is specified by user"""),
         args=Parameter(
             args=("args",),
@@ -54,25 +59,21 @@ class CrawlInit(Interface):
 
     @staticmethod
     def __call__(template=None, func=None, args=[]):
+        cfg_ = ConfigManager([])
+        cfg_.remove_section('general')
+        cfg_.add_section('crawl:pipeline')
+
 
         if template and func:
-            with open("crawl.cfg", 'w') as f:
-                f.write("""\
-[crawl:pipeline]
-template = %s
-func = %s
-                        """ % (template, func))
+            cfg_.set('crawl:pipeline', 'template', template)
+            cfg_.set('crawl:pipeline', 'func', func)
+
             lgr.info("Generated crawl.cfg with provided template and func")
 
+
         if template and not func:
-            if args[0]:
-                with open("crawl.cfg", 'w') as f:
-                    f.write("""\
-[crawl:pipeline]
-template = %s
-_dataset = %s
-                                    """ % (template, args[0]))
-                lgr.info("Generated crawl.cfg with provided template and dataset name")
+            if not args:
 
 
+        cfg_.write(open(curdir + '/.datalad/crawl/crawl.cfg'))
 
