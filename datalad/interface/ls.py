@@ -239,25 +239,26 @@ class FsModel(DsModel):
     def size(self):
         """Size of the node computed based on its type"""
         type_ = self.type_
-        if not type_:
-            return -1
-        if 'annex' == type_:
+
+        if type_ == 'annex':
             if self.annex_local_size:
                 return self.annex_local_size
             else:
                 return Runner().run(['du', '-s', self._path])[0].split('\t')[0]
-        elif 'git' == type_:
+        elif type_ == 'git':
             return self.git_local_size
-        elif 'file' == type_:
-            return lstat(self._path).st_size
-        elif type_ in ['link', 'link-broken']:
+        elif type_ in ['file', 'link', 'link-broken']:
+            size = ondisk_size = 0 \
+                if type_ == 'broken-link' \
+                else lstat(self.symlink).st_size
             if self.repo.repo.is_under_annex(self._path):
-                return self.repo.repo.info(self._path, batch=True)['size']
-            return 0 if type_ == 'broken-link' else lstat(self.symlink).st_size
+                size = self.repo.repo.info(self._path, batch=True)['size']
+            # TODO: all the ondisk_size handling to report both
+            return size
         elif 'dir' == type_:
             return Runner().run(['du', '-s', self._path])[0].split('\t')[0]  # lstat(self._path).st_size
         else:
-            return -1
+            raise RuntimeError("I must have not got here! my type is %s" % type_)
 
     @property
     def type_(self):
@@ -440,20 +441,31 @@ def fs_render(root, subdir, json=None):
         print dumps(subdir) + '\n'
 
 
-def fs_traverse(loc, repo, recursive=False, json=None):
-    """takes a root path, traverses through its nodes and returns a dictionary of relevant features attached to each node
+def fs_traverse(path, repo, recursive=False, json=None):
+    """Traverse path through its nodes and returns a dictionary of relevant attributes attached to each node
 
-    extracts and returns a (recursive) list of directory info at loc
-    does not traverse into annex, git or hidden directories
+    Parameters
+    ----------
+    path
+    repo
+    recursive: bool
+      Recurse into subdirectories (note that submodules are not traversed)
+    json
+
+    Returns
+    -------
+    list of dict
+      extracts and returns a (recursive) list of directory info at path
+      does not traverse into annex, git or hidden directories
     """
-    fs = fs_extract(loc, repo)
+    fs = fs_extract(path, repo)
 
-    if isdir(loc):                                # if node is a directory
-        fs["nodes"] = [fs_extract(loc, repo)]     # store its info in dict
+    if isdir(path):                                # if node is a directory
+        fs["nodes"] = [fs_extract(path, repo)]     # store its info in dict
         fs["nodes"][0]["name"] = ".."             # and replace its name with ".." to emulate unix syntax
 
-        for node in listdir(loc):
-            nodepath = opj(loc, node)
+        for node in listdir(path):
+            nodepath = opj(path, node)
             if not ignored(nodepath, only_hidden=True):
                 # append info on nodes children to its dictionary
                 fs["nodes"].extend([fs_extract(nodepath, repo)])
@@ -461,13 +473,15 @@ def fs_traverse(loc, repo, recursive=False, json=None):
             if recursive and isdir(nodepath) and not ignored(nodepath):
                 # if recursive, create info dictionary of each child directory
                 subdir = fs_traverse(nodepath, repo, recursive=recursive, json=json)
-                # run renderer on subdirectory(subdir) at location(loc) with json option set by user
-                lgr.info('Subdir: ' + opj(loc, node))
+                # run renderer on subdirectory(subdir) at location(path) with json option set by user
+                lgr.info('Subdir: ' + opj(path, node))
                 fs_render(nodepath, subdir, json=json)
 
         # update current node size by summing sizes of all its 1st level children
-        total_size = reduce(lambda size, node: size + int(FsModel(node['path'], repo).size), fs['nodes'][1:], 0)
-        fs["size"], fs["nodes"][0]["size"] = [humanize.naturalsize(total_size)]*2
+        total_size = reduce(lambda size, node: size + int(FsModel(node['path'], repo).size),
+                            fs['nodes'][1:],
+                            0)
+        fs["size"], fs["nodes"][0]["size"] = [humanize.naturalsize(total_size)] * 2
 
     return fs
 
