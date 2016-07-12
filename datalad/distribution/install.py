@@ -207,7 +207,7 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     assert(src_dotgit == '.git')
 
 
-def get_containing_subdataset(ds, path):
+def get_containing_subdataset(ds, path, recursive=False, recursion_limit=None):
     """Given a base dataset and a relative path get containing subdataset
 
     Parameters
@@ -227,7 +227,8 @@ def get_containing_subdataset(ds, path):
         #       - have dedicated exception
         raise ValueError("path {0} not in dataset {1}.".format(path, ds))
 
-    for subds in ds.get_subdatasets():
+    for subds in ds.get_subdatasets(recursive=recursive,
+                                    recursion_limit=recursion_limit):
         common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
         if common.endswith(sep) and common == _with_sep(subds):
             return Dataset(path=opj(ds.path, common))
