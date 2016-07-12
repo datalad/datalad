@@ -317,6 +317,16 @@ class Annexificator(object):
                              "Please adjust pipeline to provide one" % url)
         return filename
 
+    def _get_url_status(self, data, url):
+        """A helper to return url_status if url_status is present in data
+         otherwise request a new one
+         """
+        if 'url_status' in data:
+            return data['url_status']
+        else:
+            downloader = self._providers.get_provider(url).get_downloader(url)
+            return downloader.get_status(url)
+
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
         # some checks
         assert (self.mode is not None)
@@ -326,16 +336,36 @@ class Annexificator(object):
         if url:
             stats.urls += 1
 
-        fpath = self._get_fpath(data, stats, url)
+        fpath = self._get_fpath(data, stats, return_None=True)
+        url_status = None
+        if url:
+            try:
+                url_status = self._get_url_status(data, url)
+            except Exception:
+                if self.skip_problematic:
+                    stats.skipped += 1
+                    lgr.debug("Failed to obtain status for url %s" % url)
+                    return
+                raise
+            if fpath is None:
+                # pick it from url_status and give for "reprocessing"
+                fpath = self._get_fpath(data, stats, filename=url_status.filename)
+
+        if not fpath:
+            if self.skip_problematic:
+                stats.skipped += 1
+                lgr.debug("Failed to figure out filename for url %s" % url)
+                return
+            raise ValueError("No filename were provided")
+
         filepath = opj(self.repo.path, fpath)
 
         lgr.debug("Request to annex %(url)s to %(fpath)s", locals())
-
         # since filename could have come from url -- let's update with it
         updated_data = updated(data, {'filename': ops(fpath)[1],
                                       # TODO? 'filepath': filepath
                                       })
-        remote_status = None
+
         if self.statusdb is not None and self._statusdb is None:
             if isinstance(self.statusdb, string_types):
                 # initiate the DB
@@ -345,17 +375,9 @@ class Annexificator(object):
             else:
                 # use provided persistent instance
                 self._statusdb = self.statusdb
+
         statusdb = self._statusdb
         if url:
-            downloader = self._providers.get_provider(url).get_downloader(url)
-
-            # request status since we would need it in either mode
-            try:
-                remote_status = data['url_status'] if 'url_status' in data else downloader.get_status(url)
-            except Exception:
-                if self.skip_problematic:
-                    return
-                raise
             if lexists(filepath):
                 # check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT
@@ -371,12 +393,12 @@ class Annexificator(object):
                 # TODO: what if the file came from another url bearing the same mtime and size????
                 #       unlikely but possible.  We would need to provide URL for comparison(s)
                 if self.mode == 'relaxed' or (
-                        statusdb is not None and not statusdb.is_different(fpath, remote_status, url)):
+                        statusdb is not None and not statusdb.is_different(fpath, url_status, url)):
                     # TODO:  check if remote_status < local_status, i.e. mtime jumped back
                     # and if so -- warning or may be according to some config setting -- skip
                     # e.g. config.get('crawl', 'new_older_files') == 'skip'
                     lgr.debug("Skipping download. URL %s doesn't provide new content for %s.  New status: %s",
-                              url, filepath, remote_status)
+                              url, filepath, url_status)
                     stats.skipped += 1
                     if self.yield_non_updated:
                         yield updated_data  # there might be more to it!
@@ -437,9 +459,9 @@ class Annexificator(object):
             else:
                 _call(self._check_non_existing_filepath, filepath, stats=stats)
             # TODO: We need to implement our special remote here since no downloaders used
-            if self.mode == 'full' and remote_status and remote_status.size:  # > 1024**2:
+            if self.mode == 'full' and url_status and url_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
-                         % (naturalsize(remote_status.size), url))
+                         % (naturalsize(url_status.size), url))
             out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
             added_to_annex = 'key' in out_json
 
@@ -459,15 +481,15 @@ class Annexificator(object):
         # so we have downloaded the beast
         # since annex doesn't care to set mtime for the symlink itself, we better set it ourselves
         if lexists(filepath):  # and islink(filepath):
-            if remote_status:
+            if url_status:
                 # set mtime of the symlink or git-added file itself
                 # utime dereferences!
                 # _call(os.utime, filepath, (time.time(), remote_status.mtime))
                 # *nix only!  TODO
-                if remote_status.mtime:
-                    _call(lmtime, filepath, remote_status.mtime)
+                if url_status.mtime:
+                    _call(lmtime, filepath, url_status.mtime)
                 if statusdb:
-                    _call(statusdb.set, filepath, remote_status)
+                    _call(statusdb.set, filepath, url_status)
             else:
                 # we still need to inform DB about this file so later it would signal to remove it
                 # if we no longer care about it
@@ -551,19 +573,25 @@ class Annexificator(object):
                     raise RuntimeError("We escaped the border of the repository itself. "
                                        "path: %s  repo: %s" % (dirpath, self.repo.path))
 
-    def _get_fpath(self, data, stats, url=None):
-        """Return relative path (fpath) to the file based on information in data or url
+    def _get_fpath(self, data, stats, filename=None, return_None=False):
+        """Return relative path (fpath) to the file based on information in data
+
+        Raises
+        ------
+        ValueError if no filename field was provided
         """
         # figure out the filename. If disposition one was needed, pipeline should
         # have had it explicitly
-        fpath = filename = \
-            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
-
-        stats.files += 1
+        if filename is None:
+            filename = data['filename'] if 'filename' in data else None
+            stats.files += 1
+        fpath = filename
 
         if filename is None:
+            if return_None:
+                return None
             stats.skipped += 1
-            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
+            raise ValueError("No filename were provided")
         elif isabs(filename):
             stats.skipped += 1
             raise ValueError("Got absolute filename %r" % filename)
