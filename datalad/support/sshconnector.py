@@ -37,7 +37,7 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, host):
+    def __init__(self, ctrl_path, host, port=None):
         """Create the connection.
 
         This does not actually open the connection.
@@ -50,6 +50,9 @@ class SSHConnection(object):
 
         host: str
           host to connect to. This may include the user ( [user@]host )
+
+        port: str
+          port to connect over
         """
         self._runner = None
 
@@ -58,6 +61,8 @@ class SSHConnection(object):
         self.host = host
         self.ctrl_path = ctrl_path
         self.cmd_prefix = ["ssh", "-S", self.ctrl_path, self.host]
+        self.port = port
+        self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
 
     def __call__(self, cmd):
         """Executes a command on the remote.
@@ -119,7 +124,7 @@ class SSHConnection(object):
             else:
                 raise
 
-    def copy(self, source, destination):
+    def copy(self, source, destination, recursive=False):
         """Copies source file/folder to destination on the remote.
 
         Parameters
@@ -135,10 +140,11 @@ class SSHConnection(object):
           stdout, stderr of the copy operation.
         """
 
-        self.scp_prefix = ["scp", "-o", "ControlPath=" + self.ctrl_path]
-        if isdir(source):  # add recursive flag if directory to be copied
-            self.scp_prefix = self.scp_prefix + ["-r"]
-        scp_cmd = self.scp_prefix + [source, self.host + ":" + destination]
+        scp_options = self.ctrl_options
+        scp_options += ["-P", self.port] if self.port else []
+        scp_options += ["-r"] if recursive else []
+
+        scp_cmd = ["scp"] + scp_options + [source, self.host + ":" + destination]
         return self.runner.run(scp_cmd, expect_fail=True, expect_stderr=True)
 
 

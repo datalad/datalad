@@ -76,23 +76,24 @@ def test_ssh_manager_close():
     ok_(not exists(opj(manager.socket_dir, 'datalad-test')))
 
 
+@skip_ssh
 @with_tempfile(mkdir=True)
-@with_tempfile
+@with_tempfile(content="one")
 def test_ssh_copy(sourcedir, sourcefile):
-    remote_url = "ssh://localhost"
+    remote_url = 'ssh://localhost'
     manager = SSHManager()
     ssh = manager.get_connection(remote_url)
     ssh.open()
 
     # copy tempfile to remote_url:target
-    target = sourcefile + ".copy"
+    target = sourcefile + '.copy'
     ssh.copy(sourcefile, opj(remote_url, target))
     # check if target exists on remote_url(=localhost)
     ok_(exists(target))
 
     # copy tempdir to remote_url:target
-    targetdir = sourcedir + ".copy"
-    ssh.copy(sourcedir, opj(remote_url, targetdir))
+    targetdir = sourcedir + '.copy'
+    ssh.copy(sourcedir, opj(remote_url, targetdir), recursive=True)
     # check if source directory copied to remote_url(=localhost)
     ok_(isdir(targetdir))
 
