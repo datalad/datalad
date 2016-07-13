@@ -1390,14 +1390,13 @@ class GitRepo(object):
         """return dictionary with count, size(in KiB) information of git objects
         """
         try:
-            count_str, err = Runner().run(
-                ['git', 'count-objects', '-v'],
-                log_stderr=True, log_stdout=True)
+            count_cmd = ['git', 'count-objects', '-v']
+            count_str, err = self._git_custom_command('', count_cmd)
             count_list = count_str.replace(': ', '\n').split('\n')
             count = {key: int(value) for (key, value) in zip(count_list[0::2], count_list[1::2]) if key and value}
             return count
         except CommandError:
-            raise(InvalidGitRepositoryError)
+            raise
 
 # TODO
 # remove submodule
