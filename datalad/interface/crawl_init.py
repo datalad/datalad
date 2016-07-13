@@ -10,16 +10,13 @@
 
 __docformat__ = 'restructuredtext'
 
-
+from os import makedirs
 from .base import Interface
-from os.path import exists, isdir, curdir
-from os.path import join as opj
-from datalad import cfg
+from os.path import exists
 from datalad.config import ConfigManager
-from datalad.consts import CRAWLER_META_CONFIG_PATH, CRAWLER_META_DIR
 from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
-from datalad.crawler.pipeline import initiate_pipeline_config
+from datalad.support.constraints import EnsureStr, EnsureNone
+from datalad.consts import CRAWLER_META_CONFIG_PATH, CRAWLER_META_DIR
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl_init')
@@ -74,5 +71,11 @@ class CrawlInit(Interface):
                 variable, name = item.split('=', 1)
                 cfg_.set('crawl:pipeline', '_'+variable, name)
 
-        cfg_.write(open(curdir + '/.datalad/crawl/crawl.cfg'))
+        if exists(CRAWLER_META_DIR):
+            cfg_.write(open(CRAWLER_META_CONFIG_PATH, 'w'))
+        else:
+            makedirs(CRAWLER_META_DIR)
+            cfg_.write(open(CRAWLER_META_CONFIG_PATH, 'w'))
+
         lgr.info("Generated crawl.cfg with provided flags and keyword arguments")
+
