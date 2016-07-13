@@ -484,7 +484,7 @@ def fs_traverse(path, repo, recursive=False, json=None):
 
     if isdir(path):                                # if node is a directory
         fs["nodes"] = [fs_extract(path, repo)]     # store its info in dict
-        fs["nodes"][0]["name"] = ".."             # and replace its name with ".." to emulate unix syntax
+        fs["nodes"][0]["name"] = "."               # and replace its name with "." to emulate unix syntax
 
         for node in listdir(path):
             nodepath = opj(path, node)
@@ -500,10 +500,11 @@ def fs_traverse(path, repo, recursive=False, json=None):
                 fs_render(nodepath, subdir, json=json)
 
         # update current node size by summing sizes of all its 1st level children
-        total_size = reduce(lambda size, node: size + int(FsModel(node['path'], repo).size),
-                            fs['nodes'][1:],
-                            0)
-        fs["size"], fs["nodes"][0]["size"] = [humanize.naturalsize(total_size)] * 2
+        total_size = sum([
+            int(FsModel(node['path'], repo).size)
+            for node in fs['nodes'][1:]
+        ])
+        fs["size"] = fs["nodes"][0]["size"] = humanize.naturalsize(total_size)
 
     return fs
 
