@@ -16,7 +16,7 @@ from nose.tools import ok_, assert_is_instance
 
 from datalad.support.sshconnector import SSHConnection, SSHManager
 from datalad.tests.utils import assert_raises, eq_
-from datalad.tests.utils import skip_ssh, with_tempfile
+from datalad.tests.utils import skip_ssh, with_tempfile, get_most_obscure_supported_name
 
 
 @skip_ssh
@@ -87,8 +87,13 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     ssh = manager.get_connection(remote_url)
     ssh.open()
 
+    # write to obscurely named file in sourcedir
+    obscure_file = opj(sourcedir, get_most_obscure_supported_name())
+    with open(obscure_file, 'w') as f:
+        f.write("three")
+
     # copy tempfile list to remote_url:sourcedir
-    sourcefiles = [sourcefile1, sourcefile2]
+    sourcefiles = [sourcefile1, sourcefile2, obscure_file]
     ssh.copy(sourcefiles, opj(remote_url, sourcedir))
 
     # recursive copy tempdir to remote_url:targetdir
@@ -103,7 +108,7 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
 
     # check if targetfiles(and its content) exist in remote_url:targetdir,
     # this implies file(s) and recursive directory copying pass
-    for targetfile, content in zip(sourcefiles, ["one", "two"]):
+    for targetfile, content in zip(sourcefiles, ["one", "two", "three"]):
         targetpath = opj(targetdir, targetfile)
         ok_(exists(targetpath))
         with open(targetpath, 'r') as fp:

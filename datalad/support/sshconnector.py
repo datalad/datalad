@@ -59,7 +59,7 @@ class SSHConnection(object):
         self.host = host
         self.ctrl_path = ctrl_path + ":" + port if port else ctrl_path
         self.port = port
-        self.ctrl_options = ['-o', 'ControlPath=' + self.ctrl_path]
+        self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
 
     def __call__(self, cmd):
         """Executes a command on the remote.
