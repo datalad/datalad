@@ -21,7 +21,6 @@ from ..dataset import Dataset
 from datalad.api import create
 from datalad.api import install
 from datalad.consts import DATASETS_TOPURL
-from datalad.distribution.install import get_containing_subdataset
 from datalad.distribution.install import _get_installationpath_from_url
 from datalad.distribution.install import _get_git_url_from_source
 from datalad.utils import chpwd
@@ -95,18 +94,18 @@ def test_get_containing_subdataset(path):
     ds.install(path='test.txt')
     ds.save("Initial commit")
     subds = ds.install("sub", source=path)
-    eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
-    eq_(get_containing_subdataset(ds, "some").path, ds.path)
+    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
+    eq_(ds.get_containing_subdataset("some").path, ds.path)
     # make sure the subds is found, even when it is not present, but still
     # known
     shutil.rmtree(subds.path)
-    eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
+    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
 
     outside_path = opj(os.pardir, "somewhere", "else")
-    assert_raises(ValueError, get_containing_subdataset, ds, outside_path)
-    assert_raises(ValueError, get_containing_subdataset, ds,
+    assert_raises(ValueError, ds.get_containing_subdataset, outside_path)
+    assert_raises(ValueError, ds.get_containing_subdataset,
                   opj(os.curdir, outside_path))
-    assert_raises(ValueError, get_containing_subdataset, ds,
+    assert_raises(ValueError, ds.get_containing_subdataset,
                   abspath(outside_path))
 
 

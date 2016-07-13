@@ -31,7 +31,6 @@ from datalad.utils import getpwd
 from .dataset import EnsureDataset
 from .dataset import Dataset
 from .dataset import datasetmethod
-from .install import get_containing_subdataset
 
 
 lgr = logging.getLogger('datalad.distribution.publish')
@@ -177,7 +176,7 @@ class Publish(Interface):
                     expl_subs.add(p)
                 else:
                     try:
-                        d = get_containing_subdataset(ds, p)
+                        d = ds.get_containing_subdataset(p)
                     except ValueError as e:
                         # p is not in ds => skip:
                         lgr.warning(str(e) + " - Skipped.")

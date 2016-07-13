@@ -39,11 +39,6 @@ from datalad.utils import rmtree
 lgr = logging.getLogger('datalad.distribution.install')
 
 
-def _with_sep(path):
-    """Little helper to guarantee that path ends with /"""
-    return path + sep if not path.endswith(sep) else path
-
-
 def _get_git_url_from_source(source):
     """Return URL for cloning associated with a source specification
 
@@ -205,34 +200,6 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     # at this point install always yields the desired result
     # just make sure
     assert(src_dotgit == '.git')
-
-
-def get_containing_subdataset(ds, path, recursive=False, recursion_limit=None):
-    """Given a base dataset and a relative path get containing subdataset
-
-    Parameters
-    ----------
-    ds : Dataset
-      Reference or base dataset
-    path : str
-      Path relative to the reference dataset
-
-    Returns
-    -------
-    Dataset
-    """
-
-    if is_explicit_path(path) and not path.startswith(ds.path):
-        # TODO: - move to dataset class
-        #       - have dedicated exception
-        raise ValueError("path {0} not in dataset {1}.".format(path, ds))
-
-    for subds in ds.get_subdatasets(recursive=recursive,
-                                    recursion_limit=recursion_limit):
-        common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
-        if common.endswith(sep) and common == _with_sep(subds):
-            return Dataset(path=opj(ds.path, common))
-    return ds
 
 
 # TODO: check whether the following is done already:
@@ -513,7 +480,7 @@ class Install(Interface):
             # - an entire untracked/unknown existing subdataset
             ###################################################
             lgr.log(5, "FileNotInAnnexError logic")
-            subds = get_containing_subdataset(ds, relativepath)
+            subds = ds.get_containing_subdataset(relativepath)
             if ds.path != subds.path:
                 # FLOW GUIDE EXIT POINT
                 # target path belongs to a known subdataset, hand
@@ -593,7 +560,7 @@ class Install(Interface):
                 # - target doesn't exist, but no source is given, so
                 #   it could be a handle that is actually contained in
                 #   a not yet installed subdataset
-                subds = get_containing_subdataset(ds, relativepath)
+                subds = ds.get_containing_subdataset(relativepath)
                 if ds.path != subds.path:
                     # FLOW GUIDE
                     # target path belongs to a subdataset, hand installation

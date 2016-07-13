@@ -10,7 +10,7 @@
 """
 
 import logging
-from os.path import abspath, join as opj, normpath
+from os.path import abspath, join as opj, commonprefix, sep, normpath
 from six import string_types, PY2
 from functools import wraps
 
@@ -22,6 +22,11 @@ from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 
 lgr = logging.getLogger('datalad.dataset')
+
+
+def _with_sep(path):
+    """Little helper to guarantee that path ends with /"""
+    return path + sep if not path.endswith(sep) else path
 
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
@@ -153,7 +158,7 @@ class Dataset(object):
           If True, absolute paths will be returned.
         recursive : bool
           If True, recurse into all subdatasets and report them too.
-        recursion_limit: int
+        recursion_limit: int or None
           If not None, set the number of subdataset levels to recurse into.
         Returns
         -------
@@ -259,7 +264,6 @@ class Dataset(object):
 
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
-        from .install import _with_sep
         if not path.startswith(_with_sep(self.path)):
             raise ValueError("path %s outside dataset %s" % (path, self))
 
@@ -356,6 +360,37 @@ class Dataset(object):
             return None
         else:
             return Dataset(sds_path)
+
+    def get_containing_subdataset(self, path, recursion_limit=None):
+        """Get the (sub)dataset containing `path`
+
+        Parameters
+        ----------
+        path : str
+          Path relative to the reference dataset
+        recursion_limit: int
+          limit the subdatasets to take into account to the given number of
+          hierarchy levels
+
+        Returns
+        -------
+        Dataset
+        """
+
+        if recursion_limit is not None and (recursion_limit < 1):
+            lgr.warning("recursion limit < 1 (%s) always results in self.")
+            return self
+
+        if is_explicit_path(path) and not path.startswith(self.path):
+            # TODO: - have dedicated exception
+            raise ValueError("path {0} not in dataset {1}.".format(path, self))
+
+        for subds in self.get_subdatasets(recursive=recursion_limit is not None,
+                                          recursion_limit=recursion_limit):
+            common = commonprefix((_with_sep(subds), _with_sep(path)))
+            if common.endswith(sep) and common == _with_sep(subds):
+                return Dataset(path=opj(self.path, common))
+        return self
 
 
 @optional_args
