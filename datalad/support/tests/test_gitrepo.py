@@ -881,3 +881,12 @@ def test_to_options():
                         annex_options=to_options(JSON=True),
                         options=to_options(unused=True)),
         ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
+
+
+@with_tempfile(mkdir=True)
+@with_tempfile()
+def test_GitRepo_count_objects(repo_path, dir_path):
+
+    repo = GitRepo(repo_path, create=True)
+    eq_(isinstance(repo.count_objects, dict), True)   # test if dictionary returned
+    eq_(len(repo.count_objects), 8)                   # test if dictionary is of expected size
