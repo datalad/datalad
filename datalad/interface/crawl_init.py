@@ -10,17 +10,23 @@
 
 __docformat__ = 'restructuredtext'
 
+
+
 from os import makedirs
 from .base import Interface
-from os.path import exists
-from datalad.config import ConfigManager
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.consts import CRAWLER_META_CONFIG_PATH, CRAWLER_META_DIR
+from os.path import exists, curdir, join as opj
+from collections import OrderedDict
+
+from ..support.gitrepo import GitRepo
+from ..support.param import Parameter
+from ..support.constraints import EnsureStr, EnsureNone
+from ..consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
+from ..support.configparserinc import SafeConfigParserWithIncludes
+from ..crawler.pipeline import load_pipeline_from_template
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl_init')
-
+CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 
 class CrawlInit(Interface):
     """
@@ -42,40 +48,68 @@ class CrawlInit(Interface):
             action="store",
             constraints=EnsureStr() | EnsureNone(),
             doc="""flag if template is specified by user"""),
-        func=Parameter(
+        template_func=Parameter(
             args=("-f", "--func"),
             action="store",
             doc="""flag if function is specified by user"""),
-        args=Parameter(
+        template_kwargs=Parameter(
             args=("args",),
             nargs="*",
-            metavar="key=value",
-            # TODO constraints=EnsureKeyValuePairs() | EnsureNone(),
-            doc="""keyword arguments to pass into the template function generating actual pipeline"""),
+            type=OrderedDict or list,
+            doc="""keyword arguments to pass into the template function generating actual pipeline,
+            organized in an ordered dict"""),
+        path=Parameter(
+            args=("path",),
+            action="store",
+            doc="""specify directory in which to save file, default is curdir"""),
+        commit=Parameter(
+            args=("-c", "--commit"),
+            action="store_true",
+            doc="""flag is user wants to commit file into git repo""")
     )
 
     @staticmethod
-    def __call__(template=None, func=None, args=[]):
-        cfg_ = ConfigManager([])
-        cfg_.remove_section('general')
-        cfg_.add_section('crawl:pipeline')
+    def __call__(template=None, template_func=None, template_kwargs=None, path=curdir, commit=False):
+
+        lgr.debug("Creating crawler configuration for template %s under %s",
+                  template, path)
+
+        crawl_config_dir = opj(path, CRAWLER_META_DIR)
+        if not exists(crawl_config_dir):
+            lgr.log(2, "Creating %s", crawl_config_dir)
+            makedirs(crawl_config_dir)
+
+        crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
+        crawl_config_repo_path = opj(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
+        cfg_ = SafeConfigParserWithIncludes()
+        cfg_.add_section(CRAWLER_PIPELINE_SECTION)
 
         if template:
-            cfg_.set('crawl:pipeline', 'template', template)
+            cfg_.set(CRAWLER_PIPELINE_SECTION, 'template', template)
 
-        if func:
-            cfg_.set('crawl:pipeline', 'func', func)
+        if template_func:
+            cfg_.set(CRAWLER_PIPELINE_SECTION, 'func', template_func)
 
-        if args:
-            for item in args:
-                variable, name = item.split('=', 1)
-                cfg_.set('crawl:pipeline', '_'+variable, name)
+        if template_kwargs:
+            if type(template_kwargs) == dict:
+                template_kwargs = OrderedDict(sorted(template_kwargs.items()))
+                for k, v in template_kwargs.items():
+                    cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
+            if type(template_kwargs) == list:
+                for item in template_kwargs:
+                    variable, name = item.split('=', 1)
+                    cfg_.set(CRAWLER_PIPELINE_SECTION, "_"+variable, name)
 
-        if exists(CRAWLER_META_DIR):
-            cfg_.write(open(CRAWLER_META_CONFIG_PATH, 'w'))
-        else:
-            makedirs(CRAWLER_META_DIR)
-            cfg_.write(open(CRAWLER_META_CONFIG_PATH, 'w'))
+        with open(crawl_config, 'w') as f:
+            cfg_.write(f)
 
-        lgr.info("Generated crawl.cfg with provided flags and keyword arguments")
+        if commit:
+            repo = GitRepo(path)
+            repo.add(crawl_config_repo_path)
+            if repo.dirty:
+                repo.commit("Initialized crawling configuration to use template %s" % template)
+            else:
+                lgr.debug("Repository is not dirty -- not committing")
+
+
 
