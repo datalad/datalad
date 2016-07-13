@@ -101,9 +101,12 @@ def test_ssh_copy(sourcedir, sourcefile1, sourcefile2):
     # if source_mtime=1.12s, scp -p sets target_mtime = 1.0s, test that
     eq_(getmtime(targetdir), int(getmtime(sourcedir)) + 0.0)
 
-    # check if targetfiles exist in remote_url:targetdir,
+    # check if targetfiles(and its content) exist in remote_url:targetdir,
     # this implies file(s) and recursive directory copying pass
-    for targetfile in sourcefiles:
-        ok_(exists(opj(targetdir, targetfile)))
+    for targetfile, content in zip(sourcefiles, ["one", "two"]):
+        targetpath = opj(targetdir, targetfile)
+        ok_(exists(targetpath))
+        with open(targetpath, 'r') as fp:
+            eq_(content, fp.read())
 
     ssh.close()

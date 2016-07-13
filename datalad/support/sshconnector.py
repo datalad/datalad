@@ -47,10 +47,8 @@ class SSHConnection(object):
         ----------
         ctrl_path: str
           path to SSH controlmaster
-
         host: str
           host to connect to. This may include the user ( [user@]host )
-
         port: str
           port to connect over
         """
@@ -61,7 +59,7 @@ class SSHConnection(object):
         self.host = host
         self.ctrl_path = ctrl_path + ":" + port if port else ctrl_path
         self.port = port
-        self.ctrl_options = ["-o", "ControlPath=\'" + self.ctrl_path + "\'"]
+        self.ctrl_options = ['-o', 'ControlPath=' + self.ctrl_path]
 
     def __call__(self, cmd):
         """Executes a command on the remote.
@@ -102,12 +100,13 @@ class SSHConnection(object):
         """
 
         # set control options
-        ctrl_options = ("-o ControlMaster=auto %s -o ControlPersist=yes" % ' '.join(self.ctrl_options))
+        ctrl_options = ["-o", "ControlMaster=auto", "-o", "ControlPersist=yes"] + self.ctrl_options
         # create ssh control master command
-        cmd = "ssh %s %s exit" % (ctrl_options, self.host)
+        cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
+
         # start control master:
         lgr.debug("Try starting control master by calling:\n%s" % cmd)
-        proc = Popen(cmd, shell=True)
+        proc = Popen(cmd)
         proc.communicate(input="\n")  # why the f.. this is necessary?
 
     def close(self):
@@ -148,12 +147,11 @@ class SSHConnection(object):
 
         # add source filepath(s) to scp command
         scp_cmd += source if isinstance(source, list) \
-            else sh_split(source, posix=not on_windows)
+            else [source]
 
         # add destination path
         scp_cmd += [self.host + ":" + destination]
-        lgr.info("%s" % ' '.join(scp_cmd))
-        return self.runner.run(scp_cmd, expect_fail=True, expect_stderr=True)
+        return self.runner.run(scp_cmd)
 
 
 @auto_repr
