@@ -7,37 +7,59 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-from nose.tools import eq_
+from nose.tools import eq_, assert_raises
 from ...api import crawl_init
-from os.path import exists, curdir
+from os import remove
+from os.path import exists
+from datalad.support.annexrepo import AnnexRepo
+from datalad.tests.utils import with_tempfile, chpwd
 from datalad.consts import CRAWLER_META_CONFIG_PATH, CRAWLER_META_DIR
-from datalad.crawler.pipeline import initiate_pipeline_config
-from datalad.crawler.pipeline import load_pipeline_from_template
 
 
-def test_crawl_init():
-    crawl_init(template='openfmri', template_func='superdataset_pipeline')
-    eq_(exists(CRAWLER_META_DIR), True)
-    eq_(exists(CRAWLER_META_CONFIG_PATH), True)
-    f = open(CRAWLER_META_CONFIG_PATH, 'r')
-    contents = f.read()
-    eq_(contents, '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n')
+@with_tempfile(mkdir=True)
+def test_crawl_init_openfmri_args(tmpdir):
+    ar = AnnexRepo(tmpdir)
+    with chpwd(tmpdir):
+        crawl_init(args={'dataset': 'ds000001'}, template='openfmri')
+        eq_(exists(CRAWLER_META_DIR), True)
+        eq_(exists(CRAWLER_META_CONFIG_PATH), True)
+        f = open(CRAWLER_META_CONFIG_PATH, 'r')
+        contents = f.read()
+        eq_(contents, '[crawl:pipeline]\ntemplate = openfmri\n_dataset = ds000001\n\n')
 
-    # template_kwargs given as a dict
-    crawl_init(template='fcptable', template_kwargs={'dataset': 'Baltimore', 'tarballs': 'True'})
-    eq_(exists(CRAWLER_META_DIR), True)
-    eq_(exists(CRAWLER_META_CONFIG_PATH), True)
-    f = open(CRAWLER_META_CONFIG_PATH, 'r')
-    contents = f.read()
-    eq_(contents, '[crawl:pipeline]\ntemplate = fcptable\n_dataset = Baltimore\n_tarballs = True\n\n')
 
-    # template_kwargs given as a list
-    crawl_init(template='fcptable', template_kwargs=['dataset=Baltimore', 'tarballs=True'])
-    eq_(exists(CRAWLER_META_DIR), True)
-    eq_(exists(CRAWLER_META_CONFIG_PATH), True)
-    f = open(CRAWLER_META_CONFIG_PATH, 'r')
-    contents = f.read()
-    eq_(contents, '[crawl:pipeline]\ntemplate = fcptable\n_dataset = Baltimore\n_tarballs = True\n\n')
+@with_tempfile(mkdir=True)
+def test_crawl_init_openfmri(tmpdir):
+    ar = AnnexRepo(tmpdir)
+    with chpwd(tmpdir):
+        crawl_init(template='openfmri', template_func='superdataset_pipeline')
+        eq_(exists(CRAWLER_META_DIR), True)
+        eq_(exists(CRAWLER_META_CONFIG_PATH), True)
+        f = open(CRAWLER_META_CONFIG_PATH, 'r')
+        contents = f.read()
+        eq_(contents, '[crawl:pipeline]\ntemplate = openfmri\nfunc = superdataset_pipeline\n\n')
+
+
+@with_tempfile(mkdir=True)
+def test_crawl_init_fcp(tmpdir):
+    ar = AnnexRepo(tmpdir)
+    with chpwd(tmpdir):
+        crawl_init(args=['dataset=Baltimore', 'tarballs=True'], template='fcptable')
+        eq_(exists(CRAWLER_META_DIR), True)
+        eq_(exists(CRAWLER_META_CONFIG_PATH), True)
+        f = open(CRAWLER_META_CONFIG_PATH, 'r')
+        contents = f.read()
+        eq_(contents, '[crawl:pipeline]\ntemplate = fcptable\n_dataset = Baltimore\n_tarballs = True\n\n')
+
+
+@with_tempfile(mkdir=True)
+def test_crawl_init_error(tmpdir):
+    ar = AnnexRepo(tmpdir)
+    with chpwd(tmpdir):
+        assert_raises(ValueError, crawl_init, args=tmpdir)
+
+
+
 
 
 

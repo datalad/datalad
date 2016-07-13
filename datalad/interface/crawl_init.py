@@ -52,29 +52,25 @@ class CrawlInit(Interface):
             args=("-f", "--func"),
             action="store",
             doc="""flag if function is specified by user"""),
-        template_kwargs=Parameter(
+        args=Parameter(
             args=("args",),
             nargs="*",
             type=OrderedDict or list,
             doc="""keyword arguments to pass into the template function generating actual pipeline,
             organized in an ordered dict"""),
-        path=Parameter(
-            args=("path",),
-            action="store",
-            doc="""specify directory in which to save file, default is curdir"""),
         commit=Parameter(
-            args=("-c", "--commit"),
+            args=("--commit",),
             action="store_true",
-            doc="""flag is user wants to commit file into git repo""")
+            doc="""flag is user wants to commit file into git repo"""),
     )
 
     @staticmethod
-    def __call__(template=None, template_func=None, template_kwargs=None, path=curdir, commit=False):
+    def __call__(args=None, template=None, template_func=None, commit=False):
 
         lgr.debug("Creating crawler configuration for template %s under %s",
-                  template, path)
+                  template)
 
-        crawl_config_dir = opj(path, CRAWLER_META_DIR)
+        crawl_config_dir = opj(curdir, CRAWLER_META_DIR)
         if not exists(crawl_config_dir):
             lgr.log(2, "Creating %s", crawl_config_dir)
             makedirs(crawl_config_dir)
@@ -90,21 +86,27 @@ class CrawlInit(Interface):
         if template_func:
             cfg_.set(CRAWLER_PIPELINE_SECTION, 'func', template_func)
 
-        if template_kwargs:
-            if type(template_kwargs) == dict:
-                template_kwargs = OrderedDict(sorted(template_kwargs.items()))
-                for k, v in template_kwargs.items():
-                    cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
-            if type(template_kwargs) == list:
-                for item in template_kwargs:
-                    variable, name = item.split('=', 1)
-                    cfg_.set(CRAWLER_PIPELINE_SECTION, "_"+variable, name)
+        if args:
+            if isinstance(args, list):
+                newargs = dict
+                for item in args:
+                    k, v = item.split('=', 1)
+                    newargs[k] = v
+                args = newargs
+            elif isinstance(args, dict):
+                pass
+            else:
+                t = type(args)
+                raise ValueError("args entered must be given in a list or dict, were given as %s", t)
+            args = OrderedDict(sorted(args.items()))
+            for k, v in args.items():
+                cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
 
         with open(crawl_config, 'w') as f:
             cfg_.write(f)
 
         if commit:
-            repo = GitRepo(path)
+            repo = GitRepo(curdir)
             repo.add(crawl_config_repo_path)
             if repo.dirty:
                 repo.commit("Initialized crawling configuration to use template %s" % template)
