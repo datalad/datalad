@@ -29,6 +29,7 @@ from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
 from datalad import ssh_manager
 from datalad.cmd import Runner
+from datalad.dochelpers import exc_str
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -244,7 +245,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     ssh(["mkdir", "-p", path])
                 except CommandError as e:
                     lgr.error("Remotely creating target directory failed at "
-                              "%s.\nError: %s" % (path, str(e)))
+                              "%s.\nError: %s" % (path, exc_str(e)))
                     continue
 
             # init git repo
@@ -255,7 +256,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 ssh(cmd)
             except CommandError as e:
                 lgr.error("Remotely initializing git repository failed at %s."
-                          "\nError: %s\nSkipping ..." % (path, str(e)))
+                          "\nError: %s\nSkipping ..." % (path, exc_str(e)))
                 continue
 
             # check git version on remote end:
@@ -274,7 +275,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 lgr.warning(
                     "Failed to determine git version on remote.\n"
                     "Error: {0}\nTrying to configure anyway "
-                    "...".format(e.message))
+                    "...".format(exc_str(e)))
 
             # allow for pushing to checked out branch
             try:
@@ -285,43 +286,48 @@ class CreatePublicationTargetSSHWebserver(Interface):
                             "You will not be able to push to checked out "
                             "branch." % path)
 
-            # create post_update script
+            # create post_update hook to refresh dataset metadata on publication server
             lgr.info("Enabling git post-update hook ...")
             try:
                 json_command = 'datalad ls -r --json file ' + str(path)
                 virtualenv = 'source /home/debanjum/datalad/.env/bin/activate'  # NOT_SCALABLE! custom virtualenv path
-                tempf = Runner().run(['mktemp'])[0].split('\n')[0]
-                hook_loc = opj(path, '.git/hooks/post-update')
-                hook_ssh = sshri.hostname + ":" + hook_loc
 
-                with open(tempf, 'a') as f:  # create post_update hook script in local tempfile
+                # create post_update hook script in local tempfile
+                tempf = Runner().run(['mktemp'])[0].split('\n')[0]
+                with open(tempf, 'a') as f:
                     for post_update_cmd in ['#!/bin/bash', 'git update-server-info', virtualenv, json_command]:
                         f.write(post_update_cmd + '\n')
+
                 # upload hook to dataset
+                hook_loc = opj(path, '.git/hooks/post-update')
+                # TODO: sshri.copy(tempf, hook_loc)
+                hook_ssh = sshri.hostname + ":" + hook_loc
                 Runner().run(['scp', '-P', sshri.port, tempf, hook_ssh] if sshri.port else ['scp', tempf, hook_ssh])
-                ssh(["chmod", '+x', opj(path, '.git/hooks/post-update')])  # make it executable
+                # and make it executable
+                ssh(["chmod", '+x', hook_loc])
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
-                          "Error: %s" % e.message)
+                          "Error: %s" % exc_str(e))
 
-            # get html for dataset rendering from local datalad repo:
+            # publish html from local datalad repo to publication server for rendering dataset web UI
             lgr.info("Uploading web interface ...")
             try:
                 import datalad
                 html = opj(dirname(datalad.__file__), "resources/website/index.html")
+                # TODO: sshri.copy(html,sshri.path)
                 scp_target = sshri.hostname + ":" + sshri.path
                 Runner().run(['scp', '-P', sshri.port, html, scp_target] if sshri.port else ['scp', html, scp_target])
 
             except CommandError as e:
                 lgr.error("Failed to get html from local datalad repository. Unable to setup web interface.\n"
-                          "Error: %s" % e.message)
+                          "Error: %s" % exc_str(e))
 
             # initially update server info "manually":
             try:
                 ssh(["git", "-C", path, "update-server-info"])
             except CommandError as e:
                 lgr.error("Failed to update server info.\n"
-                          "Error: %s" % e.message)
+                          "Error: %s" % exc_str(e))
 
         if target:
             # add the sibling(s):
