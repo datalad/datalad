@@ -11,7 +11,6 @@
 """
 
 import logging
-import os
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
@@ -23,13 +22,17 @@ from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
 from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.network import is_datalad_compat_ri
 from datalad.utils import getpwd
 
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import Dataset
+from .dataset import resolve_path
+from .install import _get_git_url_from_source
 
 
 __docformat__ = 'restructuredtext'
@@ -127,7 +130,11 @@ class Add(Interface):
             raise InsufficientArgumentsError("insufficient information for "
                                              "adding: requires at least a path "
                                              "or a source.")
-        if path and not isinstance(path, list):
+
+        # When called from cmdline `path` and `source` will be a list even if
+        # there is only one item.
+        # Make sure we deal with the same when called via python API:
+        if path is not None and not isinstance(path, list):
             path = [path]
         if source and not isinstance(source, list):
             source = [source]
@@ -146,61 +153,104 @@ class Add(Interface):
                                                  "none found.")
         assert isinstance(dataset, Dataset)
 
-        # list to collect parameters for actual git/git-annex calls:
-        # (dataset, path, source)
-        call_tuples = []
+        # TODO: Q: are the list operations in the following 3 blocks (resolving
+        #          paths, sources and datasets) guaranteed to be stable
+        #          regarding order?
 
-
-        resolved_paths = None
+        # resolve path(s):
+        resolved_paths = []
         if path:
-            # resolve path(s) and assign the respective (sub)dataset:
-            from .dataset import resolve_path
-            from .install import get_containing_subdataset
-
             resolved_paths = [resolve_path(p, dataset) for p in path]
 
-            for p in resolved_paths:
+        # resolve source(s):
+        resolved_sources = []
+        if source:
+            for s in source:
+                if not is_datalad_compat_ri(s):
+                    raise ValueError("invalid source parameter: %s" % s)
+                resolved_sources.append(_get_git_url_from_source(s))
 
-                # Note, that `get_containing_subdataset` raises if `p` is
-                # outside `dataset`, but it returns `dataset`, if `p` is inside
-                # a subdataset not included by `recursion_limit`. In the latter
-                # case, the git calls will fail instead.
-                # We could check for this right here and fail early, but this
-                # would lead to the need to discover the entire hierarchy no
-                # matter if actually required.
-                r_ds = get_containing_subdataset(dataset, p,
-                                                 recursive=recursive,
-                                                 recursion_limit=recursion_limit)
-                call_tuples.append((r_ds, p, None))
+        # find (sub-)datasets to add things to (and fail on invalid paths):
+        if recursive:
+            # Note, that `get_containing_subdataset` raises if `p` is
+            # outside `dataset`, but it returns `dataset`, if `p` is inside
+            # a subdataset not included by `recursion_limit`. In the latter
+            # case, the git calls will fail instead.
+            # We could check for this right here and fail early, but this
+            # would lead to the need to discover the entire hierarchy no
+            # matter if actually required.
+            resolved_datasets = [dataset.get_containing_subdataset(
+                p, recursion_limit=recursion_limit) for p in resolved_paths]
+        else:
+            # if not recursive, try to add everything to dataset itself:
+            resolved_datasets = [dataset for i in range(len(resolved_paths))]
+
+        # we need a resolved dataset per path:
+        assert len(resolved_paths) == len(resolved_datasets)
+
+        # sort parameters for actual git/git-annex calls:
+        # (dataset, path, source)
+        from six.moves import zip_longest
+
+        calls = {d.path: {
+            # list of paths to 'git-add':
+            'g_add': [] ,
+            # list of paths to 'git-annex-add':
+            'a_add': [] ,
+            # list of sources to 'git-annex-addurl':
+            'addurl_s': [],
+            # list of (path, source) to 'git-annex-addurl --file':
+            'addurl_f': []
+            } for d in resolved_datasets}
+        for ds, p, s in list(zip_longest(resolved_datasets,
+                                         resolved_paths, resolved_sources)):
+
+            # it should not happen, that `path` as well as `source` are None:
+            assert p or s
+
+            if not s:
+                # we have a path only
+                if to_git:
+                    calls[ds.path]['g_add'].append(p)
+                else:
+                    calls[ds.path]['a_add'].append(p)
+            elif not p:
+                # we have a source only
+                calls[ds.path]['addurl_s'].append(s)
+            else:
+                # we have a path and a source
+                calls[ds.path]['addurl_f'].append((p, s))
+
+        # now do the actual add operation:
+        # TODO: return values
+        # TODO: implement git/git-annex/git-annex-add options
+        for dspath in calls:
+            ds = Dataset(dspath)
+            if calls[dspath]['g_add']:
+                ds.repo.add(calls[dspath]['g_add'],
+                            git=True, git_options=git_opts)
+            if calls[ds.path]['a_add']:
+                # TODO: annex required or call git-annex-init if there's no annex yet?
+                assert isinstance(ds.repo, AnnexRepo)
+                ds.repo.add(calls[dspath]['a_add'], git=False,
+                            git_options=git_opts, annex_options=annex_opts,
+                            options=annex_add_opts)
+            if calls[ds.path]['addurl_s']:
+                assert isinstance(ds.repo, AnnexRepo)
+                ds.repo.add_urls(calls[ds.path]['addurl_s'],
+                                 options=annex_add_opts,  # TODO: extra parameter for addurl?
+                                 git_options=git_opts,
+                                 annex_options=annex_opts)
+            if calls[ds.path]['addurl_f']:
+                assert isinstance(ds.repo, AnnexRepo)
+                for f, u in calls[ds.path]['addurl_f']:
+                    ds.repo.add_url_to_file(f, u,
+                                            options=annex_add_opts,  # TODO: see above
+                                            git_options=git_opts,
+                                            annex_options=annex_opts,
+                                            batch=True)
 
         # TODO: RF: Dataset.get_subdatasets to return Dataset instances!
         # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
-        # TODO: RF: get_containing_subdatasets => Dataset (+ recursion_limit)
 
-
-
-        # TODO: Move
-        if source and resolved_paths:
-            # items in source lead to 'annex addurl' and
-            # we have explicit target(s) for these
-            # extract source-target pairs:
-            num_pairs = min([len(resolved_paths), len(source)])
-            url_targets = resolved_paths[:num_pairs]
-            url_sources = source[:num_pairs]
-            resolved_paths = resolved_paths[num_pairs:]
-            source = source[num_pairs:]
-
-            # now, `resolved_paths` or `source` might have remaining elements to be
-            # treated as if they were passed without the other parameter
-
-        # (remaining) resolved path(s) have no source => need to exists
-
-
-
-        raise NotImplementedError
-
-    # Note: addurl --file=...    existing <= "record that it can be downloaded from there" => test,whether it chekcs content
-
-
-
-
+        # TODO: result_renderer

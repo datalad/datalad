@@ -510,7 +510,7 @@ class GitRepo(object):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True):
+    def add(self, files, commit=False, msg=None, git=True, git_options=None):
         """Adds file(s) to the repository.
 
         Parameters
@@ -526,6 +526,9 @@ class GitRepo(object):
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
 
         # needs to be True - see docstring:
         assert(git)

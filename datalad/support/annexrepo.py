@@ -401,7 +401,7 @@ class AnnexRepo(GitRepo):
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
-            msg=None):
+            msg=None, git_options=None, annex_options=None):
         """Add file(s) to the repository.
 
         Parameters
@@ -422,6 +422,12 @@ class AnnexRepo(GitRepo):
         -------
         list of dict
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
+
+        if annex_options:
+            lgr.warning("annex_options not yet implemented. Ignored.")
 
         options = options[:] if options else []
 
@@ -642,7 +648,7 @@ class AnnexRepo(GitRepo):
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
-                        batch=False):
+                        batch=False, git_options=None, annex_options=None):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -668,6 +674,13 @@ class AnnexRepo(GitRepo):
           In batch mode only ATM returns dict representation of json output returned
           by annex
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
+
+        if annex_options:
+            lgr.warning("annex_options not yet implemented. Ignored.")
+
         options = options[:] if options else []
         git_options = []
         #if file_ == 'about.txt':
@@ -710,12 +723,13 @@ class AnnexRepo(GitRepo):
                         % str(out_json))
             return out_json
 
-    def add_urls(self, urls, options=None, backend=None, cwd=None):
+    def add_urls(self, urls, options=None, backend=None, cwd=None,
+                 git_options=None, annex_options=None):
         """Downloads each url to its own file, which is added to the annex.
 
         Parameters
         ----------
-        urls: list
+        urls: list of str
 
         options: list, optional
             options to the annex command
@@ -723,6 +737,13 @@ class AnnexRepo(GitRepo):
         cwd: string, optional
             working directory from within which to invoke git-annex
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
+
+        if annex_options:
+            lgr.warning("annex_options not yet implemented. Ignored.")
+
         options = options[:] if options else []
 
         self._run_annex_command('addurl', annex_options=options + urls,
