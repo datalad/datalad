@@ -457,7 +457,8 @@ class AnnexRepo(GitRepo):
 
         else:
             return_list = list(self._run_annex_command_json(
-                'add', args=options + files, backend=backend))
+                'add', args=options + files, backend=backend, expect_fail=True,
+                expect_stderr=True))
 
         if commit:
             if msg is None:

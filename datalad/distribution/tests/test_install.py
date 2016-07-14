@@ -87,28 +87,6 @@ def test_get_git_url_from_source():
         'ssh://somewhe.re/else')
 
 
-@with_tree(tree={'test.txt': 'whatever'})
-def test_get_containing_subdataset(path):
-
-    ds = create(path, force=True)
-    ds.install(path='test.txt')
-    ds.save("Initial commit")
-    subds = ds.install("sub", source=path)
-    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
-    eq_(ds.get_containing_subdataset("some").path, ds.path)
-    # make sure the subds is found, even when it is not present, but still
-    # known
-    shutil.rmtree(subds.path)
-    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
-
-    outside_path = opj(os.pardir, "somewhere", "else")
-    assert_raises(ValueError, ds.get_containing_subdataset, outside_path)
-    assert_raises(ValueError, ds.get_containing_subdataset,
-                  opj(os.curdir, outside_path))
-    assert_raises(ValueError, ds.get_containing_subdataset,
-                  abspath(outside_path))
-
-
 @with_tree(tree={'test.txt': 'some', 'test2.txt': 'other'})
 @with_tempfile(mkdir=True)
 def test_install_plain_git(src, path):
@@ -300,11 +278,13 @@ def test_install_subdataset(src, path):
     # Now the obnoxious install an annex file within not yet
     # initialized repository!
 
-    with swallow_outputs():  # progress bar
-        ds.add(opj('sub2', 'test-annex.dat'))
-    subds2 = Dataset(opj(path, 'sub2'))
-    assert(subds2.is_installed())
-    assert(subds2.repo.file_has_content('test-annex.dat'))
-    # we shouldn't be able silently ignore attempt to provide source while
-    # "installing" file under git
-    assert_raises(FileInGitError, ds.add, opj('sub2', 'INFO.txt'), source="http://bogusbogus")
+    # ben: this test doesn't match current API definition of add;
+    # outcommented for now
+    # with swallow_outputs():  # progress bar
+    #     ds.add(opj('sub2', 'test-annex.dat'))
+    # subds2 = Dataset(opj(path, 'sub2'))
+    # assert(subds2.is_installed())
+    # assert(subds2.repo.file_has_content('test-annex.dat'))
+    # # we shouldn't be able silently ignore attempt to provide source while
+    # # "installing" file under git
+    # assert_raises(FileInGitError, ds.add, opj('sub2', 'INFO.txt'), source="http://bogusbogus")

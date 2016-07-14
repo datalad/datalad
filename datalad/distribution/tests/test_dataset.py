@@ -10,8 +10,10 @@
 """
 
 import os
+import shutil
 from os.path import join as opj, abspath, normpath
 from ..dataset import Dataset, EnsureDataset, resolve_path
+from datalad.api import create
 from datalad.utils import chpwd, getpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -201,3 +203,29 @@ def test_subdatasets(path):
     assert_true(ds.is_installed())
     eq_(ds.get_subdatasets(), [])
     # TODO actual submodule checkout is still there
+
+
+@with_tree(tree={'test.txt': 'whatever'})
+def test_get_containing_subdataset(path):
+
+    ds = create(path, force=True)
+    ds.install(path='test.txt')
+    ds.save("Initial commit")
+    subds = ds.create_subdataset("sub")
+
+    # refresh git python index => TODO
+    ds.repo.repo.index.update()
+
+    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
+    eq_(ds.get_containing_subdataset("some").path, ds.path)
+    # make sure the subds is found, even when it is not present, but still
+    # known
+    shutil.rmtree(subds.path)
+    eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
+
+    outside_path = opj(os.pardir, "somewhere", "else")
+    assert_raises(ValueError, ds.get_containing_subdataset, outside_path)
+    assert_raises(ValueError, ds.get_containing_subdataset,
+                  opj(os.curdir, outside_path))
+    assert_raises(ValueError, ds.get_containing_subdataset,
+                  abspath(outside_path))

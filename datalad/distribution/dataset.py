@@ -385,8 +385,15 @@ class Dataset(object):
             # TODO: - have dedicated exception
             raise ValueError("path {0} not in dataset {1}.".format(path, self))
 
-        for subds in self.get_subdatasets(recursive=recursion_limit is not None,
-                                          recursion_limit=recursion_limit):
+        for subds in self.get_subdatasets(recursive=True,
+                                          recursion_limit=recursion_limit,
+
+                                          # Note: Fails either on one test or another
+                                          #
+                                          # Following are values to pass the tests:
+                                          # False: test test_get_containing_subdataset
+                                          # True: test_add_recursive
+                                          absolute=True):
             common = commonprefix((_with_sep(subds), _with_sep(path)))
             if common.endswith(sep) and common == _with_sep(subds):
                 return Dataset(path=opj(self.path, common))

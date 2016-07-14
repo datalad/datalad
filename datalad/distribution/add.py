@@ -158,6 +158,7 @@ class Add(Interface):
         #          regarding order?
 
         # resolve path(s):
+        # TODO: expandpath?
         resolved_paths = []
         if path:
             resolved_paths = [resolve_path(p, dataset) for p in path]
@@ -194,9 +195,9 @@ class Add(Interface):
 
         calls = {d.path: {
             # list of paths to 'git-add':
-            'g_add': [] ,
+            'g_add': [],
             # list of paths to 'git-annex-add':
-            'a_add': [] ,
+            'a_add': [],
             # list of sources to 'git-annex-addurl':
             'addurl_s': [],
             # list of (path, source) to 'git-annex-addurl --file':
@@ -221,7 +222,7 @@ class Add(Interface):
                 # we have a path and a source
                 calls[ds.path]['addurl_f'].append((p, s))
 
-        # now do the actual add operation:
+        # now do the actual add operations:
         # TODO: return values
         # TODO: implement git/git-annex/git-annex-add options
         for dspath in calls:
