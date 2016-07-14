@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
+import datalad
 from os.path import join as opj, abspath, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
 
@@ -289,22 +290,15 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # create post_update hook to refresh dataset metadata on publication server
             lgr.info("Enabling git post-update hook ...")
             try:
+                hook_remote_target = opj(path, '.git/hooks/post-update')
                 json_command = 'datalad ls -r --json file ' + str(path)
                 virtualenv = 'source /home/debanjum/datalad/.env/bin/activate'  # NOT_SCALABLE! custom virtualenv path
 
-                # create post_update hook script in local tempfile
-                tempf = Runner().run(['mktemp'])[0].split('\n')[0]
-                with open(tempf, 'a') as f:
-                    for post_update_cmd in ['#!/bin/bash', 'git update-server-info', virtualenv, json_command]:
-                        f.write(post_update_cmd + '\n')
+                hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', virtualenv, json_command])
+                with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
+                    sshri.copy(tempf, hook_remote_target)           # upload hook to dataset
 
-                # upload hook to dataset
-                hook_loc = opj(path, '.git/hooks/post-update')
-                # TODO: sshri.copy(tempf, hook_loc)
-                hook_ssh = sshri.hostname + ":" + hook_loc
-                Runner().run(['scp', '-P', sshri.port, tempf, hook_ssh] if sshri.port else ['scp', tempf, hook_ssh])
-                # and make it executable
-                ssh(["chmod", '+x', hook_loc])
+                ssh(["chmod", '+x', hook_remote_target])            # and make it executable
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
@@ -312,12 +306,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # publish html from local datalad repo to publication server for rendering dataset web UI
             lgr.info("Uploading web interface ...")
             try:
-                import datalad
                 html = opj(dirname(datalad.__file__), "resources/website/index.html")
-                # TODO: sshri.copy(html,sshri.path)
-                scp_target = sshri.hostname + ":" + sshri.path
-                Runner().run(['scp', '-P', sshri.port, html, scp_target] if sshri.port else ['scp', html, scp_target])
-
+                sshri.copy(html, sshri.path)
             except CommandError as e:
                 lgr.error("Failed to get html from local datalad repository. Unable to setup web interface.\n"
                           "Error: %s" % exc_str(e))
