@@ -78,7 +78,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
       Top level URL to the datasets.
     """
 
-    dataset_url = '%s%s' % (topurl, dataset)
+    dataset_url = '%s%s/' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
