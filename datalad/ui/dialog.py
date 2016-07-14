@@ -14,6 +14,8 @@ __docformat__ = 'restructuredtext'
 
 import os
 import sys
+import time
+
 from six import PY2
 import getpass
 from mock import patch
@@ -93,21 +95,37 @@ class ConsoleLog(object):
         return pbar(*args, out=self.out, **kwargs)
 
 
-def getpass_echo(*args, **kwargs):
+def getpass_echo(prompt='Password: ', stream=None):
     """Q&D workaround until we have proper 'centralized' UI -- just use getpass BUT enable echo
     """
     if on_windows:
         # Can't do anything fancy yet, so just ask the one without echo
-        return getpass.getpass(*args, **kwargs)
+        return getpass.getpass(prompt=prompt, stream=stream)
     else:
         # We can mock patch termios so that ECHO is not turned OFF.
         # Side-effect -- additional empty line is printed
+
+        # def _no_emptyline_write(out):
+        #     # Additional mock to prevent not needed empty line print since we do have echo
+        #     # doesn't work since we don't know the stream here really
+        #     if out == '\n':
+        #         return
+        #     stream.write(out)
         with patch('termios.ECHO', 255**2):
-            return getpass.getpass(*args, **kwargs)
+            #patch.object(stream, 'write', _no_emptyline_write(stream)):
+            return getpass.getpass(prompt=prompt, stream=stream)
 
 
 @auto_repr
 class DialogUI(ConsoleLog, InteractiveUI):
+
+    def __init__(self, *args, **kwargs):
+        super(DialogUI, self).__init__(*args, **kwargs)
+        # ATM doesn't make sense to print the same title for subsequent questions
+        # so we will store previous one and not show it if was the previous one shown
+        # within 5 seconds from prev question
+        self._prev_title = None
+        self._prev_title_time = 0
 
     def question(self, text,
                  title=None, choices=None,
@@ -119,7 +137,7 @@ class DialogUI(ConsoleLog, InteractiveUI):
                              % (default, choices))
 
         msg = ''
-        if title:
+        if title and not (title == self._prev_title and time.time() - self._prev_title_time < 5):
             # might not actually get displayed if all in/out redirected
             # self.out.write(title + "\n")
             # so merge into msg for getpass
@@ -166,6 +184,10 @@ Question? [choice1|choice2]
                            % (response, choices))
                 continue
             break
+
+        self._prev_title = title
+        self._prev_title_time = time.time()
+
         return response
 
 
