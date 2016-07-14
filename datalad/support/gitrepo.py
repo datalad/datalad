@@ -1385,6 +1385,18 @@ class GitRepo(object):
 
         return track_remote, track_branch
 
+    @property
+    def count_objects(self):
+        """return dictionary with count, size(in KiB) information of git objects
+        """
+
+        count_cmd = ['git', 'count-objects', '-v']
+        count_str, err = self._git_custom_command('', count_cmd)
+        count = {key: int(value)
+                 for key, value in [item.split(': ')
+                                    for item in count_str.split('\n')
+                                    if len(item.split(': ')) == 2]}
+        return count
 
 # TODO
 # remove submodule
