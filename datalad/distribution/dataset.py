@@ -362,12 +362,12 @@ class Dataset(object):
             return Dataset(sds_path)
 
     def get_containing_subdataset(self, path, recursion_limit=None):
-        """Get the (sub)dataset containing `path`
+        """Get the (sub-)dataset containing `path`
 
         Parameters
         ----------
         path : str
-          Path relative to the reference dataset
+          Path to determine the containing (sub-)dataset for
         recursion_limit: int
           limit the subdatasets to take into account to the given number of
           hierarchy levels
@@ -381,19 +381,17 @@ class Dataset(object):
             lgr.warning("recursion limit < 1 (%s) always results in self.")
             return self
 
-        if is_explicit_path(path) and not path.startswith(self.path):
-            # TODO: - have dedicated exception
-            raise ValueError("path {0} not in dataset {1}.".format(path, self))
+        if is_explicit_path(path):
+            path = resolve_path(path, self)
+            if not path.startswith(self.path):
+                # TODO: - have dedicated exception
+                raise ValueError("path {0} not in dataset {1}.".format(path, self))
+            from os.path import relpath
+            path = relpath(path, self.path)
 
         for subds in self.get_subdatasets(recursive=True,
                                           recursion_limit=recursion_limit,
-
-                                          # Note: Fails either on one test or another
-                                          #
-                                          # Following are values to pass the tests:
-                                          # False: test test_get_containing_subdataset
-                                          # True: test_add_recursive
-                                          absolute=True):
+                                          absolute=False):
             common = commonprefix((_with_sep(subds), _with_sep(path)))
             if common.endswith(sep) and common == _with_sep(subds):
                 return Dataset(path=opj(self.path, common))

@@ -213,9 +213,6 @@ def test_get_containing_subdataset(path):
     ds.save("Initial commit")
     subds = ds.create_subdataset("sub")
 
-    # refresh git python index => TODO
-    ds.repo.repo.index.update()
-
     eq_(ds.get_containing_subdataset(opj("sub", "some")).path, subds.path)
     eq_(ds.get_containing_subdataset("some").path, ds.path)
     # make sure the subds is found, even when it is not present, but still
