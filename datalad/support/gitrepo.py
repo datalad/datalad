@@ -1389,14 +1389,14 @@ class GitRepo(object):
     def count_objects(self):
         """return dictionary with count, size(in KiB) information of git objects
         """
-        try:
-            count_cmd = ['git', 'count-objects', '-v']
-            count_str, err = self._git_custom_command('', count_cmd)
-            count_list = count_str.replace(': ', '\n').split('\n')
-            count = {key: int(value) for (key, value) in zip(count_list[0::2], count_list[1::2]) if key and value}
-            return count
-        except CommandError:
-            raise
+
+        count_cmd = ['git', 'count-objects', '-v']
+        count_str, err = self._git_custom_command('', count_cmd)
+        count = {key: int(value)
+                 for key, value in [item.split(': ')
+                                    for item in count_str.split('\n')
+                                    if len(item.split(': ')) == 2]}
+        return count
 
 # TODO
 # remove submodule
