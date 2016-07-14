@@ -448,7 +448,7 @@ class GitRepo(object):
                         stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
 
-        if create and not exists(opj(path, '.git')):
+        if create and not GitRepo.is_valid_repo(path):
             try:
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
@@ -477,6 +477,11 @@ class GitRepo(object):
         This is done by comparing the base repository path.
         """
         return self.path == obj.path
+
+    @classmethod
+    def is_valid_repo(cls, path):
+        """Returns if a given path points to a git repository"""
+        return exists(opj(path, '.git', 'objects'))
 
     @classmethod
     def get_toppath(cls, path):
