@@ -414,8 +414,9 @@ def serve_path_via_http(tfunc, *targs):
         hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http,
-                                                args=(hostname, path, queue))
+        multi_proc = multiprocessing.Process(
+            target=_multiproc_serve_path_via_http,
+            args=(hostname, path, queue))
         multi_proc.start()
         port = queue.get(timeout=300)
         url = 'http://{}:{}/'.format(hostname, port)
@@ -429,7 +430,7 @@ def serve_path_via_http(tfunc, *targs):
             with patch.dict('os.environ', env, clear=True):
                 return tfunc(*(args + (path, url)), **kwargs)
         finally:
-            lgr.debug("HTTP: stopping server")
+            lgr.debug("HTTP: stopping server under %s" % path)
             multi_proc.terminate()
 
     return newfunc

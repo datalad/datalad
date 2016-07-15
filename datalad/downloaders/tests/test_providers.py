@@ -8,14 +8,18 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Tests for data providers"""
 
+from mock import patch
+
 from ..providers import Provider
 from ..providers import Providers
+from ..providers import HTTPDownloader
 from ...tests.utils import eq_
 from ...tests.utils import assert_in
 from ...tests.utils import assert_greater
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_raises
 
+from ...support.external_versions import external_versions
 
 def test_Providers_OnStockConfiguration():
     providers = Providers.from_config_files()
@@ -70,3 +74,15 @@ def test_Providers_default_ones():
 def test_Providers_process_credential():
     # If uknown type -- raises ValueError
     assert_raises(ValueError, Providers._process_credential, 'cred', {'type': '_unknown_'})
+
+
+def test_get_downloader_class():
+    url = 'http://example.com'
+
+    with patch.object(external_versions, '_versions', {'requests': 1}):
+        assert Provider._get_downloader_class(url) is HTTPDownloader
+
+    with patch.object(external_versions, '_versions', {'requests': None}):
+        with assert_raises(RuntimeError) as cmr:
+            Provider._get_downloader_class(url)
+        assert_in("you need 'requests'", str(cmr.exception))

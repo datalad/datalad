@@ -16,6 +16,7 @@ from .base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
 from datalad.crawler.pipeline import initiate_pipeline_config
+from datalad.support.stats import ActivityStats
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl')
@@ -105,8 +106,9 @@ class Crawl(Interface):
             lgr.info("Running pipeline %s" % str(pipeline))
             # TODO: capture the state of all branches so in case of crash
             # we could gracefully reset back
+            stats = ActivityStats()
             try:
-                run_pipeline(pipeline)
+                output = run_pipeline(pipeline, stats=stats)
             except Exception as exc:
                 # TODO: config.crawl.failure = full-reset | last-good-master
                 # probably ask via ui which action should be performed unless
@@ -114,3 +116,5 @@ class Crawl(Interface):
                 raise
 
             # TODO:  Move gc/clean over here!
+
+            return output, stats

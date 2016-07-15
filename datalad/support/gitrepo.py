@@ -39,6 +39,7 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
+from datalad.dochelpers import exc_str
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
@@ -456,7 +457,7 @@ class GitRepo(object):
                                                   odbt=default_git_odbt,
                                                   **kwargs)
             except GitCommandError as e:
-                lgr.error(str(e))
+                lgr.error(exc_str(e))
                 raise
         else:
             try:
