@@ -387,5 +387,5 @@ def test_knows_annex(here, there):
 def test_make_tempfile():
     # check if mkdir, content conflict caught
     with assert_raises(ValueError):
-        with make_tempfile(content="blah", mkdir=True):
+        with make_tempfile(content="blah", mkdir=True):  # pragma: no cover
             pass
