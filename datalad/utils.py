@@ -742,6 +742,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     Examples
     --------
+        >>> from os.path import exists
         >>> from datalad.utils import make_tempfile
         >>> with make_tempfile() as fname:
         ...    open(fname, 'w').write('silly test')
