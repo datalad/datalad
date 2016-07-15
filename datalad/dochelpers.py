@@ -224,7 +224,7 @@ def borrowdoc(cls, methodname=None):
     return _borrowdoc
 
 
-def borrowkwargs(cls, methodname=None, exclude=None):
+def borrowkwargs(cls=None, methodname=None, exclude=None):
     """Return  a decorator which would borrow docstring for ``**kwargs``
 
     Notes
@@ -252,10 +252,14 @@ def borrowkwargs(cls, methodname=None, exclude=None):
     def _borrowkwargs(method):
         """Decorator which borrows docstrings for ``**kwargs`` for the `method`
         """
-        if methodname is None:
-            other_method = getattr(cls, method.__name__)
-        else:
-            other_method = getattr(cls, methodname)
+        if cls:
+            if methodname is None:
+                other_method = getattr(cls, method.__name__)
+            else:
+                other_method = getattr(cls, methodname)
+        elif methodname:
+            other_method = methodname
+
         # TODO:
         # method.__doc__ = enhanced_from(other_method.__doc__)
 
