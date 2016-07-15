@@ -193,19 +193,25 @@ class Add(Interface):
         # (dataset, path, source)
         from six.moves import zip_longest
 
-        calls = {d.path: {
-            # list of paths to 'git-add':
-            'g_add': [],
-            # list of paths to 'git-annex-add':
-            'a_add': [],
-            # list of sources to 'git-annex-addurl':
-            'addurl_s': [],
-            # list of (path, source) to 'git-annex-addurl --file':
-            'addurl_f': []
-            } for d in resolved_datasets}
-        for ds, p, s in list(zip_longest(resolved_datasets,
-                                         resolved_paths, resolved_sources)):
+        param_tuples = list(zip_longest(resolved_datasets,
+                                        resolved_paths, resolved_sources))
+        # possible None-datasets in `param_tuples` were filled in by zip_longest
+        # and need to be replaced by `dataset`:
+        param_tuples = [(d if d is not None else dataset, p, s)
+                        for d, p, s in param_tuples]
 
+        calls = {d.path: { # list of paths to 'git-add':
+                           'g_add': [],
+                           # list of paths to 'git-annex-add':
+                           'a_add': [],
+                           # list of sources to 'git-annex-addurl':
+                           'addurl_s': [],
+                           # list of (path, source) to
+                           # 'git-annex-addurl --file':
+                           'addurl_f': []
+                         } for d in [i for i, p, s in param_tuples]}
+
+        for ds, p, s in param_tuples:
             # it should not happen, that `path` as well as `source` are None:
             assert p or s
 
