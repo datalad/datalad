@@ -22,7 +22,7 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 from ..consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
 from ..support.configparserinc import SafeConfigParserWithIncludes
-from ..crawler.pipeline import load_pipeline_from_template
+from ..crawler.pipeline import load_pipeline_from_template, initiate_pipeline_config
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl_init')
@@ -67,51 +67,14 @@ class CrawlInit(Interface):
     @staticmethod
     def __call__(args=None, template=None, template_func=None, commit=False):
 
-        lgr.debug("Creating crawler configuration for template %s under %s",
-                  template)
-
-        crawl_config_dir = opj(curdir, CRAWLER_META_DIR)
-        if not exists(crawl_config_dir):
-            lgr.log(2, "Creating %s", crawl_config_dir)
-            makedirs(crawl_config_dir)
-
-        crawl_config = opj(crawl_config_dir, CRAWLER_META_CONFIG_FILENAME)
-        crawl_config_repo_path = opj(CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME)
-        cfg_ = SafeConfigParserWithIncludes()
-        cfg_.add_section(CRAWLER_PIPELINE_SECTION)
-
-        if template:
-            cfg_.set(CRAWLER_PIPELINE_SECTION, 'template', template)
-
-        if template_func:
-            cfg_.set(CRAWLER_PIPELINE_SECTION, 'func', template_func)
-
         if args:
             if isinstance(args, list):
-                newargs = dict
-                for item in args:
-                    k, v = item.split('=', 1)
-                    newargs[k] = v
-                args = newargs
+                args = OrderedDict(map(str, it.split('=', 1)) for it in args)
             elif isinstance(args, dict):
                 pass
             else:
-                t = type(args)
-                raise ValueError("args entered must be given in a list or dict, were given as %s", t)
-            args = OrderedDict(sorted(args.items()))
-            for k, v in args.items():
-                cfg_.set(CRAWLER_PIPELINE_SECTION, "_" + k, str(v))
+                raise ValueError("args entered must be given in a list or dict, were given as %s", type(args))
 
-        with open(crawl_config, 'w') as f:
-            cfg_.write(f)
+        initiate_pipeline_config(template, template_func, args)
 
-        if commit:
-            repo = GitRepo(curdir)
-            repo.add(crawl_config_repo_path)
-            if repo.dirty:
-                repo.commit("Initialized crawling configuration to use template %s" % template)
-            else:
-                lgr.debug("Repository is not dirty -- not committing")
-
-
-
+       # TODO: WiP: load_pipeline_from_template(template, template_func, kwargs=args) check

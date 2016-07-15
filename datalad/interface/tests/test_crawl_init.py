@@ -16,6 +16,8 @@ from datalad.tests.utils import with_tempfile, chpwd
 from datalad.consts import CRAWLER_META_CONFIG_PATH, CRAWLER_META_DIR
 
 
+# TODO: generalize 3 first tests into 1 parametric... reference git grep 'yield_test'
+
 @with_tempfile(mkdir=True)
 def test_crawl_init_openfmri_args(tmpdir):
     ar = AnnexRepo(tmpdir)
@@ -57,10 +59,3 @@ def test_crawl_init_error(tmpdir):
     ar = AnnexRepo(tmpdir)
     with chpwd(tmpdir):
         assert_raises(ValueError, crawl_init, args=tmpdir)
-
-
-
-
-
-
-
