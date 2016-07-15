@@ -356,7 +356,7 @@ def initiate_pipeline_config(template, template_func=None, template_kwargs=None,
     return crawl_config
 
 
-def load_pipeline_from_module(module, func=None, args=None, kwargs=None):
+def load_pipeline_from_module(module, func=None, args=None, kwargs=None, return_only=False):
     """Load pipeline from a Python module
 
     Parameters
@@ -369,6 +369,8 @@ def load_pipeline_from_module(module, func=None, args=None, kwargs=None):
       Positional arguments to provide to the function.
     kwargs: dict, optional
       Keyword arguments to provide to the function.
+    return_only: bool, optional
+      flag true if only to return pipeline
     """
 
     func = func or 'pipeline'
@@ -387,6 +389,8 @@ def load_pipeline_from_module(module, func=None, args=None, kwargs=None):
                              fromlist=['datalad.crawler.pipelines'])
         else:
             mod = __import__(modname, level=0)
+        if return_only:
+            return getattr(mod, func)
         return getattr(mod, func)(*args, **kwargs)
     except Exception as e:
         raise RuntimeError("Failed to import pipeline from %s: %s" % (module, exc_str(e)))
@@ -424,7 +428,7 @@ def _find_pipeline(name):
     return None
 
 
-def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
+def load_pipeline_from_template(name, func=None, args=None, kwargs=None, return_only=False):
     """Given a name, loads that pipeline from datalad.crawler.pipelines
 
     and later from other locations
@@ -432,11 +436,18 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
     Parameters
     ----------
     name: str
-        Name of the pipeline defining the filename, or the full path to it (TODO)
+        Name of the pipeline (the template) defining the filename, or the full path to it (TODO),
+        example: openfmri
+    func: str
+        Name of function from which pipeline to run
+        example: superdataset_pipeline
     args: dict, optional
         Positional args for the pipeline, passed as `*args` into the pipeline call
     kwargs: dict, optional
-        Keyword args for the pipeline, passed as `**kwargs` into the pipeline call
+        Keyword args for the pipeline, passed as `**kwargs` into the pipeline call,
+        example: {'dataset': 'ds000001'}
+    return_only: bool, optional
+        flag true if only to return pipeline
     """
 
     if isabs(name) or exists(name):
@@ -453,7 +464,7 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None):
     else:
         raise ValueError("could not find pipeline for %s" % name)
 
-    return load_pipeline_from_module(filename, func=func, args=args, kwargs=kwargs)
+    return load_pipeline_from_module(filename, func=func, args=args, kwargs=kwargs, return_only=return_only)
 
 
 # TODO: we might need to find present .datalad/crawl in another branch if not

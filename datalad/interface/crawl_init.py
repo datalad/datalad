@@ -11,18 +11,16 @@
 __docformat__ = 'restructuredtext'
 
 
-
-from os import makedirs
 from .base import Interface
-from os.path import exists, curdir, join as opj
 from collections import OrderedDict
 
-from ..support.gitrepo import GitRepo
+
+from ..dochelpers import exc_str
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
-from ..consts import CRAWLER_META_DIR, CRAWLER_META_CONFIG_FILENAME
-from ..support.configparserinc import SafeConfigParserWithIncludes
+from ..utils import get_func_kwargs_doc
 from ..crawler.pipeline import load_pipeline_from_template, initiate_pipeline_config
+
 
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl_init')
@@ -73,8 +71,26 @@ class CrawlInit(Interface):
             elif isinstance(args, dict):
                 pass
             else:
-                raise ValueError("args entered must be given in a list or dict, were given as %s", type(args))
+                raise ValueError(
+                    "args entered must be given in a list or dict, were given as %s",
+                    type(args))
+        else:
+            args = {}
+
+        pipeline_func = load_pipeline_from_template(template, template_func, kwargs=args, return_only=True)
+
+        try:
+            pipeline = pipeline_func(**args)
+        except Exception as exc:
+            raise RuntimeError(
+                "Running the pipeline function resulted in %s."
+                "FYI this pipeline only takes the following args: %s"
+                % (exc_str(exc), get_func_kwargs_doc(pipeline_func)))
+
+        if not pipeline:
+            raise ValueError("returned pipeline is empty")
+
+        if not isinstance(pipeline, list):
+            raise ValueError("pipeline should be represented as a list. Got: %r" % pipeline)
 
         initiate_pipeline_config(template, template_func, args)
-
-       # TODO: WiP: load_pipeline_from_template(template, template_func, kwargs=args) check
