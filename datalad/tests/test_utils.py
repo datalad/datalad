@@ -34,6 +34,7 @@ from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
+from ..utils import get_func_kwargs_doc
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -47,6 +48,15 @@ from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
+
+
+def test_get_func_kwargs_doc():
+    from datalad.crawler.pipelines.openfmri import pipeline
+    output = ['dataset: str\n  Id of the OpenfMRI dataset (e.g. ds000001)',
+              'versioned_urls: bool, optional\n  Request versioned URLs.  '
+              'OpenfMRI bucket is versioned, but if\n  original data resides '
+              'elsewhere, set to False', 'topurl: str, optional\n  Top level URL to the datasets.']
+    eq_(get_func_kwargs_doc(pipeline), output)
 
 
 @with_tempfile(mkdir=True)
