@@ -182,7 +182,7 @@ class AnnexRepo(GitRepo):
 
         # Check whether an annex already exists at destination
         # XXX this doesn't work for a submodule!
-        if not exists(opj(self.path, '.git', 'annex')):
+        if not AnnexRepo.is_valid_repo(self.path):
             # so either it is not annex at all or just was not yet initialized
             # TODO: unify/reuse code somewhere else on detecting being annex
             if any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
@@ -216,6 +216,12 @@ class AnnexRepo(GitRepo):
             writer.release()
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
+
+    @classmethod
+    def is_valid_repo(cls, path):
+        """Returns if a given path points to a git repository"""
+        return GitRepo.is_valid_repo(path) and \
+               exists(opj(path, '.git', 'annex'))
 
     def add_remote(self, name, url, options=''):
         """Overrides method from GitRepo in order to set

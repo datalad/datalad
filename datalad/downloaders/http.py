@@ -31,7 +31,7 @@ from ..support.cookies import cookies_db
 from ..support.status import FileStatus
 
 from .base import Authenticator
-from .base import BaseDownloader
+from .base import BaseDownloader, DownloaderSession
 from .base import DownloadError, AccessDeniedError, AccessFailedError, UnhandledRedirectError
 
 from logging import getLogger
@@ -276,6 +276,71 @@ class HTTPDigestAuthAuthenticator(HTTPRequestsAuthenticator):
         raise NotImplementedError("not yet functioning, see https://github.com/kennethreitz/requests/issues/2934")
 
 
+@auto_repr
+class HTTPDownloaderSession(DownloaderSession):
+    def __init__(self, size=None, filename=None,  url=None, headers=None,
+                 response=None, chunk_size=1024**2):
+        super(HTTPDownloaderSession, self).__init__(
+            size=size, filename=filename, url=url, headers=headers,
+        )
+        self.chunk_size = chunk_size
+        self.response = response
+
+    def download(self, f=None, pbar=None, size=None):
+        response = self.response
+        total = 0
+        return_content = f is None
+        if f is None:
+            # no file to download to
+            # TODO: actually strange since it should have been decoded then...
+            f = BytesIO()
+
+        # must use .raw to be able avoiding decoding/decompression while downloading
+        # to a file
+        chunk_size_ = min(self.chunk_size, size) if size is not None else self.chunk_size
+
+        # XXX With requests_ftp BytesIO is provided as response.raw for ftp urls,
+        # which has no .stream, so let's do ducktyping and provide our custom stream
+        # via BufferedReader for such cases, while maintaining the rest of code
+        # intact.  TODO: figure it all out, since doesn't scale for any sizeable download
+        if not hasattr(response.raw, 'stream'):
+            def _stream():
+                buf = io.BufferedReader(response.raw)
+                v = True
+                while v:
+                    v = buf.read(chunk_size_)
+                    yield v
+
+            stream = _stream()
+        else:
+            stream = response.raw.stream(chunk_size_, decode_content=return_content)
+
+        for chunk in stream:
+            if chunk:  # filter out keep-alive new chunks
+                chunk_len = len(chunk)
+                if size is not None and total + chunk_len > size:
+                    # trim the download to match target size
+                    chunk = chunk[:size - total]
+                    chunk_len = len(chunk)
+                total += chunk_len
+                f.write(chunk)
+                try:
+                    # TODO: pbar is not robust ATM against > 100% performance ;)
+                    if pbar:
+                        pbar.update(total)
+                except Exception as e:
+                    lgr.warning("Failed to update progressbar: %s" % exc_str(e))
+                # TEMP
+                # see https://github.com/niltonvolpato/python-progressbar/pull/44
+                ui.out.flush()
+                if size is not None and total >= size:
+                    break  # we have done as much as we were asked
+        if return_content:
+            out = f.getvalue()
+            if PY3 and isinstance(out, bytes):
+                out = out.decode()
+            return out
+
 
 @auto_repr
 class HTTPDownloader(BaseDownloader):
@@ -325,7 +390,7 @@ class HTTPDownloader(BaseDownloader):
 
         return False
 
-    def _get_download_details(self, url, chunk_size=1024**2,
+    def get_downloader_session(self, url,
                               allow_redirects=True, use_redirected_url=True):
         # TODO: possibly make chunk size adaptive
         response = self._session.get(url, stream=True, allow_redirects=allow_redirects)
@@ -342,61 +407,13 @@ class HTTPDownloader(BaseDownloader):
 
         headers['Url-Filename'] = url_filename
 
-        def _downloader(f=None, pbar=None, size=None):
-            total = 0
-            return_content = f is None
-            if f is None:
-                # no file to download to
-                # TODO: actually strange since it should have been decoded then...
-                f = BytesIO()
-
-            # must use .raw to be able avoiding decoding/decompression while downloading
-            # to a file
-            chunk_size_ = min(chunk_size, size) if size is not None else chunk_size
-
-            # XXX With requests_ftp BytesIO is provided as response.raw for ftp urls,
-            # which has no .stream, so let's do ducktyping and provide our custom stream
-            # via BufferedReader for such cases, while maintaining the rest of code
-            # intact.  TODO: figure it all out, since doesn't scale for any sizeable download
-            if not hasattr(response.raw, 'stream'):
-                def _stream():
-                    buf = io.BufferedReader(response.raw)
-                    v = True
-                    while v:
-                        v = buf.read(chunk_size_)
-                        yield v
-                stream = _stream()
-            else:
-                stream = response.raw.stream(chunk_size_, decode_content=return_content)
-
-            for chunk in stream:
-                if chunk:  # filter out keep-alive new chunks
-                    chunk_len = len(chunk)
-                    if size is not None and total + chunk_len > size:
-                        # trim the download to match target size
-                        chunk = chunk[:size - total]
-                        chunk_len = len(chunk)
-                    total += chunk_len
-                    f.write(chunk)
-                    try:
-                        # TODO: pbar is not robust ATM against > 100% performance ;)
-                        if pbar:
-                            pbar.update(total)
-                    except Exception as e:
-                        lgr.warning("Failed to update progressbar: %s" % exc_str(e))
-                    # TEMP
-                    # see https://github.com/niltonvolpato/python-progressbar/pull/44
-                    ui.out.flush()
-                    if size is not None and total >= size:
-                        break  # we have done as much as we were asked
-            if return_content:
-                out = f.getvalue()
-                if PY3 and isinstance(out, bytes):
-                    out = out.decode()
-                return out
-
-        return _downloader, target_size, url_filename, headers
-
+        return HTTPDownloaderSession(
+            size=target_size,
+            url=response.url,
+            filename=url_filename,
+            headers=headers,
+            response=response
+        )
 
     @classmethod
     def get_status_from_headers(cls, headers):

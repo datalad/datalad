@@ -138,7 +138,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
 
 @with_tempfile(mkdir=True)
-def check_download_external_url(url, failed_str, success_str, d):
+def check_download_external_url(url, failed_str, success_str, d, url_final=None):
     fpath = opj(d, get_url_straight_filename(url))
     providers = get_test_providers(url)  # url for check of credentials
     provider = providers.get_provider(url)
@@ -187,6 +187,12 @@ def check_download_external_url(url, failed_str, success_str, d):
         # TODO introduce support for mtime into requests_ftp?
         assert(status.mtime)
     assert(status.size)
+
+    # Verify possible redirections
+    if url_final is None:
+        url_final = url
+    assert_equal(downloader.get_target_url(url), url_final)
+
     # TODO -- more and more specific
 
 
