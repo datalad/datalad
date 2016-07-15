@@ -745,7 +745,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         >>> from os.path import exists
         >>> from datalad.utils import make_tempfile
         >>> with make_tempfile() as fname:
-        ...    open(fname, 'w').write('silly test')
+        ...    k = open(fname, 'w').write('silly test')
         >>> assert not exists(fname)  # was removed
 
         >>> with make_tempfile(content="blah") as fname:
