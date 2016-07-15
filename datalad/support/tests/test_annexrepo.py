@@ -1096,6 +1096,8 @@ def test_is_available(batch, direct, p):
     assert is_available(fname, remote='origin') is False
     # it is on the 'web'
     assert is_available(fname, remote='web') is True
+    # not effective somehow :-/  may be the process already running or smth
+    #with swallow_logs(), swallow_outputs():  # it will complain!
     assert is_available(fname, remote='unknown') is False
     assert_false(is_available("boguskey", key=True))
 

@@ -1101,6 +1101,9 @@ class AnnexRepo(GitRepo):
     def is_available(self, file_, remote=None, key=False, batch=False):
         """Check if file or key is available (from a remote)
 
+        In case if key or remote is misspecified, it wouldn't fail but just keep
+        returning False, although possibly also complaining out loud ;)
+
         Parameters
         ----------
         file_: str
@@ -1136,9 +1139,14 @@ class AnnexRepo(GitRepo):
             except CommandError:
                 return False
         else:
-            out = self._batched.get('checkpresentkey', path=self.path)(annex_input)
+            annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
+            out = self._batched.get(':'.join(annex_cmd), annex_cmd, path=self.path)(key_)
             try:
-                return {'0': False, '1': True}[out]
+                return {
+                    '': False, # when remote is misspecified ... stderr carries the msg
+                    '0': False,
+                    '1': True,
+                }[out]
             except KeyError:
                 raise ValueError(
                     "Received output %r from annex, whenever expect 0 or 1" % out
@@ -1362,6 +1370,8 @@ class BatchedAnnex(object):
     def __init__(self, annex_cmd, git_options=[], annex_options=[], path=None,
                  json=False,
                  output_proc=None):
+        if not isinstance(annex_cmd, list):
+            annex_cmd = [annex_cmd]
         self.annex_cmd = annex_cmd
         self.git_options = git_options
         self.annex_options = annex_options + (['--json'] if json else [])
@@ -1374,7 +1384,7 @@ class BatchedAnnex(object):
     def _initialize(self):
         lgr.debug("Initiating a new process for %s" % repr(self))
         cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + self.git_options + \
-              ['annex', self.annex_cmd] + self.annex_options + ['--batch'] # , '--debug']
+              ['annex'] + self.annex_cmd + self.annex_options + ['--batch'] # , '--debug']
         lgr.log(5, "Command: %s" % cmd)
         # TODO: look into _run_annex_command  to support default options such as --debug
         #
