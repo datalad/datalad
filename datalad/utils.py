@@ -728,7 +728,8 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
         If True, temporary directory created using tempfile.mkdtemp()
     content : str or bytes, optional
         Content to be stored in the file created
-    wrapped : TODO
+    wrapped : function, optional
+        If set, function name used to prefix temporary file name
     `**tkwargs`:
         All other arguments are passed into the call to tempfile.mk{,d}temp(),
         and resultant temporary filename is passed as the first argument into
@@ -741,6 +742,7 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
 
     Examples
     --------
+        >>> from datalad.utils import make_tempfile
         >>> with make_tempfile() as fname:
         ...    open(fname, 'w').write('silly test')
         >>> assert not exists(fname)  # was removed

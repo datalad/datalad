@@ -46,7 +46,7 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 from ..support.vcr_ import *
-from ..dochelpers import exc_str
+from ..dochelpers import exc_str, borrowkwargs
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
 from . import _TEMP_PATHS_GENERATED
@@ -453,22 +453,13 @@ def without_http_proxy(tfunc):
     return newfunc
 
 
+@borrowkwargs(methodname=make_tempfile)
 @optional_args
 def with_tempfile(t, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end
 
     Parameters
     ----------
-    mkdir : bool, optional (default: False)
-        If True, temporary directory created using tempfile.mkdtemp()
-    content : str or bytes, optional
-        Content to be stored in the file created
-    `**tkwargs`:
-        All other arguments are passed into the call to tempfile.mk{,d}temp(),
-        and resultant temporary filename is passed as the first argument into
-        the function t.  If no 'prefix' argument is provided, it will be
-        constructed using module and function names ('.' replaced with
-        '_').
 
     To change the used directory without providing keyword argument 'dir' set
     DATALAD_TESTS_TEMPDIR.
