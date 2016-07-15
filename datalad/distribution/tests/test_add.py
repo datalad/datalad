@@ -206,7 +206,8 @@ def test_add_source(path, url, ds_dir):
     # Note: local4.dat didn't come from an url,
     # but 'local1.dat' consumes two urls
     eq_(len(annexed), len(urls))
-    eq_(len(annexed), len(listdir(ds.path)))
+    # all files annexed (-1 for '.git'):
+    eq_(len(annexed), len(listdir(ds.path)) - 1)
 
 
 

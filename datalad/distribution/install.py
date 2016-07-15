@@ -47,6 +47,10 @@ def _get_git_url_from_source(source):
     # TODO: Probably RF this into RI.as_git_url(), that would be overridden
     # by subclasses or sth. like that
 
+    if source is None:  # TODO: why does this even happen?
+        lgr.warning("received 'None' as 'source'.")
+        return source
+
     if not isinstance(source, RI):
         source_ri = RI(source)
     else:
