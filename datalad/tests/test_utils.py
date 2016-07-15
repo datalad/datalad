@@ -35,6 +35,7 @@ from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
 from ..utils import get_func_kwargs_doc
+from ..utils import make_tempfile
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -143,7 +144,7 @@ def _check_setup_exceptionhook(interactive):
                 assert_equal(post_mortem_tb[0], tb_)
             else:
                 assert_equal(post_mortem_tb, [])
-                assert_in('We cannot setup exception hook', cml.out)
+                # assert_in('We cannot setup exception hook', cml.out)
 
     eq_(old_exceptionhook, sys.excepthook)
 
@@ -385,9 +386,16 @@ def test_is_explicit_path():
 def test_knows_annex(here, there):
     from datalad.support.gitrepo import GitRepo
     from datalad.support.annexrepo import AnnexRepo
-    git = GitRepo(path=here, create=True)
+    GitRepo(path=here, create=True)
     assert_false(knows_annex(here))
-    annex = AnnexRepo(path=here, create=True)
+    AnnexRepo(path=here, create=True)
     assert_true(knows_annex(here))
-    gitclone = GitRepo(path=there, url=here, create=True)
+    GitRepo(path=there, url=here, create=True)
     assert_true(knows_annex(there))
+
+
+def test_make_tempfile():
+    # check if mkdir, content conflict caught
+    with assert_raises(ValueError):
+        with make_tempfile(content="blah", mkdir=True):  # pragma: no cover
+            pass

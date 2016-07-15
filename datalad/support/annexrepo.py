@@ -182,7 +182,7 @@ class AnnexRepo(GitRepo):
 
         # Check whether an annex already exists at destination
         # XXX this doesn't work for a submodule!
-        if not exists(opj(self.path, '.git', 'annex')):
+        if not AnnexRepo.is_valid_repo(self.path):
             # so either it is not annex at all or just was not yet initialized
             # TODO: unify/reuse code somewhere else on detecting being annex
             if any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
@@ -216,6 +216,12 @@ class AnnexRepo(GitRepo):
             writer.release()
 
         self._batched = BatchedAnnexes(batch_size=batch_size)
+
+    @classmethod
+    def is_valid_repo(cls, path):
+        """Returns if a given path points to a git repository"""
+        return GitRepo.is_valid_repo(path) and \
+               exists(opj(path, '.git', 'annex'))
 
     def add_remote(self, name, url, options=''):
         """Overrides method from GitRepo in order to set
@@ -744,6 +750,18 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
+    @normalize_path
+    def get_urls(self, file_, key=False, batch=False):
+        """Get URLs for a file/key
+
+        Parameters
+        ----------
+        file_: str
+        key: bool, optional
+            Either provided files are actually annex keys
+        """
+        return self.whereis(file_, output='full', batch=batch)[AnnexRepo.WEB_UUID]['urls']
+
     @normalize_paths
     def drop(self, files, options=None, key=False):
         """Drops the content of annexed files from this repository.
@@ -846,7 +864,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def whereis(self, files, output='uuids', key=False):
+    def whereis(self, files, output='uuids', key=False, batch=False):
         """Lists repositories that have actual content of file(s).
 
         Parameters
@@ -881,6 +899,9 @@ class AnnexRepo(GitRepo):
                   'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
                 }}
         """
+        if batch:
+            lgr.warning("TODO: --batch mode for whereis.  Operating serially")
+
         options = ["--key"] if key else []
 
         json_objects = self._run_annex_command_json('whereis', args=options + files)
@@ -1075,6 +1096,61 @@ class AnnexRepo(GitRepo):
                 return ''
         else:
             return self._batched.get('contentlocation', path=self.path)(key)
+
+    @normalize_paths(serialize=True)
+    def is_available(self, file_, remote=None, key=False, batch=False):
+        """Check if file or key is available (from a remote)
+
+        In case if key or remote is misspecified, it wouldn't fail but just keep
+        returning False, although possibly also complaining out loud ;)
+
+        Parameters
+        ----------
+        file_: str
+            Filename or a key
+        remote: str, optional
+            Remote which to check.  If None, possibly multiple remotes are checked
+            before positive result is reported
+        key: bool, optional
+            Either provided files are actually annex keys
+        batch: bool, optional
+            Initiate or continue with a batched run of annex checkpresentkey
+
+        Returns
+        -------
+        bool
+            with True indicating that file/key is available from (the) remote
+        """
+
+        if key:
+            key_ = file_
+        else:
+            key_ = self.get_file_key(file_)  # ?, batch=batch
+
+        annex_input = (key_,) if not remote else (key_, remote)
+
+        if not batch:
+            try:
+                out, err = self._run_annex_command('checkpresentkey',
+                                                   annex_options=list(annex_input),
+                                                   expect_fail=True)
+                assert(not out)
+                return True
+            except CommandError:
+                return False
+        else:
+            annex_cmd = ["checkpresentkey"] + ([remote] if remote else [])
+            out = self._batched.get(':'.join(annex_cmd), annex_cmd, path=self.path)(key_)
+            try:
+                return {
+                    '': False, # when remote is misspecified ... stderr carries the msg
+                    '0': False,
+                    '1': True,
+                }[out]
+            except KeyError:
+                raise ValueError(
+                    "Received output %r from annex, whenever expect 0 or 1" % out
+                )
 
     @normalize_paths(match_return_type=False)
     def _annex_custom_command(self, files, cmd_str,
@@ -1294,6 +1370,8 @@ class BatchedAnnex(object):
     def __init__(self, annex_cmd, git_options=[], annex_options=[], path=None,
                  json=False,
                  output_proc=None):
+        if not isinstance(annex_cmd, list):
+            annex_cmd = [annex_cmd]
         self.annex_cmd = annex_cmd
         self.git_options = git_options
         self.annex_options = annex_options + (['--json'] if json else [])
@@ -1306,7 +1384,7 @@ class BatchedAnnex(object):
     def _initialize(self):
         lgr.debug("Initiating a new process for %s" % repr(self))
         cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + self.git_options + \
-              ['annex', self.annex_cmd] + self.annex_options + ['--batch'] # , '--debug']
+              ['annex'] + self.annex_cmd + self.annex_options + ['--batch'] # , '--debug']
         lgr.log(5, "Command: %s" % cmd)
         # TODO: look into _run_annex_command  to support default options such as --debug
         #

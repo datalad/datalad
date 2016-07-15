@@ -16,6 +16,8 @@ from mock import patch
 from ...api import crawl
 
 from ...tests.utils import assert_cwd_unchanged
+from ...tests.utils import assert_equal
+from ...support.stats import ActivityStats
 
 @assert_cwd_unchanged(ok_to_chdir=True)
 @patch('datalad.utils.chpwd')
@@ -23,8 +25,9 @@ from ...tests.utils import assert_cwd_unchanged
 @patch('datalad.crawler.pipeline.run_pipeline')
 # Note that order of patched things as args is reverse for some reason :-/
 def test_crawl_api_chdir(run_pipeline_, load_pipeline_from_config_, chpwd_):
-    crawl('some_path_not_checked', chdir='somedir')
+    output, stats = crawl('some_path_not_checked', chdir='somedir')
+    assert_equal(stats, ActivityStats())  # nothing was done but we got it
 
     chpwd_.assert_called_with('somedir')
     load_pipeline_from_config_.assert_called_with('some_path_not_checked')
-    run_pipeline_.assert_called_with(['pipeline'])
+    run_pipeline_.assert_called_with(['pipeline'], stats=ActivityStats())

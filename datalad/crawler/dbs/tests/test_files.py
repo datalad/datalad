@@ -54,7 +54,7 @@ def _test_AnnexDB(cls, path):
     status1_.filename = 'file1.txt'
     assert_false(db.is_different('file1.txt', status1_))
     status1_.filename = 'different.txt'
-    assert_true(db.is_different('file1.txt', status1_))
+    assert_false(db.is_different('file1.txt', status1_))
 
     os.unlink(filepath1)  # under annex- - we don't have unlock yet and thus can't inplace augment
     with open(filepath1, 'a') as f:

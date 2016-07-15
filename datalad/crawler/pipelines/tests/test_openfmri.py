@@ -10,6 +10,7 @@
 import os
 from glob import glob
 from os.path import join as opj
+from mock import patch
 
 from ...nodes.crawl_url import crawl_url
 from ...nodes.matches import *
@@ -20,6 +21,7 @@ from ...nodes.annex import Annexificator, initiate_dataset
 from ...pipeline import load_pipeline_from_module
 
 from ....support.stats import ActivityStats
+from ....support.gitrepo import GitRepo
 from ....support.annexrepo import AnnexRepo
 
 from ....api import clean
@@ -38,8 +40,10 @@ from ....tests.utils import use_cassette
 from ....tests.utils import ok_file_has_content
 from ....tests.utils import ok_file_under_git
 
+from .. import openfmri
 from ..openfmri import pipeline as ofpipeline
 
+import logging
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
 
@@ -188,7 +192,8 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 )
 @serve_path_via_http
 @with_tempfile
-def test_openfmri_pipeline1(ind, topurl, outd):
+@with_tempfile
+def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
 
     list(initiate_dataset(
         template="openfmri",
@@ -325,7 +330,7 @@ def test_openfmri_pipeline1(ind, topurl, outd):
     # Let's see if pipeline would remove files we stopped tracking
     remove_from_index(index_html, '<a href=.ds666_R1.0.0[^<]*</a>')
     with chpwd(outd):
-        with swallow_logs() as cml:
+        with swallow_logs(new_level=logging.WARNING) as cml:
             out = run_pipeline(pipeline)
             # since files get removed in incoming, but repreprocessed completely
             # incomming-processed and merged into master -- new commits will come
@@ -352,6 +357,21 @@ def test_openfmri_pipeline1(ind, topurl, outd):
 
     eq_(out[0]['datalad_stats'].get_total().removed, 1)
     assert_not_equal(commits_hexsha_, commits_hexsha_removed)
+
+    # we will check if a clone would be crawling just as good
+    from datalad.api import crawl
+
+    # make a brand new clone
+    GitRepo(clonedir, outd)
+
+    def _pipeline(*args, **kwargs):
+        """Helper to mock openfmri.pipeline invocation so it looks at our 'server'"""
+        kwargs = updated(kwargs, {'topurl': topurl, 'versioned_urls': False})
+        return ofpipeline(*args,  **kwargs)
+
+    with chpwd(clonedir), patch.object(openfmri, 'pipeline', _pipeline):
+        output, stats = crawl()  # we should be able to recrawl without doing anything
+        ok_(stats, ActivityStats(files=5, skipped=4, add_git=1, urls=4))
 
 test_openfmri_pipeline1.tags = ['integration']
 
