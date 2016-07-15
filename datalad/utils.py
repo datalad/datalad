@@ -14,7 +14,7 @@ import time
 
 from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
-from six import text_type
+from six import text_type, binary_type
 
 import logging
 import shutil
@@ -24,6 +24,7 @@ import sys
 import tempfile
 import platform
 import gc
+import glob
 
 from functools import wraps
 from time import sleep
@@ -716,5 +717,80 @@ def knows_annex(path):
     return "origin/git-annex" in repo.get_remote_branches() \
            or "git-annex" in repo.get_branches()
 
-lgr.log(5, "Done importing datalad.utils")
 
+@contextmanager
+def make_tempfile(content=None, wrapped=None, **tkwargs):
+    """Helper class to provide a temporary file name and remove it at the end (context manager)
+
+    Parameters
+    ----------
+    mkdir : bool, optional (default: False)
+        If True, temporary directory created using tempfile.mkdtemp()
+    content : str or bytes, optional
+        Content to be stored in the file created
+    wrapped : function, optional
+        If set, function name used to prefix temporary file name
+    `**tkwargs`:
+        All other arguments are passed into the call to tempfile.mk{,d}temp(),
+        and resultant temporary filename is passed as the first argument into
+        the function t.  If no 'prefix' argument is provided, it will be
+        constructed using module and function names ('.' replaced with
+        '_').
+
+    To change the used directory without providing keyword argument 'dir' set
+    DATALAD_TESTS_TEMPDIR.
+
+    Examples
+    --------
+        >>> from os.path import exists
+        >>> from datalad.utils import make_tempfile
+        >>> with make_tempfile() as fname:
+        ...    k = open(fname, 'w').write('silly test')
+        >>> assert not exists(fname)  # was removed
+
+        >>> with make_tempfile(content="blah") as fname:
+        ...    assert open(fname).read() == "blah"
+    """
+
+    if tkwargs.get('mkdir', None) and content is not None:
+        raise ValueError("mkdir=True while providing content makes no sense")
+
+    tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=wrapped)
+
+    # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+    # let mktemp handle it otherwise. However, an explicitly provided
+    # dir=... will override this.
+    mkdir = tkwargs_.pop('mkdir', False)
+
+    filename = {False: tempfile.mktemp,
+                True: tempfile.mkdtemp}[mkdir](**tkwargs_)
+    filename = realpath(filename)
+
+    if content:
+        with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
+            f.write(content)
+
+    if __debug__:
+        # TODO mkdir
+        lgr.debug('Created temporary thing named %s"' % filename)
+    try:
+        yield filename
+    finally:
+        # glob here for all files with the same name (-suffix)
+        # would be useful whenever we requested .img filename,
+        # and function creates .hdr as well
+        lsuffix = len(tkwargs_.get('suffix', ''))
+        filename_ = lsuffix and filename[:-lsuffix] or filename
+        filenames = glob.glob(filename_ + '*')
+        if len(filename_) < 3 or len(filenames) > 5:
+            # For paranoid yoh who stepped into this already ones ;-)
+            lgr.warning("It is unlikely that it was intended to remove all"
+                        " files matching %r. Skipping" % filename_)
+            return
+        for f in filenames:
+            try:
+                rmtemp(f)
+            except OSError:
+                pass
+
+lgr.log(5, "Done importing datalad.utils")
