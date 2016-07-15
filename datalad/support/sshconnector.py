@@ -16,6 +16,7 @@ git calls to a ssh remote without the need to reauthenticate.
 import logging
 from subprocess import Popen
 from shlex import split as sh_split
+from os.path import isdir
 
 from datalad.support.network import RI, is_ssh
 
@@ -36,7 +37,7 @@ class SSHConnection(object):
     """Representation of a (shared) ssh connection.
     """
 
-    def __init__(self, ctrl_path, host):
+    def __init__(self, ctrl_path, host, port=None):
         """Create the connection.
 
         This does not actually open the connection.
@@ -46,17 +47,19 @@ class SSHConnection(object):
         ----------
         ctrl_path: str
           path to SSH controlmaster
-
         host: str
           host to connect to. This may include the user ( [user@]host )
+        port: str
+          port to connect over
         """
         self._runner = None
 
         # TODO: This may actually also contain "user@host".
         #       So, better name instead of 'host'?
         self.host = host
-        self.ctrl_path = ctrl_path
-        self.cmd_prefix = ["ssh", "-S", self.ctrl_path, self.host]
+        self.ctrl_path = ctrl_path + ":" + port if port else ctrl_path
+        self.port = port
+        self.ctrl_options = ["-o", "ControlPath=" + self.ctrl_path]
 
     def __call__(self, cmd):
         """Executes a command on the remote.
@@ -75,7 +78,7 @@ class SSHConnection(object):
         # TODO: Do we need to check for the connection to be open or just rely
         # on possible ssh failing?
 
-        ssh_cmd = self.cmd_prefix + cmd if isinstance(cmd, list) \
+        ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + cmd if isinstance(cmd, list) \
             else sh_split(cmd, posix=not on_windows)
             # windows check currently not needed, but keep it as a reminder
 
@@ -96,11 +99,14 @@ class SSHConnection(object):
         connection, if it is not there already.
         """
 
+        # set control options
+        ctrl_options = ["-o", "ControlMaster=auto", "-o", "ControlPersist=yes"] + self.ctrl_options
+        # create ssh control master command
+        cmd = ["ssh"] + ctrl_options + [self.host, "exit"]
+
         # start control master:
-        cmd = "ssh -o ControlMaster=auto -o \"ControlPath=%s\" " \
-              "-o ControlPersist=yes %s exit" % (self.ctrl_path, self.host)
         lgr.debug("Try starting control master by calling:\n%s" % cmd)
-        proc = Popen(cmd, shell=True)
+        proc = Popen(cmd)
         proc.communicate(input="\n")  # why the f.. this is necessary?
 
     def close(self):
@@ -117,6 +123,35 @@ class SSHConnection(object):
                 pass
             else:
                 raise
+
+    def copy(self, source, destination, recursive=False, preserve_attrs=False):
+        """Copies source file/folder to destination on the remote.
+
+        Parameters
+        ----------
+        source: str or list
+          file/folder path(s) to copy from on local
+        destination: str
+          file/folder path to copy to on remote
+
+        Returns
+        -------
+        str
+          stdout, stderr of the copy operation.
+        """
+
+        # add recursive, preserve_attributes flag if recursive, preserve_attrs set and create scp command
+        scp_options = self.ctrl_options + ["-r"] if recursive else self.ctrl_options
+        scp_options += ["-p"] if preserve_attrs else []
+        scp_cmd = ["scp"] + scp_options
+
+        # add source filepath(s) to scp command
+        scp_cmd += source if isinstance(source, list) \
+            else [source]
+
+        # add destination path
+        scp_cmd += [self.host + ":" + destination]
+        return self.runner.run(scp_cmd)
 
 
 @auto_repr
