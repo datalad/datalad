@@ -15,7 +15,7 @@ from mock import patch
 from ..dochelpers import single_or_plural, borrowdoc, borrowkwargs
 from ..dochelpers import exc_str
 
-from .utils import assert_equal, assert_true
+from .utils import assert_equal, assert_true, assert_raises
 from .utils import assert_re_in
 
 def test_basic():
@@ -86,6 +86,10 @@ def test_borrow_kwargs():
         def met_nodoc(self, **kwargs):
             pass
 
+        @borrowkwargs(methodname=A.met1)
+        def met_anothermet(self, **kwargs):
+            pass
+
         @borrowkwargs(A, 'met1')
         def met_nodockwargs(self, bogus=None, **kwargs):
             """B.met_nodockwargs
@@ -113,6 +117,7 @@ def test_borrow_kwargs():
     assert_true('B.met1 doc' in B.met1.__doc__)
     for m in (B.met1,
               B.met_nodoc,
+              B.met_anothermet,
               B.met_nodockwargs,
               B.met_excludes):
         docstring = m.__doc__
