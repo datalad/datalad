@@ -103,10 +103,14 @@ def test_with_tempfile_content(f):
 
 
 def test_with_tempfile_content_raises_on_mkdir():
+
+    @with_tempfile(content="test", mkdir=True)
+    def t():  # pragma: no cover
+        raise AssertionError("must not be run")
+
     with assert_raises(ValueError):
-        @with_tempfile(content="test", mkdir=True)
-        def t():
-            pass
+        # after this commit, it will check when invoking, not when decorating
+        t()
 
 
 def test_with_testrepos():

@@ -15,7 +15,7 @@ from mock import patch
 from ..dochelpers import single_or_plural, borrowdoc, borrowkwargs
 from ..dochelpers import exc_str
 
-from .utils import assert_equal, assert_true
+from .utils import assert_equal, assert_true, assert_raises
 from .utils import assert_re_in
 
 def test_basic():
@@ -29,18 +29,18 @@ def test_borrow_doc():
     class A(object):
         def met1(self):
             """met1doc"""
-            pass
+            pass  # pragma: no cover
         def met2(self):
             """met2doc"""
-            pass
+            pass  # pragma: no cover
 
     class B(object):
         @borrowdoc(A)
         def met1(self):
-            pass
+            pass  # pragma: no cover
         @borrowdoc(A, 'met1')
         def met2(self):
-            pass
+            pass  # pragma: no cover
 
     assert_equal(B.met1.__doc__, A.met1.__doc__)
     assert_equal(B.met2.__doc__, A.met1.__doc__)
@@ -59,11 +59,11 @@ def test_borrow_kwargs():
             kp2 : int, optional
               something
             """
-            pass
+            pass  # pragma: no cover
 
         def met2(self):
             """met2doc"""
-            pass
+            pass  # pragma: no cover
 
     class B(object):
 
@@ -80,11 +80,15 @@ def test_borrow_kwargs():
 
             Some postamble
             """
-            pass
+            pass  # pragma: no cover
 
         @borrowkwargs(A, 'met1')
         def met_nodoc(self, **kwargs):
-            pass
+            pass  # pragma: no cover
+
+        @borrowkwargs(methodname=A.met1)
+        def met_anothermet(self, **kwargs):
+            pass  # pragma: no cover
 
         @borrowkwargs(A, 'met1')
         def met_nodockwargs(self, bogus=None, **kwargs):
@@ -95,7 +99,7 @@ def test_borrow_kwargs():
             bogus
               something
             """
-            pass
+            pass  # pragma: no cover
 
         if True:
             # Just so we get different indentation level
@@ -108,11 +112,12 @@ def test_borrow_kwargs():
                 boguse
                   something
                 """
-                pass
+                pass  # pragma: no cover
 
     assert_true('B.met1 doc' in B.met1.__doc__)
     for m in (B.met1,
               B.met_nodoc,
+              B.met_anothermet,
               B.met_nodockwargs,
               B.met_excludes):
         docstring = m.__doc__

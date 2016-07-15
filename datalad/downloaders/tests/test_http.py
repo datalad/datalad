@@ -25,6 +25,8 @@ from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
+from ...tests.utils import skip_if_no_network
+from ...tests.utils import with_testsui
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -38,6 +40,7 @@ except ImportError:
     httpretty = NoHTTPPretty()
 
 from mock import patch
+from ...tests.utils import SkipTest
 from ...tests.utils import assert_in
 from ...tests.utils import assert_not_in
 from ...tests.utils import assert_equal
@@ -135,7 +138,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
 
 @with_tempfile(mkdir=True)
-def check_download_external_url(url, failed_str, success_str, d):
+def check_download_external_url(url, failed_str, success_str, d, url_final=None):
     fpath = opj(d, get_url_straight_filename(url))
     providers = get_test_providers(url)  # url for check of credentials
     provider = providers.get_provider(url)
@@ -180,8 +183,16 @@ def check_download_external_url(url, failed_str, success_str, d):
     # Verify status
     status = downloader.get_status(url)
     assert(isinstance(status, FileStatus))
-    assert(status.mtime)
+    if not url.startswith('ftp://'):
+        # TODO introduce support for mtime into requests_ftp?
+        assert(status.mtime)
     assert(status.size)
+
+    # Verify possible redirections
+    if url_final is None:
+        url_final = url
+    assert_equal(downloader.get_target_url(url), url_final)
+
     # TODO -- more and more specific
 
 
@@ -196,6 +207,18 @@ def test_authenticate_external_portals():
           "failed", \
           "2000 1005 2000 3000"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
+
+
+@skip_if_no_network
+def test_download_ftp():
+    try:
+        import requests_ftp
+    except ImportError:
+        raise SkipTest("need requests_ftp")  # TODO - make it not ad-hoc
+    yield check_download_external_url, \
+          "ftp://ftp.gnu.org/README", \
+          None, \
+          "This is ftp.gnu.org"
 
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
@@ -317,6 +340,42 @@ def test_HTMLFormAuthenticator_httpretty(d):
 
     # Unsuccesfull scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
+
+
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+@with_testsui(responses=['yes'])  # will request to reentry it
+def test_HTMLFormAuthenticator_httpretty_authfail404(d):
+    # mimic behavior of nersc which 404s but provides feedback whenever
+    # credentials are incorrect.  In our case we should fail properly
+    credential = FakeCredential1(name='test', url=None)
+
+    was_called = []
+
+    def request_post_callback(request, uri, headers):
+        post_params = request.parsed_body
+        if post_params['password'][0] == 'testpassword2':
+            was_called.append('404')
+            return 404, headers, "Really 404"
+        else:
+            was_called.append('failed')
+            return 404, headers, "Failed"
+
+    httpretty.register_uri(httpretty.POST, url, body=request_post_callback)
+
+    # Also we want to test how would it work if cookie is available (may be)
+    authenticator = HTMLFormAuthenticator(dict(username="{user}",
+                                               password="{password}",
+                                               submit="CustomLogin"),
+                                          failure_re="Failed")
+
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    # first one goes with regular DownloadError -- was 404 with not matching content
+    assert_raises(DownloadError, downloader.download, url, path=d)
+    assert_equal(was_called, ['failed', '404'])
 
 
 class FakeCredential2(UserPassword):

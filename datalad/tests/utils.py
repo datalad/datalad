@@ -46,7 +46,7 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 from ..support.vcr_ import *
-from ..dochelpers import exc_str
+from ..dochelpers import exc_str, borrowkwargs
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
 from . import _TEMP_PATHS_GENERATED
@@ -414,8 +414,9 @@ def serve_path_via_http(tfunc, *targs):
         hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http,
-                                                args=(hostname, path, queue))
+        multi_proc = multiprocessing.Process(
+            target=_multiproc_serve_path_via_http,
+            args=(hostname, path, queue))
         multi_proc.start()
         port = queue.get(timeout=300)
         url = 'http://{}:{}/'.format(hostname, port)
@@ -429,7 +430,7 @@ def serve_path_via_http(tfunc, *targs):
             with patch.dict('os.environ', env, clear=True):
                 return tfunc(*(args + (path, url)), **kwargs)
         finally:
-            lgr.debug("HTTP: stopping server")
+            lgr.debug("HTTP: stopping server under %s" % path)
             multi_proc.terminate()
 
     return newfunc
@@ -453,22 +454,13 @@ def without_http_proxy(tfunc):
     return newfunc
 
 
+@borrowkwargs(methodname=make_tempfile)
 @optional_args
-def with_tempfile(t, content=None, **tkwargs):
+def with_tempfile(t, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end
 
     Parameters
     ----------
-    mkdir : bool, optional (default: False)
-        If True, temporary directory created using tempfile.mkdtemp()
-    content : str or bytes, optional
-        Content to be stored in the file created
-    `**tkwargs`:
-        All other arguments are passed into the call to tempfile.mk{,d}temp(),
-        and resultant temporary filename is passed as the first argument into
-        the function t.  If no 'prefix' argument is provided, it will be
-        constructed using module and function names ('.' replaced with
-        '_').
 
     To change the used directory without providing keyword argument 'dir' set
     DATALAD_TESTS_TEMPDIR.
@@ -485,46 +477,8 @@ def with_tempfile(t, content=None, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
-
-        tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=t)
-
-        # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
-        # let mktemp handle it otherwise. However, an explicitly provided
-        # dir=... will override this.
-        mkdir = tkwargs_.pop('mkdir', False)
-
-        filename = {False: tempfile.mktemp,
-                    True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-        filename = realpath(filename)
-
-        if content:
-            with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
-                f.write(content)
-        if __debug__:
-            lgr.debug('Running %s with temporary filename %s',
-                      t.__name__, filename)
-        try:
+        with make_tempfile(wrapped=t, **tkwargs) as filename:
             return t(*(arg + (filename,)), **kw)
-        finally:
-            # glob here for all files with the same name (-suffix)
-            # would be useful whenever we requested .img filename,
-            # and function creates .hdr as well
-            lsuffix = len(tkwargs_.get('suffix', ''))
-            filename_ = lsuffix and filename[:-lsuffix] or filename
-            filenames = glob.glob(filename_ + '*')
-            if len(filename_) < 3 or len(filenames) > 5:
-                # For paranoid yoh who stepped into this already ones ;-)
-                lgr.warning("It is unlikely that it was intended to remove all"
-                            " files matching %r. Skipping" % filename_)
-                return
-            for f in filenames:
-                try:
-                    rmtemp(f)
-                except OSError:
-                    pass
-
-    if tkwargs.get('mkdir', None) and content is not None:
-        raise ValueError("mkdir=True while providing content makes no sense")
 
     return newfunc
 
@@ -702,6 +656,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
                 pass  # might need to provide additional handling so, handle
     return newfunc
 with_testrepos.__test__ = False
+
 
 @optional_args
 def with_fake_cookies_db(func, cookies={}):

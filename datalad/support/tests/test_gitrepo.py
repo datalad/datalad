@@ -881,3 +881,15 @@ def test_to_options():
                         annex_options=to_options(JSON=True),
                         options=to_options(unused=True)),
         ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
+
+
+@with_tempfile
+def test_GitRepo_count_objects(repo_path):
+
+    repo = GitRepo(repo_path, create=True)
+    # test if dictionary returned
+    eq_(isinstance(repo.count_objects, dict), True)
+    # test if dictionary contains keys and values we expect
+    empty_count = {'count': 0, 'garbage': 0,  'in-pack': 0, 'packs': 0, 'prune-packable': 0,
+                   'size': 0, 'size-garbage': 0, 'size-pack': 0}
+    eq_(empty_count, repo.count_objects)

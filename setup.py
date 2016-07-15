@@ -59,6 +59,9 @@ requires = {
         'msgpack-python',
         'requests>=1.2',
     ] + keyring_requires,
+    'downloaders-extra': [
+       'requests_ftp',
+    ],
     'crawl': [
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
     ],

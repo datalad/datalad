@@ -39,6 +39,7 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
+from datalad.dochelpers import exc_str
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
@@ -448,7 +449,7 @@ class GitRepo(object):
                         stdout="%s already exists" if exists(path) else "")
                 raise  # reraise original
 
-        if create and not exists(opj(path, '.git')):
+        if create and not GitRepo.is_valid_repo(path):
             try:
                 lgr.debug("Initialize empty Git repository at {0}".format(path))
                 self.repo = self.cmd_call_wrapper(gitpy.Repo.init, path,
@@ -456,7 +457,7 @@ class GitRepo(object):
                                                   odbt=default_git_odbt,
                                                   **kwargs)
             except GitCommandError as e:
-                lgr.error(str(e))
+                lgr.error(exc_str(e))
                 raise
         else:
             try:
@@ -477,6 +478,11 @@ class GitRepo(object):
         This is done by comparing the base repository path.
         """
         return self.path == obj.path
+
+    @classmethod
+    def is_valid_repo(cls, path):
+        """Returns if a given path points to a git repository"""
+        return exists(opj(path, '.git', 'objects'))
 
     @classmethod
     def get_toppath(cls, path):
@@ -1380,6 +1386,18 @@ class GitRepo(object):
 
         return track_remote, track_branch
 
+    @property
+    def count_objects(self):
+        """return dictionary with count, size(in KiB) information of git objects
+        """
+
+        count_cmd = ['git', 'count-objects', '-v']
+        count_str, err = self._git_custom_command('', count_cmd)
+        count = {key: int(value)
+                 for key, value in [item.split(': ')
+                                    for item in count_str.split('\n')
+                                    if len(item.split(': ')) == 2]}
+        return count
 
 # TODO
 # remove submodule
