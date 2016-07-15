@@ -31,6 +31,7 @@ from .add_sibling import AddSibling
 from datalad import ssh_manager
 from datalad.cmd import Runner
 from datalad.dochelpers import exc_str
+from datalad.utils import make_tempfile
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
@@ -296,7 +297,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
                 hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', virtualenv, json_command])
                 with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
-                    sshri.copy(tempf, hook_remote_target)           # upload hook to dataset
+                    ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
 
                 ssh(["chmod", '+x', hook_remote_target])            # and make it executable
             except CommandError as e:
@@ -307,7 +308,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             lgr.info("Uploading web interface ...")
             try:
                 html = opj(dirname(datalad.__file__), "resources/website/index.html")
-                sshri.copy(html, sshri.path)
+                ssh.copy(html, sshri.path)
             except CommandError as e:
                 lgr.error("Failed to get html from local datalad repository. Unable to setup web interface.\n"
                           "Error: %s" % exc_str(e))
