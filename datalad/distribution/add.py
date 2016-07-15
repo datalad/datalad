@@ -229,8 +229,11 @@ class Add(Interface):
                 calls[ds.path]['addurl_f'].append((p, s))
 
         # now do the actual add operations:
+        # TODO: what to do on failure? If we don't catch, we currently cannot
+        #       report, what possibly was successfully done before
         # TODO: return values
         # TODO: implement git/git-annex/git-annex-add options
+
         for dspath in calls:
             ds = Dataset(dspath)
             if calls[dspath]['g_add']:
@@ -263,7 +266,6 @@ class Add(Interface):
                                             annex_options=annex_opts,
                                             batch=True)
 
-        # TODO: RF: Dataset.get_subdatasets to return Dataset instances!
         # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
 
         # TODO: result_renderer

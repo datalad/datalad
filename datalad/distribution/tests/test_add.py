@@ -170,10 +170,43 @@ def test_add_source(path, url, ds_dir):
     eq_(len(reg_urls), 1)  # one remote for 'local2.dat', that is not "here"
     eq_([urls[2]], reg_urls[0])
 
-    # TODO: provide more paths than sources:
+    # provide more paths than sources:
+    # fail on non-existing 'local4.dat':
+    with assert_raises(CommandError) as e:
+        ds.add(path=['local3.dat', 'local4.dat'], source=urls[4])
+        assert_in("local4.dat not found", str(e.exception))
+    with open(opj(ds.path, 'local4.dat'), 'w') as f:
+        f.write('local4 content')
 
-    # TODO: provide more sources than paths:
+    ds.add(path=['local3.dat', 'local4.dat'], source=urls[4])
+    annexed = ds.repo.get_annexed_files()
+    eq_(len(annexed), 5)
+    assert_in('local3.dat', annexed)
+    assert_in('local4.dat', annexed)
 
+    # 'local3.dat' has a remote source
+    whereis_dict = ds.repo.whereis('local3.dat', output='full')
+    reg_urls = [whereis_dict[uuid]['urls'] for uuid in whereis_dict
+                if not whereis_dict[uuid]['here']]
+    eq_(len(reg_urls), 1)  # one remote for 'local3.dat', that is not "here"
+    eq_([urls[4]], reg_urls[0])
+
+    # 'local4.dat' has no remote source
+    whereis_dict = ds.repo.whereis('local4.dat', output='full')
+    reg_urls = [whereis_dict[uuid]['urls'] for uuid in whereis_dict
+                if not whereis_dict[uuid]['here']]
+    eq_(len(reg_urls), 0)
+
+    # provide more sources than paths:
+    ds.add('local5.dat', source=urls[5:])
+    annexed = ds.repo.get_annexed_files()
+    assert_in('local5.dat', annexed)
+    eq_(len(annexed), 5 + len(urls[5:]))
+
+    # Note: local4.dat didn't come from an url,
+    # but 'local1.dat' consumes two urls
+    eq_(len(annexed), len(urls))
+    eq_(len(annexed), len(listdir(ds.path)))
 
 
 

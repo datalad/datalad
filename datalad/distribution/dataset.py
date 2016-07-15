@@ -141,6 +141,7 @@ class Dataset(object):
             lgr.warning("Remote '%s' already exists. Ignore.")
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
+    # TODO: RF: Dataset.get_subdatasets to return Dataset instances! (optional?)
     def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                         recursive=False, recursion_limit=None):
 
