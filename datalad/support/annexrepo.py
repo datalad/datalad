@@ -750,6 +750,18 @@ class AnnexRepo(GitRepo):
 
         self._run_annex_command('rmurl', annex_options=[file_] + [url])
 
+    @normalize_path
+    def get_urls(self, file_, key=False, batch=False):
+        """Get URLs for a file/key
+
+        Parameters
+        ----------
+        file_: str
+        key: bool, optional
+            Either provided files are actually annex keys
+        """
+        return self.whereis(file_, output='full', batch=batch)[AnnexRepo.WEB_UUID]['urls']
+
     @normalize_paths
     def drop(self, files, options=None, key=False):
         """Drops the content of annexed files from this repository.
@@ -852,7 +864,7 @@ class AnnexRepo(GitRepo):
 
     # TODO: reconsider having any magic at all and maybe just return a list/dict always
     @normalize_paths
-    def whereis(self, files, output='uuids', key=False):
+    def whereis(self, files, output='uuids', key=False, batch=False):
         """Lists repositories that have actual content of file(s).
 
         Parameters
@@ -887,6 +899,9 @@ class AnnexRepo(GitRepo):
                   'urls': ['http://127.0.0.1:43442/about.txt', 'http://example.com/someurl']
                 }}
         """
+        if batch:
+            lgr.warning("TODO: --batch mode for whereis.  Operating serially")
+
         options = ["--key"] if key else []
 
         json_objects = self._run_annex_command_json('whereis', args=options + files)
@@ -1081,6 +1096,53 @@ class AnnexRepo(GitRepo):
                 return ''
         else:
             return self._batched.get('contentlocation', path=self.path)(key)
+
+    @normalize_paths(serialize=True)
+    def is_available(self, file_, remote=None, key=False, batch=False):
+        """Check if file or key is available (from a remote)
+
+        Parameters
+        ----------
+        file_: str
+            Filename or a key
+        remote: str, optional
+            Remote which to check.  If None, possibly multiple remotes are checked
+            before positive result is reported
+        key: bool, optional
+            Either provided files are actually annex keys
+        batch: bool, optional
+            Initiate or continue with a batched run of annex checkpresentkey
+
+        Returns
+        -------
+        bool
+            with True indicating that file/key is available from (the) remote
+        """
+
+        if key:
+            key_ = file_
+        else:
+            key_ = self.get_file_key(file_)  # ?, batch=batch
+
+        annex_input = (key_,) if not remote else (key_, remote)
+
+        if not batch:
+            try:
+                out, err = self._run_annex_command('checkpresentkey',
+                                                   annex_options=list(annex_input),
+                                                   expect_fail=True)
+                assert(not out)
+                return True
+            except CommandError:
+                return False
+        else:
+            out = self._batched.get('checkpresentkey', path=self.path)(annex_input)
+            try:
+                return {'0': False, '1': True}[out]
+            except KeyError:
+                raise ValueError(
+                    "Received output %r from annex, whenever expect 0 or 1" % out
+                )
 
     @normalize_paths(match_return_type=False)
     def _annex_custom_command(self, files, cmd_str,

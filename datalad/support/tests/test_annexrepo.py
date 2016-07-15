@@ -10,6 +10,7 @@
 
 """
 
+from functools import partial
 from os import mkdir
 
 from six.moves.urllib.parse import urljoin
@@ -1072,3 +1073,37 @@ def test_annex_remove(path1, path2):
         assert_not_in("rm-test.dat", repo.get_annexed_files())
         eq_(out[0], "rm-test.dat")
 
+
+@with_batch_direct
+@with_testrepos('basic_annex', flavors=['clone'], count=1)
+def test_is_available(batch, direct, p):
+    annex = AnnexRepo(p)
+
+    # bkw = {'batch': batch}
+    if batch:
+        is_available = partial(annex.is_available, batch=batch)
+    else:
+        is_available = annex.is_available
+
+    fname = 'test-annex.dat'
+    key = annex.get_file_key(fname)
+
+    # explicit is to verify data type etc
+    assert is_available(key, key=True) is True
+    assert is_available(fname) is True
+
+    # known remote but doesn't have it
+    assert is_available(fname, remote='origin') is False
+    # it is on the 'web'
+    assert is_available(fname, remote='web') is True
+    assert is_available(fname, remote='unknown') is False
+    assert_false(is_available("boguskey", key=True))
+
+    # remove url
+    urls = annex.get_urls(fname) #, **bkw)
+    assert(len(urls) == 1)
+    annex.rm_url(fname, urls[0])
+
+    assert is_available(key, key=True) is False
+    assert is_available(fname) is False
+    assert is_available(fname, remote='web') is False

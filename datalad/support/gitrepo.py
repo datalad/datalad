@@ -201,7 +201,8 @@ def normalize_path(func):
 
 
 @optional_args
-def normalize_paths(func, match_return_type=True, map_filenames_back=False):
+def normalize_paths(func, match_return_type=True, map_filenames_back=False,
+                    serialize=False):
     """Decorator to provide unified path conversions.
 
     Note
@@ -232,6 +233,10 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
       If True and returned value is a dictionary, it assumes to carry entries
       one per file, and then filenames are mapped back to as provided from the
       normalized (from the root of the repo) paths
+    serialize : bool, optional
+      Loop through files giving only a single one to the function one at a time.
+      This allows to simplify implementation and interface to annex commands
+      which do not take multiple args in the same call (e.g. checkpresentkey)
     """
 
     @wraps(func)
@@ -269,7 +274,13 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
         else:
             remap_filenames = lambda x: x
 
-        result = func(self, files_new, *args, **kwargs)
+        if serialize: # and not single_file:
+            result = [
+                func(self, f, *args, **kwargs)
+                for f in files_new
+            ]
+        else:
+            result = func(self, files_new, *args, **kwargs)
 
         if single_file is None:
             # no files were provided, nothing we can do really
