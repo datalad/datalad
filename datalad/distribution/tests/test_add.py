@@ -24,6 +24,7 @@ from datalad.tests.utils import with_tree
 from datalad.tests.utils import SkipTest
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import serve_path_via_http
 from datalad.utils import chpwd
 
 from ..dataset import Dataset
@@ -51,11 +52,11 @@ def test_add_insufficient_args(path):
 
 
 tree_arg = dict(tree={'test.txt': 'some',
-                 'test_annex.txt': 'some annex',
-                 'test1.dat': 'test file 1',
-                 'test2.dat': 'test file 2',
-                 'dir': {'testindir': 'someother',
-                         'testindir2': 'none'}})
+                      'test_annex.txt': 'some annex',
+                      'test1.dat': 'test file 1',
+                      'test2.dat': 'test file 2',
+                      'dir': {'testindir': 'someother',
+                              'testindir2': 'none'}})
 
 
 @with_tree(**tree_arg)
@@ -122,24 +123,56 @@ def test_add_recursive(path):
     assert_in('testindir2', Dataset(opj(path, 'dir')).repo.get_indexed_files())
 
 
-def test_add_source():
-    # ???
-    raise SkipTest("TODO")
-#
-# source <=> path paired by order
-#
-# source => RI  => addurl
-#
-#             dataset=None,
-#             path=None,
-#             source=None,
-#             to_git=False,
-#             recursive=False,
-#             recursion_limit=None,
-#             git_opts=None,
-#             annex_opts=None,
-#             annex_add_opts=None
+@with_tree(tree={'file1.txt': 'whatever 1',
+                 'file2.txt': 'whatever 2',
+                 'file3.txt': 'whatever 3',
+                 'file4.txt': 'whatever 4',
+                 'file5.txt': 'whatever 5',
+                 'file6.txt': 'whatever 6',
+                 'file7.txt': 'whatever 7'})
+@serve_path_via_http
+@with_tempfile(mkdir=True)
+def test_add_source(path, url, ds_dir):
+    from os import listdir
+    from datalad.support.network import RI
 
+    urls = [RI(url + f) for f in listdir(path)]
+    ds = Dataset(ds_dir).create()
+    eq_(len(ds.repo.get_annexed_files()), 0)
+
+    # add a remote source to git => fail:
+    assert_raises(NotImplementedError, ds.add, source=urls[0], to_git=True)
+    # annex add a remote source:
+    ds.add(source=urls[0])
+    eq_(len(ds.repo.get_annexed_files()), 1)
+
+    # add two remote source an give local names:
+    ds.add(path=['local1.dat', 'local2.dat'], source=urls[1:3])
+    annexed = ds.repo.get_annexed_files()
+    eq_(len(annexed), 3)
+    assert_in('local1.dat', annexed)
+    assert_in('local2.dat', annexed)
+
+    # add a second source for one of them
+    ds.add(path='local1.dat', source=urls[3])
+    eq_(len(annexed), 3)
+    whereis_dict = ds.repo.whereis('local1.dat', output='full')
+    reg_urls = [whereis_dict[uuid]['urls'] for uuid in whereis_dict
+                if not whereis_dict[uuid]['here']]
+    eq_(len(reg_urls), 1)  # one remote for 'local1.dat', that is not "here"
+    eq_({str(urls[1]), str(urls[3])},
+        set(reg_urls[0]))
+
+    # just to be sure compare to 'local2.dat':
+    whereis_dict = ds.repo.whereis('local2.dat', output='full')
+    reg_urls = [whereis_dict[uuid]['urls'] for uuid in whereis_dict
+                if not whereis_dict[uuid]['here']]
+    eq_(len(reg_urls), 1)  # one remote for 'local2.dat', that is not "here"
+    eq_([urls[2]], reg_urls[0])
+
+    # TODO: provide more paths than sources:
+
+    # TODO: provide more sources than paths:
 
 
 

@@ -243,12 +243,18 @@ class Add(Interface):
                             git_options=git_opts, annex_options=annex_opts,
                             options=annex_add_opts)
             if calls[ds.path]['addurl_s']:
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 assert isinstance(ds.repo, AnnexRepo)
                 ds.repo.add_urls(calls[ds.path]['addurl_s'],
                                  options=annex_add_opts,  # TODO: extra parameter for addurl?
                                  git_options=git_opts,
                                  annex_options=annex_opts)
             if calls[ds.path]['addurl_f']:
+                if to_git:
+                    raise NotImplementedError("Can't add a remote source "
+                                              "directly to git.")
                 assert isinstance(ds.repo, AnnexRepo)
                 for f, u in calls[ds.path]['addurl_f']:
                     ds.repo.add_url_to_file(f, u,
