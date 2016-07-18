@@ -305,7 +305,7 @@ class AnnexCustomRemote(object):
         msg = l.split(None, n)
         if req and (req != msg[0]):
             # verify correct response was given
-            self.error("Expected %r, got %r.  Ignoring" % (resp, msg[0]))
+            self.error("Expected %r, got %r.  Ignoring" % (req, msg[0]))
             return None
         self.heavydebug("Received %r" % (msg,))
         return msg

@@ -363,7 +363,7 @@ class ExtractedArchive(object):
                     lgr.debug("Cleaning up the %s for %s under %s", name, self._archive, path)
                     # TODO:  we must be careful here -- to not modify permissions of files
                     #        only of directories
-                    rmtree(path)
+                    (rmtree if isdir(path) else os.unlink)(path)
 
 
     @property
@@ -374,7 +374,7 @@ class ExtractedArchive(object):
 
     @property
     def stamp_path(self):
-        return opj(self._path, self.STAMP_SUFFIX)
+        return self._path + self.STAMP_SUFFIX
 
     @property
     def is_extracted(self):
