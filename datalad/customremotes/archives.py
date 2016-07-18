@@ -119,17 +119,49 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         """
         urls = self.get_URLS(key)
 
+        assert(urls)
+
         if len(urls) == 1:
             return urls[0]
-        else:  # multiple
-            # TODO:  utilize cache to check which archives might already be
-            #        present in the cache.
-            #    Then if not present in the cache -- check which are present
-            #    locally and choose that one to use
-            if self._last_url and self._last_url in urls:
-                return self._last_url
-            else:
-                return urls[0]  # just the first one
+
+        # multiple URLs are available so we need to figure out which one
+        # would be most efficient to "deal with"
+        url_akey_paths = filter(
+            bool,
+            [
+                self.get_contentlocation(self._parse_url(url)[:2][0], absolute=True, verify_exists=False)
+                for url in urls
+            ]
+        )
+
+        # by default get_contentlocation would return empty result for a key
+        # which is not available locally.  But we could still have extracted archive
+        # in the cache.  So we need pretty much get first all possible and then
+        # only remove those which aren't present locally.  So verify_exists was added
+
+        # utilize cache to check which archives might already be present in the cache
+        for akey_path in url_akey_paths:
+            if self.cache[akey_path].is_extracted:
+                return url
+
+        # if not present in the cache -- check which are present
+        # locally and choose that one to use, so it would get extracted
+        for akey_path in url_akey_paths:
+            if exists(akey_path):
+                return url
+
+        # So no archive is present either in the cache or originally under annex
+        # XXX some kind of a heuristic I guess is to use last_url ;-)
+        if self._last_url and self._last_url in urls:
+            return self._last_url
+        else:
+            self.heavydebug(
+                "Multiple URLs were found providing key %s. Choosing the first one: %s",
+                key, urls[0]
+            )
+            return urls[0]  # just the first one
+
+        raise RuntimeError("For paranoids -- Must not get here")  # pragma: no cover
 
     def _get_akey_afile(self, key):
         """Given a key, figure out target archive key, and file within archive
@@ -169,16 +201,16 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # But reply that present only if archive is present
         # TODO: this would throw exception if not present, so this statement is kinda bogus
-        akey_fpath = self.get_contentlocation(akey)  #, relative_to_top=True))
-        if akey_fpath:
-            akey_path = opj(self.path, akey_fpath)
+        akey_path = self.get_contentlocation(akey, absolute=True)
+        if akey_path:
+            # Extract via cache only if size is not yet known
+            if size is None:
+                # if for testing we want to force getting the archive extracted
+                # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
+                efile = self.cache[akey_path].get_extracted_filename(afile)
 
-            # if for testing we want to force getting the archive extracted
-            # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
-            efile = self.cache[akey_path].get_extracted_filename(afile)
-
-            if size is None and exists(efile):
-                size = os.stat(efile).st_size
+                if exists(efile):
+                    size = os.stat(efile).st_size
 
             if size is None:
                 size = 'UNKNOWN'
@@ -216,6 +248,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # Otherwise it is unrealistic to even require to recompute key if we
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
+        # TODO:  in case one archive is N/A we should check the next one
         akey, afile = self._get_akey_afile(key)
         if self.get_contentlocation(akey) or self.repo.is_available(akey, batch=True, key=True):
             self.send("CHECKPRESENT-SUCCESS", key)
@@ -268,9 +301,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         akey, afile = self._get_akey_afile(key)
         akey_fpath = self.get_contentlocation(akey)
-        if akey_fpath:  # present
-            akey_path = opj(self.path, akey_fpath)
-        else:
+        if not akey_fpath:
             # TODO: make it more stringent?
             # Command could have fail to run if key was not present locally yet
             # Thus retrieve the key using annex

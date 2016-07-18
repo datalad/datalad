@@ -328,6 +328,10 @@ class ArchivesCache(object):
 class ExtractedArchive(object):
     """Container for the extracted archive
     """
+
+    # suffix to use for a stamp so we could guarantee that extracted archive is
+    STAMP_SUFFIX = '.stamp'
+
     def __init__(self, archive, path=None, persistent=False):
         self._archive = archive
         # TODO: bad location for extracted archive -- use tempfile
@@ -349,12 +353,18 @@ class ExtractedArchive(object):
         #     lgr.info("As instructed, not cleaning up the cache under %s"
         #              % self._path)
         #     return
-        if exists(self._path):
-            if (not self._persistent) or force:
-                lgr.debug("Cleaning up the cache for %s under %s", self._archive, self._path)
-                # TODO:  we must be careful here -- to not modify permissions of files
-                #        only of directories
-                rmtree(self._path)
+
+        for path, name in [
+            (self._path, 'cache'),
+            (self.stamp_path, 'stamp file')
+        ]:
+            if exists(path):
+                if (not self._persistent) or force:
+                    lgr.debug("Cleaning up the %s for %s under %s", name, self._archive, path)
+                    # TODO:  we must be careful here -- to not modify permissions of files
+                    #        only of directories
+                    rmtree(path)
+
 
     @property
     def path(self):
@@ -362,24 +372,48 @@ class ExtractedArchive(object):
         """
         return self._path
 
+    @property
+    def stamp_path(self):
+        return opj(self._path, self.STAMP_SUFFIX)
+
+    @property
+    def is_extracted(self):
+        return exists(self.path) and exists(self.stamp_path) \
+               and os.stat(self.stamp_path).st_mtime >= os.stat(self.path).st_mtime
+
     def assure_extracted(self):
         """Return path to the extracted `archive`.  Extract archive if necessary
         """
         path = self.path
-        if not exists(path):
+
+        if not self.is_extracted:
             # we need to extract the archive
             # TODO: extract to _tmp and then move in a single command so we
             # don't end up picking up broken pieces
             lgr.debug("Extracting {self._archive} under {path}".format(**locals()))
+            if exists(path):
+                lgr.debug("Previous extracted (but probably not fully) cached archive found. Removing %s", path)
+                rmtree(path)
+
             os.makedirs(path)
             assert(exists(path))
-
+            # remove old stamp
+            if exists(self.stamp_path):
+                rmtree(self.stamp_path)
             decompress_file(self._archive, path, leading_directories=None)
 
             # TODO: must optional since we might to use this content, move it into the tree etc
             # lgr.debug("Adjusting permissions to R/O for the extracted content")
             # rotree(path)
             assert(exists(path))
+
+            # create a stamp
+            with open(self.stamp_path, 'w') as f:
+                f.write(self._archive)
+
+            # assert that stamp mtime is not older than archive's directory
+            assert(self.is_extracted)
+
         return path
 
     # TODO: remove?

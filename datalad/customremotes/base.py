@@ -229,8 +229,8 @@ class AnnexCustomRemote(object):
 
     # Helpers functionality
 
-    def get_contentlocation(self, key):
-        """Return absolute path to the file containing the key
+    def get_contentlocation(self, key, absolute=False, verify_exists=True):
+        """Return (relative to top or absolute) path to the file containing the key
 
         This is a wrapper around AnnexRepo.get_contentlocation which provides caching
         of the result (we are asking the location for the same archive key often)
@@ -242,11 +242,15 @@ class AnnexCustomRemote(object):
         else:
             fpath = self._contentlocations[key]
             # but verify that it exists
-            if not lexists(opj(self.path, fpath)):
+            if verify_exists and not lexists(opj(self.path, fpath)):
                 # prune from cache
                 del self._contentlocations[key]
                 fpath = ''
-        return fpath
+
+        if absolute and fpath:
+            return opj(self.path, fpath)
+        else:
+            return fpath
 
     #
     # Communication with git-annex
@@ -308,8 +312,8 @@ class AnnexCustomRemote(object):
 
     # TODO: see if we could adjust the "originating" file:line, because
     # otherwise they are all reported from main.py:117 etc
-    def heavydebug(self, msg):
-        lgr.log(4, msg)
+    def heavydebug(self, msg, *args, **kwargs):
+        lgr.log(4, msg, *args, **kwargs)
 
     # Since protocol allows for some messaging back, let's duplicate to lgr
     def debug(self, msg):
@@ -535,7 +539,8 @@ class AnnexCustomRemote(object):
                     urls.append(url[0])
                 else:
                     break
-        self.heavydebug("Received URLS: %s" % urls)
+
+        self.heavydebug("Got %d URL(s) for key %s: %s", len(urls), key, urls)
 
         if not urls:
             raise ValueError("Did not get any URLs for %s which we support" % key)
