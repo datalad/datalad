@@ -194,7 +194,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
 
-
     def req_CHECKPRESENT(self, key):
         """Check if copy is available
 
@@ -218,11 +217,9 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
         akey, afile = self._get_akey_afile(key)
-        if self.get_contentlocation(akey):
+        if self.get_contentlocation(akey) or self.repo.is_available(akey, batch=True, key=True):
             self.send("CHECKPRESENT-SUCCESS", key)
         else:
-            # TODO: proxy the same to annex itself to verify check for archive.
-            # If archive is no longer available -- then CHECKPRESENT-FAILURE
             self.send("CHECKPRESENT-UNKNOWN", key)
 
     def req_REMOVE(self, key):

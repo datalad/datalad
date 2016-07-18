@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+from os import unlink
 from os.path import exists, join as opj, pardir, basename, lexists
 from glob import glob
 
@@ -24,10 +26,12 @@ from ...tests.utils import SkipTest
 
 from ...support.annexrepo import AnnexRepo
 from ...support.exceptions import FileNotInRepositoryError
+from ...support.exceptions import CommandError
 from ...tests.utils import with_tree, serve_path_via_http, ok_file_under_git, swallow_outputs
 from ...tests.utils import swallow_logs
 from ...utils import chpwd, getpwd, rmtemp
 from ...utils import find_files
+from ...utils import rmtree
 
 from ...api import add_archive_content, clean
 
@@ -179,13 +183,19 @@ def test_add_archive_content(path_orig, url, repo_path):
     repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
     chpwd(orig_pwd)  # just to avoid warnings ;)  move below whenever SkipTest removed
 
-    raise SkipTest("TODO: wait for https://git-annex.branchable.com/todo/checkpresentkey_without_explicit_remote")
-    # bug was that dropping didn't work since archive was dropped first
-    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
     repo.drop(opj('1', '1 f.txt'))  # should be all kosher
     repo.get(opj('1', '1 f.txt'))  # and should be able to get it again
 
-    # TODO: verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
+    # bug was that dropping didn't work since archive was dropped first
+    repo._annex_custom_command([], ["git", "annex", "drop", "--all"])
+
+    # verify that we can't drop a file if archive key was dropped and online archive was removed or changed size! ;)
+    repo.get(key_1tar, options=['--key'])
+    unlink(opj(path_orig, '1.tar.gz'))
+    with assert_raises(CommandError) as cme, swallow_logs(new_level=logging.ERROR) as cml:
+        repo.drop(key_1tar, options=['--key'])  # is available from the URL -- should be kosher
+        assert(exists, opj(repo.path, repo.get_contentlocation(key_1tar)))
+        assert_in('Could only verify the existence of 0 out of 1 necessary copies' in cml.out)
 
 
 @assert_cwd_unchanged(ok_to_chdir=True)
