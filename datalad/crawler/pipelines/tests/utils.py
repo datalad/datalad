@@ -11,16 +11,17 @@ from ....support.annexrepo import AnnexRepo
 
 from ....utils import chpwd
 from ....utils import swallow_logs
-from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
+from ....tests.utils import ok_
 from ....tests.utils import with_tempfile
-from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
-import logging
+
 from logging import getLogger
 lgr = getLogger('datalad.crawl.tests')
 
-from ..fcptable import pipeline, superdataset_pipeline
 
-
-def test_smoke_pipelines():
-    yield _test_smoke_pipelines, pipeline, 'bogus'
-    yield _test_smoke_pipelines, superdataset_pipeline, None
+@with_tempfile(mkdir=True)
+def _test_smoke_pipelines(func, args, tmpdir):
+    AnnexRepo(tmpdir, create=True)
+    with chpwd(tmpdir):
+        with swallow_logs():
+            for p in [func(args)]:
+                ok_(len(p) > 1)
