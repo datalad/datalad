@@ -28,6 +28,8 @@ import glob
 
 from functools import wraps
 from time import sleep
+from inspect import getargspec
+from datalad.dochelpers import get_docstring_split
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -50,6 +52,10 @@ except:  # pragma: no cover
 #
 # Little helpers
 #
+
+
+def get_func_kwargs_doc(func):
+    return [dict(get_docstring_split(func)[1]).get(x) for x in getargspec(func)[0]]
 
 
 def assure_tuple_or_list(obj):
