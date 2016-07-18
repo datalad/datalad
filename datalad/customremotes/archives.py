@@ -11,10 +11,8 @@
 __docformat__ = 'restructuredtext'
 
 import os
-import re
 from os.path import exists, join as opj, basename, abspath
 from collections import OrderedDict
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -25,7 +23,6 @@ from ..support.archives import ArchivesCache
 from ..support.network import URL
 from ..utils import getpwd
 from .base import AnnexCustomRemote
-from .base import URI_PREFIX
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
@@ -107,14 +104,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             fdict['size'] = int(fdict['size'])
         return key, path, fdict
 
-
-    # def _get_akey_afile(self, key):
-    #     """Given a key, figure out target archive key, and file within archive
-    #     """
-    #     url = self._get_key_url(key)
-    #     return self._parse_url(url)[:2]  # skip size
-
-    def _gen_akey_afiles(self, key, sorted=True):
+    def _gen_akey_afiles(self, key, sorted=False):
         """Given a key, yield akey, afile pairs
 
         if `sorted`, then first those which have extracted version in local cache
@@ -122,17 +112,15 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         Gets determined based on urls for datalad archives
 
-        Made "generators all the way" as an excercise but also to delay any
-        checks etc until really necessary
+        Made "generators all the way" as an exercise but also to delay any
+        checks etc until really necessary.
         """
-        #import epdb; epdb.serve()
-
         urls = self.get_URLS(key)
 
-        akey_afiles = [
+        akey_afiles = (
             self._parse_url(url)[:2]  # skip size
             for url in urls
-        ]
+        )
 
         if not sorted:
             for pair in akey_afiles:
@@ -143,42 +131,37 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # multiple URLs are available so we need to figure out which one
         # would be most efficient to "deal with"
-        akey_paths = [
-            self.get_contentlocation(
+        akey_afile_paths = (
+            ((akey, afile), self.get_contentlocation(
                 akey,
                 absolute=True, verify_exists=False
-            )
-            for akey, _ in akey_afiles
-        ]
+                ))
+            for akey, afile in akey_afiles
+        )
 
         # by default get_contentlocation would return empty result for a key
         # which is not available locally.  But we could still have extracted archive
         # in the cache.  So we need pretty much get first all possible and then
         # only remove those which aren't present locally.  So verify_exists was added
         yielded = set()
-        akey_afiles_, akey_paths_ = [], []
+        akey_afile_paths_ = []
 
         # utilize cache to check which archives might already be present in the cache
-        for akey_afile, akey_path in zip(akey_afiles, akey_paths):
+        for akey_afile, akey_path in akey_afile_paths:
             if akey_path and self.cache[akey_path].is_extracted:
                 yield akey_afile
                 yielded.add(akey_afile)
-            akey_afiles_.append(akey_afile)
-            akey_paths_.append(akey_path)
+            akey_afile_paths_.append((akey_afile, akey_path))
 
         # replace generators with already collected ones into a list.
         # The idea that in many cases we don't even need to create a full list
         # and that initial single yield would be enough, thus we don't need to check
         # locations etc for every possible hit
-        #akey_afiles = akey_afiles_
-        #akey_paths = akey_paths_
-        self.heavydebug("URLS: %s", urls)
-        self.heavydebug("Akey_afiles: %s", akey_afiles)
-        self.heavydebug("Akey_paths: %s", akey_paths)
+        akey_afile_paths = akey_afile_paths_
 
         # if not present in the cache -- check which are present
         # locally and choose that one to use, so it would get extracted
-        for akey_afile, akey_path in zip(akey_afiles, akey_paths):
+        for akey_afile, akey_path in akey_afile_paths:
             if akey_path and exists(akey_path):
                 yielded.add(akey_afile)
                 yield akey_afile
@@ -186,12 +169,11 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # So no archive is present either in the cache or originally under annex
         # XXX some kind of a heuristic I guess is to use last_url ;-)
         if self._last_url and self._last_url in urls:
-            self.heavydebug(self._last_url)
-            akey_afile = akey_afiles[urls.index(self._last_url)]
+            akey_afile, _ = akey_afile_paths[urls.index(self._last_url)]
             yielded.add(akey_afile)
             yield akey_afile
 
-        for akey_afile in akey_afiles:
+        for akey_afile, _ in akey_afile_paths:
             if akey_afile not in yielded:
                 yield akey_afile
 
@@ -274,7 +256,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # Otherwise it is unrealistic to even require to recompute key if we
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
-        # TODO:  in case one archive is N/A we should check the next one
         for akey, afile in self._gen_akey_afiles(key):
             if self.get_contentlocation(akey) or self.repo.is_available(akey, batch=True, key=True):
                 self.send("CHECKPRESENT-SUCCESS", key)
@@ -329,7 +310,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     def _transfer(self, cmd, key, path):
 
         akeys_tried = []
-        for akey, afile in self._gen_akey_afiles(key):
+        for akey, afile in self._gen_akey_afiles(key, sorted=True):
             akeys_tried.append(akey)
             try:
                 akey_fpath = self.get_contentlocation(akey)
