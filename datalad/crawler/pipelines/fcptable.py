@@ -40,16 +40,8 @@ def extract_readme(data):
     if lexists("README.txt"):
         os.unlink("README.txt")
 
-    for title, detail in zip(xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data),
-                             xpath_match('//*[@class="tableHdr"]/td|strong/text()')(data)):
-        if title['match'] == data['dataset']:
-            pi = (re.search(('<br>.*<br>'), detail['match'])).group()
-            cleaner = re.compile('<.*?>')
-            data['PI'] = re.sub(cleaner, '', pi)
-            data['details'] = (re.search(('n =.*[0-9]'), detail['match'])).group()
-
-            with open("README.txt", "w") as fi:
-                fi.write("""\
+    with open("README.txt", "w") as fi:
+        fi.write("""\
 FCP1000 sub-dataset %(dataset)s
 ------------------------
 
@@ -57,8 +49,8 @@ Author(s): %(PI)s
 Details: %(details)s
         """ % data)
 
-            lgr.info("Generated README.txt")
-            yield {'filename': "README.txt"}
+        lgr.info("Generated README.txt")
+        yield {'filename': "README.txt"}
 
 
 class find_dataset(object):
@@ -78,12 +70,20 @@ class find_dataset(object):
 
         titles = [x['match'] for x in xpath_match('//*/tr [@class="tableHdr"]/td/strong/text()')(data)]
         tar_tds = [x['match'] for x in xpath_match('//*/tr [@class="tableDownload"]/td')(data)]
+        details = [x['match'] for x in xpath_match('//*[@class="tableHdr"]/td|strong/text()')(data)]
+
         if len(titles) != len(tar_tds):
             assert tar_tds[-1] == '<td></td>'
-        for title, tar in zip(titles, tar_tds):
+            assert len(tar_tds) == len(titles) + 1
+
+        for title, tar, detail in zip(titles, tar_tds, details):
             if title == self.dataset:
                 data['title'] = title
                 data['response'] = tar
+                pi = (re.search(('<br>.*<br>'), detail)).group()
+                cleaner = re.compile('<.*?>')
+                data['PI'] = re.sub(cleaner, '', pi)
+                data['details'] = (re.search(('n =.*[0-9]'), detail)).group()
                 yield data
                 return
         raise RuntimeError("Failed to find a cell for the dataset %s" % self.dataset)
@@ -108,6 +108,7 @@ def pipeline(dataset):
             crawl_url(TOPURL),
             [
                 assign({'dataset': dataset}),
+                # first row was formatted differently so we need to condition it a bit
                 sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
                 find_dataset(dataset),
                 [  # README
