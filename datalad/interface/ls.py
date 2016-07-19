@@ -462,6 +462,16 @@ def fs_render(root, subdir, json=None):
     elif json == 'display':
         print(dumps(subdir) + '\n')
 
+def machinesize(humansize):
+    """convert human-size string to machine-size"""
+    try:
+        size_str, size_unit = humansize.split(" ")
+    except AttributeError:
+        return float(humansize)
+    unit_converter = {'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}
+    machinesize = float(size_str)*(1024**unit_converter[size_unit])
+    return machinesize
+
 
 def fs_traverse(path, repo, recursive=False, json=None):
     """Traverse path through its nodes and returns a dictionary of relevant attributes attached to each node
@@ -495,13 +505,15 @@ def fs_traverse(path, repo, recursive=False, json=None):
             if recursive and isdir(nodepath) and not ignored(nodepath):
                 # if recursive, create info dictionary of each child directory
                 subdir = fs_traverse(nodepath, repo, recursive=recursive, json=json)
+                # update parent with child computed size of itself
+                fs["nodes"][-1]["size"] = subdir["size"]
                 # run renderer on subdirectory(subdir) at location(path) with json option set by user
                 lgr.info('Subdir: ' + opj(path, node))
                 fs_render(nodepath, subdir, json=json)
 
         # update current node size by summing sizes of all its 1st level children
         total_size = sum([
-            int(FsModel(node['path'], repo).size)
+            machinesize(node['size'])
             for node in fs['nodes'][1:]
         ])
         fs["size"] = fs["nodes"][0]["size"] = humanize.naturalsize(total_size)
