@@ -15,7 +15,6 @@ import requests
 import requests.auth
 
 import io
-from six import PY3
 from six import BytesIO
 
 from ..utils import assure_list_from_str, assure_dict_from_str
@@ -335,10 +334,9 @@ class HTTPDownloaderSession(DownloaderSession):
                 ui.out.flush()
                 if size is not None and total >= size:
                     break  # we have done as much as we were asked
+
         if return_content:
             out = f.getvalue()
-            if PY3 and isinstance(out, bytes):
-                out = out.decode()
             return out
 
 

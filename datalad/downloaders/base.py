@@ -18,7 +18,8 @@ import time
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from os.path import exists, join as opj, isdir
-from six import string_types, PY2
+from six import PY2
+from six import binary_type, PY3
 
 
 from .. import cfg
@@ -219,7 +220,7 @@ class BaseDownloader(object):
 
             if file_:
                 with open(file_) as fp:
-                    content = fp.read()
+                    content = fp.read(self._DOWNLOAD_SIZE_TO_VERIFY_AUTH)
             else:
                 assert(content is not None)
 
@@ -420,6 +421,10 @@ class BaseDownloader(object):
             content = downloader_session.download(size=size)
             #pbar.finish()
             downloaded_size = len(content)
+
+            # now that we know size based on encoded content, let's decode into string type
+            if PY3 and isinstance(content, binary_type):
+                content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 
             self._verify_download(url, downloaded_size, target_size, None, content=content)
