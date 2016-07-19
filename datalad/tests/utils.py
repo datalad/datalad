@@ -334,8 +334,9 @@ def ok_archives_caches(repopath, n=1, persistent=None):
                    ARCHIVES_TEMP_DIR + {None: '*', True: '', False: '-*'}[persistent],
                    '*')
     dirs = glob.glob(glob_ptn)
-    assert_equal(len(dirs), n,
-                 msg="Found following dirs when needed %d of them: %s" % (n, dirs))
+    n2 = n * 2  # per each directory we should have a .stamp file
+    assert_equal(len(dirs), n2,
+                 msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
 def ok_file_has_content(path, content):
     """Verify that file exists and has expected content"""
