@@ -22,7 +22,7 @@ from ...tests.utils import assert_equal, assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
-from datalad.interface.ls import ignored, fs_traverse, _ls_json
+from datalad.interface.ls import ignored, fs_traverse, _ls_json, RepoModel
 from os.path import exists, lexists, join as opj, abspath, isabs
 
 from datalad.downloaders.tests.utils import get_test_providers
@@ -83,13 +83,12 @@ def test_ignored(topdir):
                   'subgit': {'fgit.txt': '987'}},
           '.hidden': {'.hidden_file': '121'}})
 def test_fs_traverse(topdir):
-    from datalad.distribution.dataset import Dataset
     AnnexRepo(opj(topdir, 'annexdir'), create=True)
     GitRepo(opj(topdir, 'gitdir'), create=True)
     GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
 
     with swallow_logs() as log, swallow_outputs() as cmo:
-        fs = fs_traverse(topdir, Dataset(topdir), recursive=True, json='display')
+        fs = fs_traverse(topdir, RepoModel(topdir), recursive=True, json='display')
         # fs_traverse logs should contain all not ignored subdirectories
         for subdir in [opj(topdir, "dir"), opj(topdir, 'dir', 'subdir')]:
             assert_in("Subdir: " + subdir, log.out)

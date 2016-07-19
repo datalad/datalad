@@ -129,15 +129,20 @@ from datalad.support.annexrepo import GitRepo
 
 
 @auto_repr
-class RepoBasedModel(object):
+class GitModel(object):
     """A base class for models which have some .repo available"""
 
-    __slots__ = ['_info', '_branch']
+    __slots__ = ['_branch', 'repo', '_path']
 
-    def __init__(self):
+    def __init__(self, repo):
+        self.repo = repo
         # lazy evaluation variables
         self._branch = None
-        self._info = None
+        self._path = None
+
+    @property
+    def path(self):
+        return self.repo.path if self._path is None else self._path
 
     @property
     def branch(self):
@@ -168,12 +173,34 @@ class RepoBasedModel(object):
         return commit.committed_date
 
     @property
+    def count_objects(self):
+        return self.repo.count_objects
+
+    @property
+    def git_local_size(self):
+        count_objects = self.count_objects
+        return count_objects['size'] if count_objects else None
+
+    @property
+    def type(self):
+        return {False: 'git', True: 'annex'}[isinstance(self.repo, AnnexRepo)]
+
+
+@auto_repr
+class AnnexModel(GitModel):
+
+    __slots__ = ['_info'] + GitModel.__slots__
+
+    def __init__(self):
+        super(AnnexModel, self).__init__()
+
+    @property
     def clean(self):
         return not self.repo.dirty
 
     @property
     def info(self):
-        if self._info is None and isinstance(self.repo, AnnexRepo):
+        if self._info is None:
             self._info = self.repo.repo_info()
         return self._info
 
@@ -187,50 +214,15 @@ class RepoBasedModel(object):
         info = self.info
         return info['local annex size'] if info else None
 
-    @property
-    def type(self):
-        return {False: 'git', True: 'annex'}[isinstance(self.repo, AnnexRepo)]
-
 
 @auto_repr
-class DsModel(RepoBasedModel):
+class FsModel(GitModel):
 
-    __slots__ = RepoBasedModel.__slots__ + ['ds', '_path']
-
-    def __init__(self, ds):
-        super(DsModel, self).__init__()
-        self.ds = ds
-        # TODO:  theoretically should not be overriden and generally just be present in the ds
-        self._path = None  # can be overriden
-
-    @property
-    def path(self):
-        return self.ds.path if self._path is None else self._path
-
-    @path.setter
-    def path(self, v):
-        self._path = v
-
-    @property
-    def repo(self):
-        return self.ds.repo
-
-    @property
-    def type(self):
-        if not exists(self.path):
-            return None
-        return super(DsModel, self).type
-
-
-@auto_repr
-class FsModel(RepoBasedModel):
-
-    __slots__ = ['_path', 'repo'] + RepoBasedModel.__slots__
+    __slots__ = ['_path', 'repo'] + GitModel.__slots__
 
     def __init__(self, path, repo=None):
-        super(FsModel, self).__init__()
+        super(FsModel, self).__init__(repo)
         self._path = path  # fs path to the node, can be overridden
-        self.repo = repo  # parent repository associated with node
         # of value only if it was annex
         # self.dsmodel = DsModel(Dataset(path)) if self.type_ == 'annex' else None
 
@@ -262,10 +254,7 @@ class FsModel(RepoBasedModel):
         type_ = self.type_
 
         if type_ == 'annex':
-            if self.annex_local_size:
-                return self.annex_local_size
-            else:
-                return Runner().run(['du', '-s', self._path])[0].split('\t')[0]
+            return self.annex_local_size
         elif type_ == 'git':
             return self.git_local_size
         elif type_ in ['file', 'link', 'link-broken']:
@@ -298,16 +287,6 @@ class FsModel(RepoBasedModel):
             return 'dir'
         else:
             return None
-
-    @property
-    def git_local_size(self):
-        """computes the disk space used by unpacked object files in the git repository"""
-        try:
-            describe, outerr = self.repo._git_custom_command([], ['git', 'count-objects', '-v'])[0].split('\n')
-            size = [item for item in describe if 'size: ' in item][0].split(': ')
-            return int(size[1])
-        except:
-            return lstat(self._path).st_size
 
 
 import string
@@ -384,11 +363,11 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     topdir = '' if isabs_loc else abspath(curdir)
 
     topds = Dataset(loc)
-    dss = [topds] + (
-        [Dataset(opj(loc, sm))
+    dss = [topds.repo] + (
+        [Dataset(opj(loc, sm)).repo
          for sm in topds.get_subdatasets(recursive=recursive)]
         if recursive else [])
-    dsms = list(map(DsModel, dss))
+    dsms = list(map(RepoModel, dss))
 
     # adjust path strings
     for ds_model in dsms:
@@ -524,11 +503,11 @@ def fs_traverse(path, repo, recursive=False, json=None):
 def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
     # find all sub-datasets under path passed and attach Dataset class to each
     topds = Dataset(loc)
-    dss = [topds] + (
-        [Dataset(opj(loc, sm))
+    dss = [topds.repo] + (
+        [Dataset(opj(loc, sm).repo)
          for sm in topds.get_subdatasets(recursive=recursive)]
         if recursive else [])
-    dsms = list(map(DsModel, dss))
+    dsms = list(map(RepoModel, dss))
 
     # for each submodule at loc passed by user
     for ds in dsms:
