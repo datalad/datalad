@@ -10,7 +10,7 @@
 
 from os.path import exists
 from ....utils import chpwd
-from ....tests.utils import assert_true
+from ....tests.utils import assert_true, assert_raises
 from ....tests.utils import with_tempfile
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from datalad.crawler.pipelines.fcptable import *
@@ -29,10 +29,15 @@ def test_smoke_pipelines():
 
 
 @with_tempfile(mkdir=True)
-def _test_dataset(dataset, tmpdir):
+def _test_dataset(dataset, error, create, tmpdir):
     TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
     with chpwd(tmpdir):
+
+        if create:
+            with open("README.txt", 'w') as f:
+                f.write(" ")
+
         pipe = [
             crawl_url(TOPURL),
             [
@@ -42,6 +47,11 @@ def _test_dataset(dataset, tmpdir):
                 extract_readme,
             ]
         ]
+
+        if error:
+            assert_raises(RuntimeError, run_pipeline, pipe)
+            return
+
         run_pipeline(pipe)
         assert_true(exists("README.txt"))
 
@@ -51,6 +61,9 @@ def _test_dataset(dataset, tmpdir):
 
 
 def test_dataset():
-    yield _test_dataset, 'Baltimore'
-    yield _test_dataset, 'AnnArbor_b'
-    yield _test_dataset, 'Ontario'
+    yield _test_dataset, 'Baltimore', None, False
+    yield _test_dataset, 'AnnArbor_b', None, False
+    yield _test_dataset, 'Ontario', None, False
+    yield _test_dataset, 'Boston', RuntimeError, False
+    yield _test_dataset, "AnnArbor_b", None, True
+
