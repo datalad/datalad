@@ -7,14 +7,14 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
-
 from os.path import exists
 from ....utils import chpwd
 from ....tests.utils import assert_true, assert_raises
-from ....tests.utils import with_tempfile
+from ....tests.utils import with_tempfile, skip_if_no_network, use_cassette
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from datalad.crawler.pipelines.fcptable import *
 from datalad.crawler.pipeline import run_pipeline
+
 
 import logging
 from logging import getLogger
@@ -28,6 +28,8 @@ def test_smoke_pipelines():
     yield _test_smoke_pipelines, superdataset_pipeline, None
 
 
+@use_cassette('test_fcptable_dataset')
+@skip_if_no_network
 @with_tempfile(mkdir=True)
 def _test_dataset(dataset, error, create, tmpdir):
     TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
