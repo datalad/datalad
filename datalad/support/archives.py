@@ -204,6 +204,7 @@ def _get_cached_filename(archive):
     # per se there is no reason to maintain any long original name here.
     return hashlib.md5(archive.encode()).hexdigest()[:10]
 
+
 import string
 import random
 def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):
@@ -212,6 +213,7 @@ def _get_random_id(size=6, chars=string.ascii_uppercase + string.digits):
     upper-case so we are tolerant to unlikely collisions on dummy FSs
     """
     return ''.join(random.choice(chars) for _ in range(size))
+
 
 class ArchivesCache(object):
     """Cache to maintain extracted archives

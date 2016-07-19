@@ -40,6 +40,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     URL_PREFIX = URL_SCHEME + ":"
 
     AVAILABILITY = "local"
+    COST = 500
 
     def __init__(self, persistent_cache=True, **kwargs):
         super(ArchiveAnnexCustomRemote, self).__init__(**kwargs)

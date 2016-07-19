@@ -172,9 +172,10 @@ class AnnexCustomRemote(object):
     CUSTOM_REMOTE_NAME = None  # if None -- no additional custom remote name
     # SUPPORTED_SCHEMES = ()
 
+    COST = DEFAULT_COST
     AVAILABILITY = DEFAULT_AVAILABILITY
 
-    def __init__(self, path=None, cost=DEFAULT_COST):  # , availability=DEFAULT_AVAILABILITY):
+    def __init__(self, path=None, cost=None):  # , availability=DEFAULT_AVAILABILITY):
         """
         Parameters
         ----------
@@ -202,6 +203,8 @@ class AnnexCustomRemote(object):
         self.path = self.repo.path
 
         self._progress = 0  # transmission to be reported back if available
+        if cost is None:
+            cost = self.COST
         self.cost = cost
         #self.availability = availability.upper()
         assert(self.AVAILABILITY.upper() in ("LOCAL", "GLOBAL"))
