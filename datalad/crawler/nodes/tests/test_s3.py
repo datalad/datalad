@@ -77,7 +77,7 @@ def test_crawl_s3(path):
 
 
 @skip_if_no_network
-@use_cassette('test_crawl_s3')
+@use_cassette('test_crawl_s3_commit_versions')
 @with_tempfile
 def test_crawl_s3_commit_versions(path):
     annex = _annex(path)
