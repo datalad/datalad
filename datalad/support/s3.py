@@ -299,7 +299,11 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             providers = Providers.from_config_files()
             s3url = "s3://%s/" % s3_bucket
             s3provider = providers.get_provider(s3url)
-            bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
+            if s3provider.authenticator.bucket is not None:
+                # we have established connection before, so let's just reuse
+                bucket = s3provider.authenticator.bucket
+            else:
+                bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
         else:
             bucket = s3conn.get_bucket(s3_bucket)
         supports_versioning = True  # assume that it does
