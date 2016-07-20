@@ -61,11 +61,8 @@ def get_func_kwargs_doc(func):
     ----------
     func: str
       name of the function from which args are being requested
-
     -------
-
     """
-
     return getargspec(func)[0]
 
     # TODO: format error message with descriptions of args

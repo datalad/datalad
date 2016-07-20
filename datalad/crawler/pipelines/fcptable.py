@@ -21,13 +21,10 @@ TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
 def superdataset_pipeline(url=TOPURL):
     """
-    XXX
     Parameters
     ----------
-    url
-       URL to the page with ..... XXX
-
-    Returns
+    url: str
+       URL point to all datasets, hence the URL at the top
     -------
 
     """
