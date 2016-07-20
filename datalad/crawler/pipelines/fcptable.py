@@ -6,8 +6,7 @@ from os.path import lexists
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
-from ..nodes.misc import assign
-from ..nodes.misc import sub
+from ..nodes.misc import assign, skip_if, sub
 from ..nodes.misc import get_disposition_filename
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
@@ -20,12 +19,22 @@ TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
 
 def superdataset_pipeline(url=TOPURL):
+    """
+    Parameters
+    ----------
+    url: str
+       URL point to all datasets, hence the URL at the top
+    -------
+
+    """
     annex = Annexificator()
     lgr.info("Creating a FCP collection pipeline")
     return [
         crawl_url(url),
         xpath_match('//*[@class="tableHdr"]/td/strong/text()', output='dataset'),
-        # TODO: replace spaces
+        skip_if(dataset='Cleveland CCF'),
+        skip_if(dataset='Durham_Madden'),
+        skip_if(dataset='NewYork_Test-Retest_Reliability'),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="fcptable",
