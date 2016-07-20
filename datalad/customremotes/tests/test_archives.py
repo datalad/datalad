@@ -76,7 +76,7 @@ def check_basic_scenario(fn_archive, fn_extracted, direct, d, d2):
     assert_true(annex.file_has_content(fn_extracted))
 
     annex.rm_url(fn_extracted, file_url)
-    with swallow_logs() as cm:
+    with swallow_logs(new_level=logging.WARN) as cm:
         assert_raises(RuntimeError, annex.drop, fn_extracted)
         in_("git-annex: drop: 1 failed", cm.out)
 
