@@ -24,8 +24,6 @@ def superdataset_pipeline(url=TOPURL):
     ----------
     url: str
        URL point to all datasets, hence the URL at the top
-    -------
-
     """
     annex = Annexificator()
     lgr.info("Creating a FCP collection pipeline")
