@@ -55,10 +55,7 @@ from .utils import skip_if_no_module
 
 def test_get_func_kwargs_doc():
     from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset: str\n  Id of the OpenfMRI dataset (e.g. ds000001)',
-              'versioned_urls: bool, optional\n  Request versioned URLs.  '
-              'OpenfMRI bucket is versioned, but if\n  original data resides '
-              'elsewhere, set to False', 'topurl: str, optional\n  Top level URL to the datasets.']
+    output = ['dataset', 'versioned_urls', 'topurl']
     eq_(get_func_kwargs_doc(pipeline), output)
 
 

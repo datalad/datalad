@@ -55,7 +55,22 @@ except:  # pragma: no cover
 
 
 def get_func_kwargs_doc(func):
-    return [dict(get_docstring_split(func)[1]).get(x) for x in getargspec(func)[0]]
+    """ Provides args for a function
+    
+    Parameters
+    ----------
+    func: str
+      name of the function from which args are being requested
+
+    Returns
+    -------
+    list
+      of the args that a function takes in
+    """
+    return getargspec(func)[0]
+
+    # TODO: format error message with descriptions of args
+    # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
 
 
 def assure_tuple_or_list(obj):
