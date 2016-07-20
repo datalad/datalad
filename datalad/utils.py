@@ -128,10 +128,14 @@ def is_interactive():
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
+
 import hashlib
+
+
 def md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
+
 
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
@@ -142,6 +146,7 @@ def sorted_files(dout):
 
 from os.path import sep as dirsep
 _VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+
 
 def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
     """Generator to find files matching regex
@@ -288,12 +293,14 @@ def file_basename(name, return_ext=False):
     else:
         return fbname
 
+
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
     filename = filename.replace('"', r'\"').replace('`', r'\`')
     filename = '"%s"' % filename
     return filename
+
 
 def encode_filename(filename):
     """Encode unicode filename
@@ -331,6 +338,7 @@ else:
             os.utime(rfilepath, (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
+
 
 def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
@@ -375,6 +383,33 @@ def assure_dict_from_str(s, **kwargs):
         out[k] = v
     return out
 
+
+def unique(seq, key=None):
+    """Given a sequence return a list only with unique elements while maintaining order
+
+    This is the fastest solution.  See
+    https://www.peterbe.com/plog/uniqifiers-benchmark
+    and
+    http://stackoverflow.com/a/480227/1265472
+    for more information.
+    Enhancement -- added ability to compare for uniqueness using a key function
+
+    Parameters
+    ----------
+    seq:
+      Sequence to analyze
+    key: callable, optional
+      Function to call on each element so we could decide not on a full
+      element, but on its member etc
+    """
+    seen = set()
+    seen_add = seen.add
+    if not key:
+        return [x for x in seq if not (x in seen or seen_add(x))]
+    else:
+        # OPT: could be optimized, since key is called twice, but for our cases
+        # should be just as fine
+        return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
 
 #
 # Decorators

@@ -17,6 +17,7 @@ import logging
 from mock import patch
 from six import PY3
 
+from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
 from os.path import isabs, expandvars, expanduser
 from collections import OrderedDict
@@ -34,6 +35,7 @@ from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
+from ..utils import unique
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -381,3 +383,14 @@ def test_knows_annex(here, there):
     assert_true(knows_annex(here))
     gitclone = GitRepo(path=there, url=here, create=True)
     assert_true(knows_annex(there))
+
+
+def test_unique():
+    eq_(unique(range(3)), [0, 1, 2])
+    eq_(unique((1, 0, 1, 3, 2, 0, 1)), [1, 0, 3, 2])
+    eq_(unique([]), [])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)]), [(1, 2), (1,), (0, 3)])
+
+    # with a key now
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], key=itemgetter(0)), [(1, 2), (0, 3)])
+    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)], key=itemgetter(1)), [(1, 2), (1, 3)])
