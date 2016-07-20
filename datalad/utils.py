@@ -55,13 +55,17 @@ except:  # pragma: no cover
 
 
 def get_func_kwargs_doc(func):
-    """ Provides documentation of necessary args for a function
+    """ Provides args for a function
     
     Parameters
     ----------
     func: str
       name of the function from which args are being requested
+
+    Returns
     -------
+    list
+      of the args that a function takes in
     """
     return getargspec(func)[0]
 
