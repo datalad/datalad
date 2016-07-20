@@ -65,10 +65,11 @@ def get_func_kwargs_doc(func):
     -------
 
     """
-    if not func.__doc__:
-        return getargspec(func)[0]
 
-    return [dict(get_docstring_split(func)[1]).get(x) for x in getargspec(func)[0]]
+    return getargspec(func)[0]
+
+    # TODO: format error message with descriptions of args
+    # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
 
 
 def assure_tuple_or_list(obj):
