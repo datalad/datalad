@@ -66,6 +66,8 @@ class CrawlInit(Interface):
     def __call__(args=None, template=None, template_func=None, commit=False):
 
         if args:
+            if isinstance(args, str):
+                args = args.split(" ")
             if isinstance(args, list):
                 args = OrderedDict(map(str, it.split('=', 1)) for it in args)
             elif isinstance(args, dict):

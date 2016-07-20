@@ -55,20 +55,19 @@ except:  # pragma: no cover
 
 
 def get_func_kwargs_doc(func):
-    """
-    TODO   describe the purpose and expections (e.g. when there is no __doc__
+    """ Provides documentation of necessary args for a function
     
     Parameters
     ----------
-    func
+    func: str
+      name of the function from which args are being requested
 
-    Returns
     -------
 
     """
-    # XXX first check that func has non-None .__doc__
-    # XXX if there should format the message neatly, not just
-    #  ['url\n   URL to the page with ..... XXX']
+    if not func.__doc__:
+        return getargspec(func)[0]
+
     return [dict(get_docstring_split(func)[1]).get(x) for x in getargspec(func)[0]]
 
 
