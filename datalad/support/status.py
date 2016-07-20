@@ -31,14 +31,14 @@ class FileStatus(object):
         if not other:
             return False
         # Disallow comparison of empty ones
-        if self.size is None and self.mtime is None and self.filename is None:
+        if self.size is None and self.mtime is None:  # and self.filename is None:
             return NotImplemented
-        if other.size is None and other.mtime is None and other.filename is None:
+        if other.size is None and other.mtime is None:  # and other.filename is None:
             return NotImplemented
 
         same = \
-            self.size == other.size and \
-            self.filename == other.filename
+            self.size == other.size #and \
+            #self.filename == other.filename
         if not same:
             return False
 

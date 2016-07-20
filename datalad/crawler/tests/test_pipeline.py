@@ -45,6 +45,7 @@ class AssertOrder(object):
     def __call__(self, numbers):
         if isinstance(numbers, int):
             numbers = {numbers}
+
         def _assert_order(data):
             self._call += 1
             lgr.debug("#%d invocation of %s " % (self._call, self))
@@ -64,6 +65,8 @@ def test_load_pipeline_from_script(d):
 
 
 DEFAULT_OUTPUT = [{'datalad_stats': ActivityStats()}]
+
+
 def _out(ld):
     """Adjust output entry to include default outputs as well
     """
@@ -189,6 +192,7 @@ def test_pipeline_recursive():
 
 def test_pipeline_looping():
     count = [0, 0]
+
     def count_threetimes(data):
         """helper to not yield anything if done it 3 times by now"""
         if count[0] >= 3:
@@ -232,7 +236,6 @@ def test_pipeline_looping():
     eq_(count, [3, 6])
 
 
-
 def test_pipeline_linear_top_isnested_pipeline():
     # check if no generated data to reach the end node, it still gets executed
     was_called = []
@@ -251,6 +254,7 @@ def test_pipeline_updated_stats():
     def n1(data):
         data['datalad_stats'].increment('add_git')
         yield data
+
     def n2(data):  # doesn't care to maintain previous stats
         data = data.copy()
         data['datalad_stats'] = ActivityStats(files=2)
@@ -259,14 +263,17 @@ def test_pipeline_updated_stats():
     pipeline_output = run_pipeline([{'output': 'outputs'}, n1, n2])
     eq_(pipeline_output, [{'datalad_stats': ActivityStats(files=2, add_git=1), 'out': 1}])
 
+
 def test_pipeline_dropped_stats():
     def n1(data):
         data['datalad_stats'].increment('add_git')
         yield data
+
     def n2(data):  # doesn't care to maintain previous stats
         yield {'out': 1}
     pipeline_output = run_pipeline([{'output': 'outputs'}, n1, n2])
     eq_(pipeline_output, [{'datalad_stats': ActivityStats(add_git=1), 'out': 1}])
+
 
 def test_pipeline_stats_persist():
     # to test that we would get proper stats returned in various pipeline layouts
