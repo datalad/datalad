@@ -32,10 +32,19 @@ class HelpAction(argparse.Action):
             # lets use the manpage on mature systems ...
             try:
                 import subprocess
+                # extract version field from datalad manpage if present, swallow_error_logs
                 man_th = subprocess.check_output(
-                    ['zgrep', '\\.TH', '/usr/share/man/man1/datalad.1.gz'])
-                man_version = man_th.split(' ')[4]
-                if __version__ not in man_version:
+                    ['zgrep', '\\.TH', '/usr/share/man/man1/datalad.1.gz'],
+                    stderr=subprocess.STDOUT)
+                man_version = man_th.split(' ')[5].strip(" '\"\t\n")
+
+                # extract current datalad version
+                datalad_version = '.'.join(
+                    __version__.split('.')[:3]
+                ).strip(" '\"\t\n")  # e.g 2.0.3.dev84 ~> 2.0.3
+
+                # don't show manpage if man_version not equal to current datalad_version
+                if datalad_version != man_version:
                     raise ValueError
                 subprocess.check_call(
                     'man %s 2> /dev/null' % parser.prog.replace(' ', '-'),
