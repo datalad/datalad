@@ -20,6 +20,14 @@ TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
 
 def superdataset_pipeline(url=TOPURL):
+    """
+    Parameters
+    ----------
+    url: str
+       URL point to all datasets, hence the URL at the top
+    -------
+
+    """
     annex = Annexificator()
     lgr.info("Creating a FCP collection pipeline")
     return [

@@ -68,3 +68,4 @@ def _test_crawl_init_error_patch(return_value, exc, exc_msg, d):
 def test_crawl_init_error_patch():
     yield _test_crawl_init_error_patch, [], ValueError, "returned pipeline is empty"
     yield _test_crawl_init_error_patch, {1: 2}, ValueError, "pipeline should be represented as a list. Got: {1: 2}"
+

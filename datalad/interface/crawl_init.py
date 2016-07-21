@@ -47,13 +47,13 @@ class CrawlInit(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""flag if template is specified by user"""),
         template_func=Parameter(
-            args=("-f", "--func"),
+            args=("-f", "--template-func"),
             action="store",
             doc="""flag if function is specified by user"""),
         args=Parameter(
             args=("args",),
             nargs="*",
-            type=OrderedDict or list,
+            constraints=EnsureStr() | EnsureNone(),
             doc="""keyword arguments to pass into the template function generating actual pipeline,
             organized in an ordered dict"""),
         commit=Parameter(
@@ -66,6 +66,8 @@ class CrawlInit(Interface):
     def __call__(args=None, template=None, template_func=None, commit=False):
 
         if args:
+            if isinstance(args, str):
+                args = [args]
             if isinstance(args, list):
                 args = OrderedDict(map(str, it.split('=', 1)) for it in args)
             elif isinstance(args, dict):

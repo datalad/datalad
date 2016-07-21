@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 import os
 from os.path import exists, join as opj, basename, abspath
 from collections import OrderedDict
+from operator import itemgetter
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -22,6 +23,7 @@ from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
 from ..utils import getpwd
+from ..utils import unique
 from .base import AnnexCustomRemote
 
 
@@ -105,7 +107,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             fdict['size'] = int(fdict['size'])
         return key, path, fdict
 
-    def _gen_akey_afiles(self, key, sorted=False):
+    def _gen_akey_afiles(self, key, sorted=False, unique_akeys=True):
         """Given a key, yield akey, afile pairs
 
         if `sorted`, then first those which have extracted version in local cache
@@ -118,10 +120,13 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         """
         urls = self.get_URLS(key)
 
-        akey_afiles = (
+        akey_afiles = [
             self._parse_url(url)[:2]  # skip size
             for url in urls
-        )
+        ]
+
+        if unique_akeys:
+            akey_afiles = unique(akey_afiles, key=itemgetter(0))
 
         if not sorted:
             for pair in akey_afiles:
@@ -169,7 +174,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # So no archive is present either in the cache or originally under annex
         # XXX some kind of a heuristic I guess is to use last_url ;-)
-        if self._last_url and self._last_url in urls:
+        if self._last_url and self._last_url in urls and (len(urls) == len(akey_afiles)):
             akey_afile, _ = akey_afile_paths[urls.index(self._last_url)]
             yielded.add(akey_afile)
             yield akey_afile
@@ -257,7 +262,9 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # Otherwise it is unrealistic to even require to recompute key if we
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
-        for akey, afile in self._gen_akey_afiles(key):
+        # The same content could be available from multiple locations within the same
+        # archive, so let's not ask it twice since here we don't care about "afile"
+        for akey, _ in self._gen_akey_afiles(key, unique_akeys=True):
             if self.get_contentlocation(akey) or self.repo.is_available(akey, batch=True, key=True):
                 self.send("CHECKPRESENT-SUCCESS", key)
                 return
@@ -311,7 +318,13 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     def _transfer(self, cmd, key, path):
 
         akeys_tried = []
-        for akey, afile in self._gen_akey_afiles(key, sorted=True):
+        # the same file could come from multiple files within the same archive
+        # So far it doesn't make sense to "try all" of them since if one fails
+        # it means the others would fail too, so it makes sense to immediately
+        # prune the list so we keep only the ones from unique akeys.
+        # May be whenever we support extraction directly from the tarballs
+        # we should go through all and choose the one easiest to get or smth.
+        for akey, afile in self._gen_akey_afiles(key, sorted=True, unique_akeys=True):
             akeys_tried.append(akey)
             try:
                 akey_fpath = self.get_contentlocation(akey)
