@@ -21,6 +21,7 @@ from tempfile import NamedTemporaryFile
 from ..cmd import Runner
 from ..log import is_interactive
 from ..utils import getpwd
+from ..version import __version__
 
 from logging import getLogger
 lgr = getLogger('datalad.cmdline')
@@ -31,11 +32,16 @@ class HelpAction(argparse.Action):
             # lets use the manpage on mature systems ...
             try:
                 import subprocess
+                man_th = subprocess.check_output(
+                    ['zgrep', '\\.TH', '/usr/share/man/man1/datalad.1.gz'])
+                man_version = man_th.split(' ')[4]
+                if __version__ not in man_version:
+                    raise ValueError
                 subprocess.check_call(
                     'man %s 2> /dev/null' % parser.prog.replace(' ', '-'),
                     shell=True)
                 sys.exit(0)
-            except (subprocess.CalledProcessError, OSError):
+            except (subprocess.CalledProcessError, OSError, IndexError, ValueError):
                 # ...but silently fall back if it doesn't work
                 pass
         if option_string == '-h':
