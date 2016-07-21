@@ -17,6 +17,11 @@ matrix:
     env:
     - DATALAD_LOGLEVEL=INFO
   - python: 2.7
+    # By default no logs will be output. This one is to test with low level but dumped to /dev/null
+    env:
+    - DATALAD_LOGLEVEL=2
+    - DATALAD_LOGTARGET=/dev/null
+  - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
