@@ -86,9 +86,8 @@ class BaseDownloader(object):
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
 
-
-    def _access(self, method, url, allow_old_session=True, **kwargs):
-        """Fetch content as pointed by the URL optionally into a file
+    def access(self, method, url, allow_old_session=True, **kwargs):
+        """Generic decorator to manage access to the URL via some method
 
         Parameters
         ----------
@@ -231,7 +230,6 @@ class BaseDownloader(object):
             raise IncompleteDownloadError("Downloaded size %d differs from originally announced %d"
                                           % (downloaded_size, target_size))
 
-
     def _download(self, url, path=None, overwrite=False, size=None, stats=None):
         """Download content into a file
 
@@ -348,8 +346,7 @@ class BaseDownloader(object):
         # but then it might require sending request anyways for Content-Disposition
         # so probably nah
         lgr.info("Downloading %r into %r", url, path)
-        return self._access(self._download, url, path=path, **kwargs)
-
+        return self.access(self._download, url, path=path, **kwargs)
 
     @property
     def cache(self):
@@ -370,7 +367,6 @@ class BaseDownloader(object):
             import atexit
             atexit.register(self._cache.close)
         return self._cache
-
 
     def _fetch(self, url, cache=None, size=None, allow_redirects=True):
         """Fetch content from a url into a file.
@@ -444,7 +440,6 @@ class BaseDownloader(object):
 
         return content, downloader_session.headers
 
-
     def fetch(self, url, **kwargs):
         """Fetch and return content (not decoded) as pointed by the URL
 
@@ -460,10 +455,9 @@ class BaseDownloader(object):
         """
         lgr.info("Fetching %r", url)
         # Do not return headers, just content
-        out = self._access(self._fetch, url, **kwargs)
+        out = self.access(self._fetch, url, **kwargs)
         # import pdb; pdb.set_trace()
         return out[0]
-
 
     def get_status(self, url, old_status=None, **kwargs):
         """Return status of the url as a dict, None if N/A
@@ -485,8 +479,7 @@ class BaseDownloader(object):
           has changed by comparing to previously obtained value.
           If URL is not reachable, None would be returned
         """
-        return self._access(self._get_status, url, old_status=old_status, **kwargs)
-
+        return self.access(self._get_status, url, old_status=old_status, **kwargs)
 
     # TODO: borrow from itself... ?
     # @borrowkwargs(BaseDownloader, 'get_status')
@@ -527,7 +520,7 @@ class BaseDownloader(object):
         -------
         str
         """
-        return self._access(self._get_target_url, url)
+        return self.access(self._get_target_url, url)
 
     def _get_target_url(self, url):
         return self.get_downloader_session(url).url
