@@ -131,7 +131,7 @@ try:
                 self._pbar = None
             try:
                 super(tqdmProgressBar, self).finish()
-            except Exception as exc:
+            except Exception as exc:  # pragma: no cover
                 #lgr.debug("Finishing tqdmProgresBar thrown %s", str_exc(exc))
                 pass
 
