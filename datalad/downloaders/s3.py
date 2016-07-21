@@ -45,6 +45,8 @@ class S3Authenticator(Authenticator):
     """Authenticator for S3 AWS
     """
 
+    DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
+
     def __init__(self, *args, **kwargs):
         super(S3Authenticator, self).__init__(*args, **kwargs)
         self.connection = None

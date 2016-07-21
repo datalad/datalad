@@ -246,11 +246,20 @@ def test_get_status_from_headers():
         'Last-Modified': 'Sat, 07 Nov 2015 05:23:36 GMT'
     }
     headers['bogus1'] = '123'
+
     assert_equal(
             HTTPDownloader.get_status_from_headers(headers),
             FileStatus(size=123, filename='bogus.txt', mtime=1446873816))
+
     assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}),
                  FileStatus(size=123))
+
+    assert_equal(
+        HTTPDownloader.get_status_from_headers({
+            'Content-Disposition': 'Attachment;Filename="Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip"',
+        }).filename,
+        'Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip')
+
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
