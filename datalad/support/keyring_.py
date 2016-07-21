@@ -29,6 +29,7 @@ class Keyring(object):
             if lgr_level < logging.DEBUG:
                 keyring_lgr = logging.getLogger('keyring')
                 keyring_lgr.setLevel(lgr_level)
+                keyring_lgr.handlers = lgr.handlers
             lgr.debug("Importing keyring")
             import keyring
             self.__keyring = keyring
