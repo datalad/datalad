@@ -27,6 +27,7 @@ from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
 from ..dochelpers import borrowkwargs
+from .credentials import CREDENTIAL_TYPES
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -73,16 +74,25 @@ class BaseDownloader(object):
         authenticator: Authenticator, optional
           Authenticator to use for authentication.
         """
-        self.credential = credential
         if not authenticator and self._DEFAULT_AUTHENTICATOR:
             authenticator = self._DEFAULT_AUTHENTICATOR()
 
         if authenticator:
             if not credential:
-                raise ValueError(
-                    "Both authenticator and credentials must be provided."
-                    " Got only authenticator %s" % repr(authenticator))
-
+                msg = "Both authenticator and credentials must be provided." \
+                      " Got only authenticator %s" % repr(authenticator)
+                if ui.yesno(
+                    title=msg,
+                    text="Do you want to enter %s credentials to be used?" % authenticator.DEFAULT_CREDENTIAL_TYPE
+                ):
+                    credential = CREDENTIAL_TYPES[authenticator.DEFAULT_CREDENTIAL_TYPE](
+                        "session-only-for-%s" % id(authenticator))
+                    credential.enter_new()
+                    # TODO: give an option to store those credentials, and generate a basic provider
+                    # record?
+                else:
+                    raise ValueError(msg)
+        self.credential = credential
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
 
@@ -541,6 +551,8 @@ class Authenticator(object):
     """
     requires_authentication = True
     # TODO: figure out interface
+
+    DEFAULT_CREDENTIAL_TYPE = 'user_password'
 
     def authenticate(self, *args, **kwargs):
         """Derived classes will provide specific implementation

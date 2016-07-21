@@ -353,10 +353,13 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         provider = providers.get_provider(loc)
 
         if not provider:
-            raise ValueError("don't know how to deal with this url %s -- no provider defined.  "
-                             "Specify just s3cmd config file instead")
-
+            raise ValueError(
+                "Don't know how to deal with this url %s -- no provider defined for %s. "
+                "Define a new provider (DOCS: TODO) or specify just s3cmd config file instead for now."
+                % loc
+            )
         downloader = provider.get_downloader(loc)
+
         # should authenticate etc, and when ready we will ask for a bucket ;)
         bucket = downloader.access(lambda url: downloader.bucket, loc)
 
