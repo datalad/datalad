@@ -57,6 +57,17 @@ def _get_bucket_connection(credential):
     return boto.connect_s3(creds["key_id"], creds["secret_id"])
 
 
+def _handle_exception(e, bucket_name):
+    """Helper to handle S3 connection exception"""
+    if e.error_code == 'AccessDenied':
+        raise AccessDeniedError(exc_str(e))
+    else:
+        raise DownloadError(
+            "Cannot connect to %s S3 bucket. Exception: %s"
+            % (bucket_name, exc_str(e))
+        )
+
+
 def get_bucket(conn, bucket_name):
     """A helper to get a bucket
 
@@ -71,17 +82,18 @@ def get_bucket(conn, bucket_name):
         # can initially deny or error to connect to the specific bucket by name,
         # and we would need to list which buckets are available under following
         # credentials:
-        lgr.debug("Cannot access bucket %s by name", bucket_name)
-        all_buckets = conn.get_all_buckets()
+        lgr.debug("Cannot access bucket %s by name: %s", bucket_name, exc_str(e))
+        try:
+            all_buckets = conn.get_all_buckets()
+        except S3ResponseError as e2:
+            lgr.debug("Cannot access all buckets: %s", exc_str(e2))
+            _handle_exception(e, 'any')
         all_bucket_names = [b.name for b in all_buckets]
         lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
         if bucket_name in all_bucket_names:
             bucket = all_buckets[all_bucket_names.index(bucket_name)]
-        elif e.error_code == 'AccessDenied':
-            raise AccessDeniedError(exc_str(e))
         else:
-            raise DownloadError("No S3 bucket named %s found. Initial exception: %s"
-                                % (bucket_name, exc_str(e)))
+            _handle_exception(e, bucket_name)
     return bucket
 
 

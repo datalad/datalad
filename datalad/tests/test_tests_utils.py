@@ -12,6 +12,7 @@ import sys
 import os
 import random
 import traceback
+import logging
 
 try:
     # optional direct dependency we might want to kick out
@@ -320,7 +321,7 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         os.chdir(os.pardir)
         raise ValueError("error exception")
 
-    with swallow_logs() as cml:
+    with swallow_logs(new_level=logging.WARN) as cml:
         with assert_raises(ValueError) as cm:
             do_chdir_value_error()
         # retrospect exception
@@ -340,7 +341,7 @@ def test_assert_cwd_unchanged_not_masking_exceptions():
         os.chdir(os.pardir)
         raise ValueError("error exception")
 
-    with swallow_logs() as cml:
+    with swallow_logs(new_level=logging.WARN) as cml:
         assert_raises(ValueError, do_chdir_value_error)
         eq_(orig_cwd, os.getcwd(),
             "assert_cwd_unchanged didn't return us back to %s" % orig_cwd)

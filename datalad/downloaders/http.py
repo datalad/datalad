@@ -287,6 +287,12 @@ class HTTPDownloaderSession(DownloaderSession):
 
     def download(self, f=None, pbar=None, size=None):
         response = self.response
+        # content_gzipped = 'gzip' in response.headers.get('content-encoding', '').split(',')
+        # if content_gzipped:
+        #     raise NotImplemented("We do not support (yet) gzipped content")
+        #     # see https://rationalpie.wordpress.com/2010/06/02/python-streaming-gzip-decompression/
+        #     # for ways to implement in python 2 and 3.2's gzip is working better with streams
+
         total = 0
         return_content = f is None
         if f is None:
@@ -312,7 +318,7 @@ class HTTPDownloaderSession(DownloaderSession):
 
             stream = _stream()
         else:
-            stream = response.raw.stream(chunk_size_, decode_content=return_content)
+            stream = response.raw.stream(chunk_size_, decode_content=True) # return_content)
 
         for chunk in stream:
             if chunk:  # filter out keep-alive new chunks

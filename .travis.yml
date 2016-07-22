@@ -13,6 +13,15 @@ matrix:
   #  env:
   #  - NOSE_WRAPPER="tools/eval_under_testloopfs"
   - python: 2.7
+    # By default no logs will be output. This one is to test with log output at INFO level
+    env:
+    - DATALAD_LOGLEVEL=INFO
+  - python: 2.7
+    # By default no logs will be output. This one is to test with low level but dumped to /dev/null
+    env:
+    - DATALAD_LOGLEVEL=2
+    - DATALAD_LOGTARGET=/dev/null
+  - python: 2.7
     env:
     # to test operation under root since also would consider FS "crippled" due to
     # ability to rewrite R/O files
@@ -72,7 +81,7 @@ install:
 
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
-  - DATALAD_LOGLEVEL=INFO $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
+  - $NOSE_WRAPPER `which nosetests` -s -v --with-doctest --doctest-tests --with-cov --cover-package datalad --logging-level=INFO
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route del -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi
   # Generate documentation and run doctests
   - PYTHONPATH=$PWD make -C docs html doctest

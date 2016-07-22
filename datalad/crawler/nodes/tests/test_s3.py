@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 # now with some recursive structure of directories
 
+import logging
 from ..s3 import crawl_s3
 from ..s3 import _strip_prefix
 from ..s3 import get_key_url
@@ -94,7 +95,7 @@ def test_crawl_s3_commit_versions(path):
     ]
 
     with externals_use_cassette('test_crawl_s3-pipeline1'):
-        with swallow_logs() as cml:
+        with swallow_logs(new_level=logging.WARN) as cml:
             out = run_pipeline(pipeline)
             assert_in("There is already a tag %s" % target_version, cml.out)
     # things are committed and thus stats are empty
@@ -141,7 +142,7 @@ def test_crawl_s3_commit_versions_one_at_a_time(path):
     ]
 
     with externals_use_cassette('test_crawl_s3-pipeline1'):
-        with swallow_logs() as cml:
+        with swallow_logs(new_level=logging.WARN) as cml:
             out = run_pipeline(pipeline)
             assert_not_in("There is already a tag %s" % target_version, cml.out)
     # things are committed and thus stats are empty
@@ -154,7 +155,7 @@ def test_crawl_s3_commit_versions_one_at_a_time(path):
     # and there should be 7 more, every time changing the total stats
     for t in range(1, 8):
         with externals_use_cassette('test_crawl_s3-pipeline1'):
-            with swallow_logs() as cml:
+            with swallow_logs(new_level=logging.WARN) as cml:
                 out = run_pipeline(pipeline)
                 assert_in("There is already a tag %s" % target_version, cml.out)
         total_stats_ = out[0]['datalad_stats'].get_total()
@@ -217,7 +218,7 @@ def test_crawl_s3_prefix():
     node = crawl_s3('datalad-test0-versioned')
     eq_(node.prefix, None)
 
-    with swallow_logs() as cml:
+    with swallow_logs(new_level=logging.WARN) as cml:
         node = crawl_s3('datalad-test0-versioned', prefix="dir")
         assert_in('adding /', cml.out)
     eq_(node.prefix, 'dir/')

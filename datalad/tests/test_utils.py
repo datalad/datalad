@@ -17,6 +17,7 @@ import logging
 from mock import patch
 from six import PY3
 
+from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
 from os.path import isabs, expandvars, expanduser
 from collections import OrderedDict
@@ -34,6 +35,7 @@ from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
+from ..utils import unique
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
 from ..support.annexrepo import AnnexRepo
@@ -53,10 +55,7 @@ from .utils import skip_if_no_module
 
 def test_get_func_kwargs_doc():
     from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset: str\n  Id of the OpenfMRI dataset (e.g. ds000001)',
-              'versioned_urls: bool, optional\n  Request versioned URLs.  '
-              'OpenfMRI bucket is versioned, but if\n  original data resides '
-              'elsewhere, set to False', 'topurl: str, optional\n  Top level URL to the datasets.']
+    output = ['dataset', 'versioned_urls', 'topurl']
     eq_(get_func_kwargs_doc(pipeline), output)
 
 
@@ -399,3 +398,14 @@ def test_make_tempfile():
     with assert_raises(ValueError):
         with make_tempfile(content="blah", mkdir=True):  # pragma: no cover
             pass
+
+
+def test_unique():
+    eq_(unique(range(3)), [0, 1, 2])
+    eq_(unique((1, 0, 1, 3, 2, 0, 1)), [1, 0, 3, 2])
+    eq_(unique([]), [])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)]), [(1, 2), (1,), (0, 3)])
+
+    # with a key now
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], key=itemgetter(0)), [(1, 2), (0, 3)])
+    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)], key=itemgetter(1)), [(1, 2), (1, 3)])

@@ -36,7 +36,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
     # do it again should raise GitCommandError since git will notice
     # there's already a git-repo at that path and therefore can't clone to `dst`
-    with swallow_logs() as cm:
+    with swallow_logs(new_level=logging.WARN) as cm:
         assert_raises(GitCommandError, AnnexRepo, dst, src)
         if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
             assert("already exists" in cm.out)

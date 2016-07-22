@@ -154,7 +154,7 @@ def _parse_parameters(paramdoc):
     like it could be with adding parameters from the parent class
 
     It assumes that previously parameters were unwrapped, so their
-    documentation starts at the begining of the string, like what
+    documentation starts at the beginning of the string, like what
     should it be after _split_out_parameters
     """
     entries = __re_spliter1.split(paramdoc)
