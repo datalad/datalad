@@ -56,8 +56,7 @@ class BuildManPage(Command):
         self.announce('Writing man page(s) to %s' % self.manpath)
         self._today = datetime.date.today()
 
-    @staticmethod
-    def version():
+    def version(self):
         # This might entail lots of imports which might not yet be available
         # so let's do ad-hoc parsing of the version.py
         with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
