@@ -351,6 +351,13 @@ def test_HTMLFormAuthenticator_httpretty(d):
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
 
 
+@with_testsui(responses=['no', 'yes', 'testlogin', 'testpassword'])
+def test_auth_but_no_cred():
+    authenticator = HTMLFormAuthenticator("")
+    assert_raises(ValueError, HTTPDownloader, credential=None, authenticator=authenticator)
+    assert(HTTPDownloader(credential=None, authenticator=authenticator))
+
+
 @skip_if(not httpretty, "no httpretty")
 @without_http_proxy
 @httpretty.activate
