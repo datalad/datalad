@@ -13,6 +13,8 @@ from os import chmod
 from os.path import join as opj
 from datalad.tests.utils import with_tempfile, eq_, ok_, SkipTest
 from six import next
+from collections import OrderedDict
+
 from ..misc import get_disposition_filename
 from ..misc import fix_permissions
 from ..misc import get_url_filename
@@ -383,3 +385,39 @@ def test_switch():
     switch_node.mapping[2].insert(0, {'output': 'outputs'})
     out = list(switch_node({'f1': 2, 'f2': 'x_'}))
     assert_equal(out, _out([{'f1': 2, 'f2': 'x_0'}, {'f1': 2, 'f2': 'x_1'}]))
+
+
+def test_switch_re():
+    ran = []
+
+    def n2(data):
+        for i in range(2):
+            ran.append(len(ran))
+            yield updated(data, {'f2': 'x_%d' % i})
+
+    switch_node = switch(
+        'f1',
+        OrderedDict([
+            ('m[13]', sub({'f2': {'_': '1'}})),
+            # should be able to consume nodes and pipelines
+            ('m[23]', [n2]),
+        ]),
+        re=True
+    )
+    out = list(switch_node({'f1': 'm123', 'f2': 'x_'}))
+    assert_equal(out, [{'f1': 'm123', 'f2': 'x1'}])
+    assert_equal(ran, [])
+
+    # but in the 2nd case, the thing is a sub-pipeline so it behaves as such without spitting
+    # out its output
+    out = list(switch_node({'f1': 'm2', 'f2': 'x_'}))
+    assert_equal(out, _out([{'f1': 'm2', 'f2': 'x_'}]))
+    assert_equal(ran, [0, 1])  # but does execute just fine
+
+    # and if matches both -- we need to get all outputs
+    for i in xrange(len(ran)):
+        ran.remove(i)
+    out = list(switch_node({'f1': 'm3', 'f2': 'x_'}))
+    assert_equal(out, [{'f1': 'm3', 'f2': 'x1'}] +
+                       _out([{'f1': 'm3', 'f2': 'x_'}]))
+    assert_equal(ran, [0, 1])  # and does execute just as fine
