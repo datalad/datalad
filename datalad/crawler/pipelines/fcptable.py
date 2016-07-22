@@ -31,7 +31,7 @@ def superdataset_pipeline(url=TOPURL):
         crawl_url(url),
         xpath_match('//*[@class="tableHdr"]/td/strong/text()', output='dataset'),
         # skipping Cleveland and NewYork due to URL redirects, Durham due to lack of dataset tarball
-        skip_if({'dataset': 'Cleveland CCF | Durham_Madden | NewYork_Test-Retest_Reliability'}, re=True),
+        skip_if({'dataset': 'Cleveland CCF|Durham_Madden|NewYork_Test-Retest_Reliability'}, re=True),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="fcptable",
@@ -114,6 +114,8 @@ def pipeline(dataset):
             crawl_url(TOPURL),
             [
                 assign({'dataset': dataset}),
+                # skipping Cleveland and NewYork due to URL redirects, Durham due to lack of dataset tarball
+                skip_if({'dataset': 'Cleveland CCF|Durham_Madden|NewYork_Test-Retest_Reliability'}, re=True),
                 # first row was formatted differently so we need to condition it a bit
                 sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
                 find_dataset(dataset),
