@@ -15,13 +15,14 @@ import argparse
 import os
 import re
 import sys
-
+import fileinput
 from tempfile import NamedTemporaryFile
 
 from ..cmd import Runner
 from ..log import is_interactive
 from ..utils import getpwd
 from ..version import __version__
+from ..dochelpers import exc_str
 
 from logging import getLogger
 lgr = getLogger('datalad.cmdline')
@@ -32,27 +33,23 @@ class HelpAction(argparse.Action):
             # lets use the manpage on mature systems ...
             try:
                 import subprocess
-                # extract version field from datalad manpage if present, swallow_error_logs
-                man_th = subprocess.check_output(
-                    ['zgrep', '\\.TH', '/usr/share/man/man1/datalad.1.gz'],
-                    stderr=subprocess.STDOUT)
+                # get the datalad manpage to use
+                manfile = '/usr/share/man/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
+                # extract version field from the manpage
+                man_th = [line for line in
+                          fileinput.input(manfile, openhook=fileinput.hook_compressed)
+                          if line.startswith(".TH")][0]
                 man_version = man_th.split(' ')[5].strip(" '\"\t\n")
 
-                # extract current datalad version
-                datalad_version = '.'.join(
-                    __version__.split('.')[:3]
-                ).strip(" '\"\t\n")  # e.g 2.0.3.dev84 ~> 2.0.3
-
                 # don't show manpage if man_version not equal to current datalad_version
-                if datalad_version != man_version:
+                if __version__ != man_version:
                     raise ValueError
                 subprocess.check_call(
-                    'man %s 2> /dev/null' % parser.prog.replace(' ', '-'),
+                    'man %s 2> /dev/null' % manfile,
                     shell=True)
                 sys.exit(0)
-            except (subprocess.CalledProcessError, OSError, IndexError, ValueError):
-                # ...but silently fall back if it doesn't work
-                pass
+            except (subprocess.CalledProcessError, OSError, IndexError, ValueError) as e:
+                lgr.debug("Did not use manpage since %s", exc_str(e))
         if option_string == '-h':
             helpstr = "%s\n%s" % (
                 parser.format_usage(),
