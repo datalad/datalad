@@ -1,3 +1,11 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """A pipeline for crawling FCP Classic Data Table"""
 
 import os, re
@@ -6,8 +14,7 @@ from os.path import lexists
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
-from ..nodes.misc import assign
-from ..nodes.misc import sub
+from ..nodes.misc import assign, skip_if, sub
 from ..nodes.misc import get_disposition_filename
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
@@ -25,15 +32,14 @@ def superdataset_pipeline(url=TOPURL):
     ----------
     url: str
        URL point to all datasets, hence the URL at the top
-    -------
-
     """
     annex = Annexificator()
     lgr.info("Creating a FCP collection pipeline")
     return [
         crawl_url(url),
         xpath_match('//*[@class="tableHdr"]/td/strong/text()', output='dataset'),
-        # TODO: replace spaces
+        # skipping Cleveland and NewYork due to URL redirects, Durham due to lack of dataset tarball
+        skip_if({'dataset': 'Cleveland CCF|Durham_Madden|NewYork_Test-Retest_Reliability'}, re=True),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="fcptable",
@@ -116,6 +122,8 @@ def pipeline(dataset):
             crawl_url(TOPURL),
             [
                 assign({'dataset': dataset}),
+                # skipping Cleveland and NewYork due to URL redirects, Durham due to lack of dataset tarball
+                skip_if({'dataset': 'Cleveland CCF|Durham_Madden|NewYork_Test-Retest_Reliability'}, re=True),
                 # first row was formatted differently so we need to condition it a bit
                 sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
                 find_dataset(dataset),
