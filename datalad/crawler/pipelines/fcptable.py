@@ -16,8 +16,10 @@ from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign, skip_if, sub
 from ..nodes.misc import assign, continue_if
+from ..nodes.misc import switch
 from ..nodes.misc import get_disposition_filename
 from ..nodes.misc import find_files
+from ..nodes.misc import debug
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 from ...consts import DATALAD_SPECIAL_REMOTE
@@ -41,7 +43,7 @@ def superdataset_pipeline(url=TOPURL):
         crawl_url(url),
         xpath_match('//*[@class="tableHdr"]/td/strong/text()', output='dataset'),
         # skipping NewYork due to URL redirects, Durham due to lack of dataset tarball
-        skip_if({'dataset': 'Durham_Madden|NewYork_Test-Retest_Reliability'}, re=True),
+        skip_if({'dataset': 'Durham_Madden'}, re=True),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="fcptable",
@@ -129,7 +131,7 @@ def pipeline(dataset):
             [
                 assign({'dataset': dataset}),
                 # skipping Cleveland and NewYork due to URL redirects, Durham due to lack of dataset tarball
-                skip_if({'dataset': 'Durham_Madden|NewYork_Test-Retest_Reliability'}, re=True),
+                skip_if({'dataset': 'Durham_Madden'}, re=True),
                 # first row was formatted differently so we need to condition it a bit
                 sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
                 find_dataset(dataset),
@@ -137,16 +139,25 @@ def pipeline(dataset):
                     extract_readme,
                     annex,
                 ],
-                [
-                    {'output': 'input+outputs'},
-                    # if cleveland, we need to follow to that page
-                    # continue_if({'dataset': 'Cleveland CCF'}),
-                    a_href_match('http://fcon_1000.projects.nitrc.org/indi/.*'),
-                    crawl_url(),
-                ],
-                # and collect all URLs pointing to tarballs
-                a_href_match('http://www.nitrc.org/frs/downloadlink.php/'), #, min_count=1),
-                #  get_disposition_filename,
+                a_href_match('.*'),
+                switch(
+                    'url',
+                    {
+                        # e.g. for Cleveland CCF -- we need to crawl one of thos pages
+                        '(http://fcon_1000.projects.nitrc.org/indi/'
+                        # or it might lead to the nitrc project page
+                        '|http://www.nitrc.org/projects/'
+                        '|http://www.nitrc.org/frs/downloadlink.php/1635$)':
+                            [
+                                {'output': 'outputs'},
+                                crawl_url(matchers=[a_href_match('http://www.nitrc.org/frs/\?group_id=[0-9]+$')]),
+                                a_href_match('(http://www.nitrc.org)?/frs/download(link)?.php/'),  # , min_count=1),
+                            ],
+                    },
+                    re=True,
+                    missing='skip',
+                ),
+                # and then collect all URLs pointing to tarballs
                 annex,
             ],
         ],
