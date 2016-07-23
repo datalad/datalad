@@ -81,7 +81,8 @@ def check_response_status(response, err_prefix="", session=None):
         raise AccessDeniedError(err_msg)
     elif response.status_code in {200}:
         pass
-    elif response.status_code in {301, 307}:
+    elif response.status_code in {301, 302, 307}:
+        # TODO: apparently tests do not excercise this one yet
         if session is None:
             raise AccessFailedError(err_msg + " no session was provided")
         redirs = list(session.resolve_redirects(response, response.request))
@@ -318,7 +319,12 @@ class HTTPDownloaderSession(DownloaderSession):
 
             stream = _stream()
         else:
-            stream = response.raw.stream(chunk_size_, decode_content=True) # return_content)
+            # XXX TODO -- it must be just a dirty workaround
+            # As we discovered with downloads from NITRC all headers come with
+            # Content-Encoding: gzip which leads  requests to decode them.  But the point
+            # is that ftp links (yoh doesn't think) are gzip compressed for the transfer
+            decode_content = not response.url.startswith('ftp://')
+            stream = response.raw.stream(chunk_size_, decode_content=decode_content)
 
         for chunk in stream:
             if chunk:  # filter out keep-alive new chunks
