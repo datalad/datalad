@@ -318,7 +318,12 @@ class HTTPDownloaderSession(DownloaderSession):
 
             stream = _stream()
         else:
-            stream = response.raw.stream(chunk_size_, decode_content=True) # return_content)
+            # XXX TODO -- it must be just a dirty workaround
+            # As we discovered with downloads from NITRC all headers come with
+            # Content-Encoding: gzip which leads  requests to decode them.  But the point
+            # is that ftp links (yoh doesn't think) are gzip compressed for the transfer
+            decode_content = not response.url.startswith('ftp://')
+            stream = response.raw.stream(chunk_size_, decode_content=decode_content)
 
         for chunk in stream:
             if chunk:  # filter out keep-alive new chunks
