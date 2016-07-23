@@ -16,9 +16,10 @@ from setuptools import setup, find_packages
 # manpage build imports
 from distutils.command.build_py import build_py
 from setup_support import BuildManPage, BuildRSTExamplesFromScripts
+from setup_support import get_version
 
 # datalad version to be installed
-version = BuildManPage.version()
+version = get_version()
 
 # Only recentish versions of find_packages support include
 # datalad_pkgs = find_packages('.', include=['datalad*'])
