@@ -509,7 +509,13 @@ class switch(object):
             if self.default is not None:
                 pipelines = [self.default]
             elif self.missing == 'raise':
-                raise
+                raise KeyError(
+                    "Found no matches for %s == %r %s %r" % (
+                    self.key,
+                    key_value,
+                    "matching one of" if self.re else "among specified",
+                    list(self.mapping.keys()))
+                )
             elif self.missing == 'skip':
                 yield data
                 return

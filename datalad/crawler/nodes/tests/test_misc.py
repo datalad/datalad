@@ -38,6 +38,7 @@ from datalad.tests.utils import skip_if_no_network
 from datalad.tests.utils import use_cassette
 from datalad.tests.utils import ok_generator
 from datalad.tests.utils import assert_in
+from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_false
 
@@ -371,6 +372,10 @@ def test_switch():
 
     # if there is a value mapping doesn't exist for, by default would fail
     data_missing = {'f1': 3, 'f2': 'x_'}
+    with assert_raises(KeyError) as cme:
+        list(switch_node(data_missing))
+    assert_in('Found no matches for f1 == 3 among', str(cme.exception))
+
     assert_raises(KeyError, list, switch_node(data_missing))
     switch_node.missing = 'skip'
     assert_equal(list(switch_node(data_missing)), [data_missing])
@@ -408,6 +413,13 @@ def test_switch_re():
     assert_equal(out, [{'f1': 'm123', 'f2': 'x1'}])
     assert_equal(ran, [])
 
+    # if there is a value mapping doesn't exist for, by default would fail
+    data_missing = {'f1': 'xxxxx', 'f2': 'x_'}
+    with assert_raises(KeyError) as cme:
+        list(switch_node(data_missing))
+    assert_re_in('Found no matches for f1 == .xxxxx. matching one of',
+                 cme.exception.args)
+
     # but in the 2nd case, the thing is a sub-pipeline so it behaves as such without spitting
     # out its output
     out = list(switch_node({'f1': 'm2', 'f2': 'x_'}))
@@ -415,7 +427,7 @@ def test_switch_re():
     assert_equal(ran, [0, 1])  # but does execute just fine
 
     # and if matches both -- we need to get all outputs
-    for i in xrange(len(ran)):
+    for i in range(len(ran)):
         ran.remove(i)
     out = list(switch_node({'f1': 'm3', 'f2': 'x_'}))
     assert_equal(out, [{'f1': 'm3', 'f2': 'x1'}] +
