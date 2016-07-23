@@ -411,6 +411,7 @@ def test_switch_re():
             ('m[13]', sub({'f2': {'_': '1'}})),
             # should be able to consume nodes and pipelines
             ('m[23]', [n2]),
+            ('emp.*', None), # just return input
         ]),
         re=True
     )
@@ -439,13 +440,17 @@ def test_switch_re():
                        _out([{'f1': 'm3', 'f2': 'x_'}]))
     assert_equal(ran, [0, 1])  # and does execute just as fine
 
+    # empty match
+    out = list(switch_node({'f1': 'empty', 'f2': 'x_'}))
+    assert_equal(out, [{'f1': 'empty', 'f2': 'x_'}])
+
 
 def _test_debug(msg, args=()):
     if 'empty' in args:
         def node(d):
             # just so Python marks it as a generator
             if False:
-                yield d
+                yield d  # pragma: no cover
             else:
                 return
     else:
