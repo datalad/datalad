@@ -15,7 +15,7 @@ import argparse
 import os
 import re
 import sys
-import fileinput
+import gzip
 from tempfile import NamedTemporaryFile
 
 from ..cmd import Runner
@@ -27,6 +27,7 @@ from ..dochelpers import exc_str
 from logging import getLogger
 lgr = getLogger('datalad.cmdline')
 
+
 class HelpAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         if is_interactive() and option_string == '--help':
@@ -34,11 +35,13 @@ class HelpAction(argparse.Action):
             try:
                 import subprocess
                 # get the datalad manpage to use
-                manfile = '/usr/share/man/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
+                manfile = os.environ.get('MANPATH', '/usr/share/man') \
+                    + '/man1/{0}.1.gz'.format(parser.prog.replace(' ', '-'))
                 # extract version field from the manpage
-                man_th = [line for line in
-                          fileinput.input(manfile, openhook=fileinput.hook_compressed)
-                          if line.startswith(".TH")][0]
+                if not os.path.exists(manfile):
+                    raise IOError("manfile is not found")
+                with gzip.open(manfile) as f:
+                    man_th = [line for line in f if line.startswith(".TH")][0]
                 man_version = man_th.split(' ')[5].strip(" '\"\t\n")
 
                 # don't show manpage if man_version not equal to current datalad_version
@@ -48,8 +51,9 @@ class HelpAction(argparse.Action):
                     'man %s 2> /dev/null' % manfile,
                     shell=True)
                 sys.exit(0)
-            except (subprocess.CalledProcessError, OSError, IndexError, ValueError) as e:
+            except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
                 lgr.debug("Did not use manpage since %s", exc_str(e))
+                raise
         if option_string == '-h':
             helpstr = "%s\n%s" % (
                 parser.format_usage(),
