@@ -82,6 +82,7 @@ def check_response_status(response, err_prefix="", session=None):
     elif response.status_code in {200}:
         pass
     elif response.status_code in {301, 302, 307}:
+        # TODO: apparently tests do not excercise this one yet
         if session is None:
             raise AccessFailedError(err_msg + " no session was provided")
         redirs = list(session.resolve_redirects(response, response.request))

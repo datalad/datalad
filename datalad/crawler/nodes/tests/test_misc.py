@@ -29,6 +29,7 @@ from ..misc import switch
 from ..misc import assign
 from ..misc import _act_if
 from ..misc import rename
+from ..misc import debug
 from ..misc import Sink
 from ...pipeline import FinishPipeline
 from ....tests.utils import with_tree
@@ -41,7 +42,11 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import assert_re_in
 from datalad.tests.utils import assert_equal
 from datalad.tests.utils import assert_false
+from datalad.tests.utils import swallow_logs
 
+import logging
+
+from mock import patch
 from nose.tools import eq_, assert_raises
 from nose import SkipTest
 
@@ -433,3 +438,30 @@ def test_switch_re():
     assert_equal(out, [{'f1': 'm3', 'f2': 'x1'}] +
                        _out([{'f1': 'm3', 'f2': 'x_'}]))
     assert_equal(ran, [0, 1])  # and does execute just as fine
+
+
+def _test_debug(msg, args=()):
+    if 'empty' in args:
+        def node(d):
+            # just so Python marks it as a generator
+            if False:
+                yield d
+            else:
+                return
+    else:
+        def node(d):
+            yield updated(d, {'debugged': True})
+
+    d1 = debug(node, *args)
+    data = {'data': 1}
+    with patch('pdb.set_trace') as set_trace:
+        with swallow_logs(new_level=logging.INFO) as cml:
+            list(d1(data))
+            set_trace.assert_called_once_with()
+            assert_re_in(msg, cml.out)
+
+
+def test_debug():
+    yield _test_debug, "About to run"
+    yield _test_debug, "Ran node .* which yielded 1 times", ('after',)
+    yield _test_debug, "Ran node .* which yielded 0 times", ('empty',)
