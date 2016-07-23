@@ -21,6 +21,7 @@ class ManPageFormatter(argparse.HelpFormatter):
                  section=1,
                  ext_sections=None,
                  authors=None,
+                 version=None
                  ):
 
         super(ManPageFormatter, self).__init__(prog)
@@ -29,6 +30,7 @@ class ManPageFormatter(argparse.HelpFormatter):
         self._section = 1
         self._today = datetime.date.today().strftime('%Y\\-%m\\-%d')
         self._ext_sections = ext_sections
+        self._version = version
 
     def _get_formatter(self, **kwargs):
         return self.formatter_class(prog=self.prog, **kwargs)
@@ -58,8 +60,9 @@ class ManPageFormatter(argparse.HelpFormatter):
         return usage
 
     def _mk_title(self, prog):
-        return '.TH {0} {1} {2}\n'.format(prog, self._section,
-                                          self._today)
+        name_version = "\"{0} {1}\"".format(prog, self._version)
+        return '.TH {0} {1} {2} {3}\n'.format(prog, self._section,
+                                              self._today, name_version)
 
     def _make_name(self, parser):
         """

@@ -9,7 +9,7 @@
 import platform
 
 from glob import glob
-from os.path import sep as pathsep, join as opj, dirname
+from os.path import sep as pathsep
 
 from setuptools import setup, find_packages
 
@@ -17,13 +17,8 @@ from setuptools import setup, find_packages
 from distutils.command.build_py import build_py
 from setup_support import BuildManPage, BuildRSTExamplesFromScripts
 
-# This might entail lots of imports which might not yet be available
-# so let's do ad-hoc parsing of the version.py
-#import datalad.version
-with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
-    version_lines = list(filter(lambda x: x.startswith('__version__'), f))
-assert(len(version_lines) == 1)
-version = version_lines[0].split('=')[1].strip(" '\"\t\n")
+# datalad version to be installed
+version = BuildManPage.version()
 
 # Only recentish versions of find_packages support include
 # datalad_pkgs = find_packages('.', include=['datalad*'])

@@ -7,7 +7,7 @@
 
 
 import os
-from os.path import join as opj
+from os.path import dirname, join as opj
 
 from distutils.core import Command
 from distutils.errors import DistutilsOptionError
@@ -56,6 +56,14 @@ class BuildManPage(Command):
         self.announce('Writing man page(s) to %s' % self.manpath)
         self._today = datetime.date.today()
 
+    def version(self):
+        # This might entail lots of imports which might not yet be available
+        # so let's do ad-hoc parsing of the version.py
+        with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
+            version_lines = list(filter(lambda x: x.startswith('__version__'), f))
+        assert(len(version_lines) == 1)
+        return version_lines[0].split('=')[1].strip(" '\"\t\n")
+
     def run(self):
 
         dist = self.distribution
@@ -78,7 +86,7 @@ class BuildManPage(Command):
                 cmdname = "{0}{1}".format(
                     'datalad-' if cmdname != 'datalad' else '',
                     cmdname)
-                format = cls(cmdname, ext_sections=sections)
+                format = cls(cmdname, ext_sections=sections, version=self.version())
                 formatted = format.format_man_page(p)
                 with open(opj(opath, '{0}.{1}'.format(
                         cmdname,
