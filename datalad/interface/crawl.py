@@ -31,11 +31,13 @@ class Crawl(Interface):
       $ datalad crawl  # within a dataset having .datalad/crawl/crawl.cfg
     """
     _params_ = dict(
-        dry_run=Parameter(
-            args=("-n", "--dry-run"),
-            action="store_true",
-            doc="""flag if file manipulations to be invoked (e.g., adding to git/annex).
-            If not, commands are only printed to the stdout"""),
+# Dry run is untested and largely probably not working in this implementation
+# so let's not expose it for now at all
+#        dry_run=Parameter(
+#            args=("-n", "--dry-run"),
+#            action="store_true",
+#            doc="""flag if file manipulations to be invoked (e.g., adding to git/annex).
+#            If not, commands are only printed to the stdout"""),
         is_pipeline=Parameter(
             args=("--is-pipeline",),
             action="store_true",
@@ -44,6 +46,10 @@ class Crawl(Interface):
             args=("-t", "--is-template"),
             action="store_true",
             doc="""flag if provided value is the name of the template to use"""),
+        recursive=Parameter(
+            args=("-r", "--recursive"),
+            action="store_true",
+            doc="""flag to crawl subdatasets as well (for now serially)"""),
         chdir=Parameter(
             args=("-C", "--chdir"),
             constraints=EnsureStr() | EnsureNone(),
@@ -58,17 +64,21 @@ class Crawl(Interface):
     )
 
     @staticmethod
-    def __call__(path=None, dry_run=False, is_pipeline=False, is_template=False, chdir=None):
+    def __call__(path=None, is_pipeline=False, is_template=False, recursive=False, chdir=None): # dry_run=False,
+        dry_run = False
+
         from datalad.crawler.pipeline import (
             load_pipeline_from_config, load_pipeline_from_module,
             get_repo_pipeline_config_path, get_repo_pipeline_script_path
         )
         from datalad.crawler.pipeline import run_pipeline
         from datalad.utils import chpwd  # import late so we could mock during tests
+        from datalad.utils import getpwd
+
         with chpwd(chdir):
 
             assert not (is_pipeline and is_template), "it is either a pipeline or a template name, can't be both"
-
+            path_orig = path
             if is_template:
                 # generate a config and overload path with its filename
                 path = initiate_pipeline_config(template=path,  # kwargs=TODO,
@@ -116,5 +126,29 @@ class Crawl(Interface):
                 raise
 
             # TODO:  Move gc/clean over here!
+
+            if recursive:
+                # get all subdatasets, and crawl them too!
+                assert path_orig is None, "Otherwise not sure what to do with path=%s in subdatasets" % path
+                import os
+                from ..distribution.dataset import Dataset
+                from ..api import crawl
+                from ..utils import swallow_logs
+                from ..dochelpers import exc_str
+                subdatasets = Dataset(os.curdir).get_subdatasets(recursive=recursive)
+
+                lgr.info("Crawling %d subdatasets", len(subdatasets))
+                # TODO: parallelize
+                for ds_ in subdatasets:
+                    try:
+                        # TODO: might be cool to be able to report a 'heart beat' from the swallow into pbar or smth
+                        with swallow_logs() as cml:
+                            output_, stats_ = crawl(chdir=ds_)
+                        lgr.info("Crawled %s: %s", ds_, stats_.as_str(mode='line'))
+                    except Exception as exc:
+                        lgr.warning("Crawling of %s has failed: %s.", #  Log output: %s",
+                                    ds_, exc_str(exc)) #, cml.out)
+                    stats += stats_
+                lgr.info("Overall stats: %s", stats.as_str(mode='line'))
 
             return output, stats
