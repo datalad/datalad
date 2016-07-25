@@ -53,7 +53,6 @@ class HelpAction(argparse.Action):
                 sys.exit(0)
             except (subprocess.CalledProcessError, IOError, OSError, IndexError, ValueError) as e:
                 lgr.debug("Did not use manpage since %s", exc_str(e))
-                raise
         if option_string == '-h':
             helpstr = "%s\n%s" % (
                 parser.format_usage(),
