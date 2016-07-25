@@ -54,7 +54,7 @@ class Unlock(Interface):
 
     @staticmethod
     @datasetmethod(name='unlock')
-    def __call__(dataset=None, path=None):
+    def __call__(path=None, dataset=None):
         # shortcut
         ds = dataset
 

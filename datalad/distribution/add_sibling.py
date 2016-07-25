@@ -79,7 +79,7 @@ class AddSibling(Interface):
 
     @staticmethod
     @datasetmethod(name='add_sibling')
-    def __call__(dataset=None, name=None, url=None,
+    def __call__(name=None, url=None, dataset=None,
                  pushurl=None, recursive=False, force=False):
 
         # TODO: Detect malformed URL and fail?

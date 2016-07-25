@@ -281,8 +281,8 @@ class Install(Interface):
 
     @staticmethod
     @datasetmethod(name='install')
-    def __call__(dataset=None, path=None, source=None, recursive=False,
-                 add_data_to_git=False):
+    def __call__(path=None, source=None, dataset=None,
+                 recursive=False, add_data_to_git=False):
         lgr.debug("Installation attempt started")
         # shortcut
         ds = dataset
