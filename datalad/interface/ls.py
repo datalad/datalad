@@ -191,8 +191,9 @@ class AnnexModel(GitModel):
 
     __slots__ = ['_info'] + GitModel.__slots__
 
-    def __init__(self):
-        super(AnnexModel, self).__init__()
+    def __init__(self, *args, **kwargs):
+        super(AnnexModel, self).__init__(*args, **kwargs)
+        self._info = ''
 
     @property
     def clean(self):
@@ -216,15 +217,13 @@ class AnnexModel(GitModel):
 
 
 @auto_repr
-class FsModel(GitModel):
+class FsModel(AnnexModel):
 
-    __slots__ = ['_path', 'repo'] + GitModel.__slots__
+    __slots__ = ['_path', 'repo'] + AnnexModel.__slots__
 
-    def __init__(self, path, repo=None):
-        super(FsModel, self).__init__(repo)
+    def __init__(self, path, repo=None, *args, **kwargs):
+        super(FsModel, self).__init__(repo, *args, **kwargs)
         self._path = path  # fs path to the node, can be overridden
-        # of value only if it was annex
-        # self.dsmodel = DsModel(Dataset(path)) if self.type_ == 'annex' else None
 
     @property
     def path(self):
@@ -367,7 +366,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         [Dataset(opj(loc, sm)).repo
          for sm in topds.get_subdatasets(recursive=recursive)]
         if recursive else [])
-    dsms = list(map(RepoModel, dss))
+    dsms = list(map(AnnexModel, dss))
 
     # adjust path strings
     for ds_model in dsms:
@@ -441,6 +440,7 @@ def fs_render(root, subdir, json=None):
     elif json == 'display':
         print(dumps(subdir) + '\n')
 
+
 def machinesize(humansize):
     """convert human-size string to machine-size"""
     try:
@@ -504,10 +504,10 @@ def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
     # find all sub-datasets under path passed and attach Dataset class to each
     topds = Dataset(loc)
     dss = [topds.repo] + (
-        [Dataset(opj(loc, sm).repo)
+        [Dataset(opj(loc, sm)).repo
          for sm in topds.get_subdatasets(recursive=recursive)]
         if recursive else [])
-    dsms = list(map(RepoModel, dss))
+    dsms = list(map(AnnexModel, dss))
 
     # for each submodule at loc passed by user
     for ds in dsms:
