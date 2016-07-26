@@ -22,7 +22,7 @@ from ...tests.utils import assert_equal, assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
-from datalad.interface.ls import ignored, fs_traverse, _ls_json, RepoModel
+from datalad.interface.ls import ignored, fs_traverse, _ls_json, AnnexModel
 from os.path import exists, lexists, join as opj, abspath, isabs
 
 from datalad.downloaders.tests.utils import get_test_providers
@@ -83,19 +83,20 @@ def test_ignored(topdir):
                   'subgit': {'fgit.txt': '987'}},
           '.hidden': {'.hidden_file': '121'}})
 def test_fs_traverse(topdir):
+    AnnexRepo(topdir)
     AnnexRepo(opj(topdir, 'annexdir'), create=True)
     GitRepo(opj(topdir, 'gitdir'), create=True)
     GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
 
     with swallow_logs() as log, swallow_outputs() as cmo:
-        fs = fs_traverse(topdir, RepoModel(topdir), recursive=True, json='display')
+        fs = fs_traverse(topdir, AnnexModel(AnnexRepo(topdir)), recursive=True, json='display')
         # fs_traverse logs should contain all not ignored subdirectories
         for subdir in [opj(topdir, "dir"), opj(topdir, 'dir', 'subdir')]:
             assert_in("Subdir: " + subdir, log.out)
 
         # fs_traverse should return a dictionary
         assert_equal(isinstance(fs, dict), True)
-        # containing the toplevel directories including annex, git-annex folders
+        # containing all the toplevel directories including git and annex folders
         assert_equal(([True for item in fs["nodes"] if ('gitdir' and 'annexdir') == item['name']]), [True])
         # fs_traverse stdout contains subdirectory
         assert_in(('file2.txt' and 'dir'), cmo.out)
