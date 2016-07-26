@@ -239,8 +239,10 @@ class FsModel(AnnexModel):
         if islink(self._path):                    # if symlink
             target_path = readlink(self._path)    # find link target
             # convert to absolute path if not
-            target_path = opj(dirname(self._path), target_path) if not isabs(target_path) else target_path
-            return target_path if exists(target_path) else None
+            target_path = target_path if isabs(target_path) \
+                else opj(dirname(self._path), target_path)
+            return target_path if exists(target_path) \
+                else None
         return None
 
     @property
@@ -405,7 +407,7 @@ def fs_extract(nodepath, repo):
 
     # Create FsModel from filesystem nodepath and its associated parent repository
     node = FsModel(nodepath, repo)
-    pretty_size = humanize.naturalsize(node.size) if node.size else -1
+    pretty_size = humanize.naturalsize(node.size) if node.size else 0.0
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
     return {"name": name, "path": node._path, "repo": node.repo.path, "type": node.type_, "size": pretty_size, "date": pretty_date}
@@ -456,7 +458,7 @@ def machinesize(humansize):
     return machinesize
 
 
-def fs_traverse(path, repo, recursive=False, json=None):
+def fs_traverse(path, repo, parent=None, recursive=False, json=None):
     """Traverse path through its nodes and returns a dictionary of relevant attributes attached to each node
 
     Parameters
@@ -476,8 +478,12 @@ def fs_traverse(path, repo, recursive=False, json=None):
     fs = fs_extract(path, repo)
 
     if isdir(path):                                # if node is a directory
-        fs["nodes"] = [fs_extract(path, repo)]     # store its info in dict
-        fs["nodes"][0]["name"] = "."               # and replace its name with "." to emulate unix syntax
+        fs["nodes"] = [fs_extract(path, repo)]     # store its info in its nodes dict too
+
+        if parent:
+            parent['name'] = '..'                  # replace parent name with ".." to emulate unix syntax
+            parent['size'] = 0.0                   # child has incorrect parent size so null it to not affect sum(size)
+            fs["nodes"].extend([parent])
 
         for node in listdir(path):
             nodepath = opj(path, node)
@@ -487,12 +493,14 @@ def fs_traverse(path, repo, recursive=False, json=None):
 
             if recursive and isdir(nodepath) and not ignored(nodepath):
                 # if recursive, create info dictionary of each child directory
-                subdir = fs_traverse(nodepath, repo, recursive=recursive, json=json)
+                subdir = fs_traverse(nodepath, repo, parent=fs["nodes"][0], recursive=recursive, json=json)
                 # update parent with child computed size of itself
                 fs["nodes"][-1]["size"] = subdir["size"]
                 # run renderer on subdirectory(subdir) at location(path) with json option set by user
                 lgr.info('Subdir: ' + opj(path, node))
                 fs_render(nodepath, subdir, json=json)
+
+        fs["nodes"][0]["name"] = "."               # replace current node name with "." to emulate unix syntax
 
         # update current node size by summing sizes of all its 1st level children
         total_size = sum([
@@ -516,7 +524,7 @@ def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
     # for each submodule at loc passed by user
     for ds in dsms:
         # (recursively) traverse each submodule
-        fs = fs_traverse(ds.path, ds.repo, recursive=recursive, json=json)
+        fs = fs_traverse(ds.path, ds.repo, parent=None, recursive=recursive, json=json)
         # run renderer on submodule(fs) at ds.path with json option set by user
         lgr.info('Submodule: ' + ds.path)
         fs_render(ds.path, fs, json=json)
