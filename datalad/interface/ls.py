@@ -144,6 +144,10 @@ class GitModel(object):
     def path(self):
         return self.repo.path if self._path is None else self._path
 
+    @path.setter
+    def path(self, v):
+        self._path = v
+
     @property
     def branch(self):
         if self._branch is None:
@@ -193,7 +197,7 @@ class AnnexModel(GitModel):
 
     def __init__(self, *args, **kwargs):
         super(AnnexModel, self).__init__(*args, **kwargs)
-        self._info = ''
+        self._info = None
 
     @property
     def clean(self):
@@ -219,10 +223,10 @@ class AnnexModel(GitModel):
 @auto_repr
 class FsModel(AnnexModel):
 
-    __slots__ = ['_path', 'repo'] + AnnexModel.__slots__
+    __slots__ = ['_path'] + AnnexModel.__slots__
 
-    def __init__(self, path, repo=None, *args, **kwargs):
-        super(FsModel, self).__init__(repo, *args, **kwargs)
+    def __init__(self, path, *args, **kwargs):
+        super(FsModel, self).__init__(*args, **kwargs)
         self._path = path  # fs path to the node, can be overridden
 
     @property
@@ -347,7 +351,7 @@ class LsFormatter(string.Formatter):
 def format_ds_model(formatter, ds_model, format_str, format_exc):
     try:
         #print("WORKING ON %s" % ds_model.path)
-        if not exists(ds_model.ds.path) or not ds_model.ds.repo:
+        if not exists(ds_model.path) or not ds_model.repo:
             return formatter.format(format_exc, ds=ds_model, msg=u"not installed")
         ds_formatted = formatter.format(format_str, ds=ds_model)
         #print("FINISHED ON %s" % ds_model.path)
@@ -512,9 +516,9 @@ def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
     # for each submodule at loc passed by user
     for ds in dsms:
         # (recursively) traverse each submodule
-        fs = fs_traverse(opj(ds.path, ""), ds, recursive=recursive, json=json)
+        fs = fs_traverse(ds.path, ds.repo, recursive=recursive, json=json)
         # run renderer on submodule(fs) at ds.path with json option set by user
-        lgr.info('Submodule: ' + opj(ds.path))
+        lgr.info('Submodule: ' + ds.path)
         fs_render(ds.path, fs, json=json)
 
 

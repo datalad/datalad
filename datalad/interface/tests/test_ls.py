@@ -89,7 +89,7 @@ def test_fs_traverse(topdir):
     GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
 
     with swallow_logs() as log, swallow_outputs() as cmo:
-        fs = fs_traverse(topdir, AnnexModel(AnnexRepo(topdir)), recursive=True, json='display')
+        fs = fs_traverse(topdir, AnnexRepo(topdir), recursive=True, json='display')
         # fs_traverse logs should contain all not ignored subdirectories
         for subdir in [opj(topdir, "dir"), opj(topdir, 'dir', 'subdir')]:
             assert_in("Subdir: " + subdir, log.out)
