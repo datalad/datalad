@@ -10,16 +10,18 @@
 """A pipeline for crawling BALSA datasets"""
 
 import os, re
+from os import curdir, listdir
 from os.path import lexists
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign
-from ..nodes.misc import Sink
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE
+from datalad.support.annexrepo import *
+from datalad.support.gitrepo import *
 
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.balsa")
@@ -54,6 +56,12 @@ TOPURL = "http://balsa.wustl.edu"
 
 def extract_readme(data):
 
+    data['title'] = xpath_match('//*/p[1]|span/text()')(data)
+    data['species'] = xpath_match('//*/p[2]|span/text()')(data)
+    data['description'] = xpath_match('//*/p[3]|span/text()')(data)
+    data['publication'] = xpath_match('//*/p[4]|span/text()')(data)
+    data['full tarball'] = xpath_match('//*[@class="btn-group"]/a[contains(text(), "d")]')(data)
+
     if lexists("README.txt"):
         os.unlink("README.txt")
 
@@ -70,44 +78,40 @@ Species: %(species)s
         yield {'filename': "README.txt"}
 
 
-class extract_info(object):
+def verify_files():
 
-    def __init__(self, dataset):
-        """
-        Node to exract information from dataset link
+    files_path = path + '/_files'
 
-        Parameters
-        ----------
-        dataset: str
-            Id of the BASLA dataset (e.g. W336)
-        """
-        self.dataset = dataset
+    con_files = listdir(path)
+    files = listdir(files_path)
 
-    def __call__(self, data):
+    # all files individually downloaded that do not exists in canonical tarball
+    list1 = [item for item in files if item not in con_files]
+    if list1:
+            lgr.warning("%s do(es) not exist in the canonical tarball by name" % list1)
+    # list1_keys = [get_file_key(item) for item in files]
 
-        data['title'] = xpath_match('//*/p[1]|span/text()')(data)
-        data['species'] = xpath_match('//*/p[2]|span/text()')(data)
-        data['description'] = xpath_match('//*/p[3]|span/text()')(data)
-        data['publication'] = xpath_match('//*/p[4]|span/text()')(data)
-        data['full tarball'] = xpath_match('//*[@class="btn-group"]/a[contains(text(), "d")]')(data)
-        return data
+    # all files from canonical tarball that were not from the batch individually downloaded
+    list2 = [item for item in con_files if item not in files]
+    if list2:
+        lgr.warning("%s do(es) not exist in the individaully listed files by name" % list2)
+    # list2_keys = [get_file_key(item) for item in con_files]
 
-#
-# class compare(object):
-#
-#     def __init__(self, ):
-#         """
-#         Node to exract information from dataset link
-#
-#         Parameters
-#         ----------
-#         dataset: str
-#             Id of the BASLA dataset (e.g. W336)
-#         """
-#
-#     def __call__(self):
+    if not list1 and not list2:
+        remove(files)  # GitRepo ?
+        lgr.info("Removing individually listed files due to no discrepancies found with canonical tarball")
 
+    if not list1 and list2:
+        remove(files)  # GitRepo ?
+        lgr.info("Removing individually listed files due as canonical tarball contains them and more")
 
+    if list1 and not list2:
+        remove(con_files)  # GitRepo ?
+        # move those in _files into annexrepo, delete _files path
+        lgr.info("Removing extracted files from canonical tarball and replacing them with individually "
+                 "downloaded files due to discrepancies")
+
+# files that are meant to be individually downloaded = xpath_match('//*[@class="modal-body"]//a/text()')
 
 
 def pipeline(dataset):
@@ -123,24 +127,27 @@ def pipeline(dataset):
                                    " and exclude=*.tsv"
                                    ])
 
-    # all files to be sunk = xpath_match('//*[@class="modal-body"]//a/text()')
-
-    # BALSA has versioning, but no clear versions to releases of the studies
+    # BALSA has versioning of scene files only
+    # TODO: changelog for scene files
     return [
         annex.switch_branch('incoming'),
         [
             crawl_url(TOPURL),
             [
                 assign({'dataset': dataset}),
-                extract_info(dataset),
                 [  # README
                     extract_readme,
+                    annex,
+                ],
+                [
+                    assign({'path': '_files/%(path)s'}, interpolate=True),
                     annex,
                 ],
                 # canonical tarball
                 a_href_match('http://balsa.wustl.edu/study/download/', min_count=1),
                 annex,
             ],
+
         ],
         annex.remove_obsolete(),
         [
@@ -157,12 +164,7 @@ def pipeline(dataset):
                    exclude=['(^|%s)\._' % os.path.sep],
                ),
             ],
-
-            # verify files node, takes annex path as input, will have to remove a set of files
-
-
-            # assign({'path': '_file/%(path)s'}, interpolate=True),
-
+            verify_files(curdir+'/annex'),  # should this be placed here, however?
             annex.switch_branch('master'),
             annex.merge_branch('incoming-processed', commit=True),
             annex.finalize(tag=True),
