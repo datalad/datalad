@@ -24,3 +24,4 @@ from ..balsa import pipeline
 
 def test_smoke_pipelines():
     yield _test_smoke_pipelines, pipeline, 'bogus'
+    yield _test_smoke_pipelines, superdataset_pipeline, None
