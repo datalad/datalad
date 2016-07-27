@@ -223,11 +223,11 @@ class AnnexModel(GitModel):
 @auto_repr
 class FsModel(AnnexModel):
 
-    __slots__ = ['_path'] + AnnexModel.__slots__
+    __slots__ = AnnexModel.__slots__
 
     def __init__(self, path, *args, **kwargs):
         super(FsModel, self).__init__(*args, **kwargs)
-        self._path = path  # fs path to the node, can be overridden
+        self._path = path
 
     @property
     def path(self):
@@ -478,36 +478,35 @@ def fs_traverse(path, repo, parent=None, recursive=False, json=None):
     fs = fs_extract(path, repo)
 
     if isdir(path):                                # if node is a directory
-        fs["nodes"] = [fs_extract(path, repo)]     # store its info in its nodes dict too
-
-        if parent:
-            parent['name'] = '..'                  # replace parent name with ".." to emulate unix syntax
-            parent['size'] = 0.0                   # child has incorrect parent size so null it to not affect sum(size)
-            fs["nodes"].extend([parent])
-
+        children = [fs_extract(path, repo)]        # store its info in its children dict too
         for node in listdir(path):
             nodepath = opj(path, node)
+
+            # if not ignored, append child node info to current nodes dictionary
             if not ignored(nodepath, only_hidden=True):
-                # append info on nodes children to its dictionary
-                fs["nodes"].extend([fs_extract(nodepath, repo)])
+                children.extend([fs_extract(nodepath, repo)])
 
-            if recursive and isdir(nodepath) and not ignored(nodepath):
-                # if recursive, create info dictionary of each child directory
-                subdir = fs_traverse(nodepath, repo, parent=fs["nodes"][0], recursive=recursive, json=json)
-                # update parent with child computed size of itself
-                fs["nodes"][-1]["size"] = subdir["size"]
-                # run renderer on subdirectory(subdir) at location(path) with json option set by user
-                lgr.info('Subdir: ' + opj(path, node))
-                fs_render(nodepath, subdir, json=json)
-
-        fs["nodes"][0]["name"] = "."               # replace current node name with "." to emulate unix syntax
+            # if recursive, create info dictionary of each child node too
+            if recursive and not ignored(nodepath):
+                subdir = fs_traverse(nodepath, repo, parent=children[0], recursive=recursive, json=json)
+                children[-1]['size'] = subdir['size']  # update parent with child computed size of itself
 
         # update current node size by summing sizes of all its 1st level children
         total_size = sum([
             machinesize(node['size'])
-            for node in fs['nodes'][1:]
+            for node in children[1:]
         ])
-        fs["size"] = fs["nodes"][0]["size"] = humanize.naturalsize(total_size)
+        fs['size'] = children[0]['size'] = humanize.naturalsize(total_size)
+
+        # replace parent, current node name with '..', '.' to emulate unix syntax
+        children[0]['name'] = '.'
+        if parent:
+            parent['name'] = '..'
+            children.insert(1, parent)  # insert parent info after current node info in children dict
+
+        fs['nodes'] = children          # add children info to main fs dictionary
+        fs_render(path, fs, json=json)  # render directory node at location(path)
+        lgr.info('Subdir: %s' % path)   # log info of current node rendered
 
     return fs
 
@@ -521,13 +520,9 @@ def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
         if recursive else [])
     dsms = list(map(AnnexModel, dss))
 
-    # for each submodule at loc passed by user
+    # (recursively) traverse each submodule for each submodule at loc passed by user
     for ds in dsms:
-        # (recursively) traverse each submodule
-        fs = fs_traverse(ds.path, ds.repo, parent=None, recursive=recursive, json=json)
-        # run renderer on submodule(fs) at ds.path with json option set by user
-        lgr.info('Submodule: ' + ds.path)
-        fs_render(ds.path, fs, json=json)
+        fs_traverse(ds.path, ds.repo, parent=None, recursive=recursive, json=json)
 
 
 #
