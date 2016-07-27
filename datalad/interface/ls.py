@@ -461,7 +461,7 @@ def machinesize(humansize):
     return machinesize
 
 
-def fs_traverse(path, repo, parent=None, recursive=False, json=None):
+def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None):
     """Traverse path through its nodes and returns a dictionary of relevant attributes attached to each node
 
     Parameters
@@ -508,25 +508,38 @@ def fs_traverse(path, repo, parent=None, recursive=False, json=None):
             children.insert(1, parent)  # insert parent info after current node info in children dict
 
         fs['nodes'] = children          # add children info to main fs dictionary
-        fs_render(path, fs, json=json)  # render directory node at location(path)
-        lgr.info('Subdir: %s' % path)   # log info of current node rendered
+        if render:                      # render directory node at location(path)
+            fs_render(path, fs, json=json)
+            lgr.info('Directory: %s' % path)   # log info of current node rendered
 
     return fs
 
 
 def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
-    """Hierarchical subdataset traversal from root dataset"""
+    """Hierarchical dataset traverser"""
+
+    # prepare dataset model and parent info to pass to traverser
+    ds_model = AnnexModel(rootds.repo)
+    fsparent = fs_extract(parent.path, parent.repo) if parent else None
+
+    # (recursively) traverse file tree of current dataset
+    fs = fs_traverse(ds_model.path, ds_model.repo, render=False, parent=fsparent, recursive=recursive, json=json)
+    size_list = [fs['size']]
 
     # (recursively) traverse each subdataset
     if recursive:
         for subds_path in rootds.get_subdatasets():
             subds = Dataset(opj(rootds.path, subds_path))
-            _ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+            subfs = _ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+            size_list.append(subfs['size'])
 
-    # (recursively) traverse file tree of current dataset
-    rootds_model = AnnexModel(rootds.repo)
-    fs = fs_traverse(rootds_model.path, rootds_model.repo, parent=None, recursive=recursive, json=json)
-    lgr.info('Submodule: ' + rootds_model.path)
+    # update total_size of current dataset to include subdataset sizes
+    total_size = sum([machinesize(subdataset_size) for subdataset_size in size_list])
+    fs['size'] = humanize.naturalsize(total_size)
+
+    # render current dataset
+    fs_render(rootds.path, fs, json=json)
+    lgr.info('Dataset: %s' % ds_model.path)
     return fs
 
 

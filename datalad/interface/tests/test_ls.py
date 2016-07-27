@@ -92,7 +92,7 @@ def test_fs_traverse(topdir):
         fs = fs_traverse(topdir, AnnexRepo(topdir), recursive=True, json='display')
         # fs_traverse logs should contain all not ignored subdirectories
         for subdir in [opj(topdir, "dir"), opj(topdir, 'dir', 'subdir')]:
-            assert_in("Subdir: " + subdir, log.out)
+            assert_in("Directory: " + subdir, log.out)
 
         # fs_traverse should return a dictionary
         assert_equal(isinstance(fs, dict), True)
