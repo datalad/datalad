@@ -46,6 +46,7 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 from ..support.vcr_ import *
+from ..support.keyring_ import MemoryKeyring
 from ..dochelpers import exc_str, borrowkwargs
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
@@ -433,6 +434,18 @@ def serve_path_via_http(tfunc, *targs):
         finally:
             lgr.debug("HTTP: stopping server under %s" % path)
             multi_proc.terminate()
+
+    return newfunc
+
+
+@optional_args
+def with_memory_keyring(t):
+
+    @wraps(t)
+    def newfunc(*args, **kwargs):
+        keyring = MemoryKeyring()
+        with patch("datalad.downloaders.credentials.keyring_", keyring):
+            return t(*(args + (keyring,)), **kwargs)
 
     return newfunc
 
