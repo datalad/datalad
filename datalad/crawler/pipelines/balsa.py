@@ -16,7 +16,7 @@ from os.path import lexists, join as opj
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
-from ..nodes.misc import assign
+from ..nodes.misc import assign, skip_if
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE
@@ -26,58 +26,56 @@ from datalad.support.gitrepo import *
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.balsa")
 
-# a dataset selected from the TOPURL
-datasetURL = 'https://balsa.wustl.edu/study/show/W336'
+TOPURL = "http://balsa.wustl.edu/study"
 
-# TODO unknown yet how to access dataset links from TOPURL
-# TOPURL = "http://balsa.wustl.edu"
 
-# def superdataset_pipeline(url=TOPURL):
-#     """
-#     Parameters
-#     ----------
-#     url: str
-#        URL point to all datasets, hence the URL at the top
-#     -------
+def superdataset_pipeline(url=TOPURL):
+    """
+    Parameters
+    ----------
+    url: str
+       URL point to all datasets, hence the URL at the top
+    -------
+
+    """
+    annex = Annexificator()
+    lgr.info("Creating a BALSA collection pipeline")
+    return [
+        crawl_url(url),
+        xpath_match('//*/tr/td[1]/a/text()', output='dataset'),
+        # skip the empty dataset used by BALSA for testing
+        skip_if({'dataset': 'test study upload'}, re=True),
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_dataset(
+            template="balsa",
+            data_fields=['dataset'],
+            existing='skip'
+        )
+    ]
+
+
+# def extract_readme(data):
 #
-#     """
-#     annex = Annexificator()
-#     lgr.info("Creating a BALSA collection pipeline")
-#     return [
-#         crawl_url(url),
-#         xpath_match('<xpath selectors to dataset link here>', output='dataset'),
-#         # http://balsa.wustl.edu/study/show<dataset ID here>
-#         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
-#         annex.initiate_dataset(
-#             template="balsa",
-#             data_fields=['dataset'],
-#             existing='skip'
-#         )
-#     ]
-
-
-def extract_readme(data):
-
-    data['title'] = xpath_match('//*/p[1]|span/text()')(data)
-    data['species'] = xpath_match('//*/p[2]|span/text()')(data)
-    data['description'] = xpath_match('//*/p[3]|span/text()')(data)
-    data['publication'] = xpath_match('//*/p[4]|span/text()')(data)
-    data['full tarball'] = xpath_match('//*[@class="btn-group"]/a[contains(text(), "d")]')(data)
-
-    if lexists("README.txt"):
-        os.unlink("README.txt")
-
-    with open("README.txt", "w") as fi:
-        fi.write("""\
-BALSA sub-dataset %(dataset)s
-------------------------
-
-Full Title: %(title)s
-Species: %(species)s
-        """ % data)
-
-        lgr.info("Generated README.txt")
-        yield {'filename': "README.txt"}
+#     data['title'] = xpath_match('//*/p[1]|span/text()')(data)
+#     data['species'] = xpath_match('//*/p[2]|span/text()')(data)
+#     data['description'] = xpath_match('//*/p[3]|span/text()')(data)
+#     data['publication'] = xpath_match('//*/p[4]|span/text()')(data)
+#     data['full tarball'] = xpath_match('//*[@class="btn-group"]/a[contains(text(), "d")]')(data)
+#
+#     if lexists("README.txt"):
+#         os.unlink("README.txt")
+#
+#     with open("README.txt", "w") as fi:
+#         fi.write("""\
+# BALSA sub-dataset %(dataset)s
+# ------------------------
+#
+# Full Title: %(title)s
+# Species: %(species)s
+#         """ % data)
+#
+#         lgr.info("Generated README.txt")
+#         yield {'filename': "README.txt"}
 
 
 @auto_repr
@@ -111,16 +109,16 @@ class BalsaSupport(object):
                 if key in files_key:
                     pass
                 else:
-                    lgr.warning("%s is varies in content from the individually downloaded files, is removed"
-                                "and file from canonical tarball is kept" % item)
+                    lgr.warning("%s is varies in content from the individually downloaded "
+                                "files, is removed and file from canonical tarball is kept" % item)
                 p = opj(files_path, item)
                 self.repo.remove(p)
             else:
                 lgr.warning("%s does not exist in the individaully listed files by name, "
                             "but will be kept from canconical tarball" % item)
         if files:
-            lgr.warning("The following files do not exist in the canonical tarball, but are individaully listed files, "
-                        "and will not be kept" % files)
+            lgr.warning("The following files do not exist in the canonical tarball, but are "
+                        "individaully listed files and will not be kept" % files)
 
 
 def pipeline(dataset):
@@ -135,25 +133,22 @@ def pipeline(dataset):
                                    " and exclude=*.json"
                                    " and exclude=*.tsv"
                                    ])
-
     balsa = BalsaSupport(repo=annex.repo, path=curdir)
+    # BALSA has no versioning atm, so no changelog either
 
     return [
         annex.switch_branch('incoming'),
         [
-            crawl_url(datasetURL),
+            crawl_url(TOPURL),
             [
                 assign({'dataset': dataset}),
-                [  # README
-                    extract_readme,
-                    annex,
-                ],
-                [
-                    assign({'path': '_files/%(path)s'}, interpolate=True),
-                    annex,
-                ],
+                skip_if({'dataset': 'test study upload'}, re=True),
                 # canonical tarball
                 a_href_match('http://balsa.wustl.edu/study/download/', min_count=1),
+                annex,
+            ],
+            [
+                assign({'path': '_files/%(path)s'}, interpolate=True),
                 annex,
             ],
 
