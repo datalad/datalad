@@ -108,8 +108,10 @@ class Ls(Interface):
 
         if loc.startswith('s3://'):
             return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
-        elif lexists(loc):  # and lexists(opj(loc, '.git')):
+        elif lexists(loc):
             # TODO: use some helper like is_dataset_path ??
+            if not Dataset(loc).is_installed():
+                raise ValueError("No dataset at %s" % loc)
             return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
         else:
             #raise ValueError("ATM supporting only s3:// URLs and paths to local datasets")
@@ -410,7 +412,8 @@ def fs_extract(nodepath, repo):
     pretty_size = humanize.naturalsize(node.size) if node.size else 0.0
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
-    return {"name": name, "path": node._path, "repo": node.repo.path, "type": node.type_, "size": pretty_size, "date": pretty_date}
+    return {"name": name, "path": node._path, "repo": node.repo.path,
+            "type": node.type_, "size": pretty_size, "date": pretty_date}
 
 
 def leaf_name(path):
@@ -511,18 +514,25 @@ def fs_traverse(path, repo, parent=None, recursive=False, json=None):
     return fs
 
 
-def _ls_json(loc, json=None, fast=False, recursive=False, all=False):
-    # find all sub-datasets under path passed and attach Dataset class to each
-    topds = Dataset(loc)
-    dss = [topds.repo] + (
-        [Dataset(opj(loc, sm)).repo
-         for sm in topds.get_subdatasets(recursive=recursive)]
-        if recursive else [])
-    dsms = list(map(AnnexModel, dss))
+def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
+    """Hierarchical subdataset traversal from root dataset"""
 
-    # (recursively) traverse each submodule for each submodule at loc passed by user
-    for ds in dsms:
-        fs_traverse(ds.path, ds.repo, parent=None, recursive=recursive, json=json)
+    # (recursively) traverse each subdataset
+    if recursive:
+        for subds_path in rootds.get_subdatasets():
+            subds = Dataset(opj(rootds.path, subds_path))
+            _ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+
+    # (recursively) traverse file tree of current dataset
+    rootds_model = AnnexModel(rootds.repo)
+    fs = fs_traverse(rootds_model.path, rootds_model.repo, parent=None, recursive=recursive, json=json)
+    lgr.info('Submodule: ' + rootds_model.path)
+    return fs
+
+
+def _ls_json(loc, fast=False, **kwargs):
+    # hierarchically traverse file tree of (sub-)dataset(s) under path passed(loc)
+    _ds_traverse(Dataset(loc), parent=None, **kwargs)
 
 
 #
