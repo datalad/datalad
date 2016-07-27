@@ -11,7 +11,7 @@
 
 import os, re
 from os import curdir, listdir
-from os.path import lexists
+from os.path import lexists, join as opj
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
@@ -26,10 +26,12 @@ from datalad.support.gitrepo import *
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.balsa")
 
-TOPURL = "http://balsa.wustl.edu"
-
+# a dataset selected from the TOPURL
+datasetURL = 'https://balsa.wustl.edu/study/show/W336'
 
 # TODO unknown yet how to access dataset links from TOPURL
+# TOPURL = "http://balsa.wustl.edu"
+
 # def superdataset_pipeline(url=TOPURL):
 #     """
 #     Parameters
@@ -78,40 +80,47 @@ Species: %(species)s
         yield {'filename': "README.txt"}
 
 
-def verify_files():
+@auto_repr
+class BalsaSupport(object):
 
-    files_path = path + '/_files'
+    def __init__(self, repo, path):
+        """Verifies that the canoncial tarball contains all files that are
+        individually listed
 
-    con_files = listdir(path)
-    files = listdir(files_path)
+           Parameters
+           ----------
+           repo: str
+             annex repo to which dataset is being annexed
+           path: str
+             path to directory where dataset is being stored
+           """
+        self.repo = repo
+        self.path = path
 
-    # all files individually downloaded that do not exists in canonical tarball
-    list1 = [item for item in files if item not in con_files]
-    if list1:
-            lgr.warning("%s do(es) not exist in the canonical tarball by name" % list1)
-    # list1_keys = [get_file_key(item) for item in files]
+    def verify_files(self):
 
-    # all files from canonical tarball that were not from the batch individually downloaded
-    list2 = [item for item in con_files if item not in files]
-    if list2:
-        lgr.warning("%s do(es) not exist in the individaully listed files by name" % list2)
-    # list2_keys = [get_file_key(item) for item in con_files]
+        files_path = opj(path, '_files')
 
-    if not list1 and not list2:
-        remove(files)  # GitRepo ?
-        lgr.info("Removing individually listed files due to no discrepancies found with canonical tarball")
+        con_files = listdir(path)  # list of files that exist from canonical tarball
+        files = listdir(files_path)  # list of file that are individually downloaded
+        files_key = [self.repo.get_file_key(item) for item in files]
 
-    if not list1 and list2:
-        remove(files)  # GitRepo ?
-        lgr.info("Removing individually listed files due as canonical tarball contains them and more")
-
-    if list1 and not list2:
-        remove(con_files)  # GitRepo ?
-        # move those in _files into annexrepo, delete _files path
-        lgr.info("Removing extracted files from canonical tarball and replacing them with individually "
-                 "downloaded files due to discrepancies")
-
-# files that are meant to be individually downloaded = xpath_match('//*[@class="modal-body"]//a/text()')
+        for item in con_files:
+            if item in files:
+                key = self.repo.get_file_key(item)
+                if key in files_key:
+                    pass
+                else:
+                    lgr.warning("%s is varies in content from the individually downloaded files, is removed"
+                                "and file from canonical tarball is kept" % item)
+                p = opj(files_path, item)
+                self.repo.remove(p)
+            else:
+                lgr.warning("%s does not exist in the individaully listed files by name, "
+                            "but will be kept from canconical tarball" % item)
+        if files:
+            lgr.warning("The following files do not exist in the canonical tarball, but are individaully listed files, "
+                        "and will not be kept" % files)
 
 
 def pipeline(dataset):
@@ -127,12 +136,12 @@ def pipeline(dataset):
                                    " and exclude=*.tsv"
                                    ])
 
-    # BALSA has versioning of scene files only
-    # TODO: changelog for scene files
+    balsa = BalsaSupport(repo=annex.repo, path=curdir)
+
     return [
         annex.switch_branch('incoming'),
         [
-            crawl_url(TOPURL),
+            crawl_url(datasetURL),
             [
                 assign({'dataset': dataset}),
                 [  # README
@@ -164,7 +173,7 @@ def pipeline(dataset):
                    exclude=['(^|%s)\._' % os.path.sep],
                ),
             ],
-            verify_files(curdir+'/annex'),  # should this be placed here, however?
+            verify_files(balsa),
             annex.switch_branch('master'),
             annex.merge_branch('incoming-processed', commit=True),
             annex.finalize(tag=True),
