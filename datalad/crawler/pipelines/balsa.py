@@ -19,7 +19,7 @@ from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign, skip_if
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
-from ...consts import ARCHIVES_SPECIAL_REMOTE
+from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
 from datalad.support.annexrepo import *
 from datalad.support.gitrepo import *
 
@@ -44,7 +44,7 @@ def superdataset_pipeline(url=TOPURL):
     lgr.info("Creating a BALSA collection pipeline")
     return [
         crawl_url(url),
-        a_href_match(".*/study/show/(?P<dataset_id>*)"),
+        a_href_match('.*/study/show/(?P<dataset_id>.*)'),
         # skip the empty dataset used by BALSA for testing
         skip_if({'dataset_id': 'Jvw1'}, re=True),
         crawl_url(),
@@ -125,7 +125,7 @@ class BalsaSupport(object):
 def pipeline(dataset_id):
     lgr.info("Creating a pipeline for the BALSA dataset %s" % dataset)
     annex = Annexificator(create=False, statusdb='json', allow_dirty=True,
-                          special_remotes=[ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_],
+                          special_remotes=[ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE],
                           options=["-c",
                                    "annex.largefiles="
                                    "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
