@@ -89,7 +89,7 @@ def superdataset_pipeline(url=TOPURL):
 @auto_repr
 class BalsaSupport(object):
 
-    def __init__(self, repo, path):
+    def __init__(self, repo):
         """Verifies that the canoncial tarball contains all files that are
         individually listed
 
@@ -97,17 +97,14 @@ class BalsaSupport(object):
            ----------
            repo: str
              annex repo to which dataset is being annexed
-           path: str
-             path to directory where dataset is being stored
            """
         self.repo = repo
-        self.path = path
 
     def verify_files(self):
 
-        files_path = opj(repo, '_files')
+        files_path = opj(curdir, '_files')
 
-        con_files = listdir(repo)  # list of files that exist from canonical tarball
+        con_files = listdir(curdir)  # list of files that exist from canonical tarball
         files = listdir(files_path)  # list of file that are individually downloaded
         files_key = [self.repo.get_file_key(item) for item in files]
 
@@ -144,7 +141,7 @@ def pipeline(dataset, dataset_id):
                                    ])
 
     dataset_url = '%s%s/' % (TOPURL, dataset_id)
-    balsa = BalsaSupport(repo=annex.repo, path=curdir)
+    balsa = BalsaSupport(repo=annex.repo)
     # BALSA has no versioning atm, so no changelog either
 
     return [
