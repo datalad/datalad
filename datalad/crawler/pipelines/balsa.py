@@ -35,28 +35,24 @@ def superdataset_pipeline(url=TOPURL):
     ----------
     url: str
        URL point to all datasets, hence the URL at the top
-    -------
 
     """
+    # xpath_match('//*/tr/td[1]/a/text()', output='dataset') # dataset = Connection Strength and Distance with Tractography
+    # xpath_match('//*/tr/td[1]/a/@href', output='dataset_id')  # dataset_id = /study/show/W336
+
     annex = Annexificator()
     lgr.info("Creating a BALSA collection pipeline")
     return [
         crawl_url(url),
-        [
-            xpath_match('//*/tr/td[1]/a/text()', output='dataset'),  # dataset = Connection Strength and Distance with Tractography
-            # skip the empty dataset used by BALSA for testing
-            skip_if({'dataset': 'test study upload'}, re=True),
-            assign({'dataset_name': '%(dataset)s'}, interpolate=True),
-        ],
-        [
-            xpath_match('//*/tr/td[1]/a/@href', output='dataset_id'),           # dataset_id = /study/show/W336
-            # skip the empty dataset used by BALSA for testing
-            skip_if({'dataset_id': 'Jvw1'}, re=True),
-            assign({'dataset_path': '%(dataset_id)s'}, interpolate=True)
-        ],
+        a_href_match(".*/study/show/(?P<dataset_id>*)"),
+        # skip the empty dataset used by BALSA for testing
+        skip_if({'dataset_id': 'Jvw1'}, re=True),
+        crawl_url(),
+        xpath_match('//*/p[1]|span/text()', output='dataset'),
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="balsa",
-            data_fields=['dataset', 'dataset_id'],
+            data_fields=['dataset_id'],
             existing='skip'
         )
     ]
@@ -116,8 +112,8 @@ class BalsaSupport(object):
                 else:
                     lgr.warning("%s is varies in content from the individually downloaded "
                                 "files, is removed and file from canonical tarball is kept" % item)
-               # p = opj(files_path, item)
-               # self.repo.remove(p)
+                p = opj(files_path, item)
+                self.repo.remove(p)
             else:
                 lgr.warning("%s does not exist in the individaully listed files by name, "
                             "but will be kept from canconical tarball" % item)
@@ -126,10 +122,10 @@ class BalsaSupport(object):
                         "individaully listed files and will not be kept" % files)
 
 
-def pipeline(dataset, dataset_id):
+def pipeline(dataset_id):
     lgr.info("Creating a pipeline for the BALSA dataset %s" % dataset)
     annex = Annexificator(create=False, statusdb='json', allow_dirty=True,
-                          special_remotes=[ARCHIVES_SPECIAL_REMOTE],
+                          special_remotes=[ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_],
                           options=["-c",
                                    "annex.largefiles="
                                    "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
@@ -140,7 +136,7 @@ def pipeline(dataset, dataset_id):
                                    " and exclude=*.tsv"
                                    ])
 
-    dataset_url = '%s%s/' % (TOPURL, dataset_id)
+    dataset_url = '%s%s' % (TOPURL, dataset_id)
     balsa = BalsaSupport(repo=annex.repo)
     # BALSA has no versioning atm, so no changelog either
 
