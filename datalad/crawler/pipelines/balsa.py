@@ -43,15 +43,16 @@ def superdataset_pipeline(url=TOPURL):
     return [
         crawl_url(url),
         [
-            xpath_match('//*/tr/td[1]/a/text()', output='dataset'),
+            xpath_match('//*/tr/td[1]/a/text()', output='dataset'),  # dataset = Connection Strength and Distance with Tractography
             # skip the empty dataset used by BALSA for testing
             skip_if({'dataset': 'test study upload'}, re=True),
             assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         ],
         [
-            xpath_match('//*/tr/td[1]/a/@href', output='dataset_id'),           # /study/show/W336
+            xpath_match('//*/tr/td[1]/a/@href', output='dataset_id'),           # dataset_id = /study/show/W336
             # skip the empty dataset used by BALSA for testing
             skip_if({'dataset_id': 'Jvw1'}, re=True),
+            assign({'dataset_path': '%(dataset_id)s'}, interpolate=True)
         ],
         annex.initiate_dataset(
             template="balsa",
