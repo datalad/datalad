@@ -153,8 +153,11 @@ class Crawl(Interface):
                             output += output_
                         lgr.info("Crawled %s: %s", ds_, stats_.as_str(mode='line'))
                     except Exception as exc:
-                        lgr.warning("Crawling of %s has failed: %s.", #  Log output: %s",
-                                    ds_, exc_str(exc)) #, cml.out)
+                        stats_total.datasets_crawl_failed += 1
+                        stats_total.datasets_crawled += 1
+                        output += [None]
+                        lgr.warning("Crawling of %s has failed: %s.",  #  Log output: %s",
+                                    ds_, exc_str(exc))  #, cml.out)
 
                 lgr.info("Overall stats: %s", stats.as_str(mode='line'))
 

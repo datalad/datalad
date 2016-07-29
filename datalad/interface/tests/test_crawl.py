@@ -48,13 +48,14 @@ def test_crawl_api_chdir(run_pipeline_, load_pipeline_from_config_, chpwd_):
 @patch('datalad.utils.chpwd')
 @patch('datalad.crawler.pipeline.get_repo_pipeline_script_path', return_value='script_path')
 @patch('datalad.crawler.pipeline.load_pipeline_from_config', return_value=['pipeline'])
-@patch('datalad.crawler.pipeline.run_pipeline', return_value=None)
+@patch('datalad.crawler.pipeline.run_pipeline', return_value=[])
 @patch('datalad.distribution.dataset.Dataset.get_subdatasets',  # return_value=['path1', 'path2'])
     side_effect=[
-        ['path1', 'path2'],
+        ['path1', 'path2', 'path_to_fail'],
         ['path1_1'],  # sub-dataset of the first sub-dataset
         [],  # so it would get crawled and have no further sub-datasets
         [],  # no sub-datasets in path2
+        # will fail to return anything for path_to_fail
     ]
 )
 # Note that order of patched things as args is reverse for some reason :-/
@@ -63,8 +64,8 @@ def test_crawl_api_recursive(get_subdatasets_, run_pipeline_, load_pipeline_from
                              chpwd_, tdir):
     with chpwd(tdir):
         output, stats = crawl(recursive=True)
-    assert_equal(output, [None]*4)  # for now output is just a list of outputs
-    assert_equal(stats, ActivityStats(datasets_crawled=4))  # nothing was done but we got it crawled
+    assert_equal(output, [[]]*4 + [None])  # for now output is just a list of outputs
+    assert_equal(stats, ActivityStats(datasets_crawled=5, datasets_crawl_failed=1))  # nothing was done but we got it crawled
     chpwd_.assert_has_calls(
         [
             call(None),

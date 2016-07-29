@@ -22,6 +22,7 @@ _COUNTS = (
     'skipped', 'overwritten', 'renamed', 'removed',
     'downloaded', 'downloaded_size', 'downloaded_time',
     'datasets_crawled',
+    'datasets_crawl_failed',
 )
 
 _LISTS = (
