@@ -116,8 +116,8 @@ class BalsaSupport(object):
                 else:
                     lgr.warning("%s is varies in content from the individually downloaded "
                                 "files, is removed and file from canonical tarball is kept" % item)
-                p = opj(files_path, item)
-                self.repo.remove(p)
+               # p = opj(files_path, item)
+               # self.repo.remove(p)
             else:
                 lgr.warning("%s does not exist in the individaully listed files by name, "
                             "but will be kept from canconical tarball" % item)
