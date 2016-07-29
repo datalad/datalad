@@ -105,9 +105,9 @@ class BalsaSupport(object):
 
     def verify_files(self):
 
-        files_path = opj(path, '_files')
+        files_path = opj(repo, '_files')
 
-        con_files = listdir(path)  # list of files that exist from canonical tarball
+        con_files = listdir(repo)  # list of files that exist from canonical tarball
         files = listdir(files_path)  # list of file that are individually downloaded
         files_key = [self.repo.get_file_key(item) for item in files]
 
