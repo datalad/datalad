@@ -20,18 +20,22 @@ _COUNTS = (
     'files', 'urls',
     'add_git', 'add_annex', 'dropped',
     'skipped', 'overwritten', 'renamed', 'removed',
-    'downloaded', 'downloaded_size', 'downloaded_time'
+    'downloaded', 'downloaded_size', 'downloaded_time',
+    'datasets_crawled',
 )
+
 _LISTS = (
     'merges',    # merges which were carried out (from -> to)
     'versions',  # versions encountered.  Latest would be used for tagging
 )
+
 _FORMATTERS = {
     # TODO:
     'downloaded_size': humanize.naturalsize,
     'merges': lambda merges: ", ".join('->'.join(merge) for merge in merges),
     'versions': lambda versions: ', '.join(versions)
 }
+
 
 # @auto_repr
 class ActivityStats(object):

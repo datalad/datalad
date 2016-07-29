@@ -86,7 +86,7 @@ class Crawl(Interface):
 
             # TODO: centralize via _params_ handling
             if dry_run:
-                if not 'crawl' in cfg.sections():
+                if 'crawl' not in cfg.sections():
                     cfg.add_section('crawl')
                 cfg.set('crawl', 'dryrun', "True")
 
@@ -95,6 +95,7 @@ class Crawl(Interface):
                 # get config from the current repository/dataset
                 if is_pipeline:
                     raise ValueError("You must specify the file if --pipeline")
+
                 # Let's see if there is a config or pipeline in this repo
                 path = get_repo_pipeline_config_path()
                 if not path or not exists(path):
@@ -124,12 +125,15 @@ class Crawl(Interface):
                 # probably ask via ui which action should be performed unless
                 # explicitly specified
                 raise
+            stats.datasets_crawled += 1
 
             # TODO:  Move gc/clean over here!
 
+            stats_total = stats.get_total()
+
             if recursive:
                 # get all subdatasets, and crawl them too!
-                assert path_orig is None, "Otherwise not sure what to do with path=%s in subdatasets" % path
+                ## ? assert path_orig is None, "Otherwise not sure what to do with path=%r in subdatasets" % path
                 import os
                 from ..distribution.dataset import Dataset
                 from ..api import crawl
@@ -138,17 +142,20 @@ class Crawl(Interface):
                 subdatasets = Dataset(os.curdir).get_subdatasets(recursive=recursive)
 
                 lgr.info("Crawling %d subdatasets", len(subdatasets))
+                output = [output]
                 # TODO: parallelize
                 for ds_ in subdatasets:
                     try:
                         # TODO: might be cool to be able to report a 'heart beat' from the swallow into pbar or smth
                         with swallow_logs() as cml:
-                            output_, stats_ = crawl(chdir=ds_)
+                            output_, stats_ = crawl(chdir=ds_, recursive=recursive)
+                            stats_total += stats_
+                            output += output_
                         lgr.info("Crawled %s: %s", ds_, stats_.as_str(mode='line'))
                     except Exception as exc:
                         lgr.warning("Crawling of %s has failed: %s.", #  Log output: %s",
                                     ds_, exc_str(exc)) #, cml.out)
-                    stats += stats_
+
                 lgr.info("Overall stats: %s", stats.as_str(mode='line'))
 
-            return output, stats
+            return output, stats_total
