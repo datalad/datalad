@@ -10,8 +10,8 @@
 """A pipeline for crawling BALSA datasets"""
 
 import os, re
-from os import curdir, listdir
-from os.path import lexists, join as opj
+from os import curdir, listdir, makedirs
+from os.path import lexists, join as opj, abspath, exists
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
@@ -52,8 +52,7 @@ def superdataset_pipeline(url=TOPURL):
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="balsa",
-            path=curdir,
-            data_fields=['dataset_id', 'dataset'],
+            data_fields=['dataset_id'],
             existing='skip'
         )
     ]
@@ -99,10 +98,14 @@ class BalsaSupport(object):
 
     def verify_files(self):
 
-        files_path = opj(curdir, '_files')
-
-        con_files = listdir(curdir)  # list of files that exist from canonical tarball
-        files = listdir(files_path)  # list of file that are individually downloaded
+        files_path = opj(abspath(curdir), '_files')
+        # list of files that exist from canonical tarball
+        con_files = listdir(abspath(curdir))
+        con_files.remove('.git')
+        con_files.remove('.gitattributes')
+        con_files.remove('.datalad')
+        # list of file that are individually downloaded
+        files = listdir(files_path)
         files_key = [self.repo.get_file_key(item) for item in files]
 
         for item in con_files:
@@ -137,6 +140,9 @@ def pipeline(dataset_id):
                                    " and exclude=*.tsv"
                                    ])
 
+    if not exists("_files"):
+        makedirs("_files")
+
     dataset_url = '%s%s' % (TOPURL, dataset_id)
     balsa = BalsaSupport(repo=annex.repo)
     # BALSA has no versioning atm, so no changelog either
@@ -148,15 +154,20 @@ def pipeline(dataset_id):
             [
                 assign({'dataset': dataset_id}),
                 skip_if({'dataset': 'test study upload'}, re=True),
-                # canonical tarball
-                a_href_match('https://balsa.wustl.edu/study/download/', min_count=1),
                 annex,
             ],
             [
                 crawl_url(dataset_url),
-                a_href_match('https://balsa.wustl.edu/study/show'),
-                assign({'path': '_files/%(path)s'}, interpolate=True),
-                annex,
+                [
+                    # canonical tarball
+                    a_href_match('https://balsa.wustl.edu/study/download/', min_count=1),
+                    annex,
+                ],
+                [
+                    a_href_match('https://balsa.wustl.edu/study/show'),
+                    assign({'path': '_files/%(path)s'}, interpolate=True),
+                    annex,
+                ],
             ],
 
         ],
@@ -175,7 +186,7 @@ def pipeline(dataset_id):
                    exclude=['(^|%s)\._' % os.path.sep],
                ),
             ],
-            verify_files(balsa),
+            balsa.verify_files(),
             annex.switch_branch('master'),
             annex.merge_branch('incoming-processed', commit=True),
             annex.finalize(tag=True),
