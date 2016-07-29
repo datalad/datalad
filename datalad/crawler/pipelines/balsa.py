@@ -48,7 +48,7 @@ def superdataset_pipeline(url=TOPURL):
         # skip the empty dataset used by BALSA for testing
         skip_if({'dataset_id': 'Jvw1'}, re=True),
         crawl_url(),
-        xpath_match('//*/p[1]|span/text()', output='dataset'),
+        xpath_match('//*/h3/text()', output='dataset'),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="balsa",
