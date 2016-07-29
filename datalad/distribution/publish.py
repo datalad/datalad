@@ -118,7 +118,7 @@ class Publish(Interface):
 
     @staticmethod
     @datasetmethod(name='publish')
-    def __call__(dataset=None, to=None, path=None, recursive=False, skip_failing=False,
+    def __call__(path=None, dataset=None, to=None, recursive=False, skip_failing=False,
                  annex_copy_opts=None):
 
         # shortcut

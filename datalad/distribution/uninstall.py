@@ -118,7 +118,7 @@ class Uninstall(Interface):
 
     @staticmethod
     @datasetmethod(name='uninstall')
-    def __call__(dataset=None, path=None, data_only=False, recursive=False,
+    def __call__(path=None, dataset=None, data_only=False, recursive=False,
                  fast=False):
 
         # Note: copy logic from install to resolve dataset and path:
