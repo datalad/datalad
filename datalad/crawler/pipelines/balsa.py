@@ -42,13 +42,20 @@ def superdataset_pipeline(url=TOPURL):
     lgr.info("Creating a BALSA collection pipeline")
     return [
         crawl_url(url),
-        xpath_match('//*/tr/td[1]/a/text()', output='dataset'),
-        # skip the empty dataset used by BALSA for testing
-        skip_if({'dataset': 'test study upload'}, re=True),
-        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        [
+            xpath_match('//*/tr/td[1]/a/text()', output='dataset'),
+            # skip the empty dataset used by BALSA for testing
+            skip_if({'dataset': 'test study upload'}, re=True),
+            assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        ],
+        [
+            xpath_match('//*/tr/td[1]/a/@href', output='dataset_id'),           # /study/show/W336
+            # skip the empty dataset used by BALSA for testing
+            skip_if({'dataset_id': 'Jvw1'}, re=True),
+        ],
         annex.initiate_dataset(
             template="balsa",
-            data_fields=['dataset'],
+            data_fields=['dataset', 'dataset_id'],
             existing='skip'
         )
     ]
@@ -121,9 +128,10 @@ class BalsaSupport(object):
                         "individaully listed files and will not be kept" % files)
 
 
-def pipeline(dataset):
+def pipeline(dataset, dataset_id):
     lgr.info("Creating a pipeline for the BALSA dataset %s" % dataset)
-    annex = Annexificator(create=False, statusdb='json', special_remotes=[ARCHIVES_SPECIAL_REMOTE],
+    annex = Annexificator(create=False, statusdb='json', allow_dirty=True,
+                          special_remotes=[ARCHIVES_SPECIAL_REMOTE],
                           options=["-c",
                                    "annex.largefiles="
                                    "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
@@ -133,6 +141,8 @@ def pipeline(dataset):
                                    " and exclude=*.json"
                                    " and exclude=*.tsv"
                                    ])
+
+    dataset_url = '%s%s/' % (TOPURL, dataset_id)
     balsa = BalsaSupport(repo=annex.repo, path=curdir)
     # BALSA has no versioning atm, so no changelog either
 
@@ -148,6 +158,8 @@ def pipeline(dataset):
                 annex,
             ],
             [
+                crawl_url(dataset_url),
+                a_href_match('http://balsa.wustl.edu/study/show'),
                 assign({'path': '_files/%(path)s'}, interpolate=True),
                 annex,
             ],
