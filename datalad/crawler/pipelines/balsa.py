@@ -60,7 +60,7 @@ def superdataset_pipeline(url=TOPURL):
 
 # def extract_readme(data):
 #
-#     data['title'] = xpath_match('//*/p[1]|span/text()')(data)
+#     data['full title'] = xpath_match('//*/p[1]|span/text()')(data)
 #     data['species'] = xpath_match('//*/p[2]|span/text()')(data)
 #     data['description'] = xpath_match('//*/p[3]|span/text()')(data)
 #     data['publication'] = xpath_match('//*/p[4]|span/text()')(data)
@@ -123,7 +123,7 @@ class BalsaSupport(object):
 
 
 def pipeline(dataset_id):
-    lgr.info("Creating a pipeline for the BALSA dataset %s" % dataset)
+    lgr.info("Creating a pipeline for the BALSA dataset %s" % dataset_id)
     annex = Annexificator(create=False, statusdb='json', allow_dirty=True,
                           special_remotes=[ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE],
                           options=["-c",
@@ -145,7 +145,7 @@ def pipeline(dataset_id):
         [
             crawl_url(TOPURL),
             [
-                assign({'dataset': dataset}),
+                assign({'dataset': dataset_id}),
                 skip_if({'dataset': 'test study upload'}, re=True),
                 # canonical tarball
                 a_href_match('https://balsa.wustl.edu/study/download/', min_count=1),
