@@ -47,6 +47,8 @@ def superdataset_pipeline(url=TOPURL):
         a_href_match('.*/study/show/(?P<dataset_id>.*)'),
         # skip the empty dataset used by BALSA for testing
         skip_if({'dataset_id': 'Jvw1'}, re=True),
+        # skip dataset that has agreement terms
+        skip_if({'dataset_id': 'RVVG'}, re=True),
         crawl_url(),
         xpath_match('//*/h3/text()', output='dataset'),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
@@ -100,10 +102,12 @@ class BalsaSupport(object):
 
         files_path = opj(abspath(curdir), '_files')
         # list of files that exist from canonical tarball
+        # TODO use find_files to exclude ..*
         con_files = listdir(abspath(curdir))
         con_files.remove('.git')
         con_files.remove('.gitattributes')
         con_files.remove('.datalad')
+        con_files.remove('_files')
         # list of file that are individually downloaded
         files = listdir(files_path)
         files_key = [self.repo.get_file_key(item) for item in files]
@@ -143,7 +147,7 @@ def pipeline(dataset_id):
     if not exists("_files"):
         makedirs("_files")
 
-    dataset_url = '%s%s' % (TOPURL, dataset_id)
+    dataset_url = '%s/show/%s' % (TOPURL, dataset_id)
     balsa = BalsaSupport(repo=annex.repo)
     # BALSA has no versioning atm, so no changelog either
 
@@ -160,11 +164,11 @@ def pipeline(dataset_id):
                 crawl_url(dataset_url),
                 [
                     # canonical tarball
-                    a_href_match('https://balsa.wustl.edu/study/download/', min_count=1),
+                    a_href_match('https://balsa.wustl.edu/study/download/.*', min_count=1),
                     annex,
                 ],
                 [
-                    a_href_match('https://balsa.wustl.edu/study/show'),
+                    a_href_match('https://balsa.wustl.edu/study/show/.*', min_count=2),
                     assign({'path': '_files/%(path)s'}, interpolate=True),
                     annex,
                 ],
