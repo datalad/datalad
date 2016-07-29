@@ -26,7 +26,7 @@ from datalad.support.gitrepo import *
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.balsa")
 
-TOPURL = "http://balsa.wustl.edu/study"
+TOPURL = "https://balsa.wustl.edu/study"
 
 
 def superdataset_pipeline(url=TOPURL):
@@ -154,12 +154,12 @@ def pipeline(dataset, dataset_id):
                 assign({'dataset': dataset}),
                 skip_if({'dataset': 'test study upload'}, re=True),
                 # canonical tarball
-                a_href_match('http://balsa.wustl.edu/study/download/', min_count=1),
+                a_href_match('https://balsa.wustl.edu/study/download/', min_count=1),
                 annex,
             ],
             [
                 crawl_url(dataset_url),
-                a_href_match('http://balsa.wustl.edu/study/show'),
+                a_href_match('https://balsa.wustl.edu/study/show'),
                 assign({'path': '_files/%(path)s'}, interpolate=True),
                 annex,
             ],
