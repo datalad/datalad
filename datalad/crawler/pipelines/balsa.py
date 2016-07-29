@@ -52,6 +52,7 @@ def superdataset_pipeline(url=TOPURL):
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="balsa",
+            path=curdir,
             data_fields=['dataset_id', 'dataset'],
             existing='skip'
         )
