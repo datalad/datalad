@@ -109,7 +109,6 @@ class Ls(Interface):
         if loc.startswith('s3://'):
             return _ls_s3(loc, config_file=config_file, list_content=list_content, **kw)
         elif lexists(loc):
-            # TODO: use some helper like is_dataset_path ??
             if not Dataset(loc).is_installed():
                 raise ValueError("No dataset at %s" % loc)
             return _ls_json(loc, json=json, **kw) if json else _ls_dataset(loc, **kw)
@@ -435,19 +434,29 @@ def ignored(path, only_hidden=False):
     return False
 
 
-def fs_render(root, subdir, json=None):
-    """takes root, subdir to render and based on json option passed renders to file, stdout or deletes json at root"""
+def fs_render(path, fs_metadata, json=None):
+    """takes root, subdir to render and based on json option passed renders to file, stdout or deletes json at root
+
+    Parameters
+    ----------
+    path: str
+      Path to metadata storage location
+    fs_metadata: dict
+      Metadata json to be rendered
+    json: str ('file', 'display', 'delete')
+      Render to file, stdout or delete json
+    """
     # store directory info of the submodule level in fs hierarchy as json
     if json == 'file':
-        with open(opj(root, '.dir.json'), 'w') as f:
-            dump(subdir, f)
+        with open(opj(path, '.dir.json'), 'w') as f:
+            dump(fs_metadata, f)
     # else if json flag set to delete, remove .dir.json of current directory
     elif json == 'delete':
-        if exists(opj(root, '.dir.json')):
-            remove(opj(root, '.dir.json'))
+        if exists(opj(path, '.dir.json')):
+            remove(opj(path, '.dir.json'))
     # else dump json to stdout
     elif json == 'display':
-        print(dumps(subdir) + '\n')
+        print(dumps(fs_metadata) + '\n')
 
 
 def machinesize(humansize):
@@ -466,11 +475,16 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
 
     Parameters
     ----------
-    path
-    repo
+    path: str
+      Path to the directory to be traversed
+    repo: AnnexRepo or GitRepo
+      Repo object the directory belongs too
+    parent: dict
+      Extracted info about parent directory
     recursive: bool
-      Recurse into subdirectories (note that submodules are not traversed)
-    json
+      Recurse into subdirectories (note that subdatasets are not traversed)
+    render: bool
+       To render from within function or not. Set to false if results to be manipulated before final render
 
     Returns
     -------
@@ -516,18 +530,34 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
 
 
 def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
-    """Hierarchical dataset traverser"""
+    """Hierarchical dataset traverser
 
-    # prepare dataset model and parent info to pass to traverser
-    ds_model = AnnexModel(rootds.repo)
+    Parameters
+    ----------
+    rootds: str
+      Path to the root dataset to be traversed
+    parent: dict
+      Extracted info about the parent dataset
+    recursive: bool
+       Recurse into subdirectories of the current dataset
+    all: bool
+       Recurse into subdatasets of the root dataset
+
+    Returns
+    -------
+    list of dict
+      extracts and returns a (recursive) list of dataset(s) info at path
+    """
+
+    # extract parent info to pass to traverser
     fsparent = fs_extract(parent.path, parent.repo) if parent else None
 
     # (recursively) traverse file tree of current dataset
-    fs = fs_traverse(ds_model.path, ds_model.repo, render=False, parent=fsparent, recursive=recursive, json=json)
+    fs = fs_traverse(rootds.path, rootds.repo, render=False, parent=fsparent, recursive=recursive, json=json)
     size_list = [fs['size']]
 
     # (recursively) traverse each subdataset
-    if recursive:
+    if all:
         for subds_path in rootds.get_subdatasets():
             subds = Dataset(opj(rootds.path, subds_path))
             subfs = _ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
@@ -538,8 +568,8 @@ def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     fs['size'] = humanize.naturalsize(total_size)
 
     # render current dataset
+    lgr.info('Dataset: %s' % rootds.path)
     fs_render(rootds.path, fs, json=json)
-    lgr.info('Dataset: %s' % ds_model.path)
     return fs
 
 
