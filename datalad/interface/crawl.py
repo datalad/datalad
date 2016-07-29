@@ -139,18 +139,25 @@ class Crawl(Interface):
                 from ..api import crawl
                 from ..utils import swallow_logs
                 from ..dochelpers import exc_str
+                # Note: we could collect all datasets to be crawled here or pass recursive=True
+                # into the subdatasets' crawl.  We will collect all of them here so we might later
+                # also introduce automatic commits when super-dataset got successfully updated
                 subdatasets = Dataset(os.curdir).get_subdatasets(recursive=recursive)
 
                 lgr.info("Crawling %d subdatasets", len(subdatasets))
                 output = [output]
                 # TODO: parallelize
+                # TODO: assumes that all sub-datasets are 'crawllable', and if not
+                # just adds them to crawl_failed count.  But may be we should make it more
+                # explicit, that some sub-datasets might not need to be crawled, so they get
+                # skipped explicitly?
                 for ds_ in subdatasets:
                     try:
                         # TODO: might be cool to be able to report a 'heart beat' from the swallow into pbar or smth
                         with swallow_logs() as cml:
-                            output_, stats_ = crawl(chdir=ds_, recursive=recursive)
+                            output_, stats_ = crawl(chdir=ds_)
                             stats_total += stats_
-                            output += output_
+                            output.append(output_)
                         lgr.info("Crawled %s: %s", ds_, stats_.as_str(mode='line'))
                     except Exception as exc:
                         stats_total.datasets_crawl_failed += 1
@@ -159,6 +166,6 @@ class Crawl(Interface):
                         lgr.warning("Crawling of %s has failed: %s.",  #  Log output: %s",
                                     ds_, exc_str(exc))  #, cml.out)
 
-                lgr.info("Overall stats: %s", stats.as_str(mode='line'))
+            lgr.info("Total stats: %s", stats_total.as_str(mode='line'))
 
             return output, stats_total

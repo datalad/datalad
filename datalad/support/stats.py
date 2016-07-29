@@ -170,7 +170,9 @@ Branches merged:
             (" overwritten", "overwritten"),
             (" +git",  "add_git"),
             (" +annex", "add_annex"),
-            ("Branches merged", "merges")
+            ("Branches merged", "merges"),
+            ("Datasets crawled", "datasets_crawled"),
+            (" failed", "datasets_crawl_failed"),
         ]
         # Filter out empty/0 ones
         out = ["%s: " % s + str(entries[m]) for s, m in out_formats if entries[m]]
