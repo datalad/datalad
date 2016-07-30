@@ -14,6 +14,10 @@ __docformat__ = 'restructuredtext'
 
 from mock import patch
 from mock import call
+from nose import SkipTest
+
+from datalad.support.external_versions import external_versions
+
 from ...api import crawl
 
 from ...tests.utils import assert_cwd_unchanged
@@ -73,6 +77,8 @@ def test_crawl_api_recursive(get_subdatasets_, run_pipeline_, load_pipeline_from
     with chpwd(tdir):
         output, stats = crawl(recursive=True)
     assert_equal(pwd, getpwd())
+    if external_versions['mock'] < '1.0.1':
+        raise SkipTest("needs a more recent mock which throws exceptions in side_effects")
     assert_equal(output, [[]]*4 + [None])  # for now output is just a list of outputs
     assert_equal(stats, ActivityStats(datasets_crawled=5, datasets_crawl_failed=1))  # nothing was done but we got it crawled
     chpwd_.assert_has_calls(
