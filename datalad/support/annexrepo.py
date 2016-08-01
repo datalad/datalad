@@ -552,8 +552,38 @@ class AnnexRepo(GitRepo):
             raise FileNotInAnnexError("Could not get a key for a file %s -- empty output" % file_)
         return entries[0]
 
+    @normalize_paths(map_filenames_back=True)
+    def find(self, files, batch=False):
+        """Provide annex info for file(s).
+
+        Parameters
+        ----------
+        files: list of str
+            files to find under annex
+        batch: bool, optional
+            initiate or continue with a batched run of annex find, instead of just
+            calling a single git annex find command
+
+        Returns
+        -------
+        list
+          list with filename if file found else empty string
+        """
+        objects = []
+        if batch:
+            objects = self._batched.get('find', path=self.path)(files)
+        else:
+            for f in files:
+                try:
+                    obj, er = self._run_annex_command('find', annex_options=[f], expect_fail=True)
+                    objects.append(obj)
+                except CommandError:
+                    objects.append('')
+
+        return objects
+
     @normalize_paths
-    def file_has_content(self, files, allow_quick=True):
+    def file_has_content(self, files, allow_quick=True, batch=True):
         """Check whether files have their content present under annex.
 
         Parameters
@@ -573,28 +603,8 @@ class AnnexRepo(GitRepo):
 
         if self.is_direct_mode() or not allow_quick:  # TODO: thin mode
             # TODO: Also provide option to look for key instead of path
-            try:
-                out, err = self._run_annex_command('find', annex_options=files,
-                                               expect_fail=True)
-            except CommandError as e:
-                if e.code == 1 and "not found" in e.stderr:
-                    if len(files) > 1:
-                        lgr.debug("One of the files was not found, so performing "
-                                  "'find' operation per each file")
-                        # we need to go file by file since one of them is non
-                        # existent and annex pukes on it
-                        return [self.file_has_content(file_) for file_ in files]
-                    return [False]
-                else:
-                    raise
-
-            found_files = {f for f in out.splitlines() if f}
-            found_files_new = set(found_files) - set(files)
-            if found_files_new:
-                raise RuntimeError("'annex find' returned entries for files which "
-                                   "we did not expect: %s" % (found_files_new,))
-
-            return [file_ in found_files for file_ in files]
+            find = self.find(files, normalize_paths=False, batch=batch)
+            return [bool(filename) for filename in find]
         else:  # ad-hoc check which should be faster than call into annex
             out = []
             for f in files:
