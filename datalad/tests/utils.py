@@ -739,6 +739,12 @@ def skip_ssh(func):
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
+
+    Parameters
+    ----------
+    ok_to_chdir: bool, optional
+      If True, allow to chdir, so this decorator would not then raise exception
+      if chdir'ed but only return to original directory
     """
 
     @wraps(func)

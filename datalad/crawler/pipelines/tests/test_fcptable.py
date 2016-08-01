@@ -9,7 +9,7 @@
 
 from os.path import exists
 from ....utils import chpwd
-from ....tests.utils import assert_true, assert_raises
+from ....tests.utils import assert_true, assert_raises, assert_false
 from ....tests.utils import with_tempfile, skip_if_no_network, use_cassette
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from datalad.crawler.pipelines.fcptable import *
@@ -31,7 +31,7 @@ def test_smoke_pipelines():
 @use_cassette('test_fcptable_dataset')
 @skip_if_no_network
 @with_tempfile(mkdir=True)
-def _test_dataset(dataset, error, create, tmpdir):
+def _test_dataset(dataset, error, create, skip, tmpdir):
     TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"
 
     with chpwd(tmpdir):
@@ -44,6 +44,7 @@ def _test_dataset(dataset, error, create, tmpdir):
             crawl_url(TOPURL),
             [
                 assign({'dataset': dataset}),
+                skip_if({'dataset': 'Cleveland CCF|Durham_Madden|NewYork_Test-Retest_Reliability'}, re=True),
                 sub({'response': {'<div class="tableParam">([^<]*)</div>': r'\1'}}),
                 find_dataset(dataset),
                 extract_readme,
@@ -55,6 +56,9 @@ def _test_dataset(dataset, error, create, tmpdir):
             return
 
         run_pipeline(pipe)
+        if skip:
+            assert_false(exists("README.txt"))
+            return
         assert_true(exists("README.txt"))
 
         f = open("README.txt", 'r')
@@ -63,9 +67,10 @@ def _test_dataset(dataset, error, create, tmpdir):
 
 
 def test_dataset():
-    yield _test_dataset, 'Baltimore', None, False
-    yield _test_dataset, 'AnnArbor_b', None, False
-    yield _test_dataset, 'Ontario', None, False
-    yield _test_dataset, 'Boston', RuntimeError, False
-    yield _test_dataset, "AnnArbor_b", None, True
+    yield _test_dataset, 'Baltimore', None, False, False
+    yield _test_dataset, 'AnnArbor_b', None, False, False
+    yield _test_dataset, 'Ontario', None, False, False
+    yield _test_dataset, 'Boston', RuntimeError, False, False
+    yield _test_dataset, "AnnArbor_b", None, True, False
+    yield _test_dataset, "Cleveland CCF", None, False, True
 

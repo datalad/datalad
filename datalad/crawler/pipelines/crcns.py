@@ -61,7 +61,7 @@ def extract_readme(data):
     yield {'filename': "README.txt"}
 
 
-def pipeline(dataset, dataset_category, versioned_urls=False):
+def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True):
     """Pipeline to crawl/annex an crcns dataset"""
 
     dataset_url = 'http://crcns.org/data-sets/{dataset_category}/{dataset}'.format(**locals())
@@ -112,7 +112,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=tarballs),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
                     existing='archive-suffix',
                     # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
