@@ -258,23 +258,28 @@ class FsModel(AnnexModel):
     def size(self):
         """Size of the node computed based on its type"""
         type_ = self.type_
+        sizes = {'total': None, 'ondisk': None, 'git': None, 'annex': None, 'annex_worktree': None}
 
-        if type_ == 'annex':
-            return self.annex_local_size
-        elif type_ == 'git':
-            return self.git_local_size
-        elif type_ in ['file', 'link', 'link-broken']:
-            size = ondisk_size = 0 \
-                if type_ == 'broken-link' \
-                else lstat(self.symlink or self._path).st_size
-            if isinstance(self.repo, AnnexRepo) and self.repo.is_under_annex(self._path):
+        if type_ in ['file', 'link', 'link-broken']:
+            # if node is under annex, ask annex for node size, ondisk_size
+            if isinstance(self.repo, AnnexRepo) and self.repo.is_under_annex(self._path, batch=True):
                 size = self.repo.info(self._path, batch=True)['size']
-            # TODO: all the ondisk_size handling to report both
-            return size
-        elif 'dir' == type_:
-            return Runner().run(['du', '-s', self._path])[0].split('\t')[0]  # lstat(self._path).st_size
-        else:
-            raise RuntimeError("I must have not got here! my type is %s" % type_)
+                ondisk_size = size \
+                    if self.repo.file_has_content(self._path) \
+                    else 0
+            # else ask fs for node size (= ondisk_size)
+            else:
+                size = ondisk_size = 0 \
+                       if type_ == 'link-broken' \
+                       else lstat(self.symlink or self._path).st_size
+
+            sizes.update({'total': size, 'ondisk': ondisk_size})
+
+        if self.repo.path == self._path:
+            sizes.update({'git': self.git_local_size,
+                          'annex': self.annex_local_size,
+                          'annex_worktree': self.annex_worktree_size})
+        return sizes
 
     @property
     def type_(self):
@@ -408,7 +413,7 @@ def fs_extract(nodepath, repo):
 
     # Create FsModel from filesystem nodepath and its associated parent repository
     node = FsModel(nodepath, repo)
-    pretty_size = humanize.naturalsize(node.size) if node.size else 0.0
+    pretty_size = humanize.naturalsize(node.size['ondisk']) if node.size['ondisk'] else 0.0
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
     return {"name": name, "path": node._path, "repo": node.repo.path,
