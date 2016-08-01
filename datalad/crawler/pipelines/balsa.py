@@ -9,7 +9,7 @@
 
 """A pipeline for crawling BALSA datasets"""
 
-import os, re
+import os
 from os import curdir, listdir, makedirs
 from os.path import lexists, join as opj, abspath, exists
 
@@ -47,8 +47,6 @@ def superdataset_pipeline(url=TOPURL):
         a_href_match('.*/study/show/(?P<dataset_id>.*)'),
         # skip the empty dataset used by BALSA for testing
         skip_if({'dataset_id': 'Jvw1'}, re=True),
-        # skip dataset that has agreement terms
-        skip_if({'dataset_id': 'RVVG'}, re=True),
         crawl_url(),
         xpath_match('//*/h3/text()', output='dataset'),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
@@ -164,11 +162,11 @@ def pipeline(dataset_id):
                 crawl_url(dataset_url),
                 [
                     # canonical tarball
-                    a_href_match('https://balsa.wustl.edu/study/download/.*', min_count=1),
+                    a_href_match('https://balsa.wustl.edu/study/download/', min_count=1),
                     annex,
                 ],
                 [
-                    a_href_match('https://balsa.wustl.edu/study/show/.*', min_count=2),
+                    a_href_match('https://balsa.wustl.edu/file/show/', min_count=2, output='path'),
                     assign({'path': '_files/%(path)s'}, interpolate=True),
                     annex,
                 ],
