@@ -755,7 +755,9 @@ class chpwd(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._prev_pwd:
-            chpwd(self._prev_pwd, logsuffix="(coming back)")
+            # Need to use self.__class__ so this instance, if the entire
+            # thing mocked during the test, still would use correct chpwd
+            self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
 def knows_annex(path):

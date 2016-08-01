@@ -1413,6 +1413,8 @@ class BatchedAnnex(object):
         self._process = None
 
     def _initialize(self):
+        # TODO -- should get all those options about --debug and --backend which are used/composed
+        # in AnnexRepo class
         lgr.debug("Initiating a new process for %s" % repr(self))
         cmd = ['git'] + AnnexRepo._GIT_COMMON_OPTIONS + self.git_options + \
               ['annex'] + self.annex_cmd + self.annex_options + ['--batch'] # , '--debug']
