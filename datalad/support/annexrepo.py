@@ -24,6 +24,9 @@ from os.path import islink
 from os.path import realpath
 from os.path import lexists
 from os.path import isdir
+from os.path import isabs
+from os.path import dirname
+from os import readlink
 from subprocess import Popen, PIPE
 from functools import wraps
 
@@ -550,43 +553,61 @@ class AnnexRepo(GitRepo):
         return entries[0]
 
     @normalize_paths
-    def file_has_content(self, files):
+    def file_has_content(self, files, allow_quick=True):
         """Check whether files have their content present under annex.
 
         Parameters
         ----------
         files: list of str
             file(s) to check for being actually present.
+        allow_quick: bool, optional
+            allow quick check, based on having a symlink into .git/annex/objects.
+            Works only in non-direct mode (TODO: thin mode)
 
         Returns
         -------
         list of bool
-            Per each input file states either file has content locally
+            For each input file states either file has content locally
         """
         # TODO: Also provide option to look for key instead of path
 
-        try:
-            out, err = self._run_annex_command('find', annex_options=files,
+        if self.is_direct_mode() or not allow_quick:  # TODO: thin mode
+            # TODO: Also provide option to look for key instead of path
+            try:
+                out, err = self._run_annex_command('find', annex_options=files,
                                                expect_fail=True)
-        except CommandError as e:
-            if e.code == 1 and "not found" in e.stderr:
-                if len(files) > 1:
-                    lgr.debug("One of the files was not found, so performing "
-                              "'find' operation per each file")
-                    # we need to go file by file since one of them is non
-                    # existent and annex pukes on it
-                    return [self.file_has_content(file_) for file_ in files]
-                return [False]
-            else:
-                raise
+            except CommandError as e:
+                if e.code == 1 and "not found" in e.stderr:
+                    if len(files) > 1:
+                        lgr.debug("One of the files was not found, so performing "
+                                  "'find' operation per each file")
+                        # we need to go file by file since one of them is non
+                        # existent and annex pukes on it
+                        return [self.file_has_content(file_) for file_ in files]
+                    return [False]
+                else:
+                    raise
 
-        found_files = {f for f in out.splitlines() if f}
-        found_files_new = set(found_files) - set(files)
-        if found_files_new:
-            raise RuntimeError("'annex find' returned entries for files which "
-                               "we did not expect: %s" % (found_files_new,))
+            found_files = {f for f in out.splitlines() if f}
+            found_files_new = set(found_files) - set(files)
+            if found_files_new:
+                raise RuntimeError("'annex find' returned entries for files which "
+                                   "we did not expect: %s" % (found_files_new,))
 
-        return [file_ in found_files for file_ in files]
+            return [file_ in found_files for file_ in files]
+        else:  # ad-hoc check which should be faster than call into annex
+            out = []
+            for f in files:
+                filepath = opj(self.path, f)
+                target_path = ''
+                if islink(filepath):                    # if symlink
+                    target_path = readlink(filepath)    # find link target
+                    # convert to absolute path if not
+                    target_path = target_path \
+                        if isabs(target_path) \
+                        else opj(dirname(filepath), target_path)
+                out.append(exists(target_path) and islink(filepath))
+            return out
 
     @normalize_paths
     def is_under_annex(self, files, allow_quick=True, batch=False):
@@ -603,7 +624,7 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         list of bool
-            Per each input file states either file is under annex
+            For each input file states either file is under annex
         """
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
@@ -873,7 +894,7 @@ class AnnexRepo(GitRepo):
             files to look for
         output: {'descriptions', 'uuids', 'full'}, optional
             If 'descriptions', a list of remotes descriptions returned is per
-            each file. If 'full', per each file a dictionary of all fields
+            each file. If 'full', for each file a dictionary of all fields
             is returned as returned by annex
         key: bool, optional
             Either provided files are actually annex keys
@@ -882,7 +903,7 @@ class AnnexRepo(GitRepo):
         -------
         list of list of unicode  or dict
             if output == 'descriptions', contains a list of descriptions of remotes
-            per each input file, describing the remote for each remote, which
+            for each input file, describing the remote for each remote, which
             was found by git-annex whereis, like::
 
                 u'me@mycomputer:~/where/my/repo/is [origin]' or
@@ -939,7 +960,7 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         dict
-          Info per each file
+          Info for each file
         """
 
         options = ['--bytes']
@@ -1218,7 +1239,7 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         list of str
-            Per each file in input list indicates the used backend by a str
+            For each file in input list indicates the used backend by a str
             like "SHA256E" or "MD5".
         """
 
