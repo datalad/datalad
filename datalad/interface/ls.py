@@ -258,7 +258,7 @@ class FsModel(AnnexModel):
     def size(self):
         """Size of the node computed based on its type"""
         type_ = self.type_
-        sizes = {'total': None, 'ondisk': None, 'git': None, 'annex': None, 'annex_worktree': None}
+        sizes = {'total': 0.0, 'ondisk': 0.0, 'git': 0.0, 'annex': 0.0, 'annex_worktree': 0.0}
 
         if type_ in ['file', 'link', 'link-broken']:
             # if node is under annex, ask annex for node size, ondisk_size
@@ -413,7 +413,7 @@ def fs_extract(nodepath, repo):
 
     # Create FsModel from filesystem nodepath and its associated parent repository
     node = FsModel(nodepath, repo)
-    pretty_size = humanize.naturalsize(node.size['ondisk']) if node.size['ondisk'] else 0.0
+    pretty_size = {stype: humanize.naturalsize(svalue) for stype, svalue in node.size.items()}
     pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
     name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
     return {"name": name, "path": node._path, "repo": node.repo.path,
@@ -513,17 +513,19 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
                 subdir = fs_traverse(nodepath, repo, parent=children[0], recursive=recursive, json=json)
                 children[-1]['size'] = subdir['size']  # update parent with child computed size of itself
 
-        # update current node size by summing sizes of all its 1st level children
-        total_size = sum([
-            machinesize(node['size'])
-            for node in children[1:]
-        ])
-        fs['size'] = children[0]['size'] = humanize.naturalsize(total_size)
+        # sum sizes of all 1st level children
+        children_size = {}
+        for node in children[1:]:
+            for size_type, child_size in node['size'].items():
+                children_size[size_type] = children_size.get(size_type, 0) + machinesize(child_size)
+        # update current node sizes to the humanized aggregate children size
+        fs['size'] = children[0]['size'] = \
+            {size_type: humanize.naturalsize(child_size)
+             for size_type, child_size in children_size.items()}
 
-        # replace parent, current node name with '..', '.' to emulate unix syntax
-        children[0]['name'] = '.'
+        children[0]['name'] = '.'       # replace current node name with '.' to emulate unix syntax
         if parent:
-            parent['name'] = '..'
+            parent['name'] = '..'       # replace parent node name with '..' to emulate unix syntax
             children.insert(1, parent)  # insert parent info after current node info in children dict
 
         fs['nodes'] = children          # add children info to main fs dictionary
@@ -568,9 +570,15 @@ def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
             subfs = _ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
             size_list.append(subfs['size'])
 
-    # update total_size of current dataset to include subdataset sizes
-    total_size = sum([machinesize(subdataset_size) for subdataset_size in size_list])
-    fs['size'] = humanize.naturalsize(total_size)
+    # sum sizes of all 1st level children dataset
+    children_size = {}
+    for subdataset_size in size_list:
+        for size_type, subds_size in subdataset_size.items():
+            children_size[size_type] = children_size.get(size_type, 0) + machinesize(subds_size)
+
+    # update current dataset sizes to the humanized aggregate subdataset sizes
+    fs['size'] = {size_type: humanize.naturalsize(size)
+                  for size_type, size in children_size.items()}
 
     # render current dataset
     lgr.info('Dataset: %s' % rootds.path)
