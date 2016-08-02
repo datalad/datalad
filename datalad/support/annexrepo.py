@@ -583,7 +583,7 @@ class AnnexRepo(GitRepo):
         return objects
 
     @normalize_paths
-    def file_has_content(self, files, allow_quick=True, batch=True):
+    def file_has_content(self, files, allow_quick=True, batch=False):
         """Check whether files have their content present under annex.
 
         Parameters
@@ -609,14 +609,12 @@ class AnnexRepo(GitRepo):
             out = []
             for f in files:
                 filepath = opj(self.path, f)
-                target_path = ''
                 if islink(filepath):                    # if symlink
-                    target_path = readlink(filepath)    # find link target
-                    # convert to absolute path if not
-                    target_path = target_path \
-                        if isabs(target_path) \
-                        else opj(dirname(filepath), target_path)
-                out.append(exists(target_path) and islink(filepath))
+                    target_path = realpath(filepath)    # find abspath of node pointed to by symlink
+                    is_annex_link = target_path.startswith(opj(self.path, '.git', 'annex', 'objects'))
+                    out.append(exists(target_path) and is_annex_link)
+                else:
+                    out.append(False)
             return out
 
     @normalize_paths
