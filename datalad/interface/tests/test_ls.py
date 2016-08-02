@@ -16,6 +16,7 @@ from glob import glob
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
+from datalad.distribution.dataset import Dataset
 from ...api import ls
 from ...utils import swallow_outputs, swallow_logs, chpwd
 from ...tests.utils import assert_equal, assert_in
@@ -109,7 +110,8 @@ def test_fs_traverse(topdir):
           '.hidden': {'.hidden_file': '121'}})
 def test_ls_json(topdir):
     annex = AnnexRepo(topdir, create=True)
-    AnnexRepo(opj(topdir, 'annexdir'), create=True)
+    ds = Dataset(topdir)
+    ds.create_subdataset(opj(topdir, 'annexdir'))
     git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
     git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)
     annex.add(opj(topdir, 'dir', 'subgit'), commit=True)
@@ -117,15 +119,20 @@ def test_ls_json(topdir):
     annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])
 
     with swallow_logs(), swallow_outputs():
-        for state in ['file', 'delete']:
-            _ls_json(topdir, json=state, recursive=True)
-            # directories that should have json files created and deleted
-            for subdir in ['dir', opj('dir', 'subdir')]:
-                assert_equal(exists(opj(topdir, subdir, '.dir.json')), True if state == 'file' else False)
+        for all in [True, False]:
+            for state in ['file', 'delete']:
+                _ls_json(topdir, json=state, all=all, recursive=True)
 
-            # directories that should not have json files created
-            for subdir in ['.hidden', opj('dir', 'subgit')]:
-                assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
+                # subdataset should have json created and deleted when all=True else not
+                assert_equal(exists(opj(topdir, 'annexdir', '.dir.json')), (state == 'file' and all))
+
+                # directories that should have json files created and deleted
+                for subdir in ['dir', opj('dir', 'subdir')]:
+                    assert_equal(exists(opj(topdir, subdir, '.dir.json')), state == 'file')
+
+                # directories that should not have json files created
+                for subdir in ['.hidden', opj('dir', 'subgit')]:
+                    assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
 
 
 @with_tempfile
