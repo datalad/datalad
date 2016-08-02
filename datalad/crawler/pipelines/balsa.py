@@ -17,7 +17,9 @@ from os.path import lexists, join as opj, abspath, exists
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign, skip_if
-from ..nodes.misc import find_files
+from ..nodes.misc import find_files, get_disposition_filename
+from ..nodes.misc import debug
+from ..nodes.misc import sub
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
 from datalad.support.annexrepo import *
@@ -26,7 +28,7 @@ from datalad.support.gitrepo import *
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.balsa")
 
-TOPURL = "https://balsa.wustl.edu/study"
+TOPURL = "https://balsa.wustl.edu/"
 
 
 def superdataset_pipeline(url=TOPURL):
@@ -39,6 +41,8 @@ def superdataset_pipeline(url=TOPURL):
     """
     # xpath_match('//*/tr/td[1]/a/text()', output='dataset') # dataset = Connection Strength and Distance with Tractography
     # xpath_match('//*/tr/td[1]/a/@href', output='dataset_id')  # dataset_id = /study/show/W336
+
+    url = opj(url, 'study/')
 
     annex = Annexificator()
     lgr.info("Creating a BALSA collection pipeline")
@@ -97,15 +101,10 @@ class BalsaSupport(object):
         self.repo = repo
 
     def verify_files(self):
-
         files_path = opj(abspath(curdir), '_files')
         # list of files that exist from canonical tarball
-        # TODO use find_files to exclude ..*
-        con_files = listdir(abspath(curdir))
-        con_files.remove('.git')
-        con_files.remove('.gitattributes')
-        con_files.remove('.datalad')
-        con_files.remove('_files')
+        # con_files = listdir(abspath(curdir))
+        con_files = list(find_files('.*', topdir=abspath(curdir))({}))
         # list of file that are individually downloaded
         files = listdir(files_path)
         files_key = [self.repo.get_file_key(item) for item in files]
@@ -125,12 +124,13 @@ class BalsaSupport(object):
                             "but will be kept from canconical tarball" % item)
         if files:
             lgr.warning("The following files do not exist in the canonical tarball, but are "
-                        "individaully listed files and will not be kept" % files)
+                        "individually listed files and will not be kept" % files)
 
 
-def pipeline(dataset_id):
+def pipeline(dataset_id, url=TOPURL):
     lgr.info("Creating a pipeline for the BALSA dataset %s" % dataset_id)
-    annex = Annexificator(create=False, statusdb='json', allow_dirty=True,
+    annex = Annexificator(create=False,
+                          statusdb='json',
                           special_remotes=[ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE],
                           options=["-c",
                                    "annex.largefiles="
@@ -145,29 +145,45 @@ def pipeline(dataset_id):
     if not exists("_files"):
         makedirs("_files")
 
-    dataset_url = '%s/show/%s' % (TOPURL, dataset_id)
-    balsa = BalsaSupport(repo=annex.repo)
-    # BALSA has no versioning atm, so no changelog either
+    def splitpath(data):
+        data = data.copy()
+        fullpath = data.pop('path')
+        path = os.path.dirname(fullpath)
+        if path:
+            data['path'] = path
+        data['filename'] = os.path.basename(fullpath)
+        yield data
 
+    files_url = opj(url, 'file/show/')
+
+    url = opj(url, 'study/')
+    canonical_url = opj(url, 'download/', dataset_id)
+    dataset_url = '%s/show/%s' % (url, dataset_id)
+
+    balsa = BalsaSupport(repo=annex.repo)
+
+    # BALSA has no versioning atm, so no changelog either
     return [
         annex.switch_branch('incoming'),
         [
-            crawl_url(TOPURL),
+            crawl_url(url),    # TOPURL/study
             [
                 assign({'dataset': dataset_id}),
                 skip_if({'dataset': 'test study upload'}, re=True),
-                annex,
             ],
             [
-                crawl_url(dataset_url),
+                crawl_url(dataset_url),    # TOPURL/study/show/[dataset_id]
                 [
                     # canonical tarball
-                    a_href_match('https://balsa.wustl.edu/study/download/', min_count=1),
+                    a_href_match(canonical_url, min_count=1),   # TOPURL/study/download/[dataset_id]
+                    assign({'filename': '%(url_text)s'}, interpolate=True),
                     annex,
                 ],
                 [
-                    a_href_match('https://balsa.wustl.edu/file/show/', min_count=2, output='path'),
-                    assign({'path': '_files/%(path)s'}, interpolate=True),
+                    a_href_match(files_url, min_count=2),  # TOPURL/file/download/[somefile_id]
+                    assign({'path': '_files/%(url_text)s'}, interpolate=True),
+                    sub({'path': {' / ': '/'}}),
+                    splitpath,
                     annex,
                 ],
             ],
