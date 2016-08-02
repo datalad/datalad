@@ -10,6 +10,7 @@
 
 
 from git.config import GitConfigParser
+import os
 from os.path import join as opj
 from datalad.support.network import is_url
 
@@ -52,7 +53,20 @@ def get_dataset_identifier(ds):
 
     Must be compliant with N-triples format, e.g. a blank node or a URI.
     """
-    return '_:dsid_placeholder'
+    dsid = None
+    if ds.repo:
+        dsid = ds.repo.repo.config_reader().get_value(
+            'annex', 'uuid', default=None)
+        if dsid:
+            dsid = 'http://db.datalad.org/ds/{}'.format(dsid)
+        else:
+            # not an annex
+            dsid = '_:{}'.format(ds.repo.get_hexsha())
+    else:
+        # not even a VCS
+        dsid = '_:{}'.format(ds.path.replace(os.sep, '_'))
+
+    return dsid
 
 
 def format_ntriples(triples):

@@ -47,17 +47,18 @@ def test_has_no_metadata(path):
 def test_get_ntriples(path):
 
     ds = Dataset(path)
+    dsid = get_dataset_identifier(ds)
     triples = get_ntriples(ds)
     assert_equal(
         format_ntriples(triples),
         """\
-_:dsid_placeholder <http://purl.org/dc/terms/type> <http://purl.org/dc/dcmitype/Dataset> .
-_:dsid_placeholder <http://xmlns.com/foaf/spec/#term_name> "studyforrest_phase2" .
-_:dsid_placeholder <http://purl.org/dc/terms/license> "PDDL" .
-_:dsid_placeholder <http://xmlns.com/foaf/spec/#term_fundedBy> "We got money from collecting plastic bottles" .
-_:dsid_placeholder <http://purl.org/dc/elements/1.1/description> "Some description" .
-_:dsid_placeholder <http://purl.org/dc/terms/conformsTo> "BIDS 1.0.0-rc3" .
-_:dsid_placeholder <http://purl.org/dc/elements/1.1/contributor> "Mike One" .
-_:dsid_placeholder <http://purl.org/dc/elements/1.1/contributor> "Anna Two" .
-_:dsid_placeholder <http://purl.org/dc/terms/bibliographicCitation> <http://studyforrest.org> .""")
+{dsid} <http://purl.org/dc/terms/type> <http://purl.org/dc/dcmitype/Dataset> .
+{dsid} <http://xmlns.com/foaf/spec/#term_name> "studyforrest_phase2" .
+{dsid} <http://purl.org/dc/terms/license> "PDDL" .
+{dsid} <http://xmlns.com/foaf/spec/#term_fundedBy> "We got money from collecting plastic bottles" .
+{dsid} <http://purl.org/dc/elements/1.1/description> "Some description" .
+{dsid} <http://purl.org/dc/terms/conformsTo> "BIDS 1.0.0-rc3" .
+{dsid} <http://purl.org/dc/elements/1.1/contributor> "Mike One" .
+{dsid} <http://purl.org/dc/elements/1.1/contributor> "Anna Two" .
+{dsid} <http://purl.org/dc/terms/bibliographicCitation> <http://studyforrest.org> .""".format(dsid=dsid))
 
