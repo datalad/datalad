@@ -10,7 +10,7 @@
 
 from os.path import exists, join as opj
 import json
-from .. import get_dataset_identifier, autoformat_ntriple_element
+from .. import get_dataset_identifier
 from ..common import predicates, objects
 
 def has_metadata(ds):
@@ -47,17 +47,17 @@ def get_ntriples(ds):
         if bidsterm in bids:
             triples.append((dsid,
                             predicates[dataladterm],
-                            autoformat_ntriple_element(bids[bidsterm])))
+                            bids[bidsterm]))
     # special case handling
     if 'BIDSVersion' in bids:
         triples.append((dsid, predicates['conformsto'],
-                        autoformat_ntriple_element('BIDS %s' % (bids['BIDSVersion'],))))
+                        'BIDS %s' % (bids['BIDSVersion'],)))
     if 'Authors' in bids:
         for author in bids['Authors']:
-            triples.append((dsid, predicates['contributor'], autoformat_ntriple_element(author)))
+            triples.append((dsid, predicates['contributor'], author))
     if 'ReferencesAndLinks' in bids:
         for ref in bids['ReferencesAndLinks']:
             triples.append((dsid, predicates['citation'],
-                            autoformat_ntriple_element(ref)))
+                            ref))
     # TODO maybe normalize labels of standard licenses to definition URIs
     return triples

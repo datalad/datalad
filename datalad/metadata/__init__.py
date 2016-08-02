@@ -71,8 +71,16 @@ def get_dataset_identifier(ds):
 
 def format_ntriples(triples):
     return '\n'.join(['{subject} {predicate} {object} .'.format(
-        subject=t[0], predicate=t[1], object=t[2]) for t in triples])
+        subject=autoformat_ntriple_element(t[0]),
+        predicate=autoformat_ntriple_element(t[1]),
+        object=autoformat_ntriple_element(t[2]))
+        for t in triples])
 
 
 def autoformat_ntriple_element(val):
-    return '<{}>'.format(val) if is_url(val) else '"{}"'.format(val)
+    if val.startswith('_:'):
+        return val
+    elif is_url(val):
+        return '<{}>'.format(val)
+    else:
+        return '"{}"'.format(val)
