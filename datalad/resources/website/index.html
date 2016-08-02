@@ -35,7 +35,7 @@
 		     "url": url,
 		     "dataSrc": "nodes"
 		 },
-	         "order": [[ 4, "asc" ], [ 0, 'asc' ]],
+	         "order": [[ 6, "desc" ], [ 0, 'asc' ]],
 		 "columns": [      //select columns and their names from json
 		     { data: "name", title: "Name" },
                      { data: "date", title: "Last Modified", className: "dt-center", width: "20%" },
@@ -43,6 +43,7 @@
 		     { data: null, title: "Description", className: "dt-center", render: function(data) { return '';}},
 		     { data: "type", title: "Type", className: "dt-center" },
                      { data: "path", title: "Path", className: "dt-center" },
+		     { data: null, title: "Sort", render: function(data) { return (data.type=='dir' || data.type=='git' || data.type=='annex');}}
 	         ],
 		 "createdRow": function ( row, data, index ) {
 		     $('td', row).eq(2).html(data.size.ondisk + "/" + data.size.total);      // show size = "ondisk size" / "total size"
@@ -73,7 +74,7 @@
 		     });
 		 }
 	     });
-	     table.columns([4,5]).visible(false);  //hide complete path and file type columns
+	     table.columns([4,5,6]).visible(false);  //hide complete path, file type and sorting columns
 	     return table;
 	 }
 	 // check if url exists
