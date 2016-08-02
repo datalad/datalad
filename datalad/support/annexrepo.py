@@ -24,9 +24,6 @@ from os.path import islink
 from os.path import realpath
 from os.path import lexists
 from os.path import isdir
-from os.path import isabs
-from os.path import dirname
-from os import readlink
 from subprocess import Popen, PIPE
 from functools import wraps
 
@@ -601,7 +598,7 @@ class AnnexRepo(GitRepo):
         """
         # TODO: Also provide option to look for key instead of path
 
-        if self.is_direct_mode() or not allow_quick:  # TODO: thin mode
+        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
             # TODO: Also provide option to look for key instead of path
             find = self.find(files, normalize_paths=False, batch=batch)
             return [bool(filename) for filename in find]
@@ -611,8 +608,8 @@ class AnnexRepo(GitRepo):
                 filepath = opj(self.path, f)
                 if islink(filepath):                    # if symlink
                     target_path = realpath(filepath)    # find abspath of node pointed to by symlink
-                    is_annex_link = target_path.startswith(opj(self.path, '.git', 'annex', 'objects'))
-                    out.append(exists(target_path) and is_annex_link)
+                    # TODO: checks for being not outside of this repository
+                    out.append(exists(target_path) and '.git/annex/objects' in target_path)
                 else:
                     out.append(False)
             return out
@@ -637,7 +634,7 @@ class AnnexRepo(GitRepo):
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
-        if self.is_direct_mode() or not allow_quick:  # TODO: thin mode
+        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
             # no other way but to call whereis and if anything returned for it
             info = self.info(files, normalize_paths=False, batch=batch)
             # info is a dict... khe khe -- "thanks" Yarik! ;)
