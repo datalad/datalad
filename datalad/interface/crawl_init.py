@@ -10,7 +10,7 @@
 
 __docformat__ = 'restructuredtext'
 
-from os.path import  curdir
+from os.path import curdir
 from .base import Interface
 from collections import OrderedDict
 from datalad.api import save
@@ -22,10 +22,10 @@ from ..support.constraints import EnsureStr, EnsureNone
 from ..utils import get_func_kwargs_doc
 from ..crawler.pipeline import load_pipeline_from_template, initiate_pipeline_config
 
-
 from logging import getLogger
 lgr = getLogger('datalad.api.crawl_init')
 CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
+
 
 class CrawlInit(Interface):
     """
@@ -100,4 +100,4 @@ class CrawlInit(Interface):
 
         if save:
             ds = Dataset(curdir)
-            ds.save("committing crawl config file", files=configfile)
+            ds.save("committing crawl config file", files=[configfile])
