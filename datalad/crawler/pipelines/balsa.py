@@ -16,12 +16,12 @@ from os.path import lexists, join as opj, abspath, exists
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
-from ..nodes.misc import assign, skip_if
-from ..nodes.misc import find_files, get_disposition_filename
+from ..nodes.misc import assign, skip_if, find_files
 from ..nodes.misc import debug
 from ..nodes.misc import sub
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
+from datalad.utils import find_files as f_f
 from datalad.support.annexrepo import *
 from datalad.support.gitrepo import *
 
@@ -104,14 +104,14 @@ class BalsaSupport(object):
         files_path = opj(abspath(curdir), '_files')
 
         # list of files that exist from canonical tarball
-        con_files = [item.get('filename') for item in (list(find_files('^(\\.).*')({}))) if not (item.get('path')).startswith('./_files')]
-        con_files.remove('incoming.json')
-        # print con_files
+        con_files = list(f_f('.*', topdir=curdir, exclude='./(_files|.datalad)'))
+        print con_files
 
         # list of file that are individually downloaded
-        files = [item.get('filename') for item in (list(find_files('.*', topdir='_files')({})))]
-        # print files
-        files_key = [self.repo.get_file_key(item) for item in files]   # does not find the file !!
+        files = list(f_f('.*', topdir='_files'))
+        print files
+
+        files_key = [self.repo.get_file_key(item) for item in files]
 
         for item in con_files:
             if item in files:
@@ -129,6 +129,7 @@ class BalsaSupport(object):
         if files:
             lgr.warning("The following files do not exist in the canonical tarball, but are "
                         "individually listed files and will not be kept" % files)
+
         yield data
 
 
