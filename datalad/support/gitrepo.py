@@ -153,11 +153,6 @@ def _normalize_path(base_dir, path):
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
         path = opj(realpath(dirname(path)), basename(path))
-        if commonprefix([path, base_dir]) != base_dir:
-            raise FileNotInRepositoryError(msg="Path outside repository: %s"
-                                               % path, filename=path)
-        else:
-            pass
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -167,11 +162,15 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = opj(realpath(getpwd()), path)
+         path = normpath(opj(realpath(getpwd()), path))
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
         return path
+
+    if commonprefix([path, base_dir]) != base_dir:
+        raise FileNotInRepositoryError(msg="Path outside repository: %s"
+                                           % path, filename=path)
 
     return relpath(path, start=base_dir)
 
