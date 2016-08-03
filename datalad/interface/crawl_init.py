@@ -10,10 +10,11 @@
 
 __docformat__ = 'restructuredtext'
 
-
+from os.path import  curdir
 from .base import Interface
 from collections import OrderedDict
-
+from datalad.api import save
+from datalad.distribution.dataset import Dataset
 
 from ..dochelpers import exc_str
 from ..support.param import Parameter
@@ -34,7 +35,7 @@ class CrawlInit(Interface):
 
     $ datalad crawl-init \
         --template openfmri \
-        --func superdataset_pipeline
+        --template-func superdataset_pipeline
 
     $ datalad crawl-init \
         --template fcptable \
@@ -56,14 +57,14 @@ class CrawlInit(Interface):
             constraints=EnsureStr() | EnsureNone(),
             doc="""keyword arguments to pass into the template function generating actual pipeline,
             organized in an ordered dict"""),
-        commit=Parameter(
-            args=("--commit",),
+        save=Parameter(
+            args=("--save",),
             action="store_true",
-            doc="""flag is user wants to commit file into git repo"""),
+            doc="""flag is user wants to save file into git repo"""),
     )
 
     @staticmethod
-    def __call__(args=None, template=None, template_func=None, commit=False):
+    def __call__(args=None, template=None, template_func=None, save=False):
 
         if args:
             if isinstance(args, str):
@@ -76,6 +77,8 @@ class CrawlInit(Interface):
                 raise ValueError(
                     "args entered must be given in a list or dict, were given as %s",
                     type(args))
+        elif not template and not template_func:
+            raise TypeError("crawl-init takes a minimum of 2 arguments (0 given)")
         else:
             args = {}
 
@@ -95,4 +98,8 @@ class CrawlInit(Interface):
         if not isinstance(pipeline, list):
             raise ValueError("pipeline should be represented as a list. Got: %r" % pipeline)
 
-        initiate_pipeline_config(template, template_func, args)
+        configfile = initiate_pipeline_config(template, template_func, args)
+
+        if save:
+            ds = Dataset(curdir)
+            ds.save("committing crawl config file", files=configfile)
