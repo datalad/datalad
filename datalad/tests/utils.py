@@ -114,7 +114,7 @@ def create_tree(path, tree, archives_leading_dir=True):
     for name, load in tree:
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
-            if name.endswith('.tar.gz') or name.endswith('.tar'):
+            if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
                 create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             else:
                 create_tree(full_name, load, archives_leading_dir=archives_leading_dir)

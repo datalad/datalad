@@ -100,14 +100,18 @@ class BalsaSupport(object):
            """
         self.repo = repo
 
-    def verify_files(self):
+    def verify_files(self, data):
         files_path = opj(abspath(curdir), '_files')
+
         # list of files that exist from canonical tarball
-        # con_files = listdir(abspath(curdir))
-        con_files = list(find_files('.*', topdir=abspath(curdir))({}))
+        con_files = [item.get('filename') for item in (list(find_files('^(\\.).*')({}))) if not (item.get('path')).startswith('./_files')]
+        con_files.remove('incoming.json')
+        print con_files
+
         # list of file that are individually downloaded
-        files = listdir(files_path)
-        files_key = [self.repo.get_file_key(item) for item in files]
+        files = [item.get('filename') for item in (list(find_files('.*', topdir='_files')({})))]
+        print files
+        files_key = [self.repo.get_file_key(item) for item in files]   # does not find the file !!
 
         for item in con_files:
             if item in files:
@@ -125,6 +129,7 @@ class BalsaSupport(object):
         if files:
             lgr.warning("The following files do not exist in the canonical tarball, but are "
                         "individually listed files and will not be kept" % files)
+        yield data
 
 
 def pipeline(dataset_id, url=TOPURL):
@@ -157,7 +162,7 @@ def pipeline(dataset_id, url=TOPURL):
     files_url = opj(url, 'file/show/')
 
     url = opj(url, 'study/')
-    canonical_url = opj(url, 'download/', dataset_id)
+    canonical_url = opj(url, 'download/.*')
     dataset_url = '%s/show/%s' % (url, dataset_id)
 
     balsa = BalsaSupport(repo=annex.repo)
@@ -204,7 +209,7 @@ def pipeline(dataset_id, url=TOPURL):
                    exclude=['(^|%s)\._' % os.path.sep],
                ),
             ],
-            balsa.verify_files(),
+            balsa.verify_files,
             annex.switch_branch('master'),
             annex.merge_branch('incoming-processed', commit=True),
             annex.finalize(tag=True),

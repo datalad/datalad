@@ -46,7 +46,7 @@ lgr = getLogger('datalad.crawl.tests')
 
 
 def test_smoke_pipelines():
-    yield _test_smoke_pipelines, superdataset_pipeline, None
+    yield _test_smoke_pipelines, superdataset_pipeline, []
 
 
 _PLUG_HERE = '<!-- PLUG HERE -->'
@@ -58,7 +58,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
         'show': {
             'WG33': {
                 'index.html': """<html><body>
-                                    <a href="/study/download/WG33">thetarball.zip</a>
+                                    <a href="/study/download/WG33.zip">thetarball.zip</a>
                                     <a href="/file/show/JX5V">file1.nii</a>
                                     <a href="/file/show/R1BX">dir1 / file2.nii</a>
                                     %s
@@ -66,12 +66,10 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             },
         },
         'download': {
-            'WG33': {
-                'thetarball.zip': {
-                    'file1.nii': "content of file1.nii",
-                    'dir1': {
-                        'file2.nii': "content of file2.nii",
-                    }
+            'WG33.zip': {
+                'file1.nii': "content of file1.nii",
+                'dir1': {
+                    'file2.nii': "content of file2.nii",
                 }
             }
         }
