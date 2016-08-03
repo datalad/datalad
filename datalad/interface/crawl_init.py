@@ -76,6 +76,8 @@ class CrawlInit(Interface):
                 raise ValueError(
                     "args entered must be given in a list or dict, were given as %s",
                     type(args))
+        elif not template and not template_func:
+            raise TypeError("crawl-init takes a minimum of 2 arguments (0 given)")
         else:
             args = {}
 
