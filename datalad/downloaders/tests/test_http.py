@@ -356,8 +356,13 @@ def test_HTMLFormAuthenticator_httpretty(d):
 @with_testsui(responses=['no', 'yes', 'testlogin', 'testpassword'])
 def test_auth_but_no_cred(keyring):
     authenticator = HTMLFormAuthenticator("")
+    # Replying 'no' to the set credentials prompt should raise ValueError
     assert_raises(ValueError, HTTPDownloader, credential=None, authenticator=authenticator)
-    assert(HTTPDownloader(credential=None, authenticator=authenticator))
+    # Reply 'yes' and set test user:pass at the next set credentials prompt
+    downloader = HTTPDownloader(credential=None, authenticator=authenticator)
+    # Verify credentials correctly set to test user:pass
+    assert_equal(downloader.credential.get('user'), 'testlogin')
+    assert_equal(downloader.credential.get('password'), 'testpassword')
 
 
 @skip_if(not httpretty, "no httpretty")
