@@ -46,7 +46,7 @@
                      { data: "path", title: "Path", className: "dt-center" },
 		     { data: null, title: "Sort", render: function(data) { return (data.type=='dir' || data.type=='git' || data.type=='annex');}}
 	         ],
-		 "createdRow": function ( row, data, index ) {)
+		 "createdRow": function ( row, data, index ) {
 		     if (data.name == '..')
 			 parent = true;
 		     if (data.size.ondisk)
