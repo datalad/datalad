@@ -106,11 +106,11 @@ class BalsaSupport(object):
         # list of files that exist from canonical tarball
         con_files = [item.get('filename') for item in (list(find_files('^(\\.).*')({}))) if not (item.get('path')).startswith('./_files')]
         con_files.remove('incoming.json')
-        print con_files
+        # print con_files
 
         # list of file that are individually downloaded
         files = [item.get('filename') for item in (list(find_files('.*', topdir='_files')({})))]
-        print files
+        # print files
         files_key = [self.repo.get_file_key(item) for item in files]   # does not find the file !!
 
         for item in con_files:

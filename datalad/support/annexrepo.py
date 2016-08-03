@@ -530,6 +530,8 @@ class AnnexRepo(GitRepo):
         except CommandError as e:
             if e.code == 1:
                 if not exists(opj(self.path, file_)):
+                    print self.path
+                    print file_
                     raise IOError(e.code, "File not found.", file_)
                 # XXX you don't like me because I can be real slow!
                 elif file_ in self.get_indexed_files():
