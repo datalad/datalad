@@ -582,7 +582,6 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
                     subfs.pop('nodes', None)
                     children.extend([subfs])
                     size_list.append(subfs['size'])
-                    import pdb; pdb.set_trace()
 
     # sum sizes of all 1st level children dataset
     children_size = {}
