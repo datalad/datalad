@@ -10,8 +10,9 @@
 """A pipeline for crawling BALSA datasets"""
 
 import os
-from os import curdir, listdir, makedirs
-from os.path import lexists, join as opj, abspath, exists
+from shutil import rmtree
+from os import curdir, makedirs, rmdir
+from os.path import lexists, join as opj, abspath, exists, normpath
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
@@ -105,30 +106,29 @@ class BalsaSupport(object):
 
         # list of files that exist from canonical tarball
         con_files = list(f_f('.*', topdir=curdir, exclude='./(_files|.datalad)'))
-        print con_files
 
         # list of file that are individually downloaded
         files = list(f_f('.*', topdir='_files'))
-        print files
-
         files_key = [self.repo.get_file_key(item) for item in files]
 
         for item in con_files:
+            item = normpath(opj('_files', item))
             if item in files:
-                key = self.repo.get_file_key(item)
-                if key in files_key:
+                key_item = self.repo.get_file_key(opj('./', item))
+                if key_item in files_key:
                     pass
                 else:
                     lgr.warning("%s is varies in content from the individually downloaded "
                                 "files, is removed and file from canonical tarball is kept" % item)
-                p = opj(files_path, item)
-                self.repo.remove(p)
+                self.repo.remove(item)
+                files = list(f_f('.*', topdir='_files'))
             else:
                 lgr.warning("%s does not exist in the individaully listed files by name, "
                             "but will be kept from canconical tarball" % item)
         if files:
             lgr.warning("The following files do not exist in the canonical tarball, but are "
-                        "individually listed files and will not be kept" % files)
+                        "individually listed files and will not be kept: %s" % files)
+            rmtree(files_path)
 
         yield data
 
