@@ -16,7 +16,7 @@ import time
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir, isfile, islink, isdir, dirname, basename, split
 from os import readlink, listdir, lstat, remove
-from json import dump, dumps
+import json as js
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
@@ -454,14 +454,14 @@ def fs_render(path, fs_metadata, json=None):
     # store directory info of the submodule level in fs hierarchy as json
     if json == 'file':
         with open(opj(path, '.dir.json'), 'w') as f:
-            dump(fs_metadata, f)
+            js.dump(fs_metadata, f)
     # else if json flag set to delete, remove .dir.json of current directory
     elif json == 'delete':
         if exists(opj(path, '.dir.json')):
             remove(opj(path, '.dir.json'))
     # else dump json to stdout
     elif json == 'display':
-        print(dumps(fs_metadata) + '\n')
+        print(js.dumps(fs_metadata) + '\n')
 
 
 def machinesize(humansize):
@@ -505,7 +505,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
             nodepath = opj(path, node)
 
             # if not ignored, append child node info to current nodes dictionary
-            if not ignored(nodepath, only_hidden=True):
+            if not ignored(nodepath):
                 children.extend([fs_extract(nodepath, repo)])
 
             # if recursive, create info dictionary of each child node too
@@ -536,15 +536,15 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
     return fs
 
 
-def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
+def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     """Hierarchical dataset traverser
 
     Parameters
     ----------
-    rootds: str
-      Path to the root dataset to be traversed
-    parent: dict
-      Extracted info about the parent dataset
+    rootds: Dataset
+      Root dataset to be traversed
+    parent: Dataset
+      Parent dataset of the current rootds
     recursive: bool
        Recurse into subdirectories of the current dataset
     all: bool
@@ -564,11 +564,25 @@ def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     size_list = [fs['size']]
 
     # (recursively) traverse each subdataset
-    if all:
-        for subds_path in rootds.get_subdatasets():
+    children = []
+    for subds_path in rootds.get_subdatasets():
+        if all:
             subds = Dataset(opj(rootds.path, subds_path))
-            subfs = _ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+            subfs = ds_traverse(subds, json=json, recursive=recursive, parent=rootds)
+            subfs.pop('nodes', None)
+            children.extend([subfs])
             size_list.append(subfs['size'])
+        # else just pick the data from .dir.json of each subdataset
+        else:
+            subds_json_path = opj(rootds.path, subds_path, '.dir.json')
+            lgr.info(subds_json_path)
+            if exists(subds_json_path):
+                with open(subds_json_path) as data_file:
+                    subfs = js.load(data_file)
+                    subfs.pop('nodes', None)
+                    children.extend([subfs])
+                    size_list.append(subfs['size'])
+                    import pdb; pdb.set_trace()
 
     # sum sizes of all 1st level children dataset
     children_size = {}
@@ -580,6 +594,7 @@ def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     fs['size'] = {size_type: humanize.naturalsize(size)
                   for size_type, size in children_size.items()}
 
+    fs['nodes'].extend(children)
     # render current dataset
     lgr.info('Dataset: %s' % rootds.path)
     fs_render(rootds.path, fs, json=json)
@@ -588,7 +603,7 @@ def _ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
 
 def _ls_json(loc, fast=False, **kwargs):
     # hierarchically traverse file tree of (sub-)dataset(s) under path passed(loc)
-    _ds_traverse(Dataset(loc), parent=None, **kwargs)
+    ds_traverse(Dataset(loc), parent=None, **kwargs)
 
 
 #
