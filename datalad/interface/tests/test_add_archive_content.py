@@ -32,7 +32,7 @@ from ...tests.utils import swallow_logs
 from ...utils import chpwd, getpwd, rmtemp
 from ...utils import find_files
 from ...utils import rmtree
-
+from ... import lgr
 from ...api import add_archive_content, clean
 
 
@@ -65,6 +65,18 @@ tree1args = dict(
                     ('d2', (
                         ('2d', ''),)
                      )),),),),
+    )
+)
+
+tree4uargs = dict(
+    tree=(
+        ('4u', {  # updated file content
+          '1.tar.gz': {
+             '1 f.txt': '1 f load4',
+              'sub.tar.gz': {
+                  '2 f.txt': '2 f'
+              }
+        }}),
     )
 )
 
@@ -224,6 +236,34 @@ def test_add_archive_content_strip_leading(path_orig, url, repo_path):
 
 # looking for the future tagging of lengthy tests
 test_add_archive_content.tags = ['integration']
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**tree4uargs)
+def test_add_archive_use_archive_dir(repo_path):
+    direct = False  # TODO: test on undirect, but too long ATM
+    repo = AnnexRepo(repo_path, create=True, direct=direct)
+    with chpwd(repo_path):
+        # Let's add first archive to the repo with default setting
+        archive_path = opj('4u', '1.tar.gz')
+        with swallow_outputs():
+            repo.add(archive_path)
+        repo.commit("added 1.tar.gz")
+
+        ok_archives_caches(repo.path, 0)
+        add_archive_content(archive_path, strip_leading_dirs=True)
+        ok_(not exists(opj('4u', '1 f.txt')))
+        ok_file_under_git(repo.path, '1 f.txt', annexed=True)
+        ok_archives_caches(repo.path, 0)
+
+        # and now let's extract under archive dir
+        add_archive_content(archive_path, strip_leading_dirs=True, use_archive_dir=True)
+        ok_file_under_git(repo.path, opj('4u', '1 f.txt'), annexed=True)
+        ok_archives_caches(repo.path, 0)
+
+        add_archive_content(opj('4u', 'sub.tar.gz'), use_archive_dir=True)
+        ok_file_under_git(repo.path, opj('4u', 'sub', '2 f.txt'), annexed=True)
+        ok_archives_caches(repo.path, 0)
 
 
 class TestAddArchiveOptions():
