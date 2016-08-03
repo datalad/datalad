@@ -308,7 +308,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             lgr.info("Uploading web interface ...")
             try:
                 html = opj(dirname(datalad.__file__), "resources/website/index.html")
-                ssh.copy(html, sshri.path)
+                ssh.copy(html, path)
             except CommandError as e:
                 lgr.error("Failed to get html from local datalad repository. Unable to setup web interface.\n"
                           "Error: %s" % exc_str(e))
