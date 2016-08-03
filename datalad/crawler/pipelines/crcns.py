@@ -61,7 +61,8 @@ def extract_readme(data):
     yield {'filename': "README.txt"}
 
 
-def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True):
+def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
+             data_origin='checksums'):
     """Pipeline to crawl/annex an crcns dataset"""
 
     dataset_url = 'http://crcns.org/data-sets/{dataset_category}/{dataset}'.format(**locals())
@@ -81,6 +82,27 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True):
     )
 
     crawler = crawl_url(dataset_url)
+    if data_origin == 'checksums':
+        urls_pipe = [   # Download from NERSC
+            # don't even bother finding the link (some times only in about, some times also on the main page
+            # just use https://portal.nersc.gov/project/crcns/download/<dataset_id>
+            # actually to not mess with crawling a custom index let's just go by checksums.md5
+            crawl_url("https://portal.nersc.gov/project/crcns/download/{dataset}/checksums.md5".format(**locals())),
+            parse_checksums(digest='md5'),
+            # they all contain filelist and checksums.md5 which we can make use of without explicit crawling
+            # no longer valid
+            # TODO:  do not download checksums.md (annex would do it) and filelist.txt (includes download
+            #   instructions which might confuse, not help)
+            skip_if({'url': '(checksums.md5|filelist.txt)$'}, re=True),
+        ]
+    elif data_origin == 'urls':
+        urls_pipe = [ # Download all the archives found on the project page
+            crawler,
+            a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
+        ]
+    else:
+        raise ValueError(data_origin)
+
     return [
         annex.switch_branch('incoming'),
         [   # nested pipeline so we could quit it earlier happen we decided that nothing todo in it
@@ -94,17 +116,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True):
             #     extract_readme,
             #     annex,
             # ],
-            [   # Download from NERSC
-                # don't even bother finding the link (some times only in about, some times also on the main page
-                # just use https://portal.nersc.gov/project/crcns/download/<dataset_id>
-                # actually to not mess with crawling a custom index let's just go by checksums.md5
-                crawl_url("https://portal.nersc.gov/project/crcns/download/{dataset}/checksums.md5".format(**locals())),
-                parse_checksums(digest='md5'),
-                # they all contain filelist and checksums.md5 which we can make use of without explicit crawling
-                # no longer valid
-                # TODO:  do not download checksums.md (annex would do it) and filelist.txt (includes download
-                #   instructions which might confuse, not help)
-                skip_if({'url': '(checksums.md5|filelist.txt)$'}, re=True),
+            urls_pipe + [
                 annex,
             ],
         ],
