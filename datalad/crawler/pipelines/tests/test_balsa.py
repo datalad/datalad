@@ -88,7 +88,6 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @with_tempfile
 @with_tempfile
 def test_balsa_pipeline(ind, topurl, outd, clonedir):
-  #  import pdb; pdb.set_trace()
     list(initiate_dataset(
         template="balsa",
         dataset_name='dataladtest-WG33',
@@ -103,17 +102,10 @@ def test_balsa_pipeline(ind, topurl, outd, clonedir):
     repo = AnnexRepo(outd, create=False)
     branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
     eq_(set(repo.get_branches()), branches)
-    # assert_not_equal(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
-    # assert_not_equal(repo.get_hexsha('incoming'), repo.get_hexsha('incoming-processed'))
+    assert_not_equal(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
+    assert_not_equal(repo.get_hexsha('incoming'), repo.get_hexsha('incoming-processed'))
 
-    #
-    # commits = {b: list(repo.get_branch_commits(b)) for b in branches}
-    # commits_hexsha = {b: list(repo.get_branch_commits(b, value='hexsha')) for b in branches}
-    # commits_l = {b: list(repo.get_branch_commits(b, limit='left-only')) for b in branches}
-    # eq_(len(commits['incoming']), 2)
-    # eq_(len(commits_l['incoming']), 2)
-    # eq_(len(commits['incoming-processed']), 4)
-    # eq_(len(commits_l['incoming-processed']), 3)  # because original merge has only 1 parent - incoming
-    # eq_(len(commits['master']), 7)  # all commits out there -- init + 2*(incoming, processed, merge)
-    # eq_(len(commits_l['master']), 3)
+    commits = {b: list(repo.get_branch_commits(b)) for b in branches}
+    eq_(len(commits['incoming']), 1)
+
 
