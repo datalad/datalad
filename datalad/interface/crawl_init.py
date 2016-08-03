@@ -13,7 +13,6 @@ __docformat__ = 'restructuredtext'
 from os.path import curdir
 from .base import Interface
 from collections import OrderedDict
-from datalad.api import save
 from datalad.distribution.dataset import Dataset
 
 from ..dochelpers import exc_str
@@ -99,5 +98,6 @@ class CrawlInit(Interface):
         configfile = initiate_pipeline_config(template, template_func, args)
 
         if save:
+            from datalad.api import save
             ds = Dataset(curdir)
             ds.save("committing crawl config file", files=[configfile])
