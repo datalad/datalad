@@ -440,7 +440,8 @@ def serve_path_via_http(tfunc, *targs):
 
 @optional_args
 def with_memory_keyring(t):
-
+    """Decorator to use non-persistant MemoryKeyring instance
+    """
     @wraps(t)
     def newfunc(*args, **kwargs):
         keyring = MemoryKeyring()
