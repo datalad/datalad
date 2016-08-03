@@ -49,6 +49,7 @@ def _test_crawl_init_error(args, template, template_func, target_value, tmpdir):
 def test_crawl_init_error():
     yield _test_crawl_init_error, 'tmpdir', None, None, ValueError
     yield _test_crawl_init_error, ['dataset=Baltimore', 'pie=True'], 'openfmri', None, RuntimeError
+    yield _test_crawl_init_error, None, None, None, TypeError
 
 
 @with_tempfile(mkdir=True)
