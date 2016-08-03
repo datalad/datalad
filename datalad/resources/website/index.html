@@ -27,6 +27,7 @@
 	 function directory(url) {
 	     // construct path to metadata json based on directory to be rendered argument passed in url
 	     var url = (getParameterByName('dir') ? getParameterByName('dir') + ".dir.json": url_exists(url) ? url : ".dir.json");
+	     var parent = false;
 
 	     var table = $('#directory').DataTable( {
 		 "async": true,    //async get json
@@ -45,8 +46,11 @@
                      { data: "path", title: "Path", className: "dt-center" },
 		     { data: null, title: "Sort", render: function(data) { return (data.type=='dir' || data.type=='git' || data.type=='annex');}}
 	         ],
-		 "createdRow": function ( row, data, index ) {
-		     $('td', row).eq(2).html(data.size.ondisk + "/" + data.size.total);      // show size = "ondisk size" / "total size"
+		 "createdRow": function ( row, data, index ) {)
+		     if (data.name == '..')
+			 parent = true;
+		     if (data.size.ondisk)
+			 $('td', row).eq(2).html(data.size.ondisk + "/" + data.size.total);  // show size = "ondisk size" / "total size"
 		     if (data.type == 'dir' || data.type == 'git' || data.type == 'annex')   // if row is a directory append '/' to name cell
 			 $('td', row).eq(0).html('<a>'+$('td', row).eq(0).html()+'/'+'</a>');
 		     if (data.name == '..')
@@ -57,9 +61,9 @@
 		 // add click handlers to each row(cell) once table initialised
 		 "initComplete": function () {
 		     var api = this.api();
-		     // remove '../' row if in top dataset
-		     if(table.row(0).data().path.endsWith(window.location.pathname) && table.row(0).data().name=='..') 
-		     {  table.row(0).remove().draw();  }                                           // remove '../' from the top dataset
+		     // all tables should have ../ parent path
+		     if (!parent)
+			 table.row.add({"name": "..", "repo": "", "date": "", "path": "", "type": "dir", "size": ""}).draw();
 		     // add click handlers
 		     api.$('tr').click( function () {           		                   // on clicking a row element
 			 var data = table.row( this ).data();                                      // extract its data json from table
