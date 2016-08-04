@@ -61,9 +61,22 @@ def extract_readme(data):
     yield {'filename': "README.txt"}
 
 
+# we might need to explicitly specify for some datasets to use_current_dir since
+# archives are already carrying the leading directory anyways...
+# actually probably wouldn't scale since within the same dataset we might need
+# some tarballs extracted one way, some other... so we might better rely on
+# stripping dirs in general BUT need to provide some sophistication, e.g. strip
+# iff directory matches archive name (without archive suffix)
+# hc-3 dataset is a good example of a mix etc... or may be just a parameter for
+# how many to strip (currently 2), but then we need to take care bout converting
+# if provided as a str from config
 def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
-             data_origin='checksums'):
+             data_origin='checksums', use_current_dir=False,
+             leading_dirs_depth=2):
     """Pipeline to crawl/annex an crcns dataset"""
+
+    if not isinstance(leading_dirs_depth, int):
+        leading_dirs_depth = int(leading_dirs_depth)
 
     dataset_url = 'http://crcns.org/data-sets/{dataset_category}/{dataset}'.format(**locals())
     lgr.info("Creating a pipeline for the crcns dataset %s" % dataset)
@@ -131,7 +144,8 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
                     strip_leading_dirs=True,
                     delete=True,
                     leading_dirs_consider=['crcns.*', dataset],
-                    leading_dirs_depth=2,
+                    leading_dirs_depth=leading_dirs_depth,
+                    use_current_dir=use_current_dir,
                     exclude='.*__MACOSX.*',  # some junk penetrates
                 ),
             ],
