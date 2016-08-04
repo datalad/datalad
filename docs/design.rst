@@ -6,7 +6,7 @@ Global portion of the config
 
 ::
 
-  [datasethandle]
+  [dataset]
   path =
   description = 
   exec = 

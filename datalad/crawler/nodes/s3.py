@@ -19,6 +19,7 @@ from os.path import lexists
 from os.path import join as opj
 
 from boto.s3.key import Key
+from boto.s3.prefix import Prefix
 from boto.s3.deletemarker import DeleteMarker
 import time
 
@@ -46,6 +47,11 @@ def get_version_for_key(k, fmt='0.0.%Y%m%d'):
     return time.strftime(fmt, time.gmtime(t))
 
 
+def _strip_prefix(s, prefix):
+    """A helper to strip the prefix from the string if present"""
+    return s[len(prefix):] if s and s.startswith(prefix) else s
+
+
 class crawl_s3(object):
     """Given a source bucket and optional prefix, generate s3:// urls for the content
 
@@ -53,11 +59,14 @@ class crawl_s3(object):
     def __init__(self,
                  bucket,
                  prefix=None,
+                 strip_prefix=True,  # either to strip leading prefix if provided
                  url_schema='s3',
                  strategy='naive',
                  versionfx=get_version_for_key,
                  repo=None,
                  ncommits=None,
+                 recursive=False,
+                 versioned=True,
                  ):
         """
 
@@ -67,6 +76,8 @@ class crawl_s3(object):
         bucket: str
         prefix: str, optional
           Either to remember redirects for subsequent invocations
+        strip_prefix: bool, optional
+          Either to strip the prefix (if given) off the target paths
         versionfx: function, optional
           If not None, to define a version from the last processed key
         repo: GitRepo, optional
@@ -80,15 +91,26 @@ class crawl_s3(object):
           If specified, used as max number of commits to perform.
           ??? In principle the same effect could be achieved by a node
           raising FinishPipeline after n'th commit
+        recursive: bool, optional
+          Either to traverse recursively or just list elements at that level
+        versioned: bool, optional
+          Either to expect bucket to be versioned and demand all versions per
+          prefix and generate versioned urls
         """
         self.bucket = bucket
+        if prefix and not prefix.endswith('/'):
+            lgr.warning("ATM we assume prefixes to correspond only to directories, adding /")
+            prefix += "/"
         self.prefix = prefix
+        self.strip_prefix = strip_prefix
         self.url_schema = url_schema
         assert(strategy in {'naive', 'commit-versions'})
         self.strategy = strategy
         self.versionfx = versionfx
         self.repo = repo
         self.ncommits = ncommits
+        self.recursive = recursive
+        self.versioned = versioned
 
     def __call__(self, data):
 
@@ -116,20 +138,35 @@ class crawl_s3(object):
 
         # TODO:  we could probably use headers to limit from previously crawled last-modified
         # for now will be inefficient -- fetch all, sort, proceed
-        from operator import attrgetter
-        all_versions = bucket.list_versions(self.prefix)
+        kwargs = {} if self.recursive else {'delimiter': '/'}
+        all_versions = (bucket.list_versions if self.versioned else bucket.list)(self.prefix, **kwargs)
         # Comparison becomes tricky whenever as if in our test bucket we have a collection
         # of rapid changes within the same ms, so they couldn't be sorted by last_modified, so we resolve based
         # on them being marked latest, or not being null (as could happen originally), and placing Delete after creation
         # In real life last_modified should be enough, but life can be as tough as we made it for 'testing'
-        cmp = lambda k: (k.last_modified, k.name, k.is_latest, k.version_id != 'null', isinstance(k, DeleteMarker))
+        def kf(k, f):
+            """Some elements, such as Prefix wouldn't have any of attributes to sort by"""
+            return getattr(k, f, None)
+        # So ATM it would sort Prefixes first, but that is not necessarily correct...
+        # Theoretically the only way to sort Prefix'es with the rest is traverse that Prefix
+        # and take latest last_modified there but it is expensive, so -- big TODO if ever ;)
+        # ACTUALLY -- may be there is an API call to return sorted by last_modified, then we
+        # would need only a single entry in result to determine the last_modified for the Prefix, thus TODO
+        cmp = lambda k: (
+            kf(k, 'last_modified'),
+            k.name,
+            kf(k, 'is_latest'),
+            kf(k, 'version_id') != 'null',
+            isinstance(k, DeleteMarker)
+        )
+
         versions_sorted = sorted(all_versions, key=cmp)  # attrgetter('last_modified'))
         # print '\n'.join(map(str, [cmp(k) for k in versions_sorted]))
 
         version_fields = ['last-modified', 'name', 'version-id']
         def get_version_cmp(k):
             # this one will return action version_id so we could uniquely identify
-            return k.last_modified, k.name, k.version_id
+            return kf(k, 'last_modified'), k.name, kf(k, 'version_id')
 
         if prev_version:
             last_modified_, name_, version_id_ = [prev_version[f] for f in version_fields]
@@ -157,24 +194,27 @@ class crawl_s3(object):
         e_prev = None
         ncommits = self.ncommits or 0
 
-        # Adding None so we could deal with the last commit within the loop without duplicating
+        # adding None so we could deal with the last commit within the loop without duplicating
         # logic later outside
         def update_versiondb(e, force=False):
-            # This way we could recover easier after a crash
+            # this way we could recover easier after a crash
             # TODO: config crawl.crawl_s3.versiondb.saveaftereach=True
-            if force or True:
+            if e is not None and (force or True):
                 versions_db.version = dict(zip(version_fields, get_version_cmp(e)))
         for e in versions_sorted + [None]:
             filename = e.name if e is not None else None
+            if (self.strip_prefix and self.prefix):
+                 filename = _strip_prefix(filename, self.prefix)
+
             if filename in staged or e is None:
-                # We should finish this one and commit
+                # we should finish this one and commit
                 if staged:
                     if self.versionfx and e_prev is not None:
                         version = self.versionfx(e_prev)
                         if version not in stats.versions:
                             stats.versions.append(version)
                     if versions_db:
-                        # Save current "version" DB so we would know where to pick up from
+                        # save current "version" DB so we would know where to pick up from
                         # upon next rerun.  Record should contain
                         # last_modified, name, versionid
                         # TODO?  what if e_prev was a DeleteMarker???
@@ -195,7 +235,7 @@ class crawl_s3(object):
                 if e.name.endswith('/'):
                     # signals a directory for which we don't care explicitly (git doesn't -- we don't! ;) )
                     continue
-                url = get_key_url(e, schema=self.url_schema)
+                url = get_key_url(e, schema=self.url_schema, versioned=self.versioned)
                 # generate and pass along the status right away since we can
                 yield updated(
                     data,
@@ -210,6 +250,17 @@ class crawl_s3(object):
                 if strategy == 'commit-versions':
                     yield updated(data, {'filename': filename, 'datalad_action': 'remove'})
                 update_versiondb(e)
+            elif isinstance(e, Prefix):
+                # so  we were provided a directory (in non-recursive traversal)
+                assert(not self.recursive)
+                yield updated(
+                    data,
+                    {
+                        'url': url,
+                        'filename': filename.rstrip('/'),
+                        'datalad_action': 'directory',
+                    }
+                )
             else:
                 raise ValueError("Don't know how to treat %s" % e)
             e_prev = e

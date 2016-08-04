@@ -26,6 +26,7 @@ from datalad.support.exceptions import InsufficientArgumentsError
 from ..utils import setup_exceptionhook, chpwd
 from ..dochelpers import exc_str
 
+
 def _license_info():
     return """\
 Copyright (c) 2013-2016 DataLad developers
@@ -50,20 +51,24 @@ THE SOFTWARE.
 """
 
 
-def setup_parser():
-    # Delay since can be a heavy import
-    from ..interface.base import dedent_docstring, get_interface_groups
+def setup_parser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        return_subparsers=False):
+    # delay since it can be a heavy import
+    from ..interface.base import dedent_docstring, get_interface_groups, \
+        get_cmdline_command_name, alter_interface_docs_for_cmdline
     # setup cmdline args parser
+    parts = {}
     # main parser
     parser = argparse.ArgumentParser(
         fromfile_prefix_chars='@',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
             DataLad provides a unified data distribution with the convenience of git-annex
-            repositories as a backend.  datalad command line tool allows to manipulate
+            repositories as a backend.  DataLad command line tools allow to manipulate
             (obtain, create, update, publish, etc.) datasets and their collections."""),
         epilog='"Control Your Data"',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=formatter_class,
         add_help=False)
     # common options
     helpers.parser_add_common_opt(parser, 'help')
@@ -76,15 +81,18 @@ def setup_parser():
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
-            help="do not catch exceptions and show exception traceback")
+            help="enter Python debugger when uncaught exception happens")
+        parser.add_argument(
+            '--idbg', action='store_true', dest='common_idebug',
+            help="enter IPython debugger when uncaught exception happens")
     parser.add_argument(
         '-C', action='append', dest='change_path', metavar='PATH',
-        help="""Run as if datalad was started in <path> instead
-        of the current working directory. When multiple -C options are given,
+        help="""run as if datalad was started in <path> instead
+        of the current working directory.  When multiple -C options are given,
         each subsequent non-absolute -C <path> is interpreted relative to the
-        preceding -C <path>. This option affects the interpretations of the
+        preceding -C <path>.  This option affects the interpretations of the
         path names in that they are made relative to the working directory
-        caused by the -C option.""")
+        caused by the -C option""")
 
     # yoh: atm we only dump to console.  Might adopt the same separation later on
     #      and for consistency will call it --verbose-level as well for now
@@ -115,17 +123,15 @@ def setup_parser():
             # turn the interface spec into an instance
             _mod = import_module(_intfspec[0], package='datalad')
             _intf = getattr(_mod, _intfspec[1])
-            if len(_intfspec) > 2:
-                cmd_name = _intfspec[2]
-            else:
-                cmd_name = _intf.__module__.split('.')[-1].replace('_', '-')
+            cmd_name = get_cmdline_command_name(_intfspec)
             # deal with optional parser args
             if hasattr(_intf, 'parser_args'):
                 parser_args = _intf.parser_args
             else:
-                parser_args = dict(formatter_class=argparse.RawDescriptionHelpFormatter)
+                parser_args = dict(formatter_class=formatter_class)
             # use class description, if no explicit description is available
-                parser_args['description'] = dedent_docstring(_intf.__doc__)
+                parser_args['description'] = alter_interface_docs_for_cmdline(
+                    _intf.__doc__)
             # create subparser, use module suffix as cmd name
             subparser = subparsers.add_parser(cmd_name, add_help=False, **parser_args)
             # all subparser can report the version
@@ -153,6 +159,7 @@ def setup_parser():
             sdescr = getattr(_intf, 'short_description',
                              parser_args['description'].split('\n')[0])
             cmd_short_descriptions.append((cmd_name, sdescr))
+            parts[cmd_name] = subparser
         grp_short_descriptions.append(cmd_short_descriptions)
 
     # create command summary
@@ -181,7 +188,11 @@ def setup_parser():
     available via command-specific --help, i.e.:
     datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
-    return parser
+    parts['datalad'] = parser
+    if return_subparsers:
+        return parts
+    else:
+        return parser
 
 
 # yoh: arn't used
@@ -217,12 +228,12 @@ def main(args=None):
         args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
-    elif cmdlineargs.common_debug:
-        # So we could see/stop clearly at the point of failure
-        setup_exceptionhook()
+    elif cmdlineargs.common_debug or cmdlineargs.common_idebug:
+        # so we could see/stop clearly at the point of failure
+        setup_exceptionhook(ipython=cmdlineargs.common_idebug)
         ret = cmdlineargs.func(cmdlineargs)
     else:
-        # Otherwise - guard and only log the summary. Postmortem is not
+        # otherwise - guard and only log the summary. Postmortem is not
         # as convenient if being caught in this ultimate except
         try:
             ret = cmdlineargs.func(cmdlineargs)

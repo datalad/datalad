@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for modifying URLs of subhandles
+"""High-level interface for modifying URLs of subdatasets
 
 """
 
@@ -23,7 +23,7 @@ from datalad.interface.base import Interface
 from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
 from datalad.utils import getpwd
 
-lgr = logging.getLogger('datalad.distribution.modify_subhandle_urls')
+lgr = logging.getLogger('datalad.distribution.modify_subdataset_urls')
 
 
 def get_module_parser(repo):
@@ -37,39 +37,40 @@ def get_module_parser(repo):
     return parser
 
 
-class ModifySubhandleURLs(Interface):
-    """Modify the URLs of subdatasets of a dataset."""
+class ModifySubdatasetURLs(Interface):
+    """Modify the URLs of sub-datasets of a dataset
+    """
 
     _params_ = dict(
         url=Parameter(
             args=("url",),
-            doc="A template for building the URLs of the subhandles."
+            doc="a template for building the URLs of the subdatasets "
                 "List of currently available placeholders:\n"
-                "%NAME\tthe name of the handle, where slashes are replaced by "
-                "dashes.",
+                "%%NAME\tthe name of the subdataset, where slashes are replaced by "
+                "dashes",
             constraints=EnsureStr()),
         dataset=Parameter(
-            args=("--dataset", "-d",),
-            doc=""""specify the dataset to update. If
+            args=("-d", "--dataset",),
+            doc="""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             action="store_true",
-            doc="Recursively modify all subhandle URLs of `dataset`."),)
+            doc="recursively modify all subdataset URLs of `dataset` "),)
 
     # TODO: User interaction. Allow for skipping and editing on a per
-    # subhandle basis. Therefore some --mode option (see below). Additionally,
+    # subdataset basis. Therefore some --mode option (see below). Additionally,
     # this leads to URL being optional, so no URL given means to
-    # edit per subhandle
+    # edit per subdataset
     # mode=Parameter(
     #     args=("--mode",),
     #     doc="",
     #     constraints=EnsureChoice(["all", "ask"]),)
 
     @staticmethod
-    @datasetmethod(name='modify_subhandle_urls')
+    @datasetmethod(name='modify_subdataset_urls')
     def __call__(url, dataset=None, recursive=False):
 
         # shortcut
@@ -97,10 +98,10 @@ class ModifySubhandleURLs(Interface):
         if recursive:
             repos_to_update += [GitRepo(opj(ds.path, sub_path))
                                 for sub_path in
-                                ds.get_dataset_handles(recursive=True)]
+                                ds.get_subdatasets(recursive=True)]
 
-        for handle_repo in repos_to_update:
-            parser = get_module_parser(handle_repo)
+        for dataset_repo in repos_to_update:
+            parser = get_module_parser(dataset_repo)
             for submodule_section in parser.sections():
                 submodule_name = submodule_section[11:-1]
                 parser.set_value(submodule_section, "url",

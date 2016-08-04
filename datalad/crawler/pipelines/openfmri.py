@@ -32,15 +32,15 @@ TOPURL = "https://openfmri.org/dataset/"
 
 # define a pipeline factory function accepting necessary keyword arguments
 # Should have no strictly positional arguments
-def collection_pipeline(url=TOPURL, **kwargs):
+def superdataset_pipeline(url=TOPURL, **kwargs):
     annex = Annexificator()
     lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
     return [
         crawl_url(url),
         a_href_match("(?P<url>.*/dataset/(?P<dataset>ds0*(?P<dataset_index>[0-9a-z]*)))/*$"),
         # https://openfmri.org/dataset/ds000001/
-        assign({'handle_name': '%(dataset)s'}, interpolate=True),
-        annex.initiate_handle(
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_dataset(
             template="openfmri",
             data_fields=['dataset'],
             # let's all specs and modifications reside in master
@@ -65,9 +65,20 @@ def extract_readme(data):
 
 
 def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
-    """Pipeline to crawl/annex an openfmri dataset"""
+    """Pipeline to crawl/annex an openfmri dataset
 
-    dataset_url = '%s%s' % (topurl, dataset)
+    Parameters
+    ----------
+    dataset: str
+      Id of the OpenfMRI dataset (e.g. ds000001)
+    versioned_urls: bool, optional
+      Request versioned URLs.  OpenfMRI bucket is versioned, but if
+      original data resides elsewhere, set to False
+    topurl: str, optional
+      Top level URL to the datasets.
+    """
+
+    dataset_url = '%s%s/' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
         create=False,  # must be already initialized etc
@@ -119,7 +130,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
                                      'verify': True}),
                 annex,
             ],
-            # TODO: describe_handle
+            # TODO: describe_dataset
             # Now some true magic -- possibly multiple commits, 1 per each detected new version!
             annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])', unversioned='default', default='1.0.0'),
         ],
@@ -139,6 +150,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
                     existing='archive-suffix',
                     strip_leading_dirs=True,
                     leading_dirs_depth=1,
+                    delete=True,
                     exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
                     # overwrite=True,
                     # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball

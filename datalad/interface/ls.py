@@ -11,6 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
+import sys
 import time
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir
@@ -32,53 +33,57 @@ lgr = getLogger('datalad.api.ls')
 
 
 class Ls(Interface):
-    """Magical helper to list content of various things (ATM only S3 buckets and datasets)
+    """List meta-information associated with URLs (e.g. s3://) and dataset(s)
 
     Examples
     --------
 
       $ datalad ls s3://openfmri/tarballs/ds202  # to list S3 bucket
-      $ datalad ls .                             # to list current dataset
+      $ datalad ls                               # to list current dataset
     """
 
     _params_ = dict(
         loc=Parameter(
-            doc="URL to list, e.g. s3:// url",
-            nargs="+",
+            doc="URL or path to list, e.g. s3://...",
+            metavar='PATH/URL',
+            nargs="*",
             constraints=EnsureStr() | EnsureNone(),
         ),
         recursive=Parameter(
             args=("-r", "--recursive"),
             action="store_true",
-            doc="Recurse into subdirectories",
+            doc="recurse into subdirectories",
         ),
         fast=Parameter(
             args=("-F", "--fast"),
             action="store_true",
-            doc="Only perform fast operations. Would be overrident by --all",
+            doc="only perform fast operations.  Would be overrident by --all",
         ),
         all=Parameter(
             args=("-a", "--all"),
             action="store_true",
-            doc="List all entries, not e.g. only latest entries in case of S3",
+            doc="list all entries, not e.g. only latest entries in case of S3",
         ),
         config_file=Parameter(
-            doc="""Path to config file which could help the 'ls'.  E.g. for s3://
+            doc="""path to config file which could help the 'ls'.  E.g. for s3://
             URLs could be some ~/.s3cfg file which would provide credentials""",
             constraints=EnsureStr() | EnsureNone()
         ),
         list_content=Parameter(
             choices=(None, 'first10', 'md5', 'full'),
-            doc="""List also the content or only first 10 bytes (first10), or md5
-            checksum of an entry.  Might require expensive
-            transfer and dump binary output to your screen.  Do not enable unless
-            you know what you are after""",
+            doc="""list also the content or only first 10 bytes (first10), or md5
+            checksum of an entry.  Might require expensive transfer and dump
+            binary output to your screen.  Do not enable unless you know what you
+            are after""",
             default=None
         ),
     )
 
     @staticmethod
     def __call__(loc, recursive=False, fast=False, all=False, config_file=None, list_content=False):
+        if isinstance(loc, list) and not len(loc):
+            # nothing given, CWD assumed -- just like regular ls
+            loc = '.'
 
         kw = dict(fast=fast, recursive=recursive, all=all)
         if isinstance(loc, list):
@@ -148,7 +153,7 @@ class DsModel(object):
         """Date of the last commit
         """
         try:
-            commit = next(self.ds.repo.git_get_branch_commits(self.branch))
+            commit = next(self.ds.repo.get_branch_commits(self.branch))
         except:
             return None
         return commit.committed_date
@@ -161,7 +166,7 @@ class DsModel(object):
     def branch(self):
         if self._branch is None:
             try:
-                self._branch = self.repo.git_get_active_branch()
+                self._branch = self.repo.get_active_branch()
             except:
                 return None
         return self._branch
@@ -175,7 +180,7 @@ class DsModel(object):
     @property
     def info(self):
         if self._info is None and isinstance(self.repo, AnnexRepo):
-            self._info = self.repo.annex_repo_info()
+            self._info = self.repo.repo_info()
         return self._info
 
     @property
@@ -201,31 +206,46 @@ class LsFormatter(string.Formatter):
         GREEN = ColorFormatter.COLOR_SEQ % (ColorFormatter.GREEN + 30)
         RESET = ColorFormatter.RESET_SEQ
     else:
-        BLUE = RED = GREEN = RESET = ""
+        BLUE = RED = GREEN = RESET = u""
+
+    # http://stackoverflow.com/questions/9932406/unicodeencodeerror-only-when-running-as-a-cron-job
+    # reveals that Python uses ascii encoding when stdout is a pipe, so we shouldn't force it to be
+    # unicode then
+    # TODO: we might want to just ignore and force utf8 while explicitly .encode()'ing output!
+    if sys.getdefaultencoding() == 'ascii':
+        OK = 'OK'   # u"✓"
+        NOK = 'X'  # u"✗"
+        NONE = '-'  # u"✗"
+    else:
+        # unicode versions which look better but which blow during tests etc
+        OK = u"✓"
+        NOK = u"✗"
+        NONE = u"✗"
+
 
     def convert_field(self, value, conversion):
         #print("%r->%r" % (value, conversion))
         if conversion == 'D':  # Date
             if value is not None:
-                return time.strftime("%Y-%m-%d/%H:%M:%S", time.localtime(value))
+                return time.strftime(u"%Y-%m-%d/%H:%M:%S", time.localtime(value))
             else:
-                return '-'
+                return u'-'
         elif conversion == 'S':  # Human size
             #return value
             if value is not None:
-                return str(humanize.naturalsize(value))
+                return humanize.naturalsize(value)
             else:
-                return '-'
+                return u'-'
         elif conversion == 'X':  # colored bool
-            chr, col = ("✓", self.GREEN) if value else ("✗", self.RED)
-            return "%s%s%s" % (col, chr, self.RESET)
+            chr, col = (self.OK, self.GREEN) if value else (self.NOK, self.RED)
+            return u"%s%s%s" % (col, chr, self.RESET)
         elif conversion == 'N':  # colored Red - if None
             if value is None:
                 # return "%s✖%s" % (self.RED, self.RESET)
-                return "%s✗%s" % (self.RED, self.RESET)
+                return u"%s%s%s" % (self.RED, self.NONE, self.RESET)
             return value
         elif conversion in {'B', 'R'}:
-            return "%s%s%s" % ({'B': self.BLUE, 'R': self.RED}[conversion], value, self.RESET)
+            return u"%s%s%s" % ({'B': self.BLUE, 'R': self.RED}[conversion], value, self.RESET)
 
         return super(LsFormatter, self).convert_field(value, conversion)
 
@@ -234,7 +254,7 @@ def format_ds_model(formatter, ds_model, format_str, format_exc):
     try:
         #print("WORKING ON %s" % ds_model.path)
         if not exists(ds_model.ds.path) or not ds_model.ds.repo:
-            return formatter.format(format_exc, ds=ds_model, msg="not installed")
+            return formatter.format(format_exc, ds=ds_model, msg=u"not installed")
         ds_formatted = formatter.format(format_str, ds=ds_model)
         #print("FINISHED ON %s" % ds_model.path)
         return ds_formatted
@@ -251,7 +271,7 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     topds = Dataset(loc)
     dss = [topds] + (
         [Dataset(opj(loc, sm))
-         for sm in topds.get_dataset_handles(recursive=recursive)]
+         for sm in topds.get_subdatasets(recursive=recursive)]
          if recursive else [])
     dsms = list(map(DsModel, dss))
 
@@ -261,15 +281,16 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         if not path:
             path = '.'
         ds_model.path = path
+    dsms = sorted(dsms, key=lambda m: m.path)
 
     maxpath = max(len(ds_model.path) for ds_model in dsms)
-    path_fmt = "{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
-    pathtype_fmt = path_fmt + "  [{ds.type}]"
-    full_fmt = pathtype_fmt + "  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
+    path_fmt = u"{ds.path!B:<%d}" % (maxpath + (11 if is_interactive() else 0))  # + to accommodate ansi codes
+    pathtype_fmt = path_fmt + u"  [{ds.type}]"
+    full_fmt = pathtype_fmt + u"  {ds.branch!N}  {ds.describe!N} {ds.date!D}"
     if (not fast) or all:
-        full_fmt += "  {ds.clean!X}"
+        full_fmt += u"  {ds.clean!X}"
     if all:
-        full_fmt += "  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
+        full_fmt += u"  {ds.annex_local_size!S}/{ds.annex_worktree_size!S}"
 
     formatter = LsFormatter()
     # weird problems happen in the parallel run -- TODO - figure it out
@@ -278,7 +299,8 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
     #         for dsm in dss):
     #     print(out)
     for dsm in dsms:
-        print(format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + "  {msg!R}"))
+        ds_str = format_ds_model(formatter, dsm, full_fmt, format_exc=path_fmt + u"  {msg!R}")
+        print(ds_str)
 
 #
 # S3 listing
@@ -329,9 +351,17 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         from datalad.downloaders.providers import Providers
         providers = Providers.from_config_files()
         provider = providers.get_provider(loc)
+
         if not provider:
-            raise ValueError("don't know how to deal with this url %s -- no downloader defined.  Specify just s3cmd config file instead")
-        bucket = provider.authenticator.authenticate(bucket_name, provider.credential)
+            raise ValueError(
+                "Don't know how to deal with this url %s -- no provider defined for %s. "
+                "Define a new provider (DOCS: TODO) or specify just s3cmd config file instead for now."
+                % loc
+            )
+        downloader = provider.get_downloader(loc)
+
+        # should authenticate etc, and when ready we will ask for a bucket ;)
+        bucket = downloader.access(lambda url: downloader.bucket, loc)
 
     info = []
     for iname, imeth in [
@@ -347,20 +377,36 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
     ui.message("Bucket info:\n %s" % '\n '.join(info))
 
     kwargs = {} if recursive else {'delimiter': '/'}
-    prefix_all_versions = list(bucket.list_versions(prefix, **kwargs))
+
+    ACCESS_METHODS = [
+        bucket.list_versions,
+        bucket.list
+    ]
+
+    prefix_all_versions = None
+    for acc in ACCESS_METHODS:
+        try:
+            prefix_all_versions = list(acc(prefix, **kwargs))
+            break
+        except Exception as exc:
+            lgr.debug("Failed to access via %s: %s", acc, exc_str(exc))
 
     if not prefix_all_versions:
         ui.error("No output was provided for prefix %r" % prefix)
     else:
         max_length = max((len(e.name) for e in prefix_all_versions))
+        max_size_length = max((len(str(getattr(e, 'size', 0))) for e in prefix_all_versions))
+
     for e in prefix_all_versions:
         if isinstance(e, Prefix):
             ui.message("%s" % (e.name, ),)
             continue
         ui.message(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), cr=' ')
         if isinstance(e, Key):
+            ui.message(" %%%dd" % max_size_length % e.size, cr=' ')
             if not (e.is_latest or all):
                 # Skip this one
+                ui.message("")
                 continue
             url = get_key_url(e, schema='http')
             try:
@@ -390,7 +436,7 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
                         content = digest.hexdigest()
                     else:
                         raise ValueError(list_content)
-                    #content = "[S3: OK]"
+                    # content = "[S3: OK]"
                 except S3ResponseError as err:
                     content = err.message
                 finally:
@@ -398,7 +444,6 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
 
             ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
         else:
-            if all:
-                ui.message("del")
+            ui.message(str(type(e)).split('.')[-1].rstrip("\"'>"))
 
 

@@ -62,13 +62,13 @@ class SafeConfigParserWithIncludes(SafeConfigParser):
     are 'files_before' and 'files_after' where files are listed 1 per
     line.
 
-    Example:
+    Example::
 
-    [INCLUDES]
-    before = 1.conf
-             3.conf
+        [INCLUDES]
+        before = 1.conf
+                 3.conf
 
-    after = 1.conf
+        after = 1.conf
 
     It is a simple implementation, so just basic care is taken about
     recursion. Includes preserve right order, ie new files are

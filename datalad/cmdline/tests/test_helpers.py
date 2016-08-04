@@ -29,20 +29,20 @@ from ...utils import chpwd, getpwd
 @with_testrepos('^basic_git$', flavors=['clone'])
 def test_get_repo_instance_git(path):
 
-    # get instance from path:
+    # get instance from path
     repo = get_repo_instance(path, GitRepo)
     assert_is_instance(repo, GitRepo)
     eq_(realpath(repo.path), realpath(path))
 
     old_pwd = getpwd()
 
-    # get instance from current dir:
+    # get instance from current dir
     chpwd(path)
     repo = get_repo_instance()
     assert_is_instance(repo, GitRepo)
     eq_(realpath(repo.path), realpath(path))
 
-    # get instance from current subdir:
+    # get instance from current subdir
     new_subdir = opj(path, "subdir")
     mkdir(new_subdir)
     chpwd(new_subdir)
@@ -58,20 +58,20 @@ def test_get_repo_instance_git(path):
 @with_testrepos('.*annex.*', flavors=['clone'])
 def test_get_repo_instance_annex(path):
 
-    # get instance from path:
+    # get instance from path
     repo = get_repo_instance(path, AnnexRepo)
     assert_is_instance(repo, AnnexRepo)
     eq_(realpath(repo.path), realpath(path))
 
     old_pwd = getpwd()
 
-    # get instance from current dir:
+    # get instance from current dir
     chpwd(path)
     repo = get_repo_instance()
     assert_is_instance(repo, AnnexRepo)
     eq_(realpath(repo.path), realpath(path))
 
-    # get instance from current subdir:
+    # get instance from current subdir
     new_subdir = opj(path, "subdir")
     mkdir(new_subdir)
     chpwd(new_subdir)

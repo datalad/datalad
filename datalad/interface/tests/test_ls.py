@@ -17,7 +17,7 @@ from glob import glob
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from ...api import ls
-from ...utils import swallow_outputs
+from ...utils import swallow_outputs, chpwd
 from ...tests.utils import assert_equal, assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
@@ -45,13 +45,28 @@ def test_ls_repos(toppath):
     AnnexRepo(toppath + '2', create=True)
     repos = glob(toppath + '*')
 
-    for args in (repos, repos + ["bogus"]):
-        # in both cases shouldn't fail
-        with swallow_outputs() as cmo:
-            ls(args)
-            assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
-            assert_in('[annex]', cmo.out)
-            assert_in('[git]', cmo.out)
-            assert_in('master', cmo.out)
-            if "bogus" in args:
-                assert_in('unknown', cmo.out)
+    for args in (repos, repos + ["/some/bogus/file"]):
+        for recursive in [False, True]:
+            # in both cases shouldn't fail
+            with swallow_outputs() as cmo:
+                ls(args, recursive=recursive)
+                assert_equal(len(cmo.out.rstrip().split('\n')), len(args))
+                assert_in('[annex]', cmo.out)
+                assert_in('[git]', cmo.out)
+                assert_in('master', cmo.out)
+                if "bogus" in args:
+                    assert_in('unknown', cmo.out)
+
+
+@with_tempfile
+def test_ls_noarg(toppath):
+    # smoke test pretty much
+    AnnexRepo(toppath, create=True)
+
+    # this test is pointless for now and until ls() actually returns
+    # something
+    with swallow_outputs():
+        ls_out = ls(toppath)
+        with chpwd(toppath):
+            assert_equal(ls_out, ls([]))
+            assert_equal(ls_out, ls('.'))

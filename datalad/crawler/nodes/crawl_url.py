@@ -29,6 +29,7 @@ from ...downloaders.providers import Providers
 from logging import getLogger
 lgr = getLogger('datalad.crawl.crawl_url')
 
+
 class crawl_url(object):
     """Given a source url, perform the initial crawling of the page, i.e. simply
     bloody fetch it and pass along
@@ -58,13 +59,13 @@ class crawl_url(object):
         self._output = output
         self._seen = set()
         self._providers = Providers.from_config_files()
-        # Partially to overcome stuck redirect
+        # partially to overcome stuck redirect
         # https://github.com/kennethreitz/requests/issues/2997
         self._redirects_cache = {} if cache_redirects else None
         self.failed = failed
 
     def reset(self):
-        """Reset cache of seen urls"""
+        """Reset cache of seen URLs"""
         self._seen = set()
 
     def _visit_url(self, url, data):
@@ -118,7 +119,6 @@ class crawl_url(object):
                     for data_matched_ in self._visit_url(data_matched['url'], data_matched):
                         yield data_matched_
 
-
     def __call__(self, data={}):
         #assert(data == {}) # atm assume we are the first of mogican
         url = data[self._input] if not self._url else self._url
@@ -161,7 +161,7 @@ def parse_checksums(digest=None):
         urlsplit = url.split('/')
         topurl = '/'.join(urlsplit[:-1])
         if digest is None:
-            # deduce from url's file extension
+            # deduce from URL's file extension
             filename = urlsplit[-1]
             base, ext = splitext(filename)
             digest_ = ext if ext else digest

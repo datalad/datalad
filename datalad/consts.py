@@ -11,7 +11,7 @@
 
 from os.path import join
 
-# directory containing prepared metadata of a handle repository:
+# directory containing prepared metadata of a dataset repository:
 HANDLE_META_DIR = ".datalad"
 CRAWLER_META_DIR = join(HANDLE_META_DIR, 'crawl')
 CRAWLER_META_CONFIG_FILENAME = 'crawl.cfg'
@@ -24,3 +24,5 @@ ARCHIVES_SPECIAL_REMOTE = 'datalad-archives'
 DATALAD_SPECIAL_REMOTE = 'datalad'
 
 ARCHIVES_TEMP_DIR = join('.git', 'datalad', 'tmp', 'archives')
+
+DATASETS_TOPURL = "http://datasets.datalad.org/"

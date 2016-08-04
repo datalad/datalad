@@ -20,11 +20,14 @@ from datalad.downloaders.tests.utils import get_test_providers
 from ..base import DownloadError
 from ..base import IncompleteDownloadError
 from ..base import BaseDownloader
+from ..credentials import UserPassword
 from ..http import HTMLFormAuthenticator
 from ..http import HTTPDownloader
-from ..providers import Credential  # to test against crcns
 from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
+from ...tests.utils import skip_if_no_network
+from ...tests.utils import with_testsui
+from ...tests.utils import with_memory_keyring
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -38,6 +41,7 @@ except ImportError:
     httpretty = NoHTTPPretty()
 
 from mock import patch
+from ...tests.utils import SkipTest
 from ...tests.utils import assert_in
 from ...tests.utils import assert_not_in
 from ...tests.utils import assert_equal
@@ -51,11 +55,14 @@ from ...tests.utils import swallow_outputs
 from ...tests.utils import with_tempfile
 from ...tests.utils import use_cassette
 from ...tests.utils import skip_if
+from ...tests.utils import without_http_proxy
 from ...support.status import FileStatus
+
 
 def test_docstring():
     doc = HTTPDownloader.__init__.__doc__
     assert_in("\ncredential: Credential", doc)
+
 
 # XXX doesn't quite work as it should since doesn't provide context handling
 # I guess... but at least causes the DownloadError ;)
@@ -72,8 +79,10 @@ def fake_open(write_=None):
         return myfile
     return myopen
 
+
 def _raise_IOError(*args, **kwargs):
     raise IOError("Testing here")
+
 
 @with_tree(tree=[('file.dat', 'abc')])
 @serve_path_via_http
@@ -130,7 +139,7 @@ def test_HTTPDownloader_basic(toppath, topurl):
 
 
 @with_tempfile(mkdir=True)
-def check_download_external_url(url, failed_str, success_str, d):
+def check_download_external_url(url, failed_str, success_str, d, url_final=None):
     fpath = opj(d, get_url_straight_filename(url))
     providers = get_test_providers(url)  # url for check of credentials
     provider = providers.get_provider(url)
@@ -175,8 +184,16 @@ def check_download_external_url(url, failed_str, success_str, d):
     # Verify status
     status = downloader.get_status(url)
     assert(isinstance(status, FileStatus))
-    assert(status.mtime)
+    if not url.startswith('ftp://'):
+        # TODO introduce support for mtime into requests_ftp?
+        assert(status.mtime)
     assert(status.size)
+
+    # Verify possible redirections
+    if url_final is None:
+        url_final = url
+    assert_equal(downloader.get_target_url(url), url_final)
+
     # TODO -- more and more specific
 
 
@@ -191,6 +208,19 @@ def test_authenticate_external_portals():
           "failed", \
           "2000 1005 2000 3000"
 test_authenticate_external_portals.tags = ['external-portal', 'network']
+
+
+@skip_if_no_network
+def test_download_ftp():
+    try:
+        import requests_ftp
+    except ImportError:
+        raise SkipTest("need requests_ftp")  # TODO - make it not ad-hoc
+    yield check_download_external_url, \
+          "ftp://ftp.gnu.org/README", \
+          None, \
+          "This is ftp.gnu.org"
+
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste
 @with_tree(tree={'file.dat': '1'})
@@ -217,17 +247,26 @@ def test_get_status_from_headers():
         'Last-Modified': 'Sat, 07 Nov 2015 05:23:36 GMT'
     }
     headers['bogus1'] = '123'
+
     assert_equal(
             HTTPDownloader.get_status_from_headers(headers),
             FileStatus(size=123, filename='bogus.txt', mtime=1446873816))
+
     assert_equal(HTTPDownloader.get_status_from_headers({'content-lengtH': '123'}),
                  FileStatus(size=123))
+
+    assert_equal(
+        HTTPDownloader.get_status_from_headers({
+            'Content-Disposition': 'Attachment;Filename="Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip"',
+        }).filename,
+        'Glasser_et_al_2016_HCP_MMP1.0_RVVG.zip')
+
 
 # TODO: test that download fails (even if authentication credentials are right) if form_url
 # is wrong!
 
 
-class FakeCredential1(Credential):
+class FakeCredential1(UserPassword):
     """Credential to test scenarios."""
     _fixed_credentials = [
         {'user': 'testlogin', 'password': 'testpassword'},
@@ -245,15 +284,16 @@ class FakeCredential1(Credential):
 url = "http://example.com/crap.txt"
 test_cookie = 'somewebsite=testcookie'
 
-#@skip_httpretty_on_problematic_pythons
+
 @skip_if(not httpretty, "no httpretty")
+@without_http_proxy
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db
 def test_HTMLFormAuthenticator_httpretty(d):
     fpath = opj(d, 'crap.txt')
 
-    credential = FakeCredential1(name='test', type='user_password', url=None)
+    credential = FakeCredential1(name='test', url=None)
     credentials = credential()
 
     def request_post_callback(request, uri, headers):
@@ -312,8 +352,56 @@ def test_HTMLFormAuthenticator_httpretty(d):
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
 
 
+@with_memory_keyring
+@with_testsui(responses=['no', 'yes', 'testlogin', 'testpassword'])
+def test_auth_but_no_cred(keyring):
+    authenticator = HTMLFormAuthenticator("")
+    # Replying 'no' to the set credentials prompt should raise ValueError
+    assert_raises(ValueError, HTTPDownloader, credential=None, authenticator=authenticator)
+    # Reply 'yes' and set test user:pass at the next set credentials prompt
+    downloader = HTTPDownloader(credential=None, authenticator=authenticator)
+    # Verify credentials correctly set to test user:pass
+    assert_equal(downloader.credential.get('user'), 'testlogin')
+    assert_equal(downloader.credential.get('password'), 'testpassword')
 
-class FakeCredential2(Credential):
+
+@skip_if(not httpretty, "no httpretty")
+@without_http_proxy
+@httpretty.activate
+@with_tempfile(mkdir=True)
+@with_fake_cookies_db
+@with_testsui(responses=['yes'])  # will request to reentry it
+def test_HTMLFormAuthenticator_httpretty_authfail404(d):
+    # mimic behavior of nersc which 404s but provides feedback whenever
+    # credentials are incorrect.  In our case we should fail properly
+    credential = FakeCredential1(name='test', url=None)
+
+    was_called = []
+
+    def request_post_callback(request, uri, headers):
+        post_params = request.parsed_body
+        if post_params['password'][0] == 'testpassword2':
+            was_called.append('404')
+            return 404, headers, "Really 404"
+        else:
+            was_called.append('failed')
+            return 404, headers, "Failed"
+
+    httpretty.register_uri(httpretty.POST, url, body=request_post_callback)
+
+    # Also we want to test how would it work if cookie is available (may be)
+    authenticator = HTMLFormAuthenticator(dict(username="{user}",
+                                               password="{password}",
+                                               submit="CustomLogin"),
+                                          failure_re="Failed")
+
+    downloader = HTTPDownloader(credential=credential, authenticator=authenticator)
+    # first one goes with regular DownloadError -- was 404 with not matching content
+    assert_raises(DownloadError, downloader.download, url, path=d)
+    assert_equal(was_called, ['failed', '404'])
+
+
+class FakeCredential2(UserPassword):
     """Credential to test scenarios."""
     _fixed_credentials = {'user': 'testlogin', 'password': 'testpassword'}
     def is_known(self):
@@ -325,13 +413,14 @@ class FakeCredential2(Credential):
 
 
 @skip_if(not httpretty, "no httpretty")
+@without_http_proxy
 @httpretty.activate
 @with_tempfile(mkdir=True)
 @with_fake_cookies_db(cookies={'example.com': dict(some_site_id='idsomething', expires='Tue, 15 Jan 2013 21:47:38 GMT')})
 def test_HTMLFormAuthenticator_httpretty_2(d):
     fpath = opj(d, 'crap.txt')
 
-    credential = FakeCredential2(name='test', type='user_password', url=None)
+    credential = FakeCredential2(name='test', url=None)
     credentials = credential()
     authenticator = HTMLFormAuthenticator(dict(username="{user}",
                                                password="{password}",
@@ -384,5 +473,3 @@ def test_HTMLFormAuthenticator_httpretty_2(d):
     with open(fpath) as f:
         content = f.read()
         assert_equal(content, "correct body")
-
-

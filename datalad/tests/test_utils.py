@@ -17,16 +17,15 @@ import logging
 from mock import patch
 from six import PY3
 
+from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
 from os.path import isabs, expandvars, expanduser
 from collections import OrderedDict
 
 from ..dochelpers import exc_str
 from ..utils import updated
-from ..utils import get_local_file_url
 from os.path import join as opj, abspath, exists
 from ..utils import rotree, swallow_outputs, swallow_logs, setup_exceptionhook, md5sum
-from ..utils import get_url_path
 from ..utils import getpwd, chpwd
 from ..utils import auto_repr
 from ..utils import find_files
@@ -36,6 +35,9 @@ from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
+from ..utils import unique
+from ..utils import get_func_kwargs_doc
+from ..utils import make_tempfile
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -49,6 +51,12 @@ from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
+
+
+def test_get_func_kwargs_doc():
+    from datalad.crawler.pipelines.openfmri import pipeline
+    output = ['dataset', 'versioned_urls', 'topurl']
+    eq_(get_func_kwargs_doc(pipeline), output)
 
 
 @with_tempfile(mkdir=True)
@@ -135,7 +143,7 @@ def _check_setup_exceptionhook(interactive):
                 assert_equal(post_mortem_tb[0], tb_)
             else:
                 assert_equal(post_mortem_tb, [])
-                assert_in('We cannot setup exception hook', cml.out)
+                # assert_in('We cannot setup exception hook', cml.out)
 
     eq_(old_exceptionhook, sys.excepthook)
 
@@ -169,19 +177,6 @@ def test_updated():
     d_ = updated(d, {0: 1})
     ok_(isinstance(d_, OrderedDict))
     eq_(d_, OrderedDict(((99, 0), ('z', 0), ('a', 0), (0, 1))))
-
-def test_get_local_file_url_linux():
-    assert_equal(get_local_file_url('/a'), 'file:///a')
-    assert_equal(get_local_file_url('/a/b/c'), 'file:///a/b/c')
-    assert_equal(get_local_file_url('/a~'), 'file:///a%7E')
-    assert_equal(get_local_file_url('/a b/'), 'file:///a%20b/')
-
-@skip_if_on_windows
-def test_get_url_path_on_fileurls():
-    assert_equal(get_url_path('file:///a'), '/a')
-    assert_equal(get_url_path('file:///a/b'), '/a/b')
-    assert_equal(get_url_path('file:///a/b#id'), '/a/b')
-    assert_equal(get_url_path('file:///a/b?whatever'), '/a/b')
 
 
 def test_get_local_file_url_windows():
@@ -390,9 +385,27 @@ def test_is_explicit_path():
 def test_knows_annex(here, there):
     from datalad.support.gitrepo import GitRepo
     from datalad.support.annexrepo import AnnexRepo
-    git = GitRepo(path=here, create=True)
+    GitRepo(path=here, create=True)
     assert_false(knows_annex(here))
-    annex = AnnexRepo(path=here, create=True)
+    AnnexRepo(path=here, create=True)
     assert_true(knows_annex(here))
-    gitclone = GitRepo(path=there, url=here, create=True)
+    GitRepo(path=there, url=here, create=True)
     assert_true(knows_annex(there))
+
+
+def test_make_tempfile():
+    # check if mkdir, content conflict caught
+    with assert_raises(ValueError):
+        with make_tempfile(content="blah", mkdir=True):  # pragma: no cover
+            pass
+
+
+def test_unique():
+    eq_(unique(range(3)), [0, 1, 2])
+    eq_(unique((1, 0, 1, 3, 2, 0, 1)), [1, 0, 3, 2])
+    eq_(unique([]), [])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)]), [(1, 2), (1,), (0, 3)])
+
+    # with a key now
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], key=itemgetter(0)), [(1, 2), (0, 3)])
+    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)], key=itemgetter(1)), [(1, 2), (1, 3)])

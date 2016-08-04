@@ -6,28 +6,44 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Information about data providers
+"""Data providers - bind downloaders and credentials together
 """
 
-import re
 from glob import glob
+from logging import getLogger
 from six import iteritems
+
+import re
+from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
 
-from os.path import dirname, abspath, join as pathjoin
-
-from ..dochelpers import exc_str
-from ..support.configparserinc import SafeConfigParserWithIncludes
-from ..ui import ui
-from ..utils import auto_repr
-from ..utils import assure_list_from_str
-
 from .base import NoneAuthenticator, NotImplementedAuthenticator
-from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
-from .s3 import S3Authenticator, S3Downloader
 
-from logging import getLogger
+from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
+from .http import HTTPDownloader
+from .s3 import S3Authenticator, S3Downloader
+from ..support.configparserinc import SafeConfigParserWithIncludes
+from ..support.external_versions import external_versions
+from ..utils import assure_list_from_str
+from ..utils import auto_repr
+
 lgr = getLogger('datalad.downloaders.providers')
+
+# dict to bind authentication_type's to authenticator classes
+# parameters will be fetched from config file itself
+AUTHENTICATION_TYPES = {
+    'html_form': HTMLFormAuthenticator,
+    'http_auth': HTTPBasicAuthAuthenticator,
+    'http_basic_auth': HTTPBasicAuthAuthenticator,
+    'http_digest_auth': HTTPDigestAuthAuthenticator,
+    'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
+    'nda-s3': S3Authenticator,
+    'xnat': NotImplementedAuthenticator,
+    'none': NoneAuthenticator,
+}
+
+from .credentials import CREDENTIAL_TYPES
+
 
 def resolve_url_to_name(d, url):
     """Given a directory (e.g. of SiteInformation._items or Credential._items)
@@ -42,82 +58,16 @@ def resolve_url_to_name(d, url):
     return None
 
 
-
-from ..support.keyring_ import keyring
-
-@auto_repr
-class Credential(object):
-    TYPES = {
-        'user_password': ('user', 'password'),
-        'aws-s3': ('key_id', 'secret_id')
-    }
-
-    def __init__(self, name, type, url=None):
-        self.name = name
-        if not type in self.TYPES:
-            raise ValueError("I do not know type %s credential. Known: %s"
-                             % (type, self.TYPES.keys()))
-        self.type = type
-        self.url = url
-
-    def _ask_field_value(self, f):
-        return ui.question(f,
-                           title="You need to authenticate with %r credentials." % self.name
-                                 + " %s provides information on how to gain access"
-                                   % self.url if self.url else '',
-                           hidden=True)
-
-    # TODO: I guess it, or subclasses depending on the type
-    def enter_new(self):
-        # Use ui., request credential fields corresponding to the type
-        # TODO: this is duplication with __call__
-        for f in self.TYPES[self.type]:
-            v = self._ask_field_value(f)
-            keyring.set_password(self.uid, f, v)
-        pass
-
-    @property
-    def uid(self):
-        return "datalad-%s" % (self.name)
-
-    @property
-    def is_known(self):
-        uid = self.uid
-        try:
-            return all(keyring.get_password(uid, f) is not None for f in self.TYPES[self.type])
-        except Exception as exc:
-            lgr.warning("Failed to query keyring: %s" % exc_str(exc))
-            return False
-
-    # should implement corresponding handling (get/set) via keyring module
-    def __call__(self):
-        # TODO: redo not stupid way
-        uid = self.uid
-        credentials = {}
-        for f in self.TYPES[self.type]:
-            v = keyring.get_password(uid, f)
-            while v is None:  # was not known
-                v = self._ask_field_value(f)
-            keyring.set_password(uid, f, v)
-            credentials[f] = v
-
-        #values = [keyring.get_password(uid, f) for f in fields]
-        #if not all(values):
-        # TODO: Fancy form
-        return credentials
-
-
-from .http import HTTPDownloader
-
 @auto_repr
 class Provider(object):
     """Class to bring together url_res, credential, and authenticator
     """
     # TODO: we might need a lazy loading of the submodules which would provide
     # specific downloaders while importing needed Python modules "on demand"
-    DOWNLOADERS = {'http': HTTPDownloader,
-                   'https': HTTPDownloader,
-                   's3': S3Downloader,
+    DOWNLOADERS = {'http': {'class': HTTPDownloader, 'externals': {'requests'}},
+                   'https': {'class': HTTPDownloader, 'externals': {'requests'}},
+                   'ftp': {'class': HTTPDownloader, 'externals': {'requests', 'boto'}},
+                   's3': {'class': S3Downloader, 'externals': {'boto'}}
                     # ... TODO
                   }
 
@@ -155,12 +105,20 @@ class Provider(object):
     def _get_downloader_class(cls, url):
         key = cls.get_scheme_from_url(url)
         if key in cls.DOWNLOADERS:
-            return cls.DOWNLOADERS[key]
+            entry = cls.DOWNLOADERS[key]
+            klass = entry['class']
+            for ext in entry.get('externals', set()):
+                if external_versions[ext] is None:
+                    raise RuntimeError(
+                        "For using %s downloader, you need '%s' dependency "
+                        "which seems to be missing" % (klass, ext)
+                    )
+            return klass
         else:
             raise ValueError("Do not know how to handle url %s for scheme %s. Known: %s"
                              % (url, key, cls.DOWNLOADERS.keys()))
 
-    def get_downloader(self, url):
+    def get_downloader(self, url, **kwargs):
         """Assigns proper downloader given the URL
 
         If one is known -- verifies its appropriateness for the given url.
@@ -172,7 +130,7 @@ class Provider(object):
             # we might need to provide it with credentials and authenticator
             # Let's do via kwargs so we could accomodate cases when downloader does not necessarily
             # cares about those... duck typing or what it is in action
-            kwargs = {}
+            kwargs = kwargs.copy()
             if self.credential:
                 kwargs['credential'] = self.credential
             if self.authenticator:
@@ -189,23 +147,6 @@ class Providers(object):
     Providers and interfaces them based on a given URL.  Each provider
     in turn takes care about associated with it Downloader.
     """
-
-    # dict to bind authentication_type's to authenticator classes
-    # parameters will be fetched from config file itself
-    AUTHENTICATION_TYPES = {
-        'html_form': HTMLFormAuthenticator,
-        'http_auth': HTTPBasicAuthAuthenticator,
-        'http_basic_auth': HTTPBasicAuthAuthenticator,
-        'http_digest_auth': HTTPDigestAuthAuthenticator,
-        'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
-        'xnat': NotImplementedAuthenticator,
-        'none': NoneAuthenticator,
-    }
-
-    CREDENTIAL_TYPES = {
-        'user_password',
-        'aws-s3'
-    }
 
     _DEFAULT_PROVIDERS = None
 
@@ -234,7 +175,7 @@ class Providers(object):
         """Would load information about related/possible websites requiring authentication from
 
         - codebase (for now) datalad/downloaders/configs/providers.cfg
-        - current handle .datalad/providers/
+        - current dataset .datalad/providers/
         - user dir  ~/.config/datalad/providers/
         - system-wide datalad installation/config /etc/datalad/providers/
 
@@ -262,7 +203,7 @@ class Providers(object):
         for section in config.sections():
             if ':' in section:
                 type_, name = section.split(':', 1)
-                assert(type_ in {'provider', 'credential'})
+                assert type_ in {'provider', 'credential'}, "we know only providers and credentials, got type %s" % type_
                 items = {
                     o: config.get(section, o) for o in config.options(section)
                 }
@@ -296,7 +237,6 @@ class Providers(object):
         """
         cls._DEFAULT_PROVIDERS = None
 
-
     @classmethod
     def _process_provider(cls, name, items):
         """Process a dictionary specifying the provider and output the Provider instance
@@ -304,12 +244,12 @@ class Providers(object):
         assert 'authentication_type' in items, "Must have authentication_type specified"
 
         auth_type = items.pop('authentication_type')
-        if auth_type not in cls.AUTHENTICATION_TYPES:
+        if auth_type not in AUTHENTICATION_TYPES:
             raise ValueError("Unknown authentication_type=%s. Known are: %s"
-                             % (auth_type, ', '.join(cls.AUTHENTICATION_TYPES)))
+                             % (auth_type, ', '.join(AUTHENTICATION_TYPES)))
 
         if auth_type != 'none':
-            authenticator = cls.AUTHENTICATION_TYPES[auth_type](
+            authenticator = AUTHENTICATION_TYPES[auth_type](
                 # Extract all the fields as keyword arguments
                 **{k[len(auth_type)+1:]: items.pop(k)
                    for k in list(items.keys())
@@ -332,8 +272,10 @@ class Providers(object):
     def _process_credential(cls, name, items):
         assert 'type' in items, "Credential must specify type.  Missing in %s" % name
         cred_type = items.pop('type')
-        return Credential(name=name, type=cred_type, url=items.pop('url', None))
-
+        if not cred_type in CREDENTIAL_TYPES:
+            raise ValueError("I do not know type %s credential. Known: %s"
+                             % (cred_type, CREDENTIAL_TYPES.keys()))
+        return CREDENTIAL_TYPES[cred_type](name=name, url=items.pop('url', None))
 
     def get_provider(self, url, only_nondefault=False):
         """Given a URL returns matching provider

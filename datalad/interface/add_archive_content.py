@@ -63,23 +63,23 @@ class AddArchiveContent(Interface):
         delete=Parameter(
             args=("-d", "--delete"),
             action="store_true",
-            doc="""Flag to delete original archive from the filesystem/git in current tree.
+            doc="""flag to delete original archive from the filesystem/git in current tree.
                    Note that it will be of no effect if --key is given."""),
         strip_leading_dirs=Parameter(
             args=("--strip-leading-dirs",),
             action="store_true",
-            doc="""Flag to move all files directories up, from how they were stored in an archive,
+            doc="""flag to move all files directories up, from how they were stored in an archive,
                    if that one contained a number (possibly more than 1 down) single leading
-                   directories."""),
+                   directories"""),
         leading_dirs_depth=Parameter(
             args=("--leading-dirs-depth",),
             action="store",
             type=int,
-            doc="""Maximal depth to strip leading directories to. If not specified (None), no limit"""),
+            doc="""maximal depth to strip leading directories to.  If not specified (None), no limit"""),
         leading_dirs_consider=Parameter(
             args=("--leading-dirs-consider",),
             action="append",
-            doc="""Regular expression(s) for directories to consider to strip away""",
+            doc="""regular expression(s) for directories to consider to strip away""",
             constraints=EnsureStr() | EnsureNone(),
         ),
         # TODO: add option to extract under archive's original directory. Currently would extract in curdir
@@ -87,8 +87,8 @@ class AddArchiveContent(Interface):
             args=("--existing",),
             choices=('fail', 'overwrite', 'archive-suffix', 'numeric-suffix'),
             default="fail",
-            doc="""What operation to perform a file from archive tries to overwrite an existing
-             file with the same name. 'fail' (default) leads to RuntimeError exception.
+            doc="""what operation to perform a file from archive tries to overwrite an existing
+             file with the same name.  'fail' (default) leads to RuntimeError exception.
              'overwrite' silently replaces existing file.  'archive-suffix' instructs to add
              a suffix (prefixed with a '-') matching archive name from which file gets extracted,
              and if that one present, 'numeric-suffix' is in effect in addition, when incremental
@@ -97,26 +97,26 @@ class AddArchiveContent(Interface):
         exclude=Parameter(
             args=("-e", "--exclude"),
             action='append',
-            doc="""Regular expressions for filenames which to exclude from being added to annex.
-            Applied after --rename if that one is specified.  For exact matching, use anchoring.""",
+            doc="""regular expressions for filenames which to exclude from being added to annex.
+            Applied after --rename if that one is specified.  For exact matching, use anchoring""",
             constraints=EnsureStr() | EnsureNone()
         ),
         rename=Parameter(
             args=("-r", "--rename"),
             action='append',
-            doc="""Regular expressions to rename files before being added under git.
+            doc="""regular expressions to rename files before being added under git.
             First letter defines how to split provided string into two parts:
-            Python regular expression (with groups), and replacement string.""",
+            Python regular expression (with groups), and replacement string""",
             constraints=EnsureStr(min_len=2) | EnsureNone()
         ),
         annex_options=Parameter(
             args=("-o", "--annex-options"),
-            doc="""Additional options to pass to git-annex""",
+            doc="""additional options to pass to git-annex""",
             constraints=EnsureStr() | EnsureNone()
         ),
         # TODO: Python only???
         annex=Parameter(
-            doc="""Annex instance to use""" #,
+            doc="""annex instance to use"""
             #constraints=EnsureStr() | EnsureNone()
         ),
         # TODO: Python only!
@@ -126,31 +126,31 @@ class AddArchiveContent(Interface):
         key=Parameter(
             args=("--key",),
             action="store_true",
-            doc="""Flag to signal if provided archive is not actually a filename on its own but an annex key"""),
+            doc="""flag to signal if provided archive is not actually a filename on its own but an annex key"""),
         copy=Parameter(
             args=("--copy",),
             action="store_true",
-            doc="""Flag to copy the content of the archive instead of moving."""),
+            doc="""flag to copy the content of the archive instead of moving"""),
         allow_dirty=Parameter(
             args=("--allow-dirty",),
             action="store_true",
-            doc="""Flag that operating on a dirty repository (uncommitted or untracked content) is Ok."""),
+            doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok"""),
         commit=Parameter(
             args=("--no-commit",),
             action="store_false",
             dest="commit",
-            doc="""Flag to not commit upon completion."""),
+            doc="""flag to not commit upon completion"""),
         drop_after=Parameter(
             args=("--drop-after",),
             action="store_true",
-            doc="""Drop extracted files after adding to annex.""",
+            doc="""drop extracted files after adding to annex""",
         ),
         delete_after=Parameter(
-            args=("--remove-after",),
+            args=("--delete-after",),
             action="store_true",
-            doc="""Extract under a temporary directory, git-annex add, and remove after.
-         To be used to "index" files within annex without actually creating corresponding
-         files under git.  Note that `annex dropunused` would later remove that load."""),
+            doc="""extract under a temporary directory, git-annex add, and delete after.  To
+             be used to "index" files within annex without actually creating corresponding
+             files under git.  Note that `annex dropunused` would later remove that load"""),
 
         # TODO: interaction with archives cache whenever we make it persistent across runs
         archive=Parameter(
@@ -246,9 +246,9 @@ class AddArchiveContent(Interface):
         earchive = annexarchive.cache[key_path]
 
         # TODO: check if may be it was already added
-        if ARCHIVES_SPECIAL_REMOTE not in annex.git_get_remotes():
+        if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
             lgr.debug("Adding new special remote {}".format(ARCHIVES_SPECIAL_REMOTE))
-            annex.annex_initremote(
+            annex.init_remote(
                 ARCHIVES_SPECIAL_REMOTE,
                 ['encryption=none', 'type=external', 'externaltype=%s' % ARCHIVES_SPECIAL_REMOTE,
                  'autoenable=true'])
@@ -258,7 +258,6 @@ class AddArchiveContent(Interface):
         try:
             old_always_commit = annex.always_commit
             annex.always_commit = False
-            keys_to_drop = []
 
             if annex_options:
                 if isinstance(annex_options, string_types):
@@ -372,16 +371,17 @@ class AddArchiveContent(Interface):
                           target_file, url, annex_options)
 
                 target_file_gitpath = opj(extract_relpath, target_file) if extract_relpath else target_file
-                out_json = annex.annex_addurl_to_file(
+                out_json = annex.add_url_to_file(
                     target_file_gitpath,
                     url, options=annex_options,
                     batch=True)
 
-                if 'key' in out_json:  # annex.is_under_annex(target_file, batch=True):
+                if 'key' in out_json and out_json['key'] is not None:  # annex.is_under_annex(target_file, batch=True):
                     # due to http://git-annex.branchable.com/bugs/annex_drop_is_not___34__in_effect__34___for_load_which_was___34__addurl_--batch__34__ed_but_not_yet_committed/?updated
                     # we need to maintain a list of those to be dropped files
                     if drop_after:
-                        keys_to_drop.append(out_json['key'])
+                        annex.drop_key(out_json['key'], batch=True)
+                        stats.dropped += 1
                     stats.add_annex += 1
                 else:
                     lgr.debug("File {} was added to git, not adding url".format(target_file))
@@ -393,11 +393,11 @@ class AddArchiveContent(Interface):
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
-                # annex.annex_add(target_path, options=annex_options)
+                # annex.add(target_path, options=annex_options)
                 # # above action might add to git or to annex
                 # if annex.file_has_content(target_path):
                 #     # if not --  it was added to git, if in annex, it is present and output is True
-                #     annex.annex_addurl_to_file(target_file, url, options=['--relaxed'], batch=True)
+                #     annex.add_url_to_file(target_file, url, options=['--relaxed'], batch=True)
                 #     stats.add_annex += 1
                 # else:
                 #     lgr.debug("File {} was added to git, not adding url".format(target_file))
@@ -424,20 +424,14 @@ class AddArchiveContent(Interface):
                 commit_stats.reset()
         finally:
             # since we batched addurl, we should close those batched processes
+            annex.precommit()
+
             if delete_after:
                 prefix_path = opj(annex.path, prefix_dir)
                 if exists(prefix_path):  # probably would always be there
                     lgr.info("Removing temporary directory under which extracted files were annexed: %s",
                              prefix_path)
                     rmtree(prefix_path)
-
-            annex.precommit()
-            if keys_to_drop:
-                # since we know that keys should be retrievable, we --force since no batching
-                # atm and it would be expensive
-                annex.annex_drop(keys_to_drop, options=['--force'], key=True)
-                stats.dropped += len(keys_to_drop)
-                annex.precommit()  # might need clean up etc again
 
             annex.always_commit = old_always_commit
             # remove what is left and/or everything upon failure

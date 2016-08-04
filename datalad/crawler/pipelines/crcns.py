@@ -25,7 +25,7 @@ from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.crcns")
 
 
-def collection_pipeline():
+def superdataset_pipeline():
     lgr.info("Creating a CRCNS collection pipeline")
     # Should return a list representing a pipeline
     annex = Annexificator()
@@ -38,9 +38,9 @@ def collection_pipeline():
         # .reset() for nodes with state so we could first get through the pipe elements and reset
         # them all
         a_href_match("(?P<url>.*/data-sets/(?P<dataset_category>[^/#]+)/(?P<dataset>[^_/#]+))$"),
-        # https://openfmri.org/dataset/ds000001/
-        assign({'handle_name': '%(dataset)s'}, interpolate=True),
-        annex.initiate_handle(
+        # http://crcns.org/data-sets/vc/pvc-1
+        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        annex.initiate_dataset(
             template="crcns",
             data_fields=['dataset_category', 'dataset'],
             # branch='incoming',  # there will be archives etc
@@ -61,7 +61,7 @@ def extract_readme(data):
     yield {'filename': "README.txt"}
 
 
-def pipeline(dataset, dataset_category, versioned_urls=False):
+def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True):
     """Pipeline to crawl/annex an crcns dataset"""
 
     dataset_url = 'http://crcns.org/data-sets/{dataset_category}/{dataset}'.format(**locals())
@@ -112,11 +112,12 @@ def pipeline(dataset, dataset_category, versioned_urls=False):
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             annex.merge_branch('incoming', strategy='theirs', commit=False),
             [   # Pipeline to augment content of the incoming and commit it to master
-                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  # So we fail if none found -- there must be some! ;)),
+                find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=tarballs),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
                     existing='archive-suffix',
                     # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
                     strip_leading_dirs=True,
+                    delete=True,
                     leading_dirs_consider=['crcns.*', dataset],
                     leading_dirs_depth=2,
                     exclude='.*__MACOSX.*',  # some junk penetrates

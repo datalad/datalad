@@ -11,7 +11,7 @@ Files organization
     - `cmdline/` - helpers for accessing `interface/` functionality from
      command line
     - `crawler/` - functionality for crawling (online) resources and creating
-      or updating handles and collections based on the scraped/downloaded data
+      or updating datasets and collections based on the scraped/downloaded data
         - `nodes/` processing elements which are used in the pipeline
         - `pipelines/` pipelines generators, to produce pipelines to be ran
         - `pipeline.py` pipeline runner
@@ -78,7 +78,9 @@ we outline the workflow used by the developers:
 
          ghremote git@github.com:YourLogin/datalad.git
 
-    to add the above `gh-YourLogin` remote.
+    to add the above `gh-YourLogin` remote.  Additional handy aliases
+    such as `ghpr` (to fetch existing pr from someone's remote) and 
+    `ghsendpr` could be found at [yarikoptic's bash config file](http://git.onerussian.com/?p=etc/bash.git;a=blob;f=.bash/bashrc/30_aliases_sh;hb=HEAD#l865)
 
 3. Create a branch (generally off the `origin/master`) to hold your changes:
 
@@ -104,7 +106,7 @@ we outline the workflow used by the developers:
    that the commit causes a breakage (e.g. of tests) at that point.  Multiple
    entries could be listed joined with a `+` (e.g. `rf+doc-`).  See `git log` for
    examples.  If a commit closes an existing DataLad issue, then add to the end
-   of the mesage `(Closes #ISSUE_NUMER)`
+   of the message `(Closes #ISSUE_NUMER)`
 
 5. Push to GitHub with:
 
@@ -122,7 +124,56 @@ we outline the workflow used by the developers:
 Development environment
 -----------------------
 
-See [README.md:Dependencies](README.md#Dependencies).
+Although we now support Python 3 (>= 3.3), primarily we still use Python 2.7
+and thus instructions below are for python 2.7 deployments.  Replace `python-{`
+with `python{,3}-{` to also install dependencies for Python 3 (e.g., if you would
+like to develop and test through tox).
+
+See [README.md:Dependencies](README.md#Dependencies) for basic information
+about installation of datalad itself.
+On Debian-based systems we recommend to enable [NeuroDebian](http://neuro.debian.net)
+since we use it to provide backports of recent fixed external modules we depend upon:
+
+```sh
+apt-get install -y -q git git-annex-standalone
+apt-get install -y -q patool python-scrapy python-{appdirs,argcomplete,git,humanize,keyring,lxml,msgpack,mock,progressbar,requests,setuptools,six}
+```
+
+and additionally, for development we suggest to use tox and new
+versions of dependencies from pypy:
+
+```sh
+apt-get install -y -q python-{dev,httpretty,testtools,nose,pip,vcr,virtualenv} python-tox
+# Some libraries which might be needed for installing via pip
+apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
+```
+
+some of which you could also install from PyP?i using pip  (prior installation of those libraries listed above
+might be necessary)
+
+```sh
+pip install -r requirements.txt
+```
+
+and you will need to install recent git-annex using appropriate for your
+OS means (for Debian/Ubuntu, once again, just use NeuroDebian).
+
+
+Documentation
+-------------
+
+### Docstrings
+
+We use [NumPy standard] for the description of parameters docstrings.  If you are using
+PyCharm, set your project settings (`Tools` -> `Python integrated tools` -> `Docstring format`).
+
+[NumPy standard]: https://github.com/numpy/numpy/blob/master/doc/HOWTO_DOCUMENT.rst.txt#docstring-standard
+
+In addition, we follow the guidelines of [Restructured Text] with the additional features and treatments
+provided by [Sphinx].
+
+[Restructured Text]: http://docutils.sourceforge.net/docs/user/rst/quickstart.html
+[Sphinx]: http://www.sphinx-doc.org/en/stable/
 
 Additional Hints
 ----------------
@@ -204,6 +255,10 @@ You can also check for common programming errors with the following tools:
           pip install nose coverage
           nosetests --with-coverage path/to/tests_for_package
 
+- We rely on https://codecov.io to provide convenient view of code coverage.
+  Installation of the codecov extension for Firefox/Iceweasel or Chromium
+  is strongly advised, since it provides coverage annotation of pull
+  requests.
 
 ### Linting
 
@@ -253,14 +308,62 @@ Various hints for developers
 
 ### Useful tools
 
-- while performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
+- While performing IO/net heavy operations use [dstat](http://dag.wieers.com/home-made/dstat)
   for quick logging of various health stats in a separate terminal window:
   
         dstat -c --top-cpu -d --top-bio --top-latency --net
 
-- to monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
-  just plug it in the middle of your pipe
+- To monitor speed of any data pipelining [pv](http://www.ivarch.com/programs/pv.shtml) is really handy,
+  just plug it in the middle of your pipe.
 
-- for remote debugging epdb could be used (avail in pip) by using
+- For remote debugging epdb could be used (avail in pip) by using
   `import epdb; epdb.serve()` in Python code and then connecting to it with
-  `python - c "import epdb; epdb.connect()"`
+  `python -c "import epdb; epdb.connect()".`
+
+- We are using codecov which has extensions for the popular browsers
+  (Firefox, Chrome) which annotates pull requests on github regarding changed coverage.
+
+### Useful Environment Variables
+Refer datalad/config.py for information on how to add these environment variables to the config file and their naming convention
+
+- *DATALAD_LOGLEVEL*: 
+  Used for control the verbosity of logs printed to stdout while running datalad commands/debugging
+- *DATALAD_TESTS_KEEPTEMP*: 
+  Function rmtemp will not remove temporary file/directory created for testing if this flag is set
+- *DATALAD_EXC_STR_TBLIMIT*: 
+  This flag is used by the datalad extract_tb function which extracts and formats stack-traces.
+  It caps the number of lines to DATALAD_EXC_STR_TBLIMIT of pre-processed entries from traceback.
+- *DATALAD_TESTS_TEMPDIR*: 
+  Create a temporary directory at location specified by this flag.
+  It is used by tests to create a temporary git directory while testing git annex archives etc
+- *DATALAD_TESTS_NONETWORK*: 
+  Skips network tests completely if this flag is set
+  Examples include test for s3, git_repositories, openfmri etc
+- *DATALAD_TESTS_SSH*: 
+  Skips SSH tests if this flag is **not** set
+- *DATALAD_LOGTRACEBACK*: 
+  Runs TraceBack function with collide set to True, if this flag is set to 'collide'.
+  This replaces any common prefix between current traceback log and previous invocation with "..."
+- *DATALAD_TESTS_NOTEARDOWN*: 
+  Does not execute teardown_package which cleans up temp files and directories created by tests if this flag is set
+- *DATALAD_USECASSETTE*:
+  Specifies the location of the file to record network transactions by the VCR module.
+  Currently used by when testing custom special remotes
+- *DATALAD_CMD_PROTOCOL*: 
+  Specifies the protocol number used by the Runner to note shell command or python function call times and allows for dry runs. 
+  'externals-time' for ExecutionTimeExternalsProtocol, 'time' for ExecutionTimeProtocol and 'null' for NullProtocol.
+  Any new DATALAD_CMD_PROTOCOL has to implement datalad.support.protocol.ProtocolInterface
+- *DATALAD_CMD_PROTOCOL_PREFIX*: 
+  Sets a prefix to add before the command call times are noted by DATALAD_CMD_PROTOCOL.
+- *DATALAD_PROTOCOL_REMOTE*:
+  Binary flag to specify whether to test protocol interactions of custom remote with annex
+- *DATALAD_LOG_TIMESTAMP*:
+  Used to add timestamp to datalad logs
+- *DATALAD_RUN_CMDLINE_TESTS*:
+  Binary flag to specify if shell testing using shunit2 to be carried out
+- *DATALAD_TEMP_FS*:
+  Specify the temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
+- *DATALAD_TEMP_FS_SIZE*:
+  Specify the size of temporary file system to use as loop device for testing DATALAD_TESTS_TEMPDIR creation
+- *DATALAD_NONLO*:
+  Specifies network interfaces to bring down/up for testing. Currently used by travis.

@@ -13,6 +13,7 @@
 __docformat__ = 'restructuredtext'
 
 from .dialog import ConsoleLog, DialogUI, UnderAnnexUI
+from .dialog import UnderTestsUI
 from ..utils import is_interactive
 
 from logging import getLogger
@@ -44,6 +45,7 @@ class _UI_Switcher(object):
                 'console': ConsoleLog,
                 'dialog': DialogUI,
                 'annex': UnderAnnexUI,
+                'tests': UnderTestsUI,
             }[backend]()
         lgr.debug("UI set to %s" % self._ui)
         self._backend = backend

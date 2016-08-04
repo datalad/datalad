@@ -28,7 +28,7 @@ lgr = getLogger('datalad.api.clean')
 
 
 class Clean(Interface):
-    """Clean up after DataLad (e.g. extracted temporary archives etc)
+    """Clean up after DataLad (e.g. extracted temporary archives, etc)
 
     Examples:
 
@@ -39,7 +39,7 @@ class Clean(Interface):
         # TODO:  --info  -- which performs dry run just summarizing what is to be cleaned up
         # TODO: Python only???
         annex=Parameter(
-            doc="""Annex instance to use""" #,
+            doc="""annex instance to use"""
             #constraints=EnsureStr() | EnsureNone()
         ),
     )

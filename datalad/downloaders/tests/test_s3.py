@@ -12,7 +12,7 @@ import os
 from mock import patch
 
 from ..s3 import S3Authenticator
-from ..providers import Providers, Credential  # to test against crcns
+from ..providers import Providers  # to test against crcns
 
 from ...tests.utils import swallow_outputs
 from ...tests.utils import SkipTest
@@ -21,6 +21,7 @@ from ...tests.utils import assert_equal
 from ...tests.utils import assert_in
 from ...tests.utils import use_cassette
 from ...tests.utils import assert_raises
+from ...tests.utils import skip_if_no_network
 from ...dochelpers import exc_str
 from ...downloaders.base import DownloadError
 
@@ -31,11 +32,13 @@ except Exception as e:
 
 from .utils import get_test_providers
 from .test_http import check_download_external_url
-from datalad.downloaders.tests.utils import get_test_providers
+
+skip_if_no_network()  # TODO: provide persistent vcr fixtures for the tests
 
 url_2versions_nonversioned1 = 's3://datalad-test0-versioned/2versions-nonversioned1.txt'
 url_2versions_nonversioned1_ver1 = url_2versions_nonversioned1 + '?versionId=null'
 url_2versions_nonversioned1_ver2 = url_2versions_nonversioned1 + '?versionId=V4Dqhu0QTEtxmvoNkCHGrjVZVomR1Ryo'
+
 
 @use_cassette('test_s3_download_basic')
 def test_s3_download_basic():
@@ -46,7 +49,6 @@ def test_s3_download_basic():
         (url_2versions_nonversioned1_ver1, 'version1', 'version2'),
     ]:
         yield check_download_external_url, url, failed_str, success_str
-test_s3_download_basic.tags = ['network']
 
 
 # TODO: redo smart way with mocking, to avoid unnecessary CPU waste

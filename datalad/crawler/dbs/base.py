@@ -21,6 +21,8 @@ from os.path import isabs
 from ...utils import auto_repr
 from ...utils import find_files
 from ...consts import HANDLE_META_DIR
+from ...support.annexrepo import AnnexRepo
+from ...support.gitrepo import GitRepo
 
 import logging
 lgr = logging.getLogger('datalad.crawler.dbs')
@@ -31,7 +33,7 @@ __docformat__ = 'restructuredtext'
 @auto_repr
 class JsonBaseDB(object):
     """
-    Base class for DBs which would store to Json files
+    Base class for DBs which would store to JSON files
     """
 
     __metaclass__ = ABCMeta
@@ -50,8 +52,8 @@ class JsonBaseDB(object):
         if self._filepath is not None:
             return
         self._filepath = opj(realpath(self.repo.path),
-                     self.__class__.__crawler_subdir__,
-                     (self.name or self.repo.git_get_active_branch())+'.json')
+                             self.__class__.__crawler_subdir__,
+                             (self.name or self.repo.get_active_branch()) + '.json')
         if lexists(self._filepath):
             self.load()
             self._loaded = True
@@ -72,7 +74,7 @@ class JsonBaseDB(object):
 
     def save(self):
         if self._filepath is None:
-            # Nothing to do
+            # nothing to do
             return
         db = self._get_db_to_save()
         if (not self._loaded) and (db == self.get_empty_db()):
@@ -85,14 +87,16 @@ class JsonBaseDB(object):
         lgr.debug("Writing %s to %s" % (self.__class__.__name__, self._filepath))
         with open(self._filepath, 'w') as f:
             json.dump(db, f, indent=2, sort_keys=True, separators=(',', ': '))
-        self.repo.git_add(self._filepath)  # stage to be committed
+
+        # stage to be committed:
+        self.repo.add(self._filepath, git=True)
 
     @property
     def db_version(self):
         return self._db['db_version']
 
     def get_empty_db(self):
-        """Return default empty DB.  Relies on subclass'es specific"""
+        """Return default empty DB.  Relies on subclasses specific"""
         db = self._get_empty_db()
         db['db_version'] = self.__class__.__version__
         return db
@@ -127,9 +131,9 @@ class FileStatusesBaseDB(object):
         annex : AnnexRepo
           Annex repository which will be consulted on the size and full path
         track_queried : bool, optional
-          Either to track what file paths were queried
+          To track what file paths were queried
         """
-        # with all the multiple inheritance smth is not working out as should
+        # with all the multiple inheritance smth is not working out as it should
         # super(FileStatusesBaseDB, self).__init__()
         self.annex = annex
         # which file paths were referred
@@ -154,12 +158,12 @@ class FileStatusesBaseDB(object):
     def get(self, fpath):
         """Given a file (under annex) relative path, return its status record
 
-        annex information about size etc might be used if load is not available
+        annex information about size, etc. might be used if load is not available
 
         Parameters
         ----------
         fpath: str
-          Path (relative to the top of the repo) of the file to get stats of
+          Path (relative to the top of the repo) of the file of which to get stats
         """
         filepath = self._get_filepath(fpath)
         if self._track_queried:
@@ -189,7 +193,7 @@ class FileStatusesBaseDB(object):
         raise NotImplementedError("must be defined in subclasses")
 
     def is_different(self, fpath, status, url=None):
-        """Return True if file pointed by fpath newer in status
+        """Return True if file pointed by fpath is newer in status
         """
         # TODO: make use of URL -- we should validate that url is among those associated
         #  with the file
@@ -201,7 +205,7 @@ class FileStatusesBaseDB(object):
     def get_obsolete(self):
         """Returns full paths for files which weren't queried, thus must have been deleted
 
-        Note that it doesn't track across branches etc.
+        Note that it doesn't track across branches, etc.
         """
         if not self._track_queried:
             raise RuntimeError("Cannot determine which files were removed since track_queried was set to False")
@@ -217,5 +221,5 @@ class FileStatusesBaseDB(object):
         return obsolete
 
     def reset(self):
-        """Reset internal state, e.g. about known queried filedpaths"""
+        """Reset internal state, e.g. about known queried filed paths"""
         self._queried_filepaths = set()

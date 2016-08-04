@@ -13,31 +13,33 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-
 from os.path import join as opj, abspath, basename, relpath, normpath
+from distutils.version import LooseVersion
 
-from six.moves.urllib.parse import urlparse
+from datalad.support.network import RI, URL, SSHRI
 
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
+from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
-from datalad.cmd import Runner
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.cmd import CommandError
 from datalad.utils import not_supported_on_windows, getpwd
 from .add_sibling import AddSibling
+from datalad import ssh_manager
 
 lgr = logging.getLogger('datalad.distribution.create_publication_target_sshwebserver')
 
 
 class CreatePublicationTargetSSHWebserver(Interface):
-    """Create a dataset on a web server via SSH, that may then serve as
-    a target for the publish command, if added as a sibling."""
+    """Create empty dataset(s) on a web server via SSH.
+
+    They can then serve as a target for the `publish` command, once added as a
+    sibling.
+    """
 
     _params_ = dict(
-        # TODO: Somehow the replacement of '_' and '-' is buggy on
-        # positional arguments
         # TODO: Figure out, whether (and when) to use `sshurl` as push url
         dataset=Parameter(
             args=("--dataset", "-d",),
@@ -47,71 +49,80 @@ class CreatePublicationTargetSSHWebserver(Interface):
             constraints=EnsureDataset() | EnsureNone()),
         sshurl=Parameter(
             args=("sshurl",),
-            doc="""SSH URL to use to log into the server and create the target
-                dataset(s). This also serves as a default for the URL to be
-                used to add the target as a sibling to `dataset` and as a
-                default for the directory on the server, where to create the
-                dataset.""",
+            metavar='SSHURL',
+            doc="""Login information for the target server. This can be given
+                as a URL (ssh://host/path) or SSH-style (user@host:path).
+                Unless overridden, this also serves the future dataset's access
+                URL and path on the server.""",
             constraints=EnsureStr()),
         target=Parameter(
             args=('target',),
-            doc="""Sibling name to create for this publication target.
-                If `recursive` is set, the same name will be used to address
-                the subdatasets' siblings. Note, that this is just a
-                convenience function, calling add_sibling after the actual
-                creation of the target dataset(s). Whenever the creation fails,
-                no siblings are added.""",
+            metavar='TARGETNAME',
+            doc="""sibling name to create for this publication target.
+                If `recursive` is set, the same name will be used to label all
+                the subdatasets' siblings.  Note, this is just a
+                convenience option, siblings can also be added at a later point
+                in time.  When creation target datasets fails, no siblings are
+                added""",
             constraints=EnsureStr() | EnsureNone(),
             nargs="?"),
         target_dir=Parameter(
             args=('--target-dir',),
-            doc="""Path to the directory on the server where to create the
-                dataset. By default it's wherever `sshurl` points to. If a
-                relative path is provided, it's interpreted as relative to the
-                user's home directory on the server.
-                Especially when using `recursive`, it's possible to provide a
-                template for building the URLs of all (sub)datasets to be
-                created by using placeholders. If you don't provide a template
-                the local hierarchy with respect to `dataset` will be
-                replicated on the server rooting in `target_dir`.\n
-                List of currently available placeholders:\n
-                %%NAME\tthe name of the datasets, where slashes are
-                replaced by dashes.\n""",
+            metavar='PATH',
+            doc="""path to the directory *on the server* where the dataset
+                shall be created. By default the SSH access URL is used to
+                identify this directory. If a relative path is provided here,
+                it is interpreted as being relative to the user's home
+                directory on the server.\n
+                Additional features are relevant for recursive processing of
+                datasets with subdatasets. By default, the local
+                dataset structure is replicated on the server. However, it is
+                possible to provide a template for generating different target
+                directory names for all (sub)datasets. Templates can contain
+                certain placeholder that are substituted for each (sub)dataset.
+                For example: "/mydirectory/dataset-%%NAME".\nSupported
+                placeholders:\n
+                %%NAME - the name of the datasets, with any slashes replaced by
+                dashes\n""",
             constraints=EnsureStr() | EnsureNone()),
         target_url=Parameter(
             args=('--target-url',),
-            doc="""The URL of the dataset sibling named by `target`. Defaults
-                to `sshurl`. This URL has to be accessible to anyone, who is
-                supposed to have access to the dataset later on.\n
-                Especially when using `recursive`, it's possible to provide a
-                template for building the URLs of all (sub)datasets to be
-                created by using placeholders.\n
-                List of currently available placeholders:\n
-                %%NAME\tthe name of the datasets, where slashes are
-                replaced by dashes.\n""",
-            nargs="?",
+            metavar='URL',
+            doc=""""public" access URL of the to-be-created target dataset(s)
+                (default: `sshurl`). Accessiblity of this URL determines the
+                access permissions of potential consumers of the dataset.
+                As with `target_dir`, templates (same set of placeholders)
+                are supported.\n""",
             constraints=EnsureStr() | EnsureNone()),
         target_pushurl=Parameter(
             args=('--target-pushurl',),
-            doc="""Defaults to `sshurl`. In case the `target_url` cannot be
-                used to publish to the dataset sibling, this option specifies a
-                URL to be used for the actual publication operation.""",
+            metavar='URL',
+            doc="""In case the `target_url` cannot be used to publish to the
+                dataset, this option specifies an alternative URL for this
+                purpose. As with `target_url`, templates (same set of
+                placeholders) are supported.\n""",
             constraints=EnsureStr() | EnsureNone()),
         recursive=Parameter(
             args=("--recursive", "-r"),
             action="store_true",
-            doc="""Recursively create the publication target for all
+            doc="""recursively create the publication target for all
                 subdatasets of `dataset`""",),
-        force=Parameter(
-            args=("--force", "-f",),
-            action="store_true",
-            doc="""If target directory exists already, force to (re-)init
-                git. Also forces to (re-)configure sibling `target`
-                (i.e. its URL(s)) in case it already exists.""",),
+        existing=Parameter(
+            args=("--existing",),
+            constraints=EnsureChoice('skip', 'replace', 'error'),
+            metavar='MODE',
+            doc="""action to perform, if target directory exists already.
+                Dataset is skipped if 'skip'. 'replace' forces to (re-)init
+                the dataset, and to (re-)configure the dataset sibling,
+                i.e. its URL(s), in case it already exists. 'error' causes an
+                exception to be raised.""",),
         shared=Parameter(
             args=("--shared",),
-            doc="""passed to git-init. TODO: Figure out how to communicate what
-                this is about""",
+            metavar='false|true|umask|group|all|world|everybody|0xxx',
+            doc="""if given, configures the access permissions on the server
+            for multi-users (this could include access by a webserver!).
+            Possible values for this option are identical to those of
+            `git init --shared` and are described in its documentation.""",
             constraints=EnsureStr() | EnsureBool()),)
 
     @staticmethod
@@ -119,7 +130,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
     def __call__(sshurl, target=None, target_dir=None,
                  target_url=None, target_pushurl=None,
                  dataset=None, recursive=False,
-                 force=False, shared=False):
+                 existing='error', shared=False):
 
         if sshurl is None:
             raise ValueError("""insufficient information for target creation
@@ -150,16 +161,15 @@ class CreatePublicationTargetSSHWebserver(Interface):
         assert(ds.repo is not None)
 
         # determine target parameters:
-        parsed_target = urlparse(sshurl)
-        host_name = parsed_target.netloc
+        sshri = RI(sshurl)
 
-        # TODO: Sufficient to fail on this condition?
-        if not parsed_target.netloc:
-            raise ValueError("Malformed URL: {0}".format(sshurl))
+        if not isinstance(sshri, SSHRI) \
+                and not (isinstance(sshri, URL) and sshri.scheme == 'ssh'):
+                    raise ValueError("Unsupported SSH URL: '{0}', use ssh://host/path or host:path syntax".format(sshurl))
 
         if target_dir is None:
-            if parsed_target.path:
-                target_dir = parsed_target.path
+            if sshri.path:
+                target_dir = sshri.path
             else:
                 target_dir = '.'
 
@@ -172,7 +182,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
         datasets = dict()
         datasets[basename(ds.path)] = ds
         if recursive:
-            for subds in ds.get_dataset_handles(recursive=True):
+            for subds in ds.get_subdatasets(recursive=True):
                 sub_path = opj(ds.path, subds)
                 # TODO: when enhancing Dataset/*Repo classes and therefore
                 # adapt to moved code, make proper distinction between name and
@@ -182,32 +192,16 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 datasets[basename(ds.path) + '/' + subds] = \
                     Dataset(sub_path)
 
-        # setup SSH Connection:
-        # TODO: Make the entire setup a helper to use it when pushing via
-        # publish?
-
-        # - build control master:
-        from datalad.utils import assure_dir
+        # request ssh connection:
         not_supported_on_windows("TODO")
-        from os import geteuid  # Linux specific import
-        var_run_user_datalad = "/var/run/user/%s/datalad" % geteuid()
-        assure_dir(var_run_user_datalad)
-        control_path = "%s/%s" % (var_run_user_datalad, host_name)
-        control_path += ":%s" % parsed_target.port if parsed_target.port else ""
+        lgr.info("Connecting ...")
+        ssh = ssh_manager.get_connection(sshurl)
+        ssh.open()
 
-        # - start control master:
-        cmd = "ssh -o ControlMaster=yes -o \"ControlPath=%s\" " \
-              "-o ControlPersist=yes %s exit" % (control_path, host_name)
-        lgr.debug("Try starting control master by calling:\n%s" % cmd)
-        import subprocess
-        proc = subprocess.Popen(cmd, shell=True)
-        proc.communicate(input="\n")  # why the f.. this is necessary?
-
-        runner = Runner()
-        ssh_cmd = ["ssh", "-S", control_path, host_name]
-
-        lgr.info("Creating target datasets ...")
-        for current_dataset in datasets:
+        # loop over all datasets, ordered from top to bottom to make test
+        # below valid (existing directories would cause the machinery to halt)
+        for current_dataset in \
+                sorted(datasets.keys(), key=lambda x: x.count('/')):
             if not replicate_local_structure:
                 path = target_dir.replace("%NAME",
                                           current_dataset.replace("/", "-"))
@@ -220,52 +214,56 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                     relpath(datasets[current_dataset].path,
                                             start=ds.path)))
 
+            lgr.info("Creating target dataset {0} at {1}".format(current_dataset, path))
             if path != '.':
-                # check if target exists, and if not --force is given,
-                # fail here
+                # check if target exists
                 # TODO: Is this condition valid for != '.' only?
                 path_exists = True
-                cmd = ssh_cmd + ["ls", path]
                 try:
-                    out, err = runner.run(cmd, expect_fail=True,
-                                          expect_stderr=True)
+                    out, err = ssh(["ls", path])
                 except CommandError as e:
                     if "No such file or directory" in e.stderr and \
-                                    path in e.stderr:
+                            path in e.stderr:
                         path_exists = False
                     else:
                         raise  # It's an unexpected failure here
 
-                if path_exists and not force:
-                    raise RuntimeError("Target directory %s already exists." %
-                                       path)
+                if path_exists:
+                    if existing == 'error':
+                        raise RuntimeError(
+                            "Target directory %s already exists." % path)
+                    elif existing == 'skip':
+                        continue
+                    elif existing == 'replace':
+                        pass
+                    else:
+                        raise ValueError("Do not know how to hand existing=%s" % repr(existing))
 
-                cmd = ssh_cmd + ["mkdir", "-p", path]
                 try:
-                    runner.run(cmd)
+                    ssh(["mkdir", "-p", path])
                 except CommandError as e:
                     lgr.error("Remotely creating target directory failed at "
                               "%s.\nError: %s" % (path, str(e)))
                     continue
 
             # init git repo
-            cmd = ssh_cmd + ["git", "-C", path, "init"]
+            cmd = ["git", "-C", path, "init"]
             if shared:
                 cmd.append("--shared=%s" % shared)
             try:
-                runner.run(cmd)
+                ssh(cmd)
             except CommandError as e:
                 lgr.error("Remotely initializing git repository failed at %s."
                           "\nError: %s\nSkipping ..." % (path, str(e)))
                 continue
 
             # check git version on remote end:
-            cmd = ssh_cmd + ["git", "version"]
             try:
-                out, err = runner.run(cmd)
-                git_version = out.lstrip("git version").strip()
+                out, err = ssh(["git", "version"])
+                assert out.strip().startswith("git version")
+                git_version = out.strip().split()[2]
                 lgr.debug("Detected git version on server: %s" % git_version)
-                if git_version < "2.4":
+                if LooseVersion(git_version) < "2.4":
                     lgr.error("Git version >= 2.4 needed to configure remote."
                               " Version detected on server: %s\nSkipping ..."
                               % git_version)
@@ -278,36 +276,29 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     "...".format(e.message))
 
             # allow for pushing to checked out branch
-            cmd = ssh_cmd + ["git", "-C", path, "config",
-                             "receive.denyCurrentBranch",
-                             "updateInstead"]
             try:
-                runner.run(cmd)
+                ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
+                     "updateInstead"])
             except CommandError as e:
                 lgr.warning("git config failed at remote location %s.\n"
                             "You will not be able to push to checked out "
                             "branch." % path)
 
             # enable post-update hook:
-            cmd = ssh_cmd + ["mv", opj(path, ".git/hooks/post-update.sample"),
-                             opj(path, ".git/hooks/post-update")]
             try:
-                runner.run(cmd)
+                ssh(["mv",
+                     opj(path, ".git/hooks/post-update.sample"),
+                     opj(path, ".git/hooks/post-update")])
             except CommandError as e:
                 lgr.error("Failed to enable post update hook.\n"
                           "Error: %s" % e.message)
 
             # initially update server info "manually":
-            cmd = ssh_cmd + ["git", "-C", path, "update-server-info"]
             try:
-                runner.run(cmd)
+                ssh(["git", "-C", path, "update-server-info"])
             except CommandError as e:
                 lgr.error("Failed to update server info.\n"
                           "Error: %s" % e.message)
-
-        # stop controlmaster (close ssh connection):
-        cmd = ["ssh", "-O", "stop", "-S", control_path, host_name]
-        out, err = runner.run(cmd, expect_stderr=True)
 
         if target:
             # add the sibling(s):
@@ -320,6 +311,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                                          url=target_url,
                                          pushurl=target_pushurl,
                                          recursive=recursive,
-                                         force=force)
+                                         force=existing in {'replace'})
 
         # TODO: Return value!?
+        #       => [(Dataset, fetch_url)]

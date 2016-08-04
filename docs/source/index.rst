@@ -1,22 +1,38 @@
-.. datalad documentation master file, created by
-   sphinx-quickstart on Tue Oct 13 08:41:19 2015.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Datalad |---| data management and distribution suite: Documentation
+*******************************************************************
 
-Welcome to datalad's documentation!
-===================================
+.. toctree::
+   :maxdepth: 1
 
-Contents:
+   acknowledgements
+
+Concepts and technologies
+=========================
 
 .. toctree::
    :maxdepth: 2
 
+   background
+   related
    usecases/index
+   glossary
+
+Commands and API
+================
+
+.. toctree::
+   :maxdepth: 2
+
+   cmdline
    modref
 
->>> import datalad
->>> print(datalad.__version__)
-0.0.3.dev0
+Automated data distributions
+============================
+
+.. toctree::
+   :maxdepth: 2
+
+   crawler/index
 
 Indices and tables
 ==================
@@ -25,3 +41,4 @@ Indices and tables
 * :ref:`modindex`
 * :ref:`search`
 
+.. |---| unicode:: U+02014 .. em dash

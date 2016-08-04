@@ -14,7 +14,7 @@ import time
 
 from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
-from six import text_type
+from six import text_type, binary_type
 
 import logging
 import shutil
@@ -24,28 +24,53 @@ import sys
 import tempfile
 import platform
 import gc
+import glob
 
 from functools import wraps
 from time import sleep
+from inspect import getargspec
+from datalad.dochelpers import get_docstring_split
 
 lgr = logging.getLogger("datalad.utils")
 
+lgr.log(5, "Importing datalad.utils")
 #
 # Some useful variables
 #
-on_windows = platform.system() == 'Windows'
-on_osx = platform.system() == 'Darwin'
-on_linux = platform.system() == 'Linux'
+_platform_system = platform.system().lower()
+on_windows = _platform_system == 'windows'
+on_osx = _platform_system == 'darwin'
+on_linux = _platform_system == 'linux'
 try:
-    on_debian_wheezy = platform.system() == 'Linux' \
-                and platform.linux_distribution()[0] == 'debian' \
-                and platform.linux_distribution()[1].startswith('7.')
+    linux_distribution = platform.linux_distribution()
+    on_debian_wheezy = on_linux \
+                       and linux_distribution[0] == 'debian' \
+                       and linux_distribution[1].startswith('7.')
 except:  # pragma: no cover
     on_debian_wheezy = False
 
 #
 # Little helpers
 #
+
+
+def get_func_kwargs_doc(func):
+    """ Provides args for a function
+    
+    Parameters
+    ----------
+    func: str
+      name of the function from which args are being requested
+
+    Returns
+    -------
+    list
+      of the args that a function takes in
+    """
+    return getargspec(func)[0]
+
+    # TODO: format error message with descriptions of args
+    # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
 
 
 def assure_tuple_or_list(obj):
@@ -100,6 +125,10 @@ def __auto_repr__(obj):
         if attr.startswith('_'):
             continue
         value = getattr(obj, attr)
+        # TODO:  should we add this feature to minimize some talktative reprs
+        # such as of URL?
+        #if value is None:
+        #    continue
         items.append("%s=%s" % (attr, shortened_repr(value)))
 
     return "%s(%s)" % (obj.__class__.__name__, ', '.join(items))
@@ -121,10 +150,14 @@ def is_interactive():
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
+
 import hashlib
+
+
 def md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
+
 
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
@@ -135,6 +168,7 @@ def sorted_files(dout):
 
 from os.path import sep as dirsep
 _VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+
 
 def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
     """Generator to find files matching regex
@@ -164,43 +198,6 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
             if exclude_vcs and re.search(_VCS_REGEX, path):
                 continue
             yield path
-
-
-#### windows workaround ###
-# TODO: There should be a better way
-def get_local_file_url(fname):
-    """Return OS specific URL pointing to a local file
-
-    Parameters
-    ----------
-    fname : string
-        Full filename
-    """
-    if on_windows:
-        fname_rep = fname.replace('\\', '/')
-        furl = "file:///%s" % urlquote(fname_rep)
-        lgr.debug("Replaced '\\' in file\'s url: %s" % furl)
-    else:
-        furl = "file://%s" % urlquote(fname)
-    return furl
-
-
-def get_url_path(url):
-    """Given a file:// url, return the path itself"""
-
-    return urlunquote(urlsplit(url).path)
-
-
-def parse_url_opts(url):
-    """Given a string with url-style options, split into content before # and options as dict"""
-    if '#' in url:
-        url_, attrs_str = url.split('#', 1)
-        opts = dict(x.split('=', 1) for x in attrs_str.split('&'))
-        if 'size' in opts:
-            opts['size'] = int(opts['size'])
-    else:
-        url_, opts = url, {}
-    return url_, opts
 
 
 def expandpath(path, force_absolute=True):
@@ -318,12 +315,14 @@ def file_basename(name, return_ext=False):
     else:
         return fbname
 
+
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
     filename = filename.replace('"', r'\"').replace('`', r'\`')
     filename = '"%s"' % filename
     return filename
+
 
 def encode_filename(filename):
     """Encode unicode filename
@@ -361,6 +360,7 @@ else:
             os.utime(rfilepath, (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
+
 
 def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
@@ -405,6 +405,33 @@ def assure_dict_from_str(s, **kwargs):
         out[k] = v
     return out
 
+
+def unique(seq, key=None):
+    """Given a sequence return a list only with unique elements while maintaining order
+
+    This is the fastest solution.  See
+    https://www.peterbe.com/plog/uniqifiers-benchmark
+    and
+    http://stackoverflow.com/a/480227/1265472
+    for more information.
+    Enhancement -- added ability to compare for uniqueness using a key function
+
+    Parameters
+    ----------
+    seq:
+      Sequence to analyze
+    key: callable, optional
+      Function to call on each element so we could decide not on a full
+      element, but on its member etc
+    """
+    seen = set()
+    seen_add = seen.add
+    if not key:
+        return [x for x in seq if not (x in seen or seen_add(x))]
+    else:
+        # OPT: could be optimized, since key is called twice, but for our cases
+        # should be just as fine
+        return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
 
 #
 # Decorators
@@ -634,73 +661,11 @@ def swallow_logs(new_level=None):
         adapter.cleanup()
 
 
-def _get_cassette_path(path):
-    if not isabs(path):  # so it was given as a name
-        return "fixtures/vcr_cassettes/%s.yaml" % path
-    return path
-
-try:
-    # TEMP: Just to overcome problem with testing on jessie with older requests
-    # https://github.com/kevin1024/vcrpy/issues/215
-    import vcr.patch as _vcrp
-    import requests as _
-    try:
-        from requests.packages.urllib3.connectionpool import HTTPConnection as _a, VerifiedHTTPSConnection as _b
-    except ImportError:
-        def returnnothing(*args, **kwargs):
-            return()
-        _vcrp.CassettePatcherBuilder._requests = returnnothing
-
-    from vcr import use_cassette as _use_cassette, VCR as _VCR
-
-    def use_cassette(path, return_body=None, **kwargs):
-        """Adapter so we could create/use custom use_cassette with custom parameters
-
-        Parameters
-        ----------
-        path : str
-          If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
-        """
-        path = _get_cassette_path(path)
-        lgr.debug("Using cassette %s" % path)
-        if return_body is not None:
-            my_vcr = _VCR(before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
-            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
-        else:
-            return _use_cassette(path, **kwargs)  # just a straight one
-
-except Exception as exc:
-    if not isinstance(exc, ImportError):
-        # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
-        lgr.warning("Failed to import vcr, no cassettes will be available: %s", exc_str(exc, limit=10))
-    # If there is no vcr.py -- provide a do nothing decorator for use_cassette
-    def use_cassette(*args, **kwargs):
-        def do_nothing_decorator(t):
-            @wraps(t)
-            def wrapper(*args, **kwargs):
-                lgr.debug("Not using vcr cassette")
-                return t(*args, **kwargs)
-            return wrapper
-        return do_nothing_decorator
-
-
-@contextmanager
-def externals_use_cassette(name):
-    """Helper to pass instruction via env variables to use specified cassette
-
-    For instance whenever we are testing custom special remotes invoked by the annex
-    but want to minimize their network traffic by using vcr.py
-    """
-    from mock import patch
-    with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(_get_cassette_path(name))}):
-        yield
-
-
 #
 # Additional handlers
 #
-_sys_excepthook = sys.excepthook # Just in case we ever need original one
-def setup_exceptionhook():
+_sys_excepthook = sys.excepthook  # Just in case we ever need original one
+def setup_exceptionhook(ipython=False):
     """Overloads default sys.excepthook with our exceptionhook handler.
 
        If interactive, our exceptionhook handler will invoke
@@ -708,19 +673,20 @@ def setup_exceptionhook():
     """
 
     def _datalad_pdb_excepthook(type, value, tb):
+        import traceback
+        traceback.print_exception(type, value, tb)
+        print()
         if is_interactive():
-            import traceback, pdb
-            traceback.print_exception(type, value, tb)
-            print()
+            import pdb
             pdb.post_mortem(tb)
-        else:
-            lgr.warn("We cannot setup exception hook since not in interactive mode")
-            # we are in interactive mode or we don't have a tty-like
-            # device, so we call the default hook
-            #sys.__excepthook__(type, value, tb)
-            _sys_excepthook(type, value, tb)
 
-    sys.excepthook = _datalad_pdb_excepthook
+    if ipython:
+        from IPython.core import ultratb
+        sys.excepthook = ultratb.FormattedTB(mode='Verbose',
+                                             # color_scheme='Linux',
+                                             call_pdb=is_interactive())
+    else:
+        sys.excepthook = _datalad_pdb_excepthook
 
 
 def assure_dir(*args):
@@ -789,7 +755,9 @@ class chpwd(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._prev_pwd:
-            chpwd(self._prev_pwd, logsuffix="(coming back)")
+            # Need to use self.__class__ so this instance, if the entire
+            # thing mocked during the test, still would use correct chpwd
+            self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
 def knows_annex(path):
@@ -804,5 +772,83 @@ def knows_annex(path):
         return False
     from datalad.support.gitrepo import GitRepo
     repo = GitRepo(path, create=False)
-    return "origin/git-annex" in repo.git_get_remote_branches() \
-           or "git-annex" in repo.git_get_branches()
+    return "origin/git-annex" in repo.get_remote_branches() \
+           or "git-annex" in repo.get_branches()
+
+
+@contextmanager
+def make_tempfile(content=None, wrapped=None, **tkwargs):
+    """Helper class to provide a temporary file name and remove it at the end (context manager)
+
+    Parameters
+    ----------
+    mkdir : bool, optional (default: False)
+        If True, temporary directory created using tempfile.mkdtemp()
+    content : str or bytes, optional
+        Content to be stored in the file created
+    wrapped : function, optional
+        If set, function name used to prefix temporary file name
+    `**tkwargs`:
+        All other arguments are passed into the call to tempfile.mk{,d}temp(),
+        and resultant temporary filename is passed as the first argument into
+        the function t.  If no 'prefix' argument is provided, it will be
+        constructed using module and function names ('.' replaced with
+        '_').
+
+    To change the used directory without providing keyword argument 'dir' set
+    DATALAD_TESTS_TEMPDIR.
+
+    Examples
+    --------
+        >>> from os.path import exists
+        >>> from datalad.utils import make_tempfile
+        >>> with make_tempfile() as fname:
+        ...    k = open(fname, 'w').write('silly test')
+        >>> assert not exists(fname)  # was removed
+
+        >>> with make_tempfile(content="blah") as fname:
+        ...    assert open(fname).read() == "blah"
+    """
+
+    if tkwargs.get('mkdir', None) and content is not None:
+        raise ValueError("mkdir=True while providing content makes no sense")
+
+    tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=wrapped)
+
+    # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+    # let mktemp handle it otherwise. However, an explicitly provided
+    # dir=... will override this.
+    mkdir = tkwargs_.pop('mkdir', False)
+
+    filename = {False: tempfile.mktemp,
+                True: tempfile.mkdtemp}[mkdir](**tkwargs_)
+    filename = realpath(filename)
+
+    if content:
+        with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
+            f.write(content)
+
+    if __debug__:
+        # TODO mkdir
+        lgr.debug('Created temporary thing named %s"' % filename)
+    try:
+        yield filename
+    finally:
+        # glob here for all files with the same name (-suffix)
+        # would be useful whenever we requested .img filename,
+        # and function creates .hdr as well
+        lsuffix = len(tkwargs_.get('suffix', ''))
+        filename_ = lsuffix and filename[:-lsuffix] or filename
+        filenames = glob.glob(filename_ + '*')
+        if len(filename_) < 3 or len(filenames) > 5:
+            # For paranoid yoh who stepped into this already ones ;-)
+            lgr.warning("It is unlikely that it was intended to remove all"
+                        " files matching %r. Skipping" % filename_)
+            return
+        for f in filenames:
+            try:
+                rmtemp(f)
+            except OSError:
+                pass
+
+lgr.log(5, "Done importing datalad.utils")

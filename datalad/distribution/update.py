@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""High-level interface for updating a handle
+"""High-level interface for updating a dataset
 
 """
 
@@ -14,21 +14,28 @@ __docformat__ = 'restructuredtext'
 
 
 import logging
-
 from os.path import join as opj
-from datalad.support.param import Parameter
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.support.gitrepo import GitRepo
-from datalad.support.exceptions import CommandError
+
 from datalad.interface.base import Interface
-from datalad.distribution.dataset import Dataset, EnsureDataset, datasetmethod
-from datalad.utils import knows_annex, getpwd
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
+from datalad.support.exceptions import CommandError
+from datalad.support.gitrepo import GitRepo
+from datalad.support.param import Parameter
+from datalad.utils import knows_annex
+from datalad.utils import getpwd
+
+from .dataset import Dataset
+from .dataset import EnsureDataset
+from .dataset import datasetmethod
 
 lgr = logging.getLogger('datalad.distribution.update')
 
 
 class Update(Interface):
-    """Update a dataset from a sibling."""
+    """Update a dataset from a sibling.
+
+    """
 
     _params_ = dict(
         name=Parameter(
@@ -37,31 +44,31 @@ class Update(Interface):
             nargs="?",
             constraints=EnsureStr() | EnsureNone()),
         dataset=Parameter(
-            args=("--dataset", "-d",),
-            doc=""""specify the dataset to update. If
+            args=("-d", "--dataset"),
+            doc=""""specify the dataset to update.  If
             no dataset is given, an attempt is made to identify the dataset
             based on the current working directory""",
             constraints=EnsureDataset() | EnsureNone()),
         merge=Parameter(
             args=("--merge",),
             action="store_true",
-            doc="Merge changes from sibling `name` or the remote branch, "
+            doc="merge changes from sibling `name` or the remote branch, "
                 "configured to be the tracking branch if no sibling was "
-                "given.",),
+                "given", ),
         # TODO: How to document it without using the term 'tracking branch'?
         recursive=Parameter(
-            args=("--recursive", "-r"),
+            args=("-r", "--recursive"),
             action="store_true",
-            doc="""If set this updates all possibly existing subdatasets,
-             too."""),
+            doc="""if set this updates all possibly existing subdatasets,
+             too"""),
         fetch_all=Parameter(
             args=("--fetch-all",),
             action="store_true",
-            doc="Fetch updates from all siblings.",),
+            doc="fetch updates from all siblings", ),
         reobtain_data=Parameter(
             args=("--reobtain-data",),
             action="store_true",
-            doc="TODO"),)
+            doc="TODO"), )
 
     @staticmethod
     @datasetmethod(name='update')
@@ -92,22 +99,22 @@ class Update(Interface):
             if dspath is None:
                 raise ValueError("No dataset found at %s." % getpwd())
             ds = Dataset(dspath)
-        assert(ds is not None)
+        assert (ds is not None)
 
         if not ds.is_installed():
             raise ValueError("No installed dataset found at "
                              "{0}.".format(ds.path))
-        assert(ds.repo is not None)
+        assert (ds.repo is not None)
 
         repos_to_update = [ds.repo]
         if recursive:
             repos_to_update += [GitRepo(opj(ds.path, sub_path))
                                 for sub_path in
-                                ds.get_dataset_handles(recursive=True)]
+                                ds.get_subdatasets(recursive=True)]
 
         for repo in repos_to_update:
             # get all remotes:
-            remotes = repo.git_get_remotes()
+            remotes = repo.get_remotes()
             if name and name not in remotes:
                 lgr.warning("'%s' not known to dataset %s.\nSkipping" %
                             (name, repo.path))
@@ -123,37 +130,40 @@ class Update(Interface):
                 lgr.debug("Found multiple remotes:\n%s" % remotes)
                 raise NotImplementedError("No merge strategy for multiple "
                                           "remotes implemented yet.")
-            lgr.info("Updating handle '%s' ..." % repo.path)
+            lgr.info("Updating dataset '%s' ..." % repo.path)
 
             # fetch remote(s):
-            repo.git_fetch(name if name else '',
-                           "--all" if fetch_all else '')
+            repo.fetch(remote=name, all_=fetch_all)
 
-            # if it is an annex and there is a tracking branch, and we didn't
-            # fetch the entire remote anyway, explicitly fetch git-annex
-            # branch:
-            # TODO: Is this logic correct? Shouldn't we fetch git-annex from
-            # `name` if there is any (or if there is no tracking branch but we
-            # have a `name`?
+            # if `repo` is an annex and we didn't fetch the entire remote
+            # anyway, explicitly fetch git-annex branch:
+
+            # TODO: This isn't correct. `fetch_all` fetches all remotes.
+            # Apparently, we currently fetch an entire remote anyway. Is this
+            # what we want? Do we want to specify a refspec instead?
+
             if knows_annex(repo.path) and not fetch_all:
-                # check for tracking branch's remote:
-                try:
-                    std_out, std_err = \
-                        repo._git_custom_command('',
-                        ["git", "config", "--get",
-                         "branch.{active_branch}.remote".format(
-                             active_branch=repo.git_get_active_branch())])
-                except CommandError as e:
-                    if e.code == 1 and e.stdout == "":
-                        std_out = None
-                    else:
-                        raise
-                if std_out:  # we have a "tracking remote"
-                    repo.git_fetch("%s git-annex" % std_out.strip())
+                if name:
+                    # we are updating from a certain remote, so git-annex branch
+                    # should be updated from there as well:
+                    repo.fetch(remote=name, refspec="git-annex")
+                    # TODO: what does failing here look like?
+                else:
+                    # we have no remote given, therefore
+                    # check for tracking branch's remote:
+
+                    track_remote, track_branch = repo.get_tracking_branch()
+                    if track_remote:
+                        # we have a "tracking remote"
+                        repo.fetch(remote=track_remote, refspec="git-annex")
 
             # merge:
             if merge:
                 lgr.info("Applying changes from tracking branch...")
+                # TODO: Adapt.
+                # TODO: Rethink default remote/tracking branch. See above.
+                # We need a "tracking remote" but custom refspec to fetch from
+                # that remote
                 cmd_list = ["git", "pull"]
                 if name:
                     cmd_list.append(name)
@@ -163,14 +173,15 @@ class Update(Interface):
                     # => TODO: allow for passing a branch
                     # (or more general refspec?)
                     # For now, just use the same name
-                    cmd_list.append(repo.git_get_active_branch())
+                    cmd_list.append(repo.get_active_branch())
 
-                out, err = repo._git_custom_command('', cmd_list)
-                lgr.info(out)
+                std_out, std_err = repo._git_custom_command('', cmd_list)
+                lgr.info(std_out)
                 if knows_annex(repo.path):
                     # annex-apply:
                     lgr.info("Updating annex ...")
-                    out, err = repo._git_custom_command('', ["git", "annex", "merge"])
-                    lgr.info(out)
+                    std_out, std_err = repo._git_custom_command(
+                        '', ["git", "annex", "merge"])
+                    lgr.info(std_out)
 
-            # TODO: return value?
+                    # TODO: return value?

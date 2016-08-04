@@ -15,8 +15,7 @@ datalad.build/
 tmp
 .noseids
 *.egg-info
-*.pyc
-*.pye
+*.py[coe]
 *.bak
 .#*
 .orig

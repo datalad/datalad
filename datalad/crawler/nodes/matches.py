@@ -15,17 +15,26 @@ import types
 
 from six import PY3
 
-from scrapy.selector import Selector
-from scrapy.http import Response
-
 from ...utils import updated
 from ...support.network import dlurljoin
+from ...utils import auto_repr
 
 from logging import getLogger
 lgr = getLogger('datalad.crawler')
 
+try:
+    from scrapy.http import Response
+    from scrapy.selector import Selector
+except ImportError:
+    lgr.debug("Failed to import Selector from scrapy, so matches would not be functional")
+    class Selector(object):
+        xpath = css = None
+    Response = None
+
+
 # for now heavily based on scrapy but we might make the backend
 # replaceable
+@auto_repr
 class ExtractorMatch(object):
     """Generic matching extractor
     """
@@ -33,7 +42,9 @@ class ExtractorMatch(object):
     def __init__(self, query, input='response', output='match', pop_input=False,
                  allow_multiple=False, xpaths=None, csss=None, min_count=None,
                  max_count=None):
-        self._query = query
+        """"""
+        # TODO: define arguments
+        self.query = query
         # allow_multiple concerns only extraction of additional xpaths and csss
         self._allow_multiple = allow_multiple
         self._xpaths = xpaths
@@ -52,16 +63,16 @@ class ExtractorMatch(object):
 
         if isinstance(input, Response):
             selector = Selector(response=input)
-            if hasattr(input, 'url') and input.url and (not 'url' in data):
-                # take the url of the response object
+            if hasattr(input, 'url') and input.url and ('url' not in data):
+                # take the URL of the response object
                 data = updated(data, {'url': input.url})
         else:
             selector = Selector(text=input)
 
         count = 0
-        for entry, data_ in self._select_and_extract(selector, self._query, data):
+        for entry, data_ in self._select_and_extract(selector, self.query, data):
             data_ = updated(data_, {self._output: entry.extract()})
-            # now get associated xpaths, csss etc
+            # now get associated xpaths, css, etc
             for selectors_dict, entry_method in ((self._xpaths, entry.xpath),
                                                  (self._csss, entry.css)):
                 if not selectors_dict:
@@ -97,7 +108,7 @@ class ExtractorMatch(object):
 
 class ScrapyExtractorMatch(ExtractorMatch):
 
-    EXTRACTOR = None  # Defined in subclasses
+    EXTRACTOR = None  # defined in subclasses
 
     def _select_and_extract(self, selector, query, data):
         # there must be some magic happening since originally
@@ -133,7 +144,7 @@ class AExtractorMatch(ExtractorMatch):
                 # it was an <a> without href
                 continue
 
-            # make it a full url, if there was an original url
+            # make it a full URL, if there was an original URL
             if prev_url:
                 url = dlurljoin(prev_url, url_href)
 
@@ -162,18 +173,20 @@ class AExtractorMatch(ExtractorMatch):
 
             yield url_e, data_
 
+
 class a_href_match(AExtractorMatch):
     """Helper to simplify matching based on URL while also extracting various tags from URL while at it
 
-    Given a url regular expression pattern, perform matching among available URLs
+    Given a URL regular expression pattern, perform matching among available URLs
     and yield those of interest, while also yielding additional groups which matched.
-    It will return keys 'url', 'url_href', 'url_text' and the original .extracted()
-    entry for the url extractor in the field specified by output argument
+    It will return keys 'url', 'url_href', 'url_text' and the original '.extracted()'
+    entry for the url extractor in the field specified by the output argument
     """
     _TARGET = 'href'
 
+
 class a_text_match(AExtractorMatch):
-    """Helper to simplify matching based on A target's text while also extracting various tags from it while at it
+    """Helper to simplify matching based on a target's text while also extracting various tags from it while at it
 
     """
     _TARGET = 'text'

@@ -24,9 +24,10 @@ from ..support.network import get_url_straight_filename
 from ..support.network import rfc2822_to_epoch, iso8601_to_epoch
 
 from .base import Authenticator
-from .base import BaseDownloader
+from .base import BaseDownloader, DownloaderSession
 from .base import DownloadError, AccessDeniedError, TargetFileAbsent
-from ..support.s3 import boto, S3ResponseError
+from ..support.s3 import boto, S3ResponseError, OrdinaryCallingFormat
+from ..support.s3 import get_bucket
 from ..support.status import FileStatus
 
 import logging
@@ -38,21 +39,27 @@ boto_lgr = logging.getLogger('boto')
 
 __docformat__ = 'restructuredtext'
 
+
 @auto_repr
 class S3Authenticator(Authenticator):
     """Authenticator for S3 AWS
     """
 
-    #def authenticate(self, url, credential, session, update=False):
-    def authenticate(self, bucket_name, credential):
+    DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
+
+    def __init__(self, *args, **kwargs):
+        super(S3Authenticator, self).__init__(*args, **kwargs)
+        self.connection = None
+        self.bucket = None
+
+    def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
 
         Returns
         -------
         bucket
         """
-        lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
-        credentials = credential()
+
         if not boto:
             raise RuntimeError("%s requires boto module which is N/A" % self)
 
@@ -63,26 +70,55 @@ class S3Authenticator(Authenticator):
             else logging.DEBUG
         )
 
-        conn = boto.connect_s3(credentials['key_id'], credentials['secret_id'])
-        try:
-            bucket = conn.get_bucket(bucket_name)
-        except S3ResponseError as e:
-            # can initially deny or error to connect to the specific bucket by name,
-            # and we would need to list which buckets are available under following
-            # credentials:
-            lgr.debug("Cannot access bucket %s by name", bucket_name)
-            all_buckets = conn.get_all_buckets()
-            all_bucket_names = [b.name for b in all_buckets]
-            lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
-            if bucket_name in all_bucket_names:
-                bucket = all_buckets[all_bucket_names.index(bucket_name)]
-            elif e.error_code == 'AccessDenied':
-                raise AccessDeniedError(exc_str(e))
-            else:
-                raise DownloadError("No S3 bucket named %s found. Initial exception: %s"
-                                    % (bucket_name, exc_str(e)))
+        # credential might contain 'session' token as well
+        # which could be provided   as   security_token=<token>.,
+        # see http://stackoverflow.com/questions/7673840/is-there-a-way-to-create-a-s3-connection-with-a-sessions-token
+        conn_kwargs = {}
+        if bucket_name.lower() != bucket_name:
+            # per http://stackoverflow.com/a/19089045/1265472
+            conn_kwargs['calling_format'] = OrdinaryCallingFormat()
+        credentials = credential()
 
+        lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
+
+        self.connection = conn = boto.connect_s3(
+            credentials['key_id'], credentials['secret_id'],
+            security_token=credentials.get('session'),
+            **conn_kwargs
+        )
+        self.bucket = bucket = get_bucket(conn, bucket_name)
         return bucket
+
+
+@auto_repr
+class S3DownloaderSession(DownloaderSession):
+    def __init__(self, size=None, filename=None, url=None, headers=None,
+                 key=None):
+        super(S3DownloaderSession, self).__init__(
+            size=size, filename=filename, headers=headers, url=url
+        )
+        self.key = key
+
+    def download(self, f=None, pbar=None, size=None):
+        # S3 specific (the rest is common with e.g. http)
+        def pbar_callback(downloaded, totalsize):
+            assert (totalsize == self.key.size)
+            if pbar:
+                try:
+                    pbar.update(downloaded)
+                except:
+                    pass  # do not let pbar spoil our fun
+
+        headers = {}
+        kwargs = dict(headers=headers, cb=pbar_callback)
+        if size:
+            headers['Range'] = 'bytes=0-%d' % (size - 1)
+        if f:
+            # TODO: May be we could use If-Modified-Since
+            # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
+            self.key.get_contents_to_file(f, num_cb=0, **kwargs)
+        else:
+            return self.key.get_contents_as_string(encoding='utf-8', **kwargs)
 
 
 @auto_repr
@@ -141,7 +177,7 @@ class S3Downloader(BaseDownloader):
         self._bucket = self.authenticator.authenticate(bucket_name, self.credential)
         return False
 
-    def _get_download_details(self, url, **kwargs):
+    def get_downloader_session(self, url, **kwargs):
         bucket_name, url_filepath, params = self._parse_url(url)
         if params:
             newkeys = set(params.keys()) - {'versionId'}
@@ -169,28 +205,14 @@ class S3Downloader(BaseDownloader):
         # Consult about filename
         url_filename = get_url_straight_filename(url)
 
-        def download_into_fp(f=None, pbar=None, size=None):
-            # S3 specific (the rest is common with e.g. http)
-            def pbar_callback(downloaded, totalsize):
-                assert(totalsize == key.size)
-                if pbar:
-                    try:
-                        pbar.update(downloaded)
-                    except:
-                        pass  # do not let pbar spoil our fun
-            headers = {}
-            kwargs = dict(headers=headers, cb=pbar_callback)
-            if size:
-                headers['Range'] = 'bytes=0-%d' % (size-1)
-            if f:
-                # TODO: May be we could use If-Modified-Since
-                # see http://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectGET.html
-                key.get_contents_to_file(f, num_cb=0, **kwargs)
-            else:
-                return key.get_contents_as_string(encoding='utf-8', **kwargs)
+        return S3DownloaderSession(
+            size=target_size,
+            filename=url_filename,
+            url=url,
+            headers=headers,
+            key=key
+        )
 
-        # TODO: possibly return a "header"
-        return download_into_fp, target_size, url_filename, headers
 
     @classmethod
     def get_key_headers(cls, key, dateformat='rfc2822'):

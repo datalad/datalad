@@ -24,10 +24,12 @@ from datalad.utils import swallow_logs
 lgr = logging.getLogger('datalad.dataset')
 
 
+# TODO: use the same piece for resolving paths against Git/AnnexRepo instances
+#       (see normalize_path)
 def resolve_path(path, ds=None):
     """Resolve a path specification (against a Dataset location)
 
-    Any explicit path (absolute or relative) is return as an absolute path.
+    Any explicit path (absolute or relative) is returned as an absolute path.
     In case of an explicit relative path, the current working directory is
     used as a reference. Any non-explicit relative path is resolved against
     as dataset location, i.e. considered relative to the location of the
@@ -43,8 +45,6 @@ def resolve_path(path, ds=None):
         return abspath(path)
     if ds is None:
         # no dataset given, use CWD as reference
-        # TODO: Check whether we should use PWD instead of CWD here. Is it done
-        # by abspath?
         return abspath(path)
     else:
         return normpath(opj(ds.path, path))
@@ -59,6 +59,9 @@ class Dataset(object):
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
+
+    def __eq__(self, other):
+        return self.path == other.path
 
     @property
     def path(self):
@@ -89,7 +92,7 @@ class Dataset(object):
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
-            if 'git-annex' in self._repo.git_get_branches():
+            if 'git-annex' in self._repo.get_branches():
                 # we acquired git-annex branch
                 self._repo = AnnexRepo(self._repo.path, create=False)
         return self._repo
@@ -118,9 +121,9 @@ class Dataset(object):
         if verify is not None:
             raise NotImplementedError("TODO: verify not implemented yet")
 
-        if name not in repo.git_get_remotes():
+        if name not in repo.get_remotes():
             # Add remote
-            repo.git_remote_add(name, url)
+            repo.add_remote(name, url)
             if publish_url is not None:
                 # set push url:
                 repo._git_custom_command('', ["git", "remote",
@@ -133,9 +136,9 @@ class Dataset(object):
             lgr.warning("Remote '%s' already exists. Ignore.")
             raise ValueError("'%s' already exists. Couldn't register sibling.")
 
-    def get_dataset_handles(self, pattern=None, fulfilled=None, absolute=False,
+    def get_subdatasets(self, pattern=None, fulfilled=None, absolute=False,
                             recursive=False):
-        """Get names/paths of all known dataset_handles (subdatasets),
+        """Get names/paths of all known dataset_datasets (subdatasets),
         optionally matching a specific name pattern.
 
 
@@ -148,8 +151,7 @@ class Dataset(object):
         absolute : bool
           If True, absolute paths will be returned.
         recursive : bool
-          If True, recurse into all subdatasets and report their dataset
-          handles too.
+          If True, recurse into all subdatasets and report them too.
 
         Returns
         -------
@@ -162,7 +164,7 @@ class Dataset(object):
 
         repo = self.repo
         if repo is None:
-            return
+            return []
 
         # check whether we have anything in the repo. if not go home early
         if not repo.repo.head.is_valid():
@@ -192,7 +194,7 @@ class Dataset(object):
                 sdspath = opj(self._path, sm)
                 rsm.extend(
                     [opj(sm, sdsh)
-                     for sdsh in Dataset(sdspath).get_dataset_handles(
+                     for sdsh in Dataset(sdspath).get_subdatasets(
                          pattern=pattern, fulfilled=fulfilled, absolute=False,
                          recursive=recursive)])
             submodules = rsm
@@ -201,6 +203,85 @@ class Dataset(object):
             return [opj(self._path, sm) for sm in submodules]
         else:
             return submodules
+
+    def create_subdataset(self, path,
+                          name=None,
+                          description=None,
+                          no_annex=False,
+                          annex_version=None,
+                          annex_backend='MD5E',
+                          git_opts=None,
+                          annex_opts=None,
+                          annex_init_opts=None):
+        """Create a subdataset within this dataset
+
+        Creates a new dataset at `path` and adds it as a subdataset to `self`.
+        `path` is required to point to a location inside the dataset `self`.
+
+        Parameters
+        ----------
+        path: str
+          path to the subdataset to be created
+        name: str
+          name of the subdataset
+        description: str
+          a human-readable description of the dataset, that helps to identify it.
+          Note: Doesn't work with `no_annex`
+        no_annex: bool
+          whether or not to create a pure git repository
+        annex_version: str
+          version of annex repository to be used
+        annex_backend: str
+          backend to be used by annex for computing file keys
+        git_opts: list of str
+          cmdline options to be passed to the git executable
+        annex_opts: list of str
+          cmdline options to be passed to git-annex
+        annex_init_opts: list of str
+          cmdline options to be passed to git-annex-init
+
+        Returns
+        -------
+        Dataset
+          the newly created dataset
+        """
+
+        # get absolute path (considering explicit vs relative):
+        path = resolve_path(path, self)
+        from .install import _with_sep
+        if not path.startswith(_with_sep(self.path)):
+            raise ValueError("path %s outside dataset %s" % (path, self))
+
+        subds = Dataset(path)
+
+        # create the dataset
+        subds.create(description=description,
+                     no_annex=no_annex,
+                     annex_version=annex_version,
+                     annex_backend=annex_backend,
+                     git_opts=git_opts,
+                     annex_opts=annex_opts,
+                     annex_init_opts=annex_init_opts,
+                     # Note:
+                     # adding to the superdataset is what we are doing herein!
+                     # add_to_super=True would lead to calling ourselves again
+                     # and again
+                     # While this is somewhat ugly, the issue behind this is a
+                     # necessarily slightly different logic of `create` in
+                     # comparison to other toplevel functions, which operate on
+                     # an existing dataset and possibly on subdatasets.
+                     # With `create` we suddenly need to operate on a
+                     # superdataset, if add_to_super is True.
+                     add_to_super=False)
+
+        # add it as a submodule
+        # TODO: clean that part and move it in here (Dataset)
+        #       or call install to add the thing inplace
+        from .install import _install_subds_inplace
+        from os.path import relpath
+        return _install_subds_inplace(ds=self, path=subds.path,
+                                      relativepath=relpath(subds.path, self.path),
+                                      name=name)
 
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific
@@ -221,26 +302,6 @@ class Dataset(object):
 #        """
 #        raise NotImplementedError("TODO")
 
-    # TODO maybe needs to get its own interface
-    def remember_state(self, message, auto_add_changes=True, version=None):
-        """
-        Parameters
-        ----------
-        auto_add_changes: bool
-        message: str
-        update_superdataset: bool
-        version: str
-        """
-        if not self.is_installed():
-            raise RuntimeError(
-                "cannot remember a state when a dataset is not yet installed")
-        repo = self.repo
-        if auto_add_changes:
-            repo.annex_add('.')
-        repo.commit(message)
-        if version:
-            repo._git_custom_command('', 'git tag "{0}"'.format(version))
-
     def recall_state(self, whereto):
         """Something that can be used to checkout a particular state
         (tag, commit) to "undo" a change or switch to a otherwise desired
@@ -253,7 +314,7 @@ class Dataset(object):
         if not self.is_installed():
             raise RuntimeError(
                 "cannot remember a state when a dataset is not yet installed")
-        self.repo.git_checkout(whereto)
+        self.repo.checkout(whereto)
 
     def is_installed(self):
         """Returns whether a dataset is installed.
@@ -266,18 +327,35 @@ class Dataset(object):
         """
         return self.path is not None and self.repo is not None
 
+    def get_superdataset(self):
+        """Get the dataset's superdataset
+
+        Returns
+        -------
+        Dataset or None
+        """
+
+        # TODO: return only if self is subdataset of the superdataset
+        #       (meaning: registered as submodule)?
+
+        from os import pardir
+        sds_path = GitRepo.get_toppath(opj(self.path, pardir))
+        if sds_path is None:
+            return None
+        else:
+            return Dataset(sds_path)
+
 
 @optional_args
-def datasetmethod(f, name=None):
+def datasetmethod(f, name=None, dataset_argname='dataset'):
     """Decorator to bind functions to Dataset class.
 
     The decorated function is still directly callable and additionally serves
-    as method `name` of class Dataset.
-    To achieve this, the first positional argument is redirected to original
-    keyword argument 'dataset'. All other arguments stay in order (and keep
-    their names, of course). That means, that the signature of the bound
-    function is name(self, a, b) if the original signature is
-    name(a, dataset, b) for example.
+    as method `name` of class Dataset.  To achieve this, the first positional
+    argument is redirected to original keyword argument 'dataset_argname'. All
+    other arguments stay in order (and keep their names, of course). That
+    means, that the signature of the bound function is name(self, a, b) if the
+    original signature is name(a, dataset, b) for example.
 
     The decorator has no effect on the actual function decorated with it.
     """
@@ -301,13 +379,13 @@ def datasetmethod(f, name=None):
         # If bound function is used with wrong signature (especially by
         # explicitly passing a dataset, let's raise a proper exception instead
         # of a 'list index out of range', that is not very telling to the user.
-        if len(args) > len(orig_pos) or 'dataset' in kwargs:
+        if len(args) > len(orig_pos) or dataset_argname in kwargs:
             raise TypeError("{0}() takes at most {1} arguments ({2} given):"
                             " {3}".format(name, len(orig_pos), len(args),
                                           ['self'] + [a for a in orig_pos
-                                                      if a != 'dataset']))
-        kwargs['dataset'] = args[0]
-        ds_index = orig_pos.index('dataset')
+                                                      if a != dataset_argname]))
+        kwargs[dataset_argname] = args[0]
+        ds_index = orig_pos.index(dataset_argname)
         for i in range(1, len(args)):
             if i <= ds_index:
                 kwargs[orig_pos[i-1]] = args[i]
@@ -316,6 +394,9 @@ def datasetmethod(f, name=None):
         return f(**kwargs)
 
     setattr(Dataset, name, apply_func)
+    # So we could post-hoc later adjust the documentation string which is assigned
+    # within .api
+    apply_func.__orig_func__ = f
     return f
 
 
