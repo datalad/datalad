@@ -63,7 +63,7 @@ def _get_digest_value(checksum=None, **digest):
       1 element dictionary {digest: value}
     """
     if digest:
-        if len(digest) > 1 or (digest.keys()[0] not in KNOWN_ALGO) or checksum:
+        if len(digest) > 1 or (next(iter(digest)) not in KNOWN_ALGO) or checksum:
             raise ValueError(
                 "You must either specify checksum= or explicitly "
                 "one of known digests %s. Got %r" % (KNOWN_ALGO, digest))
