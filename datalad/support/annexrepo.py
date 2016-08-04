@@ -549,44 +549,70 @@ class AnnexRepo(GitRepo):
             raise FileNotInAnnexError("Could not get a key for a file %s -- empty output" % file_)
         return entries[0]
 
+    @normalize_paths(map_filenames_back=True)
+    def find(self, files, batch=False):
+        """Provide annex info for file(s).
+
+        Parameters
+        ----------
+        files: list of str
+            files to find under annex
+        batch: bool, optional
+            initiate or continue with a batched run of annex find, instead of just
+            calling a single git annex find command
+
+        Returns
+        -------
+        list
+          list with filename if file found else empty string
+        """
+        objects = []
+        if batch:
+            objects = self._batched.get('find', path=self.path)(files)
+        else:
+            for f in files:
+                try:
+                    obj, er = self._run_annex_command('find', annex_options=[f], expect_fail=True)
+                    objects.append(obj)
+                except CommandError:
+                    objects.append('')
+
+        return objects
+
     @normalize_paths
-    def file_has_content(self, files):
+    def file_has_content(self, files, allow_quick=True, batch=False):
         """Check whether files have their content present under annex.
 
         Parameters
         ----------
         files: list of str
             file(s) to check for being actually present.
+        allow_quick: bool, optional
+            allow quick check, based on having a symlink into .git/annex/objects.
+            Works only in non-direct mode (TODO: thin mode)
 
         Returns
         -------
         list of bool
-            Per each input file states either file has content locally
+            For each input file states either file has content locally
         """
         # TODO: Also provide option to look for key instead of path
 
-        try:
-            out, err = self._run_annex_command('find', annex_options=files,
-                                               expect_fail=True)
-        except CommandError as e:
-            if e.code == 1 and "not found" in e.stderr:
-                if len(files) > 1:
-                    lgr.debug("One of the files was not found, so performing "
-                              "'find' operation per each file")
-                    # we need to go file by file since one of them is non
-                    # existent and annex pukes on it
-                    return [self.file_has_content(file_) for file_ in files]
-                return [False]
-            else:
-                raise
-
-        found_files = {f for f in out.splitlines() if f}
-        found_files_new = set(found_files) - set(files)
-        if found_files_new:
-            raise RuntimeError("'annex find' returned entries for files which "
-                               "we did not expect: %s" % (found_files_new,))
-
-        return [file_ in found_files for file_ in files]
+        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
+            # TODO: Also provide option to look for key instead of path
+            find = self.find(files, normalize_paths=False, batch=batch)
+            return [bool(filename) for filename in find]
+        else:  # ad-hoc check which should be faster than call into annex
+            out = []
+            for f in files:
+                filepath = opj(self.path, f)
+                if islink(filepath):                    # if symlink
+                    target_path = realpath(filepath)    # find abspath of node pointed to by symlink
+                    # TODO: checks for being not outside of this repository
+                    out.append(exists(target_path) and '.git/annex/objects' in target_path)
+                else:
+                    out.append(False)
+            return out
 
     @normalize_paths
     def is_under_annex(self, files, allow_quick=True, batch=False):
@@ -603,12 +629,12 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         list of bool
-            Per each input file states either file is under annex
+            For each input file states either file is under annex
         """
         # theoretically in direct mode files without content would also be
         # broken symlinks on the FSs which support it, but that would complicate
         # the matters
-        if self.is_direct_mode() or not allow_quick:  # TODO: thin mode
+        if self.is_direct_mode() or batch or not allow_quick:  # TODO: thin mode
             # no other way but to call whereis and if anything returned for it
             info = self.info(files, normalize_paths=False, batch=batch)
             # info is a dict... khe khe -- "thanks" Yarik! ;)
@@ -873,7 +899,7 @@ class AnnexRepo(GitRepo):
             files to look for
         output: {'descriptions', 'uuids', 'full'}, optional
             If 'descriptions', a list of remotes descriptions returned is per
-            each file. If 'full', per each file a dictionary of all fields
+            each file. If 'full', for each file a dictionary of all fields
             is returned as returned by annex
         key: bool, optional
             Either provided files are actually annex keys
@@ -882,7 +908,7 @@ class AnnexRepo(GitRepo):
         -------
         list of list of unicode  or dict
             if output == 'descriptions', contains a list of descriptions of remotes
-            per each input file, describing the remote for each remote, which
+            for each input file, describing the remote for each remote, which
             was found by git-annex whereis, like::
 
                 u'me@mycomputer:~/where/my/repo/is [origin]' or
@@ -939,7 +965,7 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         dict
-          Info per each file
+          Info for each file
         """
 
         options = ['--bytes']
@@ -1218,7 +1244,7 @@ class AnnexRepo(GitRepo):
         Returns
         -------
         list of str
-            Per each file in input list indicates the used backend by a str
+            For each file in input list indicates the used backend by a str
             like "SHA256E" or "MD5".
         """
 

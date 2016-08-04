@@ -154,8 +154,6 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
         pass
 
 
-
-
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
@@ -179,22 +177,24 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
 
 # 1 is enough to test file_has_content
+@with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def test_AnnexRepo_file_has_content(src, annex_path):
-    ar = AnnexRepo(annex_path, src)
+def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
+    ar = AnnexRepo(annex_path, src, direct=direct)
     testfiles = ["test-annex.dat", "test.dat"]
+
     assert_equal(ar.file_has_content(testfiles), [False, False])
 
     ok_annex_get(ar, "test-annex.dat")
-    assert_equal(ar.file_has_content(testfiles), [True, False])
-    assert_equal(ar.file_has_content(testfiles[:1]), [True])
+    assert_equal(ar.file_has_content(testfiles, batch=batch), [True, False])
+    assert_equal(ar.file_has_content(testfiles[:1], batch=batch), [True])
 
-    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"]),
+    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"], batch=batch),
                  [True, False, False])
 
-    assert_false(ar.file_has_content("bogus.txt"))
-    assert_true(ar.file_has_content("test-annex.dat"))
+    assert_false(ar.file_has_content("bogus.txt", batch=batch))
+    assert_true(ar.file_has_content("test-annex.dat", batch=batch))
 
 
 # 1 is enough to test
