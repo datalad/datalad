@@ -90,8 +90,8 @@ class AddArchiveContent(Interface):
             doc="""regular expression(s) for directories to consider to strip away""",
             constraints=EnsureStr() | EnsureNone(),
         ),
-        use_archive_dir=Parameter(
-            args=("--use-archive-dir",),
+        use_current_dir=Parameter(
+            args=("--use-current-dir",),
             action="store_true",
             doc="""flag to extract archive under the directory where it is located, not under current
                directory.  %s""" % _KEY_OPT_NOTE),
@@ -185,7 +185,7 @@ class AddArchiveContent(Interface):
     @staticmethod
     def __call__(archive, annex=None,
                  strip_leading_dirs=False, leading_dirs_depth=None, leading_dirs_consider=None,
-                 use_archive_dir=False,
+                 use_current_dir=False,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
                  annex_options=None, copy=False, commit=True, allow_dirty=False,
                  stats=None, drop_after=False, delete_after=False):
@@ -245,12 +245,12 @@ class AddArchiveContent(Interface):
         # are we in a subdirectory of the repository? then we should add content under that
         # subdirectory,
         # get the path relative to the repo top
-        if use_archive_dir:
-            extract_relpath = relpath(archive_dir, annex_path)
+        if commonprefix([pwd, annex_path]) != annex_path:
+            extract_relpath = None
         else:
             extract_relpath = relpath(pwd, annex_path) \
-                if commonprefix([pwd, annex_path]) == annex_path \
-                else None
+                if use_current_dir \
+                else relpath(archive_dir, annex_path)
 
         # and operate from now on the key or whereever content available "canonically"
         try:

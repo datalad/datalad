@@ -129,11 +129,11 @@ def test_add_archive_content(path_orig, url, repo_path):
     # -- in caching and overwrite check
     assert_in("already exists", str(cme.exception))
     # but should do fine if overrides are allowed
-    add_archive_content(opj('1u', '1.tar.gz'), existing='overwrite')
+    add_archive_content(opj('1u', '1.tar.gz'), existing='overwrite', use_current_dir=True)
     d1_basic_checks()
-    add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix')
-    add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix')
-    add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix')
+    add_archive_content(opj('2u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
+    add_archive_content(opj('3u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
+    add_archive_content(opj('4u', '1.tar.gz'), existing='archive-suffix', use_current_dir=True)
     # rudimentary test
     assert_equal(sorted(map(basename, glob(opj(repo_path, '1', '1*')))),
                  ['1 f-1.1.txt', '1 f-1.2.txt', '1 f-1.txt', '1 f.txt'])
@@ -251,17 +251,17 @@ def test_add_archive_use_archive_dir(repo_path):
         repo.commit("added 1.tar.gz")
 
         ok_archives_caches(repo.path, 0)
-        add_archive_content(archive_path, strip_leading_dirs=True)
+        add_archive_content(archive_path, strip_leading_dirs=True, use_current_dir=True)
         ok_(not exists(opj('4u', '1 f.txt')))
         ok_file_under_git(repo.path, '1 f.txt', annexed=True)
         ok_archives_caches(repo.path, 0)
 
         # and now let's extract under archive dir
-        add_archive_content(archive_path, strip_leading_dirs=True, use_archive_dir=True)
+        add_archive_content(archive_path, strip_leading_dirs=True)
         ok_file_under_git(repo.path, opj('4u', '1 f.txt'), annexed=True)
         ok_archives_caches(repo.path, 0)
 
-        add_archive_content(opj('4u', 'sub.tar.gz'), use_archive_dir=True)
+        add_archive_content(opj('4u', 'sub.tar.gz'))
         ok_file_under_git(repo.path, opj('4u', 'sub', '2 f.txt'), annexed=True)
         ok_archives_caches(repo.path, 0)
 
