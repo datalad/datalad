@@ -26,6 +26,7 @@ from logging import getLogger
 lgr = getLogger('datalad.api.crawl_init')
 CRAWLER_PIPELINE_SECTION = 'crawl:pipeline'
 
+
 class CrawlInit(Interface):
     """
     Allows user to specify template and function to generate a pipeline
@@ -40,26 +41,27 @@ class CrawlInit(Interface):
         --template fcptable \
         dataset=Baltimore tarballs=True
     """
+
     _params_ = dict(
         template=Parameter(
             args=("-t", "--template"),
             action="store",
             constraints=EnsureStr() | EnsureNone(),
-            doc="""flag if template is specified by user"""),
+            doc="""the name of the template"""),
         template_func=Parameter(
             args=("-f", "--template-func"),
             action="store",
-            doc="""flag if function is specified by user"""),
+            doc="""the name of the function"""),
         args=Parameter(
             args=("args",),
             nargs="*",
             constraints=EnsureStr() | EnsureNone(),
             doc="""keyword arguments to pass into the template function generating actual pipeline,
-            organized in an ordered dict"""),
+            organized in [PY: a dict PY][CMD: key=value pairs CMD]"""),
         commit=Parameter(
             args=("--commit",),
             action="store_true",
-            doc="""flag is user wants to commit file into git repo"""),
+            doc="""flag if to commit crawl config file"""),
     )
 
     @staticmethod
@@ -76,6 +78,8 @@ class CrawlInit(Interface):
                 raise ValueError(
                     "args entered must be given in a list or dict, were given as %s",
                     type(args))
+        elif not template:
+            raise TypeError("crawl-init needs a template")
         else:
             args = {}
 
