@@ -27,6 +27,7 @@ from ...support.network import get_url_straight_filename
 from ...tests.utils import with_fake_cookies_db
 from ...tests.utils import skip_if_no_network
 from ...tests.utils import with_testsui
+from ...tests.utils import with_memory_keyring
 
 # BTW -- mock_open is not in mock on wheezy (Debian 7.x)
 try:
@@ -349,6 +350,19 @@ def test_HTMLFormAuthenticator_httpretty(d):
 
     # Unsuccesfull scenarios to test:
     # the provided URL at the end 404s, or another failure (e.g. interrupted download)
+
+
+@with_memory_keyring
+@with_testsui(responses=['no', 'yes', 'testlogin', 'testpassword'])
+def test_auth_but_no_cred(keyring):
+    authenticator = HTMLFormAuthenticator("")
+    # Replying 'no' to the set credentials prompt should raise ValueError
+    assert_raises(ValueError, HTTPDownloader, credential=None, authenticator=authenticator)
+    # Reply 'yes' and set test user:pass at the next set credentials prompt
+    downloader = HTTPDownloader(credential=None, authenticator=authenticator)
+    # Verify credentials correctly set to test user:pass
+    assert_equal(downloader.credential.get('user'), 'testlogin')
+    assert_equal(downloader.credential.get('password'), 'testpassword')
 
 
 @skip_if(not httpretty, "no httpretty")
