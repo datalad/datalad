@@ -46,6 +46,7 @@ from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
 from ..support.archives import compress_files
 from ..support.vcr_ import *
+from ..support.keyring_ import MemoryKeyring
 from ..dochelpers import exc_str, borrowkwargs
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
@@ -334,8 +335,9 @@ def ok_archives_caches(repopath, n=1, persistent=None):
                    ARCHIVES_TEMP_DIR + {None: '*', True: '', False: '-*'}[persistent],
                    '*')
     dirs = glob.glob(glob_ptn)
-    assert_equal(len(dirs), n,
-                 msg="Found following dirs when needed %d of them: %s" % (n, dirs))
+    n2 = n * 2  # per each directory we should have a .stamp file
+    assert_equal(len(dirs), n2,
+                 msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
 def ok_file_has_content(path, content):
     """Verify that file exists and has expected content"""
@@ -432,6 +434,19 @@ def serve_path_via_http(tfunc, *targs):
         finally:
             lgr.debug("HTTP: stopping server under %s" % path)
             multi_proc.terminate()
+
+    return newfunc
+
+
+@optional_args
+def with_memory_keyring(t):
+    """Decorator to use non-persistant MemoryKeyring instance
+    """
+    @wraps(t)
+    def newfunc(*args, **kwargs):
+        keyring = MemoryKeyring()
+        with patch("datalad.downloaders.credentials.keyring_", keyring):
+            return t(*(args + (keyring,)), **kwargs)
 
     return newfunc
 
@@ -738,6 +753,12 @@ def skip_ssh(func):
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
+
+    Parameters
+    ----------
+    ok_to_chdir: bool, optional
+      If True, allow to chdir, so this decorator would not then raise exception
+      if chdir'ed but only return to original directory
     """
 
     @wraps(func)

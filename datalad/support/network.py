@@ -46,9 +46,12 @@ def get_response_disposition_filename(s):
     if not s:
         return None
     # If the response has Content-Disposition, try to get filename from it
-    cd = dict(map(
-        lambda x: x.strip().split('=') if '=' in x else (x.strip(),''),
-        s.split(';')))
+    cd = map(
+            lambda x: x.strip().split('=', 1) if '=' in x else [x.strip(), ''],
+            s.split(';')
+    )
+    # unify the key to be lower case and make it into a dict
+    cd = dict([[x[0].lower()] + x[1:] for x in cd])
     if 'filename' in cd:
         filename = cd['filename'].strip("\"'")
         return filename

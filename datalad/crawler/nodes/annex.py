@@ -484,7 +484,16 @@ class Annexificator(object):
         # file might have been added but really not changed anything (e.g. the same README was generated)
         # TODO:
         # if out_json:  # if not try -- should be here!
-        _call(stats.increment, 'add_annex' if 'key' in out_json else 'add_git')
+        # File might have been not modified at all, so let's check its status first
+        changed = set().union(*self._get_status(args=[fpath]))
+        if fpath in changed:
+            _call(stats.increment,
+                  'add_annex'
+                    if ('key' in out_json and out_json['key'] is not None)
+                    else 'add_git'
+                  )
+        else:
+            _call(stats.increment, 'skipped')
 
         # TODO!!:  sanity check that no large files are added to git directly!
 
@@ -809,28 +818,37 @@ class Annexificator(object):
         self.repo.add(fpaths, git=True)
         # self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
 
-    def _get_status(self):
+    def _get_status(self, args=[]):
         """Custom check of status to see what files were staged, untracked etc
         until
         https://github.com/gitpython-developers/GitPython/issues/379#issuecomment-180101921
         is resolved
         """
         # out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
-        out, err = self.repo._git_custom_command([], ["git", "status", "--porcelain"])
-        assert not err
+        cmd_args = ["git", "status", "--porcelain"] + args
         staged, notstaged, untracked, deleted = [], [], [], []
+        statuses = {
+            '??': untracked,
+            'A ': staged,
+            'M ': staged,
+            ' M': notstaged,
+            ' D': deleted
+        }
+
+        if isinstance(self.repo, AnnexRepo) and self.repo.is_direct_mode():
+            statuses['AD'] = staged
+            out, err = self.repo.proxy(cmd_args)
+        else:
+            out, err = self.repo._git_custom_command([], cmd_args)
+            assert not err
+
         for l in out.split('\n'):
             if not l:
                 continue
             act = l[:2]  # first two characters is what is happening to the file
             fname = l[3:]
             try:
-                {'??': untracked,
-                 'A ': staged,
-                 'M ': staged,
-                 ' M': notstaged,
-                 ' D': deleted,
-                 }[act].append(fname)
+                statuses[act].append(fname)
                 # for the purpose of this use, we don't even want MM or anything else
             except KeyError:
                 raise RuntimeError("git status %r not yet supported. TODO" % act)

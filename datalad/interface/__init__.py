@@ -43,6 +43,7 @@ _group_misc = (
     [
         ('datalad.interface.test', 'Test'),
         ('datalad.interface.crawl', 'Crawl'),
+        ('datalad.interface.crawl_init', 'CrawlInit', 'crawl-init'),
         ('datalad.interface.ls', 'Ls'),
         ('datalad.interface.clean', 'Clean'),
         ('datalad.interface.add_archive_content', 'AddArchiveContent',

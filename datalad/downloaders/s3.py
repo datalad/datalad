@@ -45,15 +45,20 @@ class S3Authenticator(Authenticator):
     """Authenticator for S3 AWS
     """
 
-    #def authenticate(self, url, credential, session, update=False):
-    def authenticate(self, bucket_name, credential):
+    DEFAULT_CREDENTIAL_TYPE = 'aws-s3'
+
+    def __init__(self, *args, **kwargs):
+        super(S3Authenticator, self).__init__(*args, **kwargs)
+        self.connection = None
+        self.bucket = None
+
+    def authenticate(self, bucket_name, credential, cache=True):
         """Authenticates to the specified bucket using provided credentials
 
         Returns
         -------
         bucket
         """
-        lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
 
         if not boto:
             raise RuntimeError("%s requires boto module which is N/A" % self)
@@ -73,12 +78,15 @@ class S3Authenticator(Authenticator):
             # per http://stackoverflow.com/a/19089045/1265472
             conn_kwargs['calling_format'] = OrdinaryCallingFormat()
         credentials = credential()
-        conn = boto.connect_s3(
+
+        lgr.info("S3 session: Connecting to the bucket %s", bucket_name)
+
+        self.connection = conn = boto.connect_s3(
             credentials['key_id'], credentials['secret_id'],
             security_token=credentials.get('session'),
             **conn_kwargs
         )
-        bucket = get_bucket(conn, bucket_name)
+        self.bucket = bucket = get_bucket(conn, bucket_name)
         return bucket
 
 

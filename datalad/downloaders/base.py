@@ -18,7 +18,8 @@ import time
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from os.path import exists, join as opj, isdir
-from six import string_types, PY2
+from six import PY2
+from six import binary_type, PY3
 
 
 from .. import cfg
@@ -26,6 +27,7 @@ from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
 from ..dochelpers import borrowkwargs
+from .credentials import CREDENTIAL_TYPES
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
@@ -72,22 +74,30 @@ class BaseDownloader(object):
         authenticator: Authenticator, optional
           Authenticator to use for authentication.
         """
-        self.credential = credential
         if not authenticator and self._DEFAULT_AUTHENTICATOR:
             authenticator = self._DEFAULT_AUTHENTICATOR()
 
         if authenticator:
             if not credential:
-                raise ValueError(
-                    "Both authenticator and credentials must be provided."
-                    " Got only authenticator %s" % repr(authenticator))
-
+                msg = "Both authenticator and credentials must be provided." \
+                      " Got only authenticator %s" % repr(authenticator)
+                if ui.yesno(
+                    title=msg,
+                    text="Do you want to enter %s credentials to be used?" % authenticator.DEFAULT_CREDENTIAL_TYPE
+                ):
+                    credential = CREDENTIAL_TYPES[authenticator.DEFAULT_CREDENTIAL_TYPE](
+                        "session-only-for-%s" % id(authenticator))
+                    credential.enter_new()
+                    # TODO: give an option to store those credentials, and generate a basic provider
+                    # record?
+                else:
+                    raise ValueError(msg)
+        self.credential = credential
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
 
-
-    def _access(self, method, url, allow_old_session=True, **kwargs):
-        """Fetch content as pointed by the URL optionally into a file
+    def access(self, method, url, allow_old_session=True, **kwargs):
+        """Generic decorator to manage access to the URL via some method
 
         Parameters
         ----------
@@ -219,7 +229,7 @@ class BaseDownloader(object):
 
             if file_:
                 with open(file_) as fp:
-                    content = fp.read()
+                    content = fp.read(self._DOWNLOAD_SIZE_TO_VERIFY_AUTH)
             else:
                 assert(content is not None)
 
@@ -229,7 +239,6 @@ class BaseDownloader(object):
         if target_size and target_size != downloaded_size:
             raise IncompleteDownloadError("Downloaded size %d differs from originally announced %d"
                                           % (downloaded_size, target_size))
-
 
     def _download(self, url, path=None, overwrite=False, size=None, stats=None):
         """Download content into a file
@@ -347,8 +356,7 @@ class BaseDownloader(object):
         # but then it might require sending request anyways for Content-Disposition
         # so probably nah
         lgr.info("Downloading %r into %r", url, path)
-        return self._access(self._download, url, path=path, **kwargs)
-
+        return self.access(self._download, url, path=path, **kwargs)
 
     @property
     def cache(self):
@@ -369,7 +377,6 @@ class BaseDownloader(object):
             import atexit
             atexit.register(self._cache.close)
         return self._cache
-
 
     def _fetch(self, url, cache=None, size=None, allow_redirects=True):
         """Fetch content from a url into a file.
@@ -420,6 +427,10 @@ class BaseDownloader(object):
             content = downloader_session.download(size=size)
             #pbar.finish()
             downloaded_size = len(content)
+
+            # now that we know size based on encoded content, let's decode into string type
+            if PY3 and isinstance(content, binary_type):
+                content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 
             self._verify_download(url, downloaded_size, target_size, None, content=content)
@@ -439,7 +450,6 @@ class BaseDownloader(object):
 
         return content, downloader_session.headers
 
-
     def fetch(self, url, **kwargs):
         """Fetch and return content (not decoded) as pointed by the URL
 
@@ -455,10 +465,9 @@ class BaseDownloader(object):
         """
         lgr.info("Fetching %r", url)
         # Do not return headers, just content
-        out = self._access(self._fetch, url, **kwargs)
+        out = self.access(self._fetch, url, **kwargs)
         # import pdb; pdb.set_trace()
         return out[0]
-
 
     def get_status(self, url, old_status=None, **kwargs):
         """Return status of the url as a dict, None if N/A
@@ -480,8 +489,7 @@ class BaseDownloader(object):
           has changed by comparing to previously obtained value.
           If URL is not reachable, None would be returned
         """
-        return self._access(self._get_status, url, old_status=old_status, **kwargs)
-
+        return self.access(self._get_status, url, old_status=old_status, **kwargs)
 
     # TODO: borrow from itself... ?
     # @borrowkwargs(BaseDownloader, 'get_status')
@@ -522,7 +530,7 @@ class BaseDownloader(object):
         -------
         str
         """
-        return self._access(self._get_target_url, url)
+        return self.access(self._get_target_url, url)
 
     def _get_target_url(self, url):
         return self.get_downloader_session(url).url
@@ -543,6 +551,8 @@ class Authenticator(object):
     """
     requires_authentication = True
     # TODO: figure out interface
+
+    DEFAULT_CREDENTIAL_TYPE = 'user_password'
 
     def authenticate(self, *args, **kwargs):
         """Derived classes will provide specific implementation

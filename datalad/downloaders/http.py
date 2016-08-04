@@ -15,7 +15,6 @@ import requests
 import requests.auth
 
 import io
-from six import PY3
 from six import BytesIO
 
 from ..utils import assure_list_from_str, assure_dict_from_str
@@ -82,7 +81,8 @@ def check_response_status(response, err_prefix="", session=None):
         raise AccessDeniedError(err_msg)
     elif response.status_code in {200}:
         pass
-    elif response.status_code in {301, 307}:
+    elif response.status_code in {301, 302, 307}:
+        # TODO: apparently tests do not excercise this one yet
         if session is None:
             raise AccessFailedError(err_msg + " no session was provided")
         redirs = list(session.resolve_redirects(response, response.request))
@@ -288,6 +288,12 @@ class HTTPDownloaderSession(DownloaderSession):
 
     def download(self, f=None, pbar=None, size=None):
         response = self.response
+        # content_gzipped = 'gzip' in response.headers.get('content-encoding', '').split(',')
+        # if content_gzipped:
+        #     raise NotImplemented("We do not support (yet) gzipped content")
+        #     # see https://rationalpie.wordpress.com/2010/06/02/python-streaming-gzip-decompression/
+        #     # for ways to implement in python 2 and 3.2's gzip is working better with streams
+
         total = 0
         return_content = f is None
         if f is None:
@@ -313,7 +319,12 @@ class HTTPDownloaderSession(DownloaderSession):
 
             stream = _stream()
         else:
-            stream = response.raw.stream(chunk_size_, decode_content=return_content)
+            # XXX TODO -- it must be just a dirty workaround
+            # As we discovered with downloads from NITRC all headers come with
+            # Content-Encoding: gzip which leads  requests to decode them.  But the point
+            # is that ftp links (yoh doesn't think) are gzip compressed for the transfer
+            decode_content = not response.url.startswith('ftp://')
+            stream = response.raw.stream(chunk_size_, decode_content=decode_content)
 
         for chunk in stream:
             if chunk:  # filter out keep-alive new chunks
@@ -335,10 +346,9 @@ class HTTPDownloaderSession(DownloaderSession):
                 ui.out.flush()
                 if size is not None and total >= size:
                     break  # we have done as much as we were asked
+
         if return_content:
             out = f.getvalue()
-            if PY3 and isinstance(out, bytes):
-                out = out.decode()
             return out
 
 

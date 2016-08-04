@@ -89,5 +89,5 @@ def test_composite_credential1():
     assert_equal(keyring.get('name:1', 'user'), None)
     assert_equal(keyring.get('name:1', 'password'), None)
     # which would get reevaluated if requested
-    assert_equal(keyring.entries, {('name', 'user'): 'user2', ('name', 'password'): 'password2'})
+    assert_equal(keyring.entries, {'name:1': {}, 'name': {'user': 'user2', 'password': 'password2'}})
     assert_equal(cred(), {'user': 'user2_1', 'password': 'password2_2'})

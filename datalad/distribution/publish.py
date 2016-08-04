@@ -27,6 +27,7 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.utils import getpwd
+from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
 from .dataset import Dataset
@@ -93,6 +94,11 @@ class Publish(Interface):
             doc="recursively publish all subdatasets of the dataset. In order "
                 "to recursivley publish with all data, use '.' as `path` in "
                 "combination with `recursive`"),
+        skip_failing=Parameter(
+            args=("--skip-failing",),
+            action="store_true",
+            doc="skip failing sub-datasets (incombination with `recursive`) "
+                "instead of failing altogether"),
         path=Parameter(
             args=("path",),
             metavar='PATH',
@@ -112,7 +118,7 @@ class Publish(Interface):
 
     @staticmethod
     @datasetmethod(name='publish')
-    def __call__(dataset=None, to=None, path=None, recursive=False,
+    def __call__(path=None, dataset=None, to=None, recursive=False, skip_failing=False,
                  annex_copy_opts=None):
 
         # shortcut
@@ -195,7 +201,7 @@ class Publish(Interface):
                         publish_subs[d.path]['dataset'] = d
                         publish_subs[d.path]['files'].append(p)
 
-        results = []
+        published, skipped = [], []
 
         if publish_this:
 
@@ -250,7 +256,7 @@ class Publish(Interface):
             # Apparently, we can annex copy new files only, after this fetch. Figure it out!
             ds.repo.fetch(remote=dest_resolved)
 
-            results.append(ds)
+            published.append(ds)
 
             if publish_files or annex_copy_opts:
                 if not isinstance(ds.repo, AnnexRepo):
@@ -259,7 +265,7 @@ class Publish(Interface):
                         "part of an annex. ({0})".format(ds))
 
                 lgr.info("Publishing data of dataset {0} ...".format(ds))
-                results += ds.repo.copy_to(files=publish_files,
+                published += ds.repo.copy_to(files=publish_files,
                                            remote=dest_resolved,
                                            options=annex_copy_opts)
 
@@ -270,8 +276,16 @@ class Publish(Interface):
             # therefore force it.
             # TODO: There might be a better solution to avoid two calls of
             # publish() on the very same Dataset instance
-            results += Dataset(opj(ds.path, dspath)).publish(
-                to=to, recursive=recursive)
+            ds_ = Dataset(opj(ds.path, dspath))
+            try:
+                published_, skipped_ = ds_.publish(to=to, recursive=recursive)
+                published += published_
+                skipped += skipped_
+            except Exception as exc:
+                if not skip_failing:
+                    raise
+                lgr.warning("Skipped %s: %s", ds.path, exc_str(exc))
+                skipped += [ds_]
 
         for d in publish_subs:
             # recurse into subdatasets
@@ -279,28 +293,33 @@ class Publish(Interface):
             # TODO: need to fetch. see above
             publish_subs[d]['dataset'].repo.fetch(remote=to)
 
-            results += publish_subs[d]['dataset'].publish(
+            published_, skipped_ = publish_subs[d]['dataset'].publish(
                 to=to,
                 path=publish_subs[d]['files'],
                 recursive=recursive,
                 annex_copy_opts=annex_copy_opts)
+            published += published_
+            skipped += skipped_
 
-        return results
+        return published, skipped
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(results):
         from datalad.ui import ui
-        if not res:
-            ui.message("Nothing was published")
-            return
-        msg = "{n} {obj} published:\n".format(
-            obj='items were' if len(res) > 1 else 'item was',
-            n=len(res))
-        for item in res:
-            if isinstance(item, Dataset):
-                msg += "Dataset: %s\n" % item.path
-            else:
-                msg += "File: %s\n" % item
-        ui.message(msg)
+        for res, res_label in zip(results, ('published', 'skipped')):
+            if not res:
+                if res_label == 'published':
+                    ui.message("Nothing was %s" % res_label)
+                continue
+            msg = "{n} {obj} {res_label}:\n".format(
+                obj='items were' if len(res) > 1 else 'item was',
+                n=len(res),
+                res_label=res_label)
+            for item in res:
+                if isinstance(item, Dataset):
+                    msg += "Dataset: %s\n" % item.path
+                else:
+                    msg += "File: %s\n" % item
+            ui.message(msg)
 
 

@@ -18,7 +18,7 @@ from os.path import dirname, abspath, join as pathjoin
 from six.moves.urllib.parse import urlparse
 
 from .base import NoneAuthenticator, NotImplementedAuthenticator
-from .credentials import CREDENTIAL_TYPES
+
 from .http import HTMLFormAuthenticator, HTTPBasicAuthAuthenticator, HTTPDigestAuthAuthenticator
 from .http import HTTPDownloader
 from .s3 import S3Authenticator, S3Downloader
@@ -28,6 +28,21 @@ from ..utils import assure_list_from_str
 from ..utils import auto_repr
 
 lgr = getLogger('datalad.downloaders.providers')
+
+# dict to bind authentication_type's to authenticator classes
+# parameters will be fetched from config file itself
+AUTHENTICATION_TYPES = {
+    'html_form': HTMLFormAuthenticator,
+    'http_auth': HTTPBasicAuthAuthenticator,
+    'http_basic_auth': HTTPBasicAuthAuthenticator,
+    'http_digest_auth': HTTPDigestAuthAuthenticator,
+    'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
+    'nda-s3': S3Authenticator,
+    'xnat': NotImplementedAuthenticator,
+    'none': NoneAuthenticator,
+}
+
+from .credentials import CREDENTIAL_TYPES
 
 
 def resolve_url_to_name(d, url):
@@ -103,7 +118,7 @@ class Provider(object):
             raise ValueError("Do not know how to handle url %s for scheme %s. Known: %s"
                              % (url, key, cls.DOWNLOADERS.keys()))
 
-    def get_downloader(self, url):
+    def get_downloader(self, url, **kwargs):
         """Assigns proper downloader given the URL
 
         If one is known -- verifies its appropriateness for the given url.
@@ -115,7 +130,7 @@ class Provider(object):
             # we might need to provide it with credentials and authenticator
             # Let's do via kwargs so we could accomodate cases when downloader does not necessarily
             # cares about those... duck typing or what it is in action
-            kwargs = {}
+            kwargs = kwargs.copy()
             if self.credential:
                 kwargs['credential'] = self.credential
             if self.authenticator:
@@ -132,24 +147,6 @@ class Providers(object):
     Providers and interfaces them based on a given URL.  Each provider
     in turn takes care about associated with it Downloader.
     """
-
-    # dict to bind authentication_type's to authenticator classes
-    # parameters will be fetched from config file itself
-    AUTHENTICATION_TYPES = {
-        'html_form': HTMLFormAuthenticator,
-        'http_auth': HTTPBasicAuthAuthenticator,
-        'http_basic_auth': HTTPBasicAuthAuthenticator,
-        'http_digest_auth': HTTPDigestAuthAuthenticator,
-        'aws-s3': S3Authenticator,  # TODO: check if having '-' is kosher
-        'nda-s3': S3Authenticator,
-        'xnat': NotImplementedAuthenticator,
-        'none': NoneAuthenticator,
-    }
-
-    CREDENTIAL_TYPES = {
-        'user_password',
-        'aws-s3'
-    }
 
     _DEFAULT_PROVIDERS = None
 
@@ -240,7 +237,6 @@ class Providers(object):
         """
         cls._DEFAULT_PROVIDERS = None
 
-
     @classmethod
     def _process_provider(cls, name, items):
         """Process a dictionary specifying the provider and output the Provider instance
@@ -248,12 +244,12 @@ class Providers(object):
         assert 'authentication_type' in items, "Must have authentication_type specified"
 
         auth_type = items.pop('authentication_type')
-        if auth_type not in cls.AUTHENTICATION_TYPES:
+        if auth_type not in AUTHENTICATION_TYPES:
             raise ValueError("Unknown authentication_type=%s. Known are: %s"
-                             % (auth_type, ', '.join(cls.AUTHENTICATION_TYPES)))
+                             % (auth_type, ', '.join(AUTHENTICATION_TYPES)))
 
         if auth_type != 'none':
-            authenticator = cls.AUTHENTICATION_TYPES[auth_type](
+            authenticator = AUTHENTICATION_TYPES[auth_type](
                 # Extract all the fields as keyword arguments
                 **{k[len(auth_type)+1:]: items.pop(k)
                    for k in list(items.keys())
