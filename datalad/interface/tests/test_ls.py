@@ -12,6 +12,8 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+
 from glob import glob
 
 from datalad.support.gitrepo import GitRepo
@@ -89,7 +91,7 @@ def test_fs_traverse(topdir):
     GitRepo(opj(topdir, 'gitdir'), create=True)
     GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
 
-    with swallow_logs() as log, swallow_outputs() as cmo:
+    with swallow_logs(new_level=logging.INFO) as log, swallow_outputs() as cmo:
         fs = fs_traverse(topdir, AnnexRepo(topdir), recursive=True, json='display')
         # fs_traverse logs should contain all not ignored subdirectories
         for subdir in [opj(topdir, "dir"), opj(topdir, 'dir', 'subdir')]:
@@ -97,8 +99,8 @@ def test_fs_traverse(topdir):
 
         # fs_traverse should return a dictionary
         assert_equal(isinstance(fs, dict), True)
-        # containing all the toplevel directories including git and annex folders
-        assert_equal(([True for item in fs["nodes"] if ('gitdir' and 'annexdir') == item['name']]), [True])
+        # not including git and annex folders
+        assert_equal(([True for item in fs["nodes"] if ('gitdir' or 'annexdir') == item['name']]), [])
         # fs_traverse stdout contains subdirectory
         assert_in(('file2.txt' and 'dir'), cmo.out)
 
