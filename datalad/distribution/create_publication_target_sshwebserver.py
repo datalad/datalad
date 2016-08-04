@@ -18,7 +18,7 @@ from os.path import join as opj, abspath, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
 
 from datalad.support.network import RI, URL, SSHRI
-
+from datalad.support.annexrepo import AnnexRepo
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
@@ -292,14 +292,16 @@ class CreatePublicationTargetSSHWebserver(Interface):
             lgr.info("Enabling git post-update hook ...")
             try:
                 hook_remote_target = opj(path, '.git/hooks/post-update')
-                json_command = 'datalad ls -r --json file ' + str(path)
-                virtualenv = 'source /home/debanjum/datalad/.env/bin/activate'  # NOT_SCALABLE! custom virtualenv path
+                json_command = 'which datalad > /dev/null && datalad ls -r --json file ' + str(path)
+                hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', json_command])
 
-                hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', virtualenv, json_command])
                 with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
                     ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
+                ssh(['chmod', '+x', hook_remote_target])            # and make it executable
 
-                ssh(["chmod", '+x', hook_remote_target])            # and make it executable
+                # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
+                if isinstance(datasets[current_dataset].repo, AnnexRepo):
+                    ssh(['git', '-C', path, 'annex', 'init', path])
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
