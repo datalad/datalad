@@ -219,7 +219,7 @@ class AnnexRepo(GitRepo):
 
     @classmethod
     def is_valid_repo(cls, path):
-        """Returns if a given path points to a git repository"""
+        """Return True if given path points to an annex repository"""
         return GitRepo.is_valid_repo(path) and \
                exists(opj(path, '.git', 'annex'))
 
@@ -310,7 +310,7 @@ class AnnexRepo(GitRepo):
             return False
 
     def is_direct_mode(self):
-        """Indicates whether or not annex is in direct mode
+        """Return True if annex is in direct mode
 
         Returns
         -------
@@ -322,7 +322,7 @@ class AnnexRepo(GitRepo):
         return self._direct_mode
 
     def is_crippled_fs(self):
-        """Indicates whether or not git-annex considers current filesystem 'crippled'.
+        """Return True if git-annex considers current filesystem 'crippled'.
 
         Returns
         -------
