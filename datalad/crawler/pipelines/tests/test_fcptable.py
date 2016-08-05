@@ -24,8 +24,8 @@ from ..fcptable import pipeline, superdataset_pipeline
 
 
 def test_smoke_pipelines():
-    yield _test_smoke_pipelines, pipeline, 'bogus'
-    yield _test_smoke_pipelines, superdataset_pipeline, None
+    yield _test_smoke_pipelines, pipeline, ['bogus']
+    yield _test_smoke_pipelines, superdataset_pipeline, []
 
 
 @use_cassette('test_fcptable_dataset')
