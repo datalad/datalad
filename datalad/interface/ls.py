@@ -506,12 +506,21 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
 
             # if not ignored, append child node info to current nodes dictionary
             if not ignored(nodepath):
-                children.extend([fs_extract(nodepath, repo)])
-
-            # if recursive, create info dictionary of each child node too
-            if recursive and not ignored(nodepath):
-                subdir = fs_traverse(nodepath, repo, parent=children[0], recursive=recursive, json=json)
-                children[-1]['size'] = subdir['size']  # update parent with child computed size of itself
+                # if recursive, create info dictionary of each child node too
+                if recursive:
+                    subdir = fs_traverse(nodepath, repo, parent=children[0], recursive=recursive, json=json)
+                else:
+                    # read child metadata from its metadata file if it exists
+                    subdir_json = opj(nodepath, '.dir.json')
+                    if exists(subdir_json):
+                        with open(subdir_json) as data_file:
+                            subdir = js.load(data_file)
+                            subdir.pop('nodes', None)
+                    # else extract whatever information you can about the child
+                    else:
+                        subdir = fs_extract(nodepath, repo)
+                # append child metadata to list
+                children.extend([subdir])
 
         # sum sizes of all 1st level children
         children_size = {}
