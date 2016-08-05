@@ -21,11 +21,11 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from ...api import ls
 from ...utils import swallow_outputs, swallow_logs, chpwd
-from ...tests.utils import assert_equal, assert_in
+from ...tests.utils import assert_equal, assert_in, assert_raises
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
-from datalad.interface.ls import ignored, fs_traverse, _ls_json, AnnexModel
+from datalad.interface.ls import ignored, fs_traverse, _ls_json, AnnexModel, machinesize
 from os.path import exists, lexists, join as opj, abspath, isabs
 
 from datalad.downloaders.tests.utils import get_test_providers
@@ -103,6 +103,13 @@ def test_fs_traverse(topdir):
         assert_equal(([True for item in fs["nodes"] if ('gitdir' or 'annexdir') == item['name']]), [])
         # fs_traverse stdout contains subdirectory
         assert_in(('file2.txt' and 'dir'), cmo.out)
+
+
+def test_machinesize():
+    assert_equal(1.0, machinesize(1))
+    for key, value in {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}.items():
+        assert_equal(1.0*(1000**value), machinesize('1 ' + key))
+    assert_raises(ValueError, machinesize, 't byte')
 
 
 @with_tree(
