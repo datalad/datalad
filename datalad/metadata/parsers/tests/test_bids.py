@@ -9,8 +9,8 @@
 """Test BIDS meta data parser """
 
 from datalad.distribution.dataset import Dataset
-from datalad.metadata import get_dataset_identifier, format_ntriples
-from datalad.metadata.parsers.bids import has_metadata, get_ntriples
+from datalad.metadata import get_dataset_identifier, format_ntriples, get_metadata
+from datalad.metadata.parsers.bids import has_metadata
 from nose.tools import assert_true, assert_false, assert_raises, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
 
@@ -25,7 +25,7 @@ def test_has_metadata(path):
 def test_has_no_metadata(path):
     ds = Dataset(path)
     assert_false(has_metadata(ds))
-    assert_raises(ValueError, get_ntriples, ds)
+    assert_equal(get_metadata(ds, guess_type=True), [])
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -44,15 +44,14 @@ def test_has_no_metadata(path):
     ]
 }
 """})
-def test_get_ntriples(path):
+def test_get_metadata(path):
 
     ds = Dataset(path)
     dsid = get_dataset_identifier(ds)
-    triples = get_ntriples(ds)
+    triples = get_metadata(ds, guess_type=True)
     assert_equal(
         format_ntriples(triples),
         """\
-{dsid} <http://purl.org/dc/terms/type> <http://purl.org/dc/dcmitype/Dataset> .
 {dsid} <http://xmlns.com/foaf/spec/#term_name> "studyforrest_phase2" .
 {dsid} <http://purl.org/dc/terms/license> "PDDL" .
 {dsid} <http://xmlns.com/foaf/spec/#term_fundedBy> "We got money from collecting plastic bottles" .

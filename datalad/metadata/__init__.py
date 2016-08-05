@@ -9,10 +9,12 @@
 """Metadata"""
 
 
-from git.config import GitConfigParser
 import os
 from os.path import join as opj
+from importlib import import_module
 from datalad.support.network import is_url
+from .common import predicates, objects
+
 
 # XXX Could become dataset method
 def get_metadata_type(ds, guess=False):
@@ -33,14 +35,14 @@ def get_metadata_type(ds, guess=False):
       Metadata type label or `None` if no type setting is found and and optional
       auto-detection yielded no results
     """
-    cfg = GitConfigParser(opj(ds.path, '.datalad', 'config'),
-                          read_only=True)
-    if cfg.has_section('metadata'):
-        return cfg.get_value('metadata', 'type', default=None)
+    cfg = ds.config
+    if cfg and cfg.has_section('metadata'):
+        if cfg.has_option('metadata', 'nativetype'):
+            return cfg.get_value('metadata', 'nativetype')
     if guess:
+        # keep local, who knows what some parsers might pull in
         from . import parsers
-        from importlib import import_module
-        for mtype in sorted([p for p in parsers.__dict__ if not p.startswith('_')]):
+        for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p == 'tests')]):
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
             if pmod.has_metadata(ds):
                 return mtype
@@ -48,6 +50,7 @@ def get_metadata_type(ds, guess=False):
         return None
 
 
+# XXX Could become dataset method
 def get_dataset_identifier(ds):
     """Returns some appropriate identifier for a dataset.
 
@@ -71,10 +74,12 @@ def get_dataset_identifier(ds):
 
 def format_ntriples(triples):
     return '\n'.join(['{subject} {predicate} {object} .'.format(
-        subject=autoformat_ntriple_element(t[0]),
-        predicate=autoformat_ntriple_element(t[1]),
-        object=autoformat_ntriple_element(t[2]))
-        for t in triples])
+        subject=autoformat_ntriple_element(sub),
+        predicate=autoformat_ntriple_element(
+            predicates[pred] if pred in predicates else pred),
+        object=autoformat_ntriple_element(
+            objects[obj] if obj in objects else obj))
+        for sub, pred, obj in triples])
 
 
 def autoformat_ntriple_element(val):
@@ -84,3 +89,23 @@ def autoformat_ntriple_element(val):
         return '<{}>'.format(val)
     else:
         return '"{}"'.format(val)
+
+
+def get_metadata(ds, guess_type=False):
+    dsid = get_dataset_identifier(ds)
+
+    triples = []
+    if ds.is_installed():
+        triples.append((dsid, '@type@', '@dataset@'))
+
+    # get native metadata
+    nativetype = get_metadata_type(ds, guess=guess_type)
+    if not nativetype:
+        return triples
+
+    # keep local, who knows what some parsers might pull in
+    from . import parsers
+    pmod = import_module('.{}'.format(nativetype), package=parsers.__package__)
+    triples.extend(pmod.get_metadata(ds))
+
+    return triples

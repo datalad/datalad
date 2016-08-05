@@ -9,7 +9,7 @@
 """Test GNU-style meta data parser """
 
 from datalad.distribution.dataset import Dataset
-from datalad.metadata.parsers.gnu import has_metadata, get_ntriples
+from datalad.metadata.parsers.gnu import has_metadata, get_metadata
 from nose.tools import assert_true
 from datalad.tests.utils import with_tree
 

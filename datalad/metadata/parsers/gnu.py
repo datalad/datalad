@@ -32,7 +32,7 @@ def has_metadata(ds):
         and (exists(opj(ds.path, 'COPYING')) or exists(opj(ds.path, 'LICENSE')))
 
 
-def get_ntriples(ds):
+def get_metadata(ds):
     """Extract metadata from GNU-style annotated dataset.
 
     Parameters
@@ -43,7 +43,6 @@ def get_ntriples(ds):
     Returns
     -------
     list
-      List of 3-tuples with subject, predicate, and object according to the
-      W3C recommendation: https://www.w3.org/TR/n-triples
+      List of 3-tuples with subject, predicate, and object
     """
     pass
