@@ -470,8 +470,8 @@ def machinesize(humansize):
         size_str, size_unit = humansize.split(" ")
     except AttributeError:
         return float(humansize)
-    unit_converter = {'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}
-    machinesize = float(size_str)*(1024**unit_converter[size_unit])
+    unit_converter = {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}
+    machinesize = float(size_str)*(1000**unit_converter[size_unit])
     return machinesize
 
 
