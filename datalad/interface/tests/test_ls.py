@@ -129,19 +129,22 @@ def test_ls_json(topdir):
 
     with swallow_logs(), swallow_outputs():
         for all in [True, False]:
-            for state in ['file', 'delete']:
-                _ls_json(topdir, json=state, all=all, recursive=True)
+            for recursive in [True, False]:
+                for state in ['file', 'delete']:
+                    _ls_json(topdir, json=state, all=all, recursive=recursive)
 
-                # subdataset should have json created and deleted when all=True else not
-                assert_equal(exists(opj(topdir, 'annexdir', '.dir.json')), (state == 'file' and all))
+                    # subdataset should have its json created and deleted when all=True else not
+                    assert_equal(exists(opj(topdir, 'annexdir', '.dir.json')), (state == 'file' and all))
 
-                # directories that should have json files created and deleted
-                for subdir in ['dir', opj('dir', 'subdir')]:
-                    assert_equal(exists(opj(topdir, subdir, '.dir.json')), state == 'file')
+                    # root should have its json file created and deleted in all cases
+                    assert_equal(exists(opj(topdir, '.dir.json')), state == 'file')
 
-                # directories that should not have json files created
-                for subdir in ['.hidden', opj('dir', 'subgit')]:
-                    assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
+                    # children should have their metadata json's created and deleted only when recursive=True
+                    assert_equal(exists(opj(topdir, 'dir', 'subdir', '.dir.json')), (state == 'file' and recursive))
+
+                    # ignored directories should not have json files created in any case
+                    for subdir in ['.hidden', opj('dir', 'subgit')]:
+                        assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
 
 
 @with_tempfile
@@ -156,4 +159,3 @@ def test_ls_noarg(toppath):
         with chpwd(toppath):
             assert_equal(ls_out, ls([]))
             assert_equal(ls_out, ls('.'))
-
