@@ -65,30 +65,27 @@ class MemoryKeyring(object):
     def get(self, name, field):
         """Get password from the specified service.
         """
-        key = (name, field)
         # to mimic behavior of keyring module
-        return self.entries[key] if key in self.entries else None
-
+        return self.entries[name][field] \
+            if name in self.entries and field in self.entries[name] \
+            else None
 
     def set(self, name, field, value):
         """Set password for the user in the specified service.
         """
-        self.entries[(name, field)] = value
+        self.entries.setdefault(name, {}).update({field: value})
 
     def delete(self, name, field=None):
         """Delete password from the specified service.
         """
-        if field:
-            self.entries.pop((name, field))
+        if name in self.entries:
+            if field:
+                self.entries[name].pop(field)
+            else:
+                # TODO: might be implemented by some super class if .keys() of some kind provided
+                self.entries.pop(name)
         else:
-            deleted = False
-            # TODO: might be implemented by some super class if .keys() of some kind provided
-            for name_, field_ in self.entries.copy():
-                if name == name_:
-                    deleted = True
-                    self.delete(name_, field_)
-            if not deleted:
-                raise KeyError("No entries associated with %s" % name)
+            raise KeyError("No entries associated with %s" % name)
 
 
 keyring = Keyring()

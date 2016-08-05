@@ -376,7 +376,7 @@ class AddArchiveContent(Interface):
                     url, options=annex_options,
                     batch=True)
 
-                if 'key' in out_json:  # annex.is_under_annex(target_file, batch=True):
+                if 'key' in out_json and out_json['key'] is not None:  # annex.is_under_annex(target_file, batch=True):
                     # due to http://git-annex.branchable.com/bugs/annex_drop_is_not___34__in_effect__34___for_load_which_was___34__addurl_--batch__34__ed_but_not_yet_committed/?updated
                     # we need to maintain a list of those to be dropped files
                     if drop_after:
