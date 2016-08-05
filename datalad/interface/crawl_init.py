@@ -56,7 +56,7 @@ class CrawlInit(Interface):
             nargs="*",
             constraints=EnsureStr() | EnsureNone(),
             doc="""keyword arguments to pass into the template function generating actual pipeline,
-            organized organized in [PY: a dict PY][CMD: key=value pairs CMD]"""),
+            organized in [PY: a dict PY][CMD: key=value pairs CMD]"""),
         save=Parameter(
             args=("--save",),
             action="store_true",
