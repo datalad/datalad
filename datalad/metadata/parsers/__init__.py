@@ -9,4 +9,3 @@
 """Metadata parsers"""
 
 from . import bids
-from . import gnu
