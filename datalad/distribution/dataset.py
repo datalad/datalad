@@ -257,6 +257,7 @@ class Dataset(object):
             return submodules
 
     def create_subdataset(self, path,
+                          force=False,
                           name=None,
                           description=None,
                           no_annex=False,
@@ -308,6 +309,7 @@ class Dataset(object):
 
         # create the dataset
         subds.create(description=description,
+                     force=force,
                      no_annex=no_annex,
                      annex_version=annex_version,
                      annex_backend=annex_backend,
