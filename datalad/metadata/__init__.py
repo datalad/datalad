@@ -70,25 +70,6 @@ def get_dataset_identifier(ds):
     return dsid
 
 
-def format_ntriples(triples):
-    return '\n'.join(['{subject} {predicate} {object} .'.format(
-        subject=autoformat_ntriple_element(sub),
-        predicate=autoformat_ntriple_element(
-            predicates[pred] if pred in predicates else pred),
-        object=autoformat_ntriple_element(
-            objects[obj] if obj in objects else obj))
-        for sub, pred, obj in triples])
-
-
-def autoformat_ntriple_element(val):
-    if val.startswith('_:'):
-        return val
-    elif is_url(val):
-        return '<{}>'.format(val)
-    else:
-        return '"{}"'.format(val)
-
-
 def _get_implicit_metadata(ds, ds_identifier):
     """Convert git/git-annex info into metadata
 
