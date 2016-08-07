@@ -13,8 +13,6 @@ import os
 from os.path import join as opj
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
-from datalad.support.network import is_url
-from .common import predicates, objects
 
 
 # XXX Could become dataset method

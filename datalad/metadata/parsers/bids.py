@@ -11,7 +11,6 @@
 from os.path import exists, join as opj
 import json
 from .. import get_dataset_identifier
-from ..common import predicates, objects
 
 def has_metadata(ds):
     return exists(opj(ds.path, 'dataset_description.json'))
