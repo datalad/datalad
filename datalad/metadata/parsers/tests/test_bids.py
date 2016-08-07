@@ -9,8 +9,7 @@
 """Test BIDS meta data parser """
 
 from datalad.distribution.dataset import Dataset
-from datalad.metadata import get_dataset_identifier, format_ntriples, get_metadata
-from datalad.metadata.parsers.bids import has_metadata
+from datalad.metadata.parsers.bids import has_metadata, get_metadata
 from nose.tools import assert_true, assert_false, assert_raises, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
 
@@ -25,7 +24,7 @@ def test_has_metadata(path):
 def test_has_no_metadata(path):
     ds = Dataset(path)
     assert_false(has_metadata(ds))
-    assert_equal(get_metadata(ds, guess_type=True), [])
+    assert_raises(ValueError, get_metadata, ds, 'ID')
 
 
 @with_tree(tree={'dataset_description.json': """
@@ -47,17 +46,25 @@ def test_has_no_metadata(path):
 def test_get_metadata(path):
 
     ds = Dataset(path)
-    dsid = get_dataset_identifier(ds)
-    triples = get_metadata(ds, guess_type=True)
+    meta = get_metadata(ds, 'ID')
+    import json
     assert_equal(
-        format_ntriples(triples),
+        json.dumps(meta, sort_keys=True, indent=2),
         """\
-{dsid} <http://xmlns.com/foaf/spec/#term_name> "studyforrest_phase2" .
-{dsid} <http://purl.org/dc/terms/license> "PDDL" .
-{dsid} <http://xmlns.com/foaf/spec/#term_fundedBy> "We got money from collecting plastic bottles" .
-{dsid} <http://purl.org/dc/elements/1.1/description> "Some description" .
-{dsid} <http://purl.org/dc/terms/conformsTo> "BIDS 1.0.0-rc3" .
-{dsid} <http://purl.org/dc/elements/1.1/contributor> "Mike One" .
-{dsid} <http://purl.org/dc/elements/1.1/contributor> "Anna Two" .
-{dsid} <http://purl.org/dc/terms/bibliographicCitation> <http://studyforrest.org> .""".format(dsid=dsid))
+{
+  "@context": "http://schema.org/", 
+  "@id": "ID", 
+  "author": [
+    "Mike One", 
+    "Anna Two"
+  ], 
+  "citation": [
+    "http://studyforrest.org"
+  ], 
+  "dcterms:conformsTo": "BIDS 1.0.0-rc3", 
+  "description": "Some description", 
+  "foaf:fundedBy": "We got money from collecting plastic bottles", 
+  "license": "PDDL", 
+  "name": "studyforrest_phase2"
+}""")
 
