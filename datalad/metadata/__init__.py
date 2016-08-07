@@ -10,6 +10,7 @@
 
 
 import os
+from os.path import join as opj
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.support.network import is_url
@@ -123,13 +124,15 @@ def _get_implicit_metadata(ds, ds_identifier):
 
         ## metadata on all subdataset
         subdss = []
-        for subds_path in ds.get_subdatasets(recursive=True):
-            subds = Dataset(subds_path)
+        # we only want immediate subdatasets
+        for subds_path in ds.get_subdatasets(recursive=False):
+            subds = Dataset(opj(ds.path, subds_path))
             subds_id = get_dataset_identifier(subds)
             if subds_id.startswith('_:'):
-                subdss.append(subds_id)
+                submeta = subds_id
             else:
-                subdss.append({'@id': subds_id})
+                submeta = {'@id': subds_id}
+            subdss.append(submeta)
         if len(subdss):
             if len(subdss) == 1:
                 subdss = subdss[0]
@@ -139,6 +142,22 @@ def _get_implicit_metadata(ds, ds_identifier):
 
 
 def get_metadata(ds, guess_type=False):
+    # TODO lookup any cached metadata
+    # TODO compact and flatten JSON-LD before storing in cache
+    return gather_metadata(ds, guess_type=guess_type)
+
+
+def gather_metadata(ds, guess_type=False):
+    """Parse a dataset to gather metadata
+
+    Returns
+    -------
+    List
+        Each item in the list is a metadata dictionary (JSON-LD compliant).
+        The first items corresponds to the annex-based metadata of the dataset.
+        The last items contains the native metadata of the dataset content. Any
+        additional items correspond to subdataset metadata sets.
+    """
     # TODO handle retrieval of subdataset metadata:
     #      from scratch vs cached
     ds_identifier = get_dataset_identifier(ds)
@@ -149,12 +168,17 @@ def get_metadata(ds, guess_type=False):
     meta = []
     meta.append(_get_implicit_metadata(ds, ds_identifier))
 
+    # we only want immediate subdatasets
+    for subds_path in ds.get_subdatasets(recursive=False):
+        subds = Dataset(opj(ds.path, subds_path))
+        subds_meta = gather_metadata(subds, guess_type=guess_type)
+        if isinstance(subds_meta, list):
+            subds_meta[0]['location'] = subds_path
+            meta.extend(subds_meta)
+
     # get native metadata
     nativetype = get_metadata_type(ds, guess=guess_type)
     if not nativetype:
-        # compact value
-        if len(meta) == 1:
-            meta = meta[0]
         return meta
 
     # keep local, who knows what some parsers might pull in
@@ -164,7 +188,4 @@ def get_metadata(ds, guess_type=False):
     # TODO here we could apply a "patch" to the native metadata, if desired
     meta.append(native_meta)
 
-    # compact value
-    if len(meta) == 1:
-        meta = meta[0]
     return meta

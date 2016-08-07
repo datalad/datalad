@@ -29,23 +29,41 @@ def test_get_metadata_type(path):
     assert_equal(get_metadata_type(Dataset(path)), 'mamboschwambo')
 
 
-@with_tempfile(mkdir=True)
+@with_tree(tree={
+    'origin': {
+        'dataset_description.json': """
+{
+    "Name": "the mother"
+}""",
+    'sub': {
+        'dataset_description.json': """
+{
+    "Name": "child"
+}"""}}})
 def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
-    assert_equal(sorted(meta.keys()), ['@context', '@id'])
-    ds.create()
+    assert_equal(sorted(meta[0].keys()), ['@context', '@id'])
+    ds.create(force=True)
     meta = get_metadata(ds)
-    assert_equal(sorted(meta.keys()), ['@context', '@id', 'type'])
-    assert_equal(meta['type'], 'Dataset')
+    assert_equal(sorted(meta[0].keys()), ['@context', '@id', 'type'])
+    assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = Dataset(opj(path, 'sibling'))
     sibling.install(source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling)
-    assert_equal(sibling_meta['dcterms:isVersionOf'],
+    assert_equal(sibling_meta[0]['dcterms:isVersionOf'],
                  {'@id': get_dataset_identifier(ds)})
     # origin should learn about the clone
     sibling.repo.push(remote='origin', refspec='git-annex')
     meta = get_metadata(ds)
-    assert_equal(meta['dcterms:hasVersion'],
+    assert_equal(meta[0]['dcterms:hasVersion'],
                  {'@id': get_dataset_identifier(sibling)})
+    # with subdataset
+    sub = Dataset(opj(path, 'origin', 'sub'))
+    sub.create(add_to_super=True, force=True)
+    meta = get_metadata(ds, guess_type=True)
+    assert_equal(meta[0]['dcterms:hasPart'],
+                 {'@id': get_dataset_identifier(sub)})
+    import json
+    print(json.dumps(meta, indent=2))
