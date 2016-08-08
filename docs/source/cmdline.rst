@@ -32,6 +32,14 @@ Dataset operations
    generated/man/datalad-save
    generated/man/datalad-unlock
 
+Meta data handling
+==================
+
+.. toctree::
+   :maxdepth: 1
+
+   generated/man/datalad-aggregate-metadata
+
 Miscellaneous commands
 ======================
 

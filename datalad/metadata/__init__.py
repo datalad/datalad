@@ -13,6 +13,7 @@ import os
 from os.path import join as opj
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
+from datalad.utils import swallow_logs
 
 
 # XXX Could become dataset method
@@ -100,13 +101,17 @@ def _get_implicit_metadata(ds, ds_identifier):
 
         # get all other annex ids, and filter out this one, origin and
         # non-specific remotes
+        with swallow_logs():
+            # swallow logs, because git annex complains about every remote
+            # for which no UUID is configured -- many special remotes...
+            repo_info = ds.repo.repo_info()
         sibling_uuids = [
             # flatten list
             item for repolist in
             # extract uuids of all listed repos
-            [[r['uuid'] for r in ds.repo.repo_info()[i] if 'uuid' in r]
+            [[r['uuid'] for r in repo_info[i] if 'uuid' in r]
                 # loop over trusted, semi and untrusted
-                for i in ds.repo.repo_info()
+                for i in repo_info
                 if i.endswith('trusted repositories')]
             for item in repolist
             # filter out special ones
@@ -126,10 +131,9 @@ def _get_implicit_metadata(ds, ds_identifier):
         for subds_path in ds.get_subdatasets(recursive=False):
             subds = Dataset(opj(ds.path, subds_path))
             subds_id = get_dataset_identifier(subds)
-            if subds_id.startswith('_:'):
-                submeta = subds_id
-            else:
-                submeta = {'@id': subds_id}
+            submeta = {'location': subds_path}
+            if not subds_id.startswith('_:'):
+                submeta['@id'] = subds_id
             subdss.append(submeta)
         if len(subdss):
             if len(subdss) == 1:
@@ -141,11 +145,10 @@ def _get_implicit_metadata(ds, ds_identifier):
 
 def get_metadata(ds, guess_type=False):
     # TODO lookup any cached metadata
-    # TODO compact and flatten JSON-LD before storing in cache
-    return gather_metadata(ds, guess_type=guess_type)
+    return extract_metadata(ds, guess_type=guess_type)
 
 
-def gather_metadata(ds, guess_type=False):
+def extract_metadata(ds, guess_type=False):
     """Parse a dataset to gather metadata
 
     Returns
@@ -165,14 +168,6 @@ def gather_metadata(ds, guess_type=False):
     # complex graph merges
     meta = []
     meta.append(_get_implicit_metadata(ds, ds_identifier))
-
-    # we only want immediate subdatasets
-    for subds_path in ds.get_subdatasets(recursive=False):
-        subds = Dataset(opj(ds.path, subds_path))
-        subds_meta = gather_metadata(subds, guess_type=guess_type)
-        if isinstance(subds_meta, list):
-            subds_meta[0]['location'] = subds_path
-            meta.extend(subds_meta)
 
     # get native metadata
     nativetype = get_metadata_type(ds, guess=guess_type)
