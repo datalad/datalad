@@ -87,7 +87,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 @serve_path_via_http
 @with_tempfile
 @with_tempfile
-def test_balsa_pipeline(ind, topurl, outd, clonedir):
+def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     list(initiate_dataset(
         template="balsa",
         dataset_name='dataladtest-WG33',
@@ -99,13 +99,88 @@ def test_balsa_pipeline(ind, topurl, outd, clonedir):
         out = run_pipeline(pipeline)
     eq_(len(out), 1)
 
-    repo = AnnexRepo(outd, create=False)
+    repo = AnnexRepo(outd, create=False)  # to be used in the checks
+    # Inspect the tree -- that we have all the branches
     branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
     eq_(set(repo.get_branches()), branches)
     assert_not_equal(repo.get_hexsha('master'), repo.get_hexsha('incoming-processed'))
+    # and that one is different from incoming
     assert_not_equal(repo.get_hexsha('incoming'), repo.get_hexsha('incoming-processed'))
 
     commits = {b: list(repo.get_branch_commits(b)) for b in branches}
     eq_(len(commits['incoming']), 1)
+    eq_(len(commits['incoming-processed']), 2)
+    eq_(len(commits['master']), 4)  # all commits out there -- init + 2*(incoming, processed, merge)
+
+    with chpwd(outd):
+        eq_(set(glob('*')), {'dir1', 'file1.nii'})
+        all_files = sorted(find_files('.'))
+
+    fpath = opj(outd, 'file1.nii')
+    ok_file_has_content(fpath, "content of file1.nii")
+    ok_file_under_git(fpath, annexed=True)
+    fpath2 = opj(outd, 'dir1', 'file2.nii')
+    ok_file_has_content(fpath2, "content of file2.nii")
+    ok_file_under_git(fpath2, annexed=True)
+
+    target_files = {
+        './.datalad/crawl/crawl.cfg',
+        './.datalad/crawl/statuses/incoming.json',
+        './file1.nii', './dir1/file2.nii'
+    }
+
+    eq_(set(all_files), target_files)
 
 
+# this test should raise warning that canonical tarball does not have one of the files listed
+_PLUG_HERE = '<!-- PLUG HERE -->'
+
+
+@with_tree(tree={
+
+    'study': {
+        'show': {
+            'WG33': {
+                'index.html': """<html><body>
+                                    <a href="/study/download/WG33.zip">thetarball.zip</a>
+                                    <a href="/file/show/JX5V">file1.nii</a>
+                                    <a href="/file/show/RIBX">dir1 / file2.nii</a>
+                                    <a href="/file/show/GSRD">file1b.nii</a>
+                                    %s
+                                  </body></html>""" % _PLUG_HERE,
+            },
+        },
+        'download': {
+            'WG33.zip': {
+                'file1.nii': "content of file1.nii",
+                'dir1': {
+                    'file2.nii': "content of file2.nii",
+                }
+            }
+        }
+    },
+
+    'file': {
+        'show': {
+                'JX5V': "content of file1.nii",
+                'RIBX': "content of file2.nii",
+                'GSRD': "content of file1b.nii"
+            },
+        },
+    },
+    archives_leading_dir=False
+)
+@serve_path_via_http
+@with_tempfile
+@with_tempfile
+def test_balsa_pipeline2(ind, topurl, outd, clonedir):
+    list(initiate_dataset(
+        template="balsa",
+        dataset_name='dataladtest-WG33',
+        path=outd,
+        data_fields=['dataset_id'])({'dataset_id': 'WG33'}))
+
+    with chpwd(outd):
+        pipeline = ofpipeline('WG33', url=topurl)
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
