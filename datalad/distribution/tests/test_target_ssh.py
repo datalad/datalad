@@ -38,30 +38,41 @@ from datalad.utils import on_windows
 @with_testrepos('.*basic.*', flavors=['local'])
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
-def test_target_ssh_simple(origin, src_path, target_path):
+def test_target_ssh_simple(origin, src_path, target_rootpath):
 
     # prepare src
     source = install(path=src_path, source=origin)
 
+    target_path = opj(target_rootpath, "basic")
     create_publication_target_sshwebserver(dataset=source,
                                            target="local_target",
                                            sshurl="ssh://localhost",
-                                           target_dir=opj(target_path, "basic"))
+                                           target_dir=target_path)
 
-    GitRepo(opj(target_path, "basic"), create=False) # raises if not a git repo
+    GitRepo(target_path, create=False)  # raises if not a git repo
     assert_in("local_target", source.repo.get_remotes())
     eq_("ssh://localhost", source.repo.get_remote_url("local_target"))
     # should NOT be able to push now, since url isn't correct:
     assert_raises(GitCommandError, publish, dataset=source, to="local_target")
+
+    # Both must be annex or git repositories
+    src_is_annex = AnnexRepo.is_valid_repo(src_path)
+    eq_(src_is_annex, AnnexRepo.is_valid_repo(target_path))
+    # And target one should be known to have a known UUID within the source if annex
+    if src_is_annex:
+        annex = AnnexRepo(src_path)
+        local_target_cfg = annex.repo.remotes["local_target"].config_reader.get
+        eq_(local_target_cfg('annex-ignore'), 'false')
+        # hm, but ATM wouldn't get a uuid since url is wrong
+        assert_raises(Exception, local_target_cfg, 'annex-uuid')
 
     # do it again without force:
     with assert_raises(RuntimeError) as cm:
         create_publication_target_sshwebserver(dataset=source,
                                                target="local_target",
                                                sshurl="ssh://localhost",
-                                               target_dir=opj(target_path,
-                                                              "basic"))
-    eq_("Target directory %s already exists." % opj(target_path, "basic"),
+                                               target_dir=target_path)
+    eq_("Target directory %s already exists." % target_path,
         str(cm.exception))
 
     # now, with force and correct url, which is also used to determine
@@ -72,28 +83,32 @@ def test_target_ssh_simple(origin, src_path, target_path):
         create_publication_target_sshwebserver(dataset=source,
                                                target="local_target",
                                                sshurl="ssh://localhost" +
-                                                      opj(target_path, "basic"),
+                                                      target_path,
                                                existing='replace')
-        eq_("ssh://localhost" + opj(target_path, "basic"),
+        eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target"))
-        eq_("ssh://localhost" + opj(target_path, "basic"),
+        eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target", push=True))
+
+        if src_is_annex:
+            annex = AnnexRepo(src_path)
+            local_target_cfg = annex.repo.remotes["local_target"].config_reader.get
+            eq_(local_target_cfg('annex-ignore'), 'false')
+            eq_(local_target_cfg('annex-uuid').count('-'), 4)  # valid uuid
 
         # again, by explicitly passing urls. Since we are on localhost, the
         # local path should work:
         create_publication_target_sshwebserver(dataset=source,
                                                target="local_target",
                                                sshurl="ssh://localhost",
-                                               target_dir=opj(target_path,
-                                                              "basic"),
-                                               target_url=opj(target_path,
-                                                              "basic"),
+                                               target_dir=target_path,
+                                               target_url=target_path,
                                                target_pushurl="ssh://localhost" +
-                                                      opj(target_path, "basic"),
+                                                              target_path,
                                                existing='replace')
-        eq_(opj(target_path, "basic"),
+        eq_(target_path,
             source.repo.get_remote_url("local_target"))
-        eq_("ssh://localhost" + opj(target_path, "basic"),
+        eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target", push=True))
 
         # now, push should work:
