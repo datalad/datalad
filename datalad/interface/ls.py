@@ -206,19 +206,19 @@ class AnnexModel(GitModel):
 
     @property
     def info(self):
-        if self._info is None:
+        if self._info is None and self.type == 'annex':
             self._info = self.repo.repo_info()
         return self._info
 
     @property
     def annex_worktree_size(self):
         info = self.info
-        return info['size of annexed files in working tree'] if info else None
+        return info['size of annexed files in working tree'] if info else 0.0
 
     @property
     def annex_local_size(self):
         info = self.info
-        return info['local annex size'] if info else None
+        return info['local annex size'] if info else 0.0
 
 
 @auto_repr
