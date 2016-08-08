@@ -63,11 +63,12 @@ class FileInGitError(FileNotInAnnexError):
 class FileNotInRepositoryError(FileNotInAnnexError):
     """Thrown if a file is not in the repository at all.
     """
+    pass
 
 
 class InsufficientArgumentsError(ValueError):
     """To be raise instead of `ValueError` when use help output is desired"""
-
+    pass
 
 #
 # Downloaders

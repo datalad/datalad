@@ -487,7 +487,11 @@ class Annexificator(object):
         # File might have been not modified at all, so let's check its status first
         changed = set().union(*self._get_status(args=[fpath]))
         if fpath in changed:
-            _call(stats.increment, 'add_annex' if 'key' in out_json else 'add_git')
+            _call(stats.increment,
+                  'add_annex'
+                    if ('key' in out_json and out_json['key'] is not None)
+                    else 'add_git'
+                  )
         else:
             _call(stats.increment, 'skipped')
 
