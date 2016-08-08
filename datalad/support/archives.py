@@ -21,6 +21,7 @@ import os
 import tempfile
 from os.path import join as opj, exists, abspath, basename, isabs, normpath, relpath, pardir, isdir
 from os.path import split as ops, sep as opsep
+from os.path import realpath
 from six import next
 from six.moves.urllib.parse import unquote as urlunquote
 
@@ -202,7 +203,9 @@ def _get_cached_filename(archive):
     """
     #return "%s_%s" % (basename(archive), hashlib.md5(archive).hexdigest()[:5])
     # per se there is no reason to maintain any long original name here.
-    return hashlib.md5(archive.encode()).hexdigest()[:10]
+    archive_cached = hashlib.md5(realpath(archive).encode()).hexdigest()[:10]
+    lgr.debug("Cached directory for archive %s is %s", archive, archive_cached)
+    return archive_cached
 
 
 import string
@@ -505,5 +508,3 @@ class ExtractedArchive(object):
                 self.clean()
         except:
             pass
-
-

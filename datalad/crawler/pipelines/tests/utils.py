@@ -23,5 +23,5 @@ def _test_smoke_pipelines(func, args, tmpdir):
     AnnexRepo(tmpdir, create=True)
     with chpwd(tmpdir):
         with swallow_logs():
-            for p in [func(args)]:
+            for p in [func(*args)]:
                 ok_(len(p) > 1)

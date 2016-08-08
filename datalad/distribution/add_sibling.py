@@ -15,13 +15,17 @@ __docformat__ = 'restructuredtext'
 import logging
 
 from os.path import join as opj, abspath, basename
+
+from datalad.dochelpers import exc_str
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone
 from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.utils import getpwd
+from datalad.support.exceptions import CommandError
 
 
 lgr = logging.getLogger('datalad.distribution.add_publication_target')
@@ -193,6 +197,14 @@ class AddSibling(Interface):
                 cmd = ["git", "remote", "set-url", "--push", name,
                        repos[repo]['pushurl']]
                 runner.run(cmd, cwd=repos[repo]['repo'].path)
+            if isinstance(ds.repo, AnnexRepo):
+                # we need to check if added sibling an annex, and try to enable it
+                # another part of the fix for #463 and #432
+                try:
+                    ds.repo.enable_remote(name)
+                except CommandError as exc:
+                    lgr.info("Failed to enable annex remote %s, could be a pure git" % name)
+                    lgr.debug("Exception was: %s" % exc_str(exc))
             successfully_added.append(repo)
 
         return successfully_added
