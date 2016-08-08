@@ -162,11 +162,11 @@ def pipeline(dataset_id, url=TOPURL):
         data['filename'] = os.path.basename(fullpath)
         yield data
 
-    files_url = opj(url, 'file/show/')
+    files_url = opj(url, 'file/show/')  # files_url = https://balsa.wustl.edu/file/show/
 
-    url = opj(url, 'study/')
-    canonical_url = opj(url, 'download/.*')
-    dataset_url = '%s/show/%s' % (url, dataset_id)
+    url = opj(url, 'study/')  # url = https://balsa.wustl.edu/study/
+    canonical_url = opj(url, 'download/', dataset_id)  # url = https://balsa.wustl.edu/study/download/[dataset_id]
+    dataset_url = '%sshow/%s' % (url, dataset_id)  # url = https://balsa.wustl.edu/study/show/[dataset_id]
 
     balsa = BalsaSupport(repo=annex.repo)
 
@@ -183,8 +183,10 @@ def pipeline(dataset_id, url=TOPURL):
                 crawl_url(dataset_url),    # TOPURL/study/show/[dataset_id]
                 [
                     # canonical tarball
-                    a_href_match(canonical_url, min_count=1),   # TOPURL/study/download/[dataset_id]
-                    assign({'filename': '%(url_text)s'}, interpolate=True),
+                    # a_href_match(canonical_url, min_count=1),   # TOPURL/study/download/[dataset_id]
+                    crawl_url(canonical_url),
+                    a_href_match('.*.zip', min_count=1),  #
+                    assign({'filename': '%(url_text)s'}, interpolate=True),  # %(url_text)s
                     annex,
                 ],
                 [

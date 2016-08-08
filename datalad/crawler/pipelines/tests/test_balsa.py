@@ -58,7 +58,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
         'show': {
             'WG33': {
                 'index.html': """<html><body>
-                                    <a href="/study/download/WG33.zip">thetarball.zip</a>
+                                    <a href="/study/download/WG33">Download (146 MB)</a>
                                     <a href="/file/show/JX5V">file1.nii</a>
                                     <a href="/file/show/R1BX">dir1 / file2.nii</a>
                                     %s
@@ -66,10 +66,12 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             },
         },
         'download': {
-            'WG33.zip': {
-                'file1.nii': "content of file1.nii",
-                'dir1': {
-                    'file2.nii': "content of file2.nii",
+            'WG33': {
+                'canonical.zip': {
+                    'file1.nii': "content of file1.nii",
+                    'dir1': {
+                        'file2.nii': "content of file2.nii",
+                    }
                 }
             }
         }
@@ -133,54 +135,55 @@ def test_balsa_pipeline1(ind, topurl, outd, clonedir):
 
 
 # this test should raise warning that canonical tarball does not have one of the files listed
-_PLUG_HERE = '<!-- PLUG HERE -->'
-
-
-@with_tree(tree={
-
-    'study': {
-        'show': {
-            'WG33': {
-                'index.html': """<html><body>
-                                    <a href="/study/download/WG33.zip">thetarball.zip</a>
-                                    <a href="/file/show/JX5V">file1.nii</a>
-                                    <a href="/file/show/RIBX">dir1 / file2.nii</a>
-                                    <a href="/file/show/GSRD">file1b.nii</a>
-                                    %s
-                                  </body></html>""" % _PLUG_HERE,
-            },
-        },
-        'download': {
-            'WG33.zip': {
-                'file1.nii': "content of file1.nii",
-                'dir1': {
-                    'file2.nii': "content of file2.nii",
-                }
-            }
-        }
-    },
-
-    'file': {
-        'show': {
-                'JX5V': "content of file1.nii",
-                'RIBX': "content of file2.nii",
-                'GSRD': "content of file1b.nii"
-            },
-        },
-    },
-    archives_leading_dir=False
-)
-@serve_path_via_http
-@with_tempfile
-@with_tempfile
-def test_balsa_pipeline2(ind, topurl, outd, clonedir):
-    list(initiate_dataset(
-        template="balsa",
-        dataset_name='dataladtest-WG33',
-        path=outd,
-        data_fields=['dataset_id'])({'dataset_id': 'WG33'}))
-
-    with chpwd(outd):
-        pipeline = ofpipeline('WG33', url=topurl)
-        out = run_pipeline(pipeline)
-    eq_(len(out), 1)
+# _PLUG_HERE = '<!-- PLUG HERE -->'
+#
+#
+# @with_tree(tree={
+#
+#     'study': {
+#         'show': {
+#             'WG33': {
+#                 'index.html': """<html><body>
+#                                     <a href="/study/download/WG33.zip">thetarball.zip</a>
+#                                     <a href="/file/show/JX5V">file1.nii</a>
+#                                     <a href="/file/show/RIBX">dir1 / file2.nii</a>
+#                                     <a href="/file/show/GSRD">file1b.nii</a>
+#
+#                                     %s
+#                                   </body></html>""" % _PLUG_HERE,
+#             },
+#         },
+#         'download': {
+#             'WG33.zip': {
+#                 'file1.nii': "content of file1.nii",
+#                 'dir1': {
+#                     'file2.nii': "content of file2.nii",
+#                 }
+#             }
+#         }
+#     },
+#
+#     'file': {
+#         'show': {
+#                 'JX5V': "content of file1.nii",
+#                 'RIBX': "content of file2.nii",
+#                 'GSRD': "content of file1b.nii"
+#             },
+#         },
+#     },
+#     archives_leading_dir=False
+# )
+# @serve_path_via_http
+# @with_tempfile
+# @with_tempfile
+# def test_balsa_pipeline2(ind, topurl, outd, clonedir):
+#     list(initiate_dataset(
+#         template="balsa",
+#         dataset_name='dataladtest-WG33',
+#         path=outd,
+#         data_fields=['dataset_id'])({'dataset_id': 'WG33'}))
+#
+#     with chpwd(outd):
+#         pipeline = ofpipeline('WG33', url=topurl)
+#         out = run_pipeline(pipeline)
+#     eq_(len(out), 1)
