@@ -156,7 +156,7 @@ def _get_implicit_metadata(ds, ds_identifier):
 
 # XXX might become its own command
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                 ignore_cache=False, flatten=False):
+                 ignore_cache=False, optimize=False):
     meta = []
     # where things are
     meta_path = opj(ds.path, metadata_basepath)
@@ -202,7 +202,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                 lgr.info(
                     'no cached meta data for subdataset at {}, ignoring'.format(
                         subds_path))
-    if flatten:
+    if optimize:
         try:
             from pyld import jsonld
         except ImportError:

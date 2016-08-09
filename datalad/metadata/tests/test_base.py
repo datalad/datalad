@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test GNU-style meta data parser """
 
-from datalad.api import Dataset
+from datalad.api import Dataset, aggregate_metadata
 from datalad.metadata import get_metadata_type, get_metadata, get_dataset_identifier
 from nose.tools import assert_true, assert_equal
 from datalad.tests.utils import with_tree, with_tempfile
@@ -64,6 +64,44 @@ def test_basic_metadata(path):
     sub.create(add_to_super=True, force=True)
     meta = get_metadata(ds, guess_type=True)
     assert_equal(meta[0]['dcterms:hasPart'],
-                 {'@id': get_dataset_identifier(sub)})
-    import json
-    print(json.dumps(meta, indent=2))
+                 {'@id': get_dataset_identifier(sub),
+                  'type': 'Dataset',
+                  'location': 'sub'})
+
+
+@with_tree(tree={
+    'origin': {
+        'dataset_description.json': """
+{
+    "Name": "mother"
+}""",
+    'sub': {
+        'dataset_description.json': """
+{
+    "Name": "child"
+}""",
+    'subsub': {
+        'dataset_description.json': """
+{
+    "Name": "grandchild"
+}"""}}}})
+def test_aggregation(path):
+    # a hierarchy of three (super/sub)datasets, each with some native metadata
+    ds = Dataset(opj(path, 'origin')).create(force=True)
+    subds = Dataset(opj(path, 'origin', 'sub')).create(force=True, add_to_super=True)
+    subsubds = Dataset(opj(path, 'origin', 'sub', 'subsub')).create(force=True, add_to_super=True)
+    # aggregate from bottom to top, guess native data, no compacting of graph
+    # should yield 6 meta data sets, one implicit, and one native per dataset
+    aggregate_metadata(ds, guess_native_type=True, optimize_metadata=False,
+                       recursive=True)
+    # no only ask the top superdataset, no recursion, just reading from the cache
+    meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False,
+            optimize=False)
+    assert_equal(len(meta), 6)
+    # same schema
+    assert_equal(6, sum([s.get('@context', None) == 'http://schema.org/' for s in meta]))
+    # three different IDs
+    assert_equal(3, len(set([s.get('@id') for s in meta])))
+    # and we know about all three datasets
+    for name in ('mother', 'child', 'grandchild'):
+        assert_true(sum([s.get('name', None) == name for s in meta]))
