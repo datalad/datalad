@@ -10,10 +10,19 @@
 
 
 import os
-from os.path import join as opj
+import json
+from os.path import join as opj, exists
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
+from ..log import lgr
+
+
+# common format
+metadata_filename = 'meta.json'
+metadata_basepath = opj('.datalad', 'meta')
+# TODO think about minimizing the JSON output by default
+json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False)
 
 
 # XXX Could become dataset method
@@ -131,7 +140,9 @@ def _get_implicit_metadata(ds, ds_identifier):
         for subds_path in ds.get_subdatasets(recursive=False):
             subds = Dataset(opj(ds.path, subds_path))
             subds_id = get_dataset_identifier(subds)
-            submeta = {'location': subds_path}
+            submeta = {
+                'location': subds_path,
+                'type': 'Dataset'}
             if not subds_id.startswith('_:'):
                 submeta['@id'] = subds_id
             subdss.append(submeta)
@@ -143,9 +154,78 @@ def _get_implicit_metadata(ds, ds_identifier):
     return meta
 
 
-def get_metadata(ds, guess_type=False):
-    # TODO lookup any cached metadata
-    return extract_metadata(ds, guess_type=guess_type)
+# XXX might become its own command
+def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
+                 ignore_cache=False, flatten=False):
+    meta = []
+    # where things are
+    meta_path = opj(ds.path, metadata_basepath)
+    main_meta_fname = opj(meta_path, metadata_filename)
+    # from cache?
+    if ignore_cache or not exists(main_meta_fname):
+        if not ignore_cache:
+            lgr.info('no extracted meta data available for {}, use ``aggregate_metadata`` command to avoid slow operation'.format(ds))
+        meta.extend(extract_metadata(ds, guess_type=guess_type))
+    else:
+        cached_meta = json.load(open(main_meta_fname, 'rb'))
+        if isinstance(cached_meta, list):
+            meta.extend(cached_meta)
+        else:
+            meta.append(cached_meta)
+    # for any subdataset that is actually registered (avoiding stale copies)
+    if not ignore_subdatasets:
+        for subds_path in ds.get_subdatasets(recursive=False):
+            subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
+            if exists(subds_meta_fname):
+                subds_meta = json.load(open(subds_meta_fname, 'rb'))
+                # we cannot simply append, or we get weired nested graphs
+                # proper way would be to expand the JSON-LD, extend the list and
+                # compact/flatten at the end. However assuming a single context
+                # we can cheat:
+                # TODO: better detect when we need to fall back to a proper
+                # graph merge via jsonld
+                if isinstance(subds_meta, list) and len(subds_meta) == 1:
+                    # simplify structure
+                    subds_meta = subds_meta[0]
+                if isinstance(subds_meta, dict) \
+                        and sorted(subds_meta.keys()) == ['@context', '@graph'] \
+                        and subds_meta.get('@context') == 'http://schema.org/':
+                    meta.extend(subds_meta['@graph'])
+                elif isinstance(subds_meta, list):
+                    meta.extend(subds_meta)
+                elif isinstance(subds_meta, dict):
+                    meta.append(subds_meta)
+                else:
+                    raise NotImplementedError(
+                        'got some unforseens meta data structure')
+            else:
+                lgr.info(
+                    'no cached meta data for subdataset at {}, ignoring'.format(
+                        subds_path))
+    if flatten:
+        try:
+            from pyld import jsonld
+        except ImportError:
+            raise ImportError(
+                'meta data flattening requested, but pyld is not available')
+        try:
+            meta = flatten_metadata_graph(meta)
+        except jsonld.JsonLdError as e:
+            # unfortunately everything gets swallowed into the same exception
+            lgr.error('meta data graph simplification failed, no network?')
+            raise e
+    return meta
+
+
+def flatten_metadata_graph(obj):
+    from pyld import jsonld
+    # simplify graph into a sequence of one dict per known dataset, even
+    # if multiple meta data set from different sources exist for the same
+    # dataset.
+
+    # TODO specify custom/caching document loader in options to speed
+    # up term resolution for subsequent calls
+    return jsonld.flatten(obj, ctx={"@context": "http://schema.org/"})
 
 
 def extract_metadata(ds, guess_type=False):

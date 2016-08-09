@@ -22,39 +22,33 @@ from datalad.distribution.dataset import datasetmethod, EnsureDataset, Dataset
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
-from . import get_metadata, extract_metadata
+from . import get_metadata, extract_metadata, metadata_filename, metadata_basepath, \
+    json_dump_kwargs, flatten_metadata_graph
 
 
-def _postproc_jsonld(obj):
+def _optimize_jsonld(obj):
     try:
         from pyld import jsonld
     except ImportError:
         lgr.debug('pyld not available, not compacting meta data graph')
         return obj
-
-    # simplify graph into a sequence of one dict per known dataset, even
-    # if multiple meta data set from different sources exist for the same
-    # dataset.
-
-    # TODO specify custom/caching document loader in options to speed
-    # up term resolution for subsequent calls
-    return jsonld.flatten(obj, ctx={"@context": "http://schema.org/"})
+    return flatten_metadata_graph(obj)
 
 
-def _store_json(path, meta):
-    # common format
-    # TODO think about minimizing the JSON output by default
-    json_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False)
+def _store_json(path, meta, optimize=True):
 
     if not exists(path):
         os.makedirs(path)
 
-    fname = opj(path, 'meta.json')
+    fname = opj(path, metadata_filename)
+
+    if optimize:
+        meta = _optimize_jsonld(meta)
 
     json.dump(
-        _postproc_jsonld(meta),
+        meta,
         codecs.getwriter('utf-8')(open(fname, 'wb+')),
-        **json_kwargs)
+        **json_dump_kwargs)
 
 
 class AggregateMetaData(Interface):
@@ -74,14 +68,20 @@ class AggregateMetaData(Interface):
             doc="""guess native meta data type of datasets, if none is
             configured. With a configured, or auto-detected meta data type,
             no native meta data will be aggregated."""),
+        optimize_metadata=Parameter(
+            args=("--optimize-metadata",),
+            action="store_true",
+            doc="""perform optimization (compacting/flattening) of the meta data
+            graph. This functionality requires network access for meta data term
+            resolution."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
     )
 
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
-    def __call__(dataset, guess_native_type=False, recursive=False,
-                 recursion_limit=None):
+    def __call__(dataset, guess_native_type=False, optimize_metadata=False,
+                 recursive=False, recursion_limit=None):
 
         if not dataset.is_installed():
             raise ValueError("will not operate unless dataset is installed")
@@ -102,23 +102,28 @@ class AggregateMetaData(Interface):
         lgr.info('aggregating meta data for {}'.format(dataset))
 
         # root path
-        metapath = opj(dataset.path, '.datalad', 'meta')
+        metapath = opj(dataset.path, metadata_basepath)
 
         # this dataset's meta data
         _store_json(
             metapath,
             # actually extract meta data, because we know we have this
             # dataset installed (although maube not all native metadata)
-            extract_metadata(dataset, guess_type=guess_native_type))
+            extract_metadata(dataset, guess_type=guess_native_type),
+            optimize=optimize_metadata)
 
         # we only want immediate subdatasets, high depths will come via
         # recursion
         for subds_path in dataset.get_subdatasets(recursive=False):
             subds = Dataset(opj(dataset.path, subds_path))
+            if not subds.is_installed():
+                lgr.info('ignoring subdataset {}, not installed'.format(subds))
+                continue
             _store_json(
                 opj(metapath, subds_path),
                 # do not extract_metadata here, but `get` to yield one
                 # compact metadata set for each subdataset, possibly even
                 # for not-installed subdatasets one level down, by using
                 # their cached metadata
-                get_metadata(subds))
+                get_metadata(subds),
+                optimize=optimize_metadata)
