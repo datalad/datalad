@@ -58,7 +58,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
         'show': {
             'WG33': {
                 'index.html': """<html><body>
-                                    <a href="/study/download/WG33">Download (146 MB)</a>
+                                    <a href="/study/download/WG33.zip">Download (146 MB)</a>
                                     <a href="/file/show/JX5V">file1.nii</a>
                                     <a href="/file/show/R1BX">dir1 / file2.nii</a>
                                     %s
@@ -66,13 +66,11 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             },
         },
         'download': {
-            'WG33': {
-                'canonical.zip': {
+            'WG33.zip': {
                     'file1.nii': "content of file1.nii",
                     'dir1': {
                         'file2.nii': "content of file2.nii",
                     }
-                }
             }
         }
     },
