@@ -14,8 +14,8 @@ __docformat__ = 'restructuredtext'
 import sys
 import time
 from os.path import exists, lexists, join as opj, abspath, isabs
-from os.path import curdir, isfile, islink, isdir, dirname, basename, split
-from os import readlink, listdir, lstat, remove
+from os.path import curdir, isfile, islink, isdir, dirname, basename, split, realpath
+from os import listdir, lstat, remove
 import json as js
 
 from six.moves.urllib.request import urlopen, Request
@@ -238,12 +238,9 @@ class FsModel(AnnexModel):
     def symlink(self):
         """if symlink returns path the symlink points to else returns None"""
         if islink(self._path):                    # if symlink
-            target_path = readlink(self._path)    # find link target
+            target_path = realpath(self._path)    # find link target
             # convert to absolute path if not
-            target_path = target_path if isabs(target_path) \
-                else opj(dirname(self._path), target_path)
-            return target_path if exists(target_path) \
-                else None
+            return target_path if exists(target_path) else None
         return None
 
     @property
@@ -611,7 +608,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
 
 def _ls_json(loc, fast=False, **kwargs):
     # hierarchically traverse file tree of (sub-)dataset(s) under path passed(loc)
-    ds_traverse(Dataset(loc), parent=None, **kwargs)
+    return ds_traverse(Dataset(loc), parent=None, **kwargs)
 
 
 #
