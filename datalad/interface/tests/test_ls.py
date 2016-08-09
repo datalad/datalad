@@ -21,7 +21,7 @@ from datalad.support.annexrepo import AnnexRepo
 from datalad.distribution.dataset import Dataset
 from ...api import ls
 from ...utils import swallow_outputs, swallow_logs, chpwd
-from ...tests.utils import assert_equal, assert_in, assert_raises
+from ...tests.utils import assert_equal, assert_in, assert_raises, assert_not_equal
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
@@ -63,6 +63,13 @@ def test_ls_repos(toppath):
                     assert_in('unknown', cmo.out)
 
 
+def test_machinesize():
+    assert_equal(1.0, machinesize(1))
+    for key, value in {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}.items():
+        assert_equal(1.0*(1000**value), machinesize('1 ' + key))
+    assert_raises(ValueError, machinesize, 't byte')
+
+
 @with_tree(
     tree={'dir': {'file1.txt': '123', 'file2.txt': '456'},
           '.hidden': {'.hidden_file': '121'}})
@@ -82,69 +89,122 @@ def test_ignored(topdir):
 
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
-                  'subdir': {'file1.txt': '123', 'file2.txt': '456'},
-                  'subgit': {'fgit.txt': '987'}},
-          '.hidden': {'.hidden_file': '121'}})
+                  'subdir': {'file1.txt': '124', 'file2.txt': '123'},
+                  'subgit': {'fgit.txt': '123'}},
+          'topfile.txt': '123',
+          '.hidden': {'.hidden_file': '123'}})
 def test_fs_traverse(topdir):
-    AnnexRepo(topdir)
+    # setup temp directory tree for testing
+    annex = AnnexRepo(topdir)
     AnnexRepo(opj(topdir, 'annexdir'), create=True)
     GitRepo(opj(topdir, 'gitdir'), create=True)
     GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
+    annex.add(opj(topdir, 'dir'), commit=True)
+    annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])
 
-    with swallow_logs(new_level=logging.INFO) as log, swallow_outputs() as cmo:
-        fs = fs_traverse(topdir, AnnexRepo(topdir), recursive=True, json='display')
-        # fs_traverse logs should contain all not ignored subdirectories
-        for subdir in [opj(topdir, "dir"), opj(topdir, 'dir', 'subdir')]:
-            assert_in("Directory: " + subdir, log.out)
+    # traverse file system in recursive and non-recursive modes
+    for recursive in [True, False]:
+        # test fs_traverse in display mode
+        with swallow_logs(new_level=logging.INFO) as log, swallow_outputs() as cmo:
+            fs = fs_traverse(topdir, AnnexRepo(topdir), recursive=recursive, json='display')
+            if recursive:
+                # fs_traverse logs should contain all not ignored subdirectories
+                for subdir in [opj(topdir, 'dir'), opj(topdir, 'dir', 'subdir')]:
+                    assert_in('Directory: ' + subdir, log.out)
+                # fs_traverse stdout contains subdirectory
+                assert_in(('file2.txt' and 'dir'), cmo.out)
 
+            # extract info of the top-level child directory
+            child = [item for item in fs['nodes'] if item['name'] == 'dir'][0]
+            # size of dir type child in non-recursive modes should be 0 Bytes(default) as
+            # dir type child's size currently has no metadata file for traverser to pick its size from
+            # and would require a recursive traversal w/ write to child metadata file mode
+            assert_equal(child['size']['total'], {True: '6 Bytes', False: '0 Bytes'}[recursive])
+
+    for recursive in [True, False]:
+        # run fs_traverse in write to json 'file' mode
+        fs = fs_traverse(topdir, AnnexRepo(topdir), recursive=recursive, json='file')
         # fs_traverse should return a dictionary
         assert_equal(isinstance(fs, dict), True)
         # not including git and annex folders
-        assert_equal(([True for item in fs["nodes"] if ('gitdir' or 'annexdir') == item['name']]), [])
-        # fs_traverse stdout contains subdirectory
-        assert_in(('file2.txt' and 'dir'), cmo.out)
+        assert_equal([item for item in fs['nodes'] if ('gitdir' or 'annexdir') == item['name']], [])
+        # extract info of the top-level child directory
+        child = [item for item in fs['nodes'] if item['name'] == 'dir'][0]
+        # verify node type
+        assert_equal(child['type'], 'dir')
+        # same node size on running fs_traversal in recursive followed by non-recursive mode
+        # verifies child's metadata file being used to find its size
+        # running in reverse order (non-recursive followed by recursive mode) will give (0, actual size)
+        assert_equal(child['size']['total'], '6 Bytes')
 
-
-def test_machinesize():
-    assert_equal(1.0, machinesize(1))
-    for key, value in {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}.items():
-        assert_equal(1.0*(1000**value), machinesize('1 ' + key))
-    assert_raises(ValueError, machinesize, 't byte')
+        # verify subdirectory traversal if run in recursive mode
+        if recursive:
+            # sub-dictionary should not include git and hidden directory info
+            assert_equal([item for item in child['nodes'] if ('subgit' or '.fgit') == item['name']], [])
+            # extract subdirectory dictionary, else fail
+            subchild = [subitem for subitem in child["nodes"] if subitem['name'] == 'subdir'][0]
+            # extract info of file1.txts, else fail
+            link = [subnode for subnode in subchild["nodes"] if subnode['name'] == 'file1.txt'][0]
+            # verify node's sizes and type
+            assert_equal(link['size']['total'], '3 Bytes')
+            assert_equal(link['size']['ondisk'], link['size']['total'])
+            assert_equal(link['type'], 'link')
+            # extract info of file2.txt, else fail
+            brokenlink = [subnode for subnode in subchild["nodes"] if subnode['name'] == 'file2.txt'][0]
+            # verify node's sizes and type
+            assert_equal(brokenlink['type'], 'link-broken')
+            assert_equal(brokenlink['size']['ondisk'], '0 Bytes')
+            assert_equal(brokenlink['size']['total'], '3 Bytes')
 
 
 @with_tree(
     tree={'dir': {'.fgit': {'ab.txt': '123'},
-                  'subdir': {'file1.txt': '123', 'file2.txt': '456'},
-                  'subgit': {'fgit.txt': '987'}},
-          '.hidden': {'.hidden_file': '121'}})
+                  'subdir': {'file1.txt': '123', 'file2.txt': '123'},
+                  'subgit': {'fgit.txt': '123'}},
+          '.hidden': {'.hidden_file': '123'}})
 def test_ls_json(topdir):
     annex = AnnexRepo(topdir, create=True)
     ds = Dataset(topdir)
-    ds.create_subdataset(opj(topdir, 'annexdir'))
-    git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)
-    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)
-    annex.add(opj(topdir, 'dir', 'subgit'), commit=True)
-    annex.add(opj(topdir, 'dir'), commit=True)
-    annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])
+    # create some file and commit it
+    open(opj(ds.path, 'subdsfile.txt'), 'w').write('123')
+    ds.install(path='subdsfile.txt')
+    ds.save("Hello!", version_tag=1)
+    # add a subdataset
+    ds.install('subds', source=topdir)
 
-    with swallow_logs(), swallow_outputs():
-        for all in [True, False]:
-            for recursive in [True, False]:
-                for state in ['file', 'delete']:
-                    _ls_json(topdir, json=state, all=all, recursive=recursive)
+    git = GitRepo(opj(topdir, 'dir', 'subgit'), create=True)                    # create git repo
+    git.add(opj(topdir, 'dir', 'subgit', 'fgit.txt'), commit=True)              # commit to git to init git repo
+    annex.add(opj(topdir, 'dir', 'subgit'), commit=True)                        # add the non-dataset git repo to annex
+    annex.add(opj(topdir, 'dir'), commit=True)                                  # add to annex (links)
+    annex.drop(opj(topdir, 'dir', 'subdir', 'file2.txt'), options=['--force'])  # broken-link
 
-                    # subdataset should have its json created and deleted when all=True else not
-                    assert_equal(exists(opj(topdir, 'annexdir', '.dir.json')), (state == 'file' and all))
+    for all in [True, False]:
+        for recursive in [True, False]:
+            for state in ['file', 'delete']:
+                with swallow_logs(), swallow_outputs():
+                    ds = _ls_json(topdir, json=state, all=all, recursive=recursive)
 
-                    # root should have its json file created and deleted in all cases
-                    assert_equal(exists(opj(topdir, '.dir.json')), state == 'file')
+                # subdataset should have its json created and deleted when all=True else not
+                assert_equal(exists(opj(topdir, 'subds', '.dir.json')), (state == 'file' and all))
+                # root should have its json file created and deleted in all cases
+                assert_equal(exists(opj(topdir, '.dir.json')), state == 'file')
+                # children should have their metadata json's created and deleted only when recursive=True
+                assert_equal(exists(opj(topdir, 'dir', 'subdir', '.dir.json')), (state == 'file' and recursive))
 
-                    # children should have their metadata json's created and deleted only when recursive=True
-                    assert_equal(exists(opj(topdir, 'dir', 'subdir', '.dir.json')), (state == 'file' and recursive))
+                # ignored directories should not have json files created in any case
+                for subdir in ['.hidden', opj('dir', 'subgit')]:
+                    assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
 
-                    # ignored directories should not have json files created in any case
-                    for subdir in ['.hidden', opj('dir', 'subgit')]:
-                        assert_equal(exists(opj(topdir, subdir, '.dir.json')), False)
+                # check size of subdataset
+                subds = [item for item in ds['nodes'] if item['name'] == ('subdsfile.txt' or 'subds')][0]
+                assert_equal(subds['size']['total'], '3 Bytes')
+
+                # run non-recursive dataset traversal after subdataset metadata already created
+                # to verify sub-dataset metadata being picked up from its metadata file in such cases
+                if state=='file' and all and not recursive:
+                    ds = _ls_json(topdir, json='file', all=False)
+                    subds = [item for item in ds['nodes'] if item['name'] == ('subdsfile.txt' or 'subds')][0]
+                    assert_equal(subds['size']['total'], '3 Bytes')
 
 
 @with_tempfile
