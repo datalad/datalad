@@ -78,6 +78,7 @@ def test_help_np():
     # thus testing sets
     assert_equal(set(sections),
                  {'Commands for dataset operations',
+                  'Commands for meta data handling',
                   'Miscellaneous commands',
                   'General information',
                   'Global options'})
