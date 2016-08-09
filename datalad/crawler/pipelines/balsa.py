@@ -40,9 +40,6 @@ def superdataset_pipeline(url=TOPURL):
        URL point to all datasets, hence the URL at the top
 
     """
-    # xpath_match('//*/tr/td[1]/a/text()', output='dataset') # dataset = Connection Strength and Distance with Tractography
-    # xpath_match('//*/tr/td[1]/a/@href', output='dataset_id')  # dataset_id = /study/show/W336
-
     url = opj(url, 'study/')
 
     annex = Annexificator()
@@ -165,7 +162,6 @@ def pipeline(dataset_id, url=TOPURL):
     files_url = opj(url, 'file/show/')  # files_url = https://balsa.wustl.edu/file/show/
 
     url = opj(url, 'study/')  # url = https://balsa.wustl.edu/study/
-    canonical_url = opj(url, 'download/', dataset_id)  # url = https://balsa.wustl.edu/study/download/[dataset_id]
     dataset_url = '%sshow/%s' % (url, dataset_id)  # url = https://balsa.wustl.edu/study/show/[dataset_id]
 
     balsa = BalsaSupport(repo=annex.repo)
@@ -174,23 +170,20 @@ def pipeline(dataset_id, url=TOPURL):
     return [
         annex.switch_branch('incoming'),
         [
-            crawl_url(url),    # TOPURL/study
+            crawl_url(url),
             [
                 assign({'dataset': dataset_id}),
                 skip_if({'dataset': 'test study upload'}, re=True),
             ],
             [
-                crawl_url(dataset_url),    # TOPURL/study/show/[dataset_id]
+                crawl_url(dataset_url),
                 [
                     # canonical tarball
-                    # a_href_match(canonical_url, min_count=1),   # TOPURL/study/download/[dataset_id]
-                    #crawl_url(canonical_url),
-                    a_href_match('.*/download/.*', min_count=1),  #
-                   #  assign({'filename': '%(url_text)s'}, interpolate=True),  # %(url_text)s
+                    a_href_match('.*/download/.*', min_count=1),
                     annex,
                 ],
                 [
-                    a_href_match(files_url, min_count=2),  # TOPURL/file/download/[somefile_id]
+                    a_href_match(files_url, min_count=2),
                     assign({'path': '_files/%(url_text)s'}, interpolate=True),
                     sub({'path': {' / ': '/'}}),
                     splitpath,
