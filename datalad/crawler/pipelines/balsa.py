@@ -184,9 +184,9 @@ def pipeline(dataset_id, url=TOPURL):
                 [
                     # canonical tarball
                     # a_href_match(canonical_url, min_count=1),   # TOPURL/study/download/[dataset_id]
-                    crawl_url(canonical_url),
-                    a_href_match('.*.zip', min_count=1),  #
-                    assign({'filename': '%(url_text)s'}, interpolate=True),  # %(url_text)s
+                    #crawl_url(canonical_url),
+                    a_href_match('.*/download/.*', min_count=1),  #
+                   #  assign({'filename': '%(url_text)s'}, interpolate=True),  # %(url_text)s
                     annex,
                 ],
                 [
