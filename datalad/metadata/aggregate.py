@@ -11,9 +11,7 @@
 
 __docformat__ = 'restructuredtext'
 
-
-import json
-import codecs
+from simplejson import dump as jsondump
 import os
 from os.path import join as opj, exists
 from datalad.interface.base import Interface
@@ -46,10 +44,7 @@ def _store_json(path, meta, optimize=True):
     if optimize:
         meta = _optimize_jsonld(meta)
 
-    json.dump(
-        meta,
-        codecs.getwriter('utf-8')(open(fname, 'wb+')),
-        **json_dump_kwargs)
+    jsondump(meta, open(fname, 'w'), **json_dump_kwargs)
 
 
 class AggregateMetaData(Interface):
@@ -108,7 +103,7 @@ class AggregateMetaData(Interface):
         _store_json(
             metapath,
             # actually extract meta data, because we know we have this
-            # dataset installed (although maube not all native metadata)
+            # dataset installed (although maybe not all native metadata)
             extract_metadata(dataset, guess_type=guess_native_type),
             optimize=optimize_metadata)
 

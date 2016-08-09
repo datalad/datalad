@@ -8,6 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test BIDS meta data parser """
 
+from simplejson import dumps
 from datalad.distribution.dataset import Dataset
 from datalad.metadata.parsers.bids import has_metadata, get_metadata
 from nose.tools import assert_true, assert_false, assert_raises, assert_equal
@@ -47,24 +48,22 @@ def test_get_metadata(path):
 
     ds = Dataset(path)
     meta = get_metadata(ds, 'ID')
-    import json
     assert_equal(
-        json.dumps(meta, sort_keys=True, indent=2),
+        dumps(meta, sort_keys=True, indent=2),
         """\
 {
-  "@context": "http://schema.org/", 
-  "@id": "ID", 
+  "@context": "http://schema.org/",
+  "@id": "ID",
   "author": [
-    "Mike One", 
+    "Mike One",
     "Anna Two"
-  ], 
+  ],
   "citation": [
     "http://studyforrest.org"
-  ], 
-  "dcterms:conformsTo": "BIDS 1.0.0-rc3", 
-  "description": "Some description", 
-  "foaf:fundedBy": "We got money from collecting plastic bottles", 
-  "license": "PDDL", 
+  ],
+  "dcterms:conformsTo": "BIDS 1.0.0-rc3",
+  "description": "Some description",
+  "foaf:fundedBy": "We got money from collecting plastic bottles",
+  "license": "PDDL",
   "name": "studyforrest_phase2"
 }""")
-

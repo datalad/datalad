@@ -10,7 +10,7 @@
 
 
 import os
-import json
+from simplejson import load as jsonload
 from os.path import join as opj, exists
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
@@ -167,7 +167,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             lgr.info('no extracted meta data available for {}, use ``aggregate_metadata`` command to avoid slow operation'.format(ds))
         meta.extend(extract_metadata(ds, guess_type=guess_type))
     else:
-        cached_meta = json.load(open(main_meta_fname, 'rb'))
+        cached_meta = jsonload(open(main_meta_fname, 'rb'))
         if isinstance(cached_meta, list):
             meta.extend(cached_meta)
         else:
@@ -177,7 +177,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         for subds_path in ds.get_subdatasets(recursive=False):
             subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
             if exists(subds_meta_fname):
-                subds_meta = json.load(open(subds_meta_fname, 'rb'))
+                subds_meta = jsonload(open(subds_meta_fname, 'rb'))
                 # we cannot simply append, or we get weired nested graphs
                 # proper way would be to expand the JSON-LD, extend the list and
                 # compact/flatten at the end. However assuming a single context

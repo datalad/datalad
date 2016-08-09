@@ -9,7 +9,7 @@
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
 from os.path import exists, join as opj
-import json
+from simplejson import load as jsonload
 from .. import get_dataset_identifier
 
 def has_metadata(ds):
@@ -32,7 +32,7 @@ def get_metadata(ds, identifier):
     if not has_metadata(ds):
         raise ValueError("no BIDS metadata found at {}".format(ds.path))
 
-    bids = json.load(open(opj(ds.path, 'dataset_description.json')))
+    bids = jsonload(open(opj(ds.path, 'dataset_description.json')))
 
     meta = {
         "@context": "http://schema.org/",
