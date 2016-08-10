@@ -366,7 +366,7 @@ class Annexificator(object):
                 stats.skipped += 1
                 lgr.debug("Failed to figure out filename for url %s" % url)
                 return
-            raise ValueError("No filename were provided")
+            raise ValueError("No filename was provided")
 
         filepath = opj(self.repo.path, fpath)
 
