@@ -23,15 +23,14 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.constraints import EnsureListOf
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.utils import getpwd
 from datalad.dochelpers import exc_str
 
 from .dataset import EnsureDataset
 from .dataset import Dataset
 from .dataset import datasetmethod
+from .dataset import require_dataset
 from .install import get_containing_subdataset
 
 
@@ -120,36 +119,7 @@ class Publish(Interface):
     @datasetmethod(name='publish')
     def __call__(path=None, dataset=None, to=None, recursive=False, skip_failing=False,
                  annex_copy_opts=None):
-
-        # shortcut
-        ds = dataset
-
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-
-        if ds is None:
-            # try CWD:
-            dspath = GitRepo.get_toppath(getpwd())
-            if not dspath:
-                raise InsufficientArgumentsError("No dataset found")
-            ds = Dataset(dspath)
-
-        # Note: This logic means, we have to be within a dataset or explicitly
-        #       pass a dataset in order to call publish. Even if we don't want
-        #       to publish this dataset itself, but subdataset(s) only.
-        #       Since we need to resolve paths against a dataset, another
-        #       approach would complicate the matter. Consider '-C' and
-        #       '--dataset' options before complaining ;)
-        assert(ds is not None)
-        lgr.debug("Resolved dataset for publication: {0}".format(ds))
-
-        # now, we know, we have to operate on ds. So, ds needs to be installed,
-        # since we cannot publish anything from a not installed dataset,
-        # can we?
-        # (But may be just the existence of ds.repo is important here.)
-        if not ds.is_installed():
-            raise ValueError("No installed dataset found at "
-                             "{0}.".format(ds.path))
+        ds = require_dataset(dataset, check_installed=True, purpose='publication')
         assert(ds.repo is not None)
 
         # figure out, what to publish from what (sub)dataset:

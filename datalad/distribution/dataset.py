@@ -20,6 +20,8 @@ from datalad.support.gitrepo import InvalidGitRepositoryError, NoSuchPathError
 from datalad.support.constraints import Constraint
 from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
+from datalad.utils import getpwd
+from datalad.support.exceptions import InsufficientArgumentsError
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -421,3 +423,47 @@ class EnsureDataset(Constraint):
     def long_description(self):
         return """Value must be a Dataset or a valid identifier of a Dataset
         (e.g. a path)"""
+
+
+def require_dataset(dataset, check_installed=True, purpose=None):
+    """Helper function to resolve a dataset.
+
+    This function tries to resolve a dataset given an input argument,
+    or based on the process' working directory, if `None` is given.
+
+    Parameters
+    ----------
+    dataset : None or path or Dataset
+      Some value identifying a dataset or `None`. In the latter case
+      a dataset will be searched based on the process working directory.
+    check_installed : boold, optional
+      If True, an optional check whether the resolved dataset is
+      properly installed will be performed.
+    purpose : str, optional
+      This string will be inserted in error messages to make them more
+      informative. The pattern is "... dataset for <STRING>".
+
+    Returns
+    -------
+    Dataset
+      Or raises an exception.
+    """
+    if dataset is not None and not isinstance(dataset, Dataset):
+            dataset = Dataset(dataset)
+
+    if dataset is None:  # possible scenario of cmdline calls
+        dspath = GitRepo.get_toppath(getpwd())
+        if not dspath:
+            raise InsufficientArgumentsError("No dataset found")
+        dataset = Dataset(dspath)
+
+    assert(dataset is not None)
+    lgr.debug("Resolved dataset{0}: {1}".format(
+        'for {}'.format(purpose) if purpose else '',
+        dataset))
+
+    if check_installed and not dataset.is_installed():
+        raise ValueError("No installed dataset found at "
+                         "{0}.".format(dataset.path))
+
+    return dataset
