@@ -851,4 +851,13 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
             except OSError:
                 pass
 
+
+def _path_(p):
+    """Given a path in POSIX" notation, regenerate one in native to the env one"""
+    if on_windows:
+        return opj(p.split('/'))
+    else:
+        # Assume that all others as POSIX compliant so nothing to be done
+        return p
+
 lgr.log(5, "Done importing datalad.utils")
