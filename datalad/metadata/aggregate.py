@@ -18,7 +18,8 @@ import os
 from os.path import join as opj, exists
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_limit, recursion_flag
-from datalad.distribution.dataset import datasetmethod, EnsureDataset, Dataset
+from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
+    Dataset, require_dataset
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
@@ -82,9 +83,8 @@ class AggregateMetaData(Interface):
     @datasetmethod(name='aggregate_metadata')
     def __call__(dataset, guess_native_type=False, optimize_metadata=False,
                  recursive=False, recursion_limit=None):
-
-        if not dataset.is_installed():
-            raise ValueError("will not operate unless dataset is installed")
+        dataset = require_dataset(
+            dataset, check_installed=True, purpose='meta data aggregation')
 
         if recursive:
             # recursive, depth first

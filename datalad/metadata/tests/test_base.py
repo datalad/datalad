@@ -10,11 +10,12 @@
 
 from datalad.api import Dataset, aggregate_metadata
 from datalad.metadata import get_metadata_type, get_metadata, get_dataset_identifier
-from nose.tools import assert_true, assert_equal
+from nose.tools import assert_true, assert_equal, assert_raises
 from datalad.tests.utils import with_tree, with_tempfile
+from datalad.utils import chpwd
 import os
 from os.path import join as opj
-
+from datalad.support.exceptions import InsufficientArgumentsError
 
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
@@ -86,6 +87,8 @@ def test_basic_metadata(path):
     "Name": "grandchild"
 }"""}}}})
 def test_aggregation(path):
+    with chpwd(path):
+        assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
     subds = Dataset(opj(path, 'origin', 'sub')).create(force=True, add_to_super=True)
@@ -96,7 +99,7 @@ def test_aggregation(path):
                        recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False,
-            optimize=False)
+                        optimize=False)
     assert_equal(len(meta), 6)
     # same schema
     assert_equal(6, sum([s.get('@context', None) == 'http://schema.org/' for s in meta]))
