@@ -23,6 +23,7 @@ from datalad.support.network import RI, is_ssh
 # TODO: centralize AppDirs (=> datalad.config?)
 from appdirs import AppDirs
 from datalad.support.exceptions import CommandError
+from datalad.dochelpers import exc_str
 from datalad.utils import not_supported_on_windows
 from datalad.utils import on_windows
 from datalad.utils import assure_dir
@@ -200,10 +201,23 @@ class SSHManager(object):
             self._connections[ctrl_path] = c
             return c
 
-    def close(self):
+    def close(self, allow_fail=True):
         """Closes all connections, known to this instance.
+
+        Parameters
+        ----------
+        allow_fail: bool, optional
+          If True, swallow exceptions which might be thrown during
+          connection.close, and just log them at DEBUG level
         """
         if self._connections:
             lgr.debug("Closing %d SSH connections..." % len(self._connections))
             for cnct in self._connections:
-                self._connections[cnct].close()
+                f = self._connections[cnct].close
+                if allow_fail:
+                    f()
+                else:
+                    try:
+                        f()
+                    except Exception as exc:
+                        lgr.debug("Failed to close a connection: %s", exc_str(exc))

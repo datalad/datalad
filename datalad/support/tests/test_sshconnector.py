@@ -17,6 +17,10 @@ from nose.tools import ok_, assert_is_instance
 from datalad.support.sshconnector import SSHConnection, SSHManager
 from datalad.tests.utils import assert_raises, eq_
 from datalad.tests.utils import skip_ssh, with_tempfile, get_most_obscure_supported_name
+from datalad.tests.utils import swallow_logs
+from datalad.tests.utils import assert_in
+
+import logging
 
 
 @skip_ssh
@@ -74,6 +78,22 @@ def test_ssh_manager_close():
 
     ok_(not exists(opj(manager.socket_dir, 'localhost')))
     ok_(not exists(opj(manager.socket_dir, 'datalad-test')))
+
+
+def test_ssh_manager_close_no_throw():
+    manager = SSHManager()
+    class bogus:
+        def close(self):
+            raise Exception("oh I am so bad")
+
+    manager._connections['bogus'] = bogus()
+    assert_raises(Exception, manager.close)
+    assert_raises(Exception, manager.close)
+
+    # but should proceed just fine if allow_fail=False
+    with swallow_logs(new_level=logging.DEBUG) as cml:
+        manager.close(allow_fail=False)
+        assert_in('Failed to close a connection: oh I am so bad', cml.out)
 
 
 @skip_ssh
