@@ -257,7 +257,7 @@ class Annexificator(object):
         # TODO: backend -- should be fetched from the config I guess... or should we
         # give that duty to the dataset initialization routine to change default backend?
         # Well -- different annexifiers might have different ideas for the backend, but
-        # then those could be overriden via options
+        # then those could be overridden via options
 
         if exists(path):
             if not exists(opj(path, '.git')):

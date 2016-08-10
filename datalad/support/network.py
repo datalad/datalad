@@ -311,7 +311,7 @@ def _guess_ri_cls(ri):
         'datalad': DataLadRI
     }
     cls = TYPES[type_]
-    # just parse the ri according to regex matchint ssh "ri" specs
+    # just parse the ri according to regex matching ssh "ri" specs
     lgr.log(5, "Detected %s ri" % type_)
     return cls
 

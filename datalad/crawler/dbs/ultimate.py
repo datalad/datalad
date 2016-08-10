@@ -19,7 +19,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.engine.reflection import Inspector
 
+from ...dochelpers import exc_str
 from ...support.digests import Digester
+from ...support.network import URL
 from .ultimate_orm import File as oFile, URL as oURL, Key as oKey, DBTable
 
 # for now lazy/ignorant yoh would just use/pass ORM's objects around
@@ -170,25 +172,6 @@ class UltimateDB(object):
         self._session = None
         # I guess that will also lead to complete destroying of engine if session is gone
 
-    @staticmethod
-    def _parse_db_url(url):
-        import re
-        # dialect[+driver]://user:password@host:port/dbname[?key=value..]
-        # interesting -- can't : or / be used in the passw?
-        r = re.compile(r"""(?P<dialect>[^:]*)://                 # dialect[+driver]://
-                           (?P<user>[^:/@]+)?(?::(?P<password>[^:/@]*))? # user:password
-                           (?:@(?P<host>[^:/@]+)(?::(?P<port>\d+))?)?/                  # @host/
-                           (?P<dbname>\S+)(?:\?(?P<options>.*))? # dbname[?key=value..]
-                        """,
-                       re.X)
-        reg = re.match(r, url)
-        if not reg:
-            raise ValueError(
-                "URL for the ultimatedb should conform to the specification "
-                "expected by sqlalchemy. "
-                "See http://docs.sqlalchemy.org/en/rel_1_1/core/engines.html")
-        return reg.groupdict()
-
     @classmethod
     def from_config(cls):
         """Factory to provide instance initiated based on config settings"""
@@ -198,11 +181,21 @@ class UltimateDB(object):
         #credential = cfg.get('ultimatedb', 'credential')
 
         # Parse url, since if contains credentials, no need to check config
-        url_rec = cls._parse_db_url(url)
-        if url_rec['user']:
+        try:
+            url = URL(url)
+        except Exception as exc:
+            raise ValueError(
+                "URL for the ultimatedb should conform to the specification "
+                "expected by sqlalchemy. "
+                "See http://docs.sqlalchemy.org/en/rel_1_1/core/engines.html "
+                "Got following exception while parsing the url %s: %s"
+                % (url, exc_str(exc))
+            )
+
+        if url.username:
             credkw = {
-                'user': url_rec['user'],
-                'password': url_rec['password']
+                'user': url.username,
+                'password': url.password,
             }
         else:
             lgr.debug("Obtaining credentials for ultimatedb from config/credentials")
