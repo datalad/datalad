@@ -446,10 +446,10 @@ def require_dataset(dataset, check_installed=True, purpose=None):
     Returns
     -------
     Dataset
-      Or raises an exception.
+      Or raises an exception (InsufficientArgumentsError).
     """
     if dataset is not None and not isinstance(dataset, Dataset):
-            dataset = Dataset(dataset)
+        dataset = Dataset(dataset)
 
     if dataset is None:  # possible scenario of cmdline calls
         dspath = GitRepo.get_toppath(getpwd())
