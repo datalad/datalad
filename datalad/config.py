@@ -20,6 +20,10 @@ from os.path import join as opj
 
 from .support.configparserinc import SafeConfigParserWithIncludes
 
+import logging
+lgr = logging.getLogger('datalad.config')
+
+
 class ConfigManager(SafeConfigParserWithIncludes, object):
     """Central configuration registry for datalad.
 
@@ -167,7 +171,10 @@ class ConfigManager(SafeConfigParserWithIncludes, object):
                 self.add_section(sec)
 
             # set value
-            self.set(sec, svar, os.environ[var])
+            val = os.environ[var]
+            lgr.debug("Setting configuration variable from env. Section: %s  Variable: %s  Value: %r",
+                      sec, svar, val)
+            self.set(sec, svar, val)
 
     def get(self, section, option, default=None, **kwargs):
         """Wrapper around SafeConfigParser.get() with a custom default value.
