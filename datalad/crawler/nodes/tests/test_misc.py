@@ -335,7 +335,6 @@ def test_sub():
     )
 
 
-
 @with_tree(tree={'1': '1', '1.txt': '2'})
 def test_find_files(d):
     assert_equal(sorted(list(sorted(x.items())) for x in find_files('.*', topdir=d)({})),
