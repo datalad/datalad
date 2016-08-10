@@ -15,8 +15,9 @@ import sys
 import time
 from os.path import exists, lexists, join as opj, abspath, isabs
 from os.path import curdir, isfile, islink, isdir, dirname, basename, split, realpath
-from os import listdir, lstat, remove
+from os import listdir, lstat, remove, makedirs
 import json as js
+import hashlib
 
 from six.moves.urllib.request import urlopen, Request
 from six.moves.urllib.error import HTTPError
@@ -405,16 +406,15 @@ def _ls_dataset(loc, fast=False, recursive=False, all=False):
         print(ds_str)
 
 
-def fs_extract(nodepath, repo):
-    """extract required info of nodepath with its associated parent repository and returns it as a dictionary"""
-
-    # Create FsModel from filesystem nodepath and its associated parent repository
-    node = FsModel(nodepath, repo)
-    pretty_size = {stype: humanize.naturalsize(svalue) for stype, svalue in node.size.items()}
-    pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
-    name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
-    return {"name": name, "path": node._path, "repo": node.repo.path,
-            "type": node.type_, "size": pretty_size, "date": pretty_date}
+def machinesize(humansize):
+    """convert human-size string to machine-size"""
+    try:
+        size_str, size_unit = humansize.split(" ")
+    except AttributeError:
+        return float(humansize)
+    unit_converter = {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}
+    machinesize = float(size_str)*(1000**unit_converter[size_unit])
+    return machinesize
 
 
 def leaf_name(path):
@@ -436,40 +436,83 @@ def ignored(path, only_hidden=False):
     return False
 
 
-def fs_render(path, fs_metadata, json=None):
-    """takes root, subdir to render and based on json option passed renders to file, stdout or deletes json at root
+def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=None):
+    """path to metadata file of node associated with the fs_metadata dictionary
 
     Parameters
     ----------
+    fs_metadata: dict
+      Metadata json of a node
     path: str
-      Path to metadata storage location
+      Path to directory of metadata to be rendered
+    ds_path: str
+      Path to dataset root
+    metadata_path: str
+      Path to metadata root. Calculated relative to ds_path
+
+    Returns
+    -------
+    str
+      path to metadata of current node
+    """
+
+    # use implicit paths unless paths explicitly specified
+    ds_path = ds_path or fs_metadata['repo']
+    path = path or fs_metadata['path']
+    metadata_path = metadata_path or '.git/datalad/metadata'
+    # directory metadata directory tree location
+    metadata_dir = opj(ds_path, metadata_path)
+    # relative path of current directory wrt dataset root
+    dir_path = path.split(ds_path)[1][1:] or basename(ds_path)
+    # create md5 hash of current directory's relative path
+    metadata_hash = hashlib.md5(dir_path).hexdigest()
+    # construct final path to metadata file
+    metadata_file = opj(metadata_dir, metadata_hash)
+
+    return metadata_file
+
+
+def fs_extract(nodepath, repo):
+    """extract required info of nodepath with its associated parent repository and returns it as a dictionary"""
+
+    # Create FsModel from filesystem nodepath and its associated parent repository
+    node = FsModel(nodepath, repo)
+    pretty_size = {stype: humanize.naturalsize(svalue) for stype, svalue in node.size.items()}
+    pretty_date = time.strftime(u"%Y-%m-%d %H:%M:%S", time.localtime(node.date))
+    name = leaf_name(node._path) if leaf_name(node._path) != "" else leaf_name(node.repo.path)
+    return {"name": name, "path": node._path, "repo": node.repo.path,
+            "type": node.type_, "size": pretty_size, "date": pretty_date}
+
+
+def fs_render(fs_metadata, json=None, **kwargs):
+    """takes node to render and based on json option passed renders to file, stdout or deletes json at root
+
+    Parameters
+    ----------
     fs_metadata: dict
       Metadata json to be rendered
     json: str ('file', 'display', 'delete')
       Render to file, stdout or delete json
     """
-    # store directory info of the submodule level in fs hierarchy as json
+
+    metadata_file = metadata_locator(fs_metadata, **kwargs)
+
     if json == 'file':
-        with open(opj(path, '.dir.json'), 'w') as f:
-            js.dump(fs_metadata, f)
+        # create metadata_root directory if it doesn't exist
+        metadata_dir = dirname(metadata_file)
+        if not exists(metadata_dir):
+            makedirs(metadata_dir)
+        # write directory metadata to json
+        with open(metadata_file, 'w') as f:
+             js.dump(fs_metadata, f)
+
     # else if json flag set to delete, remove .dir.json of current directory
-    elif json == 'delete':
-        if exists(opj(path, '.dir.json')):
-            remove(opj(path, '.dir.json'))
+    elif json == 'delete' and exists(metadata_file):
+        remove(metadata_file)
+
     # else dump json to stdout
     elif json == 'display':
         print(js.dumps(fs_metadata) + '\n')
-
-
-def machinesize(humansize):
-    """convert human-size string to machine-size"""
-    try:
-        size_str, size_unit = humansize.split(" ")
-    except AttributeError:
-        return float(humansize)
-    unit_converter = {'Byte': 0, 'Bytes': 0, 'kB': 1, 'MB': 2, 'GB': 3, 'TB': 4, 'PB': 5}
-    machinesize = float(size_str)*(1000**unit_converter[size_unit])
-    return machinesize
 
 
 def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None):
@@ -508,7 +551,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
                     subdir = fs_traverse(nodepath, repo, parent=children[0], recursive=recursive, json=json)
                 else:
                     # read child metadata from its metadata file if it exists
-                    subdir_json = opj(nodepath, '.dir.json')
+                    subdir_json = metadata_locator(path=nodepath, ds_path=fs["repo"])
                     if exists(subdir_json):
                         with open(subdir_json) as data_file:
                             subdir = js.load(data_file)
@@ -536,7 +579,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
 
         fs['nodes'] = children          # add children info to main fs dictionary
         if render:                      # render directory node at location(path)
-            fs_render(path, fs, json=json)
+            fs_render(fs, json=json)
             lgr.info('Directory: %s' % path)   # log info of current node rendered
 
     return fs
@@ -580,10 +623,11 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
             size_list.append(subfs['size'])
         # else just pick the data from .dir.json of each subdataset
         else:
-            subds_json_path = opj(rootds.path, subds_path, '.dir.json')
-            lgr.info(subds_json_path)
-            if exists(subds_json_path):
-                with open(subds_json_path) as data_file:
+            subds_path = opj(rootds.path, subds_path)
+            subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
+            if exists(subds_json):
+                lgr.info(subds_path)
+                with open(subds_json) as data_file:
                     subfs = js.load(data_file)
                     subfs.pop('nodes', None)
                     children.extend([subfs])
@@ -602,7 +646,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     fs['nodes'].extend(children)
     # render current dataset
     lgr.info('Dataset: %s' % rootds.path)
-    fs_render(rootds.path, fs, json=json)
+    fs_render(fs, json=json)
     return fs
 
 
