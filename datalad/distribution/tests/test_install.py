@@ -50,7 +50,8 @@ from datalad.tests.utils import ok_clean_git
 from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import swallow_logs
-
+from datalad.tests.utils import use_cassette
+from datalad.utils import _path_
 
 def test_insufficient_args():
     assert_raises(InsufficientArgumentsError, install)
@@ -314,3 +315,13 @@ def _test_guess_dot_git(annex, path, url, tdir):
 def test_guess_dot_git():
     for annex in False, True:
         yield _test_guess_dot_git, annex
+
+
+@use_cassette('test_install_crcns')
+@with_tempfile(mkdir=True)
+def test_install_crcns(tdir):
+    with chpwd(tdir):
+        install("all-nonrecursive", source="///")
+        # should not hang in infinite recursion
+        install(_path_("all-nonrecursive/crcns"))
+        ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
