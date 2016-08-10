@@ -45,7 +45,9 @@ def test_ssh_get_connection():
 
 
 @skip_ssh
-def test_ssh_open_close():
+@with_tempfile(suffix=" \"`suffix:;& ", # get_most_obscure_supported_name(),
+               content="1")
+def test_ssh_open_close(tfile1):
 
     manager = SSHManager()
     c1 = manager.get_connection('ssh://localhost')
@@ -59,6 +61,11 @@ def test_ssh_open_close():
     remote_ls = [entry for entry in out.splitlines() if entry != '.' and entry != '..']
     local_ls = os.listdir(os.path.expanduser('~'))
     eq_(set(remote_ls), set(local_ls))
+
+    # now test for arguments containing spaces and other pleasant symbols
+    out, err = c1(['ls', '-l', tfile1])
+    assert_in(tfile1, out)
+    eq_(err, '')
 
     c1.close()
     # control master doesn't exist anymore:
