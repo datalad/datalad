@@ -23,8 +23,8 @@ from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.cmd import Runner
 from ..interface.base import Interface
-from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
-from datalad.utils import getpwd
+from datalad.distribution.dataset import EnsureDataset, Dataset, \
+    datasetmethod, require_dataset
 from datalad.support.exceptions import CommandError
 
 
@@ -94,24 +94,8 @@ class AddSibling(Interface):
         if url is None:
             url = pushurl
 
-        # shortcut
-        ds = dataset
-
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-        if ds is None:
-            # try to find a dataset at or above CWD
-            dspath = GitRepo.get_toppath(abspath(getpwd()))
-            if dspath is None:
-                raise ValueError(
-                        "No dataset found at or above {0}.".format(getpwd()))
-            ds = Dataset(dspath)
-            lgr.debug("Resolved dataset for target creation: {0}".format(ds))
-
-        assert(ds is not None and name is not None and url is not None)
-
-        if not ds.is_installed():
-            raise ValueError("Dataset {0} is not installed yet.".format(ds))
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='sibling addition')
         assert(ds.repo is not None)
 
         ds_basename = basename(ds.path)

@@ -11,7 +11,7 @@
 
 import os
 from os.path import join as opj, abspath, normpath
-from ..dataset import Dataset, EnsureDataset, resolve_path
+from ..dataset import Dataset, EnsureDataset, resolve_path, require_dataset
 from datalad.utils import chpwd, getpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -26,6 +26,7 @@ from datalad.tests.utils import assert_not_in
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
+from datalad.support.exceptions import InsufficientArgumentsError
 
 
 def test_EnsureDataset():
@@ -194,3 +195,24 @@ def test_subdatasets(path):
     assert_true(ds.is_installed())
     eq_(ds.get_subdatasets(), [])
     # TODO actual submodule checkout is still there
+
+
+@with_tempfile(mkdir=True)
+def test_require_dataset(path):
+    # in this folder by default
+    assert_equal(
+        require_dataset(None).path,
+        abspath(os.path.curdir))
+    with chpwd(path):
+        assert_raises(
+            InsufficientArgumentsError,
+            require_dataset,
+            None)
+    assert_equal(
+        require_dataset('some', check_installed=False).path,
+        abspath('some'))
+    assert_raises(
+        ValueError,
+        require_dataset,
+        'some',
+        check_installed=True)

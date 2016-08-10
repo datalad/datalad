@@ -19,15 +19,14 @@ from os.path import join as opj
 from datalad.interface.base import Interface
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.exceptions import CommandError
 from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
 from datalad.utils import knows_annex
-from datalad.utils import getpwd
 
 from .dataset import Dataset
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
+from .dataset import require_dataset
 
 lgr = logging.getLogger('datalad.distribution.update')
 
@@ -86,24 +85,7 @@ class Update(Interface):
                                       "implemented yet.")
 
         # shortcut
-        ds = dataset
-
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-
-        # if we have no dataset given, figure out which one we need to operate
-        # on, based on the current working directory of the process:
-        if ds is None:
-            # try to find a dataset at or above PWD:
-            dspath = GitRepo.get_toppath(getpwd())
-            if dspath is None:
-                raise ValueError("No dataset found at %s." % getpwd())
-            ds = Dataset(dspath)
-        assert (ds is not None)
-
-        if not ds.is_installed():
-            raise ValueError("No installed dataset found at "
-                             "{0}.".format(ds.path))
+        ds = require_dataset(dataset, check_installed=True, purpose='updating')
         assert (ds.repo is not None)
 
         repos_to_update = [ds.repo]

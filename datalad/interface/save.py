@@ -18,13 +18,10 @@ from os.path import abspath
 
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.exceptions import InsufficientArgumentsError
-from datalad.support.gitrepo import GitRepo
 from datalad.support.param import Parameter
-from datalad.distribution.dataset import Dataset
 from datalad.distribution.dataset import EnsureDataset
 from datalad.distribution.dataset import datasetmethod
-from datalad.utils import getpwd
+from datalad.distribution.dataset import require_dataset
 
 from .base import Interface
 
@@ -76,21 +73,9 @@ class Save(Interface):
     def __call__(message=None, files=None, dataset=None,
                  auto_add_changes=False, version_tag=None):
         # shortcut
-        ds = dataset
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='saving')
 
-        if ds is not None and not isinstance(ds, Dataset):
-            ds = Dataset(ds)
-
-        if ds is None:
-            # try CWD:
-            dspath = GitRepo.get_toppath(getpwd())
-            if not dspath:
-                raise InsufficientArgumentsError("No dataset found")
-            ds = Dataset(dspath)
-
-        if not ds.is_installed():
-            raise RuntimeError(
-                "cannot save a state when a dataset is not yet installed")
         if not message:
             message = 'Changes recorded by datalad'
         if auto_add_changes:
