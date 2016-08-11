@@ -1224,7 +1224,7 @@ class GitRepo(object):
         # TODO: May be check for the need of -b options herein?
 
         self._git_custom_command(
-            '', ['git', 'checkout'] + options + [name],
+            '', ['git', 'checkout'] + options + [str(name)],
             expect_stderr=True
         )
 

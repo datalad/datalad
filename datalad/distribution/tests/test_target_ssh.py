@@ -139,9 +139,9 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 
     # raise if git repos were not created:
     t_super = GitRepo(opj(target_path, basename(src_path)), create=False)
-    t_sub1 = GitRepo(opj(target_path, basename(src_path) + "-sub1"),
+    t_sub1 = GitRepo(opj(target_path, basename(src_path) + "-subm 1"),
                      create=False)
-    t_sub2 = GitRepo(opj(target_path, basename(src_path) + "-sub2"),
+    t_sub2 = GitRepo(opj(target_path, basename(src_path) + "-subm 2"),
                      create=False)
 
     for repo in [source.repo, sub1.repo, sub2.repo]:

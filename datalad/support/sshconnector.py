@@ -32,6 +32,10 @@ from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.ssh')
 
+def _wrap_str(s):
+    """Helper to wrap argument into '' to be passed over ssh cmdline"""
+    s = s.replace("'", r'\'')
+    return "'%s'" % s
 
 @auto_repr
 class SSHConnection(object):
@@ -83,10 +87,9 @@ class SSHConnection(object):
             # windows check currently not needed, but keep it as a reminder
         # The safest best while dealing with any special characters is to wrap
         # entire argument into "" while escaping possibly present " inside.
-        # Actually repr seems to achieve the same goal at least with basic symbols
         # I guess for the ` & and other symbols used in the shell -- yet to figure out
-        # how to escape it reliably
-        cmd_list = list(map(repr, cmd_list))
+        # how to escape it reliably.
+        cmd_list = list(map(_wrap_str, cmd_list))
         ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + cmd_list
 
         # TODO: pass expect parameters from above?
