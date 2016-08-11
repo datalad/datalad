@@ -6,7 +6,7 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Metadata"""
+"""Metadata handling (parsing, storing, querying)"""
 
 
 import os
@@ -78,16 +78,23 @@ def get_dataset_identifier(ds):
     return dsid
 
 
+def _get_base_metadata(ds_identifier):
+    """Return base metadata as dict for a given ds_identifier
+    """
+
+    return {
+        "@context": "http://schema.org/",
+        "@id": ds_identifier,
+    }
+
+
 def _get_implicit_metadata(ds, ds_identifier):
     """Convert git/git-annex info into metadata
 
     Anything that doesn't come as metadata in dataset **content**, but is
     encoded in the dataset repository itself.
     """
-    meta = {
-        "@context": "http://schema.org/",
-        "@id": ds_identifier,
-    }
+    meta = _get_base_metadata(ds_identifier)
 
     # whenever we have a full dataset, give it a type
     if ds.is_installed():

@@ -12,6 +12,7 @@
 
 from os.path import exists, join as opj
 from simplejson import load as jsonload
+from .. import _get_base_metadata
 
 _metadata_fname = 'datapackage.json'
 
@@ -40,15 +41,13 @@ def _compact_author(obj):
 
 def _compact_license(obj):
     if isinstance(obj, dict):
-        if 'url' in obj:
-            return obj['url']
-        else:
-            return obj['type']
+        # With obj itself if no url or type
+        return obj.get('url', obj.get('type', obj))
     else:
         return obj
 
 
-def get_metadata(ds, identifier):
+def get_metadata(ds, ds_identifier):
     """Extract metadata from a frictionless data package.
 
     Parameters
@@ -67,10 +66,7 @@ def get_metadata(ds, identifier):
 
     foreign = jsonload(open(opj(ds.path, _metadata_fname)))
 
-    meta = {
-        "@context": "http://schema.org/",
-        "@id": identifier,
-    }
+    meta = _get_base_metadata(ds_identifier)
 
     for term in (
             'name', 'title', 'description', 'keywords', 'version',

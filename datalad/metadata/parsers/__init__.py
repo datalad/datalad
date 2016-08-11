@@ -10,3 +10,7 @@
 
 from . import bids
 from . import frictionless_datapackage
+
+# TODO: consider bringing common functionality together via a class hierarchy
+# something along the
+# BaseMetaParser -> JSONMetaParser -> {BIDS, Frictionless_DataPackage}?

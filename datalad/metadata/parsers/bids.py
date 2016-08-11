@@ -11,12 +11,21 @@
 from os.path import exists, join as opj
 from simplejson import load as jsonload
 from .. import get_dataset_identifier
+from .. import _get_base_metadata
 
+# XXX Could become a class attribute
+_metadata_fname = 'dataset_description.json'
+
+
+# XXX Could become a class method
 def has_metadata(ds):
-    return exists(opj(ds.path, 'dataset_description.json'))
+    return exists(opj(ds.path, _metadata_fname))
 
 
-def get_metadata(ds, identifier):
+# XXX Could become a class method
+# XXX consider RFing into get_metadata(ds) and then centrally updating base_metadata
+#     with returned meta, or do we foresee some meta without that base?
+def get_metadata(ds, ds_identifier):
     """Extract metadata from BIDS datasets.
 
     Parameters
@@ -32,12 +41,9 @@ def get_metadata(ds, identifier):
     if not has_metadata(ds):
         raise ValueError("no BIDS metadata found at {}".format(ds.path))
 
-    bids = jsonload(open(opj(ds.path, 'dataset_description.json')))
+    bids = jsonload(open(opj(ds.path, _metadata_fname)))
 
-    meta = {
-        "@context": "http://schema.org/",
-        "@id": identifier,
-    }
+    meta = _get_base_metadata(ds_identifier)
 
     # TODO maybe normalize labels of standard licenses to definition URIs
     # perform mapping
