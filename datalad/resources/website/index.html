@@ -25,19 +25,18 @@
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.10.5/jquery.dataTables.min.js"></script>
 	<script type="text/javascript" charset="utf8" src="https://raw.githubusercontent.com/blueimp/JavaScript-MD5/master/js/md5.min.js"></script>
 	<script>
-	 function directory(url) {
+	 function directory() {
 	     // construct path to metadata json based on directory to be rendered argument passed in url
 	     var metadata_dir = '.git/datalad/metadata/'
-	     var metadata_path = getParameterByName('dir') ? getParameterByName('dir').slice(0,-1): '/';
-	     var url = window.location.pathname + metadata_dir + md5(metadata_path);
-	     console.log(metadata_path, md5(metadata_path), url);
+	     var metadata_path = getParameterByName('dir') ? getParameterByName('dir').slice(1,-1) : '/';
+	     var metadata_url = window.location.pathname + metadata_dir + md5(metadata_path);
 	     var parent = false;
 
 	     var table = $('#directory').DataTable( {
 		 "async": true,    //async get json
 		 "paging": false,  //ensure scrolling instead of pages
 		 "ajax": {         //specify url to get json from ajax
-		     "url": url,
+		     "url": metadata_url,
 		     "dataSrc": "nodes"
 		 },
 	         "order": [[ 6, "desc" ], [ 0, 'asc' ]],
@@ -67,56 +66,32 @@
 		     var api = this.api();
 		     // all tables should have ../ parent path
 		     if (!parent)
-			 table.row.add({"name": "..", "repo": "", "date": "", "path": "", "type": "dir", "size": ""}).draw();
+			 table.row.add({"name": "..", "repo": "", "date": "", "path": "", "type": "annex", "size": ""}).draw();
 		     // add click handlers
 		     api.$('tr').click( function () {           		                     // on clicking a row element
 			 var data = table.row( this ).data();                                        // extract its data json from table
-			 if (data.type == 'git' || data.type == 'annex') {
-			     if (data.name == '..')
-				 window.location.assign(parent_url(window.location.href));           // move up the url tree
-			     else if (url_exists(window.location.href + data.name + '/index.html'))  // if index.html exists and dir='git' or 'annex' it must be a dataset so move to its url/index.html
-				 window.location.assign(window.location.href + data.name);
-			     else
-				 window.location.search = '?dir=' + data.name;                       // else pass the repo name as parameter to current datasets index.html i.e ?dir=data.name
-			 }
-			 else if (data.type == 'dir') {                                              // if clicked row of directory type
-			     dir = getParameterByName('dir');
-			     console.log(dir);
-			     if (data.name == '..') {                                                // if to move directory tree
-				 if (parent_url(dir) == '/' || parent_url(dir) == '')                // and moving up makes us reach dataset root
-				     window.location.assign(window.location.href);                   // remove ?dir= parameter, go to dataset_url == index.html location. i.e url?dir=dir/ -> url
-				 else
-				     window.location.search = '?dir=' + parent_url(dir);             // else pass back parent of current ?dir= parameter. i.e ?dir=dir/subdir -> ?dir=dir
-			     }
-			     else {                                                                  // else append clicked row name to current ?dir= parameter
-				 if (dir) {
-				     console.log('?dir=' + dir + data.name);
-				     window.location.search = '?dir=' + dir + data.name;
-				 }
-				 else {
-				     console.log('?dir=' + dir + data.name);
-				     window.location.search = '?dir=' + data.name;
-				 }
-			     }
-			 }
-			 else if (data.type == 'file' || data.type == 'link') {                                 // if clicked row of directory type
-			     dir = getParameterByName('dir');
-			     if (dir)
-				 window.location.assign(window.location.href.split('?')[0] + dir + data.name);  // go to url of clicked file/link
-			     else
-				 window.location.assign(window.location.href.split('?')[0] + data.name);        // go to url of clicked file/link
-			 }
+			 if (data.type == 'link-broken') { return; }                                 // don't do anything for broken links
+			 var dir = getParameterByName('dir');                                        // get directory parameter
+			 var move = data.name == '..' ? parent_url : child_url;                      // which direction to move, up or down the path ?
+			 var next = dir ? move(dir, data.name) : move(absolute_url(''), data.name);  // which path to move, dir parameter or current path ?
+			 update_param_or_path(next, data.type, dir) ? window.location.search = '?dir=' + next: window.location.assign(next);  // update parameter or url path with new path ?
 		     });
 		 }
 	     });
-	     table.columns([4,5,6]).visible(false);  //hide complete path, file type and sorting columns
+	     table.columns([4,5,6]).visible(false);  // hide complete path, file type and sorting columns
 	     return table;
 	 }
 	 // check if url exists
 	 function url_exists(url) { var http = new XMLHttpRequest();  http.open('HEAD', url, false);  http.send();  return http.status!=404; }
 
 	 // construct parent path of url passed
-	 function parent_url(url) {  url_array = url.split(/[\\/]/);  url_array.splice(-2,1);  return url_array.join('/');  }
+	 function parent_url(url, node_name) {  url_array = url.split(/[\\/]/);  url_array.splice(-2,1);  return url_array.join('/');  }
+
+	 // construct child path of url passed
+	 function child_url(url, node_name) {  return url + node_name;  }
+
+	 // decompose url to actual path to node e.g if next_url=d1/d2/d3 and current_url = example.com/ds/?dir=d1/d2 -> return example.com/ds/d1/d2/d3
+	 function absolute_url(next_url) {  return (window.location.pathname.replace(/\?.*/g, '') + next_url).replace('//','/');  }
 
 	 //extract GET parameters from URL
 	 function getParameterByName(name, url) {
@@ -125,11 +100,21 @@
 	     name = name.replace(/[\[\]]/g, "\\$&");
 	     var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
 		 results = regex.exec(url);
-	     if (!results) return null;
-	     if (!results[2]) return null;
+	     if (!results || !results[2]) return null;
 	     return decodeURIComponent(results[2].replace(/\+/g, " "));
 	 }
 
+	 //to update parameter if url directory or not dataset
+	 function update_param_or_path(url, type, current_state) {
+	     // only check for index.html in directories of type annex, git,
+	     // allows other dirs to have index.html, eases constrain on non-datalad index.html presence in dataset
+	     if (type == 'git' || type == 'annex') {
+		 url += '/index.html';
+		 test_url = (current_state ? absolute_url(url): url).replace('//', '/');    // convert url to absolute if passed as parameter as its relative
+		 return url_exists(test_url) ? false: true;                                 // if index.html exists @ url, the clicked node is a dataset
+	     }
+	     return type == 'dir' ? true: false
+	 }
 	 $(document).ready(function() {
 	     var table = directory();   // construct table based on files in directory and their metadata
 	 });
