@@ -1,0 +1,93 @@
+# emacs: -*- mode: python; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# ex: set sts=4 ts=4 sw=4 noet:
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+#
+#   See COPYING file distributed along with the datalad package for the
+#   copyright and license terms.
+#
+# ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
+"""Parser for friction-less data packages
+(http://specs.frictionlessdata.io/data-packages)
+"""
+
+from os.path import exists, join as opj
+from simplejson import load as jsonload
+
+_metadata_fname = 'datapackage.json'
+
+
+def has_metadata(ds):
+    fname = opj(ds.path, _metadata_fname)
+    try:
+        return exists(fname) and 'name' in jsonload(open(fname))
+    except:
+        return False
+
+
+def _compact_author(obj):
+    if isinstance(obj, dict):
+        bits = []
+        if 'name' in obj:
+            bits.append(obj['name'])
+        if 'email' in obj:
+            bits.append('<{}>'.format(obj['email']))
+        if 'web' in obj:
+            bits.append('({})'.format(obj['web']))
+        return ' '.join(bits)
+    else:
+        return obj
+
+
+def _compact_license(obj):
+    if isinstance(obj, dict):
+        if 'url' in obj:
+            return obj['url']
+        else:
+            return obj['type']
+    else:
+        return obj
+
+
+def get_metadata(ds, identifier):
+    """Extract metadata from a frictionless data package.
+
+    Parameters
+    ----------
+    ds : dataset instance
+      Dataset to extract metadata from.
+
+    Returns
+    -------
+    dict
+      JSON-LD compliant
+    """
+    if not has_metadata(ds):
+        raise ValueError(
+            "no data package metadata found at {}".format(ds.path))
+
+    foreign = jsonload(open(opj(ds.path, _metadata_fname)))
+
+    meta = {
+        "@context": "http://schema.org/",
+        "@id": identifier,
+    }
+
+    for term in (
+            'name', 'title', 'description', 'keywords', 'version',
+            'homepage'):
+        if term in foreign:
+            meta[term] = foreign[term]
+    if 'author' in foreign:
+        meta['author'] = _compact_author(foreign['author'])
+    if 'contributors' in foreign:
+        meta['contributors'] = [_compact_author(c)
+                                for c in foreign['contributors']]
+    # two license terms were supported at some point
+    if 'license' in foreign:
+        meta['license'] = _compact_license(foreign['license'])
+    if 'licenses' in foreign:
+        meta['license'] = [_compact_license(l) for l in foreign['licenses']]
+
+    meta['dcterms:conformsTo'] = 'http://specs.frictionlessdata.io/data-packages'
+
+    return meta

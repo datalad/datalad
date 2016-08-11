@@ -17,6 +17,7 @@ import os
 from os.path import join as opj
 from datalad.support.exceptions import InsufficientArgumentsError
 
+
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
     # nothing set, nothing found
@@ -28,6 +29,16 @@ def test_get_metadata_type(path):
     # minimal setting
     open(opj(path, '.datalad', 'config'), 'w+').write('[metadata]\nnativetype = mamboschwambo\n')
     assert_equal(get_metadata_type(Dataset(path)), ['mamboschwambo'])
+
+
+@with_tree(tree={
+    'dataset_description.json': "{}",
+    'datapackage.json': '{"name": "some"}'
+})
+def test_get_multiple_metadata_types(path):
+    assert_equal(
+        sorted(get_metadata_type(Dataset(path), guess=True)),
+        ['bids', 'frictionless_datapackage'])
 
 
 @with_tree(tree={
