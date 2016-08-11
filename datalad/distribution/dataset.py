@@ -263,6 +263,7 @@ class Dataset(object):
                           no_annex=False,
                           annex_version=None,
                           annex_backend='MD5E',
+                          native_metadata_type=None,
                           git_opts=None,
                           annex_opts=None,
                           annex_init_opts=None):
@@ -286,6 +287,8 @@ class Dataset(object):
           version of annex repository to be used
         annex_backend: str
           backend to be used by annex for computing file keys
+        native_metadata_type : list(str), optional
+          meta data type labels
         git_opts: list of str
           cmdline options to be passed to the git executable
         annex_opts: list of str
@@ -313,6 +316,7 @@ class Dataset(object):
                      no_annex=no_annex,
                      annex_version=annex_version,
                      annex_backend=annex_backend,
+                     native_metadata_type=native_metadata_type,
                      git_opts=git_opts,
                      annex_opts=annex_opts,
                      annex_init_opts=annex_init_opts,

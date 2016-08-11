@@ -116,6 +116,14 @@ class Create(Interface):
             of datasets across platforms (especially those with limited
             path lengths)""",
             nargs=1),
+        native_metadata_type=Parameter(
+            args=('--native-metadata-type',),
+            metavar='LABEL',
+            action='append',
+            constraints=EnsureStr() | EnsureNone(),
+            doc="""Metadata type label. Match match the name of the respective
+            parser implementation in Datalad (i.e. "bids").[CMD:  This option
+            can be given multiple times CMD]"""),
         git_opts=git_opts,
         annex_opts=annex_opts,
         annex_init_opts=annex_init_opts,
@@ -132,6 +140,7 @@ class Create(Interface):
             no_annex=False,
             annex_version=None,
             annex_backend='MD5E',
+            native_metadata_type=None,
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None):
@@ -168,6 +177,7 @@ class Create(Interface):
                 no_annex=no_annex,
                 annex_version=annex_version,
                 annex_backend=annex_backend,
+                native_metadata_type=native_metadata_type,
                 git_opts=git_opts,
                 annex_opts=annex_opts,
                 annex_init_opts=annex_init_opts)
@@ -209,7 +219,7 @@ class Create(Interface):
                 ds.config.unset(id_var, where='dataset')
             ds.config.add(id_var, ds.id, where='dataset')
 
-           # save everthing
+            # save everthing
             ds.repo.add('.datalad', git=True)
             vcs.commit(msg="[DATALAD] initial commit",
                        options=to_options(allow_empty=True))

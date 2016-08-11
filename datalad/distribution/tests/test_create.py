@@ -95,7 +95,7 @@ def test_create_curdir(path, path2):
 @with_tempfile
 def test_create(path):
     ds = Dataset(path)
-    ds.create(description="funny")
+    ds.create(description="funny", native_metadata_type=['bim', 'bam', 'bum'])
     ok_(ds.is_installed())
     ok_clean_git(ds.path, annex=True)
 
@@ -112,6 +112,9 @@ def test_create(path):
     assert_equal(
         ds.config.get_value('datalad.dataset', 'id'),
         ds.id)
+    assert_equal(
+        ds.config.get_value('datalad.metadata', 'nativetype'),
+        'bim bam bum')
 
 
 @with_tempfile
