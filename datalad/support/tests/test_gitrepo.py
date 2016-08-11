@@ -181,7 +181,7 @@ def test_GitRepo_get_indexed_files(src, path):
 
     runner = Runner()
     out = runner(['git', 'ls-files'], cwd=path)
-    out_list = filter(bool, out[0].split('\n'))
+    out_list = list(filter(bool, out[0].split('\n')))
 
     for item in idx_list:
         assert_in(item, out_list, "%s not found in output of git ls-files in %s" % (item, path))
