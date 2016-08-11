@@ -143,7 +143,7 @@ def _normalize_path(base_dir, path):
     if not path:
         return path
 
-    base_dir = realpath(base_dir)
+    base_dir = realpath(base_dir)  # realpath OK
     # path = normpath(path)
     # Note: disabled normpath, because it may break paths containing symlinks;
     # But we don't want to realpath relative paths, in case cwd isn't the
@@ -153,7 +153,7 @@ def _normalize_path(base_dir, path):
         # path might already be a symlink pointing to annex etc,
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
-        path = opj(realpath(dirname(path)), basename(path))
+        path = opj(realpath(dirname(path)), basename(path))  # realpath OK
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -163,7 +163,7 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = normpath(opj(realpath(getpwd()), path))
+         path = normpath(opj(realpath(getpwd()), path))  # realpath OK
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.

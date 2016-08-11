@@ -305,7 +305,7 @@ class Dataset(object):
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
         from .install import _with_sep
-        if not realpath(path).startswith(_with_sep(realpath(self.path))):
+        if not realpath(path).startswith(_with_sep(realpath(self.path))):  # realpath OK
             raise ValueError("path %s outside dataset %s" % (path, self))
 
         subds = Dataset(path)
@@ -336,10 +336,11 @@ class Dataset(object):
         # TODO: clean that part and move it in here (Dataset)
         #       or call install to add the thing inplace
         from .install import _install_subds_inplace
-        from os.path import relpath
-        return _install_subds_inplace(ds=self, path=subds.path,
-                                      relativepath=relpath(subds.path, self.path),
-                                      name=name)
+        return _install_subds_inplace(
+            ds=self, path=subds.path,
+            relativepath=relpath(realpath(subds.path), realpath(self.path)),  # realpath OK
+            name=name
+        )
 
 #    def get_file_handles(self, pattern=None, fulfilled=None):
 #        """Get paths to all known file_handles, optionally matching a specific

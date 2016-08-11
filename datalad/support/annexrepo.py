@@ -616,7 +616,8 @@ class AnnexRepo(GitRepo):
             for f in files:
                 filepath = opj(self.path, f)
                 if islink(filepath):                    # if symlink
-                    target_path = realpath(filepath)    # find abspath of node pointed to by symlink
+                    # find abspath of node pointed to by symlink
+                    target_path = realpath(filepath)  # realpath OK
                     # TODO: checks for being not outside of this repository
                     out.append(exists(target_path) and '.git/annex/objects' in target_path)
                 else:
@@ -654,7 +655,8 @@ class AnnexRepo(GitRepo):
                 filepath = opj(self.path, f)
                 # todo checks for being not outside of this repository
                 out.append(
-                    islink(filepath) and '.git/annex/objects' in realpath(filepath)
+                    islink(filepath)
+                    and '.git/annex/objects' in realpath(filepath)  # realpath OK
                 )
             return out
 
