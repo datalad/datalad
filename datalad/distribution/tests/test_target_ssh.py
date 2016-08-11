@@ -129,8 +129,8 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         AnnexRepo(opj(src_path, subds), init=True,
                   create=False).checkout("master")
 
-    sub1 = Dataset(opj(src_path, "sub1"))
-    sub2 = Dataset(opj(src_path, "sub2"))
+    sub1 = Dataset(opj(src_path, "subm 1"))
+    sub2 = Dataset(opj(src_path, "subm 2"))
 
     create_publication_target_sshwebserver(dataset=source,
                                            sshurl="ssh://localhost",

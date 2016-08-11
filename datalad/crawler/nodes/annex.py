@@ -129,7 +129,7 @@ class initiate_dataset(object):
             # we need first to initiate a git repository
             git_repo = GitRepo(path, create=True)
             # since we are initiating, that branch shouldn't exist yet, thus --orphan
-            git_repo.checkout(self.branch, options="--orphan")
+            git_repo.checkout(self.branch, options=["--orphan"])
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creator"
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
@@ -661,7 +661,7 @@ class Annexificator(object):
                     if remote_branch in remote_branches:
                         lgr.info("Did not find branch %r locally. Checking out remote one %r"
                                  % (branch, remote_branch))
-                        self.repo.checkout(remote_branch, options='--track')
+                        self.repo.checkout(remote_branch, options=['--track'])
                         # refresh the list -- same check will come again
                         existing_branches = self.repo.get_branches()
                         break
@@ -670,14 +670,14 @@ class Annexificator(object):
                 if parent is None:
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
-                    self.repo.checkout(branch, options="--orphan")
+                    self.repo.checkout(branch, options=["--orphan"])
                     if self.repo.dirty:
                         self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
                     lgr.info("Checking out %s into a new branch %s" % (parent, branch))
-                    self.repo.checkout(parent, options="-b %s" % branch)
+                    self.repo.checkout(parent, options=["-b", branch])
             else:
                 lgr.info("Checking out an existing branch %s" % (branch))
                 self.repo.checkout(branch)
