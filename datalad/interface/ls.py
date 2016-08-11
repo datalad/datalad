@@ -463,7 +463,7 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     # directory metadata directory tree location
     metadata_dir = opj(ds_path, metadata_path)
     # relative path of current directory wrt dataset root
-    dir_path = path.split(ds_path)[1][1:] or basename(ds_path)
+    dir_path = path.split(ds_path)[1][1:] or '/'
     # create md5 hash of current directory's relative path
     metadata_hash = hashlib.md5(dir_path).hexdigest()
     # construct final path to metadata file
@@ -504,7 +504,7 @@ def fs_render(fs_metadata, json=None, **kwargs):
             makedirs(metadata_dir)
         # write directory metadata to json
         with open(metadata_file, 'w') as f:
-             js.dump(fs_metadata, f)
+            js.dump(fs_metadata, f)
 
     # else if json flag set to delete, remove .dir.json of current directory
     elif json == 'delete' and exists(metadata_file):
