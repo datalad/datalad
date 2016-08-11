@@ -23,6 +23,7 @@ from datalad.support.network import RI, is_ssh
 # TODO: centralize AppDirs (=> datalad.config?)
 from appdirs import AppDirs
 from datalad.support.exceptions import CommandError
+from datalad.dochelpers import exc_str
 from datalad.utils import not_supported_on_windows
 from datalad.utils import on_windows
 from datalad.utils import assure_dir
@@ -31,6 +32,10 @@ from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.ssh')
 
+def _wrap_str(s):
+    """Helper to wrap argument into '' to be passed over ssh cmdline"""
+    s = s.replace("'", r'\'')
+    return "'%s'" % s
 
 @auto_repr
 class SSHConnection(object):
@@ -77,10 +82,15 @@ class SSHConnection(object):
 
         # TODO: Do we need to check for the connection to be open or just rely
         # on possible ssh failing?
-
-        ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + cmd if isinstance(cmd, list) \
+        cmd_list = cmd if isinstance(cmd, list) \
             else sh_split(cmd, posix=not on_windows)
             # windows check currently not needed, but keep it as a reminder
+        # The safest best while dealing with any special characters is to wrap
+        # entire argument into "" while escaping possibly present " inside.
+        # I guess for the ` & and other symbols used in the shell -- yet to figure out
+        # how to escape it reliably.
+        cmd_list = list(map(_wrap_str, cmd_list))
+        ssh_cmd = ["ssh"] + self.ctrl_options + [self.host] + cmd_list
 
         # TODO: pass expect parameters from above?
         # Hard to explain to toplevel users ... So for now, just set True
@@ -200,10 +210,23 @@ class SSHManager(object):
             self._connections[ctrl_path] = c
             return c
 
-    def close(self):
+    def close(self, allow_fail=True):
         """Closes all connections, known to this instance.
+
+        Parameters
+        ----------
+        allow_fail: bool, optional
+          If True, swallow exceptions which might be thrown during
+          connection.close, and just log them at DEBUG level
         """
         if self._connections:
             lgr.debug("Closing %d SSH connections..." % len(self._connections))
             for cnct in self._connections:
-                self._connections[cnct].close()
+                f = self._connections[cnct].close
+                if allow_fail:
+                    f()
+                else:
+                    try:
+                        f()
+                    except Exception as exc:
+                        lgr.debug("Failed to close a connection: %s", exc_str(exc))

@@ -207,11 +207,11 @@ def test_install_subdataset(src, path):
     ds = install(path=path, source=src)
 
     # subdataset not installed:
-    subds = Dataset(opj(path, 'sub1'))
+    subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
 
     # install it:
-    ds.install('sub1')
+    ds.install('subm 1')
     assert_true(isdir(opj(subds.path, '.git')))
 
     ok_(subds.is_installed())
@@ -223,13 +223,13 @@ def test_install_subdataset(src, path):
     # Now the obnoxious install an annex file within not yet
     # initialized repository!
     with swallow_outputs():  # progress bar
-        ds.install(opj('sub2', 'test-annex.dat'))
-    subds2 = Dataset(opj(path, 'sub2'))
+        ds.install(opj('subm 2', 'test-annex.dat'))
+    subds2 = Dataset(opj(path, 'subm 2'))
     assert(subds2.is_installed())
     assert(subds2.repo.file_has_content('test-annex.dat'))
     # we shouldn't be able silently ignore attempt to provide source while
     # "installing" file under git
-    assert_raises(FileInGitError, ds.install, opj('sub2', 'INFO.txt'), source="http://bogusbogus")
+    assert_raises(FileInGitError, ds.install, opj('subm 2', 'INFO.txt'), source="http://bogusbogus")
 
 
 @with_tree(tree={

@@ -17,6 +17,8 @@ import os
 from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
     exists, islink, sep, realpath
 
+from six.moves.urllib.parse import quote as urlquote
+
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.distribution.dataset import Dataset, datasetmethod, \
@@ -31,7 +33,7 @@ from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
     is_explicit_path, on_windows, swallow_logs
-from datalad.support.network import RI
+from datalad.support.network import RI, URL
 from datalad.support.network import DataLadRI
 from datalad.support.network import is_url, is_datalad_compat_ri
 from datalad.utils import rmtree
@@ -131,8 +133,13 @@ def _install_subds_from_flexible_source(ds, sm_path, sm_url, recursive):
             url_suffix = '/.git'
             remote_url = remote_url[:-5]
         # attempt: submodule checkout at parent remote URL
+        # We might need to quote sm_path portion, e.g. for spaces etc
+        if remote_url and isinstance(RI(remote_url), URL):
+            sm_path_url = urlquote(sm_path)
+        else:
+            sm_path_url = sm_path
         clone_urls.append('{0}/{1}{2}'.format(
-            remote_url, sm_path, url_suffix))
+            remote_url, sm_path_url, url_suffix))
     # attempt: configured submodule URL
     # TODO: consider supporting DataLadRI here?  or would confuse
     #  git and we wouldn't want that (i.e. not allow pure git clone

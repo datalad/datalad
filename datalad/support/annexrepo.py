@@ -223,7 +223,7 @@ class AnnexRepo(GitRepo):
         return GitRepo.is_valid_repo(path) and \
                exists(opj(path, '.git', 'annex'))
 
-    def add_remote(self, name, url, options=''):
+    def add_remote(self, name, url, options=[]):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
         super(AnnexRepo, self).add_remote(name, url, options)

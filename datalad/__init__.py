@@ -23,7 +23,7 @@ cfg = ConfigManager()
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
-atexit.register(ssh_manager.close)
+atexit.register(ssh_manager.close, allow_fail=False)
 
 
 def test(package='datalad', **kwargs):

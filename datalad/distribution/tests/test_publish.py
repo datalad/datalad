@@ -49,7 +49,7 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     res = publish(dataset=source, to="target")
@@ -107,7 +107,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     # subdatasets have no remote yet, so recursive publishing should fail:
@@ -117,11 +117,11 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
-    sub1_target.checkout("TMP", "-b")
+    sub1_target.checkout("TMP", ["-b"])
     sub2_target = GitRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", "-b")
-    sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
+    sub2_target.checkout("TMP", ["-b"])
+    sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
+    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -170,16 +170,16 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # create plain git at target:
     target = AnnexRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
-    sub1_target.checkout("TMP", "-b")
+    sub1_target.checkout("TMP", ["-b"])
     sub2_target = GitRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", "-b")
-    sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
+    sub2_target.checkout("TMP", ["-b"])
+    sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
+    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -221,6 +221,6 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
             result_paths.append(item.path)
         else:
             result_paths.append(item)
-    eq_({source.path, opj(source.path, "sub1"),
-         opj(source.path, "sub2"), 'test-annex.dat'},
+    eq_({source.path, opj(source.path, "subm 1"),
+         opj(source.path, "subm 2"), 'test-annex.dat'},
         set(result_paths))

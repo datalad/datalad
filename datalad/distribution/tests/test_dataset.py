@@ -86,7 +86,6 @@ def test_register_sibling(remote, path):
     assert_in('my_sibling', ds.repo.get_remotes())
     eq_(ds.repo.get_remote_url('my_sibling'), remote)
 
-
     ds.register_sibling('my_other_sibling', remote,
                         publish_url='http://fake.pushurl.com')
     assert_in('my_other_sibling', ds.repo.get_remotes())
@@ -99,11 +98,11 @@ def test_register_sibling(remote, path):
 @with_testrepos('.*nested_submodule.*', flavors=['local'])
 def test_get_subdatasets(path):
     ds = Dataset(path)
-    eq_(set(ds.get_subdatasets()), {'subdataset'})
+    eq_(set(ds.get_subdatasets()), {'sub dataset1'})
     eq_(set(ds.get_subdatasets(recursive=True)),
-        {'subdataset/subsubdataset', 'subdataset/subsubdataset/sub1',
-         'subdataset/subsubdataset/sub2', 'subdataset/sub1',
-         'subdataset/sub2', 'subdataset'})
+        {'sub dataset1/sub sub dataset1', 'sub dataset1/sub sub dataset1/subm 1',
+         'sub dataset1/sub sub dataset1/subm 2', 'sub dataset1/subm 1',
+         'sub dataset1/subm 2', 'sub dataset1'})
     # TODO:  More Flavors!
 
 
@@ -118,11 +117,11 @@ def test_is_installed(src, path):
     AnnexRepo(path, src)
     ok_(ds.is_installed())
     # submodule still not installed:
-    subds = Dataset(opj(path, 'sub1'))
+    subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
     # get the submodule
     from datalad.cmd import Runner
-    Runner().run(['git', 'submodule', 'update', '--init', 'sub1'], cwd=path)
+    Runner().run(['git', 'submodule', 'update', '--init', 'subm 1'], cwd=path)
     ok_(subds.is_installed())
 
 
