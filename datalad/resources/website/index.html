@@ -23,10 +23,14 @@
 	<table id="directory" class="display" width="100%" cellspacing="0"></table>
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.12.3.min.js"></script>
 	<script type="text/javascript" charset="utf8" src="http://ajax.aspnetcdn.com/ajax/jquery.dataTables/1.10.5/jquery.dataTables.min.js"></script>
+	<script type="text/javascript" charset="utf8" src="https://raw.githubusercontent.com/blueimp/JavaScript-MD5/master/js/md5.min.js"></script>
 	<script>
 	 function directory(url) {
 	     // construct path to metadata json based on directory to be rendered argument passed in url
-	     var url = (getParameterByName('dir') ? getParameterByName('dir') + ".dir.json": url_exists(url) ? url : ".dir.json");
+	     var metadata_dir = '.git/datalad/metadata/'
+	     var metadata_path = getParameterByName('dir') ? getParameterByName('dir').slice(0,-1): '/';
+	     var url = window.location.pathname + metadata_dir + md5(metadata_path);
+	     console.log(metadata_path, md5(metadata_path), url);
 	     var parent = false;
 
 	     var table = $('#directory').DataTable( {
@@ -65,16 +69,43 @@
 		     if (!parent)
 			 table.row.add({"name": "..", "repo": "", "date": "", "path": "", "type": "dir", "size": ""}).draw();
 		     // add click handlers
-		     api.$('tr').click( function () {           		                   // on clicking a row element
-			 var data = table.row( this ).data();                                      // extract its data json from table
-			 if (data.type == 'dir' || data.type == 'git' || data.type == 'annex') {   // if clicked row of directory type
-			     if (data.name != ".")
-				 window.location.search = '?dir=' + (data.name == ".." ? parent_url(url).replace('.dir.json', ''): url.replace('.dir.json', data.name + '/'));
+		     api.$('tr').click( function () {           		                     // on clicking a row element
+			 var data = table.row( this ).data();                                        // extract its data json from table
+			 if (data.type == 'git' || data.type == 'annex') {
+			     if (data.name == '..')
+				 window.location.assign(parent_url(window.location.href));           // move up the url tree
+			     else if (url_exists(window.location.href + data.name + '/index.html'))  // if index.html exists and dir='git' or 'annex' it must be a dataset so move to its url/index.html
+				 window.location.assign(window.location.href + data.name);
+			     else
+				 window.location.search = '?dir=' + data.name;                       // else pass the repo name as parameter to current datasets index.html i.e ?dir=data.name
 			 }
-			 else if (data.type == 'file' || data.type == 'link') {
-			    // update url to load json from selected directory
-                            window.location.assign(url.replace('.dir.json', data.name));
-	               }
+			 else if (data.type == 'dir') {                                              // if clicked row of directory type
+			     dir = getParameterByName('dir');
+			     console.log(dir);
+			     if (data.name == '..') {                                                // if to move directory tree
+				 if (parent_url(dir) == '/' || parent_url(dir) == '')                // and moving up makes us reach dataset root
+				     window.location.assign(window.location.href);                   // remove ?dir= parameter, go to dataset_url == index.html location. i.e url?dir=dir/ -> url
+				 else
+				     window.location.search = '?dir=' + parent_url(dir);             // else pass back parent of current ?dir= parameter. i.e ?dir=dir/subdir -> ?dir=dir
+			     }
+			     else {                                                                  // else append clicked row name to current ?dir= parameter
+				 if (dir) {
+				     console.log('?dir=' + dir + data.name);
+				     window.location.search = '?dir=' + dir + data.name;
+				 }
+				 else {
+				     console.log('?dir=' + dir + data.name);
+				     window.location.search = '?dir=' + data.name;
+				 }
+			     }
+			 }
+			 else if (data.type == 'file' || data.type == 'link') {                                 // if clicked row of directory type
+			     dir = getParameterByName('dir');
+			     if (dir)
+				 window.location.assign(window.location.href.split('?')[0] + dir + data.name);  // go to url of clicked file/link
+			     else
+				 window.location.assign(window.location.href.split('?')[0] + data.name);        // go to url of clicked file/link
+			 }
 		     });
 		 }
 	     });
@@ -95,7 +126,7 @@
 	     var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
 		 results = regex.exec(url);
 	     if (!results) return null;
-	     if (!results[2]) return '';
+	     if (!results[2]) return null;
 	     return decodeURIComponent(results[2].replace(/\+/g, " "));
 	 }
 
