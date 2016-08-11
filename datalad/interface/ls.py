@@ -13,7 +13,7 @@ __docformat__ = 'restructuredtext'
 
 import sys
 import time
-from os.path import exists, lexists, join as opj, abspath, isabs
+from os.path import exists, lexists, join as opj, abspath, isabs, getmtime
 from os.path import curdir, isfile, islink, isdir, dirname, basename, split, realpath
 from os import listdir, lstat, remove, makedirs
 import json as js
@@ -643,7 +643,15 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     fs['size'] = {size_type: humanize.naturalsize(size)
                   for size_type, size in children_size.items()}
 
+    # add dataset specific entries to its dict
+    fs['tags'] = AnnexModel(rootds.repo).describe
+    fs['branch'] = AnnexModel(rootds.repo).branch
+    fs['index-mtime'] = time.strftime(u"%Y-%m-%d %H:%M:%S",
+                                      time.localtime(getmtime(opj(rootds.path, '.git', 'index'))))
+
+    # append children datasets info to current dataset
     fs['nodes'].extend(children)
+
     # render current dataset
     lgr.info('Dataset: %s' % rootds.path)
     fs_render(fs, json=json)
