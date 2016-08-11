@@ -465,7 +465,7 @@ def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=No
     # relative path of current directory wrt dataset root
     dir_path = path.split(ds_path)[1][1:] or '/'
     # create md5 hash of current directory's relative path
-    metadata_hash = hashlib.md5(dir_path).hexdigest()
+    metadata_hash = hashlib.md5(dir_path.encode('utf-8')).hexdigest()
     # construct final path to metadata file
     metadata_file = opj(metadata_dir, metadata_hash)
 
