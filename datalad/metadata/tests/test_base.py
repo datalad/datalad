@@ -27,7 +27,7 @@ def test_get_metadata_type(path):
     assert_equal(get_metadata_type(Dataset(path)), None)
     # minimal setting
     open(opj(path, '.datalad', 'config'), 'w+').write('[metadata]\nnativetype = mamboschwambo\n')
-    assert_equal(get_metadata_type(Dataset(path)), 'mamboschwambo')
+    assert_equal(get_metadata_type(Dataset(path)), ['mamboschwambo'])
 
 
 @with_tree(tree={

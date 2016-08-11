@@ -27,7 +27,7 @@ json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False)
 
 # XXX Could become dataset method
 def get_metadata_type(ds, guess=False):
-    """Return the metadata type/scheme of a dataset
+    """Return the metadata type(s)/scheme(s) of a dataset
 
     Parameters
     ----------
@@ -36,27 +36,26 @@ def get_metadata_type(ds, guess=False):
     guess : bool
       Whether to try to auto-detect the type if no metadata type setting is
       found. All supported metadata schemes are tested in alphanumeric order.
-      Only the label of the first matching scheme is reported.
 
     Returns
     -------
-    str or None
-      Metadata type label or `None` if no type setting is found and and optional
-      auto-detection yielded no results
+    list(str) or None
+      Metadata type labels or `None` if no type setting is found and and
+      optional auto-detection yielded no results
     """
     cfg = ds.config
     if cfg and cfg.has_section('metadata'):
         if cfg.has_option('metadata', 'nativetype'):
-            return cfg.get_value('metadata', 'nativetype')
+            return cfg.get_value('metadata', 'nativetype').split()
+    mtypes = []
     if guess:
         # keep local, who knows what some parsers might pull in
         from . import parsers
         for mtype in sorted([p for p in parsers.__dict__ if not (p.startswith('_') or p == 'tests')]):
             pmod = import_module('.%s' % (mtype,), package=parsers.__package__)
             if pmod.has_metadata(ds):
-                return mtype
-    else:
-        return None
+                mtypes.append(mtype)
+    return mtypes if len(mtypes) else None
 
 
 # XXX Could become dataset method
@@ -250,15 +249,17 @@ def extract_metadata(ds, guess_type=False):
     meta.append(_get_implicit_metadata(ds, ds_identifier))
 
     # get native metadata
-    nativetype = get_metadata_type(ds, guess=guess_type)
-    if not nativetype:
+    nativetypes = get_metadata_type(ds, guess=guess_type)
+    if not nativetypes:
         return meta
 
     # keep local, who knows what some parsers might pull in
     from . import parsers
-    pmod = import_module('.{}'.format(nativetype), package=parsers.__package__)
-    native_meta = pmod.get_metadata(ds, ds_identifier)
-    # TODO here we could apply a "patch" to the native metadata, if desired
-    meta.append(native_meta)
+    for nativetype in nativetypes:
+        pmod = import_module('.{}'.format(nativetype),
+                             package=parsers.__package__)
+        native_meta = pmod.get_metadata(ds, ds_identifier)
+        # TODO here we could apply a "patch" to the native metadata, if desired
+        meta.append(native_meta)
 
     return meta
