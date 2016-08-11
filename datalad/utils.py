@@ -167,10 +167,11 @@ def sorted_files(dout):
                        if not '.git' in r], []))
 
 from os.path import sep as dirsep
-_VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
 
-def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
     """Generator to find files matching regex
 
     Parameters
@@ -181,11 +182,14 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
       as regex to exclude those files (regex: %r)
+    exclude_datalad:
+      If True, excludes files known to be datalad meta-data files (e.g. under
+      .datalad/ subdirectory) (regex: %r)
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
-    """ % _VCS_REGEX
+    """ % (_VCS_REGEX, _DATALAD_REGEX)
 
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
@@ -196,6 +200,8 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
             if exclude and re.search(exclude, path):
                 continue
             if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            if exclude_datalad and re.search(_DATALAD_REGEX, path):
                 continue
             yield path
 

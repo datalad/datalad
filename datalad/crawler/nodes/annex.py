@@ -17,6 +17,7 @@ from os import listdir
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os.path import isdir, islink
+from os.path import relpath
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
@@ -1013,15 +1014,26 @@ class Annexificator(object):
 
         return _commit_versions
 
-    def remove_other_versions(self, name=None, overlay=False):
+    def remove_other_versions(self, name=None, overlay=False, remove_unversioned=False, exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
+
+        Parameters
+        ----------
+        remove_unversioned: bool, optional
+          If there is a version defined now, remove those files which are unversioned
+          i.e. not listed associated with any version
+        exclude : basestring, optional
+          Regexp to search to exclude files from considering to remove them if
+          `remove_unversioned`.  Passed to `find_files`.  E.g. `README.*` which
+          could have been generated in `incoming` branch
         """
 
         def _remove_other_versions(data):
             if overlay:
                 raise NotImplementedError(overlay)
+
             stats = data.get('datalad_stats', None)
             versions_db = SingleVersionDB(self.repo, name=name)
 
@@ -1041,6 +1053,21 @@ class Annexificator(object):
                     if lexists(vfpathfull):
                         lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
                         os.unlink(vfpathfull)
+
+            if remove_unversioned:
+                # it might be that we haven't 'recorded' unversioned ones at all
+                # and now got an explicit version, so we would just need to remove them all
+                # For that we need to get all files which left, and remove them unless they are part
+                # of the current version
+                current_version_files = set(versions_db.versions[current_version].values())
+                for fpath in find_files('.*', exclude=exclude, exclude_datalad=True, exclude_vcs=True):
+                    fpath = relpath(fpath, '.')  # ./bla -> bla
+                    if fpath in current_version_files:
+                        continue
+                    lgr.log(5, "Removing unversioned %s file", fpath)
+                    os.unlink(fpath)
+            elif exclude:
+                lgr.warning("`exclude=%r` was specified whenever remove_unversioned is False", exclude)
 
             if stats:
                 stats.versions.append(current_version)

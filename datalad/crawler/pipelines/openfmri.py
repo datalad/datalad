@@ -141,7 +141,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
             annex.switch_branch('incoming-processed'),
             annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False),
             # still we would have all the versions present -- we need to restrict only to the current one!
-            annex.remove_other_versions('incoming'),
+            annex.remove_other_versions('incoming', remove_unversioned=True, exclude='(README|changelog).*'),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
                 {'loop': True},
