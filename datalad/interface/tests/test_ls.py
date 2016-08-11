@@ -26,8 +26,8 @@ from ...tests.utils import assert_equal, assert_in, assert_raises, assert_not_eq
 from ...tests.utils import use_cassette
 from ...tests.utils import with_tempfile
 from ...tests.utils import with_tree
-from datalad.interface.ls import ignored, fs_traverse, _ls_json, AnnexModel, machinesize
-from os.path import exists, lexists, join as opj, abspath, isabs, basename
+from datalad.interface.ls import ignored, fs_traverse, _ls_json, machinesize
+from os.path import exists, join as opj
 
 from datalad.downloaders.tests.utils import get_test_providers
 
@@ -189,13 +189,15 @@ def test_ls_json(topdir):
                     ds = _ls_json(topdir, json=state, all=all, recursive=recursive)
 
                 # subdataset should have its json created and deleted when all=True else not
-                subds_metahash = hashlib.md5('subds').hexdigest()
+                subds_metahash = hashlib.md5('/').hexdigest()
                 subds_metapath = opj(topdir, 'subds', meta_dir, subds_metahash)
                 assert_equal(exists(subds_metapath), (state == 'file' and all))
+
                 # root should have its json file created and deleted in all cases
-                ds_metahash = hashlib.md5(basename(topdir)).hexdigest()
+                ds_metahash = hashlib.md5('/').hexdigest()
                 ds_metapath = opj(meta_path, ds_metahash)
                 assert_equal(exists(ds_metapath), state == 'file')
+
                 # children should have their metadata json's created and deleted only when recursive=True
                 child_metahash = hashlib.md5(opj('dir', 'subdir')).hexdigest()
                 child_metapath = opj(meta_path, child_metahash)
