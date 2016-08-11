@@ -51,6 +51,7 @@ from datalad.tests.utils import serve_path_via_http
 from datalad.tests.utils import swallow_outputs
 from datalad.tests.utils import swallow_logs
 from datalad.tests.utils import use_cassette
+from datalad.tests.utils import skip_if_no_network
 from datalad.utils import _path_
 
 def test_insufficient_args():
@@ -317,6 +318,7 @@ def test_guess_dot_git():
         yield _test_guess_dot_git, annex
 
 
+@skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
 def test_install_crcns(tdir):
