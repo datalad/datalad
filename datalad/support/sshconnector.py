@@ -18,10 +18,10 @@ from subprocess import Popen
 from shlex import split as sh_split
 from os.path import isdir
 
-from datalad.support.network import RI, is_ssh
+# !!! Do not import network here -- delay import, allows to shave off 50ms or so
+# on initial import datalad time
+# from datalad.support.network import RI, is_ssh
 
-# TODO: centralize AppDirs (=> datalad.config?)
-from appdirs import AppDirs
 from datalad.support.exceptions import CommandError
 from datalad.dochelpers import exc_str
 from datalad.utils import not_supported_on_windows
@@ -32,10 +32,12 @@ from datalad.cmd import Runner
 
 lgr = logging.getLogger('datalad.ssh')
 
+
 def _wrap_str(s):
     """Helper to wrap argument into '' to be passed over ssh cmdline"""
     s = s.replace("'", r'\'')
     return "'%s'" % s
+
 
 @auto_repr
 class SSHConnection(object):
@@ -176,8 +178,16 @@ class SSHManager(object):
 
         self._connections = dict()
 
-        self.socket_dir = AppDirs('datalad', 'datalad.org').user_config_dir
-        assure_dir(self.socket_dir)
+        self._socket_dir = None
+
+    @property
+    def socket_dir(self):
+        if self._socket_dir is None:
+            # TODO: centralize AppDirs (=> datalad.config?)
+            from appdirs import AppDirs
+            self._socket_dir = AppDirs('datalad', 'datalad.org').user_config_dir
+            assure_dir(self._socket_dir)
+        return self._socket_dir
 
     def get_connection(self, url):
         """Get a singleton, representing a shared ssh connection to `url`
@@ -192,6 +202,7 @@ class SSHManager(object):
         SSHConnection
         """
         # parse url:
+        from datalad.support.network import RI, is_ssh
         sshri = RI(url)
 
         if not is_ssh(sshri):

@@ -9,9 +9,6 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
-import atexit
-
-from .version import __version__
 from .log import lgr
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
@@ -23,7 +20,12 @@ cfg = ConfigManager()
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
+
+import atexit
 atexit.register(ssh_manager.close, allow_fail=False)
+atexit.register(lgr.log, 5, "Exiting")
+
+from .version import __version__
 
 
 def test(package='datalad', **kwargs):

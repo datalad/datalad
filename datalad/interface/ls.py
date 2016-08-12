@@ -24,7 +24,6 @@ from .base import Interface
 from ..ui import ui
 from ..utils import swallow_logs
 from ..dochelpers import exc_str
-from ..support.s3 import get_key_url
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 
@@ -408,6 +407,8 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
                 # Skip this one
                 ui.message("")
                 continue
+            # OPT: delayed import
+            from ..support.s3 import get_key_url
             url = get_key_url(e, schema='http')
             try:
                 _ = urlopen(Request(url))

@@ -10,6 +10,10 @@
 """
 
 import logging
+lgr = logging.getLogger('datalad.dataset')
+
+lgr.log(5, "Importing dataset")
+
 from os.path import abspath, join as opj, normpath
 from six import string_types, PY2
 from functools import wraps
@@ -23,7 +27,6 @@ from datalad.utils import swallow_logs
 from datalad.utils import getpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 
-lgr = logging.getLogger('datalad.dataset')
 
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
