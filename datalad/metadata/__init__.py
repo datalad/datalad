@@ -25,6 +25,11 @@ metadata_basepath = opj('.datalad', 'meta')
 json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False)
 
 
+def _load_metadata_from_file(fname):
+    meta = jsonload(open(fname, 'rb'))
+    return meta
+
+
 # XXX Could become dataset method
 def get_metadata_type(ds, guess=False):
     """Return the metadata type(s)/scheme(s) of a dataset
@@ -93,6 +98,10 @@ def get_implicit_metadata(ds, ds_identifier=None):
 
     Anything that doesn't come as metadata in dataset **content**, but is
     encoded in the dataset repository itself.
+
+    Returns
+    -------
+    dict
     """
     if ds_identifier is None:
         ds_identifier = get_dataset_identifier(ds)
@@ -196,7 +205,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                 guess_type=guess_type,
                 ds_identifier=ds_identifier))
     else:
-        cached_meta = jsonload(open(main_meta_fname, 'rb'))
+        cached_meta = _load_metadata_from_file(main_meta_fname)
         if isinstance(cached_meta, list):
             meta.extend(cached_meta)
         else:
@@ -206,7 +215,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         for subds_path in ds.get_subdatasets(recursive=False):
             subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
             if exists(subds_meta_fname):
-                subds_meta = jsonload(open(subds_meta_fname, 'rb'))
+                subds_meta = _load_metadata_from_file(subds_meta_fname)
                 # we cannot simply append, or we get weired nested graphs
                 # proper way would be to expand the JSON-LD, extend the list and
                 # compact/flatten at the end. However assuming a single context
