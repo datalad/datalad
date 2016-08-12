@@ -7,6 +7,10 @@
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 
+import logging
+lgr = logging.getLogger('datalad.network')
+
+lgr.log(5, "Importing support.network")
 import calendar
 import email.utils
 import gzip
@@ -31,12 +35,9 @@ from six.moves.urllib.error import URLError
 from datalad.utils import on_windows
 from datalad.consts import DATASETS_TOPURL
 
-from datalad.utils import auto_repr
 # TODO not sure what needs to use `six` here yet
-import requests
-
-import logging
-lgr = logging.getLogger('datalad.network')
+# !!! Lazily import requests where needed -- needs 30ms or so
+# import requests
 
 
 def get_response_disposition_filename(s):
@@ -164,11 +165,12 @@ def iso8601_to_epoch(datestr):
     return calendar.timegm(iso8601.parse_date(datestr).timetuple())
 
 
-def __urlopen_requests(url, header_vals=None):
+def __urlopen_requests(url):
     # XXX Workaround for now for ... broken code
     if isinstance(url, Request):
         url = url.get_full_url()
-    return requests.Session().get(url)
+    from requests import Session
+    return Session().get(url)
 
 
 def retry_urlopen(url, retries=3):
@@ -845,3 +847,5 @@ def get_local_file_url(fname):
         # TODO:  need to fix for all the encoding etc
         furl = str(URL(scheme='file', path=fname))
     return furl
+
+lgr.log(5, "Finished importing support.network")
