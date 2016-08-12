@@ -942,7 +942,9 @@ class Annexificator(object):
                 # all new versions must be greater than the previous version
                 # since otherwise it would mean that we are complementing previous version and it might be
                 # a sign of a problem
-                assert (all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
+                # Well -- so far in the single use-case with openfmri it was that they added
+                # derivatives for the same version, so I guess we will allow for that, thus allowing =
+                assert (all((LooseVersion(prev_version) <= LooseVersion(v)) for v in versions))
                 # old implementation when we didn't have entire versions db stored
                 # new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
                 new_versions = versions
@@ -953,8 +955,8 @@ class Annexificator(object):
             if new_versions:
                 smallest_new_version = next(iter(new_versions))
                 if prev_version:
-                    if LooseVersion(smallest_new_version) <= LooseVersion(prev_version):
-                        raise ValueError("Smallest new version %s is <= prev_version %s"
+                    if LooseVersion(smallest_new_version) < LooseVersion(prev_version):
+                        raise ValueError("Smallest new version %s is < prev_version %s"
                                          % (smallest_new_version, prev_version))
 
             versions_db.update_versions(versions)  # store all new known versions
@@ -1147,7 +1149,7 @@ class Annexificator(object):
                 if stats:
                     _call(stats.reset)
             else:
-                lgr.info("Found branch non-dirty - nothing is committed")
+                lgr.info("Found branch non-dirty -- nothing was committed")
 
             if tag and stats:
                 # versions survive only in total_stats
