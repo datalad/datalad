@@ -55,7 +55,6 @@ def test_get_metadata(path):
 
     ds = Dataset(path)
     meta = get_metadata(ds, 'ID')
-    print(dumps(meta, sort_keys=True, indent=2))
     assert_equal(
         dumps(meta, sort_keys=True, indent=2),
         """\
