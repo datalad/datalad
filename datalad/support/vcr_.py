@@ -10,11 +10,13 @@
 """
 
 import logging
+import os
 
 from functools import wraps
 from os.path import isabs
 from os.path import realpath
 from contextlib import contextmanager
+from nose import SkipTest
 
 from datalad.dochelpers import exc_str
 
@@ -26,6 +28,29 @@ def _get_cassette_path(path):
     if not isabs(path):  # so it was given as a name
         return "fixtures/vcr_cassettes/%s.yaml" % path
     return path
+
+
+def skip_if_no_network(func=None):
+    """Skip test completely in NONETWORK settings
+
+    If not used as a decorator, and just a function, could be used at the module level
+    """
+
+    def check_and_raise():
+        if os.environ.get('DATALAD_TESTS_NONETWORK'):
+            raise SkipTest("Skipping since no network settings")
+
+    if func:
+        @wraps(func)
+        def newfunc(*args, **kwargs):
+            check_and_raise()
+            return func(*args, **kwargs)
+        # right away tag the test as a networked test
+        tags = getattr(newfunc, 'tags', [])
+        newfunc.tags = tags + ['network']
+        return newfunc
+    else:
+        check_and_raise()
 
 try:
     # TEMP: Just to overcome problem with testing on jessie with older requests
@@ -49,14 +74,15 @@ try:
         path : str
           If not absolute path, treated as a name for a cassette under fixtures/vcr_cassettes/
         """
+
         path = _get_cassette_path(path)
         lgr.debug("Using cassette %s" % path)
         if return_body is not None:
             my_vcr = _VCR(
                 before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
-            return my_vcr.use_cassette(path, **kwargs)  # with a custom response
+            return skip_if_no_network(my_vcr.use_cassette(path, **kwargs))  # with a custom response
         else:
-            return _use_cassette(path, **kwargs)  # just a straight one
+            return skip_if_no_network(_use_cassette(path, **kwargs))  # just a straight one
 
     # shush vcr
     vcr_lgr = logging.getLogger('vcr')
@@ -67,9 +93,11 @@ except Exception as exc:
         # something else went hairy (e.g. vcr failed to import boto due to some syntax error)
         lgr.warning("Failed to import vcr, no cassettes will be available: %s",
                     exc_str(exc, limit=10))
+
     # If there is no vcr.py -- provide a do nothing decorator for use_cassette
     def use_cassette(*args, **kwargs):
         def do_nothing_decorator(t):
+            @skip_if_no_network
             @wraps(t)
             def wrapper(*args, **kwargs):
                 lgr.debug("Not using vcr cassette")
@@ -88,4 +116,3 @@ def externals_use_cassette(name):
     from mock import patch
     with patch.dict('os.environ', {'DATALAD_USECASSETTE': realpath(_get_cassette_path(name))}):
         yield
-

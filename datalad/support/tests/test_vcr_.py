@@ -10,7 +10,8 @@
 
 from ..vcr_ import use_cassette
 from ...tests.utils import SkipTest
-from ...tests.utils import eq_
+from ...tests.utils import eq_, assert_raises
+from mock import patch
 
 
 def test_use_cassette_if_no_vcr():
@@ -33,3 +34,9 @@ def test_use_cassette_if_no_vcr():
         return x + 1
 
     eq_(checker(1), 2)
+
+    # test if use_cassette obeys skip_if_no_network
+    with patch.dict('os.environ', {'DATALAD_TESTS_NONETWORK': '1'}):
+        assert_raises(SkipTest, checker, 1)
+    with patch.dict('os.environ', {}):
+        eq_(checker(1), 2)
