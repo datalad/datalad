@@ -193,7 +193,25 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
     # XXX it may be worth the put the combined output of this function in a separate
     # cache on the local machine, in order to speed up meta data access, but maybe this
     # is already the domain of a `query` implementation
-    meta.append(get_implicit_metadata(ds, ds_identifier))
+    implicit_meta = get_implicit_metadata(ds, ds_identifier)
+    # create a lookup dict to find parts by subdataset mountpoint
+    has_part = implicit_meta.get('dcterms:hasPart', [])
+    if not isinstance(has_part, list):
+        has_part = [has_part]
+    has_part = {hp['location']: hp for hp in has_part}
+
+    # figure out all other version of this dataset: origin or siblings
+    # build a flat list of UUIDs
+    candidates = ('dcterms:isVersionOf', 'dcterms:hasVersion')
+    ds_versions = [
+        # flatten list
+        item for versionlist in
+        # extract uuids of all listed repos
+        [[implicit_meta[i]['@id'] for r in implicit_meta[i] if '@id' in r]
+            # loop over all possible terms
+            for i in candidates if i in implicit_meta]
+        for item in versionlist]
+    meta.append(implicit_meta)
 
     # from cache?
     if ignore_cache or not exists(main_meta_fname):
@@ -219,27 +237,49 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                 # we cannot simply append, or we get weired nested graphs
                 # proper way would be to expand the JSON-LD, extend the list and
                 # compact/flatten at the end. However assuming a single context
-                # we can cheat:
-                # TODO: better detect when we need to fall back to a proper
-                # graph merge via jsonld
+                # we can cheat.
+                # get a list of terms from any possible source
                 if isinstance(subds_meta, list) and len(subds_meta) == 1:
                     # simplify structure
                     subds_meta = subds_meta[0]
                 if isinstance(subds_meta, dict) \
                         and sorted(subds_meta.keys()) == ['@context', '@graph'] \
                         and subds_meta.get('@context') == 'http://schema.org/':
-                    meta.extend(subds_meta['@graph'])
-                elif isinstance(subds_meta, list):
-                    meta.extend(subds_meta)
+                    subds_meta = subds_meta['@graph']
                 elif isinstance(subds_meta, dict):
-                    meta.append(subds_meta)
+                    subds_meta = [subds_meta]
+                elif isinstance(subds_meta, list):
+                    # list this possibility explicitely to get 'else' to indicate that
+                    # we hit something unforseen
+                    pass
                 else:
                     raise NotImplementedError(
                         'got some unforseens meta data structure')
+                # make sure we have a meaningful @id for any subdataset in hasPart,
+                # regardless of whether it is installed or not. This is needed to
+                # be able to connect super and subdatasets in the graph of a new clone
+                # we a new UUID
+                if not '@id' in has_part[subds_path]:
+                    # this must be an uninstalled subdataset
+                    # look for a meta data set that knows about being part of any
+                    # sibling of this dataset, so we can use its @id
+                    for md in subds_meta:
+                        cand_id = md.get('dcterms:isPartOf', None)
+                        if cand_id in ds_versions and '@id' in md:
+                            has_part[subds_path]['@id'] = md['@id']
+                            break
+
+                # hand over subdataset meta data
+                meta.extend(subds_meta)
             else:
                 lgr.info(
                     'no cached meta data for subdataset at {}, ignoring'.format(
                         subds_path))
+        # reassign modified 'hasPart; term
+        parts = list(has_part.values())
+        if len(parts) == 1:
+            parts = parts[0]
+        implicit_meta['dcterms:hasPart'] = parts
     if optimize:
         try:
             from pyld import jsonld

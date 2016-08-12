@@ -6,9 +6,9 @@
 #   copyright and license terms.
 #
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
-"""Test GNU-style meta data parser """
+"""Test meta data """
 
-from datalad.api import Dataset, aggregate_metadata
+from datalad.api import Dataset, aggregate_metadata, query
 from datalad.metadata import get_metadata_type, get_metadata, get_dataset_identifier
 from nose.tools import assert_true, assert_equal, assert_raises
 from datalad.tests.utils import with_tree, with_tempfile
@@ -87,6 +87,11 @@ def test_basic_metadata(path):
 {
     "Name": "mother"
 }""",
+        'datapackage.json': """
+{
+    "name": "MOTHER",
+    "keywords": ["example", "multitype metadata"]
+}""",
     'sub': {
         'dataset_description.json': """
 {
@@ -102,20 +107,49 @@ def test_aggregation(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
     # a hierarchy of three (super/sub)datasets, each with some native metadata
     ds = Dataset(opj(path, 'origin')).create(force=True)
-    subds = Dataset(opj(path, 'origin', 'sub')).create(force=True, add_to_super=True)
-    subsubds = Dataset(opj(path, 'origin', 'sub', 'subsub')).create(force=True, add_to_super=True)
+    subds = Dataset(opj(path, 'origin', 'sub')).create(
+        force=True, add_to_super=True)
+    subsubds = Dataset(opj(path, 'origin', 'sub', 'subsub')).create(
+        force=True, add_to_super=True)
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
+    # and a second natiev set for the topmost dataset
     aggregate_metadata(ds, guess_native_type=True, optimize_metadata=False,
                        recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
-    meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False,
-                        optimize=False)
-    assert_equal(len(meta), 6)
+    meta = get_metadata(
+        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False,
+        optimize=False)
+    assert_equal(len(meta), 7)
     # same schema
-    assert_equal(6, sum([s.get('@context', None) == 'http://schema.org/' for s in meta]))
+    assert_equal(
+        7, sum([s.get('@context', None) == 'http://schema.org/' for s in meta]))
     # three different IDs
     assert_equal(3, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
     for name in ('mother', 'child', 'grandchild'):
         assert_true(sum([s.get('name', None) == name for s in meta]))
+
+    ds.save('with aggregated meta data', auto_add_changes=True)
+
+    # now clone the beast to simulate a new user installing an empty dataset
+    clone = Dataset(opj(path, 'clone'))
+    clone.install(source=ds.path)
+
+    # get fresh meta data, the implicit one for the top-most datasets should
+    # differ, but the rest not
+    clonemeta = get_metadata(
+        clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False,
+        optimize=False)
+
+    # make sure the implicit md for the topmost come first
+    assert_equal(clonemeta[0]['@id'], get_dataset_identifier(clone))
+    assert_equal(clonemeta[0]['dcterms:isVersionOf']['@id'],
+                 get_dataset_identifier(ds))
+    # all but the implicit is identical
+    assert_equal(clonemeta[1:], meta[1:])
+    # the implicit md of the clone should list a dataset ID for its subds,
+    # although it has not been obtained!
+    assert_equal(
+        clonemeta[0]['dcterms:hasPart']['@id'],
+        get_dataset_identifier(subds))

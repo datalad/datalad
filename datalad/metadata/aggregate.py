@@ -22,7 +22,8 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
-    metadata_basepath, json_dump_kwargs, flatten_metadata_graph
+    metadata_basepath, json_dump_kwargs, flatten_metadata_graph, \
+    get_dataset_identifier
 
 
 def _optimize_jsonld(obj):
@@ -117,11 +118,11 @@ class AggregateMetaData(Interface):
             if not subds.is_installed():
                 lgr.info('ignoring subdataset {}, not installed'.format(subds))
                 continue
+            subds_meta = get_metadata(
+                subds, guess_type=guess_native_type, ignore_subdatasets=False,
+                ignore_cache=False, optimize=False)
+            subds_meta[0]['dcterms:isPartOf'] = get_dataset_identifier(dataset)
             _store_json(
                 opj(metapath, subds_path),
-                # do not get_native_metadata here, but `get` to yield one
-                # compact metadata set for each subdataset, possibly even
-                # for not-installed subdatasets one level down, by using
-                # their cached metadata
-                get_metadata(subds),
+                subds_meta,
                 optimize=optimize_metadata)
