@@ -21,8 +21,8 @@ from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
 from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
-from . import get_metadata, extract_metadata, metadata_filename, metadata_basepath, \
-    json_dump_kwargs, flatten_metadata_graph
+from . import get_metadata, get_native_metadata, metadata_filename, \
+    metadata_basepath, json_dump_kwargs, flatten_metadata_graph
 
 
 def _optimize_jsonld(obj):
@@ -102,12 +102,15 @@ class AggregateMetaData(Interface):
         # this dataset's meta data
         _store_json(
             metapath,
-            # actually extract meta data, because we know we have this
+            # actually extract native meta data, because we know we have this
             # dataset installed (although maybe not all native metadata)
-            extract_metadata(dataset, guess_type=guess_native_type),
+            # Important: do not store implicit metadata, as this will be largely
+            # invalid in a new clone, and is relatively inexpensive to produce
+            # from material that is guaranteed to be present after a plain clone
+            get_native_metadata(dataset, guess_type=guess_native_type),
             optimize=optimize_metadata)
 
-        # we only want immediate subdatasets, high depths will come via
+        # we only want immediate subdatasets, higher depths will come via
         # recursion
         for subds_path in dataset.get_subdatasets(recursive=False):
             subds = Dataset(opj(dataset.path, subds_path))
@@ -116,7 +119,7 @@ class AggregateMetaData(Interface):
                 continue
             _store_json(
                 opj(metapath, subds_path),
-                # do not extract_metadata here, but `get` to yield one
+                # do not get_native_metadata here, but `get` to yield one
                 # compact metadata set for each subdataset, possibly even
                 # for not-installed subdatasets one level down, by using
                 # their cached metadata

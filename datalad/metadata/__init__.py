@@ -88,12 +88,15 @@ def _get_base_metadata(ds_identifier):
     }
 
 
-def _get_implicit_metadata(ds, ds_identifier):
+def get_implicit_metadata(ds, ds_identifier=None):
     """Convert git/git-annex info into metadata
 
     Anything that doesn't come as metadata in dataset **content**, but is
     encoded in the dataset repository itself.
     """
+    if ds_identifier is None:
+        ds_identifier = get_dataset_identifier(ds)
+
     meta = _get_base_metadata(ds_identifier)
 
     # whenever we have a full dataset, give it a type
@@ -103,6 +106,7 @@ def _get_implicit_metadata(ds, ds_identifier):
     # look for known remote annexes, doesn't need configured
     # remote to be meaningful
     # need annex repo instance
+    # TODO refactor to use ds.uuid when #701 is addressed
     if ds.repo and hasattr(ds.repo, 'repo_info'):
         ds_uuid = ds.repo.repo.config_reader().get_value(
             'annex', 'uuid', default='')
@@ -163,15 +167,34 @@ def _get_implicit_metadata(ds, ds_identifier):
 # XXX might become its own command
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                  ignore_cache=False, optimize=False):
+    # common identifier
+    ds_identifier = get_dataset_identifier(ds)
+    # metadata receptacle
     meta = []
     # where things are
     meta_path = opj(ds.path, metadata_basepath)
     main_meta_fname = opj(meta_path, metadata_filename)
+
+    # start with the implicit meta data, currently there is no cache for
+    # this type of meta data, as it will change with every clone.
+    # In contrast, native meta data is cached, although the UUIDs in it will
+    # not necessarily match this clone. However, this clone should have a
+    # 'hasVersion' meta data item that lists the respective UUID, and consequently
+    # we know which clone was used to extract/cache the meta data
+    # XXX it may be worth the put the combined output of this function in a separate
+    # cache on the local machine, in order to speed up meta data access, but maybe this
+    # is already the domain of a `query` implementation
+    meta.append(get_implicit_metadata(ds, ds_identifier))
+
     # from cache?
     if ignore_cache or not exists(main_meta_fname):
         if not ignore_cache:
-            lgr.info('no extracted meta data available for {}, use ``aggregate_metadata`` command to avoid slow operation'.format(ds))
-        meta.extend(extract_metadata(ds, guess_type=guess_type))
+            lgr.info('no extracted native meta data available for {}, use the ``aggregate_metadata`` command to avoid slow operation'.format(ds))
+        meta.extend(
+            get_native_metadata(
+                ds,
+                guess_type=guess_type,
+                ds_identifier=ds_identifier))
     else:
         cached_meta = jsonload(open(main_meta_fname, 'rb'))
         if isinstance(cached_meta, list):
@@ -234,8 +257,8 @@ def flatten_metadata_graph(obj):
     return jsonld.flatten(obj, ctx={"@context": "http://schema.org/"})
 
 
-def extract_metadata(ds, guess_type=False):
-    """Parse a dataset to gather metadata
+def get_native_metadata(ds, guess_type=False, ds_identifier=None):
+    """Parse a dataset to gather its native metadata
 
     Returns
     -------
@@ -245,16 +268,12 @@ def extract_metadata(ds, guess_type=False):
         The last items contains the native metadata of the dataset content. Any
         additional items correspond to subdataset metadata sets.
     """
-    # TODO handle retrieval of subdataset metadata:
-    #      from scratch vs cached
-    ds_identifier = get_dataset_identifier(ds)
-
+    if ds_identifier is None:
+        ds_identifier = get_dataset_identifier(ds)
     # using a list, because we could get multiple sets of meta data per
     # dataset, and we want to quickly collect them without having to do potentially
     # complex graph merges
     meta = []
-    meta.append(_get_implicit_metadata(ds, ds_identifier))
-
     # get native metadata
     nativetypes = get_metadata_type(ds, guess=guess_type)
     if not nativetypes:
