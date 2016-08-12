@@ -318,7 +318,6 @@ def test_guess_dot_git():
         yield _test_guess_dot_git, annex
 
 
-@skip_if_no_network
 @use_cassette('test_install_crcns')
 @with_tempfile(mkdir=True)
 def test_install_crcns(tdir):
