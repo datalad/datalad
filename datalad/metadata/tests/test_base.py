@@ -153,3 +153,15 @@ def test_aggregation(path):
     assert_equal(
         clonemeta[0]['dcterms:hasPart']['@id'],
         get_dataset_identifier(subds))
+
+    # now obtain a subdataset in the clone and the IDs should be updated
+    clone.install('sub')
+    # only the uncached metadata
+    partial = get_metadata(clone, ignore_cache=True)
+    # two implicit sets for top and sub dataset
+    assert_equal(len(partial), 2)
+    # ids don't change
+    assert_equal(partial[0]['@id'], clonemeta[0]['@id'])
+    # datasets are properly connected
+    assert_equal(partial[0]['dcterms:hasPart']['@id'],
+                 partial[1]['@id'])
