@@ -848,4 +848,4 @@ def get_local_file_url(fname):
         furl = str(URL(scheme='file', path=fname))
     return furl
 
-lgr.log(5, "Finished importing support.network")
+lgr.log(5, "Done importing support.network")

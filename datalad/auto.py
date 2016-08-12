@@ -10,7 +10,8 @@
 """
 
 import sys
-from mock import patch
+# OPT delay import for expensive mock until used
+#from mock import patch
 from six import PY2
 import six.moves.builtins as __builtin__
 builtins_name = '__builtin__' if PY2 else 'builtins'
@@ -79,6 +80,7 @@ class AutomagicIO(object):
 
         """
         # wrap it all for resilience to errors -- proxying must do no harm!
+        from mock import patch
         try:
             if self._in_open:
                 raise _EarlyExit
