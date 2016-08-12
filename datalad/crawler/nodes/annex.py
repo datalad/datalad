@@ -727,12 +727,13 @@ class Annexificator(object):
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
 
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
+            skip_no_changes_ = skip_no_changes
+            if skip_no_changes is None:
+                # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                skip_no_changes_ = True
+
             if last_merged_checksum == self.repo.get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
-                skip_no_changes_ = skip_no_changes
-                if skip_no_changes is None:
-                    # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
-                    skip_no_changes_ = True
                 if skip_no_changes_:
                     lgr.debug("Skipping the merge")
                     return
@@ -748,6 +749,14 @@ class Annexificator(object):
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
+
+            # There were no merges, but we were instructed to not skip
+            if not nmerges and skip_no_changes_ is False:
+                # so we will try to merge it nevertheless
+                lgr.info("There was nothing to merge but we were instructed to merge due to skip_no_changes=False")
+                all_to_merge = [branch]
+                nmerges = 1
+
             plmerges = "s" if nmerges > 1 else ""
             lgr.info("Initiating %(nmerges)d merge%(plmerges)s of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
