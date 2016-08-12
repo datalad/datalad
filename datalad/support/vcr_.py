@@ -80,9 +80,13 @@ try:
         if return_body is not None:
             my_vcr = _VCR(
                 before_record_response=lambda r: dict(r, body={'string': return_body.encode()}))
-            return skip_if_no_network(my_vcr.use_cassette(path, **kwargs))  # with a custom response
+            dec = my_vcr.use_cassette(path, **kwargs)  # with a custom response
         else:
-            return skip_if_no_network(_use_cassette(path, **kwargs))  # just a straight one
+            dec = _use_cassette(path, **kwargs)  # just a straight one
+
+        # now we need to chain decorators application whenever a function will actually
+        # be provided
+        return lambda f: skip_if_no_network(dec(f))
 
     # shush vcr
     vcr_lgr = logging.getLogger('vcr')
