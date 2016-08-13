@@ -16,10 +16,12 @@ from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import sub
+from ..nodes.misc import switch
 from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
+from ...utils import updated
 from ...consts import ARCHIVES_SPECIAL_REMOTE
 
 # Possibly instantiate a logger if you would like to log
@@ -33,7 +35,7 @@ TOPURL = "https://openfmri.org/dataset/"
 # define a pipeline factory function accepting necessary keyword arguments
 # Should have no strictly positional arguments
 def superdataset_pipeline(url=TOPURL, **kwargs):
-    annex = Annexificator()
+    annex = Annexificator(no_annex=True)
     lgr.info("Creating a pipeline with kwargs %s" % str(kwargs))
     return [
         crawl_url(url),
@@ -64,7 +66,7 @@ def extract_readme(data):
            }
 
 
-def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
+def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
     """Pipeline to crawl/annex an openfmri dataset
 
     Parameters
@@ -77,7 +79,9 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
     topurl: str, optional
       Top level URL to the datasets.
     """
-
+    skip_no_changes = True    # to redo incoming-processed, would finish dirty in incoming-processed
+                              # when commit would fail since nothing to commit
+    leading_dirs_depth = int(leading_dirs_depth)
     dataset_url = '%s%s/' % (topurl, dataset)
     lgr.info("Creating a pipeline for the openfmri dataset %s" % dataset)
     annex = Annexificator(
@@ -91,12 +95,25 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
                  "annex.largefiles="
                  # ISSUES LICENSE Makefile
                  "exclude=Makefile and exclude=LICENSE* and exclude=ISSUES*"
-                 " and exclude=CHANGES* and exclude=README*"
-                 " and exclude=*.[mc] and exclude=dataset*.json"
+                 " and exclude=CHANGES* and exclude=README* and exclude=ReadMe.txt"
+                 " and exclude=*.[mc] and exclude=dataset*.json and exclude=license.txt"
                  " and (exclude=*.txt or include=*/*.txt)"
                  " and (exclude=*.json or include=*/*.json)"
                  " and (exclude=*.tsv or include=*/*.tsv)"
                  ])
+
+    # common kwargs which would later would be tuned up
+    def add_archive_content(**kw):
+        return annex.add_archive_content(
+            existing = 'archive-suffix',
+            strip_leading_dirs = bool(leading_dirs_depth),
+            leading_dirs_depth = leading_dirs_depth,
+            delete = True,
+            exclude = ['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
+            **kw
+        # overwrite=True,
+        # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball
+        )
 
     return [
         annex.switch_branch('incoming'),
@@ -137,11 +154,10 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
         annex.remove_obsolete(),  # should be called while still within incoming but only once
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
-            {'loop': True},  # loop for multiple versions merges
+            {'loop': not skip_no_changes},  # loop for multiple versions merges
             annex.switch_branch('incoming-processed'),
             annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False,
-                               # skip_no_changes=False  # to redo incoming-processed, would finish dirty in incoming-processed
-                               # when commit would fail since nothing to commit
+                               skip_no_changes=skip_no_changes
                                ),
             # still we would have all the versions present -- we need to restrict only to the current one!
             annex.remove_other_versions('incoming', remove_unversioned=True, exclude='(README|changelog).*'),
@@ -149,14 +165,12 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL):
                 # There might be archives within archives, so we need to loop
                 {'loop': True},
                 find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=True),  #  we fail if none found -- there must be some! ;)),
-                annex.add_archive_content(
-                    existing='archive-suffix',
-                    strip_leading_dirs=True,
-                    leading_dirs_depth=1,
-                    delete=True,
-                    exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
-                    # overwrite=True,
-                    # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball
+                assign({'dataset_file': dataset + '///%(filename)s'}, interpolate=True),
+                switch(
+                    'dataset_file',
+                    {'ds0*158///aalmasks\.zip$': add_archive_content(add_archive_leading_dir=True)},
+                    default=add_archive_content(),
+                    re=True,
                 ),
             ],
             annex.switch_branch('master'),
