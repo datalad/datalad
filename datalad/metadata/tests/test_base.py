@@ -167,6 +167,13 @@ def test_aggregation(path):
     assert_equal(partial[0]['dcterms:hasPart']['@id'],
                  partial[1]['@id'])
 
-    # reaggrate metadata in top-level dataset, this time save changes
+    # try reaggrate metadata in top-level dataset, this time save changes
+    # will not do in dirty repo!
+    assert_raises(RuntimeError, aggregate_metadata, ds, recursive=True, save=True)
+    # hand clean
+    # XXX why does `save` does not interpret files relative to itself, but relative
+    # to CWD?
+    subds.save(files=[opj(subds.path, 'subsub')])
+    # redo aggregation exactly as above, but now save changes
     aggregate_metadata(ds, guess_native_type=True, optimize_metadata=False,
                        recursive=True, save=True)

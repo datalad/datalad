@@ -71,6 +71,12 @@ class AggregateMetaData(Interface):
             doc="""perform optimization (compacting/flattening) of the meta data
             graph. This functionality requires network access for meta data term
             resolution."""),
+        save=Parameter(
+            args=('--save',),
+            action='store_true',
+            doc="""save aggregated meta data in the dataset(s). If a dataset has
+            unsaved changes, setting this flag will cause an error to avoid
+            accidentally saving arbitrary changes."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
     )
@@ -78,9 +84,18 @@ class AggregateMetaData(Interface):
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
     def __call__(dataset, guess_native_type=False, optimize_metadata=False,
-                 recursive=False, recursion_limit=None):
+                 save=False, recursive=False, recursion_limit=None):
         dataset = require_dataset(
             dataset, check_installed=True, purpose='meta data aggregation')
+
+        # it is important to check this prior diving into subdatasets
+        # because we might also modify them
+        if save and dataset.repo.repo.is_dirty(index=True,
+                                               working_tree=False,
+                                               submodules=True):
+            raise RuntimeError(
+                "not aggregating meta data in {}, saving requested, but unsaved changes are already present".format(
+                    dataset))
 
         if recursive:
             # recursive, depth first
@@ -91,9 +106,12 @@ class AggregateMetaData(Interface):
                         AggregateMetaData.__call__(
                             Dataset(opj(dataset.path, subds_path)),
                             guess_native_type=guess_native_type,
+                            save=save,
                             recursive=recursive,
                             recursion_limit=None if recursion_limit is None
                             else recursion_limit - 1)
+                        # stage potential changes in this submodule
+                        dataset.repo.add(subds_path, git=True)
 
         lgr.info('aggregating meta data for {}'.format(dataset))
 
@@ -126,3 +144,10 @@ class AggregateMetaData(Interface):
                 opj(metapath, subds_path),
                 subds_meta,
                 optimize=optimize_metadata)
+        if save:
+            dataset.repo.add(metapath, git=True)
+            if dataset.repo.repo.is_dirty(
+                    index=True,
+                    working_tree=False,
+                    submodules=True):
+                dataset.save(message="[DATALAD] save aggregated meta data")
