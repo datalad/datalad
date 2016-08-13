@@ -98,7 +98,7 @@ class Create(Interface):
             args=("--no-annex",),
             doc="""if set, a plain Git repository will be created without any
             annex""",
-            action='store_false'),
+            action='store_true'),
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
