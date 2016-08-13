@@ -17,6 +17,7 @@ from os import listdir
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os.path import isdir, islink
+from os.path import relpath
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
@@ -726,12 +727,13 @@ class Annexificator(object):
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
 
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
+            skip_no_changes_ = skip_no_changes
+            if skip_no_changes is None:
+                # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                skip_no_changes_ = True
+
             if last_merged_checksum == self.repo.get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
-                skip_no_changes_ = skip_no_changes
-                if skip_no_changes is None:
-                    # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
-                    skip_no_changes_ = True
                 if skip_no_changes_:
                     lgr.debug("Skipping the merge")
                     return
@@ -747,6 +749,14 @@ class Annexificator(object):
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
+
+            # There were no merges, but we were instructed to not skip
+            if not nmerges and skip_no_changes_ is False:
+                # so we will try to merge it nevertheless
+                lgr.info("There was nothing to merge but we were instructed to merge due to skip_no_changes=False")
+                all_to_merge = [branch]
+                nmerges = 1
+
             plmerges = "s" if nmerges > 1 else ""
             lgr.info("Initiating %(nmerges)d merge%(plmerges)s of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
@@ -932,7 +942,9 @@ class Annexificator(object):
                 # all new versions must be greater than the previous version
                 # since otherwise it would mean that we are complementing previous version and it might be
                 # a sign of a problem
-                assert (all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
+                # Well -- so far in the single use-case with openfmri it was that they added
+                # derivatives for the same version, so I guess we will allow for that, thus allowing =
+                assert (all((LooseVersion(prev_version) <= LooseVersion(v)) for v in versions))
                 # old implementation when we didn't have entire versions db stored
                 # new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
                 new_versions = versions
@@ -943,8 +955,8 @@ class Annexificator(object):
             if new_versions:
                 smallest_new_version = next(iter(new_versions))
                 if prev_version:
-                    if LooseVersion(smallest_new_version) <= LooseVersion(prev_version):
-                        raise ValueError("Smallest new version %s is <= prev_version %s"
+                    if LooseVersion(smallest_new_version) < LooseVersion(prev_version):
+                        raise ValueError("Smallest new version %s is < prev_version %s"
                                          % (smallest_new_version, prev_version))
 
             versions_db.update_versions(versions)  # store all new known versions
@@ -1013,15 +1025,26 @@ class Annexificator(object):
 
         return _commit_versions
 
-    def remove_other_versions(self, name=None, overlay=False):
+    def remove_other_versions(self, name=None, overlay=False, remove_unversioned=False, exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
+
+        Parameters
+        ----------
+        remove_unversioned: bool, optional
+          If there is a version defined now, remove those files which are unversioned
+          i.e. not listed associated with any version
+        exclude : basestring, optional
+          Regexp to search to exclude files from considering to remove them if
+          `remove_unversioned`.  Passed to `find_files`.  E.g. `README.*` which
+          could have been generated in `incoming` branch
         """
 
         def _remove_other_versions(data):
             if overlay:
                 raise NotImplementedError(overlay)
+
             stats = data.get('datalad_stats', None)
             versions_db = SingleVersionDB(self.repo, name=name)
 
@@ -1041,6 +1064,21 @@ class Annexificator(object):
                     if lexists(vfpathfull):
                         lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
                         os.unlink(vfpathfull)
+
+            if remove_unversioned:
+                # it might be that we haven't 'recorded' unversioned ones at all
+                # and now got an explicit version, so we would just need to remove them all
+                # For that we need to get all files which left, and remove them unless they are part
+                # of the current version
+                current_version_files = set(versions_db.versions[current_version].values())
+                for fpath in find_files('.*', exclude=exclude, exclude_datalad=True, exclude_vcs=True):
+                    fpath = relpath(fpath, '.')  # ./bla -> bla
+                    if fpath in current_version_files:
+                        continue
+                    lgr.log(5, "Removing unversioned %s file", fpath)
+                    os.unlink(fpath)
+            elif exclude:
+                lgr.warning("`exclude=%r` was specified whenever remove_unversioned is False", exclude)
 
             if stats:
                 stats.versions.append(current_version)
@@ -1111,7 +1149,7 @@ class Annexificator(object):
                 if stats:
                     _call(stats.reset)
             else:
-                lgr.info("Found branch non-dirty - nothing is committed")
+                lgr.info("Found branch non-dirty -- nothing was committed")
 
             if tag and stats:
                 # versions survive only in total_stats
