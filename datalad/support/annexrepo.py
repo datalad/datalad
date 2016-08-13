@@ -184,9 +184,7 @@ class AnnexRepo(GitRepo):
         # XXX this doesn't work for a submodule!
         if not AnnexRepo.is_valid_repo(self.path):
             # so either it is not annex at all or just was not yet initialized
-            # TODO: unify/reuse code somewhere else on detecting being annex
-            if any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
-                any((b == 'git-annex' for b in self.get_branches())):
+            if self.is_with_annex():
                 # it is an annex repository which was not initialized yet
                 if create or init:
                     lgr.debug('Annex repository was not yet initialized at %s.'
@@ -218,10 +216,15 @@ class AnnexRepo(GitRepo):
         self._batched = BatchedAnnexes(batch_size=batch_size)
 
     @classmethod
-    def is_valid_repo(cls, path):
+    def is_valid_repo(cls, path, allow_noninitialized=False):
         """Return True if given path points to an annex repository"""
-        return GitRepo.is_valid_repo(path) and \
-               exists(opj(path, '.git', 'annex'))
+        initialized_annex = GitRepo.is_valid_repo(path) and \
+            exists(opj(path, '.git', 'annex'))
+        if allow_noninitialized:
+            return initialized_annex \
+                   or GitRepo(path, create=False, init=False).is_with_annex()
+        else:
+            return initialized_annex
 
     def add_remote(self, name, url, options=[]):
         """Overrides method from GitRepo in order to set

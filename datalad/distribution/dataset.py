@@ -85,9 +85,11 @@ class Dataset(object):
         """
         if self._repo is None:
             with swallow_logs():
-                for cls, kw in ((AnnexRepo, {'init': False}),
-                                (GitRepo, {})):
-                    if cls.is_valid_repo(self._path):
+                for cls, ckw, kw in (
+                        (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                        (GitRepo, {}, {})
+                ):
+                    if cls.is_valid_repo(self._path, **ckw):
                         try:
                             lgr.debug("Detected %s at %s", cls, self._path)
                             self._repo = cls(self._path, create=False, **kw)
