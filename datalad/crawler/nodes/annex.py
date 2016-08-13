@@ -204,7 +204,9 @@ class Annexificator(object):
     Should be relative. If absolute found -- ValueError is raised
     """
 
-    def __init__(self, path=None, mode='full', options=None,
+    def __init__(self, path=None,
+                 no_annex=False,
+                 mode='full', options=None,
                  special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
                  auto_finalize=True,
@@ -222,6 +224,8 @@ class Annexificator(object):
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
           annex modes where no actual download is performed and the files' keys are their URLs
+        no_annex : bool
+          Assume/create a simple Git repository, without git-annex
         special_remotes : list, optional
           List of custom special remotes to initialize and enable by default
         yield_non_updated : bool, optional
@@ -260,14 +264,18 @@ class Annexificator(object):
                 if (len(listdir(path))) and (not allow_dirty):
                     raise RuntimeError("Directory %s is not empty." % path)
 
-        self.repo = AnnexRepo(path, always_commit=False, **kwargs)
+        self.repo = (GitRepo if no_annex else AnnexRepo)(path, always_commit=False, **kwargs)
 
         git_remotes = self.repo.get_remotes()
-        # TODO: move under AnnexRepo with proper testing etc
-        repo_info_repos = [v for k, v in self.repo.repo_info().items()
-                           if k.endswith(' repositories')]
-        annex_remotes = {r['description']: r for r in sum(repo_info_repos, [])}
         if special_remotes:
+            if no_annex: # isinstance(self.repo, GitRepo):
+                raise ValueError("Cannot have special remotes in a simple git repo")
+
+            # TODO: move under AnnexRepo with proper testing etc
+            repo_info_repos = [v for k, v in self.repo.repo_info().items()
+                               if k.endswith(' repositories')]
+            annex_remotes = {r['description']: r for r in sum(repo_info_repos, [])}
+
             for remote in special_remotes:
                 if remote not in git_remotes:
                     if remote in annex_remotes:

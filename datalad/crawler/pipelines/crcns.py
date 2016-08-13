@@ -28,7 +28,7 @@ lgr = getLogger("datalad.crawler.pipelines.crcns")
 def superdataset_pipeline():
     lgr.info("Creating a CRCNS collection pipeline")
     # Should return a list representing a pipeline
-    annex = Annexificator()
+    annex = Annexificator(no_annex=True)
     return [
         crawl_url("http://crcns.org/data-sets",
             matchers=[a_href_match('.*/data-sets/[^#/]+$')]),
