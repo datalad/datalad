@@ -8,7 +8,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test meta data """
 
-from datalad.api import Dataset, aggregate_metadata, query
+from datalad.api import Dataset, aggregate_metadata
 from datalad.metadata import get_metadata_type, get_metadata, get_dataset_identifier
 from nose.tools import assert_true, assert_equal, assert_raises
 from datalad.tests.utils import with_tree, with_tempfile
@@ -130,6 +130,7 @@ def test_aggregation(path):
     for name in ('mother', 'child', 'grandchild'):
         assert_true(sum([s.get('name', None) == name for s in meta]))
 
+    # save the toplevel dataset only (see below)
     ds.save('with aggregated meta data', auto_add_changes=True)
 
     # now clone the beast to simulate a new user installing an empty dataset
@@ -165,3 +166,7 @@ def test_aggregation(path):
     # datasets are properly connected
     assert_equal(partial[0]['dcterms:hasPart']['@id'],
                  partial[1]['@id'])
+
+    # reaggrate metadata in top-level dataset, this time save changes
+    aggregate_metadata(ds, guess_native_type=True, optimize_metadata=False,
+                       recursive=True, save=True)
