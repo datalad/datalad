@@ -327,3 +327,12 @@ def test_install_crcns(tdir):
         # should not hang in infinite recursion
         install(_path_("all-nonrecursive/crcns"))
         ok_(exists(_path_("all-nonrecursive/crcns/.git/config")))
+
+
+@skip_if_no_network
+@use_cassette('test_install_crcns')
+@with_tempfile(mkdir=True)
+def test_install_datasets_root(tdir):
+    with chpwd(tdir):
+        install("///")
+        ok_(exists('datasets.datalad.org'))

@@ -40,6 +40,7 @@ from datalad.cmd import GitRunner
 
 # imports from same module:
 from .gitrepo import GitRepo
+from .gitrepo import NoSuchPathError
 from .gitrepo import normalize_path
 from .gitrepo import normalize_paths
 from .gitrepo import GitCommandError
@@ -50,7 +51,7 @@ from .exceptions import FileNotInAnnexError
 from .exceptions import FileInGitError
 from .exceptions import AnnexBatchCommandError
 from .exceptions import InsufficientArgumentsError
-from .network import is_ssh
+from git import InvalidGitRepositoryError
 
 lgr = logging.getLogger('datalad.annex')
 
@@ -144,6 +145,7 @@ class AnnexRepo(GitRepo):
         # - request SSHConnection instance and write config even if no
         #   connection needed (but: connection is not actually created/opened)
         # - no solution for a ssh url of a file (annex addurl)
+        from datalad.support.network import is_ssh
         for r in self.get_remotes():
             for url in [self.get_remote_url(r),
                         self.get_remote_url(r, push=True)]:
@@ -221,8 +223,11 @@ class AnnexRepo(GitRepo):
         initialized_annex = GitRepo.is_valid_repo(path) and \
             exists(opj(path, '.git', 'annex'))
         if allow_noninitialized:
-            return initialized_annex \
-                   or GitRepo(path, create=False, init=False).is_with_annex()
+            try:
+                return initialized_annex \
+                       or GitRepo(path, create=False, init=False).is_with_annex()
+            except (NoSuchPathError, InvalidGitRepositoryError):
+                return False
         else:
             return initialized_annex
 
@@ -230,6 +235,7 @@ class AnnexRepo(GitRepo):
         """Overrides method from GitRepo in order to set
         remote.<name>.annex-ssh-options in case of a SSH remote."""
         super(AnnexRepo, self).add_remote(name, url, options)
+        from datalad.support.network import is_ssh
         if is_ssh(url):
             c = ssh_manager.get_connection(url)
             writer = self.repo.config_writer()
