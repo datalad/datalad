@@ -181,6 +181,9 @@ _versioned_files = """
 
 @with_tree(tree={
     'ds666': {
+        # there could also be a case of a file with "unique" name without versioned counterpart
+        # e.g. ds666_models.tar.gz  which seems to be not treated correctly (not placed into any
+        # version in case of ds000017)
         'index.html': """<html><body>
                             <a href="release_history.txt">Release History</a>
                             <a href="ds666.tar.gz">Raw data on AWS, no version</a>

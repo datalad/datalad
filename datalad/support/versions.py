@@ -43,7 +43,7 @@ def get_versions(vfpath_statuses, regex, overlay=True,
       Regular expression to extract version.  Group 'version' should be defined
       if more than a single group present. If no groups defined at all, entire
       match considered to be a version.  Matched entry is stripped from the filename
-      to generated unversioned path (fpath)
+      to generatee unversioned path (fpath)
     overlay: bool, optional
       Assume overlayed structure, so if a file misses an entry for some version,
       it is ok
