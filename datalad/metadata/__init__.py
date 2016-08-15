@@ -181,7 +181,7 @@ def _get_version_ids_from_implicit_meta(meta):
 
 # XXX might become its own command
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                 ignore_cache=False, optimize=False):
+                 ignore_cache=False):
     # common identifier
     ds_identifier = get_dataset_identifier(ds)
     # metadata receptacle
@@ -232,7 +232,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                 meta.extend(
                     get_metadata(subds, guess_type=guess_type,
                                  ignore_subdatasets=False,
-                                 ignore_cache=True, optimize=optimize))
+                                 ignore_cache=True))
             else:
                 subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
                 if exists(subds_meta_fname):
@@ -284,18 +284,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             parts = parts[0]
         if len(parts):
             implicit_meta['dcterms:hasPart'] = parts
-    if optimize:
-        try:
-            from pyld import jsonld
-        except ImportError:
-            raise ImportError(
-                'meta data flattening requested, but pyld is not available')
-        try:
-            meta = flatten_metadata_graph(meta)
-        except jsonld.JsonLdError as e:
-            # unfortunately everything gets swallowed into the same exception
-            lgr.error('meta data graph simplification failed, no network?')
-            raise e
+
     return meta
 
 

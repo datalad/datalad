@@ -121,12 +121,10 @@ def test_aggregation(path):
     # aggregate from bottom to top, guess native data, no compacting of graph
     # should yield 6 meta data sets, one implicit, and one native per dataset
     # and a second natiev set for the topmost dataset
-    aggregate_metadata(ds, guess_native_type=True, optimize_metadata=False,
-                       recursive=True)
+    aggregate_metadata(ds, guess_native_type=True, recursive=True)
     # no only ask the top superdataset, no recursion, just reading from the cache
     meta = get_metadata(
-        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False,
-        optimize=False)
+        ds, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
     assert_equal(len(meta), 7)
     # same schema
     assert_equal(
@@ -150,8 +148,7 @@ def test_aggregation(path):
     # get fresh meta data, the implicit one for the top-most datasets should
     # differ, but the rest not
     clonemeta = get_metadata(
-        clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False,
-        optimize=False)
+        clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
 
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], get_dataset_identifier(clone))
@@ -185,6 +182,5 @@ def test_aggregation(path):
     # to CWD?
     subds.save(files=[opj(subds.path, 'subsub')])
     # redo aggregation exactly as above, but now save changes
-    aggregate_metadata(ds, guess_native_type=True, optimize_metadata=False,
-                       recursive=True, save=True)
+    aggregate_metadata(ds, guess_native_type=True, recursive=True, save=True)
     #TODO update the clone or reclone to check whether saved meta data comes down the pipe

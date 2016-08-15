@@ -21,24 +21,11 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
-    metadata_basepath, flatten_metadata_graph, \
-    get_dataset_identifier
+    metadata_basepath, get_dataset_identifier
 from datalad.support.json import dump as jsondump
 
 
-def _optimize_jsonld(obj):
-    try:
-        from pyld import jsonld
-    except ImportError:
-        lgr.debug('pyld not available, not compacting meta data graph')
-        return obj
-    return flatten_metadata_graph(obj)
-
-
-def _store_json(path, meta, optimize=True):
-    if optimize:
-        meta = _optimize_jsonld(meta)
-
+def _store_json(path, meta):
     if not exists(path):
         os.makedirs(path)
     fname = opj(path, metadata_filename)
@@ -62,12 +49,6 @@ class AggregateMetaData(Interface):
             doc="""guess native meta data type of datasets, if none is
             configured. With a configured, or auto-detected meta data type,
             no native meta data will be aggregated."""),
-        optimize_metadata=Parameter(
-            args=("--optimize-metadata",),
-            action="store_true",
-            doc="""perform optimization (compacting/flattening) of the meta data
-            graph. This functionality requires network access for meta data term
-            resolution."""),
         save=Parameter(
             args=('--save',),
             action='store_true',
@@ -80,8 +61,8 @@ class AggregateMetaData(Interface):
 
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
-    def __call__(dataset, guess_native_type=False, optimize_metadata=False,
-                 save=False, recursive=False, recursion_limit=None):
+    def __call__(dataset, guess_native_type=False, save=False, recursive=False,
+            recursion_limit=None):
         dataset = require_dataset(
             dataset, check_installed=True, purpose='meta data aggregation')
 
@@ -123,8 +104,7 @@ class AggregateMetaData(Interface):
             # Important: do not store implicit metadata, as this will be largely
             # invalid in a new clone, and is relatively inexpensive to produce
             # from material that is guaranteed to be present after a plain clone
-            get_native_metadata(dataset, guess_type=guess_native_type),
-            optimize=optimize_metadata)
+            get_native_metadata(dataset, guess_type=guess_native_type))
 
         # we only want immediate subdatasets, higher depths will come via
         # recursion
@@ -135,12 +115,9 @@ class AggregateMetaData(Interface):
                 continue
             subds_meta = get_metadata(
                 subds, guess_type=guess_native_type, ignore_subdatasets=False,
-                ignore_cache=False, optimize=False)
+                ignore_cache=False)
             subds_meta[0]['dcterms:isPartOf'] = get_dataset_identifier(dataset)
-            _store_json(
-                opj(metapath, subds_path),
-                subds_meta,
-                optimize=optimize_metadata)
+            _store_json(opj(metapath, subds_path), subds_meta)
         if save:
             dataset.repo.add(metapath, git=True)
             if dataset.repo.repo.is_dirty(
