@@ -286,7 +286,8 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         parts = list(has_part.values())
         if len(parts) == 1:
             parts = parts[0]
-        implicit_meta['dcterms:hasPart'] = parts
+        if len(parts):
+            implicit_meta['dcterms:hasPart'] = parts
     if optimize:
         try:
             from pyld import jsonld
