@@ -12,7 +12,7 @@
 
 from os.path import exists, join as opj
 from simplejson import load as jsonload
-from .. import _get_base_metadata
+from .. import _get_base_dataset_metadata
 
 _metadata_fname = 'datapackage.json'
 
@@ -66,7 +66,7 @@ def get_metadata(ds, ds_identifier):
 
     foreign = jsonload(open(opj(ds.path, _metadata_fname)))
 
-    meta = _get_base_metadata(ds_identifier)
+    meta = _get_base_dataset_metadata(ds_identifier)
 
     for term in (
             'name', 'title', 'description', 'keywords', 'version',

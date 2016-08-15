@@ -11,7 +11,7 @@
 from os.path import exists, join as opj
 from simplejson import load as jsonload
 from .. import get_dataset_identifier
-from .. import _get_base_metadata
+from .. import _get_base_dataset_metadata
 
 # XXX Could become a class attribute
 _metadata_fname = 'dataset_description.json'
@@ -43,7 +43,7 @@ def get_metadata(ds, ds_identifier):
 
     bids = jsonload(open(opj(ds.path, _metadata_fname)))
 
-    meta = _get_base_metadata(ds_identifier)
+    meta = _get_base_dataset_metadata(ds_identifier)
 
     # TODO maybe normalize labels of standard licenses to definition URIs
     # perform mapping

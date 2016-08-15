@@ -18,6 +18,29 @@ from os.path import join as opj
 from datalad.support.exceptions import InsufficientArgumentsError
 
 
+_dataset_hierarchy_template = {
+    'origin': {
+        'dataset_description.json': """
+{
+    "Name": "mother"
+}""",
+        'datapackage.json': """
+{
+    "name": "MOTHER",
+    "keywords": ["example", "multitype metadata"]
+}""",
+    'sub': {
+        'dataset_description.json': """
+{
+    "Name": "child"
+}""",
+    'subsub': {
+        'dataset_description.json': """
+{
+    "Name": "grandchild"
+}"""}}}}
+
+
 @with_tempfile(mkdir=True)
 def test_get_metadata_type(path):
     # nothing set, nothing found
@@ -81,27 +104,7 @@ def test_basic_metadata(path):
                   'location': 'sub'})
 
 
-@with_tree(tree={
-    'origin': {
-        'dataset_description.json': """
-{
-    "Name": "mother"
-}""",
-        'datapackage.json': """
-{
-    "name": "MOTHER",
-    "keywords": ["example", "multitype metadata"]
-}""",
-    'sub': {
-        'dataset_description.json': """
-{
-    "Name": "child"
-}""",
-    'subsub': {
-        'dataset_description.json': """
-{
-    "Name": "grandchild"
-}"""}}}})
+@with_tree(tree=_dataset_hierarchy_template)
 def test_aggregation(path):
     with chpwd(path):
         assert_raises(InsufficientArgumentsError, aggregate_metadata, None)
@@ -177,3 +180,4 @@ def test_aggregation(path):
     # redo aggregation exactly as above, but now save changes
     aggregate_metadata(ds, guess_native_type=True, optimize_metadata=False,
                        recursive=True, save=True)
+    #TODO update the clone or reclone to check whether saved meta data comes down the pipe

@@ -83,7 +83,7 @@ def get_dataset_identifier(ds):
     return dsid
 
 
-def _get_base_metadata(ds_identifier):
+def _get_base_dataset_metadata(ds_identifier):
     """Return base metadata as dict for a given ds_identifier
     """
 
@@ -106,7 +106,7 @@ def get_implicit_metadata(ds, ds_identifier=None):
     if ds_identifier is None:
         ds_identifier = get_dataset_identifier(ds)
 
-    meta = _get_base_metadata(ds_identifier)
+    meta = _get_base_dataset_metadata(ds_identifier)
 
     # whenever we have a full dataset, give it a type
     if ds.is_installed():
