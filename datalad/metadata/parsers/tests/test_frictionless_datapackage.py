@@ -77,5 +77,6 @@ def test_get_metadata(path):
   "license": "http://opendatacommons.org/licenses/pddl/",
   "name": "cpi",
   "title": "Annual Consumer Price Index (CPI)",
+  "type": "Dataset",
   "version": "2.0.0"
 }""")

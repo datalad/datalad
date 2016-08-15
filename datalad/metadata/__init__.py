@@ -90,6 +90,7 @@ def _get_base_dataset_metadata(ds_identifier):
     return {
         "@context": "http://schema.org/",
         "@id": ds_identifier,
+        "type": "Dataset",
     }
 
 
@@ -107,10 +108,6 @@ def get_implicit_metadata(ds, ds_identifier=None):
         ds_identifier = get_dataset_identifier(ds)
 
     meta = _get_base_dataset_metadata(ds_identifier)
-
-    # whenever we have a full dataset, give it a type
-    if ds.is_installed():
-        meta['type'] = 'Dataset'
 
     # look for known remote annexes, doesn't need configured
     # remote to be meaningful

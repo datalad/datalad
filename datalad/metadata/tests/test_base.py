@@ -78,7 +78,7 @@ def test_get_multiple_metadata_types(path):
 def test_basic_metadata(path):
     ds = Dataset(opj(path, 'origin'))
     meta = get_metadata(ds)
-    assert_equal(sorted(meta[0].keys()), ['@context', '@id'])
+    assert_equal(sorted(meta[0].keys()), ['@context', '@id', 'type'])
     ds.create(force=True)
     meta = get_metadata(ds)
     assert_equal(sorted(meta[0].keys()), ['@context', '@id', 'type'])
