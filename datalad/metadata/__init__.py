@@ -10,25 +10,17 @@
 
 
 import os
-from simplejson import load as jsonload
-from io import open
 from os.path import join as opj, exists
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
 from ..log import lgr
+from datalad.support.json import load as jsonload
 
 
 # common format
 metadata_filename = 'meta.json'
 metadata_basepath = opj('.datalad', 'meta')
-# TODO think about minimizing the JSON output by default
-json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False, encoding='utf-8')
-
-
-def _load_metadata_from_file(fname):
-    meta = jsonload(open(fname, 'r', encoding='utf-8'))
-    return meta
 
 
 # XXX Could become dataset method
@@ -224,7 +216,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                 guess_type=guess_type,
                 ds_identifier=ds_identifier))
     else:
-        cached_meta = _load_metadata_from_file(main_meta_fname)
+        cached_meta = jsonload(main_meta_fname)
         if isinstance(cached_meta, list):
             meta.extend(cached_meta)
         else:
@@ -241,7 +233,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             else:
                 subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
                 if exists(subds_meta_fname):
-                    subds_meta = _load_metadata_from_file(subds_meta_fname)
+                    subds_meta = jsonload(subds_meta_fname)
                     # we cannot simply append, or we get weired nested graphs
                     # proper way would be to expand the JSON-LD, extend the list and
                     # compact/flatten at the end. However assuming a single context

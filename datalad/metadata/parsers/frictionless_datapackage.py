@@ -11,7 +11,7 @@
 """
 
 from os.path import exists, join as opj
-from simplejson import load as jsonload
+from datalad.support.json import load as jsonload
 from .. import _get_base_dataset_metadata
 
 _metadata_fname = 'datapackage.json'
@@ -20,7 +20,7 @@ _metadata_fname = 'datapackage.json'
 def has_metadata(ds):
     fname = opj(ds.path, _metadata_fname)
     try:
-        return exists(fname) and 'name' in jsonload(open(fname))
+        return exists(fname) and 'name' in jsonload(fname)
     except:
         return False
 
@@ -64,7 +64,7 @@ def get_metadata(ds, ds_identifier):
         raise ValueError(
             "no data package metadata found at {}".format(ds.path))
 
-    foreign = jsonload(open(opj(ds.path, _metadata_fname)))
+    foreign = jsonload(opj(ds.path, _metadata_fname))
 
     meta = _get_base_dataset_metadata(ds_identifier)
 

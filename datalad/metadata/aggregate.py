@@ -11,8 +11,6 @@
 
 __docformat__ = 'restructuredtext'
 
-from simplejson import dump as jsondump
-import codecs
 import os
 from os.path import join as opj, exists
 from datalad.interface.base import Interface
@@ -23,8 +21,9 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
-    metadata_basepath, json_dump_kwargs, flatten_metadata_graph, \
+    metadata_basepath, flatten_metadata_graph, \
     get_dataset_identifier
+from datalad.support.json import dump as jsondump
 
 
 def _optimize_jsonld(obj):
@@ -37,16 +36,13 @@ def _optimize_jsonld(obj):
 
 
 def _store_json(path, meta, optimize=True):
-
-    if not exists(path):
-        os.makedirs(path)
-
-    fname = opj(path, metadata_filename)
-
     if optimize:
         meta = _optimize_jsonld(meta)
 
-    jsondump(meta, codecs.getwriter('utf-8')(open(fname, 'wb')), **json_dump_kwargs)
+    if not exists(path):
+        os.makedirs(path)
+    fname = opj(path, metadata_filename)
+    jsondump(meta, fname)
 
 
 class AggregateMetaData(Interface):

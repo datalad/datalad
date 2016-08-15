@@ -9,8 +9,7 @@
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
 from os.path import exists, join as opj
-from simplejson import load as jsonload
-from .. import get_dataset_identifier
+from datalad.support.json import load as jsonload
 from .. import _get_base_dataset_metadata
 
 # XXX Could become a class attribute
@@ -41,7 +40,7 @@ def get_metadata(ds, ds_identifier):
     if not has_metadata(ds):
         raise ValueError("no BIDS metadata found at {}".format(ds.path))
 
-    bids = jsonload(open(opj(ds.path, _metadata_fname)))
+    bids = jsonload(opj(ds.path, _metadata_fname))
 
     meta = _get_base_dataset_metadata(ds_identifier)
 
