@@ -83,7 +83,9 @@ def test_basic_metadata(path):
     assert_equal(sorted(meta[0].keys()), ['@context', '@id', 'type'])
     ds.create(force=True)
     meta = get_metadata(ds)
-    assert_equal(sorted(meta[0].keys()), ['@context', '@id', 'type'])
+    assert_equal(
+        sorted(meta[0].keys()),
+        ['@context', '@id', 'location', 'type'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = Dataset(opj(path, 'sibling'))

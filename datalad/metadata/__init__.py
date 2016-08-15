@@ -102,6 +102,9 @@ def get_implicit_metadata(ds, ds_identifier=None):
 
     meta = _get_base_dataset_metadata(ds_identifier)
 
+    if ds.is_installed():
+        meta['location'] = os.curdir
+
     # look for known remote annexes, doesn't need configured
     # remote to be meaningful
     # need annex repo instance
