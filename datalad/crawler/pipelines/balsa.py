@@ -62,11 +62,6 @@ def superdataset_pipeline(url=TOPURL):
 
 # def extract_readme(data):
 #
-#     data['full title'] = xpath_match('//*/p[1]|span/text()')(data)
-#     data['species'] = xpath_match('//*/p[2]|span/text()')(data)
-#     data['description'] = xpath_match('//*/p[3]|span/text()')(data)
-#     data['publication'] = xpath_match('//*/p[4]|span/text()')(data)
-#     data['full tarball'] = xpath_match('//*[@class="btn-group"]/a[contains(text(), "d")]')(data)
 #
 #     if lexists("README.txt"):
 #         os.unlink("README.txt")
@@ -82,6 +77,11 @@ def superdataset_pipeline(url=TOPURL):
 #
 #         lgr.info("Generated README.txt")
 #         yield {'filename': "README.txt"}
+#
+# In [48]: response.xpath('//*[contains(text(), "DESCRIPTION")]').extract()
+# Out[48]: [u'<span class="attributeLabel">DESCRIPTION:</span>']
+
+
 
 
 @auto_repr
