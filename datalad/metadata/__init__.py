@@ -171,6 +171,19 @@ def get_implicit_metadata(ds, ds_identifier=None):
     return meta
 
 
+def _get_version_ids_from_implicit_meta(meta):
+    # figure out all other version of this dataset: origin or siblings
+    # build a flat list of UUIDs
+    hv = meta.get('dcterms:hasVersion', [])
+    if isinstance(hv, dict):
+        hv = [hv]
+    versions = [v['@id'] for v in hv if '@id' in v]
+    iv = meta.get('dcterms:isVersionOf', {})
+    if '@id' in iv:
+        versions.append(iv['@id'])
+    return versions
+
+
 # XXX might become its own command
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                  ignore_cache=False, optimize=False):
@@ -198,18 +211,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         has_part = [has_part]
     has_part = {hp['location']: hp for hp in has_part}
 
-    # figure out all other version of this dataset: origin or siblings
-    # build a flat list of UUIDs
-    candidates = ('dcterms:isVersionOf', 'dcterms:hasVersion')
-    ds_versions = [
-        # flatten list
-        item for versionlist in
-        # extract uuids of all listed repos
-        # Note: cannot use r['@id'] because sometimes implicit_meta[i] is a dict
-        [[implicit_meta[i]['@id'] for r in implicit_meta[i] if '@id' in r]
-            # loop over all possible terms
-            for i in candidates if i in implicit_meta]
-        for item in versionlist]
+    ds_versions = _get_version_ids_from_implicit_meta(implicit_meta)
     meta.append(implicit_meta)
 
     # from cache?
