@@ -1,4 +1,5 @@
 # emacs: -*- mode: python-mode; py-indent-offset: 4; tab-width: 4; indent-tabs-mode: nil -*-
+# -*- coding: utf-8 -*-
 # ex: set sts=4 ts=4 sw=4 noet:
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 #
@@ -8,6 +9,7 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 """Test meta data """
 
+from six import PY2
 from datalad.api import Dataset, aggregate_metadata
 from datalad.metadata import get_metadata_type, get_metadata, get_dataset_identifier
 from nose.tools import assert_true, assert_equal, assert_raises
@@ -22,22 +24,22 @@ _dataset_hierarchy_template = {
     'origin': {
         'dataset_description.json': """
 {
-    "Name": "mother"
+    "Name": "mother_äöü東"
 }""",
         'datapackage.json': """
 {
-    "name": "MOTHER",
+    "name": "MOTHER_äöü東",
     "keywords": ["example", "multitype metadata"]
 }""",
     'sub': {
         'dataset_description.json': """
 {
-    "Name": "child"
+    "Name": "child_äöü東"
 }""",
     'subsub': {
         'dataset_description.json': """
 {
-    "Name": "grandchild"
+    "Name": "grandchild_äöü東"
 }"""}}}}
 
 
@@ -130,8 +132,11 @@ def test_aggregation(path):
     # three different IDs
     assert_equal(3, len(set([s.get('@id') for s in meta])))
     # and we know about all three datasets
-    for name in ('mother', 'child', 'grandchild'):
-        assert_true(sum([s.get('name', None) == name for s in meta]))
+    for name in ('mother_äöü東', 'child_äöü東', 'grandchild_äöü東'):
+        if PY2:
+            assert_true(sum([s.get('name', None) == name.decode('utf-8') for s in meta]))
+        else:
+            assert_true(sum([s.get('name', None) == name for s in meta]))
 
     # save the toplevel dataset only (see below)
     ds.save('with aggregated meta data', auto_add_changes=True)

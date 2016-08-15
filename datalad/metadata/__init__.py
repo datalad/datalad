@@ -11,6 +11,7 @@
 
 import os
 from simplejson import load as jsonload
+from io import open
 from os.path import join as opj, exists
 from importlib import import_module
 from datalad.distribution.dataset import Dataset
@@ -22,11 +23,11 @@ from ..log import lgr
 metadata_filename = 'meta.json'
 metadata_basepath = opj('.datalad', 'meta')
 # TODO think about minimizing the JSON output by default
-json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False)
+json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False, encoding='utf-8')
 
 
 def _load_metadata_from_file(fname):
-    meta = jsonload(open(fname, 'rb'))
+    meta = jsonload(open(fname, 'r', encoding='utf-8'))
     return meta
 
 
@@ -204,6 +205,7 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         # flatten list
         item for versionlist in
         # extract uuids of all listed repos
+        # Note: cannot use r['@id'] because sometimes implicit_meta[i] is a dict
         [[implicit_meta[i]['@id'] for r in implicit_meta[i] if '@id' in r]
             # loop over all possible terms
             for i in candidates if i in implicit_meta]

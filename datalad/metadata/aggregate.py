@@ -12,6 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 from simplejson import dump as jsondump
+import codecs
 import os
 from os.path import join as opj, exists
 from datalad.interface.base import Interface
@@ -45,7 +46,7 @@ def _store_json(path, meta, optimize=True):
     if optimize:
         meta = _optimize_jsonld(meta)
 
-    jsondump(meta, open(fname, 'w'), **json_dump_kwargs)
+    jsondump(meta, codecs.getwriter('utf-8')(open(fname, 'wb')), **json_dump_kwargs)
 
 
 class AggregateMetaData(Interface):
