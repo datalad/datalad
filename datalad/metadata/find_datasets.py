@@ -56,7 +56,7 @@ class FindDatasets(Interface):
 
     @staticmethod
     @datasetmethod(name='query')
-    def __call__(dataset, match, report=None):
+    def __call__(match, dataset, report=None):
 
         ds = require_dataset(dataset, check_installed=True, purpose='meta data query')
 
