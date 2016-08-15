@@ -69,7 +69,9 @@ def setup_parser(
     parts = {}
     # main parser
     parser = argparse.ArgumentParser(
-        fromfile_prefix_chars='@',
+        # cannot use '@' because we need to input JSON-LD properties (which might come wit @ prefix)
+        # MH: question, do we need this at all?
+        fromfile_prefix_chars=':',
         # usage="%(prog)s ...",
         description=dedent_docstring("""\
             DataLad provides a unified data distribution with the convenience of git-annex

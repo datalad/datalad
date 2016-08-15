@@ -38,6 +38,7 @@ Meta data handling
 .. toctree::
    :maxdepth: 1
 
+   generated/man/datalad-find-datasets
    generated/man/datalad-aggregate-metadata
 
 Miscellaneous commands
