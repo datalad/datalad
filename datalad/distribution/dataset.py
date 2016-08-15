@@ -26,6 +26,7 @@ from datalad.utils import optional_args, expandpath, is_explicit_path
 from datalad.utils import swallow_logs
 from datalad.utils import getpwd
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.dochelpers import exc_str
 
 
 
@@ -87,13 +88,20 @@ class Dataset(object):
         """
         if self._repo is None:
             with swallow_logs():
-                try:
-                    self._repo = AnnexRepo(self._path, create=False, init=False)
-                except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError):
-                    try:
-                        self._repo = GitRepo(self._path, create=False)
-                    except (InvalidGitRepositoryError, NoSuchPathError):
-                        pass
+                for cls, ckw, kw in (
+                        (AnnexRepo, {'allow_noninitialized': True}, {'init': False}),
+                        (GitRepo, {}, {})
+                ):
+                    if cls.is_valid_repo(self._path, **ckw):
+                        try:
+                            lgr.debug("Detected %s at %s", cls, self._path)
+                            self._repo = cls(self._path, create=False, **kw)
+                            break
+                        except (InvalidGitRepositoryError, NoSuchPathError, RuntimeError) as exc:
+                            lgr.debug("Oops -- guess on repo type was wrong?: %s", exc_str(exc))
+                            pass
+                if self._repo is None:
+                    lgr.info("Failed to detect a valid repo at %s" % self.path)
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen

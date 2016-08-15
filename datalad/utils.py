@@ -769,6 +769,9 @@ class chpwd(object):
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
 
+    It is just a thin wrapper around GitRepo.is_with_annex() classmethod
+    which also checks for `path` to exist first.
+
     This includes actually present annexes, but also uninitialized ones, or
     even the presence of a remote annex branch.
     """
@@ -777,9 +780,7 @@ def knows_annex(path):
         lgr.debug("No annex: test path {0} doesn't exist".format(path))
         return False
     from datalad.support.gitrepo import GitRepo
-    repo = GitRepo(path, create=False)
-    return "origin/git-annex" in repo.get_remote_branches() \
-           or "git-annex" in repo.get_branches()
+    return GitRepo(path, init=False, create=False).is_with_annex()
 
 
 @contextmanager

@@ -28,6 +28,7 @@ from datalad.tests.utils import ok_startswith
 from datalad.tests.utils import skip_if_no_module
 from datalad.support.exceptions import InsufficientArgumentsError
 
+from datalad.api import install
 
 def test_EnsureDataset():
 
@@ -120,8 +121,13 @@ def test_is_installed(src, path):
     subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
     # get the submodule
-    from datalad.cmd import Runner
-    Runner().run(['git', 'submodule', 'update', '--init', 'subm 1'], cwd=path)
+    # This would init so there is a .git file with symlink info, which is
+    # as we agreed is more pain than gain, so let's use our install which would
+    # do it right, after all we are checking 'is_installed' ;)
+    # from datalad.cmd import Runner
+    # Runner().run(['git', 'submodule', 'update', '--init', 'subm 1'], cwd=path)
+    with chpwd(path):
+        install('subm 1')
     ok_(subds.is_installed())
 
 

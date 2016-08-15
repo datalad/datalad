@@ -144,7 +144,12 @@ def test_add_archive_content(path_orig, url, repo_path):
     # and we should be able to reference it while under subdirectory
     subdir = opj(repo_path, 'subdir')
     with chpwd(subdir, mkdir=True):
-        add_archive_content(opj(pardir, '1.tar.gz'))
+        add_archive_content(opj(pardir, '1.tar.gz'), use_current_dir=True)
+        d1_basic_checks()
+        # or we could keep relative path and also demand to keep the archive prefix
+        # while extracting under original (annex root) dir
+        add_archive_content(opj(pardir, '1.tar.gz'), add_archive_leading_dir=True)
+    with chpwd('1'):
         d1_basic_checks()
 
     # test with excludes and renames and annex options
@@ -288,6 +293,17 @@ class TestAddArchiveOptions():
         # To test that .tar gets removed
         add_archive_content('1.tar', annex=self.annex, strip_leading_dirs=True, delete=True)
         assert_false(lexists(opj(self.annex.path, '1.tar')))
+
+    def test_add_archive_leading_dir(self):
+        import os
+        os.mkdir(opj(self.annex.path, 'sub'))
+        f123 = opj('sub', '123.tar')
+        os.rename(opj(self.annex.path, '1.tar'), opj(self.annex.path, f123))
+        self.annex.remove('1.tar', force=True)
+        self.annex.add(f123)
+        self.annex.commit(msg="renamed")
+        add_archive_content(f123, annex=self.annex, add_archive_leading_dir=True, strip_leading_dirs=True)
+        ok_file_under_git(self.annex.path, opj('sub', '123', 'file.txt'), annexed=True)
 
     def test_add_delete_after_and_drop(self):
         # To test that .tar gets removed

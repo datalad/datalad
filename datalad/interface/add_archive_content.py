@@ -73,6 +73,12 @@ class AddArchiveContent(Interface):
             action="store_true",
             doc="""flag to delete original archive from the filesystem/git in current tree.
                    %s""" % _KEY_OPT_NOTE),
+        add_archive_leading_dir=Parameter(
+            args=("--add-archive-leading-dir",),
+            action="store_true",
+            doc="""flag to place extracted content under a directory which would correspond
+                   to archive name with suffix stripped.  E.g. for archive `example.zip` its
+                   content will be extracted under a directory `example/`"""),
         strip_leading_dirs=Parameter(
             args=("--strip-leading-dirs",),
             action="store_true",
@@ -93,8 +99,8 @@ class AddArchiveContent(Interface):
         use_current_dir=Parameter(
             args=("--use-current-dir",),
             action="store_true",
-            doc="""flag to extract archive under the directory where it is located, not under current
-               directory.  %s""" % _KEY_OPT_NOTE),
+            doc="""flag to extract archive under the current directory,  not the directory where archive is located.
+                   %s""" % _KEY_OPT_NOTE),
         # TODO: add option to extract under archive's original directory. Currently would extract in curdir
         existing=Parameter(
             args=("--existing",),
@@ -184,6 +190,7 @@ class AddArchiveContent(Interface):
 
     @staticmethod
     def __call__(archive, annex=None,
+                 add_archive_leading_dir=False,
                  strip_leading_dirs=False, leading_dirs_depth=None, leading_dirs_consider=None,
                  use_current_dir=False,
                  delete=False, key=False, exclude=None, rename=None, existing='fail',
@@ -216,6 +223,7 @@ class AddArchiveContent(Interface):
             archive_path = opj(annex.path, archive)
         annex_path = annex.path
 
+        # _rpath below should depict paths relative to the top of the annex
         archive_rpath = relpath(archive_path, annex_path)
 
         # TODO: somewhat too cruel -- may be an option or smth...
@@ -223,42 +231,53 @@ class AddArchiveContent(Interface):
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
+
         if not key:
             # we were given a file which must exist
             if not exists(archive_path):
                 raise ValueError("Archive {} does not exist".format(archive))
             # TODO: support adding archives content from outside the annex/repo
-            origin = archive
+            origin = 'archive'
             key = annex.get_file_key(archive_rpath)
             archive_dir = dirname(archive_path)
         else:
-            origin = key
+            origin = 'key'
+            key = archive
             archive_dir = None  # We must not have anything to do with the location under .git/annex
+
+        archive_basename = file_basename(archive)
 
         if not key:
             # TODO: allow for it to be under git???  how to reference then?
             raise NotImplementedError(
-                "Provided file is not under annex.  We don't support yet adding everything "
-                "straight to git"
+                "Provided file %s is not under annex.  We don't support yet adding everything "
+                "straight to git" % archive
             )
 
-        # are we in a subdirectory of the repository? then we should add content under that
+        # are we in a subdirectory of the repository?
+        pwd_under_annex = commonprefix([pwd, annex_path]) == annex_path
+        #  then we should add content under that
         # subdirectory,
         # get the path relative to the repo top
-        if commonprefix([pwd, annex_path]) != annex_path:
-            extract_relpath = None
+        if use_current_dir:
+            # if outside -- extract to the top of repo
+            extract_rpath = relpath(pwd, annex_path) \
+                if pwd_under_annex \
+                else None
         else:
-            extract_relpath = relpath(pwd, annex_path) \
-                if use_current_dir \
-                else relpath(archive_dir, annex_path)
+            extract_rpath = relpath(archive_dir, annex_path)
+
+        # relpath might return '.' as the relative path to curdir, which then normalize_paths
+        # would take as instructions to really go from cwd, so we need to sanitize
+        if extract_rpath == curdir:
+            extract_rpath = None  # no special relpath from top of the repo
 
         # and operate from now on the key or whereever content available "canonically"
         try:
-            key_path = annex.get_contentlocation(key)  # , relative_to_top=True)
+            key_rpath = annex.get_contentlocation(key)  # , relative_to_top=True)
         except:
             raise RuntimeError("Content of %s seems to be N/A.  Fetch it first" % key)
 
-        #key_path = opj(reltop, key_path)
         # now we simply need to go through every file in that archive and
         lgr.info("Adding content of the archive %s into annex %s", archive, annex)
 
@@ -268,7 +287,7 @@ class AddArchiveContent(Interface):
         annexarchive = ArchiveAnnexCustomRemote(path=annex_path, persistent_cache=True)
         # We will move extracted content so it must not exist prior running
         annexarchive.cache.allow_existing = True
-        earchive = annexarchive.cache[key_path]
+        earchive = annexarchive.cache[key_rpath]
 
         # TODO: check if may be it was already added
         if ARCHIVES_SPECIAL_REMOTE not in annex.get_remotes():
@@ -318,7 +337,11 @@ class AddArchiveContent(Interface):
                 # preliminary target name which might get modified by renames
                 target_file_orig = target_file = extracted_file
 
+                # strip leading dirs
                 target_file = target_file[leading_dir_len:]
+
+                if add_archive_leading_dir:
+                    target_file = opj(archive_basename, target_file)
 
                 if rename:
                     target_file = apply_replacement_rules(rename, target_file)
@@ -361,7 +384,7 @@ class AddArchiveContent(Interface):
                         fn_base, fn_ext = file_basename(fn, return_ext=True)
 
                         if existing == 'archive-suffix':
-                            fn_base += '-%s' % file_basename(origin)
+                            fn_base += '-%s' % archive_basename
                         elif existing == 'numeric-suffix':
                             pass  # archive-suffix will have the same logic
                         else:
@@ -395,9 +418,9 @@ class AddArchiveContent(Interface):
                 lgr.debug("Adding %s to annex pointing to %s and with options %r",
                           target_file, url, annex_options)
 
-                target_file_gitpath = opj(extract_relpath, target_file) if extract_relpath else target_file
+                target_file_rpath = opj(extract_rpath, target_file) if extract_rpath else target_file
                 out_json = annex.add_url_to_file(
-                    target_file_gitpath,
+                    target_file_rpath,
                     url, options=annex_options,
                     batch=True)
 
@@ -414,7 +437,7 @@ class AddArchiveContent(Interface):
 
                 if delete_after:
                     # forcing since it is only staged, not yet committed
-                    annex.remove(target_file_gitpath, force=True)  # TODO: batch!
+                    annex.remove(target_file_rpath, force=True)  # TODO: batch!
                     stats.removed += 1
 
                 # # chaining 3 annex commands, 2 of which not batched -- less efficient but more bullet proof etc
@@ -432,7 +455,7 @@ class AddArchiveContent(Interface):
 
                 del target_file  # Done with target_file -- just to have clear end of the loop
 
-            if delete and archive:
+            if delete and archive and origin != 'key':
                 lgr.debug("Removing the original archive {}".format(archive))
                 # force=True since some times might still be staged and fail
                 annex.remove(archive_rpath, force=True)
@@ -444,7 +467,7 @@ class AddArchiveContent(Interface):
             if commit:
                 commit_stats = outside_stats if outside_stats else stats
                 annex.commit(
-                    "Added content extracted from %s\n\n%s" % (origin, commit_stats.as_str(mode='full'))
+                    "Added content extracted from %s %s\n\n%s" % (origin, archive, commit_stats.as_str(mode='full'))
                 )
                 commit_stats.reset()
         finally:
