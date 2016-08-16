@@ -189,6 +189,7 @@ class Publish(Interface):
                         "No known default target for "
                         "publication and none given.")
 
+        subds_prev_hexsha = {}
         if recursive:
             all_subdatasets = ds.get_subdatasets(fulfilled=True)
             subds_to_consider = \
@@ -196,6 +197,9 @@ class Publish(Interface):
                     ds.repo, all_subdatasets, dest_resolved, since=since) \
                 if publish_this \
                 else all_subdatasets
+            # if we were returned a dict, we got subds_prev_hexsha
+            if isinstance(subds_to_consider, dict):
+                subds_prev_hexsha = subds_to_consider
             for subds_path in subds_to_consider:
                 if path and '.' in path:
                     # we explicitly are passing '.' to subdatasets in case of
@@ -225,7 +229,12 @@ class Publish(Interface):
                 # but may be we could just rely on internal logic within
                 # subdataset to figure out what it needs to publish.
                 # But we need to pass empty string one inside as is
-                pkw = dict(since=since) if since == '' else {}
+                pkw = {}
+                if since == '':
+                    pkw['since'] = since
+                elif since is None:
+                    # pass previous state for that submodule if known
+                    pkw['since'] = subds_prev_hexsha.get(dspath, None)
                 published_, skipped_ = ds_.publish(to=to, recursive=recursive, **pkw)
                 published += published_
                 skipped += skipped_
@@ -341,5 +350,4 @@ class Publish(Interface):
             # not sure if it could even track renames of subdatasets
             # but let's "check"
             assert(d.a_path == d.b_path)
-        changed_subdatasets = [d.b_path for d in diff]
-        return changed_subdatasets
+        return dict((d.a_path, d.a_blob.hexsha) for d in diff)
