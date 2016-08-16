@@ -662,7 +662,7 @@ class GitRepo(object):
         if options:
             # we can't pass all possible options to gitpython's implementation
             # of commit. Therefore we need a direct call to git:
-            cmd = ['git', 'commit'] + (["-m", msg] if msg else []) + options
+            cmd = ['git', 'commit'] + (["-m", msg if msg else ""]) + options
             lgr.debug("Committing via direct call of git: %s" % cmd)
             self._git_custom_command([], cmd)
         else:
