@@ -13,6 +13,7 @@ import os
 from shutil import rmtree
 from os import curdir, makedirs, rmdir
 from os.path import lexists, join as opj, abspath, exists, normpath
+from string import split
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
@@ -50,7 +51,7 @@ def superdataset_pipeline(url=TOPURL):
         # skip the empty dataset used by BALSA for testing
         skip_if({'dataset_id': 'Jvw1'}, re=True),
         crawl_url(),
-        xpath_match('//*/h3/text()', output='dataset'),
+        xpath_match('substring(//*/h3/text(), 8, string-length(//*/h3/text()))', output='dataset'),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
         annex.initiate_dataset(
             template="balsa",
@@ -62,6 +63,17 @@ def superdataset_pipeline(url=TOPURL):
 
 # def extract_readme(data):
 #
+#     elements = int(xpath_match('count(//*[contains(text(), "DESCRIPTION")]/following-sibling::*[1]/../text())')) + 1
+#     x = 2
+#     while x < elements:
+#         data['desc'] = xpath_match('normalize-space(//*[contains(text(), "DESCRIPTION")]/following-sibling::*'
+#                                    '[1]/../text()[%(x)s])')(data)
+#     data['species'] = xpath_match('normalize-space(//*[contains(text(), "SPECIES")]/following-sibling::*'
+#                                   '[1]/../text()[2])')(data)
+#     data['authors'] = xpath_match('normalize-space(//*[contains(text(), "AUTHORS")]/../ul)')(data)
+#     data['pub'] = xpath_match('//*[contains(text(), "PUBLICATION")]/following-sibling::*[1]/../span[2]/text()')(data)
+#     data['doi'] = xpath_match('//*[contains(text(), "DOI")]/following-sibling::*[1]/../a/text()')(data)
+#     data['title'] = xpath_match('//*[contains(text(), "Study:")]/following-sibling::*[1]/../h3/text()')(data)
 #
 #     if lexists("README.txt"):
 #         os.unlink("README.txt")
@@ -72,16 +84,21 @@ def superdataset_pipeline(url=TOPURL):
 # ------------------------
 #
 # Full Title: %(title)s
+#
+# Description: %(desc)s
+#
+# Authors: %(authors)s
 # Species: %(species)s
+# Publication: %(pub)s
+#
 #         """ % data)
 #
 #         lgr.info("Generated README.txt")
 #         yield {'filename': "README.txt"}
-#
-# In [48]: response.xpath('//*[contains(text(), "DESCRIPTION")]').extract()
-# Out[48]: [u'<span class="attributeLabel">DESCRIPTION:</span>']
-
-
+# [
+#     extract_readme,
+#     annex,
+# ],
 
 
 @auto_repr
