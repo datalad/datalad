@@ -138,11 +138,7 @@ class Publish(Interface):
         publish_this = False   # whether to publish `ds`
         publish_files = []     # which files to publish by `ds`
 
-        # it is important to publish parent dataset after children
-        # so possible updates of meta-information on the server
-        # triggered from the hook(s) work out correctly.  Thus -- collecting
-        # them into a list
-        expl_subs = []         # subdatasets to publish explicitly
+        expl_subs = set()      # subdatasets to publish explicitly
         publish_subs = dict()  # collect what to publish from subdatasets
 
         if not path:
@@ -153,7 +149,7 @@ class Publish(Interface):
                 subdatasets = ds.get_subdatasets()
                 if p in subdatasets:
                     # p is a subdataset, that needs to be published itself
-                    expl_subs.append(p)
+                    expl_subs.add(p)
                 else:
                     try:
                         d = get_containing_subdataset(ds, p)
@@ -212,11 +208,11 @@ class Publish(Interface):
                 else:
                     # we can recursively publish only, if there actually
                     # is something
-                    expl_subs.append(subds_path)
+                    expl_subs.add(subds_path)
 
         published, skipped = [], []
 
-        for dspath in expl_subs:
+        for dspath in sorted(expl_subs):
             # these datasets need to be pushed regardless of additional paths
             # pointing inside them
             # due to API, this may not happen when calling publish with paths,
