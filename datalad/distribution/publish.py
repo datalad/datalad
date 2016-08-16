@@ -22,10 +22,11 @@ from datalad.interface.base import Interface
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
-from datalad.support.constraints import EnsureListOf
+from datalad.support.constraints import EnsureChoice
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
+from datalad.utils import assure_list
 
 from .dataset import EnsureDataset
 from .dataset import Dataset
@@ -91,8 +92,17 @@ class Publish(Interface):
             args=("-r", "--recursive"),
             action="store_true",
             doc="recursively publish all subdatasets of the dataset. In order "
-                "to recursivley publish with all data, use '.' as `path` in "
+                "to recursively publish with all data, use '.' as `path` in "
                 "combination with `recursive`"),
+        since=Parameter(
+            args=("--since",),
+            constraints=EnsureStr() | EnsureNone(),
+            doc="""When publishing dataset(s), specifies commit (treeish, tag, etc)
+            from which to look for changes
+            to decide either updated publishing is necessary for this and which children.
+            If empty argument is provided, then we will always run publish command.
+            By default, would take from the previously published to that remote/sibling
+            state (for the current branch)"""),
         skip_failing=Parameter(
             args=("--skip-failing",),
             action="store_true",
@@ -117,19 +127,25 @@ class Publish(Interface):
 
     @staticmethod
     @datasetmethod(name='publish')
-    def __call__(path=None, dataset=None, to=None, recursive=False, skip_failing=False,
-                 annex_copy_opts=None):
+    def __call__(path=None, dataset=None, to=None, recursive=False, since=None,
+                 skip_failing=False, annex_copy_opts=None):
         ds = require_dataset(dataset, check_installed=True, purpose='publication')
         assert(ds.repo is not None)
+
+        path = assure_list(path)
 
         # figure out, what to publish from what (sub)dataset:
         publish_this = False   # whether to publish `ds`
         publish_files = []     # which files to publish by `ds`
 
-        expl_subs = set()      # subdatasets to publish explicitly
+        # it is important to publish parent dataset after children
+        # so possible updates of meta-information on the server
+        # triggered from the hook(s) work out correctly.  Thus -- collecting
+        # them into a list
+        expl_subs = []         # subdatasets to publish explicitly
         publish_subs = dict()  # collect what to publish from subdatasets
         if recursive:
-            for subds_path in ds.get_subdatasets(fulfilled=True):
+            for subds_path in Publish._get_subdatasets_to_publish(ds, to, since=since):
                 if path and '.' in path:
                     # we explicitly are passing '.' to subdatasets in case of
                     # `recursive`. Therefore these datasets are going into
@@ -141,16 +157,17 @@ class Publish(Interface):
                 else:
                     # we can recursively publish only, if there actually
                     # is something
-                    expl_subs.add(subds_path)
+                    expl_subs.append(subds_path)
 
         if not path:
             # publish `ds` itself, if nothing else is given:
             publish_this = True
         else:
             for p in path:
-                if p in ds.get_subdatasets():
+                subdatasets = ds.get_subdatasets()
+                if p in subdatasets:
                     # p is a subdataset, that needs to be published itself
-                    expl_subs.add(p)
+                    expl_subs.append(p)
                 else:
                     try:
                         d = get_containing_subdataset(ds, p)
@@ -172,6 +189,43 @@ class Publish(Interface):
                         publish_subs[d.path]['files'].append(p)
 
         published, skipped = [], []
+
+        for dspath in expl_subs:
+            # these datasets need to be pushed regardless of additional paths
+            # pointing inside them
+            # due to API, this may not happen when calling publish with paths,
+            # therefore force it.
+            # TODO: There might be a better solution to avoid two calls of
+            # publish() on the very same Dataset instance
+            ds_ = Dataset(opj(ds.path, dspath))
+            try:
+                # we could take local diff for the subdataset
+                # but may be we could just rely on internal logic within
+                # subdataset to figure out what it needs to publish.
+                # But we need to pass empty string one inside as is
+                pkw = dict(since=since) if since == '' else {}
+                published_, skipped_ = ds_.publish(to=to, recursive=recursive, **pkw)
+                published += published_
+                skipped += skipped_
+            except Exception as exc:
+                if not skip_failing:
+                    raise
+                lgr.warning("Skipped %s: %s", ds.path, exc_str(exc))
+                skipped += [ds_]
+
+        for d in publish_subs:
+            # recurse into subdatasets
+
+            # TODO: need to fetch. see above
+            publish_subs[d]['dataset'].repo.fetch(remote=to)
+
+            published_, skipped_ = publish_subs[d]['dataset'].publish(
+                to=to,
+                path=publish_subs[d]['files'],
+                recursive=recursive,
+                annex_copy_opts=annex_copy_opts)
+            published += published_
+            skipped += skipped_
 
         if publish_this:
 
@@ -243,38 +297,6 @@ class Publish(Interface):
                                            remote=dest_resolved,
                                            options=annex_copy_opts)
 
-        for dspath in expl_subs:
-            # these datasets need to be pushed regardless of additional paths
-            # pointing inside them
-            # due to API, this may not happen when calling publish with paths,
-            # therefore force it.
-            # TODO: There might be a better solution to avoid two calls of
-            # publish() on the very same Dataset instance
-            ds_ = Dataset(opj(ds.path, dspath))
-            try:
-                published_, skipped_ = ds_.publish(to=to, recursive=recursive)
-                published += published_
-                skipped += skipped_
-            except Exception as exc:
-                if not skip_failing:
-                    raise
-                lgr.warning("Skipped %s: %s", ds.path, exc_str(exc))
-                skipped += [ds_]
-
-        for d in publish_subs:
-            # recurse into subdatasets
-
-            # TODO: need to fetch. see above
-            publish_subs[d]['dataset'].repo.fetch(remote=to)
-
-            published_, skipped_ = publish_subs[d]['dataset'].publish(
-                to=to,
-                path=publish_subs[d]['files'],
-                recursive=recursive,
-                annex_copy_opts=annex_copy_opts)
-            published += published_
-            skipped += skipped_
-
         return published, skipped
 
     @staticmethod
@@ -296,4 +318,29 @@ class Publish(Interface):
                     msg += "File: %s\n" % item
             ui.message(msg)
 
+    @staticmethod
+    def _get_subdatasets_to_publish(ds, to, since=None):
+        all_subdatasets = ds.get_subdatasets(fulfilled=True)
 
+        if since == '':
+            # we are instructed to publish all
+            return all_subdatasets
+
+        if since is None:  # default behavior - only updated since last update
+            # so we figure out what was the last update
+            # XXX here we assume one to one mapping of names from local branches
+            # to the remote
+            active_branch = ds.repo.get_active_branch()
+            since = '%s/%s' % (to, active_branch)
+
+            if since not in ds.repo.get_remote_branches():
+                # we did not publish it before - so everything must go
+                return all_subdatasets
+
+        diff = ds.repo.repo.commit().diff(since, all_subdatasets)
+        for d in diff:
+            # not sure if it could even track renames of subdatasets
+            # but let's "check"
+            assert(d.a_name == d.b_name)
+        changed_subdatasets = [d.b_name for d in diff]
+        return changed_subdatasets

@@ -368,6 +368,22 @@ else:
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
 
 
+def assure_list(s):
+    """Given not a list, would place it into a list. If None - empty list is returned
+
+    Parameters
+    ----------
+    s: list or anything
+    """
+
+    if isinstance(s, list):
+        return s
+    elif s is None:
+        return []
+    else:
+        return [s]
+
+
 def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
 
