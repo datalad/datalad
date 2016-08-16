@@ -256,11 +256,8 @@ class Publish(Interface):
         if publish_this:
             # upstream branch needed for update (merge) and subsequent push,
             # in case there is no.
-            if track_branch is None:
-                # no tracking branch yet:
-                set_upstream = True
-            else:
-                set_upstream = False
+            # no tracking branch yet?
+            set_upstream = track_branch is None
 
             # is `to` an already known remote?
             if dest_resolved not in ds.repo.get_remotes():
@@ -327,7 +324,6 @@ class Publish(Interface):
 
     @staticmethod
     def _get_changed_datasets(repo, all_subdatasets, to, since=None):
-
         if since == '':
             # we are instructed to publish all
             return all_subdatasets
