@@ -61,44 +61,42 @@ def superdataset_pipeline(url=TOPURL):
     ]
 
 
-# def extract_readme(data):
-#
-#     elements = int(xpath_match('count(//*[contains(text(), "DESCRIPTION")]/following-sibling::*[1]/../text())')) + 1
-#     x = 2
-#     while x < elements:
-#         data['desc'] = xpath_match('normalize-space(//*[contains(text(), "DESCRIPTION")]/following-sibling::*'
-#                                    '[1]/../text()[%(x)s])')(data)
-#     data['species'] = xpath_match('normalize-space(//*[contains(text(), "SPECIES")]/following-sibling::*'
-#                                   '[1]/../text()[2])')(data)
-#     data['authors'] = xpath_match('normalize-space(//*[contains(text(), "AUTHORS")]/../ul)')(data)
-#     data['pub'] = xpath_match('//*[contains(text(), "PUBLICATION")]/following-sibling::*[1]/../span[2]/text()')(data)
-#     data['doi'] = xpath_match('//*[contains(text(), "DOI")]/following-sibling::*[1]/../a/text()')(data)
-#     data['title'] = xpath_match('//*[contains(text(), "Study:")]/following-sibling::*[1]/../h3/text()')(data)
-#
-#     if lexists("README.txt"):
-#         os.unlink("README.txt")
-#
-#     with open("README.txt", "w") as fi:
-#         fi.write("""\
-# BALSA sub-dataset %(dataset)s
-# ------------------------
-#
-# Full Title: %(title)s
-#
-# Description: %(desc)s
-#
-# Authors: %(authors)s
-# Species: %(species)s
-# Publication: %(pub)s
-#
-#         """ % data)
-#
-#         lgr.info("Generated README.txt")
-#         yield {'filename': "README.txt"}
-# [
-#     extract_readme,
-#     annex,
-# ],
+def extract_readme(data):
+    # elements = int(count)
+    # x = 2
+    # while x < elements:
+    # data['desc'] = [x['match'] for x in xpath_match('normalize-space(//*[contains(text(), "DESCRIPTION")]/'
+    #                                                'following-sibling::*[1]/../text())')(data)][0]
+
+    data['species'] = [x['match'] for x in xpath_match('normalize-space(//*[contains(text(), "SPECIES")]/'
+                                                       'following-sibling::*[1]/../text()[2])')(data)][0]
+    data['authors'] = [x['match'] for x in xpath_match('normalize-space(//*[contains(text(), "AUTHORS")]/../'
+                                                       'ul)')(data)][0]
+    data['pub'] = [x['match'] for x in xpath_match('//*[contains(text(), "PUBLICATION")]/'
+                                                   'following-sibling::*[1]/../span[2]/text()')(data)][0]
+    data['doi'] = [x['match'] for x in xpath_match('//*[contains(text(), "DOI")]/'
+                                                   'following-sibling::*[1]/../a/text()')(data)][0]
+    data['title'] = [x['match'] for x in xpath_match('//*[contains(text(), "Study:")]/'
+                                                     'following-sibling::*[1]/../h3/text()')(data)][0]
+
+    if lexists("README.txt"):
+        os.unlink("README.txt")
+
+    with open("README.txt", "w") as fi:
+        fi.write("""\
+BALSA sub-dataset %(title)s
+------------------------
+
+Description: TODO
+
+Authors: %(authors)s
+Species: %(species)s
+Publication: %(pub)s
+
+        """ % data)
+
+        lgr.info("Generated README.txt")
+        yield {'filename': "README.txt"}
 
 
 @auto_repr
@@ -192,6 +190,10 @@ def pipeline(dataset_id, url=TOPURL):
             ],
             [
                 crawl_url(dataset_url),
+                [
+                    extract_readme,
+                    annex,
+                ],
                 [
                     # canonical tarball
                     a_href_match('.*/download/.*', min_count=1),
