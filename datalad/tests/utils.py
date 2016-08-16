@@ -44,7 +44,6 @@ from nose import SkipTest
 from ..cmd import Runner
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
-from ..support.archives import compress_files
 from ..support.vcr_ import *
 from ..support.keyring_ import MemoryKeyring
 from ..dochelpers import exc_str, borrowkwargs
@@ -82,6 +81,7 @@ def skip_if_scrapy_without_selector():
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
+    from ..support.archives import compress_files
     dirname = file_basename(name)
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
