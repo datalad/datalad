@@ -350,4 +350,4 @@ class Publish(Interface):
             # not sure if it could even track renames of subdatasets
             # but let's "check"
             assert(d.a_path == d.b_path)
-        return dict((d.b_path, d.b_blob.hexsha) for d in diff)
+        return dict((d.b_path, d.b_blob.hexsha if d.b_blob else None) for d in diff)
