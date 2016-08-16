@@ -232,7 +232,7 @@ class Publish(Interface):
                 pkw = {}
                 if since == '':
                     pkw['since'] = since
-                elif since is None:
+                else:
                     # pass previous state for that submodule if known
                     pkw['since'] = subds_prev_hexsha.get(dspath, None)
                 published_, skipped_ = ds_.publish(to=to, recursive=recursive, **pkw)
@@ -350,4 +350,4 @@ class Publish(Interface):
             # not sure if it could even track renames of subdatasets
             # but let's "check"
             assert(d.a_path == d.b_path)
-        return dict((d.a_path, d.a_blob.hexsha) for d in diff)
+        return dict((d.b_path, d.b_blob.hexsha) for d in diff)
