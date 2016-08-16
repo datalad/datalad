@@ -320,7 +320,7 @@ class Publish(Interface):
 
     @staticmethod
     def _get_changed_datasets(repo, all_subdatasets, to, since=None):
-        if since == '':
+        if since == '' or not all_subdatasets:
             # we are instructed to publish all
             return all_subdatasets
 
@@ -335,10 +335,11 @@ class Publish(Interface):
                 # we did not publish it before - so everything must go
                 return all_subdatasets
 
+        lgr.debug("Checking diff since %s for %s" % (since, all_subdatasets))
         diff = repo.repo.commit().diff(since, all_subdatasets)
         for d in diff:
             # not sure if it could even track renames of subdatasets
             # but let's "check"
-            assert(d.a_name == d.b_name)
-        changed_subdatasets = [d.b_name for d in diff]
+            assert(d.a_path == d.b_path)
+        changed_subdatasets = [d.b_path for d in diff]
         return changed_subdatasets
