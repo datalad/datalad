@@ -144,20 +144,6 @@ class Publish(Interface):
         # them into a list
         expl_subs = []         # subdatasets to publish explicitly
         publish_subs = dict()  # collect what to publish from subdatasets
-        if recursive:
-            for subds_path in Publish._get_subdatasets_to_publish(ds, to, since=since):
-                if path and '.' in path:
-                    # we explicitly are passing '.' to subdatasets in case of
-                    # `recursive`. Therefore these datasets are going into
-                    # `publish_subs`, instead of `expl_subs`:
-                    sub = Dataset(opj(ds.path, subds_path))
-                    publish_subs[sub.path] = dict()
-                    publish_subs[sub.path]['dataset'] = sub
-                    publish_subs[sub.path]['files'] = ['.']
-                else:
-                    # we can recursively publish only, if there actually
-                    # is something
-                    expl_subs.append(subds_path)
 
         if not path:
             # publish `ds` itself, if nothing else is given:
@@ -187,6 +173,46 @@ class Publish(Interface):
                             publish_subs[d.d.path]['files'] = list()
                         publish_subs[d.path]['dataset'] = d
                         publish_subs[d.path]['files'].append(p)
+
+        if publish_this:
+            # Note: we need an upstream remote, if there's none given. We could
+            # wait for git push to complain, but we need to explicitly figure it
+            # out for pushing annex branch anyway and we might as well fail
+            # right here.
+
+            track_remote, track_branch = ds.repo.get_tracking_branch()
+
+            # keep `to` in case it's None for passing to recursive calls:
+            dest_resolved = to
+            if to is None:
+                if track_remote:
+                    dest_resolved = track_remote
+                else:
+                    # we have no remote given and no upstream => fail
+                    raise InsufficientArgumentsError(
+                        "No known default target for "
+                        "publication and none given.")
+
+        if recursive:
+            all_subdatasets = ds.get_subdatasets(fulfilled=True)
+            subds_to_consider = \
+                Publish._get_changed_datasets(
+                    ds.repo, all_subdatasets, dest_resolved, since=since) \
+                if publish_this \
+                else all_subdatasets
+            for subds_path in subds_to_consider:
+                if path and '.' in path:
+                    # we explicitly are passing '.' to subdatasets in case of
+                    # `recursive`. Therefore these datasets are going into
+                    # `publish_subs`, instead of `expl_subs`:
+                    sub = Dataset(opj(ds.path, subds_path))
+                    publish_subs[sub.path] = dict()
+                    publish_subs[sub.path]['dataset'] = sub
+                    publish_subs[sub.path]['files'] = ['.']
+                else:
+                    # we can recursively publish only, if there actually
+                    # is something
+                    expl_subs.append(subds_path)
 
         published, skipped = [], []
 
@@ -228,25 +254,6 @@ class Publish(Interface):
             skipped += skipped_
 
         if publish_this:
-
-            # Note: we need an upstream remote, if there's none given. We could
-            # wait for git push to complain, but we need to explicitly figure it
-            # out for pushing annex branch anyway and we might as well fail
-            # right here.
-
-            track_remote, track_branch = ds.repo.get_tracking_branch()
-
-            # keep `to` in case it's None for passing to recursive calls:
-            dest_resolved = to
-            if to is None:
-                if track_remote:
-                    dest_resolved = track_remote
-                else:
-                    # we have no remote given and no upstream => fail
-                    raise InsufficientArgumentsError(
-                        "No known default target for "
-                        "publication and none given.")
-
             # upstream branch needed for update (merge) and subsequent push,
             # in case there is no.
             if track_branch is None:
@@ -319,8 +326,7 @@ class Publish(Interface):
             ui.message(msg)
 
     @staticmethod
-    def _get_subdatasets_to_publish(ds, to, since=None):
-        all_subdatasets = ds.get_subdatasets(fulfilled=True)
+    def _get_changed_datasets(repo, all_subdatasets, to, since=None):
 
         if since == '':
             # we are instructed to publish all
@@ -330,14 +336,14 @@ class Publish(Interface):
             # so we figure out what was the last update
             # XXX here we assume one to one mapping of names from local branches
             # to the remote
-            active_branch = ds.repo.get_active_branch()
+            active_branch = repo.get_active_branch()
             since = '%s/%s' % (to, active_branch)
 
-            if since not in ds.repo.get_remote_branches():
+            if since not in repo.get_remote_branches():
                 # we did not publish it before - so everything must go
                 return all_subdatasets
 
-        diff = ds.repo.repo.commit().diff(since, all_subdatasets)
+        diff = repo.repo.commit().diff(since, all_subdatasets)
         for d in diff:
             # not sure if it could even track renames of subdatasets
             # but let's "check"
