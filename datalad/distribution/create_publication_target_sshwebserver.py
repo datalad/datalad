@@ -16,6 +16,8 @@ import logging
 import datalad
 from os.path import join as opj, abspath, basename, relpath, normpath, dirname
 from distutils.version import LooseVersion
+from jsmin import jsmin
+from glob import glob
 
 from datalad.support.network import RI, URL, SSHRI
 from datalad.support.annexrepo import AnnexRepo
@@ -320,15 +322,26 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # publish html from local datalad repo to publication server for rendering dataset web UI
             lgr.info("Uploading web interface ...")
             try:
+                # upload html to dataset
                 html = opj(dirname(datalad.__file__), 'resources', 'website', 'index.html')
                 ssh.copy(html, path)
+
+                # upload assets to the dataset
                 webresources_local = opj(dirname(datalad.__file__), 'resources', 'website', 'assets')
                 webresources_remote = opj(path, '.git', 'datalad', 'web')
                 ssh(['mkdir', '-p', webresources_remote])
                 ssh.copy(webresources_local, webresources_remote, recursive=True)
 
+                # minimize and upload js assets
+                for js_file in glob(opj(webresources_local, 'js', '*.js')):
+                    with open(js_file) as asset:
+                        minified = jsmin(asset.read())                          # minify asset
+                        with make_tempfile(content=minified) as tempf:          # write minified to tempfile
+                            js_name = js_file.split('/')[-1]
+                            ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
+
             except CommandError as e:
-                lgr.error("Failed to get web ui from local datalad repository. Unable to setup web interface.\n"
+                lgr.error("Failed to push web interface to the remote datalad repository.\n"
                           "Error: %s" % exc_str(e))
 
             # initially update server info "manually":
