@@ -28,7 +28,11 @@
 	 function directory() {
 	     // construct path to metadata json based on directory to be rendered argument passed in url
 	     var metadata_dir = '.git/datalad/metadata/'
-	     var metadata_path = getParameterByName('dir') ? getParameterByName('dir').slice(1,-1) : '/';
+	     var metadata_path = getParameterByName('dir') ?
+				 getParameterByName('dir').replace(window.location.pathname, '')
+							  .replace(/^\/?/, '')
+							  .replace(/\/?$/, '')
+			       : '/';
 	     var metadata_url = window.location.pathname + metadata_dir + md5(metadata_path);
 	     var parent = false;
 
@@ -74,7 +78,9 @@
 			 var dir = getParameterByName('dir');                                        // get directory parameter
 			 var move = data.name == '..' ? parent_url : child_url;                      // which direction to move, up or down the path ?
 			 var next = dir ? move(dir, data.name) : move(absolute_url(''), data.name);  // which path to move, dir parameter or current path ?
-			 update_param_or_path(next, data.type, dir) ? window.location.search = '?dir=' + next: window.location.assign(next);  // update parameter or url path with new path ?
+                         update_param_or_path(next, data.type, dir) ?                                // update parameter or url path with new path ?
+                                    window.location.search = '?dir=' + next.replace(window.location.pathname, '') :
+                                    window.location.assign(next);
 		     });
 		 }
 	     });
@@ -85,10 +91,10 @@
 	 function url_exists(url) { var http = new XMLHttpRequest();  http.open('HEAD', url, false);  http.send();  return http.status!=404; }
 
 	 // construct parent path of url passed
-	 function parent_url(url, node_name) {  url_array = url.split(/[\\/]/);  url_array.splice(-2,1);  return url_array.join('/');  }
+	 function parent_url(url, node_name) { turl = url.endsWith("/") ? url: url.concat("/"); url_array = turl.split(/[\\/]/);  url_array.splice(-2,1);  return url_array.join('/');  }
 
 	 // construct child path of url passed
-	 function child_url(url, node_name) {  return url + node_name;  }
+	 function child_url(url, node_name) {  return url.endsWith("/") ? url.concat(node_name): url.concat('/').concat(node_name);  }
 
 	 // decompose url to actual path to node e.g if next_url=d1/d2/d3 and current_url = example.com/ds/?dir=d1/d2 -> return example.com/ds/d1/d2/d3
 	 function absolute_url(next_url) {  return (window.location.pathname.replace(/\?.*/g, '') + next_url).replace('//','/');  }
@@ -106,14 +112,16 @@
 
 	 //to update parameter if url directory or not dataset
 	 function update_param_or_path(url, type, current_state) {
-	     // only check for index.html in directories of type annex, git,
+	     // if url = root path(wrt index.html) then append index.html to url
 	     // allows other dirs to have index.html, eases constrain on non-datalad index.html presence in dataset
-	     if (type == 'git' || type == 'annex') {
-		 url += '/index.html';
-		 test_url = (current_state ? absolute_url(url): url).replace('//', '/');    // convert url to absolute if passed as parameter as its relative
-		 return url_exists(test_url) ? false: true;                                 // if index.html exists @ url, the clicked node is a dataset
+	     if (url == window.location.pathname || url == '/') {
+	 	 url = window.location.pathname + 'index.html';
+		 return false;
 	     }
-	     return type == 'dir' ? true: false
+	     else if (type == 'file' || type == 'link')
+		 return false;
+	     else
+		 return true;
 	 }
 	 $(document).ready(function() {
 	     var table = directory();   // construct table based on files in directory and their metadata
