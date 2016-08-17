@@ -35,7 +35,7 @@ Some code distributed within DataLad was not developed by the DataLad team,
 hence you should adhere to the copyright and license terms of respective
 authors if you are to use corresponding parts.
 
-## TestKraut
-
-To migrate out anyways
-
+## `datalad/resources/website`
+   - [JQuery](https://code.jquery.com) - MIT License - Copyright (c) 2016-
+   - [Datatables](http://datatables.net) - MIT License - Copyright (c) 2016-
+   - [BlueImp-MD5](https://github.com/blueimp/JavaScript-MD5) - MIT License - Copyright (c) 2016-

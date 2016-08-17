@@ -302,7 +302,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # create post_update hook to refresh dataset metadata on publication server
             lgr.info("Enabling git post-update hook ...")
             try:
-                hook_remote_target = opj(path, '.git/hooks/post-update')
+                hook_remote_target = opj(path, '.git', 'hooks', 'post-update')
                 json_command = 'which datalad > /dev/null && datalad ls -r --json file ' + str(path)
                 hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', json_command])
 
@@ -320,10 +320,15 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # publish html from local datalad repo to publication server for rendering dataset web UI
             lgr.info("Uploading web interface ...")
             try:
-                html = opj(dirname(datalad.__file__), "resources/website/index.html")
+                html = opj(dirname(datalad.__file__), 'resources', 'website', 'index.html')
                 ssh.copy(html, path)
+                webresources_local = opj(dirname(datalad.__file__), 'resources', 'website', 'assets')
+                webresources_remote = opj(path, '.git', 'datalad', 'web')
+                ssh(['mkdir', '-p', webresources_remote])
+                ssh.copy(webresources_local, webresources_remote, recursive=True)
+
             except CommandError as e:
-                lgr.error("Failed to get html from local datalad repository. Unable to setup web interface.\n"
+                lgr.error("Failed to get web ui from local datalad repository. Unable to setup web interface.\n"
                           "Error: %s" % exc_str(e))
 
             # initially update server info "manually":
