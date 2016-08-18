@@ -268,9 +268,9 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     # Check tags for the versions
     eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
     # +1 because original "release" was assumed to be 1.0.0
-    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1' '1.0.1'])
-    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][1].hexsha)  # next to the last one
-    eq_(repo.repo.tags[1].commit.hexsha, commits_l['master'][0].hexsha)  # the last one
+    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1', '1.0.1'])
+    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][-2].hexsha)  # next to the last one
+    eq_(repo.repo.tags[-1].commit.hexsha, commits_l['master'][0].hexsha)  # the last one
 
     def hexsha(l):
         return l.__class__(x.hexsha for x in l)
