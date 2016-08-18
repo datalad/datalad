@@ -38,6 +38,8 @@ from ..utils import any_re_search
 from ..utils import unique
 from ..utils import get_func_kwargs_doc
 from ..utils import make_tempfile
+from ..utils import on_windows
+from ..utils import _path_
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -55,7 +57,7 @@ from .utils import skip_if_no_module
 
 def test_get_func_kwargs_doc():
     from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset', 'versioned_urls', 'topurl']
+    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth']
     eq_(get_func_kwargs_doc(pipeline), output)
 
 
@@ -409,3 +411,12 @@ def test_unique():
     # with a key now
     eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], key=itemgetter(0)), [(1, 2), (0, 3)])
     eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)], key=itemgetter(1)), [(1, 2), (1, 3)])
+
+
+def test_path_():
+    eq_(_path_('a'), 'a')
+    if on_windows:
+        eq_(_path_('a/b'), r'a\b')
+    else:
+        p = 'a/b/c'
+        assert(_path_(p) is p)  # nothing is done to it whatsoever

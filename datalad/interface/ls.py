@@ -27,7 +27,6 @@ from .base import Interface
 from ..ui import ui
 from ..utils import swallow_logs
 from ..dochelpers import exc_str
-from ..support.s3 import get_key_url
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 from ..distribution.dataset import Dataset
@@ -352,6 +351,12 @@ class LsFormatter(string.Formatter):
             return u"%s%s%s" % ({'B': self.BLUE, 'R': self.RED}[conversion], value, self.RESET)
 
         return super(LsFormatter, self).convert_field(value, conversion)
+
+    def format_field(self, value, format_spec):
+        # TODO: move all the "coloring" into formatting, so we could correctly indent
+        # given the format and only then color it up
+        # print "> %r, %r" % (value, format_spec)
+        return super(LsFormatter, self).format_field(value, format_spec)
 
 
 def format_ds_model(formatter, ds_model, format_str, format_exc):
@@ -768,6 +773,8 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
                 # Skip this one
                 ui.message("")
                 continue
+            # OPT: delayed import
+            from ..support.s3 import get_key_url
             url = get_key_url(e, schema='http')
             try:
                 _ = urlopen(Request(url))

@@ -12,12 +12,14 @@
 
 __docformat__ = 'restructuredtext'
 
+from logging import getLogger
+lgr = getLogger('datalad.ui')
+
+lgr.log(5, "Starting importing ui")
+
 from .dialog import ConsoleLog, DialogUI, UnderAnnexUI
 from .dialog import UnderTestsUI
 from ..utils import is_interactive
-
-from logging import getLogger
-lgr = getLogger('datalad.ui')
 
 # TODO: implement logic on selection of the ui based on the cfg and environment
 # e.g. we cannot use DialogUI if session is not interactive
@@ -69,4 +71,8 @@ class _UI_Switcher(object):
             return super(_UI_Switcher, self).__setattr__(key, value)
         return setattr(self._ui, key, value)
 
+lgr.log(5, "Initiating UI switcher")
+
 ui = _UI_Switcher()
+
+lgr.log(5, "Done importing ui")

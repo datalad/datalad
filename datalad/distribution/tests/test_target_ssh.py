@@ -129,8 +129,8 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         AnnexRepo(opj(src_path, subds), init=True,
                   create=False).checkout("master")
 
-    sub1 = Dataset(opj(src_path, "sub1"))
-    sub2 = Dataset(opj(src_path, "sub2"))
+    sub1 = Dataset(opj(src_path, "subm 1"))
+    sub2 = Dataset(opj(src_path, "subm 2"))
 
     create_publication_target_sshwebserver(dataset=source,
                                            sshurl="ssh://localhost",
@@ -139,9 +139,9 @@ def test_target_ssh_recursive(origin, src_path, target_path):
 
     # raise if git repos were not created:
     t_super = GitRepo(opj(target_path, basename(src_path)), create=False)
-    t_sub1 = GitRepo(opj(target_path, basename(src_path) + "-sub1"),
+    t_sub1 = GitRepo(opj(target_path, basename(src_path) + "-subm 1"),
                      create=False)
-    t_sub2 = GitRepo(opj(target_path, basename(src_path) + "-sub2"),
+    t_sub2 = GitRepo(opj(target_path, basename(src_path) + "-subm 2"),
                      create=False)
 
     for repo in [source.repo, sub1.repo, sub2.repo]:
