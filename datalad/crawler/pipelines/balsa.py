@@ -61,42 +61,32 @@ def superdataset_pipeline(url=TOPURL):
     ]
 
 
-def extract_readme(data):
-    # elements = int(count)
-    # x = 2
-    # while x < elements:
-    # data['desc'] = [x['match'] for x in xpath_match('normalize-space(//*[contains(text(), "DESCRIPTION")]/'
-    #                                                'following-sibling::*[1]/../text())')(data)][0]
+def extract_meta(data):
 
-    data['species'] = [x['match'] for x in xpath_match('normalize-space(//*[contains(text(), "SPECIES")]/'
-                                                       'following-sibling::*[1]/../text()[2])')(data)][0]
-    data['authors'] = [x['match'] for x in xpath_match('normalize-space(//*[contains(text(), "AUTHORS")]/../'
-                                                       'ul)')(data)][0]
-    data['pub'] = [x['match'] for x in xpath_match('//*[contains(text(), "PUBLICATION")]/'
-                                                   'following-sibling::*[1]/../span[2]/text()')(data)][0]
-    data['doi'] = [x['match'] for x in xpath_match('//*[contains(text(), "DOI")]/'
-                                                   'following-sibling::*[1]/../a/text()')(data)][0]
-    data['title'] = [x['match'] for x in xpath_match('//*[contains(text(), "Study:")]/'
-                                                     'following-sibling::*[1]/../h3/text()')(data)][0]
+    # we do not want SCENES or OWNERS
+    attributes = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/text()')(data)]
+    attributes = [str(x) for x in attributes]
 
-    if lexists("README.txt"):
-        os.unlink("README.txt")
+    num = [x['match'] for x in xpath_match('count(//*[@class="attributeLabel"]/../p)')(data)]
+    content = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/../p')(data)]
+    # content = [x for x in content]
 
-    with open("README.txt", "w") as fi:
+    # 'normalize-space(//*[@class="attributeLabel"]/../div/ul[*])'
+    # json_dict = {x: y for x, y in zip(attributes, content)}
+    #
+    # print json_dict
+
+    if not exists(".datalad/meta"):
+        makedirs(".datalad/meta")
+
+    # use json.dump() to fomulate
+    opj(".datalad/meta/balsa.json".split('/'))
+    with open(".datalad/meta/balsa.json", "w") as fi:
         fi.write("""\
-BALSA sub-dataset %(title)s
-------------------------
+        """)
 
-Description: TODO
-
-Authors: %(authors)s
-Species: %(species)s
-Publication: %(pub)s
-
-        """ % data)
-
-        lgr.info("Generated README.txt")
-        yield {'filename': "README.txt"}
+        lgr.info("Generated descriptor file")
+        yield {'filename': ".datalad/meta/balsa.json"}
 
 
 @auto_repr
@@ -191,7 +181,7 @@ def pipeline(dataset_id, url=TOPURL):
             [
                 crawl_url(dataset_url),
                 [
-                    extract_readme,
+                    extract_meta,
                     annex,
                 ],
                 [
