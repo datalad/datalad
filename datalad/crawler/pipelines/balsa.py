@@ -14,6 +14,7 @@ from shutil import rmtree
 from os import curdir, makedirs, rmdir
 from os.path import lexists, join as opj, abspath, exists, normpath
 from string import split
+from collections import OrderedDict
 
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
@@ -63,28 +64,24 @@ def superdataset_pipeline(url=TOPURL):
 
 def extract_meta(data):
 
-    # we do not want SCENES or OWNERS
-    attributes = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/text()')(data)]
-    attributes = [str(x) for x in attributes]
-
-    num = [x['match'] for x in xpath_match('count(//*[@class="attributeLabel"]/../p)')(data)]
     content = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/../p')(data)]
-    # content = [x for x in content]
+    content = [(re.sub('<[^<]+?>|[\t|\n]', '', (str(x.encode('ascii', 'replace'))))).strip() for x in content]
 
-    # 'normalize-space(//*[@class="attributeLabel"]/../div/ul[*])'
-    # json_dict = {x: y for x, y in zip(attributes, content)}
-    #
-    # print json_dict
+    json_dict = OrderedDict(map(str, x.split(':', 1)) for x in content)
+
+    content2 = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/../ul/preceding-sibling::*[1]/../div')(data)]
+    content2 = [(re.sub('</li>', ', ', x)) for x in content2]
+    content2 = [(re.sub('<[^<]+?>|[\t|\n]', '', (str(x.encode('ascii', 'replace'))))).strip() for x in content2]
+
+    dict2 = OrderedDict(map(str, x.split(':', 1)) for x in content2)
+    json_dict.update({key: dict2[key] for key in dict2 if key in ['AUTHORS', 'INSTITUTIONS']})
 
     if not exists(".datalad/meta"):
         makedirs(".datalad/meta")
 
-    # use json.dump() to fomulate
     opj(".datalad/meta/balsa.json".split('/'))
     with open(".datalad/meta/balsa.json", "w") as fi:
-        fi.write("""\
-        """)
-
+        json.dump(json_dict, fi, indent=1)
         lgr.info("Generated descriptor file")
         yield {'filename': ".datalad/meta/balsa.json"}
 
