@@ -19,7 +19,7 @@ from collections import OrderedDict
 # Import necessary nodes
 from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
-from ..nodes.misc import assign, skip_if, find_files
+from ..nodes.misc import assign, skip_if, find_files, continue_if
 from ..nodes.misc import debug
 from ..nodes.misc import sub
 from ..nodes.annex import Annexificator
@@ -54,6 +54,18 @@ def superdataset_pipeline(url=TOPURL):
         crawl_url(),
         xpath_match('substring(//*/h3/text(), 8, string-length(//*/h3/text()))', output='dataset'),
         assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        # [
+        #     continue_if({'dataset_id': 'RVVG'}),
+        #     assign({'dataset_name': '%(dataset_id)s: 2016-Glasser_et_al-Multimodal_parcellation'}, interpolate=True),
+        # ],
+        # [
+        #     continue_if({'dataset_id': 'W336'}),
+        #     assign({'dataset_name': '%(dataset_id)s: 2016-Donahue_et_al-Connection_strength_and_distance'}, interpolate=True),
+        # ],
+        # [
+        #     continue_if({'dataset_id': 'WG33'}),
+        #     assign({'dataset_name': '%(dataset_id)s: 2016-VanEssen_et_al-BALSA'}, interpolate=True),
+        # ],
         annex.initiate_dataset(
             template="balsa",
             data_fields=['dataset_id'],

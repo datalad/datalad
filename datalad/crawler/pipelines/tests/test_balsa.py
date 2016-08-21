@@ -126,7 +126,8 @@ def test_balsa_pipeline1(ind, topurl, outd, clonedir):
     target_files = {
         './.datalad/crawl/crawl.cfg',
         './.datalad/crawl/statuses/incoming.json',
-        './file1.nii', './dir1/file2.nii'
+        './file1.nii', './dir1/file2.nii',
+        './.datalad/meta/balsa.json',
     }
 
     eq_(set(all_files), target_files)
