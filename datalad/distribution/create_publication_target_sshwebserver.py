@@ -255,42 +255,13 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     continue
 
             # init git repo
-            cmd = ["git", "-C", path, "init"]
-            if shared:
-                cmd.append("--shared=%s" % shared)
-            try:
-                ssh(cmd)
-            except CommandError as e:
-                lgr.error("Initialization of remote git repository failed at %s."
-                          "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+            if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
+                                                                        datasets[current_dataset]):
                 continue
 
-            if isinstance(datasets[current_dataset].repo, AnnexRepo):
-                # init remote git annex repo (part fix of #463)
-                try:
-                    ssh(["git", "-C", path, "annex", "init"])
-                except CommandError as e:
-                    lgr.error("Initialization of remote git annex repository failed at %s."
-                              "\nError: %s\nSkipping ..." % (path, exc_str(e)))
-                    continue
-
-            # check git version on remote end:
-            try:
-                out, err = ssh(["git", "version"])
-                assert out.strip().startswith("git version")
-                git_version = out.strip().split()[2]
-                lgr.debug("Detected git version on server: %s" % git_version)
-                if LooseVersion(git_version) < "2.4":
-                    lgr.error("Git version >= 2.4 needed to configure remote."
-                              " Version detected on server: %s\nSkipping ..."
-                              % git_version)
-                    continue
-
-            except CommandError as e:
-                lgr.warning(
-                    "Failed to determine git version on remote.\n"
-                    "Error: {0}\nTrying to configure anyway "
-                    "...".format(exc_str(e)))
+            # check git version on remote end
+            if not CreatePublicationTargetSSHWebserver.remote_git_version(ssh):
+                continue
 
             # allow for pushing to checked out branch
             try:
@@ -330,15 +301,58 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 target_url = sshurl
             if target_pushurl is None:
                 target_pushurl = sshurl
-            result_adding = AddSibling()(dataset=ds,
-                                         name=target,
-                                         url=target_url,
-                                         pushurl=target_pushurl,
-                                         recursive=recursive,
-                                         force=existing in {'replace'})
+            AddSibling()(dataset=ds,
+                         name=target,
+                         url=target_url,
+                         pushurl=target_pushurl,
+                         recursive=recursive,
+                         force=existing in {'replace'})
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
+
+    @staticmethod
+    def init_remote_repo(path, ssh, shared, dataset):
+        cmd = ["git", "-C", path, "init"]
+        if shared:
+            cmd.append("--shared=%s" % shared)
+        try:
+            ssh(cmd)
+        except CommandError as e:
+            lgr.error("Initialization of remote git repository failed at %s."
+                      "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+            return False
+
+        if isinstance(dataset.repo, AnnexRepo):
+            # init remote git annex repo (part fix of #463)
+            try:
+                ssh(["git", "-C", path, "annex", "init"])
+            except CommandError as e:
+                lgr.error("Initialization of remote git annex repository failed at %s."
+                          "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+                return False
+        return True
+
+    @staticmethod
+    def remote_git_version(ssh):
+        try:
+            out, err = ssh(["git", "version"])
+            assert out.strip().startswith("git version")
+            git_version = out.strip().split()[2]
+            lgr.debug("Detected git version on server: %s" % git_version)
+            if LooseVersion(git_version) < "2.4":
+                lgr.error("Git version >= 2.4 needed to configure remote."
+                          " Version detected on server: %s\nSkipping ..."
+                          % git_version)
+                return False
+
+        except CommandError as e:
+            lgr.warning(
+                "Failed to determine git version on remote.\n"
+                "Error: {0}\nTrying to configure anyway "
+                "...".format(exc_str(e)))
+
+        return git_version or True
 
     @staticmethod
     def create_postupdate_hook(path, ssh, dataset):
