@@ -49,6 +49,77 @@ def test_smoke_pipelines():
     yield _test_smoke_pipelines, superdataset_pipeline, []
 
 
+@with_tree(tree={
+
+    'study': {
+        'show': {
+            'WG33': {
+                'index.html': """<html><body>
+                                    <div>
+                                        <a href="/study/download/WG33.tar.gz">Download (146 MB)</a>
+                                        <a href="/file/show/JX5V">file1.nii</a>
+                                        <a href="/file/show/R1BX">dir1 / file2.nii</a>
+                                    </div>
+                                    <div>
+                                        <p>
+                                            <span class="attributeLabel">SPECIES:</span><br>
+                                            Human
+                                        </p>
+                                        <p>
+                                            <span class="attributeLabel">DESCRIPTION:</span><br>
+                                            DC Van Essen, J Smith, MF Glasser (2016) PMID: 27074495
+                                        </p>
+                                        <p>
+                                            <span class="attributeLabel">PUBLICATION:</span><br>
+                                            <span>NeuroImage</span>
+                                        </p>
+                                    </div>
+                                  </body></html>"""
+            },
+        },
+        'download': {
+            'WG33.tar.gz': {
+                    'file1.nii': "content of file1.nii",
+                    'dir1': {
+                        'file2.nii': "content of file2.nii",
+                    }
+            }
+        }
+    },
+
+    'file': {
+        'show': {
+                'JX5V': "content of file1.nii",
+                'R1BX': "content of file2.nii",
+            },
+        },
+    },
+    archives_leading_dir=False
+)
+@serve_path_via_http
+@with_tempfile
+@with_tempfile
+def test_balsa_extract_meta(ind, topurl, outd, clonedir):
+    list(initiate_dataset(
+        template="balsa",
+        dataset_name='dataladtest-WG33',
+        path=outd,
+        data_fields=['dataset_id'])({'dataset_id': 'WG33'}))
+
+    with chpwd(outd):
+        pipeline = ofpipeline('WG33', url=topurl)
+        out = run_pipeline(pipeline)
+    eq_(len(out), 1)
+
+    # from os import listdir
+    # ls = listdir(outd)
+    # print ls
+
+    with chpwd(outd):
+        f = open(".datalad/meta/balsa.json", 'r')
+        contents = f.read()
+
+
 _PLUG_HERE = '<!-- PLUG HERE -->'
 
 
