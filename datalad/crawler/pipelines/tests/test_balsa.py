@@ -126,6 +126,11 @@ def test_balsa_extract_meta(ind, topurl, outd, clonedir):
         contents = f.read()
     assert_true("SPECIES" and "DESCRIPTION" and "PUBLICATION" and "AUTHORS" in contents)
 
+    repo = AnnexRepo(outd, create=False)  # to be used in the checks
+    # Inspect the tree -- that we have all the branches
+    branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
+    eq_(set(repo.get_branches()), branches)
+
 
 _PLUG_HERE = '<!-- PLUG HERE -->'
 
