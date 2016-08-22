@@ -68,18 +68,12 @@ def superdataset_pipeline(url=TOPURL):
 
 
 def extract_meta(data):
-
-    content = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/../p')(data)]
+    content = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/..')(data)]
+    content = [(re.sub('</li>', ', ', x)) for x in content]
     content = [(re.sub('<[^<]+?>|[\t|\n]', '', (str(x.encode('ascii', 'replace'))))).strip() for x in content]
+    [content.remove(x) for x in content if x.find('SCENES:' or 'OWNERS:') >= 0]
 
     json_dict = OrderedDict(map(str, x.split(':', 1)) for x in content)
-
-    content2 = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/../div/ul/..')(data)]
-    content2 = [(re.sub('</li>', ', ', x)) for x in content2]
-    content2 = [(re.sub('<[^<]+?>|[\t|\n]', '', (str(x.encode('ascii', 'replace'))))).strip() for x in content2]
-
-    dict2 = OrderedDict(map(str, x.split(':', 1)) for x in content2)
-    json_dict.update({key: dict2[key] for key in dict2 if key not in ['SCENES', 'OWNERS']})
 
     if not exists(".datalad/meta"):
         makedirs(".datalad/meta")

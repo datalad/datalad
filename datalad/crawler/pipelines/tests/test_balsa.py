@@ -10,6 +10,7 @@
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from ..balsa import pipeline as ofpipeline, superdataset_pipeline
 import os
+from os.path import exists
 from glob import glob
 from os.path import join as opj
 from mock import patch
@@ -32,7 +33,7 @@ from ....utils import swallow_logs
 from ....tests.utils import with_tree
 from ....tests.utils import SkipTest
 from ....tests.utils import eq_, assert_not_equal, ok_, assert_raises
-from ....tests.utils import assert_in, assert_not_in
+from ....tests.utils import assert_in, assert_not_in, assert_true
 from ....tests.utils import skip_if_no_module
 from ....tests.utils import with_tempfile
 from ....tests.utils import serve_path_via_http
@@ -74,6 +75,14 @@ def test_smoke_pipelines():
                                             <span>NeuroImage</span>
                                         </p>
                                     </div>
+                                    <div>
+                                        <span class="attributeLabel">AUTHORS:</span><br>
+                                        <ul>
+                                            <li>DC Van Essen</li>
+                                            <li>J Smith</li>
+                                            <li>MF Glasser</>
+                                        </ul>
+                                    </div>
                                   </body></html>"""
             },
         },
@@ -111,13 +120,11 @@ def test_balsa_extract_meta(ind, topurl, outd, clonedir):
         out = run_pipeline(pipeline)
     eq_(len(out), 1)
 
-    # from os import listdir
-    # ls = listdir(outd)
-    # print ls
-
     with chpwd(outd):
+        assert_true(exists(".datalad/meta/balsa.json"))
         f = open(".datalad/meta/balsa.json", 'r')
         contents = f.read()
+    assert_true("SPECIES" and "DESCRIPTION" and "PUBLICATION" and "AUTHORS" in contents)
 
 
 _PLUG_HERE = '<!-- PLUG HERE -->'
