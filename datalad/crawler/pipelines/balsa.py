@@ -21,7 +21,7 @@ from ..nodes.crawl_url import crawl_url
 from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign, skip_if, find_files, continue_if
 from ..nodes.misc import debug
-from ..nodes.misc import sub
+from ..nodes.misc import sub, switch
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
 from datalad.utils import find_files as f_f
@@ -43,6 +43,10 @@ def superdataset_pipeline(url=TOPURL):
 
     """
     url = opj(url, 'study/')
+    hardcodeNames = {'RVVG': '2016-Glasser_et_al-Multimodal_parcellation',
+                     'W336': '2016-Donahue_et_al-Connection_strength_and_distance',
+                     'WG33': '2016-VanEssen_et_al-BALSA'
+                     }
 
     annex = Annexificator()
     lgr.info("Creating a BALSA collection pipeline")
@@ -53,19 +57,8 @@ def superdataset_pipeline(url=TOPURL):
         skip_if({'dataset_id': 'Jvw1'}, re=True),
         crawl_url(),
         xpath_match('substring(//*/h3/text(), 8, string-length(//*/h3/text()))', output='dataset'),
-        assign({'dataset_name': '%(dataset)s'}, interpolate=True),
-        # [
-        #     continue_if({'dataset_id': 'RVVG'}),
-        #     assign({'dataset_name': '%(dataset_id)s: 2016-Glasser_et_al-Multimodal_parcellation'}, interpolate=True),
-        # ],
-        # [
-        #     continue_if({'dataset_id': 'W336'}),
-        #     assign({'dataset_name': '%(dataset_id)s: 2016-Donahue_et_al-Connection_strength_and_distance'}, interpolate=True),
-        # ],
-        # [
-        #     continue_if({'dataset_id': 'WG33'}),
-        #     assign({'dataset_name': '%(dataset_id)s: 2016-VanEssen_et_al-BALSA'}, interpolate=True),
-        # ],
+        # assign({'dataset_name': '%(dataset)s'}, interpolate=True),
+        switch('dataset_id', {idkey: assign({'dataset_name': name}) for idkey, name in hardcodeNames.items()}),
         annex.initiate_dataset(
             template="balsa",
             data_fields=['dataset_id'],
