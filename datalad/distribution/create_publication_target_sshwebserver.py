@@ -380,12 +380,14 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
     @staticmethod
     def upload_web_interface(path, ssh):
+        # path to web interface resources on local
+        webui_local = opj(dirname(datalad.__file__), 'resources', 'website')
         # upload html to dataset
-        html = opj(dirname(datalad.__file__), 'resources', 'website', 'index.html')
+        html = opj(webui_local, 'index.html')
         ssh.copy(html, path)
 
         # upload assets to the dataset
-        webresources_local = opj(dirname(datalad.__file__), 'resources', 'website', 'assets')
+        webresources_local = opj(webui_local, 'assets')
         webresources_remote = opj(path, '.git', 'datalad', 'web')
         ssh(['mkdir', '-p', webresources_remote])
         ssh.copy(webresources_local, webresources_remote, recursive=True)

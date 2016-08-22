@@ -434,7 +434,7 @@ def ignored(path, only_hidden=False):
     ignore list includes hidden files and git or annex maintained folders
     when only_hidden set, only ignores hidden files and folders not git or annex maintained folders
     """
-    if (isdir(opj(path, ".git")) or isdir(opj(path, ".git", "annex"))) and not only_hidden:
+    if isdir(opj(path, ".git")) and not only_hidden:
         return True
     if '.' == leaf_name(path)[0] or leaf_name(path) == 'index.html':
         return True
@@ -585,7 +585,7 @@ def fs_traverse(path, repo, parent=None, render=True, recursive=False, json=None
         fs['nodes'] = children          # add children info to main fs dictionary
         if render:                      # render directory node at location(path)
             fs_render(fs, json=json)
-            lgr.info('Directory: %s' % path)   # log info of current node rendered
+            lgr.info('Directory: %s' % path)
 
     return fs
 
@@ -626,7 +626,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
             subfs.pop('nodes', None)
             children.extend([subfs])
             size_list.append(subfs['size'])
-        # else just pick the data from .dir.json of each subdataset
+        # else just pick the data from metadata_file of each subdataset
         else:
             subds_path = opj(rootds.path, subds_path)
             subds_json = metadata_locator(path=subds_path, ds_path=subds_path)
