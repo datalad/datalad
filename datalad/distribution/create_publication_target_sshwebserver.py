@@ -207,6 +207,9 @@ class CreatePublicationTargetSSHWebserver(Interface):
         ssh = ssh_manager.get_connection(sshurl)
         ssh.open()
 
+        # flag to check if at dataset_root
+        at_root = True
+
         # loop over all datasets, ordered from top to bottom to make test
         # below valid (existing directories would cause the machinery to halt)
         for current_dataset in \
@@ -284,12 +287,14 @@ class CreatePublicationTargetSSHWebserver(Interface):
                           "Error: %s" % exc_str(e))
 
             # publish web-interface to root dataset on publication server
-            lgr.info("Uploading web interface to %s" % path)
-            try:
-                CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh)
-            except CommandError as e:
-                lgr.error("Failed to push web interface to the remote datalad repository.\n"
-                          "Error: %s" % exc_str(e))
+            if at_root:
+                lgr.info("Uploading web interface to %s" % path)
+                at_root = False
+                try:
+                    CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh)
+                except CommandError as e:
+                    lgr.error("Failed to push web interface to the remote datalad repository.\n"
+                              "Error: %s" % exc_str(e))
 
             # don't (re-)initialize dataset if existing == reconfigure
             if existing != 'reconfigure':
