@@ -144,8 +144,8 @@ class CreatePublicationTargetSSHWebserver(Interface):
             raise ValueError("""insufficient information for target creation
             (needs at least a dataset and a SSH URL).""")
 
-        if target is None and (target_url is not None
-                               or target_pushurl is not None):
+        if target is None and (target_url is not None or
+                               target_pushurl is not None):
             raise ValueError("""insufficient information for adding the target
             as a sibling (needs at least a name)""")
 
@@ -304,17 +304,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # create post_update hook to refresh dataset metadata on publication server
             lgr.info("Enabling git post-update hook ...")
             try:
-                hook_remote_target = opj(path, '.git', 'hooks', 'post-update')
-                json_command = 'which datalad > /dev/null && datalad ls -r --json file ' + str(path)
-                hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', json_command])
-
-                with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
-                    ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
-                ssh(['chmod', '+x', hook_remote_target])            # and make it executable
-
-                # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
-                if isinstance(datasets[current_dataset].repo, AnnexRepo):
-                    ssh(['git', '-C', path, 'annex', 'init', path])
+                CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dataset])
             except CommandError as e:
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
@@ -322,24 +312,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             # publish html from local datalad repo to publication server for rendering dataset web UI
             lgr.info("Uploading web interface ...")
             try:
-                # upload html to dataset
-                html = opj(dirname(datalad.__file__), 'resources', 'website', 'index.html')
-                ssh.copy(html, path)
-
-                # upload assets to the dataset
-                webresources_local = opj(dirname(datalad.__file__), 'resources', 'website', 'assets')
-                webresources_remote = opj(path, '.git', 'datalad', 'web')
-                ssh(['mkdir', '-p', webresources_remote])
-                ssh.copy(webresources_local, webresources_remote, recursive=True)
-
-                # minimize and upload js assets
-                for js_file in glob(opj(webresources_local, 'js', '*.js')):
-                    with open(js_file) as asset:
-                        minified = jsmin(asset.read())                          # minify asset
-                        with make_tempfile(content=minified) as tempf:          # write minified to tempfile
-                            js_name = js_file.split('/')[-1]
-                            ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
-
+                CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh)
             except CommandError as e:
                 lgr.error("Failed to push web interface to the remote datalad repository.\n"
                           "Error: %s" % exc_str(e))
@@ -366,3 +339,37 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
+
+    @staticmethod
+    def create_postupdate_hook(path, ssh, dataset):
+        hook_remote_target = opj(path, '.git', 'hooks', 'post-update')
+        json_command = 'which datalad > /dev/null && datalad ls -r --json file ' + str(path)
+        hook_content = '\n'.join(['#!/bin/bash', 'git update-server-info', json_command])
+
+        with make_tempfile(content=hook_content) as tempf:  # create post_update hook script
+            ssh.copy(tempf, hook_remote_target)             # upload hook to dataset
+        ssh(['chmod', '+x', hook_remote_target])            # and make it executable
+
+        # Initialize annex repo on remote copy if current_dataset is an AnnexRepo
+        if isinstance(dataset.repo, AnnexRepo):
+            ssh(['git', '-C', path, 'annex', 'init', path])
+
+    @staticmethod
+    def upload_web_interface(path, ssh):
+        # upload html to dataset
+        html = opj(dirname(datalad.__file__), 'resources', 'website', 'index.html')
+        ssh.copy(html, path)
+
+        # upload assets to the dataset
+        webresources_local = opj(dirname(datalad.__file__), 'resources', 'website', 'assets')
+        webresources_remote = opj(path, '.git', 'datalad', 'web')
+        ssh(['mkdir', '-p', webresources_remote])
+        ssh.copy(webresources_local, webresources_remote, recursive=True)
+
+        # minimize and upload js assets
+        for js_file in glob(opj(webresources_local, 'js', '*.js')):
+            with open(js_file) as asset:
+                minified = jsmin(asset.read())                          # minify asset
+                with make_tempfile(content=minified) as tempf:          # write minified to tempfile
+                    js_name = js_file.split('/')[-1]
+                    ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
