@@ -13,7 +13,6 @@ import os
 from shutil import rmtree
 from os import curdir, makedirs, rmdir
 from os.path import lexists, join as opj, abspath, exists, normpath
-from string import split
 from collections import OrderedDict
 
 # Import necessary nodes
@@ -70,7 +69,7 @@ def superdataset_pipeline(url=TOPURL):
 def extract_meta(data):
     content = [x['match'] for x in xpath_match('//*[@class="attributeLabel"]/..')(data)]
     content = [(re.sub('</li>', ', ', x)) for x in content]
-    content = [(re.sub('<[^<]+?>|[\t|\n]', '', (str(x.encode('ascii', 'replace'))))).strip() for x in content]
+    content = [(re.sub('<[^<]+?>|[\t|\n|\r]', '', (str(x.encode('ascii', 'ignore'))))).strip() for x in content]
     [content.remove(x) for x in content if x.find('SCENES:' or 'OWNERS:') >= 0]
 
     json_dict = OrderedDict(map(str, x.split(':', 1)) for x in content)
