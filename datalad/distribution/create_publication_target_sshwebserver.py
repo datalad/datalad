@@ -117,13 +117,14 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 subdatasets of `dataset`""",),
         existing=Parameter(
             args=("--existing",),
-            constraints=EnsureChoice('skip', 'replace', 'error'),
+            constraints=EnsureChoice('skip', 'replace', 'error', 'reconfigure'),
             metavar='MODE',
             doc="""action to perform, if target directory exists already.
                 Dataset is skipped if 'skip'. 'replace' forces to (re-)init
                 the dataset, and to (re-)configure the dataset sibling,
-                i.e. its URL(s), in case it already exists. 'error' causes an
-                exception to be raised.""",),
+                i.e. its URL(s), in case it already exists. 'reconfigure'
+                updates metadata of the dataset sibling. 'error' causes
+                an exception to be raised.""",),
         shared=Parameter(
             args=("--shared",),
             metavar='false|true|umask|group|all|world|everybody|0xxx',
@@ -242,7 +243,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                             "Target directory %s already exists." % path)
                     elif existing == 'skip':
                         continue
-                    elif existing == 'replace':
+                    elif existing == 'replace' or existing == 'reconfigure':
                         pass
                     else:
                         raise ValueError("Do not know how to hand existing=%s" % repr(existing))
@@ -254,25 +255,27 @@ class CreatePublicationTargetSSHWebserver(Interface):
                               "%s.\nError: %s" % (path, exc_str(e)))
                     continue
 
-            # init git repo
-            if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
-                                                                        datasets[current_dataset]):
-                continue
+            # don't (re-)initialize dataset if existing == reconfigure
+            if existing != 'reconfigure':
+                # init git repo
+                if not CreatePublicationTargetSSHWebserver.init_remote_repo(path, ssh, shared,
+                                                                            datasets[current_dataset]):
+                    continue
 
-            # check git version on remote end
-            if not CreatePublicationTargetSSHWebserver.remote_git_version(ssh):
-                continue
+                # check git version on remote end
+                if not CreatePublicationTargetSSHWebserver.remote_git_version(ssh):
+                    continue
 
-            # allow for pushing to checked out branch
-            try:
-                ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
-                     "updateInstead"])
-            except CommandError as e:
-                lgr.warning("git config failed at remote location %s.\n"
-                            "You will not be able to push to checked out "
-                            "branch. Error: %s", path, exc_str(e))
+                # allow for pushing to checked out branch
+                try:
+                    ssh(["git", "-C", path, "config", "receive.denyCurrentBranch",
+                         "updateInstead"])
+                except CommandError as e:
+                    lgr.warning("git config failed at remote location %s.\n"
+                                "You will not be able to push to checked out "
+                                "branch. Error: %s", path, exc_str(e))
 
-            # create post_update hook to refresh dataset metadata on publication server
+            # enable metadata refresh on dataset updates to publication server
             lgr.info("Enabling git post-update hook ...")
             try:
                 CreatePublicationTargetSSHWebserver.create_postupdate_hook(path, ssh, datasets[current_dataset])
@@ -280,33 +283,35 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 lgr.error("Failed to add json creation command to post update hook.\n"
                           "Error: %s" % exc_str(e))
 
-            # publish html from local datalad repo to publication server for rendering dataset web UI
-            lgr.info("Uploading web interface ...")
+            # publish web-interface to root dataset on publication server
+            lgr.info("Uploading web interface to %s" % path)
             try:
                 CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh)
             except CommandError as e:
                 lgr.error("Failed to push web interface to the remote datalad repository.\n"
                           "Error: %s" % exc_str(e))
 
-            # initially update server info "manually":
-            try:
-                ssh(["git", "-C", path, "update-server-info"])
-            except CommandError as e:
-                lgr.error("Failed to update server info.\n"
-                          "Error: %s" % exc_str(e))
+            # don't (re-)initialize dataset if existing == reconfigure
+            if existing != 'reconfigure':
+                # initially update server info "manually":
+                try:
+                    ssh(["git", "-C", path, "update-server-info"])
+                except CommandError as e:
+                    lgr.error("Failed to update server info.\n"
+                              "Error: %s" % exc_str(e))
 
-        if target:
-            # add the sibling(s):
-            if target_url is None:
-                target_url = sshurl
-            if target_pushurl is None:
-                target_pushurl = sshurl
-            AddSibling()(dataset=ds,
-                         name=target,
-                         url=target_url,
-                         pushurl=target_pushurl,
-                         recursive=recursive,
-                         force=existing in {'replace'})
+                if target:
+                    # add the sibling(s):
+                    if target_url is None:
+                        target_url = sshurl
+                    if target_pushurl is None:
+                        target_pushurl = sshurl
+                    AddSibling()(dataset=ds,
+                                 name=target,
+                                 url=target_url,
+                                 pushurl=target_pushurl,
+                                 recursive=recursive,
+                                 force=existing in {'replace'})
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
