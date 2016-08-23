@@ -13,6 +13,7 @@ __docformat__ = 'restructuredtext'
 
 from os.path import exists, isdir
 from .base import Interface
+
 from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureChoice, EnsureNone
 from datalad.crawler.pipeline import initiate_pipeline_config
@@ -104,6 +105,8 @@ class Crawl(Interface):
                     if path and exists(path):
                         is_pipeline = True
 
+            stats = ActivityStats()
+
             if not path:
                 raise RuntimeError("Cannot locate crawler config or pipeline file")
 
@@ -117,7 +120,6 @@ class Crawl(Interface):
             lgr.info("Running pipeline %s" % str(pipeline))
             # TODO: capture the state of all branches so in case of crash
             # we could gracefully reset back
-            stats = ActivityStats()
             try:
                 output = run_pipeline(pipeline, stats=stats)
             except Exception as exc:
