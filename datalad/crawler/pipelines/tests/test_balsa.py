@@ -96,13 +96,29 @@ def test_smoke_pipelines():
             }
         }
     },
-
     'file': {
         'show': {
-                'JX5V': "content of file1.nii",
-                'R1BX': "content of file2.nii",
+            'JX5V': {
+                'index.html': """<html><body>
+                                    <a href="/file/download/file1.nii">Download (120 MB)</a>
+                                </body></html>"""
             },
+            'R1BX': {
+                'index.html': """<html><body>
+                    <a href="/file/download/dir1/file2.nii">Download (26 MB)</a>
+                </body></html>"""
+            }
+
         },
+
+        'download': {
+            'file1.nii': "content of file1.nii",
+            'dir1': {
+                'file2.nii': "content of file2.nii",
+            }
+        }
+    },
+
     },
     archives_leading_dir=False
 )
@@ -126,11 +142,6 @@ def test_balsa_extract_meta(ind, topurl, outd, clonedir):
         f = open(".datalad/meta/balsa.json", 'r')
         contents = f.read()
     assert_true("SPECIES" and "DESCRIPTION" and "PUBLICATION" and "AUTHORS" in contents)
-
-    repo = AnnexRepo(outd, create=False)  # to be used in the checks
-    # Inspect the tree -- that we have all the branches
-    branches = {'master', 'incoming', 'incoming-processed', 'git-annex'}
-    eq_(set(repo.get_branches()), branches)
 
 
 _PLUG_HERE = '<!-- PLUG HERE -->'
@@ -161,9 +172,25 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 
     'file': {
         'show': {
-                'JX5V': "content of file1.nii",
-                'R1BX': "content of file2.nii",
+            'JX5V': {
+                'index.html': """<html><body>
+                                    <a href="/file/download/file1.nii">Download (120 MB)</a>
+                                </body></html>"""
             },
+            'R1BX': {
+                'index.html': """<html><body>
+                    <a href="/file/download/dir1/file2.nii">Download (26 MB)</a>
+                </body></html>"""
+            }
+
+        },
+
+        'download': {
+            'file1.nii': "content of file1.nii",
+            'dir1': {
+                'file2.nii': "content of file2.nii",
+                }
+            }
         },
     },
     archives_leading_dir=False
@@ -249,10 +276,31 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 
     'file': {
         'show': {
-                'JX5V': "content of file1.nii is different",
-                'RIBX': "content of file2.nii",
-                'GSRD': "content of file1b.nii"
+            'JX5V': {
+                'index.html': """<html><body>
+                                    <a href="/file/download/file1.nii">Download (120 MB)</a>
+                                </body></html>"""
             },
+            'R1BX': {
+                'index.html': """<html><body>
+                    <a href="/file/download/dir1/file2.nii">Download (26 MB)</a>
+                </body></html>"""
+            },
+            'GSRD': {
+                'index.html': """<html><body>
+                    <a href="/file/download/file1b.nii">Download (26 MB)</a>
+                 </body></html>"""
+            }
+
+        },
+
+        'download': {
+            'file1.nii': "content of file1.nii is different",
+            'file1b.nii': "content of file1b.nii",
+            'dir1': {
+                'file2.nii': "content of file2.nii",
+                }
+            }
         },
     },
     archives_leading_dir=False
