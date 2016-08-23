@@ -23,7 +23,7 @@ from ..nodes.misc import debug
 from ..nodes.misc import sub, switch
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
-from datalad.utils import find_files as f_f
+from datalad.utils import find_files as f_f, _path_
 from datalad.support.annexrepo import *
 from datalad.support.gitrepo import *
 
@@ -77,8 +77,7 @@ def extract_meta(data):
     if not exists(".datalad/meta"):
         makedirs(".datalad/meta")
 
-    opj(".datalad/meta/balsa.json".split('/'))
-    with open(".datalad/meta/balsa.json", "w") as fi:
+    with open(_path_(".datalad/meta/balsa.json"), "w") as fi:
         json.dump(json_dict, fi, indent=1)
         lgr.info("Generated descriptor file")
         yield {'filename': ".datalad/meta/balsa.json"}
