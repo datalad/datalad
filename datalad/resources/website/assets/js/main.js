@@ -40,7 +40,7 @@ function child_url(url, node_name) {
 /**
  * if path given return path else return window.location.pathname
  * replaces direct calls to window.location with function
- * will allow to mock tests for functions using window.location
+ * allows mocking tests for functions using window.location.pathname
  * @return {string} returns path to current window location
  */
 function loc() {
@@ -55,7 +55,10 @@ function loc() {
  * @return {string} returns path to node based on current location
  */
 function absolute_url(next_url) {
-  return (loc().replace(/\?.*/g, '') + next_url).replace('//', '/');
+  if (!next_url)
+    return loc();
+  else
+    return (loc().replace(/\?.*/g, '') + next_url).replace('//', '/');
 }
 
 /**
@@ -76,7 +79,7 @@ function getParameterByName(name, url) {
 
 /**
  * update url parameter or url ?
- * @param {string} url next url to traverse to
+ * @param {string} next_url next url to traverse to
  * @param {string} type type of clicked node
  * @param {string} current_state current node type. (variable unused)
  * @return {boolean} true if clicked node not root dataset
@@ -85,7 +88,7 @@ function update_param_or_path(next_url, type, current_state) {
   // if url = root path(wrt index.html) then append index.html to url
   // allows non-root dataset dirs to have index.html
   // ease constrain on non-datalad index.html presence in dataset
-  if (next_url === loc() || next_url === '/') {
+  if (next_url === loc() || next_url === '/' || !next_url) {
     return false;
   } else if (type === 'file' || type === 'link')
     return false;
@@ -101,13 +104,17 @@ function update_param_or_path(next_url, type, current_state) {
  */
 function directory(jQuery, md5) {
   var metadata_dir = '.git/datalad/metadata/';
-  var metadata_path = getParameterByName('dir') ?
-        // remove basepath to directory
-        getParameterByName('dir').replace(loc(), '')
-        .replace(/^\/?/, '')    // replace beginning '/'
-        .replace(/\/?$/, '') :  // replace ending '/'
-        '/';
-  var metadata_url = loc() + metadata_dir + md5(metadata_path);
+  var current_loc = absolute_url(getParameterByName('dir'));
+  var metadata_url = '';
+  if (url_exists(current_loc + metadata_dir))
+    metadata_url = current_loc + metadata_dir + md5('/');
+  else {
+    var metadata_path =
+          getParameterByName('dir').replace(loc(), '')   // remove basepath to dir
+          .replace(/^\/?/, '')                           // replace beginning '/'
+          .replace(/\/?$/, '');                          // replace ending '/'
+    metadata_url = loc() + metadata_dir + md5(metadata_path);
+  }
   var parent = false;
 
   var table = jQuery('#directory').dataTable({
@@ -165,8 +172,9 @@ function directory(jQuery, md5) {
         // which path to move, dir parameter or current path ?
         var next = dir ? move(dir, data.name) : move(absolute_url(''), data.name);
         // update parameter or url path with new path ?
+        //console.log(dir, move, next, update_param_or_path(next, data.type, dir));
         if (update_param_or_path(next, data.type, dir))
-          window.location.search = '?dir=' + next.replace(loc(), '');
+          window.location.search = '?dir=' + next.replace(loc(), '/');
         else
           window.location.assign(next);
       });
