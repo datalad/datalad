@@ -21,6 +21,7 @@ from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign, skip_if, find_files, continue_if
 from ..nodes.misc import debug
 from ..nodes.misc import sub, switch
+from ..nodes.misc import get_disposition_filename
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
 from datalad.utils import find_files as f_f
@@ -47,7 +48,7 @@ def superdataset_pipeline(url=TOPURL):
                      'WG33': '2016-VanEssen_et_al-BALSA'
                      }
 
-    annex = Annexificator()
+    annex = Annexificator(no_annex=True)
     lgr.info("Creating a BALSA collection pipeline")
     return [
         crawl_url(url),
@@ -103,9 +104,11 @@ class BalsaSupport(object):
 
         # list of files that exist from canonical tarball
         con_files = list(f_f('.*', topdir=curdir, exclude='./(_files|.datalad)'))
+        assert(con_files)
 
         # list of file that are individually downloaded
         files = list(f_f('.*', topdir='_files'))
+        assert(files)
         files_key = [self.repo.get_file_key(item) for item in files]
 
         for item in con_files:
@@ -128,6 +131,22 @@ class BalsaSupport(object):
             rmtree(files_path)
 
         yield data
+
+
+def fixup_the_filename(data):
+    # TODO: use file_basename
+    from datalad.utils import file_basename
+    download_ext = file_basename(data['filename'], return_ext=True)[-1]
+    orig_filename, orig_ext = file_basename(data['filename_orig'], return_ext=True)
+    if orig_ext != download_ext:
+        assert(download_ext == 'zip')  # we are not aware of other cases
+        assert(orig_ext == 'scene')
+        data = data.copy()
+        # They have a bug that the same name of the archive provided for multiple .scene files
+        # available within the study
+        data['filename'] = orig_filename + '_scene' + '.' + download_ext
+    yield data
+
 
 
 def pipeline(dataset_id, url=TOPURL):
@@ -189,6 +208,18 @@ def pipeline(dataset_id, url=TOPURL):
                     assign({'path': '_files/%(url_text)s'}, interpolate=True),
                     sub({'path': {' / ': '/'}}),
                     splitpath,
+                    # TODO #1: make warnings appear from verify_files
+                    #crawl_url(),
+                    #a_href_match('.*/download/.*', min_count=1),
+                    # TODO #2:
+                    # add a node which calls for get_disposition_filename
+                    # and if it ends with .scene (for which we should have .zip)
+                    # create a filename by replacing .scene with _scene.zip
+                    # to annex it into
+                    #assign({'target_filename': '%(filename)s'}, interpolate=True),  # so we could use it in our magical function
+                    # because get_disposition will override it
+                    #get_disposition_filename,
+                    #fixup_the_filename,
                     annex,
                 ],
             ],
