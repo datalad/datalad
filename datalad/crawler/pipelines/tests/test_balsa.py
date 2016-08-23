@@ -255,7 +255,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
         'show': {
             'WG33': {
                 'index.html': """<html><body>
-                                    <a href="/study/download/WG33.zip">thetarball.zip</a>
+                                    <a href="/study/download/WG33.tar.gz">Download (172 MB)</a>
                                     <a href="/file/show/JX5V">file1.nii</a>
                                     <a href="/file/show/RIBX">dir1 / file2.nii</a>
                                     <a href="/file/show/GSRD">file1b.nii</a>
@@ -265,7 +265,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
             },
         },
         'download': {
-            'WG33.zip': {
+            'WG33.tar.gz': {
                 'file1.nii': "content of file1.nii",
                 'dir1': {
                     'file2.nii': "content of file2.nii",
