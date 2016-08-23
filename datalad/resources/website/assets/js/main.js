@@ -1,6 +1,10 @@
-/* global window */
+/* global window XMLHttpRequest */
 
-// check if url exists
+/**
+ * check if url exists
+ * @param {string} url url to test for existence
+ * @return {boolean} returns true if url exists
+ */
 function url_exists(url) {
   var http = new XMLHttpRequest();
   http.open('HEAD', url, false);
@@ -8,7 +12,12 @@ function url_exists(url) {
   return http.status !== 404;
 }
 
-// construct parent path of url passed
+/**
+ * construct parent path to current url
+ * @param {string} url current url
+ * @param {string} node_name clicked node name
+ * @return {string} url to parent of current url
+ */
 function parent_url(url, node_name) {
   var turl = url.endsWith("/") ? url : url.concat("/");
   var url_array = turl.split(/[\\/]/);
@@ -16,26 +25,45 @@ function parent_url(url, node_name) {
   return url_array.join('/');
 }
 
-// construct child path of url passed
+/**
+ * construct child path from current url and clicked node name
+ * @param {string} url current url
+ * @param {string} node_name clicked node name
+ * @return {string} url to reach clicked node
+ */
 function child_url(url, node_name) {
-  return url.endsWith("/") ? url.concat(node_name) : url.concat('/').concat(node_name);
+  var turl = url.endsWith('/') ? url.slice(0, -1) : url;
+  var tnode_name = node_name.startsWith('/') ? node_name.slice(1) : node_name;
+  return turl + '/' + tnode_name;
 }
 
-// replace direct calls to window.location with function
-// will allow to mock tests for funcs using window.location
-function loc(path) {
-  return path ? path : window.location.pathname;
+/**
+ * if path given return path else return window.location.pathname
+ * replaces direct calls to window.location with function
+ * will allow to mock tests for functions using window.location
+ * @return {string} returns path to current window location
+ */
+function loc() {
+  return window.location.pathname;
 }
 
-// decompose url to actual path to node
-// e.g if next_url=d1/d2/d3 and
-// current_url = example.com/ds/?dir=d1/d2
-// return example.com/ds/d1/d2/d3
+/**
+ * decompose url to actual path to node
+ * e.g if next_url = d1/d2/d3, current_url = example.com/ds/?dir=d1/d2
+ * return example.com/ds/d1/d2/d3
+ * @param {string} next_url name of GET parameter to extract value from
+ * @return {string} returns path to node based on current location
+ */
 function absolute_url(next_url) {
   return (loc().replace(/\?.*/g, '') + next_url).replace('//', '/');
 }
 
-// extract GET parameters from URL
+/**
+ * extract GET parameters from URL
+ * @param {string} name name of GET parameter to extract value from
+ * @param {string} url url to extract parameter from
+ * @return {string} returns the value associated with the `name` GET parameter if exists else null
+ */
 function getParameterByName(name, url) {
 // refer https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
   if (!url) url = window.location.href;
@@ -46,13 +74,18 @@ function getParameterByName(name, url) {
   return decodeURIComponent(results[2].replace(/\+/g, " "));
 }
 
-// to update parameter if url directory or not dataset
-function update_param_or_path(url, type, current_state) {
+/**
+ * update url parameter or url ?
+ * @param {string} url next url to traverse to
+ * @param {string} type type of clicked node
+ * @param {string} current_state current node type. (variable unused)
+ * @return {boolean} true if clicked node not root dataset
+ */
+function update_param_or_path(next_url, type, current_state) {
   // if url = root path(wrt index.html) then append index.html to url
   // allows non-root dataset dirs to have index.html
   // ease constrain on non-datalad index.html presence in dataset
-  if (url === loc() || url === '/') {
-    url = loc() + 'index.html';
+  if (next_url === loc() || next_url === '/') {
     return false;
   } else if (type === 'file' || type === 'link')
     return false;
@@ -60,7 +93,12 @@ function update_param_or_path(url, type, current_state) {
     return true;
 }
 
-// construct path to metadata json based on directory to be rendered argument passed in url
+/**
+ * construct path to metadata json based on directory to be rendered argument passed in url
+ * @param {object} jQuery jQuery library object
+ * @param {object} md5 md5 library object
+ * @return {object} returns the rendered DataTable object
+ */
 function directory(jQuery, md5) {
   var metadata_dir = '.git/datalad/metadata/';
   var metadata_path = getParameterByName('dir') ?
@@ -96,7 +134,6 @@ function directory(jQuery, md5) {
     createdRow: function(row, data, index) {
       if (data.name === '..')
         parent = true;
-
       // show size = "ondisk size" / "total size"
       if (data.size.ondisk)
         jQuery('td', row).eq(2).html(data.size.ondisk + "/" + data.size.total);
@@ -111,7 +148,7 @@ function directory(jQuery, md5) {
     // add click handlers to each row(cell) once table initialised
     initComplete: function() {
       var api = this.api();
-	// all tables should have ../ parent path
+      // all tables should have ../ parent path
       if (!parent)
         api.row.add({name: "..", repo: "", date: "", path: "", type: "annex", size: ""}).draw();
       // add click handlers
@@ -135,6 +172,5 @@ function directory(jQuery, md5) {
       });
     }
   });
-  // api.columns([4, 5, 6]).visible(false);  // hide complete path, file type and sorting columns
   return table;
 }
