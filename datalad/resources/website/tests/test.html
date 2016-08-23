@@ -36,12 +36,11 @@
 	  assert.equal(child_url('/root', 'child/'), '/root/child/');
 	  assert.equal(child_url('/', '/root'), '/root');
 	  assert.equal(child_url('', 'root'), '/root');
+	  //assert.equal('http://localhost:8000/?dir=MLd_cells/');
       });
       QUnit.test("Construct Absolute URL", function(assert) {
 	  // mock out loc func with stub (normally returns window.location.pathname)
-	  loc = sinon.stub();
-
-	  loc.returns('example.com');
+	  loc = sinon.stub().returns('example.com');
 	  assert.equal(absolute_url('/d1'), 'example.com/d1',
 		       'at domain root');
 
@@ -56,13 +55,16 @@
 	  loc.returns('example.com/ds/?dir=d1/d2');
 	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
 		       'if subpath in GET parameter');
+	  assert.equal(absolute_url(), loc(), 'if nothing passed return current location');
       });
       QUnit.test("Update Param or Path ?", function(assert) {
 	  assert.equal(update_param_or_path('/ds1/', 'dir'), true, 'param if next is a directory');
-	  assert.equal(update_param_or_path('/ds1/', '..'), true, 'param if next is parent \'..\'');
 	  assert.equal(update_param_or_path('/ds1/', 'file'), false, 'param if next is a file');
-	  assert.equal(update_param_or_path('/', '/'), false, 'path if next is the root dataset');
-	  //assert.equal(update_param_or_path('/ds1/', '..'), false, 'path if next is parent and parent is root of dataset');
+	  assert.equal(update_param_or_path('/ds1/', 'link'), false, 'param if next is a link');
+	  assert.equal(update_param_or_path('/'), false, 'path if next is the root dataset');
+	  assert.equal(update_param_or_path(), false, 'path if next null/undefined/empty');
+	  loc = sinon.stub().returns('/ds1');
+	  assert.equal(update_param_or_path('/ds1'), false, 'path if next is root of dataset at subfolder');
       });
       QUnit.test("Get Parameter by Name", function(assert) {
 	  assert.equal(getParameterByName('dir'), null,
