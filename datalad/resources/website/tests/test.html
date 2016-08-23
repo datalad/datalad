@@ -18,33 +18,61 @@
     <script src="qunit/qunit.js"></script>
     <script>
       QUnit.test("Parent URL", function(assert) {
-	  assert.equal(parent_url('root/child', ''), 'root/');
-	  assert.equal(parent_url('root/child/', ''), 'root/');
-	  assert.equal(parent_url('/root/child/', ''), '/root/');
-	  assert.equal(parent_url('root/', ''), '');
-	  assert.equal(parent_url('/', ''), '');
+	  assert.equal(parent_url('root/child'), 'root/');
+	  assert.equal(parent_url('root/child/'), 'root/');
+	  assert.equal(parent_url('/root/child/'), '/root/');
+	  assert.equal(parent_url('/root'), '/');
+	  assert.equal(parent_url('root/'), '');
+	  assert.equal(parent_url('/root/'), '/');
+	  assert.equal(parent_url('/'), '');
+	  assert.equal(parent_url(''), '');
       });
       QUnit.test("Child URL", function(assert) {
-	  assert.equal(child_url('root/child/', 'grandchild'), 'root/child/grandchild');
-	  assert.equal(child_url('/root/child', 'grandchild'), '/root/child/grandchild');
-	  assert.equal(child_url('/root/child/', 'grandchild/'), '/root/child/grandchild/');
+	  assert.equal(child_url('/root', 'child'), '/root/child');
+	  assert.equal(child_url('/root/', 'child'), '/root/child');
+	  assert.equal(child_url('root/', '/child'), 'root/child');
+	  assert.equal(child_url('/root/', 'child/'), '/root/child/');
+	  assert.equal(child_url('/root/', '/child/'), '/root/child/');
+	  assert.equal(child_url('/root', 'child/'), '/root/child/');
+	  assert.equal(child_url('/', '/root'), '/root');
+	  assert.equal(child_url('', 'root'), '/root');
       });
-      QUnit.test("Absolute URL", function(assert) {
+      QUnit.test("Construct Absolute URL", function(assert) {
 	  // mock out window.location.pathname with loc function stub
 	  current = sinon.stub(window, 'loc');
-	  // if at domain root
+
 	  current.returns('example.com');
-	  assert.equal(absolute_url('/d1'), 'example.com/d1');
-	  // if currently at subdirectory
-	  // both paths with trailing slashes, ensure no double forward slashes
+	  assert.equal(absolute_url('/d1'), 'example.com/d1',
+		       'at domain root');
+
 	  current.returns('example.com/ds/');
-	  assert.equal(absolute_url('/d1/'), 'example.com/ds/d1/');
-	  // if root '/' path in dir parameter
+	  assert.equal(absolute_url('/d1/'), 'example.com/ds/d1/',
+		       'at subdirectory. no double forward slashes even if both paths with trailing slashes');
+
 	  current.returns('example.com/ds2/?dir=/');
-	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds2/d1/d2/d3');
-	  // if subpath in dir parameter
+	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds2/d1/d2/d3',
+		       'if root path(/) in GET parameter');
+
 	  current.returns('example.com/ds/?dir=d1/d2');
-	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3');
+	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
+		       'if subpath in GET parameter');
+      });
+      QUnit.test("Update Param or Path ?", function(assert) {
+	  assert.equal(update_param_or_path('/ds1/', 'dir'), true, 'param if next is a directory');
+	  assert.equal(update_param_or_path('/ds1/', '..'), true, 'param if next is parent \'..\'');
+	  assert.equal(update_param_or_path('/ds1/', 'file'), false, 'param if next is a file');
+	  assert.equal(update_param_or_path('/', '/'), false, 'path if next is the root dataset');
+	  //assert.equal(update_param_or_path('/ds1/', '..'), false, 'path if next is parent and parent is root of dataset');
+      });
+      QUnit.test("Get Parameter by Name", function(assert) {
+	  assert.equal(getParameterByName('dir'), null,
+		       'ok if no url passed');
+	  assert.equal(getParameterByName('dir', 'example.com/d1?dir=/test'), '/test',
+		       'value if parameter has value');
+	  assert.equal(getParameterByName('dir', 'example.com/d1/?dir='), null,
+		       'null if parameter value is empty');
+	  assert.equal(getParameterByName('dir', 'example.com/d1/d2/d3'), null,
+		       'null if parameter does not exist');
       });
       QUnit.test("jQuery Ajax", function (assert) {
 	  sinon.spy(jQuery, "ajax");
@@ -54,7 +82,6 @@
 	  assert.equal(jQuery.ajax.getCall(0).args[0].url, "/some/resource");
 	  assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
       });
-
     </script>
   </body>
 </html>
