@@ -38,22 +38,22 @@
 	  assert.equal(child_url('', 'root'), '/root');
       });
       QUnit.test("Construct Absolute URL", function(assert) {
-	  // mock out window.location.pathname with loc function stub
-	  current = sinon.stub(window, 'loc');
+	  // mock out loc func with stub (normally returns window.location.pathname)
+	  loc = sinon.stub();
 
-	  current.returns('example.com');
+	  loc.returns('example.com');
 	  assert.equal(absolute_url('/d1'), 'example.com/d1',
 		       'at domain root');
 
-	  current.returns('example.com/ds/');
+	  loc.returns('example.com/ds/');
 	  assert.equal(absolute_url('/d1/'), 'example.com/ds/d1/',
 		       'at subdirectory. no double forward slashes even if both paths with trailing slashes');
 
-	  current.returns('example.com/ds2/?dir=/');
+	  loc.returns('example.com/ds2/?dir=/');
 	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds2/d1/d2/d3',
 		       'if root path(/) in GET parameter');
 
-	  current.returns('example.com/ds/?dir=d1/d2');
+	  loc.returns('example.com/ds/?dir=d1/d2');
 	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
 		       'if subpath in GET parameter');
       });
