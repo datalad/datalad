@@ -102,33 +102,35 @@ class BalsaSupport(object):
         files_path = opj(abspath(curdir), '_files')
 
         # list of files that exist from canonical tarball
-        con_files = list(f_f('.*', topdir=curdir, exclude='./(_files|.datalad)'))
-        assert(con_files)
+        con_files = set(f_f('.*', topdir=curdir, exclude='./(_files|.datalad)'))
+        assert con_files
 
-        # list of file that are individually downloaded
-        files = list(f_f('.*', topdir='_files'))
-        assert(files)
-        files_key = [self.repo.get_file_key(item) for item in files]
+        # list of files that are individually downloaded
+        files = set(f_f('.*', topdir='_files'))
+        assert files
 
-        for item in con_files:
-            item = normpath(opj('_files', item))
-            if item in files:
-                key_item = self.repo.get_file_key(opj('./', item))
-                if key_item in files_key:
+        for item_from_con in con_files:
+            item_compare = normpath(opj('_files', item_from_con))
+            if item_compare in files:
+                key_item = self.repo.get_file_key(item_from_con)
+                key_files_item = self.repo.get_file_key(item_compare)
+                if key_item == key_files_item:
                     pass
                 else:
-                    lgr.warning("%s is varies in content from the individually downloaded "
-                                "files, is removed and file from canonical tarball is kept" % item)
-                self.repo.remove(item)
-                files = list(f_f('.*', topdir='_files'))
+                    lgr.warning("%s varies in content from the individually downloaded "
+                                "file with the same name, it is removed and file "
+                                "from canonical tarball is kept" % item_from_con)
+
+                files.discard(item_compare)
             else:
                 lgr.warning("%s does not exist in the individaully listed files by name, "
-                            "but will be kept from canconical tarball" % item)
+                            "but will be kept from canconical tarball" % item_compare)
+
         if files:
             lgr.warning("The following files do not exist in the canonical tarball, but are "
                         "individually listed files and will not be kept: %s" % files)
-            rmtree(files_path)
 
+        rmtree(files_path)
         yield data
 
 
@@ -145,7 +147,6 @@ def fixup_the_filename(data):
         # available within the study
         data['filename'] = orig_filename + '_scene' + '.' + download_ext
     yield data
-
 
 
 def pipeline(dataset_id, url=TOPURL):
@@ -207,10 +208,9 @@ def pipeline(dataset_id, url=TOPURL):
                     assign({'path': '_files/%(url_text)s'}, interpolate=True),
                     sub({'path': {' / ': '/'}}),
                     splitpath,
-                    # TODO #1: make warnings appear from verify_files
                     #crawl_url(),
                     #a_href_match('.*/download/.*', min_count=1),
-                    # TODO #2:
+                    # TODO
                     # add a node which calls for get_disposition_filename
                     # and if it ends with .scene (for which we should have .zip)
                     # create a filename by replacing .scene with _scene.zip
