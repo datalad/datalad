@@ -123,8 +123,8 @@ class BalsaSupport(object):
 
                 files.discard(item_compare)
             else:
-                lgr.warning("%s does not exist in the individaully listed files by name, "
-                            "but will be kept from canconical tarball" % item_compare)
+                lgr.warning("%s does not exist in the individually listed files by name, "
+                            "but will be kept from canonical tarball" % item_compare)
 
         if files:
             lgr.warning("The following files do not exist in the canonical tarball, but are "
@@ -134,11 +134,11 @@ class BalsaSupport(object):
         yield data
 
 
-def fixup_the_filename(data):
+def fix_the_filename(data):
     # TODO: use file_basename
     from datalad.utils import file_basename
     download_ext = file_basename(data['filename'], return_ext=True)[-1]
-    orig_filename, orig_ext = file_basename(data['filename_orig'], return_ext=True)
+    orig_filename, orig_ext = file_basename(data['target_filename'], return_ext=True)  # data['filename_orig']
     if orig_ext != download_ext:
         assert(download_ext == 'zip')  # we are not aware of other cases
         assert(orig_ext == 'scene')
@@ -208,17 +208,12 @@ def pipeline(dataset_id, url=TOPURL):
                     assign({'path': '_files/%(url_text)s'}, interpolate=True),
                     sub({'path': {' / ': '/'}}),
                     splitpath,
-                    #crawl_url(),
-                    #a_href_match('.*/download/.*', min_count=1),
-                    # TODO
-                    # add a node which calls for get_disposition_filename
-                    # and if it ends with .scene (for which we should have .zip)
-                    # create a filename by replacing .scene with _scene.zip
-                    # to annex it into
-                    #assign({'target_filename': '%(filename)s'}, interpolate=True),  # so we could use it in our magical function
+                    crawl_url(),
+                    a_href_match('.*/download/.*', max_count=1),
+                    # so we could use it in our magical function
                     # because get_disposition will override it
-                    #get_disposition_filename,
-                    #fixup_the_filename,
+                    assign({'target_filename': '%(filename)s'}, interpolate=True),
+                    fix_the_filename,
                     annex,
                 ],
             ],
