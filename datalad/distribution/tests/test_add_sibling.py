@@ -99,11 +99,11 @@ def test_add_sibling(origin, repo_path):
                       force=True)
 
     eq_(set(res), {basename(source.path),
-                   opj(basename(source.path), "sub1"),
-                   opj(basename(source.path), "sub2")})
+                   opj(basename(source.path), "subm 1"),
+                   opj(basename(source.path), "subm 2")})
     for repo in [source.repo,
-                 GitRepo(opj(source.path, "sub1")),
-                 GitRepo(opj(source.path, "sub2"))]:
+                 GitRepo(opj(source.path, "subm 1")),
+                 GitRepo(opj(source.path, "subm 2"))]:
         assert_in("test-remote", repo.get_remotes())
         url = repo.get_remote_url("test-remote")
         pushurl = repo.get_remote_url("test-remote", push=True)
@@ -119,12 +119,12 @@ def test_add_sibling(origin, repo_path):
                       recursive=True,
                       force=True)
     eq_(set(res), {basename(source.path),
-                   opj(basename(source.path), "sub1"),
-                   opj(basename(source.path), "sub2")})
+                   opj(basename(source.path), "subm 1"),
+                   opj(basename(source.path), "subm 2")})
 
     for repo in [source.repo,
-                 GitRepo(opj(source.path, "sub1")),
-                 GitRepo(opj(source.path, "sub2"))]:
+                 GitRepo(opj(source.path, "subm 1")),
+                 GitRepo(opj(source.path, "subm 2"))]:
         assert_in("test-remote-2", repo.get_remotes())
         url = repo.get_remote_url("test-remote-2")
         pushurl = repo.get_remote_url("test-remote-2", push=True)

@@ -98,3 +98,13 @@ class UnhandledRedirectError(DownloadError):
     def __init__(self, msg=None, url=None, **kwargs):
         super(UnhandledRedirectError, self).__init__(msg, **kwargs)
         self.url = url
+
+#
+# Crawler
+#
+
+class CrawlerError(Exception):
+    pass
+
+class PipelineNotSpecifiedError(CrawlerError):
+    pass

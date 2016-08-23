@@ -167,10 +167,11 @@ def sorted_files(dout):
                        if not '.git' in r], []))
 
 from os.path import sep as dirsep
-_VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
 
-def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
     """Generator to find files matching regex
 
     Parameters
@@ -181,11 +182,14 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
       as regex to exclude those files (regex: %r)
+    exclude_datalad:
+      If True, excludes files known to be datalad meta-data files (e.g. under
+      .datalad/ subdirectory) (regex: %r)
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
-    """ % _VCS_REGEX
+    """ % (_VCS_REGEX, _DATALAD_REGEX)
 
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
@@ -196,6 +200,8 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
             if exclude and re.search(exclude, path):
                 continue
             if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            if exclude_datalad and re.search(_DATALAD_REGEX, path):
                 continue
             yield path
 
@@ -360,6 +366,22 @@ else:
             os.utime(rfilepath, (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
+
+
+def assure_list(s):
+    """Given not a list, would place it into a list. If None - empty list is returned
+
+    Parameters
+    ----------
+    s: list or anything
+    """
+
+    if isinstance(s, list):
+        return s
+    elif s is None:
+        return []
+    else:
+        return [s]
 
 
 def assure_list_from_str(s, sep='\n'):
@@ -763,6 +785,9 @@ class chpwd(object):
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
 
+    It is just a thin wrapper around GitRepo.is_with_annex() classmethod
+    which also checks for `path` to exist first.
+
     This includes actually present annexes, but also uninitialized ones, or
     even the presence of a remote annex branch.
     """
@@ -771,9 +796,7 @@ def knows_annex(path):
         lgr.debug("No annex: test path {0} doesn't exist".format(path))
         return False
     from datalad.support.gitrepo import GitRepo
-    repo = GitRepo(path, create=False)
-    return "origin/git-annex" in repo.get_remote_branches() \
-           or "git-annex" in repo.get_branches()
+    return GitRepo(path, init=False, create=False).is_with_annex()
 
 
 @contextmanager
@@ -850,5 +873,14 @@ def make_tempfile(content=None, wrapped=None, **tkwargs):
                 rmtemp(f)
             except OSError:
                 pass
+
+
+def _path_(p):
+    """Given a path in POSIX" notation, regenerate one in native to the env one"""
+    if on_windows:
+        return opj(p.split('/'))
+    else:
+        # Assume that all others as POSIX compliant so nothing to be done
+        return p
 
 lgr.log(5, "Done importing datalad.utils")

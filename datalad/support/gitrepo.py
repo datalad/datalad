@@ -494,6 +494,17 @@ class GitRepo(object):
         """Returns if a given path points to a git repository"""
         return exists(opj(path, '.git', 'objects'))
 
+    def is_with_annex(self, only_remote=False):
+        """Return True if GitRepo (assumed) at the path has remotes with git-annex branch
+
+        Parameters
+        ----------
+        only_remote: bool, optional
+            Check only remote (no local branches) for having git-annex branch
+        """
+        return any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
+            ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
+
     @classmethod
     def get_toppath(cls, path):
         """Return top-level of a repository given the path.
@@ -651,7 +662,7 @@ class GitRepo(object):
         if options:
             # we can't pass all possible options to gitpython's implementation
             # of commit. Therefore we need a direct call to git:
-            cmd = ['git', 'commit'] + (["-m", msg] if msg else []) + options
+            cmd = ['git', 'commit'] + (["-m", msg if msg else ""]) + options
             lgr.debug("Committing via direct call of git: %s" % cmd)
             self._git_custom_command([], cmd)
         else:
@@ -942,35 +953,42 @@ class GitRepo(object):
 
 # TODO: --------------------------------------------------------------------
 
-    def add_remote(self, name, url, options=''):
-        """
+    def add_remote(self, name, url, options=[]):
+        """Register remote pointing to a url
         """
 
-        return self._git_custom_command('', 'git remote add %s %s %s' %
-                                 (options, name, url))
+        return self._git_custom_command(
+            '', ['git', 'remote', 'add'] + options + [name, url]
+        )
 
     def remove_remote(self, name):
-        """
+        """Remove existing remote
         """
 
-        return self._git_custom_command('', 'git remote remove %s' % name)
+        return self._git_custom_command(
+            '', ['git', 'remote', 'remove', name]
+        )
 
     def show_remotes(self, name='', verbose=False):
         """
         """
 
-        v = "-v" if verbose else ""
-        out, err = self._git_custom_command('', 'git remote %s show %s' %
-                                            (v, name))
+        options = ["-v"] if verbose else []
+        name = [name] if name else []
+        out, err = self._git_custom_command(
+            '', ['git', 'remote'] + options + ['show'] + name
+        )
         return out.rstrip(linesep).splitlines()
 
-    def update_remote(self, name='', verbose=False):
+    def update_remote(self, name=None, verbose=False):
         """
         """
-
-        v = "-v" if verbose else ''
-        self._git_custom_command('', 'git remote %s update %s' % (name, v),
-                                 expect_stderr=True)
+        options = ["-v"] if verbose else []
+        name = [name] if name else []
+        self._git_custom_command(
+            '', ['git', 'remote'] + name + ['update'] + options,
+            expect_stderr=True
+        )
 
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
@@ -1211,29 +1229,35 @@ class GitRepo(object):
                 return
             yield fvalue(c)
 
-    def checkout(self, name, options=''):
+    def checkout(self, name, options=[]):
         """
         """
         # TODO: May be check for the need of -b options herein?
 
-        self._git_custom_command('', 'git checkout %s %s' % (options, name),
-                                 expect_stderr=True)
+        self._git_custom_command(
+            '', ['git', 'checkout'] + options + [str(name)],
+            expect_stderr=True
+        )
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
     def merge(self, name, options=[], msg=None, **kwargs):
         if msg:
             options = options + ["-m", msg]
-        self._git_custom_command('', ['git', 'merge'] + options + [name],
-                                 **kwargs)
+        self._git_custom_command(
+            '', ['git', 'merge'] + options + [name],
+            **kwargs
+        )
 
     def remove_branch(self, branch):
-        self._git_custom_command('', 'git branch -D %s' % branch)
+        self._git_custom_command(
+            '', ['git', 'branch', '-D', branch]
+        )
 
-    def ls_remote(self, remote, options=None):
-        self._git_custom_command('', 'git ls-remote %s %s' %
-                                 (options if options is not None else '',
-                                  remote))
+    def ls_remote(self, remote, options=[]):
+        self._git_custom_command(
+            '', ['git', 'ls-remote'] + options + [remote]
+        )
         # TODO: Return values?
     
     @property
@@ -1361,7 +1385,9 @@ class GitRepo(object):
           Custom tag label.
         """
         # TODO later to be extended with tagging particular commits and signing
-        self._git_custom_command('', 'git tag "{0}"'.format(tag))
+        self._git_custom_command(
+            '', ['git', 'tag', str(tag)]
+        )
 
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.
