@@ -19,7 +19,7 @@ function url_exists(url) {
  * @return {string} url to parent of current url
  */
 function parent_url(url, node_name) {
-  var turl = url.endsWith("/") ? url : url.concat("/");
+  var turl = url.charAt(url.length - 1) === '/' ? url : url.concat("/");
   var url_array = turl.split(/[\\/]/);
   url_array.splice(-2, 1);
   return url_array.join('/');
@@ -32,8 +32,8 @@ function parent_url(url, node_name) {
  * @return {string} url to reach clicked node
  */
 function child_url(url, node_name) {
-  var turl = url.endsWith('/') ? url.slice(0, -1) : url;
-  var tnode_name = node_name.startsWith('/') ? node_name.slice(1) : node_name;
+  var turl = url.charAt(url.length - 1) === '/' ? url.slice(0, -1) : url;
+  var tnode_name = node_name.charAt(0) === '/' ? node_name.slice(1) : node_name;
   return turl + '/' + tnode_name;
 }
 
