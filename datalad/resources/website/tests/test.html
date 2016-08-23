@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>Datalad WebUI Test</title>
+    <link rel="stylesheet" href="qunit/qunit.css">
+  </head>
+  <body>
+    <div id="qunit"></div>
+    <div id="qunit-fixture"></div>
+    <script src="../assets/js/jquery-1.12.3.js"></script>
+    <script src="../assets/js/jquery.dataTables.js"></script>
+    <script src="../assets/js/md5.js"></script>
+    <script src="../assets/js/main.js"></script>
+    <script src="qunit/sinon.js"></script>
+    <script src="qunit/sinon-qunit.js"></script>
+    <script src="qunit/qunit.js"></script>
+    <script>
+      QUnit.test("Parent URL", function(assert) {
+	  assert.equal(parent_url('root/child', ''), 'root/');
+	  assert.equal(parent_url('root/child/', ''), 'root/');
+	  assert.equal(parent_url('/root/child/', ''), '/root/');
+	  assert.equal(parent_url('root/', ''), '');
+	  assert.equal(parent_url('/', ''), '');
+      });
+      QUnit.test("Child URL", function(assert) {
+	  assert.equal(child_url('root/child/', 'grandchild'), 'root/child/grandchild');
+	  assert.equal(child_url('/root/child', 'grandchild'), '/root/child/grandchild');
+	  assert.equal(child_url('/root/child/', 'grandchild/'), '/root/child/grandchild/');
+      });
+      QUnit.test("Absolute URL", function(assert) {
+	  // mock out window.location.pathname with loc function stub
+	  current = sinon.stub(window, 'loc');
+	  // if at domain root
+	  current.returns('example.com');
+	  assert.equal(absolute_url('/d1'), 'example.com/d1');
+	  // if currently at subdirectory
+	  // both paths with trailing slashes, ensure no double forward slashes
+	  current.returns('example.com/ds/');
+	  assert.equal(absolute_url('/d1/'), 'example.com/ds/d1/');
+	  // if root '/' path in dir parameter
+	  current.returns('example.com/ds2/?dir=/');
+	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds2/d1/d2/d3');
+	  // if subpath in dir parameter
+	  current.returns('example.com/ds/?dir=d1/d2');
+	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3');
+      });
+      QUnit.test("jQuery Ajax", function (assert) {
+	  sinon.spy(jQuery, "ajax");
+	  jQuery.getJSON("/some/resource");
+
+	  assert.ok(jQuery.ajax.calledOnce);
+	  assert.equal(jQuery.ajax.getCall(0).args[0].url, "/some/resource");
+	  assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
+      });
+
+    </script>
+  </body>
+</html>
