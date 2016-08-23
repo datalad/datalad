@@ -19,9 +19,11 @@ from distutils.version import LooseVersion
 from datalad.support.network import RI, URL, SSHRI
 
 from datalad.support.param import Parameter
+from datalad.dochelpers import exc_str
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.support.constraints import EnsureChoice
 from datalad.support.gitrepo import GitRepo
+from datalad.support.annexrepo import AnnexRepo
 from ..interface.base import Interface
 from datalad.distribution.dataset import EnsureDataset, Dataset, datasetmethod
 from datalad.cmd import CommandError
@@ -243,7 +245,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     ssh(["mkdir", "-p", path])
                 except CommandError as e:
                     lgr.error("Remotely creating target directory failed at "
-                              "%s.\nError: %s" % (path, str(e)))
+                              "%s.\nError: %s" % (path, exc_str(e)))
                     continue
 
             # init git repo
@@ -253,9 +255,18 @@ class CreatePublicationTargetSSHWebserver(Interface):
             try:
                 ssh(cmd)
             except CommandError as e:
-                lgr.error("Remotely initializing git repository failed at %s."
-                          "\nError: %s\nSkipping ..." % (path, str(e)))
+                lgr.error("Initialization of remote git repository failed at %s."
+                          "\nError: %s\nSkipping ..." % (path, exc_str(e)))
                 continue
+
+            if isinstance(datasets[current_dataset].repo, AnnexRepo):
+                # init remote git annex repo (part fix of #463)
+                try:
+                    ssh(["git", "-C", path, "annex", "init"])
+                except CommandError as e:
+                    lgr.error("Initialization of remote git annex repository failed at %s."
+                              "\nError: %s\nSkipping ..." % (path, exc_str(e)))
+                    continue
 
             # check git version on remote end:
             try:
@@ -282,7 +293,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             except CommandError as e:
                 lgr.warning("git config failed at remote location %s.\n"
                             "You will not be able to push to checked out "
-                            "branch." % path)
+                            "branch. Error: %s", path, exc_str(e))
 
             # enable post-update hook:
             try:
