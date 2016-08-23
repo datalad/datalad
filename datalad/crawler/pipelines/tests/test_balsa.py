@@ -10,6 +10,7 @@
 from datalad.crawler.pipelines.tests.utils import _test_smoke_pipelines
 from ..balsa import pipeline as ofpipeline, superdataset_pipeline
 import os
+import logging
 from os.path import exists
 from glob import glob
 from os.path import join as opj
@@ -217,6 +218,7 @@ def test_balsa_pipeline1(ind, topurl, outd, clonedir):
 
 
 # this test should raise warning that canonical tarball does not have one of the files listed
+# and that a listed file differs in content
 _PLUG_HERE = '<!-- PLUG HERE -->'
 
 
@@ -247,7 +249,7 @@ _PLUG_HERE = '<!-- PLUG HERE -->'
 
     'file': {
         'show': {
-                'JX5V': "content of file1.nii",
+                'JX5V': "content of file1.nii is different",
                 'RIBX': "content of file2.nii",
                 'GSRD': "content of file1b.nii"
             },
@@ -266,6 +268,33 @@ def test_balsa_pipeline2(ind, topurl, outd, clonedir):
         data_fields=['dataset_id'])({'dataset_id': 'WG33'}))
 
     with chpwd(outd):
-        pipeline = ofpipeline('WG33', url=topurl)
-        out = run_pipeline(pipeline)
+        with swallow_logs(new_level=logging.WARN) as cml:
+            pipeline = ofpipeline('WG33', url=topurl)
+            out = run_pipeline(pipeline)
+            assert_true('The following files do not exist in the canonical tarball, '
+                        'but are individually listed files and will not be kept:'
+                        in cml.out)
+            assert_true('./file1.nii varies in content from the individually downloaded '
+                        'file with the same name, it is removed and file from canonical '
+                        'tarball is kept' in cml.out)
     eq_(len(out), 1)
+
+    with chpwd(outd):
+        eq_(set(glob('*')), {'dir1', 'file1.nii'})
+        all_files = sorted(find_files('.'))
+
+    fpath = opj(outd, 'file1.nii')
+    ok_file_has_content(fpath, "content of file1.nii")
+    ok_file_under_git(fpath, annexed=True)
+    fpath2 = opj(outd, 'dir1', 'file2.nii')
+    ok_file_has_content(fpath2, "content of file2.nii")
+    ok_file_under_git(fpath2, annexed=True)
+
+    target_files = {
+        './.datalad/crawl/crawl.cfg',
+        './.datalad/crawl/statuses/incoming.json',
+        './file1.nii', './dir1/file2.nii',
+        './.datalad/meta/balsa.json',
+    }
+
+    eq_(set(all_files), target_files)
