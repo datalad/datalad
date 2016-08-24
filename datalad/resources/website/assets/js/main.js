@@ -44,7 +44,7 @@ function child_url(url, node_name) {
  * @return {string} returns path to current window location
  */
 function loc() {
-  return window.location.pathname;
+  return window.location;
 }
 
 /**
@@ -56,9 +56,9 @@ function loc() {
  */
 function absolute_url(next_url) {
   if (!next_url)
-    return loc();
+    return loc().pathname;
   else
-    return (loc().replace(/\?.*/g, '') + next_url).replace('//', '/');
+    return (loc().pathname.replace(/\?.*/g, '') + next_url).replace('//', '/');
 }
 
 /**
@@ -69,7 +69,7 @@ function absolute_url(next_url) {
  */
 function getParameterByName(name, url) {
 // refer https://stackoverflow.com/questions/901115/how-can-i-get-query-string-values-in-javascript
-  if (!url) url = window.location.href;
+  if (!url) url = loc().href;
   name = name.replace(/[\[\]]/g, "\\$&");
   var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)");
   var results = regex.exec(url);
@@ -88,7 +88,7 @@ function update_param_or_path(next_url, type, current_state) {
   // if url = root path(wrt index.html) then append index.html to url
   // allows non-root dataset dirs to have index.html
   // ease constrain on non-datalad index.html presence in dataset
-  if (next_url === loc() || next_url === '/' || !next_url) {
+  if (next_url === loc().pathname || next_url === '/' || !next_url) {
     return false;
   } else if (type === 'file' || type === 'link')
     return false;
@@ -97,31 +97,66 @@ function update_param_or_path(next_url, type, current_state) {
 }
 
 /**
- * construct path to metadata json based on directory to be rendered argument passed in url
+ * decide the url to move to based on current location and clicked node
+ * @param {string} data data of clicked node
+ * @param {string} url url to extract parameter from by getParameterByName
+ * @return {Object} json contaning traverse type and traverse path
+ */
+function click_handler(data, url) {
+  // don't do anything for broken links
+  if (data.type === 'link-broken')
+    return {next: '', type: 'none'};
+  // get directory parameter
+  var dir = getParameterByName('dir', url);
+  // which direction to move, up or down the path ?
+  var move = data.name === '..' ? parent_url : child_url;
+  // which path to move, dir parameter or current path ?
+  var next = dir ? move(absolute_url(dir), data.name) : move(absolute_url(''), data.name);
+  // console.log(dir, move, next, update_param_or_path(next, data.type, dir));
+  var traverse = {next: next, type: 'assign'};
+  // if to update parameter, make next relative to index.html path
+  if (update_param_or_path(next, data.type, dir))
+    traverse = {next: '?dir=' + next.replace(loc().pathname, '/'), type: 'search'};
+  // if clicked was current node '.', remove '.' at at end of next
+  if (data.name === '.')
+    traverse.next = traverse.next.slice(0, -1);
+  return traverse;
+}
+
+/**
+ * construct path to metadata json of node to be rendered
+ * @param {object} md5 the md5 library object, used to compute metadata hash name of current node
+ * @return {string} path to the current node's metadata json
+ */
+function metadata_locator(md5) {
+  var metadata_dir = '.git/datalad/metadata/';
+  var current_loc = absolute_url(getParameterByName('dir')).replace(/\/?$/, '');
+
+  if (url_exists(current_loc + '/' + metadata_dir))
+    return current_loc + '/' + metadata_dir + md5('/');
+  else {
+    var metadata_path = getParameterByName('dir')
+          .replace(loc().pathname, '')   // remove basepath to dir
+          .replace(/^\/?/, '')           // replace beginning '/'
+          .replace(/\/?$/, '');          // replace ending '/'
+    return loc().pathname + metadata_dir + md5(metadata_path);
+  }
+}
+
+/**
+ * render the datatable interface based on current node metadata
  * @param {object} jQuery jQuery library object
  * @param {object} md5 md5 library object
  * @return {object} returns the rendered DataTable object
  */
 function directory(jQuery, md5) {
-  var metadata_dir = '.git/datalad/metadata/';
-  var current_loc = absolute_url(getParameterByName('dir'));
-  var metadata_url = '';
-  if (url_exists(current_loc + metadata_dir))
-    metadata_url = current_loc + metadata_dir + md5('/');
-  else {
-    var metadata_path =
-          getParameterByName('dir').replace(loc(), '')   // remove basepath to dir
-          .replace(/^\/?/, '')                           // replace beginning '/'
-          .replace(/\/?$/, '');                          // replace ending '/'
-    metadata_url = loc() + metadata_dir + md5(metadata_path);
-  }
   var parent = false;
 
   var table = jQuery('#directory').dataTable({
     async: true,    // async get json
     paging: false,  // ensure scrolling instead of pages
     ajax: {         // specify url to get json from ajax
-      url: metadata_url,
+      url: metadata_locator(md5),
       dataSrc: "nodes"
     },
     order: [[6, "desc"], [0, 'asc']],
@@ -160,23 +195,11 @@ function directory(jQuery, md5) {
         api.row.add({name: "..", repo: "", date: "", path: "", type: "annex", size: ""}).draw();
       // add click handlers
       api.$('tr').click(function() {
-        // extract its data json from table
-        var data = api.row(this).data();
-        // don't do anything for broken links
-        if (data.type === 'link-broken')
-          return;
-        // get directory parameter
-        var dir = getParameterByName('dir');
-        // which direction to move, up or down the path ?
-        var move = data.name === '..' ? parent_url : child_url;
-        // which path to move, dir parameter or current path ?
-        var next = dir ? move(dir, data.name) : move(absolute_url(''), data.name);
-        // update parameter or url path with new path ?
-        //console.log(dir, move, next, update_param_or_path(next, data.type, dir));
-        if (update_param_or_path(next, data.type, dir))
-          window.location.search = '?dir=' + next.replace(loc(), '/');
-        else
-          window.location.assign(next);
+        var traverse = click_handler(api.row(this).data());
+        if (traverse.type === 'assign')
+          window.location.assign(traverse.next);
+        else if (traverse.type === 'search')
+          window.location.search = traverse.next;
       });
     }
   });

@@ -40,22 +40,22 @@
       });
       QUnit.test("Construct Absolute URL", function(assert) {
 	  // mock out loc func with stub (normally returns window.location.pathname)
-	  loc = sinon.stub().returns('example.com');
+	  loc = sinon.stub().returns({pathname: 'example.com'});
 	  assert.equal(absolute_url('/d1'), 'example.com/d1',
 		       'at domain root');
 
-	  loc.returns('example.com/ds/');
+	  loc.returns({pathname: 'example.com/ds/'});
 	  assert.equal(absolute_url('/d1/'), 'example.com/ds/d1/',
 		       'at subdirectory. no double forward slashes even if both paths with trailing slashes');
 
-	  loc.returns('example.com/ds2/?dir=/');
+	  loc.returns({pathname: 'example.com/ds2/?dir=/'});
 	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds2/d1/d2/d3',
 		       'if root path(/) in GET parameter');
 
-	  loc.returns('example.com/ds/?dir=d1/d2');
+	  loc.returns({pathname: 'example.com/ds/?dir=d1/d2'});
 	  assert.equal(absolute_url('d1/d2/d3'), 'example.com/ds/d1/d2/d3',
 		       'if subpath in GET parameter');
-	  assert.equal(absolute_url(), loc(), 'if nothing passed return current location');
+	  assert.equal(absolute_url(), loc().pathname, 'if nothing passed return current location');
       });
       QUnit.test("Update Param or Path ?", function(assert) {
 	  assert.equal(update_param_or_path('/ds1/', 'dir'), true, 'param if next is a directory');
@@ -63,7 +63,7 @@
 	  assert.equal(update_param_or_path('/ds1/', 'link'), false, 'param if next is a link');
 	  assert.equal(update_param_or_path('/'), false, 'path if next is the root dataset');
 	  assert.equal(update_param_or_path(), false, 'path if next null/undefined/empty');
-	  loc = sinon.stub().returns('/ds1');
+	  loc = sinon.stub().returns({pathname: '/ds1'});
 	  assert.equal(update_param_or_path('/ds1'), false, 'path if next is root of dataset at subfolder');
       });
       QUnit.test("Get Parameter by Name", function(assert) {
@@ -76,13 +76,20 @@
 	  assert.equal(getParameterByName('dir', 'example.com/d1/d2/d3'), null,
 		       'null if parameter does not exist');
       });
-      QUnit.test("jQuery Ajax", function (assert) {
+      QUnit.test("jQuery Ajax", function(assert) {
 	  sinon.spy(jQuery, "ajax");
 	  jQuery.getJSON("/some/resource");
 
 	  assert.ok(jQuery.ajax.calledOnce);
 	  assert.equal(jQuery.ajax.getCall(0).args[0].url, "/some/resource");
 	  assert.equal(jQuery.ajax.getCall(0).args[0].dataType, "json");
+      });
+      QUnit.test("Click Handler", function(assert) {
+	  loc = sinon.stub().returns({pathname: '/ds1/', href: '/ds1/?dir=/d1/'});
+	  assert.deepEqual(click_handler({name: '..', type: 'dir'}), {next: '/ds1/', type: 'assign'}, 'go to index.html root not domain root on param to path transition');
+	  assert.deepEqual(click_handler({name: '.', type: 'dir'}), {next: '?dir=/d1/', type: 'search'}, 'url does not change if click current node');
+	  assert.deepEqual(click_handler({name: 'ds2', type: 'annex'}), {next: '?dir=/d1/ds2', type: 'search'}, 'url does not change if click current node');
+	  assert.deepEqual(click_handler({name: 'd2', type: 'dir'}), {next: '?dir=/d1/d2', type: 'search'}, 'url does not change if click current node');
       });
     </script>
   </body>
