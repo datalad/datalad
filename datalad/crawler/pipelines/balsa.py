@@ -9,7 +9,10 @@
 
 """A pipeline for crawling BALSA datasets"""
 
+import json
 import os
+import re
+
 from shutil import rmtree
 from os import curdir, makedirs, rmdir
 from os.path import lexists, join as opj, abspath, exists, normpath
@@ -21,12 +24,11 @@ from ..nodes.matches import xpath_match, a_href_match
 from ..nodes.misc import assign, skip_if, find_files, continue_if
 from ..nodes.misc import debug
 from ..nodes.misc import sub, switch
-from ..nodes.misc import get_disposition_filename
 from ..nodes.annex import Annexificator
 from ...consts import ARCHIVES_SPECIAL_REMOTE, DATALAD_SPECIAL_REMOTE
-from datalad.utils import find_files as f_f, _path_
-from datalad.support.annexrepo import *
-from datalad.support.gitrepo import *
+from ...utils import find_files as f_f, _path_
+from ...utils import auto_repr
+from ...utils import updated
 
 from logging import getLogger
 lgr = getLogger("datalad.crawler.pipelines.balsa")
@@ -183,6 +185,13 @@ def pipeline(dataset_id, url=TOPURL):
 
     balsa = BalsaSupport(repo=annex.repo)
 
+    from datalad.downloaders.providers import Providers
+    providers = Providers.from_config_files()
+    balsa_downloader = providers.get_provider(url).get_downloader(url)
+
+    def get_disposition_filename(data):
+        yield updated(data, {'filename': balsa_downloader.get_status(data['url']).filename})
+
     # BALSA has no versioning atm, so no changelog either
     return [
         annex.switch_branch('incoming'),
@@ -213,6 +222,7 @@ def pipeline(dataset_id, url=TOPURL):
                     # so we could use it in our magical function
                     # because get_disposition will override it
                     assign({'target_filename': '%(filename)s'}, interpolate=True),
+                    get_disposition_filename,
                     fix_the_filename,
                     annex,
                 ],
