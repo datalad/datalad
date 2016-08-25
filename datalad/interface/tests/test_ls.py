@@ -211,6 +211,9 @@ def test_ls_json(topdir):
                     child_metahash = get_metahash(*subdir)
                     assert_equal(exists(opj(meta_path, child_metahash)), False)
 
+                # check if its updated in its nodes sublist too. used by web-ui json. regression test
+                assert_equal(ds['nodes'][0]['size']['total'], ds['size']['total'])
+
                 # check size of subdataset
                 subds = [item for item in ds['nodes'] if item['name'] == ('subdsfile.txt' or 'subds')][0]
                 assert_equal(subds['size']['total'], '3 Bytes')
