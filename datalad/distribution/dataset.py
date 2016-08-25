@@ -130,8 +130,8 @@ class Dataset(object):
         """
         if self._id is None:
             if self.repo:
-                self._id = self.repo.repo.config_reader().get_value(
-                    'annex', 'uuid', default='')
+                if hasattr(self.repo, 'uuid'):
+                    self._id = self.repo.uuid
                 if not self._id:
                     # no annex
                     self._id = '_:{}'.format(self.repo.get_hexsha())
