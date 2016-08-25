@@ -647,6 +647,7 @@ def ds_traverse(rootds, parent=None, json=None, recursive=False, all=False):
     # update current dataset sizes to the humanized aggregate subdataset sizes
     fs['size'] = {size_type: humanize.naturalsize(size)
                   for size_type, size in children_size.items()}
+    fs['nodes'][0]['size'] = fs['size']  # update self's updated size in nodes sublist too!
 
     # add dataset specific entries to its dict
     fs['tags'] = AnnexModel(rootds.repo).describe
