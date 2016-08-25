@@ -121,8 +121,8 @@ class Create(Interface):
             metavar='LABEL',
             action='append',
             constraints=EnsureStr() | EnsureNone(),
-            doc="""Metadata type label. Match match the name of the respective
-            parser implementation in Datalad (i.e. "bids").[CMD:  This option
+            doc="""Metadata type label. Must match the name of the respective
+            parser implementation in Datalad (e.g. "bids").[CMD:  This option
             can be given multiple times CMD]"""),
         git_opts=git_opts,
         annex_opts=annex_opts,
