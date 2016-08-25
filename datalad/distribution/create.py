@@ -14,6 +14,7 @@ import logging
 
 from os import listdir
 from os.path import isdir
+from os.path import realpath
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import git_opts
@@ -136,6 +137,8 @@ class Create(Interface):
             annex_opts=None,
             annex_init_opts=None):
 
+        if not isinstance(force, bool):
+            raise ValueError("force should be bool, got %r.  Did you mean to provide a 'path'?" % force)
         if path:
             if isinstance(path, Dataset):
                 ds = path

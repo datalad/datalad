@@ -96,7 +96,9 @@ def test_get_containing_subdataset(path):
     ds = create(path, force=True)
     ds.install(path='test.txt')
     ds.save("Initial commit")
-    subds = ds.install("sub", source=path)
+    sub_path = opj(path, "sub")
+    subds = create(sub_path, add_to_super=True)
+    # symlinks in path are evil!  TODO: unify one way or another
     eq_(get_containing_subdataset(ds, opj("sub", "some")).path, subds.path)
     eq_(get_containing_subdataset(ds, "some").path, ds.path)
     # make sure the subds is found, even when it is not present, but still
@@ -187,11 +189,13 @@ def test_install_dataset_from_just_source_via_path(url, path):
     ok_clean_git(ds.path, annex=False)
     assert_true(os.path.lexists(opj(ds.path, 'test-annex.dat')))
 
+
 @with_testrepos(flavors=['local-url', 'network', 'local'])
 @with_tempfile
 def test_install_into_dataset(source, top_path):
     ds = create(top_path)
-    subds = ds.install(path="sub", source=source)
+    # install is no longer doing "create" action, so test RFed to reflect that
+    subds = create(opj(top_path, 'sub'), add_to_super=True)
     assert_true(isdir(opj(subds.path, '.git')))
     ok_(subds.is_installed())
     # sub is clean:
@@ -221,7 +225,7 @@ def test_install_subdataset(src, path):
     assert_equal(set(subds.repo.get_indexed_files()),
                  {'test.dat', 'INFO.txt', 'test-annex.dat'})
 
-    # Now the obnoxious install an annex file within not yet
+    # Now the obnoxious install of an annex file within not yet
     # initialized repository!
     with swallow_outputs():  # progress bar
         ds.install(opj('subm 2', 'test-annex.dat'))

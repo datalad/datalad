@@ -15,7 +15,7 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
-    exists, islink, sep, realpath
+    exists, lexists, islink, sep, realpath
 
 from six.moves.urllib.parse import quote as urlquote
 
@@ -25,11 +25,12 @@ from datalad.cmd import Runner
 from datalad.distribution.dataset import Dataset, datasetmethod, \
     resolve_path, EnsureDataset
 from datalad.interface.base import Interface
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
-    FileNotInAnnexError
+from datalad.support.annexrepo import AnnexRepo, FileInGitError
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
     EnsureBool
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import FileNotInAnnexError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
@@ -229,7 +230,6 @@ def get_containing_subdataset(ds, path):
     -------
     Dataset
     """
-
     if is_explicit_path(path) and not path.startswith(ds.path):
         # TODO: - move to dataset class
         #       - have dedicated exception
@@ -427,7 +427,7 @@ class Install(Interface):
             if recursive:
                 if recursive == "data" and isinstance(ds.repo, AnnexRepo):
                     ds.repo.get('.')
-                for sm in ds.repo.get_submodules():
+                for sm in sorted(ds.repo.get_submodules()):
                     _install_subds_from_flexible_source(
                         ds, sm.path, sm.url, recursive=recursive)
             return ds
@@ -454,31 +454,29 @@ class Install(Interface):
         # at this point we know nothing about the
         # installation target
         ###################################################
+        #import pdb;
+        #pdb.set_trace()
         try:
             # it is simplest to let annex tell us what we are dealing with
-            lgr.debug("Trying to fetch file %s using annex", relativepath)
-            if not isinstance(vcs, AnnexRepo):
-                assert(isinstance(vcs, GitRepo))
-                # FLOW GUIDE
-                # this is not an annex repo, but we raise exceptions
-                # to be able to treat them alike in the special case handling
-                # below
-                # TODO: inefficient to ask for all files, we need to check
-                # with GitRepo if it knows about the file
-                if relativepath in vcs.get_indexed_files():
-                    # relativepath is in git
-                    raise FileInGitError("We need to handle it as known to git")
-                else:
-                    raise FileNotInAnnexError("We don't have yet annex repo here")
-            if vcs.get_file_key(relativepath):
-                # FLOW GUIDE EXIT POINT
-                # this is an annex'ed file -> get it
-                # TODO implement `copy --from` using `source`
-                # TODO fail if `source` is something strange
-                vcs.get(relativepath)
-                # return the absolute path to the installed file
-                return path
+            lgr.debug("Checking %r for belonging to git or annex", relativepath)
+            try:
+                if isinstance(vcs, AnnexRepo) and lexists(path) and vcs.get_file_key(relativepath):
+                    lgr.debug("Trying to 'get' file %s using annex", relativepath)
+                    # FLOW GUIDE
+                    # this is an annex'ed file -> get it
+                    # TODO implement `copy --from` using `source`
+                    # TODO fail if `source` is something strange
+                    vcs.get(relativepath)
+                    # return the absolute path to the installed file
+                    return path
+            except FileNotInAnnexError as exc:
+                lgr.debug("File is not under annex, let's see if under git at all")
 
+            if relativepath in vcs.get_indexed_files():
+                # relativepath is in git
+                raise FileInGitError("We need to handle it as known to git")
+            else:
+                raise FileNotInRepositoryError("Not in repository at all")
         except FileInGitError:
             ###################################################
             # FLOW GUIDE
@@ -513,7 +511,7 @@ class Install(Interface):
                 ds, submodule.path, submodule.url, recursive=recursive)
             return subds
 
-        except FileNotInAnnexError:
+        except FileNotInRepositoryError:
             ###################################################
             # FLOW GUIDE
             #
@@ -522,12 +520,17 @@ class Install(Interface):
             # - an untracked file in this dataset
             # - an entire untracked/unknown existing subdataset
             ###################################################
-            lgr.log(5, "FileNotInAnnexError logic")
+            lgr.log(5, "FileNotInRepositoryError logic")
             subds = get_containing_subdataset(ds, relativepath)
             if ds.path != subds.path:
                 # FLOW GUIDE EXIT POINT
                 # target path belongs to a known subdataset, hand
                 # installation over to it
+                # But first make sure subds is installed
+                ds.install(
+                    subds,
+                    recursive=recursive,
+                    add_data_to_git=add_data_to_git)
                 return subds.install(
                     path=relpath(path, start=subds.path),
                     source=source,
