@@ -9,7 +9,7 @@
 """BIDS metadata parser (http://bids.neuroimaging.io)"""
 
 from os.path import exists, join as opj
-from datalad.support.json import load as jsonload
+from datalad.support.json_py import load as jsonload
 from .. import _get_base_dataset_metadata
 
 # XXX Could become a class attribute

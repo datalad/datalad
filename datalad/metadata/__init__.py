@@ -15,7 +15,7 @@ from importlib import import_module
 from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
 from ..log import lgr
-from datalad.support.json import load as jsonload
+from datalad.support.json_py import load as jsonload
 
 
 # common format

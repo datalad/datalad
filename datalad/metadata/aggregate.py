@@ -22,7 +22,7 @@ from ..support.constraints import EnsureNone
 from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
     metadata_basepath, get_dataset_identifier
-from datalad.support.json import dump as jsondump
+from datalad.support.json_py import dump as jsondump
 
 
 def _store_json(path, meta):

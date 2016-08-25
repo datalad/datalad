@@ -11,7 +11,7 @@
 """
 
 from os.path import exists, join as opj
-from datalad.support.json import load as jsonload
+from datalad.support.json_py import load as jsonload
 from .. import _get_base_dataset_metadata
 
 _metadata_fname = 'datapackage.json'
