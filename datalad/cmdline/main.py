@@ -10,16 +10,17 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+lgr = logging.getLogger('datalad.cmdline')
+
+lgr.log(5, "Importing cmdline.main")
 
 import argparse
-import logging
 import sys
-import os
 import textwrap
 from importlib import import_module
 
 import datalad
-from datalad.log import lgr
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -51,9 +52,16 @@ THE SOFTWARE.
 """
 
 
+# TODO:  OPT look into making setup_parser smarter to become faster
+# Now it seems to take up to 200ms to do all the parser setup
+# even though it might not be necessary to know about all the commands etc.
+# I wondered if it could somehow decide on what commands to worry about etc
+# by going through sys.args first
 def setup_parser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False):
+
+    lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
         get_cmdline_command_name, alter_interface_docs_for_cmdline
@@ -121,6 +129,7 @@ def setup_parser(
 
         for _intfspec in _interfaces:
             # turn the interface spec into an instance
+            lgr.log(5, "Importing module %s " % _intfspec[0])
             _mod = import_module(_intfspec[0], package='datalad')
             _intf = getattr(_mod, _intfspec[1])
             cmd_name = get_cmdline_command_name(_intfspec)
@@ -189,6 +198,7 @@ def setup_parser(
     datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
     parts['datalad'] = parser
+    lgr.log(5, "Finished setup_parser")
     if return_subparsers:
         return parts
     else:
@@ -206,6 +216,7 @@ def setup_parser(
 
 
 def main(args=None):
+    lgr.log(5, "Starting main(%r)", args)
     # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser()
     try:
@@ -247,3 +258,5 @@ def main(args=None):
             sys.exit(1)
     if hasattr(cmdlineargs, 'result_renderer'):
         cmdlineargs.result_renderer(ret)
+
+lgr.log(5, "Done importing cmdline.main")

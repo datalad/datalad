@@ -39,6 +39,7 @@ from git.objects.blob import Blob
 
 from datalad import ssh_manager
 from datalad.cmd import Runner, GitRunner
+from datalad.dochelpers import exc_str
 from datalad.utils import optional_args
 from datalad.utils import on_windows
 from datalad.utils import getpwd
@@ -152,11 +153,6 @@ def _normalize_path(base_dir, path):
         # so realpath only its directory, to get "inline" with
         # realpath(base_dir) above
         path = opj(realpath(dirname(path)), basename(path))
-        if commonprefix([path, base_dir]) != base_dir:
-            raise FileNotInRepositoryError(msg="Path outside repository: %s"
-                                               % path, filename=path)
-        else:
-            pass
     # Executive decision was made to not do this kind of magic!
     #
     # elif commonprefix([realpath(getpwd()), base_dir]) == base_dir:
@@ -166,11 +162,15 @@ def _normalize_path(base_dir, path):
     # BUT with relative curdir/pardir start it would assume relative to curdir
     #
     elif path.startswith(_curdirsep) or path.startswith(_pardirsep):
-         path = opj(realpath(getpwd()), path)
+         path = normpath(opj(realpath(getpwd()), path))
     else:
         # We were called from outside the repo. Therefore relative paths
         # are interpreted as being relative to self.path already.
         return path
+
+    if commonprefix([path, base_dir]) != base_dir:
+        raise FileNotInRepositoryError(msg="Path outside repository: %s"
+                                           % path, filename=path)
 
     return relpath(path, start=base_dir)
 
@@ -201,7 +201,8 @@ def normalize_path(func):
 
 
 @optional_args
-def normalize_paths(func, match_return_type=True, map_filenames_back=False):
+def normalize_paths(func, match_return_type=True, map_filenames_back=False,
+                    serialize=False):
     """Decorator to provide unified path conversions.
 
     Note
@@ -232,6 +233,10 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
       If True and returned value is a dictionary, it assumes to carry entries
       one per file, and then filenames are mapped back to as provided from the
       normalized (from the root of the repo) paths
+    serialize : bool, optional
+      Loop through files giving only a single one to the function one at a time.
+      This allows to simplify implementation and interface to annex commands
+      which do not take multiple args in the same call (e.g. checkpresentkey)
     """
 
     @wraps(func)
@@ -269,7 +274,13 @@ def normalize_paths(func, match_return_type=True, map_filenames_back=False):
         else:
             remap_filenames = lambda x: x
 
-        result = func(self, files_new, *args, **kwargs)
+        if serialize: # and not single_file:
+            result = [
+                func(self, f, *args, **kwargs)
+                for f in files_new
+            ]
+        else:
+            result = func(self, files_new, *args, **kwargs)
 
         if single_file is None:
             # no files were provided, nothing we can do really
@@ -456,7 +467,7 @@ class GitRepo(object):
                                                   odbt=default_git_odbt,
                                                   **kwargs)
             except GitCommandError as e:
-                lgr.error(str(e))
+                lgr.error(exc_str(e))
                 raise
         else:
             try:
@@ -482,6 +493,17 @@ class GitRepo(object):
     def is_valid_repo(cls, path):
         """Returns if a given path points to a git repository"""
         return exists(opj(path, '.git', 'objects'))
+
+    def is_with_annex(self, only_remote=False):
+        """Return True if GitRepo (assumed) at the path has remotes with git-annex branch
+
+        Parameters
+        ----------
+        only_remote: bool, optional
+            Check only remote (no local branches) for having git-annex branch
+        """
+        return any((b.endswith('/git-annex') for b in self.get_remote_branches())) or \
+            ((not only_remote) and any((b == 'git-annex' for b in self.get_branches())))
 
     @classmethod
     def get_toppath(cls, path):
@@ -643,7 +665,7 @@ class GitRepo(object):
         if options:
             # we can't pass all possible options to gitpython's implementation
             # of commit. Therefore we need a direct call to git:
-            cmd = ['git', 'commit'] + (["-m", msg] if msg else []) + options
+            cmd = ['git', 'commit'] + (["-m", msg if msg else ""]) + options
             lgr.debug("Committing via direct call of git: %s" % cmd)
             self._git_custom_command([], cmd)
         else:
@@ -934,35 +956,42 @@ class GitRepo(object):
 
 # TODO: --------------------------------------------------------------------
 
-    def add_remote(self, name, url, options=''):
-        """
+    def add_remote(self, name, url, options=[]):
+        """Register remote pointing to a url
         """
 
-        return self._git_custom_command('', 'git remote add %s %s %s' %
-                                 (options, name, url))
+        return self._git_custom_command(
+            '', ['git', 'remote', 'add'] + options + [name, url]
+        )
 
     def remove_remote(self, name):
-        """
+        """Remove existing remote
         """
 
-        return self._git_custom_command('', 'git remote remove %s' % name)
+        return self._git_custom_command(
+            '', ['git', 'remote', 'remove', name]
+        )
 
     def show_remotes(self, name='', verbose=False):
         """
         """
 
-        v = "-v" if verbose else ""
-        out, err = self._git_custom_command('', 'git remote %s show %s' %
-                                            (v, name))
+        options = ["-v"] if verbose else []
+        name = [name] if name else []
+        out, err = self._git_custom_command(
+            '', ['git', 'remote'] + options + ['show'] + name
+        )
         return out.rstrip(linesep).splitlines()
 
-    def update_remote(self, name='', verbose=False):
+    def update_remote(self, name=None, verbose=False):
         """
         """
-
-        v = "-v" if verbose else ''
-        self._git_custom_command('', 'git remote %s update %s' % (name, v),
-                                 expect_stderr=True)
+        options = ["-v"] if verbose else []
+        name = [name] if name else []
+        self._git_custom_command(
+            '', ['git', 'remote'] + name + ['update'] + options,
+            expect_stderr=True
+        )
 
     # TODO: centralize all the c&p code in fetch, pull, push
     # TODO: document **kwargs passed to gitpython
@@ -1203,29 +1232,35 @@ class GitRepo(object):
                 return
             yield fvalue(c)
 
-    def checkout(self, name, options=''):
+    def checkout(self, name, options=[]):
         """
         """
         # TODO: May be check for the need of -b options herein?
 
-        self._git_custom_command('', 'git checkout %s %s' % (options, name),
-                                 expect_stderr=True)
+        self._git_custom_command(
+            '', ['git', 'checkout'] + options + [str(name)],
+            expect_stderr=True
+        )
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
     def merge(self, name, options=[], msg=None, **kwargs):
         if msg:
             options = options + ["-m", msg]
-        self._git_custom_command('', ['git', 'merge'] + options + [name],
-                                 **kwargs)
+        self._git_custom_command(
+            '', ['git', 'merge'] + options + [name],
+            **kwargs
+        )
 
     def remove_branch(self, branch):
-        self._git_custom_command('', 'git branch -D %s' % branch)
+        self._git_custom_command(
+            '', ['git', 'branch', '-D', branch]
+        )
 
-    def ls_remote(self, remote, options=None):
-        self._git_custom_command('', 'git ls-remote %s %s' %
-                                 (options if options is not None else '',
-                                  remote))
+    def ls_remote(self, remote, options=[]):
+        self._git_custom_command(
+            '', ['git', 'ls-remote'] + options + [remote]
+        )
         # TODO: Return values?
     
     @property
@@ -1353,7 +1388,9 @@ class GitRepo(object):
           Custom tag label.
         """
         # TODO later to be extended with tagging particular commits and signing
-        self._git_custom_command('', 'git tag "{0}"'.format(tag))
+        self._git_custom_command(
+            '', ['git', 'tag', str(tag)]
+        )
 
     def get_tracking_branch(self, branch=None):
         """Get the tracking branch for `branch` if there is any.

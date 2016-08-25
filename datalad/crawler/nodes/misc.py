@@ -13,6 +13,7 @@ import inspect
 import os
 import re
 import stat
+import pdb
 
 from stat import ST_MODE, S_IEXEC, S_IXOTH, S_IXGRP
 from os.path import curdir, isdir, isabs, exists, join as opj, split as ops
@@ -451,14 +452,23 @@ class find_files(object):
 @auto_repr
 class switch(object):
     """Helper node which would decide which sub-pipeline/node to execute based on values in data
+
+
+    Example
+    -------
+
+    TODO
     """
 
-    def __init__(self, key, mapping, default=None, missing='raise'):
+    def __init__(self, key, mapping, default=None, missing='raise', re=False):
         """
         Parameters
         ----------
         key: str
         mapping: dict
+        re: bool, optional
+          Either mapping keys define the regular expressions.  Note that in case
+          multiple regular expressions match, all of them would "work it"
         default: node or pipeline, optional
           Node or pipeline to use if no mapping was found
         missing: ('raise', 'stop', 'skip'), optional
@@ -470,7 +480,9 @@ class switch(object):
         """
         self.key = key
         self.mapping = mapping
-        self.missing = missing
+        self.re = re
+        # trying self.missing assigning just for the sake of auto_repr
+        self.missing = self._missing = missing
         self.default = default
 
     @property
@@ -484,29 +496,85 @@ class switch(object):
 
     def __call__(self, data):
         # make decision which sub-pipeline
-        try:
-            pipeline = self.mapping[data[self.key]]
-        except KeyError:
+
+        key_value = data[self.key]
+        if not self.re:
+            try:
+                pipelines = [self.mapping[key_value]]
+            except KeyError:
+                pipelines = []
+        else:
+            # find all the matches
+            pipelines = [
+                pipeline
+                for regex, pipeline in self.mapping.items()
+                if re.match(regex, key_value)
+            ]
+
+        if not pipelines:  # None has matched
             if self.default is not None:
-                pipeline = self.default
+                pipelines = [self.default]
             elif self.missing == 'raise':
-                raise
+                raise KeyError(
+                    "Found no matches for %s == %r %s %r" % (
+                    self.key,
+                    key_value,
+                    "matching one of" if self.re else "among specified",
+                    list(self.mapping.keys()))
+                )
             elif self.missing == 'skip':
                 yield data
                 return
             elif self.missing == 'stop':
                 return
 
-        if pipeline is None:
-            yield data
-            return
+        for pipeline in pipelines:
+            if pipeline is None:
+                yield data
+                return
 
-        if not isinstance(pipeline, PIPELINE_TYPES):
-            # it was a node, return its output
-            gen = pipeline(data)
-        else:
-            gen = xrun_pipeline(pipeline, data)
+            if not isinstance(pipeline, PIPELINE_TYPES):
+                # it was a node, return its output
+                gen = pipeline(data)
+            else:
+                gen = xrun_pipeline(pipeline, data)
 
-        # run and yield each result
-        for out in gen:
+            # run and yield each result
+            for out in gen:
+                yield out
+
+
+@auto_repr
+class debug(object):
+    """Helper node to fall into debugger (pdb for now) whenever node is called"""
+
+    def __init__(self, node, when='before'):
+        """
+        Parameters
+        ----------
+        node: callable
+        when: str, optional
+          Determines when to enter the debugger:
+          - before: right before running the node
+          - after: after it was ran
+          - empty: when node produced no output
+        """
+        self.node = node
+        self.when = when
+
+    def __call__(self, data):
+        node = self.node
+        when = self.when
+        if when == 'before':
+            lgr.info("About to run %s node", node)
+            pdb.set_trace()
+
+        n = 0
+        for out in node(data):
+            n += 1
             yield out
+
+        if when == 'after' or (when == 'empty' and n == 0):
+            lgr.info("Ran node %s which yielded %d times", node, n)
+            pdb.set_trace()
+

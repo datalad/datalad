@@ -10,6 +10,7 @@
 
 """
 
+from functools import partial
 from os import mkdir
 
 from six.moves.urllib.parse import urljoin
@@ -35,7 +36,7 @@ def test_AnnexRepo_instance_from_clone(src, dst):
 
     # do it again should raise GitCommandError since git will notice
     # there's already a git-repo at that path and therefore can't clone to `dst`
-    with swallow_logs() as cm:
+    with swallow_logs(new_level=logging.WARN) as cm:
         assert_raises(GitCommandError, AnnexRepo, dst, src)
         if git.__version__ != "1.0.2" and git.__version__ != "2.0.5":
             assert("already exists" in cm.out)
@@ -153,8 +154,6 @@ def test_AnnexRepo_annex_proxy(src, annex_path):
         pass
 
 
-
-
 @assert_cwd_unchanged
 @with_testrepos('.*annex.*', flavors=local_testrepo_flavors)
 @with_tempfile
@@ -178,22 +177,24 @@ def test_AnnexRepo_get_file_key(src, annex_path):
 
 
 # 1 is enough to test file_has_content
+@with_batch_direct
 @with_testrepos('.*annex.*', flavors=['local'], count=1)
 @with_tempfile
-def test_AnnexRepo_file_has_content(src, annex_path):
-    ar = AnnexRepo(annex_path, src)
+def test_AnnexRepo_file_has_content(batch, direct, src, annex_path):
+    ar = AnnexRepo(annex_path, src, direct=direct)
     testfiles = ["test-annex.dat", "test.dat"]
+
     assert_equal(ar.file_has_content(testfiles), [False, False])
 
     ok_annex_get(ar, "test-annex.dat")
-    assert_equal(ar.file_has_content(testfiles), [True, False])
-    assert_equal(ar.file_has_content(testfiles[:1]), [True])
+    assert_equal(ar.file_has_content(testfiles, batch=batch), [True, False])
+    assert_equal(ar.file_has_content(testfiles[:1], batch=batch), [True])
 
-    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"]),
+    assert_equal(ar.file_has_content(testfiles + ["bogus.txt"], batch=batch),
                  [True, False, False])
 
-    assert_false(ar.file_has_content("bogus.txt"))
-    assert_true(ar.file_has_content("test-annex.dat"))
+    assert_false(ar.file_has_content("bogus.txt", batch=batch))
+    assert_true(ar.file_has_content("test-annex.dat", batch=batch))
 
 
 # 1 is enough to test
@@ -1072,3 +1073,39 @@ def test_annex_remove(path1, path2):
         assert_not_in("rm-test.dat", repo.get_annexed_files())
         eq_(out[0], "rm-test.dat")
 
+
+@with_batch_direct
+@with_testrepos('basic_annex', flavors=['clone'], count=1)
+def test_is_available(batch, direct, p):
+    annex = AnnexRepo(p)
+
+    # bkw = {'batch': batch}
+    if batch:
+        is_available = partial(annex.is_available, batch=batch)
+    else:
+        is_available = annex.is_available
+
+    fname = 'test-annex.dat'
+    key = annex.get_file_key(fname)
+
+    # explicit is to verify data type etc
+    assert is_available(key, key=True) is True
+    assert is_available(fname) is True
+
+    # known remote but doesn't have it
+    assert is_available(fname, remote='origin') is False
+    # it is on the 'web'
+    assert is_available(fname, remote='web') is True
+    # not effective somehow :-/  may be the process already running or smth
+    #with swallow_logs(), swallow_outputs():  # it will complain!
+    assert is_available(fname, remote='unknown') is False
+    assert_false(is_available("boguskey", key=True))
+
+    # remove url
+    urls = annex.get_urls(fname) #, **bkw)
+    assert(len(urls) == 1)
+    annex.rm_url(fname, urls[0])
+
+    assert is_available(key, key=True) is False
+    assert is_available(fname) is False
+    assert is_available(fname, remote='web') is False

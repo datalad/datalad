@@ -17,6 +17,7 @@ from six import PY3
 
 from ...utils import updated
 from ...support.network import dlurljoin
+from ...utils import auto_repr
 
 from logging import getLogger
 lgr = getLogger('datalad.crawler')
@@ -33,6 +34,7 @@ except ImportError:
 
 # for now heavily based on scrapy but we might make the backend
 # replaceable
+@auto_repr
 class ExtractorMatch(object):
     """Generic matching extractor
     """
@@ -40,7 +42,9 @@ class ExtractorMatch(object):
     def __init__(self, query, input='response', output='match', pop_input=False,
                  allow_multiple=False, xpaths=None, csss=None, min_count=None,
                  max_count=None):
-        self._query = query
+        """"""
+        # TODO: define arguments
+        self.query = query
         # allow_multiple concerns only extraction of additional xpaths and csss
         self._allow_multiple = allow_multiple
         self._xpaths = xpaths
@@ -66,7 +70,7 @@ class ExtractorMatch(object):
             selector = Selector(text=input)
 
         count = 0
-        for entry, data_ in self._select_and_extract(selector, self._query, data):
+        for entry, data_ in self._select_and_extract(selector, self.query, data):
             data_ = updated(data_, {self._output: entry.extract()})
             # now get associated xpaths, css, etc
             for selectors_dict, entry_method in ((self._xpaths, entry.xpath),

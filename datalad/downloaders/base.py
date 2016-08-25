@@ -18,7 +18,8 @@ import time
 
 from abc import ABCMeta, abstractmethod, abstractproperty
 from os.path import exists, join as opj, isdir
-from six import string_types, PY2
+from six import PY2
+from six import binary_type, PY3
 
 
 from .. import cfg
@@ -26,9 +27,32 @@ from ..ui import ui
 from ..utils import auto_repr
 from ..dochelpers import exc_str
 from ..dochelpers import borrowkwargs
+from .credentials import CREDENTIAL_TYPES
 
 from logging import getLogger
 lgr = getLogger('datalad.downloaders')
+
+
+# TODO: remove headers, HTTP specific
+@auto_repr
+class DownloaderSession(object):
+    """Base class to encapsulate information and possibly a session to download the content
+
+    The idea is that corresponding downloader provides all necessary
+    information and if necessary some kind of session to facilitate
+    .download method
+    """
+
+    def __init__(self, size=None, filename=None, url=None, headers=None):
+        self.size = size
+        self.filename = filename
+        self.headers = headers
+        self.url = url
+
+    def download(self, f=None, pbar=None, size=None):
+        raise NotImplementedError("must be implemented in subclases")
+
+        # TODO: get_status ?
 
 
 @auto_repr
@@ -50,22 +74,30 @@ class BaseDownloader(object):
         authenticator: Authenticator, optional
           Authenticator to use for authentication.
         """
-        self.credential = credential
         if not authenticator and self._DEFAULT_AUTHENTICATOR:
             authenticator = self._DEFAULT_AUTHENTICATOR()
 
         if authenticator:
             if not credential:
-                raise ValueError(
-                    "Both authenticator and credentials must be provided."
-                    " Got only authenticator %s" % repr(authenticator))
-
+                msg = "Both authenticator and credentials must be provided." \
+                      " Got only authenticator %s" % repr(authenticator)
+                if ui.yesno(
+                    title=msg,
+                    text="Do you want to enter %s credentials to be used?" % authenticator.DEFAULT_CREDENTIAL_TYPE
+                ):
+                    credential = CREDENTIAL_TYPES[authenticator.DEFAULT_CREDENTIAL_TYPE](
+                        "session-only-for-%s" % id(authenticator))
+                    credential.enter_new()
+                    # TODO: give an option to store those credentials, and generate a basic provider
+                    # record?
+                else:
+                    raise ValueError(msg)
+        self.credential = credential
         self.authenticator = authenticator
         self._cache = None  # for fetches, not downloads
 
-
-    def _access(self, method, url, allow_old_session=True, **kwargs):
-        """Fetch content as pointed by the URL optionally into a file
+    def access(self, method, url, allow_old_session=True, **kwargs):
+        """Generic decorator to manage access to the URL via some method
 
         Parameters
         ----------
@@ -166,7 +198,7 @@ class BaseDownloader(object):
         return filepath + ".datalad-download-temp"
 
     @abstractmethod
-    def _get_download_details(self, url):
+    def get_downloader_session(self, url):
         """
 
         Parameters
@@ -177,9 +209,11 @@ class BaseDownloader(object):
         -------
         downloader_into_fp: callable
            Which takes two parameters: file, pbar
-        target_size: int or None (if uknown)
+        target_size: int or None (if unknown)
+        url: str
+           Possibly redirected url
         url_filename: str or None
-           Filename as decided from the url
+           Filename as decided from the (redirected) url
         headers : dict or None
         """
         raise NotImplementedError("Must be implemented in the subclass")
@@ -195,7 +229,7 @@ class BaseDownloader(object):
 
             if file_:
                 with open(file_) as fp:
-                    content = fp.read()
+                    content = fp.read(self._DOWNLOAD_SIZE_TO_VERIFY_AUTH)
             else:
                 assert(content is not None)
 
@@ -205,7 +239,6 @@ class BaseDownloader(object):
         if target_size and target_size != downloaded_size:
             raise IncompleteDownloadError("Downloaded size %d differs from originally announced %d"
                                           % (downloaded_size, target_size))
-
 
     def _download(self, url, path=None, overwrite=False, size=None, stats=None):
         """Download content into a file
@@ -227,9 +260,10 @@ class BaseDownloader(object):
 
         """
 
-        downloader, target_size, url_filename, headers = self._get_download_details(url)
-        status = self.get_status_from_headers(headers)
+        downloader_session = self.get_downloader_session(url)
+        status = self.get_status_from_headers(downloader_session.headers)
 
+        target_size = downloader_session.size
         if size is not None:
             target_size = min(target_size, size)
 
@@ -237,12 +271,12 @@ class BaseDownloader(object):
         if path:
             if isdir(path):
                 # provided path is a directory under which to save
-                filename = url_filename
+                filename = downloader_session.filename
                 filepath = opj(path, filename)
             else:
                 filepath = path
         else:
-            filepath = url_filename
+            filepath = downloader_session.filename
 
         existed = exists(filepath)
         if existed and not overwrite:
@@ -264,7 +298,7 @@ class BaseDownloader(object):
                 # Consider to improve to make it animated as well, or shorten here
                 pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
                 t0 = time.time()
-                downloader(fp, pbar, size=size)
+                downloader_session.download(fp, pbar, size=size)
                 downloaded_time = time.time() - t0
                 pbar.finish()
             downloaded_size = os.stat(temp_filepath).st_size
@@ -322,8 +356,7 @@ class BaseDownloader(object):
         # but then it might require sending request anyways for Content-Disposition
         # so probably nah
         lgr.info("Downloading %r into %r", url, path)
-        return self._access(self._download, url, path=path, **kwargs)
-
+        return self.access(self._download, url, path=path, **kwargs)
 
     @property
     def cache(self):
@@ -344,7 +377,6 @@ class BaseDownloader(object):
             import atexit
             atexit.register(self._cache.close)
         return self._cache
-
 
     def _fetch(self, url, cache=None, size=None, allow_redirects=True):
         """Fetch content from a url into a file.
@@ -379,21 +411,26 @@ class BaseDownloader(object):
                     lgr.warning("Failed to unpack loaded from cache for %s: %s",
                                 url, exc_str(exc))
 
-        downloader, target_size, url_filename, headers = self._get_download_details(url, allow_redirects=allow_redirects)
+        downloader_session = self.get_downloader_session(url, allow_redirects=allow_redirects)
 
+        target_size = downloader_session.size
         if size is not None:
             if size == 0:
                 # no download of the content was requested -- just return headers and be done
-                return None, headers
+                return None, downloader_session.headers
             target_size = min(size, target_size)
 
         # FETCH CONTENT
         try:
             # Consider to improve to make it animated as well, or shorten here
             #pbar = ui.get_progressbar(label=url, fill_text=filepath, maxval=target_size)
-            content = downloader(size=size)
+            content = downloader_session.download(size=size)
             #pbar.finish()
             downloaded_size = len(content)
+
+            # now that we know size based on encoded content, let's decode into string type
+            if PY3 and isinstance(content, binary_type):
+                content = content.decode()
             # downloaded_size = os.stat(temp_filepath).st_size
 
             self._verify_download(url, downloaded_size, target_size, None, content=content)
@@ -409,10 +446,9 @@ class BaseDownloader(object):
             # apparently requests' CaseInsensitiveDict is not serialazable
             # TODO:  may be we should reuse that type everywhere, to avoid
             # out own handling for case-handling
-            self.cache[cache_key] = msgpack.dumps((content, dict(headers)))
+            self.cache[cache_key] = msgpack.dumps((content, dict(downloader_session.headers)))
 
-        return content, headers
-
+        return content, downloader_session.headers
 
     def fetch(self, url, **kwargs):
         """Fetch and return content (not decoded) as pointed by the URL
@@ -429,10 +465,9 @@ class BaseDownloader(object):
         """
         lgr.info("Fetching %r", url)
         # Do not return headers, just content
-        out = self._access(self._fetch, url, **kwargs)
+        out = self.access(self._fetch, url, **kwargs)
         # import pdb; pdb.set_trace()
         return out[0]
-
 
     def get_status(self, url, old_status=None, **kwargs):
         """Return status of the url as a dict, None if N/A
@@ -454,8 +489,7 @@ class BaseDownloader(object):
           has changed by comparing to previously obtained value.
           If URL is not reachable, None would be returned
         """
-        return self._access(self._get_status, url, old_status=old_status, **kwargs)
-
+        return self.access(self._get_status, url, old_status=old_status, **kwargs)
 
     # TODO: borrow from itself... ?
     # @borrowkwargs(BaseDownloader, 'get_status')
@@ -484,6 +518,24 @@ class BaseDownloader(object):
     def get_status_from_headers(cls, headers):
         raise NotImplementedError("Implement in the subclass: %s" % cls)
 
+    def get_target_url(self, url):
+        """Return url after possible redirections
+
+        Parameters
+        ----------
+        url : string
+          URL to access
+
+        Returns
+        -------
+        str
+        """
+        return self.access(self._get_target_url, url)
+
+    def _get_target_url(self, url):
+        return self.get_downloader_session(url).url
+
+
 # Exceptions.  might migrate elsewhere
 from ..support.exceptions import *
 
@@ -499,6 +551,8 @@ class Authenticator(object):
     """
     requires_authentication = True
     # TODO: figure out interface
+
+    DEFAULT_CREDENTIAL_TYPE = 'user_password'
 
     def authenticate(self, *args, **kwargs):
         """Derived classes will provide specific implementation

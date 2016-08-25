@@ -12,13 +12,20 @@
 
 __docformat__ = 'restructuredtext'
 
+from logging import getLogger
+lgr = getLogger('datalad.ui.dialog')
+
+lgr.log(5, "Starting importing ui.dialog")
+
 import os
 import sys
 import time
 
 from six import PY2
 import getpass
-from mock import patch
+
+#!!! OPT adds >100ms to import time!!!
+# from mock import patch
 from collections import deque
 from copy import copy
 
@@ -111,6 +118,7 @@ def getpass_echo(prompt='Password: ', stream=None):
         #     if out == '\n':
         #         return
         #     stream.write(out)
+        from mock import patch
         with patch('termios.ECHO', 255**2):
             #patch.object(stream, 'write', _no_emptyline_write(stream)):
             return getpass.getpass(prompt=prompt, stream=stream)
@@ -248,3 +256,5 @@ class UnderTestsUI(DialogUI):
         self.clear_responses()
         assert not len(responses), \
             "Still have some responses left: %s" % repr(self._responses)
+
+lgr.log(5, "Done importing ui.dialog")

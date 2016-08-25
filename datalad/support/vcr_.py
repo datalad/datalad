@@ -58,6 +58,10 @@ try:
         else:
             return _use_cassette(path, **kwargs)  # just a straight one
 
+    # shush vcr
+    vcr_lgr = logging.getLogger('vcr')
+    if lgr.getEffectiveLevel() > logging.DEBUG:
+        vcr_lgr.setLevel(logging.WARN)
 except Exception as exc:
     if not isinstance(exc, ImportError):
         # something else went hairy (e.g. vcr failed to import boto due to some syntax error)

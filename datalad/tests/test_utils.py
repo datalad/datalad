@@ -17,6 +17,7 @@ import logging
 from mock import patch
 from six import PY3
 
+from operator import itemgetter
 from os.path import dirname, normpath, pardir, basename
 from os.path import isabs, expandvars, expanduser
 from collections import OrderedDict
@@ -34,6 +35,11 @@ from ..utils import file_basename
 from ..utils import expandpath, is_explicit_path
 from ..utils import knows_annex
 from ..utils import any_re_search
+from ..utils import unique
+from ..utils import get_func_kwargs_doc
+from ..utils import make_tempfile
+from ..utils import on_windows
+from ..utils import _path_
 from ..support.annexrepo import AnnexRepo
 
 from nose.tools import ok_, eq_, assert_false, assert_equal, assert_true
@@ -47,6 +53,12 @@ from .utils import assert_not_in
 from .utils import assert_raises
 from .utils import ok_startswith
 from .utils import skip_if_no_module
+
+
+def test_get_func_kwargs_doc():
+    from datalad.crawler.pipelines.openfmri import pipeline
+    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth', 'prefix']
+    eq_(get_func_kwargs_doc(pipeline), output)
 
 
 @with_tempfile(mkdir=True)
@@ -375,9 +387,36 @@ def test_is_explicit_path():
 def test_knows_annex(here, there):
     from datalad.support.gitrepo import GitRepo
     from datalad.support.annexrepo import AnnexRepo
-    git = GitRepo(path=here, create=True)
+    GitRepo(path=here, create=True)
     assert_false(knows_annex(here))
-    annex = AnnexRepo(path=here, create=True)
+    AnnexRepo(path=here, create=True)
     assert_true(knows_annex(here))
-    gitclone = GitRepo(path=there, url=here, create=True)
+    GitRepo(path=there, url=here, create=True)
     assert_true(knows_annex(there))
+
+
+def test_make_tempfile():
+    # check if mkdir, content conflict caught
+    with assert_raises(ValueError):
+        with make_tempfile(content="blah", mkdir=True):  # pragma: no cover
+            pass
+
+
+def test_unique():
+    eq_(unique(range(3)), [0, 1, 2])
+    eq_(unique((1, 0, 1, 3, 2, 0, 1)), [1, 0, 3, 2])
+    eq_(unique([]), [])
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)]), [(1, 2), (1,), (0, 3)])
+
+    # with a key now
+    eq_(unique([(1, 2), (1,), (1, 2), (0, 3)], key=itemgetter(0)), [(1, 2), (0, 3)])
+    eq_(unique([(1, 2), (1, 3), (1, 2), (0, 3)], key=itemgetter(1)), [(1, 2), (1, 3)])
+
+
+def test_path_():
+    eq_(_path_('a'), 'a')
+    if on_windows:
+        eq_(_path_('a/b'), r'a\b')
+    else:
+        p = 'a/b/c'
+        assert(_path_(p) is p)  # nothing is done to it whatsoever

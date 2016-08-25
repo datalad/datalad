@@ -48,11 +48,11 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     res = publish(dataset=source, to="target")
-    eq_(res, [source])
+    eq_(res, ([source], []))
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
@@ -61,7 +61,7 @@ def test_publish_simple(origin, src_path, dst_path):
 
     # don't fail when doing it again
     res = publish(dataset=source, to="target")
-    eq_(res, [source])
+    eq_(res, ([source], []))
 
     ok_clean_git(src_path, annex=False)
     ok_clean_git(dst_path, annex=False)
@@ -81,7 +81,7 @@ def test_publish_simple(origin, src_path, dst_path):
     ok_clean_git(src_path, annex=False)
 
     res = publish(dataset=source)
-    eq_(res, [source])
+    eq_(res, ([source], []))
 
     ok_clean_git(dst_path, annex=False)
     eq_(list(target.get_branch_commits("master")),
@@ -106,7 +106,7 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # create plain git at target:
     target = GitRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     # subdatasets have no remote yet, so recursive publishing should fail:
@@ -116,11 +116,11 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
-    sub1_target.checkout("TMP", "-b")
+    sub1_target.checkout("TMP", ["-b"])
     sub2_target = GitRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", "-b")
-    sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
+    sub2_target.checkout("TMP", ["-b"])
+    sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
+    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -129,10 +129,13 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # testing result list
     # (Note: Dataset lacks __eq__ for now. Should this be based on path only?)
-    assert_is_instance(res, list)
-    for item in res:
+    assert_is_instance(res, tuple)
+    assert_is_instance(res[0], list)
+    assert_is_instance(res[1], list)
+    eq_(res[1], [])  # nothing failed/was skipped
+    for item in res[0]:
         assert_is_instance(item, Dataset)
-    eq_({res[0].path, res[1].path, res[2].path},
+    eq_({res[0][0].path, res[0][1].path, res[0][2].path},
         {src_path, sub1.path, sub2.path})
 
     eq_(list(target.get_branch_commits("master")),
@@ -147,6 +150,28 @@ def test_publish_recursive(origin, src_path, dst_path, sub1_pub, sub2_pub):
         list(sub2.get_branch_commits("master")))
     eq_(list(sub2_target.get_branch_commits("git-annex")),
         list(sub2.get_branch_commits("git-annex")))
+
+    # test for publishing with  --since.  By default since no changes, only current pushed
+    res_ = publish(dataset=source, recursive=True)
+    # only current one would get pushed
+    eq_(set(r.path for r in res_[0]), {src_path})
+
+    # all get pushed
+    res_ = publish(dataset=source, recursive=True, since='HEAD^')
+    eq_(set(r.path for r in res_[0]), {src_path, sub1.path, sub2.path})
+
+    # Let's now update one subm
+    with open(opj(sub2.path, "file.txt"), 'w') as f:
+        f.write('')
+    sub2.add('file.txt')
+    sub2.commit("")
+    # TODO: Doesn't work:  https://github.com/datalad/datalad/issues/636
+    #source.save("changed sub2", auto_add_changes=True)
+    source.repo.commit("", options=['-a'])
+
+    res_ = publish(dataset=source, recursive=True)
+    # only updated ones were published
+    eq_(set(r.path for r in res_[0]), {src_path, sub2.path})
 
 
 @with_testrepos('submodule_annex', flavors=['local'])  #TODO: Use all repos after fixing them
@@ -166,16 +191,16 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # create plain git at target:
     target = AnnexRepo(dst_path, create=True)
-    target.checkout("TMP", "-b")
+    target.checkout("TMP", ["-b"])
     source.repo.add_remote("target", dst_path)
 
     # now, set up targets for the submodules:
     sub1_target = GitRepo(sub1_pub, create=True)
-    sub1_target.checkout("TMP", "-b")
+    sub1_target.checkout("TMP", ["-b"])
     sub2_target = GitRepo(sub2_pub, create=True)
-    sub2_target.checkout("TMP", "-b")
-    sub1 = GitRepo(opj(src_path, 'sub1'), create=False)
-    sub2 = GitRepo(opj(src_path, 'sub2'), create=False)
+    sub2_target.checkout("TMP", ["-b"])
+    sub1 = GitRepo(opj(src_path, 'subm 1'), create=False)
+    sub2 = GitRepo(opj(src_path, 'subm 2'), create=False)
     sub1.add_remote("target", sub1_pub)
     sub2.add_remote("target", sub2_pub)
 
@@ -187,7 +212,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
     source.repo.fetch("target")
 
     res = publish(dataset=source, to="target", path=['test-annex.dat'])
-    eq_(res, [source, 'test-annex.dat'])
+    eq_(res, ([source, 'test-annex.dat'], []))
 
     eq_(list(target.get_branch_commits("master")),
         list(source.repo.get_branch_commits("master")))
@@ -202,7 +227,7 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     source.repo.fetch("target")
     res = publish(dataset=source, to="target", path=['.'])
-    eq_(res, [source, 'test-annex.dat'])
+    eq_(res, ([source, 'test-annex.dat'], []))
 
     source.repo.fetch("target")
     import glob
@@ -212,11 +237,11 @@ def test_publish_with_data(origin, src_path, dst_path, sub1_pub, sub2_pub):
 
     # collect result paths:
     result_paths = []
-    for item in res:
+    for item in res[0]:
         if isinstance(item, Dataset):
             result_paths.append(item.path)
         else:
             result_paths.append(item)
-    eq_({source.path, opj(source.path, "sub1"),
-         opj(source.path, "sub2"), 'test-annex.dat'},
+    eq_({source.path, opj(source.path, "subm 1"),
+         opj(source.path, "subm 2"), 'test-annex.dat'},
         set(result_paths))

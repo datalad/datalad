@@ -14,7 +14,7 @@ import time
 
 from os.path import curdir, basename, exists, realpath, islink, join as opj, isabs, normpath, expandvars, expanduser, abspath
 from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote, urlsplit
-from six import text_type
+from six import text_type, binary_type
 
 import logging
 import shutil
@@ -24,9 +24,12 @@ import sys
 import tempfile
 import platform
 import gc
+import glob
 
 from functools import wraps
 from time import sleep
+from inspect import getargspec
+from datalad.dochelpers import get_docstring_split
 
 lgr = logging.getLogger("datalad.utils")
 
@@ -49,6 +52,25 @@ except:  # pragma: no cover
 #
 # Little helpers
 #
+
+
+def get_func_kwargs_doc(func):
+    """ Provides args for a function
+    
+    Parameters
+    ----------
+    func: str
+      name of the function from which args are being requested
+
+    Returns
+    -------
+    list
+      of the args that a function takes in
+    """
+    return getargspec(func)[0]
+
+    # TODO: format error message with descriptions of args
+    # return [repr(dict(get_docstring_split(func)[1]).get(x)) for x in getargspec(func)[0]]
 
 
 def assure_tuple_or_list(obj):
@@ -128,10 +150,14 @@ def is_interactive():
     #
     return sys.stdin.isatty() and sys.stdout.isatty() and sys.stderr.isatty()
 
+
 import hashlib
+
+
 def md5sum(filename):
     with open(filename, 'rb') as f:
         return hashlib.md5(f.read()).hexdigest()
+
 
 def sorted_files(dout):
     """Return a (sorted) list of files under dout
@@ -141,9 +167,11 @@ def sorted_files(dout):
                        if not '.git' in r], []))
 
 from os.path import sep as dirsep
-_VCS_REGEX = '%s\.(git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_VCS_REGEX = '%s\.(?:git|gitattributes|svn|bzr|hg)(?:%s|$)' % (dirsep, dirsep)
+_DATALAD_REGEX = '%s\.(?:datalad)(?:%s|$)' % (dirsep, dirsep)
 
-def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False):
+
+def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, exclude_datalad=False, dirs=False):
     """Generator to find files matching regex
 
     Parameters
@@ -154,11 +182,14 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
     exclude_vcs:
       If True, excludes commonly known VCS subdirectories.  If string, used
       as regex to exclude those files (regex: %r)
+    exclude_datalad:
+      If True, excludes files known to be datalad meta-data files (e.g. under
+      .datalad/ subdirectory) (regex: %r)
     topdir: basestring, optional
       Directory where to search
     dirs: bool, optional
       Either to match directories as well as files
-    """ % _VCS_REGEX
+    """ % (_VCS_REGEX, _DATALAD_REGEX)
 
     for dirpath, dirnames, filenames in os.walk(topdir):
         names = (dirnames + filenames) if dirs else filenames
@@ -169,6 +200,8 @@ def find_files(regex, topdir=curdir, exclude=None, exclude_vcs=True, dirs=False)
             if exclude and re.search(exclude, path):
                 continue
             if exclude_vcs and re.search(_VCS_REGEX, path):
+                continue
+            if exclude_datalad and re.search(_DATALAD_REGEX, path):
                 continue
             yield path
 
@@ -288,12 +321,14 @@ def file_basename(name, return_ext=False):
     else:
         return fbname
 
+
 def escape_filename(filename):
     """Surround filename in "" and escape " in the filename
     """
     filename = filename.replace('"', r'\"').replace('`', r'\`')
     filename = '"%s"' % filename
     return filename
+
 
 def encode_filename(filename):
     """Encode unicode filename
@@ -331,6 +366,23 @@ else:
             os.utime(rfilepath, (time.time(), mtime))
         # doesn't work on OSX
         # Runner().run(['touch', '-h', '-d', '@%s' % mtime, filepath])
+
+
+def assure_list(s):
+    """Given not a list, would place it into a list. If None - empty list is returned
+
+    Parameters
+    ----------
+    s: list or anything
+    """
+
+    if isinstance(s, list):
+        return s
+    elif s is None:
+        return []
+    else:
+        return [s]
+
 
 def assure_list_from_str(s, sep='\n'):
     """Given a multiline string convert it to a list of return None if empty
@@ -375,6 +427,33 @@ def assure_dict_from_str(s, **kwargs):
         out[k] = v
     return out
 
+
+def unique(seq, key=None):
+    """Given a sequence return a list only with unique elements while maintaining order
+
+    This is the fastest solution.  See
+    https://www.peterbe.com/plog/uniqifiers-benchmark
+    and
+    http://stackoverflow.com/a/480227/1265472
+    for more information.
+    Enhancement -- added ability to compare for uniqueness using a key function
+
+    Parameters
+    ----------
+    seq:
+      Sequence to analyze
+    key: callable, optional
+      Function to call on each element so we could decide not on a full
+      element, but on its member etc
+    """
+    seen = set()
+    seen_add = seen.add
+    if not key:
+        return [x for x in seq if not (x in seen or seen_add(x))]
+    else:
+        # OPT: could be optimized, since key is called twice, but for our cases
+        # should be just as fine
+        return [x for x in seq if not (key(x) in seen or seen_add(key(x)))]
 
 #
 # Decorators
@@ -698,11 +777,16 @@ class chpwd(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._prev_pwd:
-            chpwd(self._prev_pwd, logsuffix="(coming back)")
+            # Need to use self.__class__ so this instance, if the entire
+            # thing mocked during the test, still would use correct chpwd
+            self.__class__(self._prev_pwd, logsuffix="(coming back)")
 
 
 def knows_annex(path):
     """Returns whether at a given path there is information about an annex
+
+    It is just a thin wrapper around GitRepo.is_with_annex() classmethod
+    which also checks for `path` to exist first.
 
     This includes actually present annexes, but also uninitialized ones, or
     even the presence of a remote annex branch.
@@ -712,9 +796,91 @@ def knows_annex(path):
         lgr.debug("No annex: test path {0} doesn't exist".format(path))
         return False
     from datalad.support.gitrepo import GitRepo
-    repo = GitRepo(path, create=False)
-    return "origin/git-annex" in repo.get_remote_branches() \
-           or "git-annex" in repo.get_branches()
+    return GitRepo(path, init=False, create=False).is_with_annex()
+
+
+@contextmanager
+def make_tempfile(content=None, wrapped=None, **tkwargs):
+    """Helper class to provide a temporary file name and remove it at the end (context manager)
+
+    Parameters
+    ----------
+    mkdir : bool, optional (default: False)
+        If True, temporary directory created using tempfile.mkdtemp()
+    content : str or bytes, optional
+        Content to be stored in the file created
+    wrapped : function, optional
+        If set, function name used to prefix temporary file name
+    `**tkwargs`:
+        All other arguments are passed into the call to tempfile.mk{,d}temp(),
+        and resultant temporary filename is passed as the first argument into
+        the function t.  If no 'prefix' argument is provided, it will be
+        constructed using module and function names ('.' replaced with
+        '_').
+
+    To change the used directory without providing keyword argument 'dir' set
+    DATALAD_TESTS_TEMPDIR.
+
+    Examples
+    --------
+        >>> from os.path import exists
+        >>> from datalad.utils import make_tempfile
+        >>> with make_tempfile() as fname:
+        ...    k = open(fname, 'w').write('silly test')
+        >>> assert not exists(fname)  # was removed
+
+        >>> with make_tempfile(content="blah") as fname:
+        ...    assert open(fname).read() == "blah"
+    """
+
+    if tkwargs.get('mkdir', None) and content is not None:
+        raise ValueError("mkdir=True while providing content makes no sense")
+
+    tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=wrapped)
+
+    # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
+    # let mktemp handle it otherwise. However, an explicitly provided
+    # dir=... will override this.
+    mkdir = tkwargs_.pop('mkdir', False)
+
+    filename = {False: tempfile.mktemp,
+                True: tempfile.mkdtemp}[mkdir](**tkwargs_)
+    filename = realpath(filename)
+
+    if content:
+        with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
+            f.write(content)
+
+    if __debug__:
+        # TODO mkdir
+        lgr.debug('Created temporary thing named %s"' % filename)
+    try:
+        yield filename
+    finally:
+        # glob here for all files with the same name (-suffix)
+        # would be useful whenever we requested .img filename,
+        # and function creates .hdr as well
+        lsuffix = len(tkwargs_.get('suffix', ''))
+        filename_ = lsuffix and filename[:-lsuffix] or filename
+        filenames = glob.glob(filename_ + '*')
+        if len(filename_) < 3 or len(filenames) > 5:
+            # For paranoid yoh who stepped into this already ones ;-)
+            lgr.warning("It is unlikely that it was intended to remove all"
+                        " files matching %r. Skipping" % filename_)
+            return
+        for f in filenames:
+            try:
+                rmtemp(f)
+            except OSError:
+                pass
+
+
+def _path_(p):
+    """Given a path in POSIX" notation, regenerate one in native to the env one"""
+    if on_windows:
+        return opj(p.split('/'))
+    else:
+        # Assume that all others as POSIX compliant so nothing to be done
+        return p
 
 lgr.log(5, "Done importing datalad.utils")
-
