@@ -734,7 +734,7 @@ class DataLadRI(RI, RegexBasedURLMixin):
         """
         if self.remote:
             raise NotImplementedError("not supported ATM to reference additional remotes")
-        return "{}{}".format(DATASETS_TOPURL, self.path)
+        return "{}{}".format(DATASETS_TOPURL, urlquote(self.path))
 
 
 def _split_colon(s, maxsplit=1):

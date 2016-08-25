@@ -181,6 +181,9 @@ _versioned_files = """
 
 @with_tree(tree={
     'ds666': {
+        # there could also be a case of a file with "unique" name without versioned counterpart
+        # e.g. ds666_models.tar.gz  which seems to be not treated correctly (not placed into any
+        # version in case of ds000017)
         'index.html': """<html><body>
                             <a href="release_history.txt">Release History</a>
                             <a href="ds666.tar.gz">Raw data on AWS, no version</a>
@@ -264,9 +267,10 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
 
     # Check tags for the versions
     eq_(out[0]['datalad_stats'].get_total().versions, ['1.0.0', '1.0.1'])
-    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.1'])
-    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][1].hexsha)  # next to the last one
-    eq_(repo.repo.tags[1].commit.hexsha, commits_l['master'][0].hexsha)  # the last one
+    # +1 because original "release" was assumed to be 1.0.0
+    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1', '1.0.1'])
+    eq_(repo.repo.tags[0].commit.hexsha, commits_l['master'][-2].hexsha)  # next to the last one
+    eq_(repo.repo.tags[-1].commit.hexsha, commits_l['master'][0].hexsha)  # the last one
 
     def hexsha(l):
         return l.__class__(x.hexsha for x in l)
@@ -418,6 +422,7 @@ test_openfmri_pipeline1.tags = ['integration']
                           </body></html>""" % _PLUG_HERE,
         'release_history.txt': '1.0.1 fixed\n1.0.0 whatever',
         'ds666.tar.gz':     {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "1.0.0"}}}},
+        # this one will get renamed, not added to index
         'ds666_R2.0.0.tar.gz':     {'ds666': {'sub-1': {'anat': {'sub-1_T1w.dat': "mighty load 2.0.0"}}}},
     }},
     archives_leading_dir=False
@@ -483,7 +488,10 @@ def test_openfmri_pipeline2(ind, topurl, outd):
     eq_(stats_total,
         ActivityStats(files=5, overwritten=1, skipped=2, downloaded=1,
                       merges=[['incoming', 'incoming-processed']],
+                      versions=['1.0.0'],
                       renamed=1, urls=2, add_annex=2))
+    # in reality there is also 1.0.0+1 tag since file changed but no version suffix
+    eq_([x.name for x in repo.repo.tags], ['1.0.0', '1.0.0+1'])
 
     check_dropall_get(repo)
 test_openfmri_pipeline2.tags = ['integration']
