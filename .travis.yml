@@ -41,7 +41,7 @@ matrix:
     # To make sure that operates correctly whenever dataset directories have symlinks
     # in their path.
     env:
-    - TMPDIR="/tmp/sym linked"
+    - TMPDIR="/tmp/sym ссылка"
   - python: 3.3
   - python: 3.4
   # Those aren't yet ready since lxml Ibelieve fails to install
