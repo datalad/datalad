@@ -115,15 +115,19 @@ class Add(Interface):
     @staticmethod
     @datasetmethod(name='add')
     def __call__(
-            dataset=None,
             path=None,
             source=None,
+            dataset=None,
             to_git=False,
             recursive=False,
             recursion_limit=None,
             git_opts=None,
             annex_opts=None,
             annex_add_opts=None):
+
+        ################
+        # TODO: check require_dataset!
+        ###############
 
         # parameter constraints:
         if not path and not source:

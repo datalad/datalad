@@ -265,11 +265,11 @@ def test_install_subdataset(src, path):
     ds = install(path=path, source=src)
 
     # subdataset not installed:
-    subds = Dataset(opj(path, 'sub1'))
+    subds = Dataset(opj(path, 'subm 1'))
     assert_false(subds.is_installed())
 
     # install it:
-    ds.install('sub1')
+    ds.install('subm 1')
     assert_true(isdir(opj(subds.path, '.git')))
 
     ok_(subds.is_installed())
