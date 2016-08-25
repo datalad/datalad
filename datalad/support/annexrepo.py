@@ -66,7 +66,7 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode']
+    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode', '_uuid']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
@@ -117,6 +117,9 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        # initialize
+        self._uuid = None
 
         if git_opts or annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git, git-annex and/or "
@@ -1333,6 +1336,24 @@ class AnnexRepo(GitRepo):
         return [line.split()[1] for line in std_out.splitlines()
                 if line.startswith('copy ') and line.endswith('ok')]
 
+    @property
+    def uuid(self):
+        """Annex UUID
+
+        Returns
+        -------
+        str
+          Returns a the annex UUID, if there is any, or `None` otherwise.
+        """
+        if not self._uuid:
+            if not self.repo:
+                return None
+            repocfg = self.repo.config_reader()
+            self._uuid = repocfg.get_value('annex', 'uuid', default='')
+            if not self._uuid:
+                self._uuid = None
+        return self._uuid
+
 
 # TODO: Why was this commented out?
 # @auto_repr
@@ -1512,5 +1533,3 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
-
-
