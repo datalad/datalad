@@ -11,7 +11,7 @@
 
 from six import PY2
 from datalad.api import Dataset, aggregate_metadata
-from datalad.metadata import get_metadata_type, get_metadata, get_dataset_identifier
+from datalad.metadata import get_metadata_type, get_metadata
 from nose.tools import assert_true, assert_equal, assert_raises
 from datalad.tests.utils import with_tree, with_tempfile
 from datalad.utils import chpwd
@@ -92,18 +92,18 @@ def test_basic_metadata(path):
     sibling.install(source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling)
     assert_equal(sibling_meta[0]['dcterms:isVersionOf'],
-                 {'@id': get_dataset_identifier(ds)})
+                 {'@id': ds.id})
     # origin should learn about the clone
     sibling.repo.push(remote='origin', refspec='git-annex')
     meta = get_metadata(ds)
     assert_equal(meta[0]['dcterms:hasVersion'],
-                 {'@id': get_dataset_identifier(sibling)})
+                 {'@id': sibling.id})
     # with subdataset
     sub = Dataset(opj(path, 'origin', 'sub'))
     sub.create(add_to_super=True, force=True)
     meta = get_metadata(ds, guess_type=True)
     assert_equal(meta[0]['dcterms:hasPart'],
-                 {'@id': get_dataset_identifier(sub),
+                 {'@id': sub.id,
                   'type': 'Dataset',
                   'location': 'sub'})
 
@@ -151,16 +151,16 @@ def test_aggregation(path):
         clone, guess_type=False, ignore_subdatasets=False, ignore_cache=False)
 
     # make sure the implicit md for the topmost come first
-    assert_equal(clonemeta[0]['@id'], get_dataset_identifier(clone))
+    assert_equal(clonemeta[0]['@id'], clone.id)
     assert_equal(clonemeta[0]['dcterms:isVersionOf']['@id'],
-                 get_dataset_identifier(ds))
+                 ds.id)
     # all but the implicit is identical
     assert_equal(clonemeta[1:], meta[1:])
     # the implicit md of the clone should list a dataset ID for its subds,
     # although it has not been obtained!
     assert_equal(
         clonemeta[0]['dcterms:hasPart']['@id'],
-        get_dataset_identifier(subds))
+        subds.id)
 
     # now obtain a subdataset in the clone and the IDs should be updated
     clone.install('sub')

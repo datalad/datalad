@@ -21,7 +21,7 @@ from ..support.param import Parameter
 from ..support.constraints import EnsureNone
 from ..log import lgr
 from . import get_metadata, get_native_metadata, metadata_filename, \
-    metadata_basepath, get_dataset_identifier
+    metadata_basepath
 from datalad.support.json_py import dump as jsondump
 
 
@@ -116,7 +116,7 @@ class AggregateMetaData(Interface):
             subds_meta = get_metadata(
                 subds, guess_type=guess_native_type, ignore_subdatasets=False,
                 ignore_cache=False)
-            subds_meta[0]['dcterms:isPartOf'] = get_dataset_identifier(dataset)
+            subds_meta[0]['dcterms:isPartOf'] = dataset.id
             _store_json(opj(metapath, subds_path), subds_meta)
         if save:
             dataset.repo.add(metapath, git=True)

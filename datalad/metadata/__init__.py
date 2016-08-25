@@ -56,26 +56,6 @@ def get_metadata_type(ds, guess=False):
     return mtypes if len(mtypes) else None
 
 
-# XXX Could become dataset method
-def get_dataset_identifier(ds):
-    """Returns some appropriate identifier for a dataset.
-
-    Any non-annex UUID identifier is prefixed for '_:'
-    """
-    dsid = None
-    if ds.repo:
-        dsid = ds.repo.repo.config_reader().get_value(
-            'annex', 'uuid', default='')
-        if not dsid:
-            # not an annex
-            dsid = '_:{}'.format(ds.repo.get_hexsha())
-    else:
-        # not even a VCS
-        dsid = '_:{}'.format(ds.path.replace(os.sep, '_'))
-
-    return dsid
-
-
 def _get_base_dataset_metadata(ds_identifier):
     """Return base metadata as dict for a given ds_identifier
     """
@@ -98,7 +78,7 @@ def get_implicit_metadata(ds, ds_identifier=None):
     dict
     """
     if ds_identifier is None:
-        ds_identifier = get_dataset_identifier(ds)
+        ds_identifier = ds.id
 
     meta = _get_base_dataset_metadata(ds_identifier)
 
@@ -151,7 +131,7 @@ def get_implicit_metadata(ds, ds_identifier=None):
         # we only want immediate subdatasets
         for subds_path in ds.get_subdatasets(recursive=False):
             subds = Dataset(opj(ds.path, subds_path))
-            subds_id = get_dataset_identifier(subds)
+            subds_id = subds.id
             submeta = {
                 'location': subds_path,
                 'type': 'Dataset'}
@@ -183,7 +163,7 @@ def _get_version_ids_from_implicit_meta(meta):
 def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
                  ignore_cache=False):
     # common identifier
-    ds_identifier = get_dataset_identifier(ds)
+    ds_identifier = ds.id
     # metadata receptacle
     meta = []
     # where things are
@@ -311,7 +291,7 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
         additional items correspond to subdataset metadata sets.
     """
     if ds_identifier is None:
-        ds_identifier = get_dataset_identifier(ds)
+        ds_identifier = ds.id
     # using a list, because we could get multiple sets of meta data per
     # dataset, and we want to quickly collect them without having to do potentially
     # complex graph merges
