@@ -132,14 +132,23 @@ function metadata_locator(md5) {
   var metadata_dir = '.git/datalad/metadata/';
   var current_loc = absolute_url(getParameterByName('dir')).replace(/\/?$/, '');
 
+  // if current node is a parent dataset
   if (url_exists(current_loc + '/' + metadata_dir))
     return current_loc + '/' + metadata_dir + md5('/');
+  // else
   else {
+    // find current nodes parent dataset
+    while (current_loc !== loc().pathname) {
+      current_loc = parent_url(current_loc);
+      if (url_exists(current_loc + '/' + metadata_dir))
+        break;
+    }
+    // and compute name of current nodes metadata hash
     var metadata_path = getParameterByName('dir')
-          .replace(loc().pathname, '')   // remove basepath to dir
-          .replace(/^\/?/, '')           // replace beginning '/'
-          .replace(/\/?$/, '');          // replace ending '/'
-    return loc().pathname + metadata_dir + md5(metadata_path);
+          .replace(current_loc.replace(loc().pathname, ''), '')   // remove basepath to dir
+          .replace(/^\/?/, '')        // replace beginning '/'
+          .replace(/\/?$/, '');       // replace ending '/'
+    return current_loc + metadata_dir + md5(metadata_path);
   }
 }
 
