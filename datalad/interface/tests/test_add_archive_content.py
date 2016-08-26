@@ -36,6 +36,33 @@ from ... import lgr
 from ...api import add_archive_content, clean
 
 
+treeargs = dict(
+    tree=(
+        ('1.tar.gz', (
+            ('__MACOSX', (('crcns_pfc-1_data', (
+                                ('CR24A', {}),)),)),
+        )),
+    )
+)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**treeargs)
+@serve_path_via_http()
+@with_tempfile(mkdir=True)
+def test_add_archive_dirs(path_orig, url, repo_path):
+    add_archive_content(
+        '1.tar.gz',
+        existing='archive-suffix',
+        # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
+        strip_leading_dirs=True,
+        delete=True,
+        leading_dirs_consider=['crcns.*', '1'],
+        leading_dirs_depth=2,
+        use_current_dir=False,
+        exclude='.*__MACOSX.*',  # some junk penetrates
+    ),
+
 # within top directory
 # archive is in subdirectory -- adding in the same (or different) directory
 
