@@ -21,6 +21,7 @@ from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_tempfile, assert_in
 from ...tests.utils import assert_equal
 from ...tests.utils import assert_false
+from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
 from ...tests.utils import SkipTest
 
@@ -44,24 +45,35 @@ treeargs = dict(
         )),
     )
 )
-
-
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**treeargs)
 @serve_path_via_http()
 @with_tempfile(mkdir=True)
 def test_add_archive_dirs(path_orig, url, repo_path):
-    add_archive_content(
-        '1.tar.gz',
-        existing='archive-suffix',
-        # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
-        strip_leading_dirs=True,
-        delete=True,
-        leading_dirs_consider=['crcns.*', '1'],
-        leading_dirs_depth=2,
-        use_current_dir=False,
-        exclude='.*__MACOSX.*',  # some junk penetrates
-    ),
+    # change to repo_path
+    chpwd(repo_path)
+    # create annex repo
+    repo = AnnexRepo(repo_path, create=True, direct=False)
+    # add archive to the repo so we could test
+    with swallow_outputs():
+        repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+    repo.commit("added 1.tar.gz")
+    # and by default it just does it, everything goes to annex
+    add_archive_content('1.tar.gz')
+
+    # test with excludes and annex options
+    add_archive_content('1.tar.gz',
+                        existing='archive-suffix',
+                        # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
+                        strip_leading_dirs=True,
+                        delete=True,
+                        leading_dirs_consider=['crcns.*', '1'],
+                        leading_dirs_depth=2,
+                        use_current_dir=False,
+                        exclude='.*__MACOSX.*')  # some junk penetrates
+    #import pdb; pdb.set_trace()
+    assert_false(exists(opj('1', '__MACOSX')))  # ideally this should pass
+    assert_true(exists(opj('1', 'c-1_data')))   # and this should fail but to reproduce crcns weird name stripping bug this should pass
 
 # within top directory
 # archive is in subdirectory -- adding in the same (or different) directory
