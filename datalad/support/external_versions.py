@@ -48,7 +48,7 @@ def _get_annex_version():
 
 def _get_git_version():
     """Return version of available git"""
-    return _runner.run('git version'.split())[0].split()[-1]
+    return _runner.run('git version'.split())[0].split()[2]
 
 
 class ExternalVersions(object):
