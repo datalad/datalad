@@ -137,7 +137,6 @@ class BalsaSupport(object):
 
 
 def fix_the_filename(data):
-    # TODO: use file_basename
     from datalad.utils import file_basename
     download_ext = file_basename(data['filename'], return_ext=True)[-1]
     orig_filename, orig_ext = file_basename(data['target_filename'], return_ext=True)  # data['filename_orig']
