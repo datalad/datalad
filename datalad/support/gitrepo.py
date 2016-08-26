@@ -47,6 +47,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import updated
 
 # imports from same module:
+from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
 from .network import is_ssh
@@ -1241,9 +1242,11 @@ class GitRepo(object):
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
-    def merge(self, name, options=[], msg=None, **kwargs):
+    def merge(self, name, options=[], msg=None, allow_unrelated=False, **kwargs):
         if msg:
             options = options + ["-m", msg]
+        if allow_unrelated and external_versions['cmd:git'] >= '2.9':
+            options += ['--allow-unrelated-histories']
         self._git_custom_command(
             '', ['git', 'merge'] + options + [name],
             **kwargs
