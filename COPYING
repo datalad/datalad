@@ -39,3 +39,5 @@ authors if you are to use corresponding parts.
    - [JQuery](https://code.jquery.com) - MIT License - Copyright (c) 2016-
    - [Datatables](http://datatables.net) - MIT License - Copyright (c) 2016-
    - [BlueImp-MD5](https://github.com/blueimp/JavaScript-MD5) - MIT License - Copyright (c) 2016-
+   - [QUnit](https://qunitjs.com/) - MIT License - Copyright (c)
+   - [Sinon-QUnit Plugin](http://sinonjs.org/qunit/) - BSD License - Copyright (c) 2010-2011

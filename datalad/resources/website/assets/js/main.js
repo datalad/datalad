@@ -186,8 +186,14 @@ function directory(jQuery, md5) {
       if (data.name === '..')
         parent = true;
       // show size = "ondisk size" / "total size"
-      if (data.size.ondisk)
+      if (data.size.ondisk && data.size.ondisk === '0 Bytes')
+        jQuery('td', row).eq(2).html("-/" + data.size.total);
+      else if (data.size.ondisk)
         jQuery('td', row).eq(2).html(data.size.ondisk + "/" + data.size.total);
+      else if (data.size.total)
+        jQuery('td', row).eq(2).html("-/" + data.size.total);
+      else
+        jQuery('td', row).eq(2).html("-/-");
       // if row is a directory append '/' to name cell
       if (data.type === 'dir' || data.type === 'git' || data.type === 'annex')
         jQuery('td', row).eq(0).html('<a>' + jQuery('td', row).eq(0).html() + '/</a>');
