@@ -66,7 +66,6 @@ requires = {
         'httpretty>=0.8.14',
         'mock',
         'nose>=1.3.4',
-        'testtools',
         'vcrpy',
     ]
 }
