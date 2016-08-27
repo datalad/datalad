@@ -261,20 +261,25 @@ def test_AnnexRepo_web_remote(sitepath, siteurl, dst):
     ldesc = ar.whereis(testfile, output='descriptions')
     assert_equal(set(ldesc), set([v['description'] for v in lfull.values()]))
 
-    # info
-    info = ar.info(testfile)
-    assert_equal(info['size'], 14)
-    assert(info['key'])  # that it is there
-    info_batched = ar.info(testfile, batch=True)
-    assert_equal(info, info_batched)
-    # while at it ;)
-    assert_equal(ar.info('nonexistent', batch=False), None)
-    assert_equal(ar.info('nonexistent', batch=True), None)
+    # info w/ and w/o fast mode
+    for fast in [True, False]:
+        info = ar.info(testfile, fast=fast)
+        assert_equal(info['size'], 14)
+        assert(info['key'])  # that it is there
+        info_batched = ar.info(testfile, batch=True, fast=fast)
+        assert_equal(info, info_batched)
+        # while at it ;)
+        assert_equal(ar.info('nonexistent', batch=False), None)
+        assert_equal(ar.info('nonexistent', batch=True), None)
 
     # annex repo info
-    repo_info = ar.repo_info()
+    repo_info = ar.repo_info(fast=False)
     assert_equal(repo_info['local annex size'], 14)
     assert_equal(repo_info['backend usage'], {'SHA256E': 1})
+    # annex repo info in fast mode
+    repo_info_fast = ar.repo_info(fast=True)
+    # doesn't give much testable info, so just comparing a subset for match with repo_info info
+    assert_equal(repo_info_fast['semitrusted repositories'], repo_info['semitrusted repositories'])
     #import pprint; pprint.pprint(repo_info)
 
     # remove the remote
