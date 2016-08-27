@@ -47,7 +47,8 @@ def superdataset_pipeline(url=TOPURL):
     url = opj(url, 'study/')
     hardcodeNames = {'RVVG': '2016-Glasser_et_al-Multimodal_parcellation',
                      'W336': '2016-Donahue_et_al-Connection_strength_and_distance',
-                     'WG33': '2016-VanEssen_et_al-BALSA'
+                     'WG33': '2016-VanEssen_et_al-BALSA',
+                     'pkGn': '2016-Glasser_et_al-HCP_Neuroimaging_approach',
                      }
 
     annex = Annexificator(no_annex=True)
