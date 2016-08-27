@@ -449,10 +449,7 @@ class AnnexRepo(GitRepo):
         if git:
             # add to git instead of annex
             if self.is_direct_mode():
-                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
-                           files
-                self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
-                # TODO: use options with git_add instead!
+                self.proxy(['git', 'add'] + options + files)
             else:
                 super(AnnexRepo, self).add(files)
 
