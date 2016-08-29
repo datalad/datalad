@@ -812,7 +812,6 @@ class GitRepo(object):
         [str]
           content of file_ as a list of lines.
         """
-
         content_str = self.repo.commit(branch).tree[file_].data_stream.read()
 
         # in python3 a byte string is returned. Need to convert it:
@@ -825,6 +824,23 @@ class GitRepo(object):
         else:
             return content_str.splitlines()
         # TODO: keep splitlines?
+
+    def get_files_history(self, files, branch='HEAD'):
+        """
+
+        Parameters
+        ----------
+        files: list
+          list of files, only commits with queried files are considered
+        branch: str
+          Name of the branch to query. Default: HEAD.
+
+        Returns
+        -------
+        [iterator]
+        yielding Commit items generator from branch history associated with files
+        """
+        return gitpy.objects.commit.Commit.iter_items(self.repo, branch, paths=files)
 
     def _gitpy_custom_call(self, cmd, cmd_args=None, cmd_options=None,
                            git_options=None, env=None,
