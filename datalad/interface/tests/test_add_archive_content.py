@@ -78,12 +78,13 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                         use_current_dir=False,
                         exclude='.*__MACOSX.*')  # some junk penetrates
 
-    assert_false(exists('__MACOSX'))  # ideally this should pass as dir excluded
-    # BUG: this is what actually happens
-    # the subdir in MACOSX isn't excluded and gets its name stripped weirdly
-    assert_true(exists('c-2_data'))
-    #assert_false(exists('CR24B')))   # this is what should happen
-    #assert_true(exists('CR24A')))    # this is what should happen
+    # regression test: the subdir in MACOSX wasn't excluded and its name was getting stripped by leading_dir_len
+    assert_false(exists('__MACOSX'))  # if stripping and exclude didn't work this fails
+    assert_false(exists('c-2_data'))  # if exclude doesn't work then name of subdir gets stripped by leading_dir_len
+    assert_false(exists('CR24B'))     # if exclude doesn't work but everything else works this fails
+
+    # if stripping_leading_dirs works this dir should exist
+    assert_true(exists('CR24A'))
 
 
 # within top directory
