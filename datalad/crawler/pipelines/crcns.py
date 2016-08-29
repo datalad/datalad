@@ -151,6 +151,6 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
             ],
         ],
         annex.switch_branch('master'),
-        annex.merge_branch('incoming-processed'),
+        annex.merge_branch('incoming-processed', allow_unrelated=True),
         annex.finalize(cleanup=True),
     ]
