@@ -19,7 +19,7 @@ from datalad.tests.utils import assert_in
 from datalad.tests.utils import swallow_logs
 
 
-@with_tempfile(content='{"Authors": ["A1"\xc2\xa0, "A2"]}')
+@with_tempfile(content=b'{"Authors": ["A1"\xc2\xa0, "A2"]}')
 def test_load_screwy_unicode(fname):
     # test that we can tollerate some screwy unicode embeddings within json
     assert_raises(JSONDecodeError, load, fname, fixup=False)
