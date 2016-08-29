@@ -148,7 +148,7 @@ apt-get install -y -q python-{dev,httpretty,nose,pip,vcr,virtualenv} python-tox
 apt-get install -y -q lib{ffi,ssl,curl4-openssl,xml2,xslt1}-dev
 ```
 
-some of which you could also install from PyP?i using pip  (prior installation of those libraries listed above
+some of which you could also install from PyPi using pip  (prior installation of those libraries listed above
 might be necessary)
 
 ```sh

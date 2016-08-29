@@ -449,10 +449,7 @@ class AnnexRepo(GitRepo):
         if git:
             # add to git instead of annex
             if self.is_direct_mode():
-                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
-                           files
-                self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
-                # TODO: use options with git_add instead!
+                self.proxy(['git', 'add'] + options + files)
             else:
                 super(AnnexRepo, self).add(files)
 
@@ -966,7 +963,7 @@ class AnnexRepo(GitRepo):
     #  and globs.
     # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
     @normalize_paths(map_filenames_back=True)
-    def info(self, files, batch=False):
+    def info(self, files, batch=False, fast=False):
         """Provide annex info for file(s).
 
         Parameters
@@ -980,7 +977,8 @@ class AnnexRepo(GitRepo):
           Info for each file
         """
 
-        options = ['--bytes']
+        options = ['--bytes', '--fast'] if fast else ['--bytes']
+
         if not batch:
             json_objects = self._run_annex_command_json('info', args=options + files)
         else:
@@ -1004,7 +1002,7 @@ class AnnexRepo(GitRepo):
             out[f] = j
         return out
 
-    def repo_info(self):
+    def repo_info(self, fast=False):
         """Provide annex info for the entire repository.
 
         Returns
@@ -1013,7 +1011,9 @@ class AnnexRepo(GitRepo):
           Info for the repository, with keys matching the ones retuned by annex
         """
 
-        json_records = list(self._run_annex_command_json('info', args=['--bytes']))
+        options = ['--bytes', '--fast'] if fast else ['--bytes']
+
+        json_records = list(self._run_annex_command_json('info', args=options))
         assert(len(json_records) == 1)
 
         # TODO: we need to abstract/centralize conversion from annex fields

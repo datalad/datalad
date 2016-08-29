@@ -690,7 +690,7 @@ def test_GitRepo_get_merge_base(src):
     assert(repo.get_merge_base([branch2, branch1]) is None)
 
     # Let's merge them up -- then merge base should match the master
-    repo.merge(branch1)
+    repo.merge(branch1, allow_unrelated=True)
     eq_(repo.get_merge_base(branch1), branch1_hexsha)
 
     # if points to some empty/non-existing branch - should also be None
@@ -773,7 +773,7 @@ def test_git_custom_calls(path, path2):
                                            log_stderr=True)
 
         assert_in("On branch master", out)
-        assert_in("nothing to commit, working directory clean", out)
+        assert_in("nothing to commit", out)
         eq_("", err)
         for line in out.splitlines():
             assert_in("stdout| " + line, cm.out)
@@ -785,7 +785,7 @@ def test_git_custom_calls(path, path2):
                                            log_stderr=False)
 
         assert_in("On branch master", out)
-        assert_in("nothing to commit, working directory clean", out)
+        assert_in("nothing to commit", out)
         eq_("", err)
         eq_("", cm.out)
 
