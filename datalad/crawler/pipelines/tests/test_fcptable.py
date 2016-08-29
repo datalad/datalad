@@ -29,7 +29,6 @@ def test_smoke_pipelines():
 
 
 @use_cassette('test_fcptable_dataset')
-@skip_if_no_network
 @with_tempfile(mkdir=True)
 def _test_dataset(dataset, error, create, skip, tmpdir):
     TOPURL = "http://fcon_1000.projects.nitrc.org/fcpClassic/FcpTable.html"

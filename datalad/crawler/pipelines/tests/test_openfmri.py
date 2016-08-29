@@ -81,7 +81,6 @@ def remove_from_index(index_file, regexp):
         f.write(re.sub(regexp, '', old_index))
 
 
-@skip_if_no_network
 @use_cassette('openfmri')
 def __test_basic_openfmri_top_pipeline():
     skip_if_no_module('scrapy')  # e.g. not present under Python3
@@ -128,7 +127,6 @@ def __test_basic_openfmri_top_pipeline():
     #print('\n'.join(map(str, all_licenses)))
 
 
-@skip_if_no_network
 @use_cassette('openfmri-1')
 @with_tempfile(mkdir=True)
 def __test_basic_openfmri_dataset_pipeline_with_annex(path):
