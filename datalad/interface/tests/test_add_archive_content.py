@@ -41,10 +41,16 @@ treeargs = dict(
     tree=(
         ('1.tar.gz', (
             ('__MACOSX', (('crcns_pfc-1_data', (
-                                ('CR24A', {}),)),)),
+                                ('CR24A', (
+                                    ('behaving', {}),)),)
+                           ),)),
+            ('crcns_pfc-1_data', (('CR24A', (
+                                ('behaving', {}),)),)),
         )),
     )
 )
+
+
 @assert_cwd_unchanged(ok_to_chdir=True)
 @with_tree(**treeargs)
 @serve_path_via_http()
@@ -52,13 +58,17 @@ treeargs = dict(
 def test_add_archive_dirs(path_orig, url, repo_path):
     # change to repo_path
     chpwd(repo_path)
+
     # create annex repo
     repo = AnnexRepo(repo_path, create=True, direct=False)
+
     # add archive to the repo so we could test
     with swallow_outputs():
         repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
     repo.commit("added 1.tar.gz")
+
     # and by default it just does it, everything goes to annex
+    from os import listdir, getcwd
     add_archive_content('1.tar.gz')
 
     # test with excludes and annex options
@@ -71,9 +81,15 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                         leading_dirs_depth=2,
                         use_current_dir=False,
                         exclude='.*__MACOSX.*')  # some junk penetrates
-    #import pdb; pdb.set_trace()
-    assert_false(exists(opj('1', '__MACOSX')))  # ideally this should pass
-    assert_true(exists(opj('1', 'c-1_data')))   # and this should fail but to reproduce crcns weird name stripping bug this should pass
+    from os.path import curdir, dirname, realpath, abspath
+
+    print repo_path
+    print (realpath('1'))
+    print (exists(opj(repo_path, '1')))  # needs to be true
+    # assert_false(exists(opj('1', '__MACOSX')))  # ideally this should pass
+    # assert_true(exists(opj('1', 'pfc-1_data')))
+    # assert_true(exists(opj('1', 'c-1_data')))   # and this should fail but to reproduce crcns weird name stripping bug this should pass
+
 
 # within top directory
 # archive is in subdirectory -- adding in the same (or different) directory
