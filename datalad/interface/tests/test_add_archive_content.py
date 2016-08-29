@@ -40,12 +40,12 @@ from ...api import add_archive_content, clean
 treeargs = dict(
     tree=(
         ('1.tar.gz', (
-            ('__MACOSX', (('crcns_pfc-1_data', (
-                                ('CR24A', (
-                                    ('behaving', {}),)),)
+            ('__MACOSX', (('crcns_pfc-2_data', (
+                                ('CR24B', (
+                                    ('behaving2', {'2 f.txt': '2 f load4'}),)),)
                            ),)),
             ('crcns_pfc-1_data', (('CR24A', (
-                                ('behaving', {}),)),)),
+                                ('behaving1', {'1 f.txt': '1 f load4'}),)),)),
         )),
     )
 )
@@ -67,10 +67,6 @@ def test_add_archive_dirs(path_orig, url, repo_path):
         repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
     repo.commit("added 1.tar.gz")
 
-    # and by default it just does it, everything goes to annex
-    from os import listdir, getcwd
-    add_archive_content('1.tar.gz')
-
     # test with excludes and annex options
     add_archive_content('1.tar.gz',
                         existing='archive-suffix',
@@ -81,14 +77,13 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                         leading_dirs_depth=2,
                         use_current_dir=False,
                         exclude='.*__MACOSX.*')  # some junk penetrates
-    from os.path import curdir, dirname, realpath, abspath
 
-    print repo_path
-    print (realpath('1'))
-    print (exists(opj(repo_path, '1')))  # needs to be true
-    # assert_false(exists(opj('1', '__MACOSX')))  # ideally this should pass
-    # assert_true(exists(opj('1', 'pfc-1_data')))
-    # assert_true(exists(opj('1', 'c-1_data')))   # and this should fail but to reproduce crcns weird name stripping bug this should pass
+    assert_false(exists('__MACOSX'))  # ideally this should pass as dir excluded
+    # BUG: this is what actually happens
+    # the subdir in MACOSX isn't excluded and gets its name stripped weirdly
+    assert_true(exists('c-2_data'))
+    #assert_false(exists('CR24B')))   # this is what should happen
+    #assert_true(exists('CR24A')))    # this is what should happen
 
 
 # within top directory
