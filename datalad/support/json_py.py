@@ -19,18 +19,46 @@ from simplejson import dump as jsondump
 # simply mirrored for now
 from simplejson import loads
 from simplejson import dumps
+from simplejson import JSONDecodeError
 
 
 # TODO think about minimizing the JSON output by default
 json_dump_kwargs = dict(indent=2, sort_keys=True, ensure_ascii=False, encoding='utf-8')
 
+# Let's just reuse top level one for now
+from ..log import lgr
+from ..dochelpers import exc_str
 
 def dump(obj, fname):
-    return jsondump(
-        obj,
-        codecs.getwriter('utf-8')(open(fname, 'wb')),
-        **json_dump_kwargs)
+    with open(fname, 'wb') as f:
+        return jsondump(
+            obj,
+            codecs.getwriter('utf-8')(f),
+            **json_dump_kwargs)
 
 
-def load(fname):
-    return jsonload(open(fname, 'r', encoding='utf-8'))
+def load(fname, fixup=True):
+    """Load JSON from a file, possibly fixing it up if initial load attempt fails
+    """
+    with open(fname, 'r', encoding='utf-8') as f:
+        try:
+            return jsonload(f)
+        except JSONDecodeError as exc:
+            if not fixup:
+                raise
+            lgr.warning("Failed to decode content in %s: %s. Trying few tricks", fname, exc_str(exc))
+
+    # Load entire content and replace common "abusers" which break JSON comprehension but in general
+    # are Ok
+    with open(fname, 'r', encoding='utf-8') as f:
+        s_orig = s = f.read()
+
+    for o, r in {
+        u"\xa0" : " ",  # non-breaking space
+    }.items():
+        s = s.replace(o, r)
+
+    if s == s_orig:
+        # we have done nothing, so just reraise previous exception
+        raise
+    return loads(s)
