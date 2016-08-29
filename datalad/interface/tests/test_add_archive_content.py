@@ -19,7 +19,7 @@ from glob import glob
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_tempfile, assert_in
-from ...tests.utils import assert_equal
+from ...tests.utils import assert_equal, assert_not_equal
 from ...tests.utils import assert_false
 from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
@@ -40,12 +40,20 @@ from ...api import add_archive_content, clean
 treeargs = dict(
     tree=(
         ('1.tar.gz', (
-            ('__MACOSX', (('crcns_pfc-2_data', (
-                                ('CR24B', (
-                                    ('behaving2', {'2 f.txt': '2 f load4'}),)),)
-                           ),)),
             ('crcns_pfc-1_data', (('CR24A', (
-                                ('behaving1', {'1 f.txt': '1 f load4'}),)),)),
+                                    ('behaving1', {'1 f.txt': '1 f load'}),)),)),
+            ('crcns_pfc-1_data', (('CR24C', (
+                                    ('behaving3', {'3 f.txt': '3 f load'}),)),)),
+
+            ('__MACOSX', (('crcns_pfc-2_data', (
+                                    ('CR24B', (
+                                        ('behaving2', {'2 f.txt': '2 f load'}),)),)
+                           ),)),
+            ('crcns_pfc-4_data', (('__MACOSX', (
+                                    ('CR24B', (
+                                        ('behaving2', {'2 f.txt': '2 f load'}),)),)
+                                   ),)),
+
         )),
     )
 )
@@ -78,13 +86,17 @@ def test_add_archive_dirs(path_orig, url, repo_path):
                         use_current_dir=False,
                         exclude='.*__MACOSX.*')  # some junk penetrates
 
+    all_files = sorted(find_files('.'))
+    target_files = {
+        './CR24A/behaving1/1 f.txt',
+        './CR24C/behaving3/3 f.txt',
+    }
+    eq_(set(all_files), target_files)
+
     # regression test: the subdir in MACOSX wasn't excluded and its name was getting stripped by leading_dir_len
     assert_false(exists('__MACOSX'))  # if stripping and exclude didn't work this fails
-    assert_false(exists('c-2_data'))  # if exclude doesn't work then name of subdir gets stripped by leading_dir_len
+    assert_false(exists('c-1_data'))  # if exclude doesn't work then name of subdir gets stripped by leading_dir_len
     assert_false(exists('CR24B'))     # if exclude doesn't work but everything else works this fails
-
-    # if stripping_leading_dirs works this dir should exist
-    assert_true(exists('CR24A'))
 
 
 # within top directory
