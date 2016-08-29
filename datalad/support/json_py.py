@@ -37,12 +37,20 @@ def dump(obj, fname):
             **json_dump_kwargs)
 
 
-def load(fname, fixup=True):
+def load(fname, fixup=True, **kw):
     """Load JSON from a file, possibly fixing it up if initial load attempt fails
+
+    Parameters
+    ----------
+    fixup : bool
+      In case of failed load, apply a set of fixups with hope to resolve issues
+      in JSON
+    **kw
+      Passed into the load (and loads after fixups) function
     """
     with open(fname, 'r', encoding='utf-8') as f:
         try:
-            return jsonload(f)
+            return jsonload(f, **kw)
         except JSONDecodeError as exc:
             if not fixup:
                 raise
@@ -61,4 +69,4 @@ def load(fname, fixup=True):
     if s == s_orig:
         # we have done nothing, so just reraise previous exception
         raise
-    return loads(s)
+    return loads(s, **kw)
