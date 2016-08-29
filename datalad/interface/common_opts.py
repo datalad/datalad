@@ -72,3 +72,8 @@ annex_copy_opts = Parameter(
     metavar='STRING',
     constraints=EnsureStr() | EnsureNone(),
     doc="""option string to be passed to :command:`git annex copy` calls""")
+
+allow_dirty = Parameter(
+    args=("--allow-dirty",),
+    action="store_true",
+    doc="""flag that operating on a dirty repository (uncommitted or untracked content) is ok""")

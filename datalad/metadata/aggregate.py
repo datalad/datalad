@@ -15,6 +15,7 @@ import os
 from os.path import join as opj, exists
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_limit, recursion_flag
+from datalad.interface.common_opts import allow_dirty
 from datalad.distribution.dataset import datasetmethod, EnsureDataset, \
     Dataset, require_dataset
 from ..support.param import Parameter
@@ -57,20 +58,21 @@ class AggregateMetaData(Interface):
             accidentally saving arbitrary changes."""),
         recursive=recursion_flag,
         recursion_limit=recursion_limit,
+        allow_dirty=allow_dirty,
     )
 
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
     def __call__(dataset, guess_native_type=False, save=False, recursive=False,
-            recursion_limit=None):
+            recursion_limit=None, allow_dirty=False):
         dataset = require_dataset(
             dataset, check_installed=True, purpose='meta data aggregation')
 
         # it is important to check this prior diving into subdatasets
         # because we might also modify them
-        if save and dataset.repo.repo.is_dirty(index=True,
-                                               working_tree=False,
-                                               submodules=True):
+        if save and \
+            not allow_dirty and \
+            dataset.repo.repo.is_dirty(index=True, working_tree=False, submodules=True):
             raise RuntimeError(
                 "not aggregating meta data in {}, saving requested, but unsaved changes are already present".format(
                     dataset))
@@ -86,8 +88,9 @@ class AggregateMetaData(Interface):
                             guess_native_type=guess_native_type,
                             save=save,
                             recursive=recursive,
-                            recursion_limit=None if recursion_limit is None
-                            else recursion_limit - 1)
+                            recursion_limit=None if recursion_limit is None else recursion_limit - 1,
+                            allow_dirty=allow_dirty
+                        )
                         # stage potential changes in this submodule
                         dataset.repo.add(subds_path, git=True)
 
