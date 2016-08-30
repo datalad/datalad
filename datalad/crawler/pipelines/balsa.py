@@ -246,7 +246,7 @@ def pipeline(dataset_id, url=TOPURL):
             ],
             balsa.verify_files,
             annex.switch_branch('master'),
-            annex.merge_branch('incoming-processed', commit=True),
+            annex.merge_branch('incoming-processed', commit=True, allow_unrelated=True),
             annex.finalize(tag=True),
         ],
         annex.switch_branch('master'),
