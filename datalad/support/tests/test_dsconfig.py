@@ -59,7 +59,7 @@ def test_something(path):
     assert_true(cfg.has_option('something', 'user'))
     assert_false(cfg.has_option('something', 'us?er'))
     assert_false(cfg.has_option('some?thing', 'user'))
-    assert_equal(cfg.options('something'), ['myint', 'user'])
+    assert_equal(sorted(cfg.options('something')), ['myint', 'user'])
     assert_equal(cfg.options('onemore.complicated の beast with.dot'), ['findme'])
 
     assert_equal(
