@@ -205,7 +205,8 @@ class Create(Interface):
 
             vcs.commit(msg="datalad initial commit",
                        options=to_options(allow_empty=True))
-            
+            # reset ID, we have a VCS now
+            ds._id = None
             return ds
 
     @staticmethod

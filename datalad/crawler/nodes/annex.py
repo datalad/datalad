@@ -375,7 +375,7 @@ class Annexificator(object):
                 stats.skipped += 1
                 lgr.debug("Failed to figure out filename for url %s" % url)
                 return
-            raise ValueError("No filename were provided")
+            raise ValueError("No filename was provided")
 
         filepath = opj(self.repo.path, fpath)
 
@@ -695,7 +695,8 @@ class Annexificator(object):
         return switch_branch
 
     def merge_branch(self, branch, target_branch=None,
-                     strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
+                     strategy=None, commit=True, one_commit_at_a_time=False,
+                     skip_no_changes=None, **merge_kwargs):
         """Merge a branch into the current branch
 
         Parameters
@@ -774,9 +775,10 @@ class Annexificator(object):
                 if self.repo.get_active_branch() != target_branch_:
                     self.repo.checkout(target_branch_)
                 if strategy is None:
-                    self.repo.merge(to_merge, options=options)
+                    self.repo.merge(to_merge, options=options, **merge_kwargs)
                 elif strategy == 'theirs':
-                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
+                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"],
+                                    expect_stderr=True, **merge_kwargs)
                     self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
                     self.repo.add('.', options=self.options)  # so everything is staged to be committed
                 else:

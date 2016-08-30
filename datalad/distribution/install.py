@@ -436,7 +436,7 @@ class Install(Interface):
         # install something into the dataset
 
         # needed by the logic below
-        assert(isabs(path))
+       # assert(isabs(path))  # Gergana swears this piece of code is not that important
 
         # express the destination path relative to the root of this dataset
         relativepath = relpath(path, start=ds.path)

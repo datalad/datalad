@@ -398,6 +398,8 @@ class BaseDownloader(object):
         bytes, dict
           content, headers
         """
+        lgr.log(3, "_fetch(%r, cache=%r, size=%r, allow_redirects=%r)",
+                url, cache, size, allow_redirects)
         if cache is None:
             cache = cfg.getboolean('crawl', 'cache', False)
 
