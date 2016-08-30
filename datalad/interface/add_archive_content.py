@@ -231,7 +231,6 @@ class AddArchiveContent(Interface):
             # already saved me once ;)
             raise RuntimeError("You better commit all the changes and untracked files first")
 
-
         if not key:
             # we were given a file which must exist
             if not exists(archive_path):
@@ -323,17 +322,6 @@ class AddArchiveContent(Interface):
             stats = ActivityStats()
 
             for extracted_file in earchive.get_extracted_files():
-                # continue to next iteration if extracted_file in excluded
-                if exclude:
-                    try:  # since we need to skip outside loop from inside loop
-                        for regexp in exclude:
-                            if re.search(regexp, extracted_file):
-                                lgr.debug("Skipping {extracted_file} since contains {regexp} pattern".format(**locals()))
-                                stats.skipped += 1
-                                raise StopIteration
-                    except StopIteration:
-                        continue
-
                 stats.files += 1
                 extracted_path = opj(earchive.path, extracted_file)
 
@@ -356,6 +344,18 @@ class AddArchiveContent(Interface):
 
                 if rename:
                     target_file = apply_replacement_rules(rename, target_file)
+
+                # continue to next iteration if extracted_file in excluded
+                if exclude:
+                    try:  # since we need to skip outside loop from inside loop
+                        for regexp in exclude:
+                            if re.search(regexp, extracted_file):
+                                lgr.debug(
+                                    "Skipping {extracted_file} since contains {regexp} pattern".format(**locals()))
+                                stats.skipped += 1
+                                raise StopIteration
+                    except StopIteration:
+                        continue
 
                 if prefix_dir:
                     target_file = opj(prefix_dir, target_file)

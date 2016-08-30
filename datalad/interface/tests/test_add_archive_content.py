@@ -44,13 +44,14 @@ treeargs = dict(
                                     ('behaving1', {'1 f.txt': '1 f load'}),)),)),
             ('crcns_pfc-1_data', (('CR24C', (
                                     ('behaving3', {'3 f.txt': '3 f load'}),)),)),
-
+            ('crcns_pfc-1_data', (('CR24D', (
+                                    ('behaving2', {'2 f.txt': '2 f load'}),)),)),
             ('__MACOSX', (('crcns_pfc-2_data', (
                                     ('CR24B', (
                                         ('behaving2', {'2 f.txt': '2 f load'}),)),)
                            ),)),
-            ('crcns_pfc-4_data', (('__MACOSX', (
-                                    ('CR24B', (
+            ('crcns_pfc-2_data', (('__MACOSX', (
+                                    ('CR24E', (
                                         ('behaving2', {'2 f.txt': '2 f load'}),)),)
                                    ),)),
 
@@ -90,6 +91,7 @@ def test_add_archive_dirs(path_orig, url, repo_path):
     target_files = {
         './CR24A/behaving1/1 f.txt',
         './CR24C/behaving3/3 f.txt',
+        './CR24D/behaving2/2 f.txt',
     }
     eq_(set(all_files), target_files)
 
