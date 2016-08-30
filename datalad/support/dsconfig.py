@@ -51,16 +51,36 @@ def _parse_gitconfig_dump(dump, store, replace):
 
 
 class ConfigManager(object):
-    """
+    """Thin wrapper around `git-config` with support for a dataset configuration.
 
     The general idea is to have an object that is primarily used to read/query
     configuration option. Upon creation, current configuration is read via one
     (or max two, in the case of the presence of dataset-specific configuration)
-    calls to `git config`).
+    calls to `git config`). If this class is initialized with a Dataset
+    instance, it supports reading and writing configuration from
+    ``.datalad/config`` inside a dataset too. This file is commit to Git and
+    hence useful to ship certain configuration items with a dataset.
 
     The API aims to provide the most significant read-access bits of a
     dictionary, the Python ConfigParser, and GitPython's config parser
     implementation.
+
+    This class is presently not capable of effienciently writing multiple
+    configurations items at once. Instead, each modification results in a
+    dedicated call to `git config`. This authors thinks this is OK, as he
+    cannot think of a situation where a large number of items need to be
+    written during normal operation. If such need arises, various solutions are
+    possible (via GitPython, or an independent writer).
+
+    Parameters
+    ----------
+    dataset : Dataset, optional
+      If provided, all `git config` calls are executed in this dataset's
+      directory. Moreover, any modifications are, by default, directed to
+      this dataset's configuration file (which will be created on demand)
+    dataset_only : bool
+      If True, configuration items are only read from a datasets persistent
+      configuration file, if any (the one in .datalad/config, not .git/config).
     """
     def __init__(self, dataset=None, dataset_only=False):
         # store in a simple dict
@@ -78,6 +98,7 @@ class ConfigManager(object):
         self.reload()
 
     def reload(self):
+        """Reload all configuration items from the configured sources"""
         self._store = {}
         # 2-step strategy: load git config from all supported sources
         # then load datalad dataset config from dataset
@@ -113,15 +134,18 @@ class ConfigManager(object):
         return self._store.__contains__(key)
 
     def keys(self):
+        """Returns list of configuration item names"""
         return self._store.keys()
 
     #
     # Compatibility with ConfigParser API
     #
     def sections(self):
+        """Returns a list of the sections available"""
         return list(set([cfg_section_regex.match(k).group(1) for k in self._store]))
 
     def options(self, section):
+        """Returns a list of options available in the specified section."""
         opts = []
         for k in self._store:
             sec, opt = cfg_sectionoption_regex.match(k).groups()
@@ -130,12 +154,14 @@ class ConfigManager(object):
         return opts
 
     def has_section(self, section):
+        """Indicates whether a section is present in the configuration"""
         for k in self._store:
             if k.startswith(section):
                 return True
         return False
 
     def has_option(self, section, option):
+        """If the given section exists, and contains the given option"""
         for k in self._store:
             sec, opt = cfg_sectionoption_regex.match(k).groups()
             if sec == section and opt == option:
@@ -143,17 +169,23 @@ class ConfigManager(object):
         return False
 
     def get(self, section, option):
+        """Get an option value for the named section"""
         return self._store['.'.join((section, option))]
-        pass
 
     def getint(self, section, option):
+        """A convenience method which coerces the option value to an integer"""
         return int(self.get(section, option))
 
     def getfloat(self, section, option):
+        """A convenience method which coerces the option value to a float"""
         return float(self.get(section, option))
 
     # this is a hybrid of ConfigParser and dict API
     def items(self, section=None):
+        """Return a list of (name, value) pairs for each option
+
+        Optionally limited to a given section.
+        """
         if section is None:
             return self._store.items()
         return [(k, v) for k, v in self._store.items() if cfg_section_regex.match(k).group(1) == section]
@@ -162,6 +194,12 @@ class ConfigManager(object):
     # Compatibility with GitPython's ConfigParser
     #
     def get_value(self, section, option, default=None):
+        """Like `get()`, but with an optional default value
+
+        If the default is not None, the given default value will be returned in
+        case the option did not exist. This behavior immitates GitPython's
+        config parser.
+        """
         try:
             return self.get(section, option)
         except KeyError as e:
@@ -201,6 +239,26 @@ class ConfigManager(object):
         return args
 
     def add(self, var, value, where='dataset', reload=True):
+        """Add a configuration variable and value
+
+        Parameters
+        ----------
+        var : str
+          Variable name including any section like `git config` expects them, e.g.
+          'core.editor'
+        value : str
+          Variable value
+        where : {'dataset', 'local', 'global'}, optional
+          Indicator which configuration file to modify. 'dataset' indicates the
+          persistent configuration in .datalad/config of a dataset; 'local'
+          the configuration of a dataset's Git repository in .git/config;
+          'global' refers to the general configuration that is not specific to
+          a single repository (usually in $USER/.gitconfig
+        reload : bool
+          Flag whether to reload the configuration from file(s) after
+          modification. This can be disable to make multiple sequential
+          modifications slightly more efficient.
+        """
         args = self._require_location(where)
         args += ('--add', var, value)
         self._runner.run(
@@ -210,6 +268,25 @@ class ConfigManager(object):
             self.reload()
 
     def rename_section(self, old, new, where='dataset', reload=True):
+        """Rename a configuration section
+
+        Parameters
+        ----------
+        old : str
+          Name of the section to rename.
+        new : str
+          Name of the section to rename to.
+        where : {'dataset', 'local', 'global'}, optional
+          Indicator which configuration file to modify. 'dataset' indicates the
+          persistent configuration in .datalad/config of a dataset; 'local'
+          the configuration of a dataset's Git repository in .git/config;
+          'global' refers to the general configuration that is not specific to
+          a single repository (usually in $USER/.gitconfig
+        reload : bool
+          Flag whether to reload the configuration from file(s) after
+          modification. This can be disable to make multiple sequential
+          modifications slightly more efficient.
+        """
         args = self._require_location(where)
         self._runner.run(
             ['git', 'config'] + args + ['--rename-section', old, new])
@@ -217,6 +294,23 @@ class ConfigManager(object):
             self.reload()
 
     def unset(self, var, where='dataset', reload=True):
+        """Remove all occurences of a variable
+
+        Parameters
+        ----------
+        var : str
+          Name of the variable to remove
+        where : {'dataset', 'local', 'global'}, optional
+          Indicator which configuration file to modify. 'dataset' indicates the
+          persistent configuration in .datalad/config of a dataset; 'local'
+          the configuration of a dataset's Git repository in .git/config;
+          'global' refers to the general configuration that is not specific to
+          a single repository (usually in $USER/.gitconfig
+        reload : bool
+          Flag whether to reload the configuration from file(s) after
+          modification. This can be disable to make multiple sequential
+          modifications slightly more efficient.
+        """
         args = self._require_location(where)
         self._runner.run(
             # use unset all as it is simpler for now
