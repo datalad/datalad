@@ -149,7 +149,7 @@ class Dataset(object):
 
         Returns
         -------
-        GitConfigParser
+        ConfigManager
         """
         if self._cfg is None:
             # associate with this dataset and read the entire config hierarchy

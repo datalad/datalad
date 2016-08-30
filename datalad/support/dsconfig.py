@@ -210,7 +210,7 @@ class ConfigManager(object):
                 raise e
 
     #
-    # Modify configuration (proxy respective git-config call
+    # Modify configuration (proxy respective git-config call)
     #
     def _require_location(self, where, args=None):
         if args is None:
