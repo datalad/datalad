@@ -126,7 +126,7 @@ class Unlock(Interface):
                 if line.strip().endswith('ok')]
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
             res = []
