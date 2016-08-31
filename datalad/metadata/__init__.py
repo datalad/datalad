@@ -126,22 +126,22 @@ def get_implicit_metadata(ds, ds_identifier=None):
                 version_meta = version_meta[0]
             meta['dcterms:hasVersion'] = version_meta
 
-        ## metadata on all subdataset
-        subdss = []
-        # we only want immediate subdatasets
-        for subds_path in ds.get_subdatasets(recursive=False):
-            subds = Dataset(opj(ds.path, subds_path))
-            subds_id = subds.id
-            submeta = {
-                'location': subds_path,
-                'type': 'Dataset'}
-            if not subds_id.startswith('_:'):
-                submeta['@id'] = subds_id
-            subdss.append(submeta)
-        if len(subdss):
-            if len(subdss) == 1:
-                subdss = subdss[0]
-            meta['dcterms:hasPart'] = subdss
+    ## metadata on all subdataset
+    subdss = []
+    # we only want immediate subdatasets
+    for subds_path in ds.get_subdatasets(recursive=False):
+        subds = Dataset(opj(ds.path, subds_path))
+        subds_id = subds.id
+        submeta = {
+            'location': subds_path,
+            'type': 'Dataset'}
+        if not subds_id.startswith('_:'):
+            submeta['@id'] = subds_id
+        subdss.append(submeta)
+    if len(subdss):
+        if len(subdss) == 1:
+            subdss = subdss[0]
+        meta['dcterms:hasPart'] = subdss
 
     return meta
 
