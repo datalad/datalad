@@ -61,7 +61,7 @@ class FindDatasets(Interface):
         ds = require_dataset(dataset, check_installed=True, purpose='meta data query')
 
         meta = get_metadata(ds, guess_type=False, ignore_subdatasets=False,
-                            ignore_cache=False, optimize=False)
+                            ignore_cache=False)
 
         # merge all info on datasets into a single dict per dataset
         meta = flatten_metadata_graph(meta)
