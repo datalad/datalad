@@ -16,7 +16,8 @@ from datalad.distribution.dataset import Dataset
 from datalad.utils import swallow_logs
 from ..log import lgr
 from datalad.support.json_py import load as jsonload
-
+from datalad.dochelpers import exc_str
+from datalad.log import lgr
 
 # common format
 metadata_filename = 'meta.json'
@@ -306,7 +307,11 @@ def get_native_metadata(ds, guess_type=False, ds_identifier=None):
     for nativetype in nativetypes:
         pmod = import_module('.{}'.format(nativetype),
                              package=parsers.__package__)
-        native_meta = pmod.get_metadata(ds, ds_identifier)
+        try:
+            native_meta = pmod.get_metadata(ds, ds_identifier)
+        except Exception as e:
+            lgr.error('failed to get native metadata ({}): {}'.format(nativetype, exc_str(e)))
+            continue
         # TODO here we could apply a "patch" to the native metadata, if desired
         meta.append(native_meta)
 
