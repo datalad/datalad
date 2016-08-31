@@ -100,14 +100,17 @@ class AggregateMetaData(Interface):
         metapath = opj(dataset.path, metadata_basepath)
 
         # this dataset's meta data
-        _store_json(
-            metapath,
-            # actually extract native meta data, because we know we have this
-            # dataset installed (although maybe not all native metadata)
-            # Important: do not store implicit metadata, as this will be largely
-            # invalid in a new clone, and is relatively inexpensive to produce
-            # from material that is guaranteed to be present after a plain clone
-            get_native_metadata(dataset, guess_type=guess_native_type))
+        # actually ask to extract native meta data, because we know we have this
+        # dataset installed (although maybe not all native metadata)
+        # Important: do not store implicit metadata, as this will be largely
+        # invalid in a new clone, and is relatively inexpensive to produce
+        # from material that is guaranteed to be present after a plain clone
+        native_metadata = get_native_metadata(
+            dataset,
+            guess_type=guess_native_type)
+        if native_metadata:
+            # avoid practically empty files
+            _store_json(metapath, native_metadata)
 
         # we only want immediate subdatasets, higher depths will come via
         # recursion
