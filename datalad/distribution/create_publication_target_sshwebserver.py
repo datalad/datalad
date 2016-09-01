@@ -305,18 +305,18 @@ class CreatePublicationTargetSSHWebserver(Interface):
                     lgr.error("Failed to update server info.\n"
                               "Error: %s" % exc_str(e))
 
-                if target:
-                    # add the sibling(s):
-                    if target_url is None:
-                        target_url = sshurl
-                    if target_pushurl is None:
-                        target_pushurl = sshurl
-                    AddSibling()(dataset=ds,
-                                 name=target,
-                                 url=target_url,
-                                 pushurl=target_pushurl,
-                                 recursive=recursive,
-                                 force=existing in {'replace'})
+        if target:
+            # add the sibling(s):
+            if target_url is None:
+                target_url = sshurl
+            if target_pushurl is None:
+                target_pushurl = sshurl
+            AddSibling()(dataset=ds,
+                         name=target,
+                         url=target_url,
+                         pushurl=target_pushurl,
+                         recursive=recursive,
+                         force=existing in {'replace'})
 
         # TODO: Return value!?
         #       => [(Dataset, fetch_url)]
