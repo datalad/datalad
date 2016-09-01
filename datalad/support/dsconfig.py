@@ -100,14 +100,12 @@ class ConfigManager(object):
     def reload(self):
         """Reload all configuration items from the configured sources"""
         self._store = {}
-        # 2-step strategy: load git config from all supported sources
-        # then load datalad dataset config from dataset
+        # 2-step strategy:
+        #   - load datalad dataset config from dataset
+        #   - load git config from all supported by git sources
         # in doing so we always stay compatible with where Git gets its
-        # config from
-        if not self._dataset_only:
-            stdout, stderr = self._run(['-l'], log_stderr=False)
-            self._store = _parse_gitconfig_dump(
-                stdout, self._store, replace=False)
+        # config from, but also allow to override persisten information
+        # from dataset locally or globally
         if self._dataset:
             # now any dataset config
             dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
@@ -117,7 +115,12 @@ class ConfigManager(object):
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store = _parse_gitconfig_dump(
-                    stdout, self._store, replace=True)
+                    stdout, self._store, replace=False)
+
+        if not self._dataset_only:
+            stdout, stderr = self._run(['-l'], log_stderr=False)
+            self._store = _parse_gitconfig_dump(
+                stdout, self._store, replace=True)
 
     #
     # Compatibility with dict API
