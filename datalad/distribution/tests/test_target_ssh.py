@@ -80,6 +80,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     # Note: on windows absolute path is not url conform. But this way it's easy
     # to test, that ssh path is correctly used.
     if not on_windows:
+        # add random file under target_path, to explicitly test existing=replace
+        open(opj(target_path, 'random'), 'w').write('123')
+
         create_publication_target_sshwebserver(dataset=source,
                                                target="local_target",
                                                sshurl="ssh://localhost" +
@@ -89,6 +92,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target", push=True))
+
+        # ensure target tree actually replaced by source
+        assert_false(exists(opj(target_path, 'random')))
 
         if src_is_annex:
             annex = AnnexRepo(src_path)
