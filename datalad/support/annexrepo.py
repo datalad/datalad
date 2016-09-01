@@ -455,14 +455,12 @@ class AnnexRepo(GitRepo):
                 cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
                            files
                 self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
+                # currently simulating return value, assuming success
+                # for all files:
+                return_list = [{u'file': f, u'success': True} for f in files]
                 # TODO: use options with git_add instead!
             else:
-                super(AnnexRepo, self).add(files)
-
-            # TODO: Make sure return value from GitRepo is consistent
-            # currently simulating return value, assuming success
-            # for all files:
-            return_list = [{u'file': f, u'success': True} for f in files]
+                return_list = super(AnnexRepo, self).add(files)
 
         else:
             return_list = list(self._run_annex_command_json(
@@ -793,6 +791,11 @@ class AnnexRepo(GitRepo):
                                 log_stderr=False, cwd=cwd)
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
+
+        # currently simulating similar return value, assuming success
+        # for all files:
+        # TODO: Make return values consistent across both *Repo classes!
+        return [{u'file': f, u'success': True} for f in urls]
 
     @normalize_path
     def rm_url(self, file_, url):

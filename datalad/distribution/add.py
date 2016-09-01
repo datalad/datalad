@@ -21,17 +21,16 @@ from datalad.interface.common_opts import annex_add_opts
 from datalad.support.constraints import EnsureStr
 from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.support.network import is_datalad_compat_ri
-from datalad.utils import getpwd
 
 
 from .dataset import EnsureDataset
 from .dataset import datasetmethod
 from .dataset import Dataset
 from .dataset import resolve_path
+from .dataset import require_dataset
 from .install import _get_git_url_from_source
 
 
@@ -125,10 +124,6 @@ class Add(Interface):
             annex_opts=None,
             annex_add_opts=None):
 
-        ################
-        # TODO: check require_dataset!
-        ###############
-
         # parameter constraints:
         if not path and not source:
             raise InsufficientArgumentsError("insufficient information for "
@@ -144,24 +139,15 @@ class Add(Interface):
             source = [source]
 
         # resolve dataset:
-        if dataset:
-            if not isinstance(dataset, Dataset):
-                dataset = Dataset(dataset)
-        else:
-            dspath = GitRepo.get_toppath(getpwd())
-            if dspath:
-                dataset = Dataset(dspath)
-            else:
-                raise InsufficientArgumentsError("insufficient information for "
-                                                 "adding: no dataset given and "
-                                                 "none found.")
-        assert isinstance(dataset, Dataset)
+        dataset = require_dataset(dataset, check_installed=True,
+                                  purpose='adding')
 
         # TODO: Q: are the list operations in the following 3 blocks (resolving
         #          paths, sources and datasets) guaranteed to be stable
         #          regarding order?
 
         # resolve path(s):
+        # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
         # TODO: expandpath?
         resolved_paths = []
         if path:
@@ -233,43 +219,69 @@ class Add(Interface):
                 calls[ds.path]['addurl_f'].append((p, s))
 
         # now do the actual add operations:
-        # TODO: what to do on failure? If we don't catch, we currently cannot
-        #       report, what possibly was successfully done before
-        # TODO: return values
         # TODO: implement git/git-annex/git-annex-add options
 
+        return_values = []
         for dspath in calls:
             ds = Dataset(dspath)
             if calls[dspath]['g_add']:
-                ds.repo.add(calls[dspath]['g_add'],
-                            git=True, git_options=git_opts)
+                return_values.extend(ds.repo.add(calls[dspath]['g_add'],
+                                                 git=True,
+                                                 git_options=git_opts))
             if calls[ds.path]['a_add']:
                 # TODO: annex required or call git-annex-init if there's no annex yet?
                 assert isinstance(ds.repo, AnnexRepo)
-                ds.repo.add(calls[dspath]['a_add'], git=False,
-                            git_options=git_opts, annex_options=annex_opts,
-                            options=annex_add_opts)
+                return_values.extend(
+                    ds.repo.add(calls[dspath]['a_add'],
+                                git=False,
+                                git_options=git_opts,
+                                annex_options=annex_opts,
+                                options=annex_add_opts))
+
+            # TODO: AnnexRepo.add_urls' return value doesn't contain the created
+            #       file name but the url
             if calls[ds.path]['addurl_s']:
                 if to_git:
                     raise NotImplementedError("Can't add a remote source "
                                               "directly to git.")
                 assert isinstance(ds.repo, AnnexRepo)
-                ds.repo.add_urls(calls[ds.path]['addurl_s'],
-                                 options=annex_add_opts,  # TODO: extra parameter for addurl?
-                                 git_options=git_opts,
-                                 annex_options=annex_opts)
+                return_values.extend(
+                    ds.repo.add_urls(calls[ds.path]['addurl_s'],
+                                     options=annex_add_opts,
+                                     # TODO: extra parameter for addurl?
+                                     git_options=git_opts,
+                                     annex_options=annex_opts))
             if calls[ds.path]['addurl_f']:
                 if to_git:
                     raise NotImplementedError("Can't add a remote source "
                                               "directly to git.")
                 assert isinstance(ds.repo, AnnexRepo)
                 for f, u in calls[ds.path]['addurl_f']:
-                    ds.repo.add_url_to_file(f, u,
-                                            options=annex_add_opts,  # TODO: see above
-                                            git_options=git_opts,
-                                            annex_options=annex_opts,
-                                            batch=True)
+                    return_values.append(
+                        ds.repo.add_url_to_file(f, u,
+                                                options=annex_add_opts,  # TODO: see above
+                                                git_options=git_opts,
+                                                annex_options=annex_opts,
+                                                batch=True))
 
-        # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
+        return return_values
 
-        # TODO: result_renderer
+    @staticmethod
+    def result_renderer_cmdline(res):
+        from datalad.ui import ui
+        from os import linesep
+        if res is None:
+            res = []
+        if not isinstance(res, list):
+            res = [res]
+        if not len(res):
+            ui.message("Nothing was installed")
+            return
+
+        msg = linesep.join([
+            "{suc} {path}".format(
+                suc="Added" if item.get('success', False)
+                    else "Failed to add",
+                path=item.get('file'))
+            for item in res])
+        ui.message(msg)

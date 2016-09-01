@@ -596,6 +596,12 @@ class GitRepo(object):
                 msg = self._get_added_files_commit_msg(files)
             self.commit(msg=msg)
 
+        # Make sure return value from GitRepo is consistent with AnnexRepo
+        # currently simulating similar return value, assuming success
+        # for all files:
+        # TODO: Make return values consistent across both *Repo classes!
+        return [{u'file': f, u'success': True} for f in files]
+
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
         """Remove files.
