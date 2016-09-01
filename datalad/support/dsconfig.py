@@ -17,7 +17,7 @@ from os.path import join as opj, exists
 
 lgr = logging.getLogger('datalad.support.dsconfig')
 
-cfg_kv_regex = re.compile(r'([^=]+)=(.*)')
+cfg_kv_regex = re.compile(r'(^.*)\n(.*)$', flags=re.MULTILINE)
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
@@ -52,7 +52,7 @@ def _parse_gitconfig_dump(dump, store, replace):
         # if we don't want to replace value, perform the multi-value
         # preserving addition on the existing store right away
         dct = store
-    for line in dump.split('\n'):
+    for line in dump.split('\0'):
         if not line:
             continue
         k, v = cfg_kv_regex.match(line).groups()
@@ -129,7 +129,7 @@ class ConfigManager(object):
             # now any dataset config
             dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
             if exists(dscfg_fname):
-                stdout, stderr = self._run(['-l', '--file', dscfg_fname],
+                stdout, stderr = self._run(['-z', '-l', '--file', dscfg_fname],
                     log_stderr=False)
                 # overwrite existing value, do not amend to get multi-line
                 # values
@@ -137,7 +137,7 @@ class ConfigManager(object):
                     stdout, self._store, replace=False)
 
         if not self._dataset_only:
-            stdout, stderr = self._run(['-l'], log_stderr=False)
+            stdout, stderr = self._run(['-z', '-l'], log_stderr=False)
             self._store = _parse_gitconfig_dump(
                 stdout, self._store, replace=True)
 
