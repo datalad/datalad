@@ -306,7 +306,7 @@ class Publish(Interface):
         return published, skipped
 
     @staticmethod
-    def result_renderer_cmdline(results):
+    def result_renderer_cmdline(results, args):
         from datalad.ui import ui
         for res, res_label in zip(results, ('published', 'skipped')):
             if not res:

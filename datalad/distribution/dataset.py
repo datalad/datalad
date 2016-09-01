@@ -11,6 +11,7 @@
 
 import logging
 
+import os
 from os.path import abspath, join as opj, commonprefix, sep, normpath
 from six import string_types, PY2
 from functools import wraps
@@ -33,7 +34,6 @@ lgr.log(5, "Importing dataset")
 def _with_sep(path):
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
-
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
 #       (see normalize_path)
@@ -62,11 +62,12 @@ def resolve_path(path, ds=None):
 
 
 class Dataset(object):
-    __slots__ = ['_path', '_repo']
+    __slots__ = ['_path', '_repo', '_id']
 
     def __init__(self, path):
         self._path = abspath(path)
         self._repo = None
+        self._id = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -107,13 +108,43 @@ class Dataset(object):
                             pass
                 if self._repo is None:
                     lgr.info("Failed to detect a valid repo at %s" % self.path)
+                else:
+                    # reset ID, because we now have a repo attached
+                    self._id = None
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
             if 'git-annex' in self._repo.get_branches():
                 # we acquired git-annex branch
                 self._repo = AnnexRepo(self._repo.path, create=False)
+                # reset ID, because we now have an annex attached
+                self._id = None
         return self._repo
+
+    @property
+    def id(self):
+        """Identifier of the dataset
+
+        Returns
+        -------
+        str
+          This is either a UUID of the dataset's annex, or the SHA sum
+          of the current commit of the Git repository (if there is no annex),
+          or string composed from the path of the dataset. Any non-UUID ID
+          string is prefixed with '_:'
+        """
+        if self._id is None:
+            if self.repo:
+                if hasattr(self.repo, 'uuid'):
+                    self._id = self.repo.uuid
+                if not self._id:
+                    # no annex
+                    self._id = '_:{}'.format(self.repo.get_hexsha())
+            else:
+                # not even a VCS
+                self._id = '_:{}'.format(self.path.replace(os.sep, '_'))
+
+        return self._id
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.

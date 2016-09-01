@@ -367,7 +367,7 @@ class Uninstall(Interface):
             raise ValueError("Cannot uninstall %s" % path)
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if not res:
             ui.message("Nothing was uninstalled")

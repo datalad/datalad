@@ -255,3 +255,19 @@ def test_require_dataset(path):
         require_dataset,
         'some',
         check_installed=True)
+
+
+@with_tempfile(mkdir=True)
+def test_dataset_id(path):
+    ds = Dataset(path)
+    # ID made from path
+    assert_true(ds.id.startswith('_:_'))
+    ds.create(no_annex=True)
+    # still "blank node" ID
+    assert_true(ds.id.startswith('_:'))
+    assert_true(ds.repo.get_hexsha() in ds.id)
+    ds.create(force=True)
+    assert_equal(
+        ds.repo.repo.config_reader().get_value(
+            'annex', 'uuid', default='NOTHING'),
+        ds.id)

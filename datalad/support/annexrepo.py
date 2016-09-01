@@ -66,7 +66,7 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode']
+    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode', '_uuid']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
@@ -117,6 +117,9 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        # initialize
+        self._uuid = None
 
         if git_opts or annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git, git-annex and/or "
@@ -452,9 +455,14 @@ class AnnexRepo(GitRepo):
         if git:
             # add to git instead of annex
             if self.is_direct_mode():
-                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
-                           files
-                self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
+                self.proxy(['git', 'add'] + options + files)
+
+                # Note/TODO:
+                # There was a reason to use the following instead of self.proxy:
+                #cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
+                #           files
+                #self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
+
                 # currently simulating return value, assuming success
                 # for all files:
                 return_list = [{u'file': f, u'success': True} for f in files]
@@ -988,7 +996,7 @@ class AnnexRepo(GitRepo):
     #  and globs.
     # OR if explicit filenames list - return list of matching entries, if globs/dirs -- return dict?
     @normalize_paths(map_filenames_back=True)
-    def info(self, files, batch=False):
+    def info(self, files, batch=False, fast=False):
         """Provide annex info for file(s).
 
         Parameters
@@ -1002,7 +1010,8 @@ class AnnexRepo(GitRepo):
           Info for each file
         """
 
-        options = ['--bytes']
+        options = ['--bytes', '--fast'] if fast else ['--bytes']
+
         if not batch:
             json_objects = self._run_annex_command_json('info', args=options + files)
         else:
@@ -1026,7 +1035,7 @@ class AnnexRepo(GitRepo):
             out[f] = j
         return out
 
-    def repo_info(self):
+    def repo_info(self, fast=False):
         """Provide annex info for the entire repository.
 
         Returns
@@ -1035,7 +1044,9 @@ class AnnexRepo(GitRepo):
           Info for the repository, with keys matching the ones retuned by annex
         """
 
-        json_records = list(self._run_annex_command_json('info', args=['--bytes']))
+        options = ['--bytes', '--fast'] if fast else ['--bytes']
+
+        json_records = list(self._run_annex_command_json('info', args=options))
         assert(len(json_records) == 1)
 
         # TODO: we need to abstract/centralize conversion from annex fields
@@ -1358,6 +1369,24 @@ class AnnexRepo(GitRepo):
         return [line.split()[1] for line in std_out.splitlines()
                 if line.startswith('copy ') and line.endswith('ok')]
 
+    @property
+    def uuid(self):
+        """Annex UUID
+
+        Returns
+        -------
+        str
+          Returns a the annex UUID, if there is any, or `None` otherwise.
+        """
+        if not self._uuid:
+            if not self.repo:
+                return None
+            repocfg = self.repo.config_reader()
+            self._uuid = repocfg.get_value('annex', 'uuid', default='')
+            if not self._uuid:
+                self._uuid = None
+        return self._uuid
+
 
 # TODO: Why was this commented out?
 # @auto_repr
@@ -1537,5 +1566,3 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
-
-

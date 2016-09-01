@@ -203,11 +203,12 @@ class Create(Interface):
 
             vcs.commit(msg="datalad initial commit",
                        options=to_options(allow_empty=True))
-            
+            # reset ID, we have a VCS now
+            ds._id = None
             return ds
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
             ui.message("Nothing was created")

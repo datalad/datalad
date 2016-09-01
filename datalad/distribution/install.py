@@ -19,6 +19,7 @@ from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
 
 from six.moves.urllib.parse import quote as urlquote
 
+from datalad.dochelpers import exc_str
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.distribution.dataset import Dataset, datasetmethod, \
@@ -415,7 +416,7 @@ class Install(Interface):
         # install something into the dataset
 
         # needed by the logic below
-        assert(isabs(path))
+       # assert(isabs(path))  # Gergana swears this piece of code is not that important
 
         # express the destination path relative to the root of this dataset
         relativepath = relpath(path, start=ds.path)
@@ -431,7 +432,7 @@ class Install(Interface):
         # FLOW GUIDE
         #
         # at this point we know nothing about the
-        # installation targether
+        # installation target
         ###################################################
         try:
             # it is simplest to let annex tell us what we are dealing with
@@ -442,9 +443,9 @@ class Install(Interface):
                 # this is not an annex repo, but we raise exceptions
                 # to be able to treat them alike in the special case handling
                 # below
-                if not exists(path):
-                    raise IOError("path doesn't exist yet, might need special handling")
-                elif relativepath in vcs.get_indexed_files():
+                # TODO: inefficient to ask for all files, we need to check
+                # with GitRepo if it knows about the file
+                if relativepath in vcs.get_indexed_files():
                     # relativepath is in git
                     raise FileInGitError("We need to handle it as known to git")
                 else:
@@ -562,7 +563,7 @@ class Install(Interface):
             else:
                 return None
 
-        except IOError:
+        except IOError as exc:
             ###################################################
             # FLOW GUIDE
             #
@@ -572,7 +573,7 @@ class Install(Interface):
             # - an entire untracked/unknown existing subdataset
             # - non-existing content that should be installed from `source`
             ###################################################
-            lgr.log(5, "IOError logic")
+            lgr.log(5, "IOError logic: %s", exc_str(exc))
             # we can end up here in two cases ATM
             if (exists(path) or islink(path)) or source is None:
                 # FLOW GUIDE
@@ -665,7 +666,7 @@ class Install(Interface):
         return vcs
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
             res = []
