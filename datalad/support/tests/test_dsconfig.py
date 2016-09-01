@@ -151,3 +151,19 @@ def test_something(path, new_home):
         # remove_section to clean it up entirely
         globalcfg.remove_section('datalad.unittest', where='global')
         ok_file_has_content(global_gitconfig, "")
+
+
+@with_tree(tree={
+    'ds': {
+    '.datalad': {
+        'config': """\
+[crazy]
+    fa = !git remote | xargs -r -I REMOTE /bin/bash -c 'echo I: Fetching from REMOTE && git fetch --prune REMOTE && git fetch -t REMOTE' && [ -d .git/svn ] && bash -c 'echo I: Fetching from SVN && git svn fetch' || : && [ -e .gitmodules ] && bash -c 'echo I: Fetching submodules && git submodule foreach git fa' && [ -d .git/sd ] && bash -c 'echo I: Fetching bugs into sd && git-sd pull --all' || :
+    pa = !git paremotes | tr ' ' '\\n'  | xargs -r -l1 git push
+    pt = !git testremotes | tr ' ' '\\n'  | xargs -r -l1 -I R git push -f R master
+    ptdry = !git testremotes | tr ' ' '\\n'  | xargs -r -l1 -I R git push -f --dry-run R master
+    padry = !git paremotes | tr ' ' '\\n' | xargs -r -l1 git push --dry-run
+"""}}})
+def test_crazy_cfg(path):
+    cfg = ConfigManager(Dataset(opj(path, 'ds')), dataset_only=True)
+    assert_in('crazy.padry', cfg)
