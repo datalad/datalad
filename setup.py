@@ -56,10 +56,13 @@ requires = {
         'requests>=1.2',
     ] + keyring_requires,
     'downloaders-extra': [
-       'requests_ftp',
+        'requests_ftp',
     ],
     'crawl': [
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
+    ],
+    'publish': [
+        'jsmin',
     ],
     'tests': [
         'BeautifulSoup4',  # VERY weak requirement, still used in one of the tests
@@ -92,7 +95,7 @@ setup(
     version=version,
     description="data distribution geared toward scientific datasets",
     packages=datalad_pkgs,
-    install_requires=requires['core'] + requires['downloaders'],
+    install_requires=requires['core'] + requires['downloaders'] + requires['publish'],
     extras_require=requires,
     entry_points={
         'console_scripts': [

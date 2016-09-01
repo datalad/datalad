@@ -10,7 +10,7 @@
 """
 
 import os
-from os.path import join as opj, abspath, basename
+from os.path import join as opj, abspath, basename, exists
 
 from git.exc import GitCommandError
 
@@ -80,6 +80,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
     # Note: on windows absolute path is not url conform. But this way it's easy
     # to test, that ssh path is correctly used.
     if not on_windows:
+        # add random file under target_path, to explicitly test existing=replace
+        open(opj(target_path, 'random'), 'w').write('123')
+
         create_publication_target_sshwebserver(dataset=source,
                                                target="local_target",
                                                sshurl="ssh://localhost" +
@@ -89,6 +92,9 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
             source.repo.get_remote_url("local_target"))
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target", push=True))
+
+        # ensure target tree actually replaced by source
+        assert_false(exists(opj(target_path, 'random')))
 
         if src_is_annex:
             annex = AnnexRepo(src_path)
@@ -111,6 +117,18 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
         eq_("ssh://localhost" + target_path,
             source.repo.get_remote_url("local_target", push=True))
 
+        # pushed web-interface html to dataset
+        assert(exists(opj(target_path, "index.html")))
+        # pushed web-interface assets directory to dataset
+        assert(exists(opj(target_path, ".git", "datalad", "web")))
+        # enabled dataset post-update hook
+        assert(exists(opj(target_path, ".git", "hooks", "post-update")))
+        # not created dataset metatadata directory in dataset
+        assert_false(exists(opj(target_path, ".git", "datalad", "metadata")))
+        # correct ls_json command in hook content
+        assert_in('datalad ls -r --json file %s' % target_path[:-1],
+                  open(opj(target_path, ".git", "hooks", "post-update")).read())
+
         # now, push should work:
         publish(dataset=source, to="local_target")
 
@@ -120,7 +138,6 @@ def test_target_ssh_simple(origin, src_path, target_rootpath):
 @with_tempfile(mkdir=True)
 @with_tempfile(mkdir=True)
 def test_target_ssh_recursive(origin, src_path, target_path):
-
     # prepare src
     source = install(path=src_path, source=origin, recursive=True)
     # TODO: For now, circumnavigate the detached head issue.
@@ -137,13 +154,19 @@ def test_target_ssh_recursive(origin, src_path, target_path):
                                            target_dir=target_path + "/%NAME",
                                            recursive=True)
 
-    # raise if git repos were not created:
-    t_super = GitRepo(opj(target_path, basename(src_path)), create=False)
-    t_sub1 = GitRepo(opj(target_path, basename(src_path) + "-subm 1"),
-                     create=False)
-    t_sub2 = GitRepo(opj(target_path, basename(src_path) + "-subm 2"),
-                     create=False)
+    # raise if git repos were not created
+    for suffix in ['-subm 1', '-subm 2', '']:
+        target_dir = opj(target_path, basename(src_path) + suffix)
+        # raise if git repos were not created
+        GitRepo(target_dir, create=False)
+
+    # web-interface html pushed to dataset
+    assert(exists(opj(target_dir, "index.html")))
+    # enabled dataset post-update hook
+    assert(exists(opj(target_dir, ".git", "hooks", "post-update")))
+    # hook content has the correct ls_json command
+    assert_in('datalad ls -r --json file %s' % target_dir[:-1],
+              open(opj(target_dir, ".git", "hooks", "post-update")).read())
 
     for repo in [source.repo, sub1.repo, sub2.repo]:
         assert_not_in("local_target", repo.get_remotes())
-
