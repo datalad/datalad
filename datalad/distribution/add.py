@@ -267,7 +267,7 @@ class Add(Interface):
         return return_values
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         from os import linesep
         if res is None:
@@ -275,7 +275,7 @@ class Add(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Nothing was installed")
+            ui.message("Nothing was added")
             return
 
         msg = linesep.join([
