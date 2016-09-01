@@ -29,6 +29,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import getpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
+from datalad.support.dsconfig import ConfigManager
 
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
@@ -58,12 +59,13 @@ def resolve_path(path, ds=None):
 
 
 class Dataset(object):
-    __slots__ = ['_path', '_repo', '_id']
+    __slots__ = ['_path', '_repo', '_id', '_cfg']
 
     def __init__(self, path):
         self._path = abspath(path)
         self._repo = None
         self._id = None
+        self._cfg = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -141,6 +143,19 @@ class Dataset(object):
                 self._id = '_:{}'.format(self.path.replace(os.sep, '_'))
 
         return self._id
+
+    @property
+    def config(self):
+        """Get an instance of the parser for the persistent dataset configuration.
+
+        Returns
+        -------
+        ConfigManager
+        """
+        if self._cfg is None:
+            # associate with this dataset and read the entire config hierarchy
+            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+        return self._cfg
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
