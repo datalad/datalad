@@ -22,6 +22,25 @@ cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
 
+_where_reload_doc = """
+        where : {'dataset', 'local', 'global'}, optional
+          Indicator which configuration file to modify. 'dataset' indicates the
+          persistent configuration in .datalad/config of a dataset; 'local'
+          the configuration of a dataset's Git repository in .git/config;
+          'global' refers to the general configuration that is not specific to
+          a single repository (usually in $USER/.gitconfig).
+        reload : bool
+          Flag whether to reload the configuration from file(s) after
+          modification. This can be disable to make multiple sequential
+          modifications slightly more efficient.""".lstrip()
+
+
+def _where_reload(obj):
+    """Helper decorator to simplify providing repetitive docstring"""
+    obj.__doc__ = obj.__doc__ % _where_reload_doc
+    return obj
+
+
 def _parse_gitconfig_dump(dump, store, replace):
     if replace:
         # if we want to replace existing values in the store
@@ -100,26 +119,27 @@ class ConfigManager(object):
     def reload(self):
         """Reload all configuration items from the configured sources"""
         self._store = {}
-        # 2-step strategy: load git config from all supported sources
-        # then load datalad dataset config from dataset
+        # 2-step strategy:
+        #   - load datalad dataset config from dataset
+        #   - load git config from all supported by git sources
         # in doing so we always stay compatible with where Git gets its
-        # config from
-        if not self._dataset_only:
-            stdout, stderr = self._runner.run(
-                ['git', 'config', '-l'], log_stderr=False)
-            self._store = _parse_gitconfig_dump(
-                stdout, self._store, replace=False)
+        # config from, but also allow to override persisten information
+        # from dataset locally or globally
         if self._dataset:
             # now any dataset config
             dscfg_fname = opj(self._dataset.path, '.datalad', 'config')
             if exists(dscfg_fname):
-                stdout, stderr = self._runner.run(
-                    ['git', 'config', '-l', '--file', dscfg_fname],
+                stdout, stderr = self._run(['-l', '--file', dscfg_fname],
                     log_stderr=False)
                 # overwrite existing value, do not amend to get multi-line
                 # values
                 self._store = _parse_gitconfig_dump(
-                    stdout, self._store, replace=True)
+                    stdout, self._store, replace=False)
+
+        if not self._dataset_only:
+            stdout, stderr = self._run(['-l'], log_stderr=False)
+            self._store = _parse_gitconfig_dump(
+                stdout, self._store, replace=True)
 
     #
     # Compatibility with dict API
@@ -212,10 +232,29 @@ class ConfigManager(object):
     #
     # Modify configuration (proxy respective git-config call)
     #
-    def _require_location(self, where, args=None):
+    @_where_reload
+    def _run(self, args, where=None, reload=False, **kwargs):
+        """Centralized helper to run "git config" calls
+
+        Parameters
+        ----------
+        args : list
+          Arguments to pass for git config
+        %s
+        **kwargs
+          Keywords arguments for Runner's call
+        """
+        if where:
+            args = self._get_location_args(where) + args
+        out = self._runner.run(['git', 'config'] + args, **kwargs)
+        if reload:
+            self.reload()
+        return out
+
+    def _get_location_args(self, where, args=None):
         if args is None:
             args = []
-        if not where in ('dataset', 'local', 'global'):
+        if where not in ('dataset', 'local', 'global'):
             raise ValueError(
                 "unknown configuration label '{}' (not 'dataset', or 'global')".format(
                     where))
@@ -238,6 +277,7 @@ class ConfigManager(object):
             args.append('--local')
         return args
 
+    @_where_reload
     def add(self, var, value, where='dataset', reload=True):
         """Add a configuration variable and value
 
@@ -248,25 +288,10 @@ class ConfigManager(object):
           'core.editor'
         value : str
           Variable value
-        where : {'dataset', 'local', 'global'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
-          persistent configuration in .datalad/config of a dataset; 'local'
-          the configuration of a dataset's Git repository in .git/config;
-          'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig
-        reload : bool
-          Flag whether to reload the configuration from file(s) after
-          modification. This can be disable to make multiple sequential
-          modifications slightly more efficient.
-        """
-        args = self._require_location(where)
-        args += ('--add', var, value)
-        self._runner.run(
-            ['git', 'config'] + args,
-            log_stderr=True)
-        if reload:
-            self.reload()
+        %s"""
+        self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
 
+    @_where_reload
     def rename_section(self, old, new, where='dataset', reload=True):
         """Rename a configuration section
 
@@ -276,44 +301,28 @@ class ConfigManager(object):
           Name of the section to rename.
         new : str
           Name of the section to rename to.
-        where : {'dataset', 'local', 'global'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
-          persistent configuration in .datalad/config of a dataset; 'local'
-          the configuration of a dataset's Git repository in .git/config;
-          'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig
-        reload : bool
-          Flag whether to reload the configuration from file(s) after
-          modification. This can be disable to make multiple sequential
-          modifications slightly more efficient.
-        """
-        args = self._require_location(where)
-        self._runner.run(
-            ['git', 'config'] + args + ['--rename-section', old, new])
-        if reload:
-            self.reload()
+        %s"""
+        self._run(['--rename-section', old, new], where=where, reload=reload)
 
+    @_where_reload
+    def remove_section(self, sec, where='dataset', reload=True):
+        """Rename a configuration section
+
+        Parameters
+        ----------
+        sec : str
+          Name of the section to remove.
+        %s"""
+        self._run(['--remove-section', sec], where=where, reload=reload)
+
+    @_where_reload
     def unset(self, var, where='dataset', reload=True):
-        """Remove all occurences of a variable
+        """Remove all occurrences of a variable
 
         Parameters
         ----------
         var : str
           Name of the variable to remove
-        where : {'dataset', 'local', 'global'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
-          persistent configuration in .datalad/config of a dataset; 'local'
-          the configuration of a dataset's Git repository in .git/config;
-          'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig
-        reload : bool
-          Flag whether to reload the configuration from file(s) after
-          modification. This can be disable to make multiple sequential
-          modifications slightly more efficient.
-        """
-        args = self._require_location(where)
-        self._runner.run(
-            # use unset all as it is simpler for now
-            ['git', 'config'] + args + ['--unset-all', var])
-        if reload:
-            self.reload()
+        %s"""
+        # use unset all as it is simpler for now
+        self._run(['--unset-all', var], where=where, reload=reload)
