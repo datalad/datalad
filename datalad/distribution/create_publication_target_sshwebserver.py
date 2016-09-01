@@ -242,18 +242,17 @@ class CreatePublicationTargetSSHWebserver(Interface):
 
                 if path_exists:
                     if existing == 'error':
-                        raise RuntimeError(
-                            "Target directory %s already exists." % path)
+                        raise RuntimeError("Target directory %s already exists." % path)
                     elif existing == 'skip':
                         continue
                     elif existing == 'replace':
-                        # TODO REMOVE IT!
-                        raise NotImplementedError("rm it!")
-                        path_exists = False  # if we succeeded removing it
+                        ssh(["chmod", "+r+w", "-R", path])  # enable write permissions to allow removing dir
+                        ssh(["rm", "-rf", path])            # remove target at path
+                        path_exists = False                 # if we succeeded in removing it
                     elif existing == 'reconfigure':
                         pass
                     else:
-                        raise ValueError("Do not know how to hand existing=%s" % repr(existing))
+                        raise ValueError("Do not know how to handle existing=%s" % repr(existing))
 
                 if not path_exists:
                     try:
