@@ -15,7 +15,7 @@ lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
 
 import os
-from os.path import abspath, join as opj, normpath
+from os.path import abspath, join as opj, normpath, realpath, relpath
 from six import string_types, PY2
 from functools import wraps
 
@@ -28,6 +28,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import getpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
+from datalad.support.dsconfig import ConfigManager
 
 
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
@@ -57,12 +58,13 @@ def resolve_path(path, ds=None):
 
 
 class Dataset(object):
-    __slots__ = ['_path', '_repo', '_id']
+    __slots__ = ['_path', '_repo', '_id', '_cfg']
 
     def __init__(self, path):
         self._path = abspath(path)
         self._repo = None
         self._id = None
+        self._cfg = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -140,6 +142,19 @@ class Dataset(object):
                 self._id = '_:{}'.format(self.path.replace(os.sep, '_'))
 
         return self._id
+
+    @property
+    def config(self):
+        """Get an instance of the parser for the persistent dataset configuration.
+
+        Returns
+        -------
+        ConfigManager
+        """
+        if self._cfg is None:
+            # associate with this dataset and read the entire config hierarchy
+            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+        return self._cfg
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -293,7 +308,7 @@ class Dataset(object):
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
         from .install import _with_sep
-        if not path.startswith(_with_sep(self.path)):
+        if not realpath(path).startswith(_with_sep(realpath(self.path))):
             raise ValueError("path %s outside dataset %s" % (path, self))
 
         subds = Dataset(path)
@@ -387,6 +402,11 @@ class Dataset(object):
         if sds_path is None:
             return None
         else:
+            if realpath(self.path) != self.path:
+                # we had symlinks in the path but sds_path would have not
+                # so let's get "symlinked" version of the superdataset path
+                sds_relpath = relpath(sds_path, realpath(self.path))
+                sds_path = normpath(opj(self.path, sds_relpath))
             return Dataset(sds_path)
 
 

@@ -19,8 +19,9 @@ from glob import glob
 
 from ...tests.utils import ok_, eq_, assert_cwd_unchanged, assert_raises, \
     with_tempfile, assert_in
-from ...tests.utils import assert_equal
+from ...tests.utils import assert_equal, assert_not_equal
 from ...tests.utils import assert_false
+from ...tests.utils import assert_true
 from ...tests.utils import ok_archives_caches
 from ...tests.utils import SkipTest
 
@@ -34,6 +35,70 @@ from ...utils import find_files
 from ...utils import rmtree
 from ... import lgr
 from ...api import add_archive_content, clean
+
+
+treeargs = dict(
+    tree=(
+        ('1.tar.gz', (
+            ('crcns_pfc-1_data', (('CR24A', (
+                                    ('behaving1', {'1 f.txt': '1 f load'}),)),)),
+            ('crcns_pfc-1_data', (('CR24C', (
+                                    ('behaving3', {'3 f.txt': '3 f load'}),)),)),
+            ('crcns_pfc-1_data', (('CR24D', (
+                                    ('behaving2', {'2 f.txt': '2 f load'}),)),)),
+            ('__MACOSX', (('crcns_pfc-2_data', (
+                                    ('CR24B', (
+                                        ('behaving2', {'2 f.txt': '2 f load'}),)),)
+                           ),)),
+            ('crcns_pfc-2_data', (('__MACOSX', (
+                                    ('CR24E', (
+                                        ('behaving2', {'2 f.txt': '2 f load'}),)),)
+                                   ),)),
+
+        )),
+    )
+)
+
+
+@assert_cwd_unchanged(ok_to_chdir=True)
+@with_tree(**treeargs)
+@serve_path_via_http()
+@with_tempfile(mkdir=True)
+def test_add_archive_dirs(path_orig, url, repo_path):
+    # change to repo_path
+    chpwd(repo_path)
+
+    # create annex repo
+    repo = AnnexRepo(repo_path, create=True, direct=False)
+
+    # add archive to the repo so we could test
+    with swallow_outputs():
+        repo.add_urls([opj(url, '1.tar.gz')], options=["--pathdepth", "-1"])
+    repo.commit("added 1.tar.gz")
+
+    # test with excludes and annex options
+    add_archive_content('1.tar.gz',
+                        existing='archive-suffix',
+                        # Since inconsistent and seems in many cases no leading dirs to strip, keep them as provided
+                        strip_leading_dirs=True,
+                        delete=True,
+                        leading_dirs_consider=['crcns.*', '1'],
+                        leading_dirs_depth=2,
+                        use_current_dir=False,
+                        exclude='.*__MACOSX.*')  # some junk penetrates
+
+    all_files = sorted(find_files('.'))
+    target_files = {
+        './CR24A/behaving1/1 f.txt',
+        './CR24C/behaving3/3 f.txt',
+        './CR24D/behaving2/2 f.txt',
+    }
+    eq_(set(all_files), target_files)
+
+    # regression test: the subdir in MACOSX wasn't excluded and its name was getting stripped by leading_dir_len
+    assert_false(exists('__MACOSX'))  # if stripping and exclude didn't work this fails
+    assert_false(exists('c-1_data'))  # if exclude doesn't work then name of subdir gets stripped by leading_dir_len
+    assert_false(exists('CR24B'))     # if exclude doesn't work but everything else works this fails
 
 
 # within top directory
