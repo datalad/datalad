@@ -290,7 +290,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             if at_root:
                 lgr.info("Uploading web interface to %s" % path)
                 try:
-                    CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh)
+                    CreatePublicationTargetSSHWebserver.upload_web_interface(path, ssh, shared)
                 except CommandError as e:
                     lgr.error("Failed to push web interface to the remote datalad repository.\n"
                               "Error: %s" % exc_str(e))
@@ -381,7 +381,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
             ssh(['git', '-C', path, 'annex', 'init', path])
 
     @staticmethod
-    def upload_web_interface(path, ssh):
+    def upload_web_interface(path, ssh, shared):
         # path to web interface resources on local
         webui_local = opj(dirname(datalad.__file__), 'resources', 'website')
         # upload html to dataset
@@ -393,6 +393,10 @@ class CreatePublicationTargetSSHWebserver(Interface):
         webresources_remote = opj(path, '.git', 'datalad', 'web')
         ssh(['mkdir', '-p', webresources_remote])
         ssh.copy(webresources_local, webresources_remote, recursive=True)
+
+        # explicitly make web+metadata dir of dataset world-readable, if shared set
+        if shared:
+            ssh(['chmod', 'a+r', '-R', dirname(webresources_remote)])
 
         # minimize and upload js assets
         for js_file in glob(opj(webresources_local, 'js', '*.js')):
