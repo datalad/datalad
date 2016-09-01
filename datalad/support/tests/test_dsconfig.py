@@ -10,12 +10,16 @@
 
 """
 
+from os.path import exists
 from os.path import join as opj
 
+from mock import patch
 from nose.tools import assert_false, assert_true, assert_equal
 from datalad.tests.utils import assert_raises
 from datalad.tests.utils import assert_in, assert_not_in
+from datalad.tests.utils import ok_file_has_content
 from datalad.tests.utils import with_tree
+from datalad.tests.utils import with_tempfile
 from datalad.utils import swallow_logs
 
 from datalad.distribution.dataset import Dataset
@@ -41,7 +45,8 @@ _dataset_config_template = {
 
 
 @with_tree(tree=_dataset_config_template)
-def test_something(path):
+@with_tempfile(mkdir=True)
+def test_something(path, new_home):
     # read nothing, has nothing
     cfg = ConfigManager(dataset_only=True)
     assert_false(len(cfg))
@@ -116,19 +121,28 @@ def test_something(path):
     assert_raises(ValueError, cfg.add, 'somesuch', 'shit', where='umpalumpa')
 
     # very carefully test non-local config
-    globalcfg = ConfigManager(dataset_only=False)
-    assert_not_in('datalad.unittest.youcan', globalcfg)
-    cfg.add('datalad.unittest.youcan', 'removeme', where='global')
-    # it did not go into the dataset's config!
-    assert_not_in('datalad.unittest.youcan', cfg)
-    # does not monitor changes!
-    globalcfg.reload()
-    assert_in('datalad.unittest.youcan', globalcfg)
-    with swallow_logs():
-        assert_raises(
-            CommandError,
-            globalcfg.unset,
-            'datalad.unittest.youcan',
-            where='local')
-    globalcfg.unset('datalad.unittest.youcan', where='global')
-    assert_not_in('datalad.unittest.youcan', globalcfg)
+    # so carefully that even in case of bad weather Yarik doesn't find some
+    # lame datalad unittest sections in his precious ~/.gitconfig
+    with patch.dict('os.environ', {'HOME': new_home}):
+        global_gitconfig = opj(new_home, '.gitconfig')
+        assert(not exists(global_gitconfig))
+        globalcfg = ConfigManager(dataset_only=False)
+        assert_not_in('datalad.unittest.youcan', globalcfg)
+        cfg.add('datalad.unittest.youcan', 'removeme', where='global')
+        assert(exists(global_gitconfig))
+        # it did not go into the dataset's config!
+        assert_not_in('datalad.unittest.youcan', cfg)
+        # does not monitor changes!
+        globalcfg.reload()
+        assert_in('datalad.unittest.youcan', globalcfg)
+        with swallow_logs():
+            assert_raises(
+                CommandError,
+                globalcfg.unset,
+                'datalad.unittest.youcan',
+                where='local')
+        globalcfg.unset('datalad.unittest.youcan', where='global')
+        assert_not_in('datalad.unittest.youcan', globalcfg)
+        # TODO: remove_section to clean it up entirely,
+        # since now it leaves the section itself behind
+        # ok_file_has_content(global_gitconfig, "")
