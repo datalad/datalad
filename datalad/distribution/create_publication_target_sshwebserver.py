@@ -398,10 +398,6 @@ class CreatePublicationTargetSSHWebserver(Interface):
         ssh(['mkdir', '-p', webresources_remote])
         ssh.copy(webresources_local, webresources_remote, recursive=True)
 
-        # explicitly make web+metadata dir of dataset world-readable, if shared set
-        if shared:
-            ssh(['chmod', 'a+r', '-R', dirname(webresources_remote)])
-
         # minimize and upload js assets
         for js_file in glob(opj(webresources_local, 'js', '*.js')):
             with open(js_file) as asset:
@@ -409,3 +405,7 @@ class CreatePublicationTargetSSHWebserver(Interface):
                 with make_tempfile(content=minified) as tempf:          # write minified to tempfile
                     js_name = js_file.split('/')[-1]
                     ssh.copy(tempf, opj(webresources_remote, 'assets', 'js', js_name))  # and upload js
+
+        # explicitly make web+metadata dir of dataset world-readable, if shared set
+        if shared:
+            ssh(['chmod', 'a+r', '-R', dirname(webresources_remote)])

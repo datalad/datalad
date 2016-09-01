@@ -436,9 +436,7 @@ def ignored(path, only_hidden=False):
     """
     if isdir(opj(path, ".git")) and not only_hidden:
         return True
-    if '.' == leaf_name(path)[0] or leaf_name(path) == 'index.html':
-        return True
-    return False
+    return '.' == leaf_name(path)[0] or leaf_name(path) == 'index.html'
 
 
 def metadata_locator(fs_metadata=None, path=None, ds_path=None, metadata_path=None):
