@@ -10,15 +10,26 @@
 
 """
 
-__docformat__ = 'restructuredtext'
-
 import logging
+
 from datalad.interface.base import Interface
-from datalad.support.constraints import EnsureStr, EnsureNone
-from datalad.distribution.dataset import EnsureDataset, datasetmethod
+from datalad.interface.common_opts import recursion_flag
+from datalad.interface.common_opts import recursion_limit
+from datalad.interface.common_opts import git_opts
+from datalad.interface.common_opts import annex_opts
+from datalad.interface.common_opts import annex_get_opts
+from datalad.support.constraints import EnsureStr
+from datalad.support.constraints import EnsureNone
 from datalad.support.param import Parameter
-from datalad.interface.common_opts import recursion_flag, recursion_limit, \
-    git_opts, annex_opts, annex_get_opts
+from datalad.support.annexrepo import AnnexRepo
+from datalad.support.gitrepo import to_options
+from datalad.support.exceptions import CommandNotAvailableError
+
+from .dataset import EnsureDataset
+from .dataset import datasetmethod
+from .dataset import require_dataset
+
+__docformat__ = 'restructuredtext'
 
 lgr = logging.getLogger('datalad.distribution.get')
 
@@ -71,7 +82,7 @@ class Get(Interface):
         annex_get_opts=annex_get_opts)
 
     @staticmethod
-    @datasetmethod(name='add')
+    @datasetmethod(name='get')
     def __call__(
             path=None,
             source=None,
@@ -81,4 +92,21 @@ class Get(Interface):
             git_opts=None,
             annex_opts=None,
             annex_get_opts=None):
+
+        ds = require_dataset(dataset, check_installed=True,
+                             purpose='getting content')
+
+        # needs to be an annex:
+        if not isinstance(ds.repo, AnnexRepo):
+            raise CommandNotAvailableError("Missing annex at {0}".format(ds))
+
+        # TODO: path with subdataset? (not recursive => fail)
+        # TODO: recursion into subdatasets
+        # Note: `path` may be a list, partially within subdatasets ...
+
+        # return value + result renderer
+
+        # Note: general call:
+        # ds.repo.get(path, options=['--from="{src}"'.format(src=source)])
+
         raise NotImplementedError
