@@ -21,7 +21,8 @@ cfg_kv_regex = re.compile(r'([^=]+)=(.*)')
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
-where_reload_doc = """
+
+_where_reload_doc = """
         where : {'dataset', 'local', 'global'}, optional
           Indicator which configuration file to modify. 'dataset' indicates the
           persistent configuration in .datalad/config of a dataset; 'local'
@@ -32,6 +33,12 @@ where_reload_doc = """
           Flag whether to reload the configuration from file(s) after
           modification. This can be disable to make multiple sequential
           modifications slightly more efficient.""".lstrip()
+
+
+def _where_reload(obj):
+    """Helper decorator to simplify providing repetitive docstring"""
+    obj.__doc__ = obj.__doc__ % _where_reload_doc
+    return obj
 
 
 def _parse_gitconfig_dump(dump, store, replace):
@@ -225,6 +232,7 @@ class ConfigManager(object):
     #
     # Modify configuration (proxy respective git-config call)
     #
+    @_where_reload
     def _run(self, args, where=None, reload=False, **kwargs):
         """Centralized helper to run "git config" calls
 
@@ -242,7 +250,6 @@ class ConfigManager(object):
         if reload:
             self.reload()
         return out
-    _run.__doc__ %= where_reload_doc
 
     def _get_location_args(self, where, args=None):
         if args is None:
@@ -270,6 +277,7 @@ class ConfigManager(object):
             args.append('--local')
         return args
 
+    @_where_reload
     def add(self, var, value, where='dataset', reload=True):
         """Add a configuration variable and value
 
@@ -282,8 +290,8 @@ class ConfigManager(object):
           Variable value
         %s"""
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
-    add.__doc__ %= where_reload_doc
 
+    @_where_reload
     def rename_section(self, old, new, where='dataset', reload=True):
         """Rename a configuration section
 
@@ -295,8 +303,8 @@ class ConfigManager(object):
           Name of the section to rename to.
         %s"""
         self._run(['--rename-section', old, new], where=where, reload=reload)
-    rename_section.__doc__ %= where_reload_doc
 
+    @_where_reload
     def remove_section(self, sec, where='dataset', reload=True):
         """Rename a configuration section
 
@@ -306,8 +314,8 @@ class ConfigManager(object):
           Name of the section to remove.
         %s"""
         self._run(['--remove-section', sec], where=where, reload=reload)
-    remove_section.__doc__ %= where_reload_doc
 
+    @_where_reload
     def unset(self, var, where='dataset', reload=True):
         """Remove all occurrences of a variable
 
@@ -318,4 +326,3 @@ class ConfigManager(object):
         %s"""
         # use unset all as it is simpler for now
         self._run(['--unset-all', var], where=where, reload=reload)
-    unset.__doc__ %= where_reload_doc
