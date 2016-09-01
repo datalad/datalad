@@ -79,21 +79,21 @@ def test_something(path, new_home):
 
     # always get all values
     assert_equal(
-        cfg.get('something', 'user'),
+        cfg.get('something.user'),
         ('name=Jane Doe', 'email=jd@example.com'))
-    assert_raises(KeyError, cfg.get, 'somedthing', 'user')
+    assert_raises(KeyError, cfg.__getitem__, 'somedthing.user')
     assert_equal(cfg.getfloat('onemore.complicated の beast with.dot', 'findme'), 5.0)
     assert_equal(cfg.getint('something', 'myint'), 3)
 
     # gitpython-style access
-    assert_equal(cfg.get('something', 'myint'), cfg.get_value('something', 'myint'))
+    assert_equal(cfg.get('something.myint'), cfg.get_value('something', 'myint'))
     assert_equal(cfg.get_value('doesnot', 'exist', default='oohaaa'), 'oohaaa')
     # weired, but that is how it is
     assert_raises(KeyError, cfg.get_value, 'doesnot', 'exist', default=None)
 
     # modification follows
     cfg.add('something.new', 'の')
-    assert_equal(cfg.get('something', 'new'), 'の')
+    assert_equal(cfg.get('something.new'), 'の')
     # sections are added on demand
     cfg.add('unheard.of', 'fame')
     assert_true(cfg.has_section('unheard.of'))

@@ -157,6 +157,10 @@ class ConfigManager(object):
         """Returns list of configuration item names"""
         return self._store.keys()
 
+    def get(self, key, default=None):
+        """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
+        return self._store.get(key, default)
+
     #
     # Compatibility with ConfigParser API
     #
@@ -188,17 +192,13 @@ class ConfigManager(object):
                 return True
         return False
 
-    def get(self, section, option):
-        """Get an option value for the named section"""
-        return self._store['.'.join((section, option))]
-
     def getint(self, section, option):
         """A convenience method which coerces the option value to an integer"""
-        return int(self.get(section, option))
+        return int(self.get_value(section, option))
 
     def getfloat(self, section, option):
         """A convenience method which coerces the option value to a float"""
-        return float(self.get(section, option))
+        return float(self.get_value(section, option))
 
     # this is a hybrid of ConfigParser and dict API
     def items(self, section=None):
@@ -221,7 +221,7 @@ class ConfigManager(object):
         config parser.
         """
         try:
-            return self.get(section, option)
+            return self['.'.join((section, option))]
         except KeyError as e:
             # this strange dance is needed because gitpython does it this way
             if default is not None:
