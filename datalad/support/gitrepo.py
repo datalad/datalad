@@ -538,7 +538,7 @@ class GitRepo(object):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True):
+    def add(self, files, commit=False, msg=None, git=True, _datalad_msg=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -592,7 +592,7 @@ class GitRepo(object):
         if commit:
             if msg is None:
                 msg = self._get_added_files_commit_msg(files)
-            self.commit(msg=msg)
+            self.commit(msg=msg, _datalad_msg=_datalad_msg)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
@@ -641,7 +641,12 @@ class GitRepo(object):
         # flush possibly cached in GitPython changes to index:
         self.repo.index.write()
 
-    def commit(self, msg=None, options=None):
+    @staticmethod
+    def _get_prefixed_commit_msg(msg):
+        DATALAD_PREFIX = "[DATALAD]"
+        return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
+
+    def commit(self, msg=None, options=None, _datalad_msg=False):
         """Commit changes to git.
 
         Parameters
@@ -650,7 +655,13 @@ class GitRepo(object):
           commit-message
         options: list of str
           cmdline options for git-commit
+        _datalad_msg: bool, optional
+          To signal that commit is automated commit by datalad, so
+          it would carry the [DATALAD] prefix
         """
+
+        if _datalad_msg:
+            msg = self._get_prefixed_commit_msg(msg)
 
         if not msg:
             if options:

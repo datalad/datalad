@@ -15,9 +15,11 @@ from ..nodes.crawl_url import parse_checksums
 from ..nodes.matches import css_match, a_href_match
 from ..nodes.misc import assign
 from ..nodes.misc import find_files
+from ..nodes.misc import sub
 from ..nodes.misc import skip_if
 from ..nodes.annex import Annexificator
 from ...consts import DATALAD_SPECIAL_REMOTE, ARCHIVES_SPECIAL_REMOTE
+from ...support.strings import get_replacement_dict
 
 # Possibly instantiate a logger if you would like to log
 # during pipeline creation
@@ -44,7 +46,7 @@ def superdataset_pipeline():
             template="crcns",
             data_fields=['dataset_category', 'dataset'],
             # branch='incoming',  # there will be archives etc
-            existing='adjust',
+            existing='skip',
             # further any additional options
         )
     ]
@@ -72,7 +74,7 @@ def extract_readme(data):
 # if provided as a str from config
 def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
              data_origin='checksums', use_current_dir=False,
-             leading_dirs_depth=2):
+             leading_dirs_depth=2, rename=None):
     """Pipeline to crawl/annex an crcns dataset"""
 
     if not isinstance(leading_dirs_depth, int):
@@ -116,6 +118,9 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
     else:
         raise ValueError(data_origin)
 
+    if rename:
+        urls_pipe += [sub({'filename': get_replacement_dict(rename)})]
+
     return [
         annex.switch_branch('incoming'),
         [   # nested pipeline so we could quit it earlier happen we decided that nothing todo in it
@@ -135,7 +140,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
         ],
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
-            annex.merge_branch('incoming', strategy='theirs', commit=False),
+            annex.merge_branch('incoming', strategy='theirs', commit=False, skip_no_changes=False),
             [   # Pipeline to augment content of the incoming and commit it to master
                 find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=tarballs),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
@@ -146,6 +151,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
                     leading_dirs_consider=['crcns.*', dataset],
                     leading_dirs_depth=leading_dirs_depth,
                     use_current_dir=use_current_dir,
+                    rename=rename,
                     exclude='.*__MACOSX.*',  # some junk penetrates
                 ),
             ],
