@@ -14,10 +14,10 @@ lgr = logging.getLogger('datalad.dataset')
 
 lgr.log(5, "Importing dataset")
 
-import os
 from os.path import abspath, join as opj, normpath
 from six import string_types, PY2
 from functools import wraps
+import uuid
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -105,42 +105,35 @@ class Dataset(object):
                             pass
                 if self._repo is None:
                     lgr.info("Failed to detect a valid repo at %s" % self.path)
-                else:
-                    # reset ID, because we now have a repo attached
-                    self._id = None
+
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
             if 'git-annex' in self._repo.get_branches():
                 # we acquired git-annex branch
                 self._repo = AnnexRepo(self._repo.path, create=False)
-                # reset ID, because we now have an annex attached
-                self._id = None
         return self._repo
 
     @property
     def id(self):
-        """Identifier of the dataset
+        """Identifier of the dataset.
+
+        This identifier is supposed to be unique across datasets, but identical
+        for different versions of the same dataset (that have all been derived
+        from the same original dataset repository).
 
         Returns
         -------
         str
-          This is either a UUID of the dataset's annex, or the SHA sum
-          of the current commit of the Git repository (if there is no annex),
-          or string composed from the path of the dataset. Any non-UUID ID
-          string is prefixed with '_:'
+          This is either a stored UUID, or if there is none: the UUID of the
+          dataset's annex, or a new generated UUID.
         """
         if self._id is None:
-            if self.repo:
-                if hasattr(self.repo, 'uuid'):
-                    self._id = self.repo.uuid
-                if not self._id:
-                    # no annex
-                    self._id = '_:{}'.format(self.repo.get_hexsha())
-            else:
-                # not even a VCS
-                self._id = '_:{}'.format(self.path.replace(os.sep, '_'))
-
+            # if we have one on record, stick to it!
+            self._id = self.config.get('datalad.dataset.id', None)
+            if self._id is None:
+                # fall back on self-made ID
+                self._id = uuid.uuid1().urn.split(':')[-1]
         return self._id
 
     @property

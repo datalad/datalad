@@ -108,10 +108,10 @@ def test_create(path):
     cmd = ['git-annex', 'info']
     cmlout = runner.run(cmd, cwd=path)
     assert_in('funny [here]', cmlout[0])
-    # check annex uuid record
+    # check datset ID
     assert_equal(
-        ds.config.get_value('datalad.annex', 'origin'),
-        ds.repo.repo.config_reader().get_value('annex', 'uuid'))
+        ds.config.get_value('datalad.dataset', 'id'),
+        ds.id)
 
 
 @with_tempfile
