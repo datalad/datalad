@@ -21,6 +21,18 @@ cfg_kv_regex = re.compile(r'([^=]+)=(.*)')
 cfg_section_regex = re.compile(r'(.*)\.[^.]+')
 cfg_sectionoption_regex = re.compile(r'(.*)\.([^.]+)')
 
+where_reload_doc = """
+        where : {'dataset', 'local', 'global'}, optional
+          Indicator which configuration file to modify. 'dataset' indicates the
+          persistent configuration in .datalad/config of a dataset; 'local'
+          the configuration of a dataset's Git repository in .git/config;
+          'global' refers to the general configuration that is not specific to
+          a single repository (usually in $USER/.gitconfig).
+        reload : bool
+          Flag whether to reload the configuration from file(s) after
+          modification. This can be disable to make multiple sequential
+          modifications slightly more efficient.""".lstrip()
+
 
 def _parse_gitconfig_dump(dump, store, replace):
     if replace:
@@ -220,16 +232,7 @@ class ConfigManager(object):
         ----------
         args : list
           Arguments to pass for git config
-        where : {'dataset', 'local', 'global'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
-          persistent configuration in .datalad/config of a dataset; 'local'
-          the configuration of a dataset's Git repository in .git/config;
-          'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig
-        reload : bool
-          Flag whether to reload the configuration from file(s) after
-          modification. This can be disable to make multiple sequential
-          modifications slightly more efficient.
+        %s
         **kwargs
           Keywords arguments for Runner's call
         """
@@ -239,6 +242,7 @@ class ConfigManager(object):
         if reload:
             self.reload()
         return out
+    _run.__doc__ %= where_reload_doc
 
     def _get_location_args(self, where, args=None):
         if args is None:
@@ -276,18 +280,9 @@ class ConfigManager(object):
           'core.editor'
         value : str
           Variable value
-        where : {'dataset', 'local', 'global'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
-          persistent configuration in .datalad/config of a dataset; 'local'
-          the configuration of a dataset's Git repository in .git/config;
-          'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig
-        reload : bool
-          Flag whether to reload the configuration from file(s) after
-          modification. This can be disable to make multiple sequential
-          modifications slightly more efficient.
-        """
+        %s"""
         self._run(['--add', var, value], where=where, reload=reload, log_stderr=True)
+    add.__doc__ %= where_reload_doc
 
     def rename_section(self, old, new, where='dataset', reload=True):
         """Rename a configuration section
@@ -298,18 +293,20 @@ class ConfigManager(object):
           Name of the section to rename.
         new : str
           Name of the section to rename to.
-        where : {'dataset', 'local', 'global'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
-          persistent configuration in .datalad/config of a dataset; 'local'
-          the configuration of a dataset's Git repository in .git/config;
-          'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig).
-        reload : bool
-          Flag whether to reload the configuration from file(s) after
-          modification. This can be disable to make multiple sequential
-          modifications slightly more efficient.
-        """
+        %s"""
         self._run(['--rename-section', old, new], where=where, reload=reload)
+    rename_section.__doc__ %= where_reload_doc
+
+    def remove_section(self, sec, where='dataset', reload=True):
+        """Rename a configuration section
+
+        Parameters
+        ----------
+        sec : str
+          Name of the section to remove.
+        %s"""
+        self._run(['--remove-section', sec], where=where, reload=reload)
+    remove_section.__doc__ %= where_reload_doc
 
     def unset(self, var, where='dataset', reload=True):
         """Remove all occurrences of a variable
@@ -318,16 +315,7 @@ class ConfigManager(object):
         ----------
         var : str
           Name of the variable to remove
-        where : {'dataset', 'local', 'global'}, optional
-          Indicator which configuration file to modify. 'dataset' indicates the
-          persistent configuration in .datalad/config of a dataset; 'local'
-          the configuration of a dataset's Git repository in .git/config;
-          'global' refers to the general configuration that is not specific to
-          a single repository (usually in $USER/.gitconfig
-        reload : bool
-          Flag whether to reload the configuration from file(s) after
-          modification. This can be disable to make multiple sequential
-          modifications slightly more efficient.
-        """
+        %s"""
         # use unset all as it is simpler for now
         self._run(['--unset-all', var], where=where, reload=reload)
+    unset.__doc__ %= where_reload_doc

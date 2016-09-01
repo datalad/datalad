@@ -141,8 +141,13 @@ def test_something(path, new_home):
                 globalcfg.unset,
                 'datalad.unittest.youcan',
                 where='local')
+        assert(globalcfg.has_section('datalad.unittest'))
         globalcfg.unset('datalad.unittest.youcan', where='global')
+        # but after we unset the only value -- that section is no longer listed
+        assert (not globalcfg.has_section('datalad.unittest'))
         assert_not_in('datalad.unittest.youcan', globalcfg)
-        # TODO: remove_section to clean it up entirely,
-        # since now it leaves the section itself behind
-        # ok_file_has_content(global_gitconfig, "")
+        # although it does leaves empty section behind in the file
+        ok_file_has_content(global_gitconfig, '[datalad "unittest"]', strip=True)
+        # remove_section to clean it up entirely
+        globalcfg.remove_section('datalad.unittest', where='global')
+        ok_file_has_content(global_gitconfig, "")
