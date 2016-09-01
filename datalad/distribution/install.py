@@ -319,15 +319,19 @@ class Install(Interface):
 
         # resolve the target location (if local) against the provided dataset
         if path is not None:
-            # Should work out just fine for regular paths, so no additional
-            # conditioning is necessary
-            path_ri = RI(path)
-            try:
-                # Wouldn't work for SSHRI ATM, see TODO within SSHRI
-                path = resolve_path(path_ri.localpath, ds)
-            except ValueError:
-                # URL doesn't point to a local something
-                pass
+            if isinstance(path, Dataset):
+                # just because it is a mess ATM and Germans will fix it all up to a candy
+                path = path.path
+            else:
+                # Should work out just fine for regular paths, so no additional
+                # conditioning is necessary
+                path_ri = RI(path)
+                try:
+                    # Wouldn't work for SSHRI ATM, see TODO within SSHRI
+                    path = resolve_path(path_ri.localpath, ds)
+                except ValueError:
+                    # URL doesn't point to a local something
+                    pass
 
         # any `path` argument that point to something local now resolved and
         # is no longer a URL
@@ -558,10 +562,14 @@ class Install(Interface):
 
             # few sanity checks
             if source and abspath(source) != path:
-                raise ValueError(
-                    "installation target already exists, but `source` points to "
-                    "another location (target: '{0}', source: '{0}'".format(
-                        source, path))
+                if exists(path):
+                    raise ValueError(
+                        "installation target already exists, but `source` points to "
+                        "another location (source: '{0}', target: '{1}'".format(
+                            source, path))
+                # install a submodule from that source
+                return _install_subds_from_flexible_source(
+                     ds, relativepath, source, recursive=recursive)
 
             if not add_data_to_git and not (isinstance(vcs, AnnexRepo)):
                 raise RuntimeError(

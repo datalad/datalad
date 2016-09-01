@@ -184,7 +184,8 @@ def test_subdatasets(path):
     ds.install(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
-    # add a subdataset
+
+    # add itself as a subdataset (crazy, isn't it?)
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
     subdss = ds.get_subdatasets()
