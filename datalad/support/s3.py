@@ -26,16 +26,17 @@ lgr = logging.getLogger('datalad.s3')
 from .keyring_ import keyring
 
 from ..dochelpers import exc_str
+from .exceptions import DownloadError, AccessDeniedError
 
 try:
     import boto
     from boto.s3.key import Key
     from boto.exception import S3ResponseError
-except ImportError:
-    boto = Key = S3ResponseError = None
+    from boto.s3.connection import OrdinaryCallingFormat
 except Exception as e:
-    lgr.warning("boto module failed to import although available: %s" % exc_str(e))
-    boto = Key = S3ResponseError = None
+    if not isinstance(e, ImportError):
+        lgr.warning("boto module failed to import although available: %s" % exc_str(e))
+    boto = Key = S3ResponseError = OrdinaryCallingFormat = None
 
 
 # TODO: should become a config option and managed along with the rest
@@ -48,12 +49,52 @@ def _get_bucket_connection(credential):
     # with different resources. Thus for now just making an option which
     # one to use
     # do full shebang with entering credentials
-    from ..downloaders.credentials import Credential
-    credential = Credential(credential, "aws-s3", None)
+    from ..downloaders.credentials import AWS_S3
+    credential = AWS_S3(credential, None)
     if not credential.is_known:
         credential.enter_new()
     creds = credential()
     return boto.connect_s3(creds["key_id"], creds["secret_id"])
+
+
+def _handle_exception(e, bucket_name):
+    """Helper to handle S3 connection exception"""
+    if e.error_code == 'AccessDenied':
+        raise AccessDeniedError(exc_str(e))
+    else:
+        raise DownloadError(
+            "Cannot connect to %s S3 bucket. Exception: %s"
+            % (bucket_name, exc_str(e))
+        )
+
+
+def get_bucket(conn, bucket_name):
+    """A helper to get a bucket
+
+    Parameters
+    ----------
+    bucket_name: str
+        Name of the bucket to connect to
+    """
+    try:
+        bucket = conn.get_bucket(bucket_name)
+    except S3ResponseError as e:
+        # can initially deny or error to connect to the specific bucket by name,
+        # and we would need to list which buckets are available under following
+        # credentials:
+        lgr.debug("Cannot access bucket %s by name: %s", bucket_name, exc_str(e))
+        try:
+            all_buckets = conn.get_all_buckets()
+        except S3ResponseError as e2:
+            lgr.debug("Cannot access all buckets: %s", exc_str(e2))
+            _handle_exception(e, 'any')
+        all_bucket_names = [b.name for b in all_buckets]
+        lgr.debug("Found following buckets %s", ', '.join(all_bucket_names))
+        if bucket_name in all_bucket_names:
+            bucket = all_buckets[all_bucket_names.index(bucket_name)]
+        else:
+            _handle_exception(e, bucket_name)
+    return bucket
 
 
 class VersionedFilesPool(object):
@@ -91,15 +132,20 @@ class VersionedFilesPool(object):
     def reset_version(self, filename):
         self._versions[filename] = 0
 
-def get_key_url(e, schema='http'):
+
+def get_key_url(e, schema='http', versioned=True):
     """Generate an s3:// or http:// url given a key
     """
     if schema == 'http':
-        return "http://{e.bucket.name}.s3.amazonaws.com/{e.name}?versionId={e.version_id}".format(e=e)
+        fmt = "http://{e.bucket.name}.s3.amazonaws.com/{e.name}"
     elif schema == 's3':
-        return "s3://{e.bucket.name}/{e.name}?versionId={e.version_id}".format(e=e)
+        fmt = "s3://{e.bucket.name}/{e.name}"
     else:
         raise ValueError(schema)
+    if versioned:
+        fmt += "?versionId={e.version_id}"
+    return fmt.format(e=e)
+
 
 def prune_and_delete_bucket(bucket):
     """Deletes all the content and then deletes bucket
@@ -265,7 +311,11 @@ def get_versioned_url(url, guarantee_versioned=False, return_all=False, verify=F
             providers = Providers.from_config_files()
             s3url = "s3://%s/" % s3_bucket
             s3provider = providers.get_provider(s3url)
-            bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
+            if s3provider.authenticator.bucket is not None:
+                # we have established connection before, so let's just reuse
+                bucket = s3provider.authenticator.bucket
+            else:
+                bucket = s3provider.authenticator.authenticate(s3_bucket, s3provider.credential)  # s3conn or _get_bucket_connection(S3_TEST_CREDENTIAL)
         else:
             bucket = s3conn.get_bucket(s3_bucket)
         supports_versioning = True  # assume that it does

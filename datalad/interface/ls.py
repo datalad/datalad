@@ -24,7 +24,6 @@ from .base import Interface
 from ..ui import ui
 from ..utils import swallow_logs
 from ..dochelpers import exc_str
-from ..support.s3 import get_key_url
 from ..support.param import Parameter
 from ..support.constraints import EnsureStr, EnsureNone
 
@@ -249,6 +248,12 @@ class LsFormatter(string.Formatter):
 
         return super(LsFormatter, self).convert_field(value, conversion)
 
+    def format_field(self, value, format_spec):
+        # TODO: move all the "coloring" into formatting, so we could correctly indent
+        # given the format and only then color it up
+        # print "> %r, %r" % (value, format_spec)
+        return super(LsFormatter, self).format_field(value, format_spec)
+
 
 def format_ds_model(formatter, ds_model, format_str, format_exc):
     try:
@@ -351,10 +356,17 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
         from datalad.downloaders.providers import Providers
         providers = Providers.from_config_files()
         provider = providers.get_provider(loc)
+
         if not provider:
-            raise ValueError("don't know how to deal with this url %s -- no downloader defined.  "
-                             "Specify just s3cmd config file instead")
-        bucket = provider.authenticator.authenticate(bucket_name, provider.credential)
+            raise ValueError(
+                "Don't know how to deal with this url %s -- no provider defined for %s. "
+                "Define a new provider (DOCS: TODO) or specify just s3cmd config file instead for now."
+                % loc
+            )
+        downloader = provider.get_downloader(loc)
+
+        # should authenticate etc, and when ready we will ask for a bucket ;)
+        bucket = downloader.access(lambda url: downloader.bucket, loc)
 
     info = []
     for iname, imeth in [
@@ -370,21 +382,39 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
     ui.message("Bucket info:\n %s" % '\n '.join(info))
 
     kwargs = {} if recursive else {'delimiter': '/'}
-    prefix_all_versions = list(bucket.list_versions(prefix, **kwargs))
+
+    ACCESS_METHODS = [
+        bucket.list_versions,
+        bucket.list
+    ]
+
+    prefix_all_versions = None
+    for acc in ACCESS_METHODS:
+        try:
+            prefix_all_versions = list(acc(prefix, **kwargs))
+            break
+        except Exception as exc:
+            lgr.debug("Failed to access via %s: %s", acc, exc_str(exc))
 
     if not prefix_all_versions:
         ui.error("No output was provided for prefix %r" % prefix)
     else:
         max_length = max((len(e.name) for e in prefix_all_versions))
+        max_size_length = max((len(str(getattr(e, 'size', 0))) for e in prefix_all_versions))
+
     for e in prefix_all_versions:
         if isinstance(e, Prefix):
             ui.message("%s" % (e.name, ),)
             continue
         ui.message(("%%-%ds %%s" % max_length) % (e.name, e.last_modified), cr=' ')
         if isinstance(e, Key):
+            ui.message(" %%%dd" % max_size_length % e.size, cr=' ')
             if not (e.is_latest or all):
                 # Skip this one
+                ui.message("")
                 continue
+            # OPT: delayed import
+            from ..support.s3 import get_key_url
             url = get_key_url(e, schema='http')
             try:
                 _ = urlopen(Request(url))
@@ -421,7 +451,6 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
 
             ui.message("ver:%-32s  acl:%s  %s [%s]%s" % (e.version_id, acl, url, urlok, content))
         else:
-            if all:
-                ui.message("del")
+            ui.message(str(type(e)).split('.')[-1].rstrip("\"'>"))
 
 

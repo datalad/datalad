@@ -44,9 +44,9 @@ from nose import SkipTest
 from ..cmd import Runner
 from ..utils import *
 from ..support.exceptions import CommandNotAvailableError
-from ..support.archives import compress_files
 from ..support.vcr_ import *
-from ..dochelpers import exc_str
+from ..support.keyring_ import MemoryKeyring
+from ..dochelpers import exc_str, borrowkwargs
 from ..cmdline.helpers import get_repo_instance
 from ..consts import ARCHIVES_TEMP_DIR
 from . import _TEMP_PATHS_GENERATED
@@ -81,6 +81,7 @@ def skip_if_scrapy_without_selector():
 def create_tree_archive(path, name, load, overwrite=False, archives_leading_dir=True):
     """Given an archive `name`, create under `path` with specified `load` tree
     """
+    from ..support.archives import compress_files
     dirname = file_basename(name)
     full_dirname = opj(path, dirname)
     os.makedirs(full_dirname)
@@ -113,7 +114,7 @@ def create_tree(path, tree, archives_leading_dir=True):
     for name, load in tree:
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
-            if name.endswith('.tar.gz') or name.endswith('.tar'):
+            if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
                 create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             else:
                 create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
@@ -154,7 +155,10 @@ def ok_clean_git_annex_proxy(path):
     finally:
         chpwd(cwd)
 
-    assert_in("nothing to commit, working directory clean", out[0], "git-status output via proxy not plausible: %s" % out[0])
+    assert_in(
+        "nothing to commit", out[0],
+        msg="git-status output via proxy not plausible: %s" % out[0]
+    )
 
 
 def ok_clean_git(path, annex=True, untracked=[]):
@@ -334,8 +338,9 @@ def ok_archives_caches(repopath, n=1, persistent=None):
                    ARCHIVES_TEMP_DIR + {None: '*', True: '', False: '-*'}[persistent],
                    '*')
     dirs = glob.glob(glob_ptn)
-    assert_equal(len(dirs), n,
-                 msg="Found following dirs when needed %d of them: %s" % (n, dirs))
+    n2 = n * 2  # per each directory we should have a .stamp file
+    assert_equal(len(dirs), n2,
+                 msg="Found following dirs when needed %d of them: %s" % (n2, dirs))
 
 def ok_file_has_content(path, content):
     """Verify that file exists and has expected content"""
@@ -414,8 +419,9 @@ def serve_path_via_http(tfunc, *targs):
         hostname = '127.0.0.1'
 
         queue = multiprocessing.Queue()
-        multi_proc = multiprocessing.Process(target=_multiproc_serve_path_via_http,
-                                                args=(hostname, path, queue))
+        multi_proc = multiprocessing.Process(
+            target=_multiproc_serve_path_via_http,
+            args=(hostname, path, queue))
         multi_proc.start()
         port = queue.get(timeout=300)
         url = 'http://{}:{}/'.format(hostname, port)
@@ -429,8 +435,21 @@ def serve_path_via_http(tfunc, *targs):
             with patch.dict('os.environ', env, clear=True):
                 return tfunc(*(args + (path, url)), **kwargs)
         finally:
-            lgr.debug("HTTP: stopping server")
+            lgr.debug("HTTP: stopping server under %s" % path)
             multi_proc.terminate()
+
+    return newfunc
+
+
+@optional_args
+def with_memory_keyring(t):
+    """Decorator to use non-persistant MemoryKeyring instance
+    """
+    @wraps(t)
+    def newfunc(*args, **kwargs):
+        keyring = MemoryKeyring()
+        with patch("datalad.downloaders.credentials.keyring_", keyring):
+            return t(*(args + (keyring,)), **kwargs)
 
     return newfunc
 
@@ -453,22 +472,13 @@ def without_http_proxy(tfunc):
     return newfunc
 
 
+@borrowkwargs(methodname=make_tempfile)
 @optional_args
-def with_tempfile(t, content=None, **tkwargs):
+def with_tempfile(t, **tkwargs):
     """Decorator function to provide a temporary file name and remove it at the end
 
     Parameters
     ----------
-    mkdir : bool, optional (default: False)
-        If True, temporary directory created using tempfile.mkdtemp()
-    content : str or bytes, optional
-        Content to be stored in the file created
-    `**tkwargs`:
-        All other arguments are passed into the call to tempfile.mk{,d}temp(),
-        and resultant temporary filename is passed as the first argument into
-        the function t.  If no 'prefix' argument is provided, it will be
-        constructed using module and function names ('.' replaced with
-        '_').
 
     To change the used directory without providing keyword argument 'dir' set
     DATALAD_TESTS_TEMPDIR.
@@ -485,46 +495,8 @@ def with_tempfile(t, content=None, **tkwargs):
 
     @wraps(t)
     def newfunc(*arg, **kw):
-
-        tkwargs_ = get_tempfile_kwargs(tkwargs, wrapped=t)
-
-        # if DATALAD_TESTS_TEMPDIR is set, use that as directory,
-        # let mktemp handle it otherwise. However, an explicitly provided
-        # dir=... will override this.
-        mkdir = tkwargs_.pop('mkdir', False)
-
-        filename = {False: tempfile.mktemp,
-                    True: tempfile.mkdtemp}[mkdir](**tkwargs_)
-        filename = realpath(filename)
-
-        if content:
-            with open(filename, 'w' + ('b' if isinstance(content, binary_type) else '')) as f:
-                f.write(content)
-        if __debug__:
-            lgr.debug('Running %s with temporary filename %s',
-                      t.__name__, filename)
-        try:
+        with make_tempfile(wrapped=t, **tkwargs) as filename:
             return t(*(arg + (filename,)), **kw)
-        finally:
-            # glob here for all files with the same name (-suffix)
-            # would be useful whenever we requested .img filename,
-            # and function creates .hdr as well
-            lsuffix = len(tkwargs_.get('suffix', ''))
-            filename_ = lsuffix and filename[:-lsuffix] or filename
-            filenames = glob.glob(filename_ + '*')
-            if len(filename_) < 3 or len(filenames) > 5:
-                # For paranoid yoh who stepped into this already ones ;-)
-                lgr.warning("It is unlikely that it was intended to remove all"
-                            " files matching %r. Skipping" % filename_)
-                return
-            for f in filenames:
-                try:
-                    rmtemp(f)
-                except OSError:
-                    pass
-
-    if tkwargs.get('mkdir', None) and content is not None:
-        raise ValueError("mkdir=True while providing content makes no sense")
 
     return newfunc
 
@@ -703,6 +675,7 @@ def with_testrepos(t, regex='.*', flavors='auto', skip=False, count=None):
     return newfunc
 with_testrepos.__test__ = False
 
+
 @optional_args
 def with_fake_cookies_db(func, cookies={}):
     """mock original cookies db with a fake one for the duration of the test
@@ -783,6 +756,12 @@ def skip_ssh(func):
 @optional_args
 def assert_cwd_unchanged(func, ok_to_chdir=False):
     """Decorator to test whether the current working directory remains unchanged
+
+    Parameters
+    ----------
+    ok_to_chdir: bool, optional
+      If True, allow to chdir, so this decorator would not then raise exception
+      if chdir'ed but only return to original directory
     """
 
     @wraps(func)
@@ -846,15 +825,17 @@ def run_under_dir(func, newdir='.'):
     return newfunc
 
 
-def assert_re_in(regex, c, flags=0):
+def assert_re_in(regex, c, flags=0, match=True, msg=None):
     """Assert that container (list, str, etc) contains entry matching the regex
     """
     if not isinstance(c, (list, tuple)):
         c = [c]
     for e in c:
-        if re.match(regex, e, flags=flags):
+        if (re.match if match else re.search)(regex, e, flags=flags):
             return
-    raise AssertionError("Not a single entry matched %r in %r" % (regex, c))
+    raise AssertionError(
+        msg or "Not a single entry matched %r in %r" % (regex, c)
+    )
 
 
 def ignore_nose_capturing_stdout(func):

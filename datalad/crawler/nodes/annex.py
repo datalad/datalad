@@ -17,6 +17,7 @@ from os import listdir
 from os.path import expanduser, join as opj, exists, isabs, lexists, curdir, realpath
 from os.path import split as ops
 from os.path import isdir, islink
+from os.path import relpath
 from os import unlink, makedirs
 from collections import OrderedDict
 from humanize import naturalsize
@@ -129,7 +130,7 @@ class initiate_dataset(object):
             # we need first to initiate a git repository
             git_repo = GitRepo(path, create=True)
             # since we are initiating, that branch shouldn't exist yet, thus --orphan
-            git_repo.checkout(self.branch, options="--orphan")
+            git_repo.checkout(self.branch, options=["--orphan"])
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creator"
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
@@ -203,11 +204,14 @@ class Annexificator(object):
     Should be relative. If absolute found -- ValueError is raised
     """
 
-    def __init__(self, path=None, mode='full', options=None,
+    def __init__(self, path=None,
+                 no_annex=False,
+                 mode='full', options=None,
                  special_remotes=[],
                  allow_dirty=False, yield_non_updated=False,
                  auto_finalize=True,
                  statusdb=None,
+                 skip_problematic=False,
                  **kwargs):
         """
 
@@ -220,6 +224,8 @@ class Annexificator(object):
           What mode of download to use for the content.  In "full" content gets downloaded
           and checksummed (according to the backend), 'fast' and 'relaxed' are just original
           annex modes where no actual download is performed and the files' keys are their URLs
+        no_annex : bool
+          Assume/create a simple Git repository, without git-annex
         special_remotes : list, optional
           List of custom special remotes to initialize and enable by default
         yield_non_updated : bool, optional
@@ -238,6 +244,9 @@ class Annexificator(object):
           Note that statusdb "lives" within the branch, so switch_branch would drop existing DB (which
           should get committed within the branch) and would create a new one if DB is requested
           again.
+        skip_problematic: bool, optional
+          If True, it would not raise an exception if e.g. url is 404 or forbidden -- then just
+          nothing is yielded, and effectively that entry is skipped
         **kwargs : dict, optional
           to be passed into AnnexRepo
         """
@@ -255,16 +264,30 @@ class Annexificator(object):
                 if (len(listdir(path))) and (not allow_dirty):
                     raise RuntimeError("Directory %s is not empty." % path)
 
-        self.repo = AnnexRepo(path, always_commit=False, **kwargs)
+        self.repo = (GitRepo if no_annex else AnnexRepo)(path, always_commit=False, **kwargs)
 
         git_remotes = self.repo.get_remotes()
         if special_remotes:
+            if no_annex: # isinstance(self.repo, GitRepo):
+                raise ValueError("Cannot have special remotes in a simple git repo")
+
+            # TODO: move under AnnexRepo with proper testing etc
+            repo_info_repos = [v for k, v in self.repo.repo_info().items()
+                               if k.endswith(' repositories')]
+            annex_remotes = {r['description']: r for r in sum(repo_info_repos, [])}
+
             for remote in special_remotes:
                 if remote not in git_remotes:
-                    self.repo.init_remote(
-                        remote,
-                        ['encryption=none', 'type=external', 'autoenable=true',
-                         'externaltype=%s' % remote])
+                    if remote in annex_remotes:
+                        # Already known - needs only enabling
+                        lgr.info("Enabling existing special remote %s" % remote)
+                        self.repo.enable_remote(remote)
+                    else:
+                        lgr.info("Initiating special remote %s" % remote)
+                        self.repo.init_remote(
+                            remote,
+                            ['encryption=none', 'type=external', 'autoenable=true',
+                             'externaltype=%s' % remote])
 
         self.mode = mode
         self.options = options or []
@@ -279,6 +302,7 @@ class Annexificator(object):
 
         self.statusdb = statusdb
         self._statusdb = None  # actual DB to be instantiated later
+        self.skip_problematic = skip_problematic
 
     # def add(self, filename, url=None):
     #     # TODO: modes
@@ -312,6 +336,16 @@ class Annexificator(object):
                              "Please adjust pipeline to provide one" % url)
         return filename
 
+    def _get_url_status(self, data, url):
+        """A helper to return url_status if url_status is present in data
+         otherwise request a new one
+         """
+        if 'url_status' in data:
+            return data['url_status']
+        else:
+            downloader = self._providers.get_provider(url).get_downloader(url)
+            return downloader.get_status(url)
+
     def __call__(self, data):  # filename=None, get_disposition_filename=False):
         # some checks
         assert (self.mode is not None)
@@ -321,16 +355,36 @@ class Annexificator(object):
         if url:
             stats.urls += 1
 
-        fpath = self._get_fpath(data, stats, url)
+        fpath = self._get_fpath(data, stats, return_None=True)
+        url_status = None
+        if url:
+            try:
+                url_status = self._get_url_status(data, url)
+            except Exception:
+                if self.skip_problematic:
+                    stats.skipped += 1
+                    lgr.debug("Failed to obtain status for url %s" % url)
+                    return
+                raise
+            if fpath is None:
+                # pick it from url_status and give for "reprocessing"
+                fpath = self._get_fpath(data, stats, filename=url_status.filename)
+
+        if not fpath:
+            if self.skip_problematic:
+                stats.skipped += 1
+                lgr.debug("Failed to figure out filename for url %s" % url)
+                return
+            raise ValueError("No filename was provided")
+
         filepath = opj(self.repo.path, fpath)
 
         lgr.debug("Request to annex %(url)s to %(fpath)s", locals())
-
         # since filename could have come from url -- let's update with it
         updated_data = updated(data, {'filename': ops(fpath)[1],
                                       # TODO? 'filepath': filepath
                                       })
-        remote_status = None
+
         if self.statusdb is not None and self._statusdb is None:
             if isinstance(self.statusdb, string_types):
                 # initiate the DB
@@ -340,12 +394,9 @@ class Annexificator(object):
             else:
                 # use provided persistent instance
                 self._statusdb = self.statusdb
+
         statusdb = self._statusdb
         if url:
-            downloader = self._providers.get_provider(url).get_downloader(url)
-
-            # request status since we would need it in either mode
-            remote_status = data['url_status'] if 'url_status' in data else downloader.get_status(url)
             if lexists(filepath):
                 # check if URL provides us updated content.  If not -- we should do nothing
                 # APP1:  in this one it would depend on local_status being asked first BUT
@@ -361,12 +412,12 @@ class Annexificator(object):
                 # TODO: what if the file came from another url bearing the same mtime and size????
                 #       unlikely but possible.  We would need to provide URL for comparison(s)
                 if self.mode == 'relaxed' or (
-                        statusdb is not None and not statusdb.is_different(fpath, remote_status, url)):
+                        statusdb is not None and not statusdb.is_different(fpath, url_status, url)):
                     # TODO:  check if remote_status < local_status, i.e. mtime jumped back
                     # and if so -- warning or may be according to some config setting -- skip
                     # e.g. config.get('crawl', 'new_older_files') == 'skip'
                     lgr.debug("Skipping download. URL %s doesn't provide new content for %s.  New status: %s",
-                              url, filepath, remote_status)
+                              url, filepath, url_status)
                     stats.skipped += 1
                     if self.yield_non_updated:
                         yield updated_data  # there might be more to it!
@@ -427,9 +478,9 @@ class Annexificator(object):
             else:
                 _call(self._check_non_existing_filepath, filepath, stats=stats)
             # TODO: We need to implement our special remote here since no downloaders used
-            if self.mode == 'full' and remote_status and remote_status.size:  # > 1024**2:
+            if self.mode == 'full' and url_status and url_status.size:  # > 1024**2:
                 lgr.info("Need to download %s from %s. No progress indication will be reported"
-                         % (naturalsize(remote_status.size), url))
+                         % (naturalsize(url_status.size), url))
             out_json = _call(self.repo.add_url_to_file, fpath, url, options=annex_options, batch=True)
             added_to_annex = 'key' in out_json
 
@@ -442,22 +493,31 @@ class Annexificator(object):
         # file might have been added but really not changed anything (e.g. the same README was generated)
         # TODO:
         # if out_json:  # if not try -- should be here!
-        _call(stats.increment, 'add_annex' if 'key' in out_json else 'add_git')
+        # File might have been not modified at all, so let's check its status first
+        changed = set().union(*self._get_status(args=[fpath]))
+        if fpath in changed:
+            _call(stats.increment,
+                  'add_annex'
+                    if ('key' in out_json and out_json['key'] is not None)
+                    else 'add_git'
+                  )
+        else:
+            _call(stats.increment, 'skipped')
 
         # TODO!!:  sanity check that no large files are added to git directly!
 
         # so we have downloaded the beast
         # since annex doesn't care to set mtime for the symlink itself, we better set it ourselves
         if lexists(filepath):  # and islink(filepath):
-            if remote_status:
+            if url_status:
                 # set mtime of the symlink or git-added file itself
                 # utime dereferences!
                 # _call(os.utime, filepath, (time.time(), remote_status.mtime))
                 # *nix only!  TODO
-                if remote_status.mtime:
-                    _call(lmtime, filepath, remote_status.mtime)
+                if url_status.mtime:
+                    _call(lmtime, filepath, url_status.mtime)
                 if statusdb:
-                    _call(statusdb.set, filepath, remote_status)
+                    _call(statusdb.set, filepath, url_status)
             else:
                 # we still need to inform DB about this file so later it would signal to remove it
                 # if we no longer care about it
@@ -541,19 +601,25 @@ class Annexificator(object):
                     raise RuntimeError("We escaped the border of the repository itself. "
                                        "path: %s  repo: %s" % (dirpath, self.repo.path))
 
-    def _get_fpath(self, data, stats, url=None):
-        """Return relative path (fpath) to the file based on information in data or url
+    def _get_fpath(self, data, stats, filename=None, return_None=False):
+        """Return relative path (fpath) to the file based on information in data
+
+        Raises
+        ------
+        ValueError if no filename field was provided
         """
         # figure out the filename. If disposition one was needed, pipeline should
         # have had it explicitly
-        fpath = filename = \
-            data['filename'] if 'filename' in data else self._get_filename_from_url(url)
-
-        stats.files += 1
+        if filename is None:
+            filename = data['filename'] if 'filename' in data else None
+            stats.files += 1
+        fpath = filename
 
         if filename is None:
+            if return_None:
+                return None
             stats.skipped += 1
-            raise ValueError("No filename were provided or could be deduced from url=%r" % url)
+            raise ValueError("No filename were provided")
         elif isabs(filename):
             stats.skipped += 1
             raise ValueError("Got absolute filename %r" % filename)
@@ -568,7 +634,7 @@ class Annexificator(object):
 
         return fpath
 
-    def switch_branch(self, branch, parent=None, must_exist=None):
+    def switch_branch(self, branch, parent=None, must_exist=None, allow_remote=True):
         """Node generator to switch branches, returns actual node
 
         Parameters
@@ -581,6 +647,8 @@ class Annexificator(object):
         must_exist : bool or None, optional
           If None, doesn't matter.  If True, would fail if branch does not exist.  If
           False, would fail if branch already exists
+        allow_remote : bool, optional
+          If not exists locally, will try to find one among remote ones
         """
 
         def switch_branch(data):
@@ -592,19 +660,33 @@ class Annexificator(object):
             existing_branches = self.repo.get_branches()
             if must_exist is not None:
                 assert must_exist == (branch in existing_branches)
+
+            # TODO: this should be a part of the gitrepo logic
+            if branch not in existing_branches and allow_remote:
+                remote_branches = self.repo.get_remote_branches()
+                remotes = sorted(set([b.split('/', 1)[0] for b in remote_branches]))
+                for r in ['origin'] + remotes:  # ok if origin tested twice
+                    remote_branch = "%s/%s" % (r, branch)
+                    if remote_branch in remote_branches:
+                        lgr.info("Did not find branch %r locally. Checking out remote one %r"
+                                 % (branch, remote_branch))
+                        self.repo.checkout(remote_branch, options=['--track'])
+                        # refresh the list -- same check will come again
+                        existing_branches = self.repo.get_branches()
+                        break
+
             if branch not in existing_branches:
-                # TODO: this should be a part of the gitrepo logic
                 if parent is None:
                     # new detached branch
                     lgr.info("Checking out a new detached branch %s" % (branch))
-                    self.repo.checkout(branch, options="--orphan")
+                    self.repo.checkout(branch, options=["--orphan"])
                     if self.repo.dirty:
                         self.repo.remove('.', r=True, f=True)  # TODO: might be insufficient if directories etc TEST/fix
                 else:
                     if parent not in existing_branches:
                         raise RuntimeError("Parent branch %s does not exist" % parent)
                     lgr.info("Checking out %s into a new branch %s" % (parent, branch))
-                    self.repo.checkout(parent, options="-b %s" % branch)
+                    self.repo.checkout(parent, options=["-b", branch])
             else:
                 lgr.info("Checking out an existing branch %s" % (branch))
                 self.repo.checkout(branch)
@@ -613,7 +695,8 @@ class Annexificator(object):
         return switch_branch
 
     def merge_branch(self, branch, target_branch=None,
-                     strategy=None, commit=True, one_commit_at_a_time=False, skip_no_changes=None):
+                     strategy=None, commit=True, one_commit_at_a_time=False,
+                     skip_no_changes=None, **merge_kwargs):
         """Merge a branch into the current branch
 
         Parameters
@@ -653,12 +736,13 @@ class Annexificator(object):
                 raise RuntimeError("Requested to merge another branch while current state is dirty")
 
             last_merged_checksum = self.repo.get_merge_base([target_branch_, branch])
+            skip_no_changes_ = skip_no_changes
+            if skip_no_changes is None:
+                # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
+                skip_no_changes_ = True
+
             if last_merged_checksum == self.repo.get_hexsha(branch):
                 lgr.debug("Branch %s doesn't provide any new commits for current HEAD" % branch)
-                skip_no_changes_ = skip_no_changes
-                if skip_no_changes is None:
-                    # TODO: skip_no_changes = config.getboolean('crawl', 'skip_merge_if_no_changes', default=True)
-                    skip_no_changes_ = True
                 if skip_no_changes_:
                     lgr.debug("Skipping the merge")
                     return
@@ -674,6 +758,14 @@ class Annexificator(object):
                 all_to_merge = [branch]
 
             nmerges = len(all_to_merge)
+
+            # There were no merges, but we were instructed to not skip
+            if not nmerges and skip_no_changes_ is False:
+                # so we will try to merge it nevertheless
+                lgr.info("There was nothing to merge but we were instructed to merge due to skip_no_changes=False")
+                all_to_merge = [branch]
+                nmerges = 1
+
             plmerges = "s" if nmerges > 1 else ""
             lgr.info("Initiating %(nmerges)d merge%(plmerges)s of %(branch)s using strategy %(strategy)s", locals())
             options = ['--no-commit'] if not commit else []
@@ -683,9 +775,10 @@ class Annexificator(object):
                 if self.repo.get_active_branch() != target_branch_:
                     self.repo.checkout(target_branch_)
                 if strategy is None:
-                    self.repo.merge(to_merge, options=options)
+                    self.repo.merge(to_merge, options=options, **merge_kwargs)
                 elif strategy == 'theirs':
-                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"], expect_stderr=True)
+                    self.repo.merge(to_merge, options=["-s", "ours", "--no-commit"],
+                                    expect_stderr=True, **merge_kwargs)
                     self.repo._git_custom_command([], "git read-tree -m -u %s" % to_merge)
                     self.repo.add('.', options=self.options)  # so everything is staged to be committed
                 else:
@@ -725,6 +818,11 @@ class Annexificator(object):
         # not supporting that ATM
         # https://github.com/gitpython-developers/GitPython/issues/361
         # and apparently not actively developed
+        msg = str(msg).strip()
+        if not msg:
+            # we need to provide some commit msg, could may be deduced from current status
+            # TODO
+            msg = "a commit"
         if msg is not None:
             options = options + ["-m", msg]
         self._precommit()  # so that all batched annexes stop
@@ -740,28 +838,37 @@ class Annexificator(object):
         self.repo.add(fpaths, git=True)
         # self.repo.cmd_call_wrapper.run(["git", "add"] + fpaths)
 
-    def _get_status(self):
+    def _get_status(self, args=[]):
         """Custom check of status to see what files were staged, untracked etc
         until
         https://github.com/gitpython-developers/GitPython/issues/379#issuecomment-180101921
         is resolved
         """
         # out, err = self.repo.cmd_call_wrapper.run(["git", "status", "--porcelain"])
-        out, err = self.repo._git_custom_command([], ["git", "status", "--porcelain"])
-        assert not err
+        cmd_args = ["git", "status", "--porcelain"] + args
         staged, notstaged, untracked, deleted = [], [], [], []
+        statuses = {
+            '??': untracked,
+            'A ': staged,
+            'M ': staged,
+            ' M': notstaged,
+            ' D': deleted
+        }
+
+        if isinstance(self.repo, AnnexRepo) and self.repo.is_direct_mode():
+            statuses['AD'] = staged
+            out, err = self.repo.proxy(cmd_args)
+        else:
+            out, err = self.repo._git_custom_command([], cmd_args)
+            assert not err
+
         for l in out.split('\n'):
             if not l:
                 continue
             act = l[:2]  # first two characters is what is happening to the file
             fname = l[3:]
             try:
-                {'??': untracked,
-                 'A ': staged,
-                 'M ': staged,
-                 ' M': notstaged,
-                 ' D': deleted,
-                 }[act].append(fname)
+                statuses[act].append(fname)
                 # for the purpose of this use, we don't even want MM or anything else
             except KeyError:
                 raise RuntimeError("git status %r not yet supported. TODO" % act)
@@ -845,7 +952,9 @@ class Annexificator(object):
                 # all new versions must be greater than the previous version
                 # since otherwise it would mean that we are complementing previous version and it might be
                 # a sign of a problem
-                assert (all((LooseVersion(prev_version) < LooseVersion(v)) for v in versions))
+                # Well -- so far in the single use-case with openfmri it was that they added
+                # derivatives for the same version, so I guess we will allow for that, thus allowing =
+                assert (all((LooseVersion(prev_version) <= LooseVersion(v)) for v in versions))
                 # old implementation when we didn't have entire versions db stored
                 # new_versions = OrderedDict(versions.items()[version_keys.index(prev_version) + 1:])
                 new_versions = versions
@@ -856,8 +965,8 @@ class Annexificator(object):
             if new_versions:
                 smallest_new_version = next(iter(new_versions))
                 if prev_version:
-                    if LooseVersion(smallest_new_version) <= LooseVersion(prev_version):
-                        raise ValueError("Smallest new version %s is <= prev_version %s"
+                    if LooseVersion(smallest_new_version) < LooseVersion(prev_version):
+                        raise ValueError("Smallest new version %s is < prev_version %s"
                                          % (smallest_new_version, prev_version))
 
             versions_db.update_versions(versions)  # store all new known versions
@@ -926,15 +1035,26 @@ class Annexificator(object):
 
         return _commit_versions
 
-    def remove_other_versions(self, name=None, overlay=False):
+    def remove_other_versions(self, name=None, overlay=False, remove_unversioned=False, exclude=None):
         """Remove other (non-current) versions of the files
 
         Pretty much to be used in tandem with commit_versions
+
+        Parameters
+        ----------
+        remove_unversioned: bool, optional
+          If there is a version defined now, remove those files which are unversioned
+          i.e. not listed associated with any version
+        exclude : basestring, optional
+          Regexp to search to exclude files from considering to remove them if
+          `remove_unversioned`.  Passed to `find_files`.  E.g. `README.*` which
+          could have been generated in `incoming` branch
         """
 
         def _remove_other_versions(data):
             if overlay:
                 raise NotImplementedError(overlay)
+
             stats = data.get('datalad_stats', None)
             versions_db = SingleVersionDB(self.repo, name=name)
 
@@ -954,6 +1074,21 @@ class Annexificator(object):
                     if lexists(vfpathfull):
                         lgr.log(5, "Removing %s of version %s. Current one %s", vfpathfull, version, current_version)
                         os.unlink(vfpathfull)
+
+            if remove_unversioned:
+                # it might be that we haven't 'recorded' unversioned ones at all
+                # and now got an explicit version, so we would just need to remove them all
+                # For that we need to get all files which left, and remove them unless they are part
+                # of the current version
+                current_version_files = set(versions_db.versions[current_version].values())
+                for fpath in find_files('.*', exclude=exclude, exclude_datalad=True, exclude_vcs=True):
+                    fpath = relpath(fpath, '.')  # ./bla -> bla
+                    if fpath in current_version_files:
+                        continue
+                    lgr.log(5, "Removing unversioned %s file", fpath)
+                    os.unlink(fpath)
+            elif exclude:
+                lgr.warning("`exclude=%r` was specified whenever remove_unversioned is False", exclude)
 
             if stats:
                 stats.versions.append(current_version)
@@ -1024,7 +1159,7 @@ class Annexificator(object):
                 if stats:
                     _call(stats.reset)
             else:
-                lgr.info("Found branch non-dirty - nothing is committed")
+                lgr.info("Found branch non-dirty -- nothing was committed")
 
             if tag and stats:
                 # versions survive only in total_stats
@@ -1121,6 +1256,8 @@ class Annexificator(object):
         """
 
         def _initiate_dataset(data):
+            # TODO: actually ATM is not that thin and forces to us to use Annexificator
+            # which forces meta-dataset to become an annex, not pure git repo...
             for data_ in initiate_dataset(*args, **kwargs)(data):
                 # Also "register" as a sub-dataset if not yet registered
                 ds = Dataset(self.repo.path)

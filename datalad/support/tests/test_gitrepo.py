@@ -149,6 +149,7 @@ def test_GitRepo_remove(path):
 
     eq_(set(gr.remove('*', r=True, f=True)), {'file2', 'd2/f1', 'd2/f2'})
 
+
 @assert_cwd_unchanged
 @with_tempfile
 def test_GitRepo_commit(path):
@@ -162,6 +163,14 @@ def test_GitRepo_commit(path):
     gr.commit("Testing GitRepo.commit().")
     ok_clean_git(path, annex=False, untracked=[])
 
+    with open(opj(path, filename), 'w') as f:
+        f.write("changed content")
+
+    gr.add(filename)
+    gr.commit("commit with options", options=to_options(dry_run=True))
+    # wasn't actually committed:
+    ok_(gr.repo.is_dirty())
+
 
 @with_testrepos(flavors=local_testrepo_flavors)
 @with_tempfile
@@ -172,7 +181,7 @@ def test_GitRepo_get_indexed_files(src, path):
 
     runner = Runner()
     out = runner(['git', 'ls-files'], cwd=path)
-    out_list = out[0].split()
+    out_list = list(filter(bool, out[0].split('\n')))
 
     for item in idx_list:
         assert_in(item, out_list, "%s not found in output of git ls-files in %s" % (item, path))
@@ -382,7 +391,7 @@ def test_GitRepo_fetch(test_path, orig_path, clone_path):
     clone = GitRepo(clone_path, orig_path)
     filename = get_most_obscure_supported_name()
 
-    origin.checkout("new_branch", "-b")
+    origin.checkout("new_branch", ['-b'])
     with open(opj(orig_path, filename), 'w') as f:
         f.write("New file.")
     origin.add(filename)
@@ -436,7 +445,7 @@ def test_GitRepo_ssh_pull(remote_path, repo_path):
     repo.add_remote("ssh-remote", url)
 
     # modify remote:
-    remote_repo.checkout("ssh-test", "-b")
+    remote_repo.checkout("ssh-test", ['-b'])
     with open(opj(remote_repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
     remote_repo.add("ssh_testfile.dat")
@@ -471,7 +480,7 @@ def test_GitRepo_ssh_push(repo_path, remote_path):
     repo.add_remote("ssh-remote", url)
 
     # modify local repo:
-    repo.checkout("ssh-test", "-b")
+    repo.checkout("ssh-test", ['-b'])
     with open(opj(repo.path, "ssh_testfile.dat"), "w") as f:
         f.write("whatever")
     repo.add("ssh_testfile.dat")
@@ -528,7 +537,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
         f.write("git2 in master")
     git2.add('masterfile')
     git2.commit("Add something to master.")
-    git2.checkout('branch2', '-b')
+    git2.checkout('branch2', ['-b'])
     with open(opj(path2, 'branch2file'), 'w') as f:
         f.write("git2 in branch2")
     git2.add('branch2file')
@@ -539,7 +548,7 @@ def test_GitRepo_remote_update(path1, path2, path3):
         f.write("git3 in master")
     git3.add('masterfile')
     git3.commit("Add something to master.")
-    git3.checkout('branch3', '-b')
+    git3.checkout('branch3', ['-b'])
     with open(opj(path3, 'branch3file'), 'w') as f:
         f.write("git3 in branch3")
     git3.add('branch3file')
@@ -581,7 +590,7 @@ def test_GitRepo_get_files(url, path):
     eq_(local_files, os_files)
 
     # create a different branch:
-    gr.checkout('new_branch', '-b')
+    gr.checkout('new_branch', ['-b'])
     filename = 'another_file.dat'
     with open(opj(path, filename), 'w') as f:
         f.write("something")
@@ -668,7 +677,7 @@ def test_GitRepo_get_merge_base(src):
 
     # Let's create a detached branch
     branch2 = "_detach_"
-    repo.checkout(branch2, options="--orphan")
+    repo.checkout(branch2, options=["--orphan"])
     # it will have all the files
     # Must not do:  https://github.com/gitpython-developers/GitPython/issues/375
     # repo.git_add('.')
@@ -681,7 +690,7 @@ def test_GitRepo_get_merge_base(src):
     assert(repo.get_merge_base([branch2, branch1]) is None)
 
     # Let's merge them up -- then merge base should match the master
-    repo.merge(branch1)
+    repo.merge(branch1, allow_unrelated=True)
     eq_(repo.get_merge_base(branch1), branch1_hexsha)
 
     # if points to some empty/non-existing branch - should also be None
@@ -764,7 +773,7 @@ def test_git_custom_calls(path, path2):
                                            log_stderr=True)
 
         assert_in("On branch master", out)
-        assert_in("nothing to commit, working directory clean", out)
+        assert_in("nothing to commit", out)
         eq_("", err)
         for line in out.splitlines():
             assert_in("stdout| " + line, cm.out)
@@ -776,7 +785,7 @@ def test_git_custom_calls(path, path2):
                                            log_stderr=False)
 
         assert_in("On branch master", out)
-        assert_in("nothing to commit, working directory clean", out)
+        assert_in("nothing to commit", out)
         eq_("", err)
         eq_("", cm.out)
 
@@ -797,7 +806,7 @@ def test_get_tracking_branch(o_path, c_path):
     clone = GitRepo(c_path, o_path)
     eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch())
 
-    clone.checkout('new_branch', '-b')
+    clone.checkout('new_branch', ['-b'])
     eq_((None, None), clone.get_tracking_branch())
 
     eq_(('origin', 'refs/heads/master'), clone.get_tracking_branch('master'))
@@ -807,21 +816,21 @@ def test_get_tracking_branch(o_path, c_path):
 def test_submodule_deinit(path):
 
     top_repo = GitRepo(path, create=False)
-    eq_(['sub1', 'sub2'], [s.name for s in top_repo.get_submodules()])
-    top_repo.update_submodule('sub1', init=True)
-    top_repo.update_submodule('sub2', init=True)
+    eq_(['subm 1', 'subm 2'], [s.name for s in top_repo.get_submodules()])
+    top_repo.update_submodule('subm 1', init=True)
+    top_repo.update_submodule('subm 2', init=True)
     ok_(all([s.module_exists() for s in top_repo.get_submodules()]))
 
     # modify submodule:
-    with open(opj(top_repo.path, 'sub1', 'file_ut.dat'), "w") as f:
+    with open(opj(top_repo.path, 'subm 1', 'file_ut.dat'), "w") as f:
         f.write("some content")
 
     assert_raises(GitCommandError, top_repo.deinit_submodule, 'sub1')
 
     # using force should work:
-    top_repo.deinit_submodule('sub1', force=True)
+    top_repo.deinit_submodule('subm 1', force=True)
 
-    ok_(not top_repo.repo.submodule('sub1').module_exists())
+    ok_(not top_repo.repo.submodule('subm 1').module_exists())
 
 
 def test_kwargs_to_options():
@@ -873,3 +882,15 @@ def test_to_options():
                         annex_options=to_options(JSON=True),
                         options=to_options(unused=True)),
         ['git', '-C/some/where', 'annex', '--JSON', 'my_cmd', '--unused'])
+
+
+@with_tempfile
+def test_GitRepo_count_objects(repo_path):
+
+    repo = GitRepo(repo_path, create=True)
+    # test if dictionary returned
+    eq_(isinstance(repo.count_objects, dict), True)
+    # test if dictionary contains keys and values we expect
+    empty_count = {'count': 0, 'garbage': 0,  'in-pack': 0, 'packs': 0, 'prune-packable': 0,
+                   'size': 0, 'size-garbage': 0, 'size-pack': 0}
+    eq_(empty_count, repo.count_objects)

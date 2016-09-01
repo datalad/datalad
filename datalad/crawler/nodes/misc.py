@@ -13,6 +13,7 @@ import inspect
 import os
 import re
 import stat
+import pdb
 
 from stat import ST_MODE, S_IEXEC, S_IXOTH, S_IXGRP
 from os.path import curdir, isdir, isabs, exists, join as opj, split as ops
@@ -169,7 +170,7 @@ class rename(object):
 class sub(object):
     """Apply re.sub regular expression substitutions to specified items"""
 
-    def __init__(self, subs):
+    def __init__(self, subs, ok_missing=False):
         """
 
         Parameters
@@ -177,11 +178,14 @@ class sub(object):
         subs: dict of key -> dict of pattern -> replacement
         """
         self.subs = subs
+        self.ok_missing = ok_missing
 
     def __call__(self, data):
         data = data.copy()
         for key, subs in self.subs.items():
             for from_, to_ in subs.items():
+                if key not in data and self.ok_missing:
+                    continue
                 data[key] = re.sub(from_, to_, data[key])
         yield data
 
@@ -231,6 +235,10 @@ def get_disposition_filename(data):
 
 class _act_if(object):
     """Base class for nodes which would act if input data matches specified values
+
+    Should generally be not used directly.  If used directly,
+    no action is taken, besides possibly regexp matched groups
+    populating the `data`
     """
 
     def __init__(self, values, re=False, negate=False):
@@ -242,8 +250,9 @@ class _act_if(object):
           Key/value pairs to compare arrived data against.  Would raise
           FinishPipeline if all keys have matched target values
         re: bool, optional
-          If specified values are to be treated as regular expression to be
-          searched
+          If specified, values are to be treated as regular expression to be
+          searched. If re and expression includes groups, those will also
+          populate yielded data
         negate: bool, optional
           Reverses, so acts (skips, etc) if no match
         """
@@ -252,30 +261,41 @@ class _act_if(object):
         self.negate = negate
 
     def __call__(self, data):
+        #import ipdb; ipdb.set_trace()
         comp = re.search if self.re else lambda x, y: x == y
         matched = True
         # finds if all match
+        data_ = data.copy()
         for k, v in iteritems(self.values):
-            if not (k in data and comp(v, data[k])):
+            res = k in data and comp(v, data[k])
+            if not res:
                 # do nothing and pass the data further
                 matched = False
                 break
+            if self.re:
+                assert(res)
+                data_.update(res.groupdict())
 
-        if matched != self.negate:
-            for v in self._act(data):
-                yield v
-        else:
-            yield data
+        for v in (self._act_mismatch
+                  if matched != self.negate
+                  else self._act_match)(data_):
+            yield v
 
-    def _act(self, data):
-        raise NotImplementedError
+    # By default, nothing really is done -- so just produce the same
+    # data.  Sub-classes will provide specific custom actions in one
+    # or another case
+    def _act_mismatch(self, data):
+        return [data]
+
+    def _act_match(self, data):
+        return [data]
 
 
 @auto_repr
 class interrupt_if(_act_if):
     """Interrupt further pipeline processing whenever obtained data matches provided value(s)"""
 
-    def _act(self, data):
+    def _act_mismatch(self, data):
         raise FinishPipeline
 
 
@@ -283,8 +303,18 @@ class interrupt_if(_act_if):
 class skip_if(_act_if):
     """Skip (do not yield anything) further pipeline processing whenever obtained data matches provided value(s)"""
 
-    def _act(self, data):
+    def _act_mismatch(self, data):
         return []  # nothing will be yielded etc
+
+
+@auto_repr
+class continue_if(_act_if):
+    """Continue if matched
+
+    An inverse of skip_if"""
+
+    def _act_match(self, data):
+        return []
 
 
 @auto_repr
@@ -422,14 +452,23 @@ class find_files(object):
 @auto_repr
 class switch(object):
     """Helper node which would decide which sub-pipeline/node to execute based on values in data
+
+
+    Example
+    -------
+
+    TODO
     """
 
-    def __init__(self, key, mapping, default=None, missing='raise'):
+    def __init__(self, key, mapping, default=None, missing='raise', re=False):
         """
         Parameters
         ----------
         key: str
         mapping: dict
+        re: bool, optional
+          Either mapping keys define the regular expressions.  Note that in case
+          multiple regular expressions match, all of them would "work it"
         default: node or pipeline, optional
           Node or pipeline to use if no mapping was found
         missing: ('raise', 'stop', 'skip'), optional
@@ -441,7 +480,9 @@ class switch(object):
         """
         self.key = key
         self.mapping = mapping
-        self.missing = missing
+        self.re = re
+        # trying self.missing assigning just for the sake of auto_repr
+        self.missing = self._missing = missing
         self.default = default
 
     @property
@@ -455,25 +496,85 @@ class switch(object):
 
     def __call__(self, data):
         # make decision which sub-pipeline
-        try:
-            pipeline = self.mapping[data[self.key]]
-        except KeyError:
+
+        key_value = data[self.key]
+        if not self.re:
+            try:
+                pipelines = [self.mapping[key_value]]
+            except KeyError:
+                pipelines = []
+        else:
+            # find all the matches
+            pipelines = [
+                pipeline
+                for regex, pipeline in self.mapping.items()
+                if re.match(regex, key_value)
+            ]
+
+        if not pipelines:  # None has matched
             if self.default is not None:
-                pipeline = self.default
+                pipelines = [self.default]
             elif self.missing == 'raise':
-                raise
+                raise KeyError(
+                    "Found no matches for %s == %r %s %r" % (
+                    self.key,
+                    key_value,
+                    "matching one of" if self.re else "among specified",
+                    list(self.mapping.keys()))
+                )
             elif self.missing == 'skip':
                 yield data
                 return
             elif self.missing == 'stop':
                 return
 
-        if not isinstance(pipeline, PIPELINE_TYPES):
-            # it was a node, return its output
-            gen = pipeline(data)
-        else:
-            gen = xrun_pipeline(pipeline, data)
+        for pipeline in pipelines:
+            if pipeline is None:
+                yield data
+                return
 
-        # run and yield each result
-        for out in gen:
+            if not isinstance(pipeline, PIPELINE_TYPES):
+                # it was a node, return its output
+                gen = pipeline(data)
+            else:
+                gen = xrun_pipeline(pipeline, data)
+
+            # run and yield each result
+            for out in gen:
+                yield out
+
+
+@auto_repr
+class debug(object):
+    """Helper node to fall into debugger (pdb for now) whenever node is called"""
+
+    def __init__(self, node, when='before'):
+        """
+        Parameters
+        ----------
+        node: callable
+        when: str, optional
+          Determines when to enter the debugger:
+          - before: right before running the node
+          - after: after it was ran
+          - empty: when node produced no output
+        """
+        self.node = node
+        self.when = when
+
+    def __call__(self, data):
+        node = self.node
+        when = self.when
+        if when == 'before':
+            lgr.info("About to run %s node", node)
+            pdb.set_trace()
+
+        n = 0
+        for out in node(data):
+            n += 1
             yield out
+
+        if when == 'after' or (when == 'empty' and n == 0):
+            lgr.info("Ran node %s which yielded %d times", node, n)
+            pdb.set_trace()
+

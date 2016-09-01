@@ -20,18 +20,23 @@ _COUNTS = (
     'files', 'urls',
     'add_git', 'add_annex', 'dropped',
     'skipped', 'overwritten', 'renamed', 'removed',
-    'downloaded', 'downloaded_size', 'downloaded_time'
+    'downloaded', 'downloaded_size', 'downloaded_time',
+    'datasets_crawled',
+    'datasets_crawl_failed',
 )
+
 _LISTS = (
     'merges',    # merges which were carried out (from -> to)
     'versions',  # versions encountered.  Latest would be used for tagging
 )
+
 _FORMATTERS = {
     # TODO:
     'downloaded_size': humanize.naturalsize,
     'merges': lambda merges: ", ".join('->'.join(merge) for merge in merges),
     'versions': lambda versions: ', '.join(versions)
 }
+
 
 # @auto_repr
 class ActivityStats(object):
@@ -165,7 +170,9 @@ Branches merged:
             (" overwritten", "overwritten"),
             (" +git",  "add_git"),
             (" +annex", "add_annex"),
-            ("Branches merged", "merges")
+            ("Branches merged", "merges"),
+            ("Datasets crawled", "datasets_crawled"),
+            (" failed", "datasets_crawl_failed"),
         ]
         # Filter out empty/0 ones
         out = ["%s: " % s + str(entries[m]) for s, m in out_formats if entries[m]]

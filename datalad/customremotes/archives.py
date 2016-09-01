@@ -11,10 +11,9 @@
 __docformat__ = 'restructuredtext'
 
 import os
-import re
 from os.path import exists, join as opj, basename, abspath
 from collections import OrderedDict
-from six.moves.urllib.parse import quote as urlquote, unquote as urlunquote
+from operator import itemgetter
 
 import logging
 lgr = logging.getLogger('datalad.customremotes.archive')
@@ -24,8 +23,8 @@ from ..cmd import link_file_load
 from ..support.archives import ArchivesCache
 from ..support.network import URL
 from ..utils import getpwd
+from ..utils import unique
 from .base import AnnexCustomRemote
-from .base import URI_PREFIX
 
 
 # TODO: RF functionality not specific to being a custom remote (loop etc)
@@ -43,6 +42,7 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
     URL_PREFIX = URL_SCHEME + ":"
 
     AVAILABILITY = "local"
+    COST = 500
 
     def __init__(self, persistent_cache=True, **kwargs):
         super(ArchiveAnnexCustomRemote, self).__init__(**kwargs)
@@ -107,35 +107,81 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             fdict['size'] = int(fdict['size'])
         return key, path, fdict
 
-    #
-    # Helper methods
-    def _get_key_url(self, key):
-        """Given a key, figure out the URL
+    def _gen_akey_afiles(self, key, sorted=False, unique_akeys=True):
+        """Given a key, yield akey, afile pairs
 
-        Raises
-        ------
-        ValueError
-            If could not figure out any URL
+        if `sorted`, then first those which have extracted version in local cache
+        will be yielded
+
+        Gets determined based on urls for datalad archives
+
+        Made "generators all the way" as an exercise but also to delay any
+        checks etc until really necessary.
         """
         urls = self.get_URLS(key)
 
-        if len(urls) == 1:
-            return urls[0]
-        else:  # multiple
-            # TODO:  utilize cache to check which archives might already be
-            #        present in the cache.
-            #    Then if not present in the cache -- check which are present
-            #    locally and choose that one to use
-            if self._last_url and self._last_url in urls:
-                return self._last_url
-            else:
-                return urls[0]  # just the first one
+        akey_afiles = [
+            self._parse_url(url)[:2]  # skip size
+            for url in urls
+        ]
 
-    def _get_akey_afile(self, key):
-        """Given a key, figure out target archive key, and file within archive
-        """
-        url = self._get_key_url(key)
-        return self._parse_url(url)[:2]  # skip size
+        if unique_akeys:
+            akey_afiles = unique(akey_afiles, key=itemgetter(0))
+
+        if not sorted:
+            for pair in akey_afiles:
+                yield pair
+            return
+
+        # Otherwise we will go through each one
+
+        # multiple URLs are available so we need to figure out which one
+        # would be most efficient to "deal with"
+        akey_afile_paths = (
+            ((akey, afile), self.get_contentlocation(
+                akey,
+                absolute=True, verify_exists=False
+                ))
+            for akey, afile in akey_afiles
+        )
+
+        # by default get_contentlocation would return empty result for a key
+        # which is not available locally.  But we could still have extracted archive
+        # in the cache.  So we need pretty much get first all possible and then
+        # only remove those which aren't present locally.  So verify_exists was added
+        yielded = set()
+        akey_afile_paths_ = []
+
+        # utilize cache to check which archives might already be present in the cache
+        for akey_afile, akey_path in akey_afile_paths:
+            if akey_path and self.cache[akey_path].is_extracted:
+                yield akey_afile
+                yielded.add(akey_afile)
+            akey_afile_paths_.append((akey_afile, akey_path))
+
+        # replace generators with already collected ones into a list.
+        # The idea that in many cases we don't even need to create a full list
+        # and that initial single yield would be enough, thus we don't need to check
+        # locations etc for every possible hit
+        akey_afile_paths = akey_afile_paths_
+
+        # if not present in the cache -- check which are present
+        # locally and choose that one to use, so it would get extracted
+        for akey_afile, akey_path in akey_afile_paths:
+            if akey_path and exists(akey_path):
+                yielded.add(akey_afile)
+                yield akey_afile
+
+        # So no archive is present either in the cache or originally under annex
+        # XXX some kind of a heuristic I guess is to use last_url ;-)
+        if self._last_url and self._last_url in urls and (len(urls) == len(akey_afiles)):
+            akey_afile, _ = akey_afile_paths[urls.index(self._last_url)]
+            yielded.add(akey_afile)
+            yield akey_afile
+
+        for akey_afile, _ in akey_afile_paths:
+            if akey_afile not in yielded:
+                yield akey_afile
 
     # Protocol implementation
     def req_CHECKURL(self, url):
@@ -169,16 +215,16 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
         # But reply that present only if archive is present
         # TODO: this would throw exception if not present, so this statement is kinda bogus
-        akey_fpath = self.get_contentlocation(akey)  #, relative_to_top=True))
-        if akey_fpath:
-            akey_path = opj(self.path, akey_fpath)
+        akey_path = self.get_contentlocation(akey, absolute=True)
+        if akey_path:
+            # Extract via cache only if size is not yet known
+            if size is None:
+                # if for testing we want to force getting the archive extracted
+                # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
+                efile = self.cache[akey_path].get_extracted_filename(afile)
 
-            # if for testing we want to force getting the archive extracted
-            # _ = self.cache.assure_extracted(self._get_key_path(akey)) # TEMP
-            efile = self.cache[akey_path].get_extracted_filename(afile)
-
-            if size is None and exists(efile):
-                size = os.stat(efile).st_size
+                if exists(efile):
+                    size = os.stat(efile).st_size
 
             if size is None:
                 size = 'UNKNOWN'
@@ -193,7 +239,6 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
             # TODO: theoretically we should first check if key is available from
             # any remote to know if file is available
             self.send("CHECKURL-FAILURE")
-
 
     def req_CHECKPRESENT(self, key):
         """Check if copy is available
@@ -217,13 +262,13 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         # Otherwise it is unrealistic to even require to recompute key if we
         # knew the backend etc
         lgr.debug("VERIFYING key %s" % key)
-        akey, afile = self._get_akey_afile(key)
-        if self.get_contentlocation(akey):
-            self.send("CHECKPRESENT-SUCCESS", key)
-        else:
-            # TODO: proxy the same to annex itself to verify check for archive.
-            # If archive is no longer available -- then CHECKPRESENT-FAILURE
-            self.send("CHECKPRESENT-UNKNOWN", key)
+        # The same content could be available from multiple locations within the same
+        # archive, so let's not ask it twice since here we don't care about "afile"
+        for akey, _ in self._gen_akey_afiles(key, unique_akeys=True):
+            if self.get_contentlocation(akey) or self.repo.is_available(akey, batch=True, key=True):
+                self.send("CHECKPRESENT-SUCCESS", key)
+                return
+        self.send("CHECKPRESENT-UNKNOWN", key)
 
     def req_REMOVE(self, key):
         """
@@ -233,17 +278,20 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
         REMOVE-FAILURE Key ErrorMsg
             Indicates that the key was unable to be removed from the remote.
         """
-        # TODO: proxy query to the underlying tarball under annex that if
-        # tarball was removed (not available at all) -- report success,
-        # otherwise failure (current the only one)
-        akey, afile = self._get_akey_afile(key)
-        if False:
-            # TODO: proxy, checking present of local tarball is not sufficient
-            #  not exists(self.get_key_path(key)):
-            self.send("REMOVE-SUCCESS", akey)
-        else:
-            self.send("REMOVE-FAILURE", akey,
-                      "Removal from file archives is not supported")
+        self.send("REMOVE-FAILURE", key,
+                  "Removal from file archives is not supported")
+        return
+        # # TODO: proxy query to the underlying tarball under annex that if
+        # # tarball was removed (not available at all) -- report success,
+        # # otherwise failure (current the only one)
+        # akey, afile = self._get_akey_afile(key)
+        # if False:
+        #     # TODO: proxy, checking present of local tarball is not sufficient
+        #     #  not exists(self.get_key_path(key)):
+        #     self.send("REMOVE-SUCCESS", akey)
+        # else:
+        #     self.send("REMOVE-FAILURE", akey,
+        #               "Removal from file archives is not supported")
 
     def req_WHEREIS(self, key):
         """
@@ -269,40 +317,52 @@ class ArchiveAnnexCustomRemote(AnnexCustomRemote):
 
     def _transfer(self, cmd, key, path):
 
-        akey, afile = self._get_akey_afile(key)
-        akey_fpath = self.get_contentlocation(akey)
-        if akey_fpath:  # present
-            akey_path = opj(self.path, akey_fpath)
-        else:
-            # TODO: make it more stringent?
-            # Command could have fail to run if key was not present locally yet
-            # Thus retrieve the key using annex
+        akeys_tried = []
+        # the same file could come from multiple files within the same archive
+        # So far it doesn't make sense to "try all" of them since if one fails
+        # it means the others would fail too, so it makes sense to immediately
+        # prune the list so we keep only the ones from unique akeys.
+        # May be whenever we support extraction directly from the tarballs
+        # we should go through all and choose the one easiest to get or smth.
+        for akey, afile in self._gen_akey_afiles(key, sorted=True, unique_akeys=True):
+            akeys_tried.append(akey)
             try:
-                # TODO: we need to report user somehow about this happening and progress on the download
-                self.runner(["git-annex", "get", "--key", akey],
-                            cwd=self.path, expect_stderr=True)
-            except Exception as e:
-                #from celery.contrib import rdb
-                #rdb.set_trace()
-                self.error("Failed to fetch {akey} containing {key}: {e}".format(**locals()))
+                akey_fpath = self.get_contentlocation(akey)
+                if not akey_fpath:
+                    # TODO: make it more stringent?
+                    # Command could have fail to run if key was not present locally yet
+                    # Thus retrieve the key using annex
+                    # TODO: we need to report user somehow about this happening and progress on the download
+                    self.runner(["git-annex", "get", "--key", akey],
+                                cwd=self.path, expect_stderr=True)
+
+                    akey_fpath = self.get_contentlocation(akey)
+                    if not akey_fpath:
+                        raise RuntimeError("We were reported to fetch it alright but now can't get its location.  Check logic")
+
+                akey_path = opj(self.repo.path, akey_fpath)
+                assert exists(akey_path), "Key file %s is not present" % akey_path
+
+                # Extract that bloody file from the bloody archive
+                # TODO: implement/use caching, for now a simple one
+                #  actually patool doesn't support extraction of a single file
+                #  https://github.com/wummel/patool/issues/20
+                # so
+                pwd = getpwd()
+                lgr.debug("Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
+                apath = self.cache[akey_path].get_extracted_file(afile)
+                link_file_load(apath, path)
+                self.send('TRANSFER-SUCCESS', cmd, key)
                 return
-            akey_fpath = self.get_contentlocation(akey)
-            if not akey_fpath:
-                raise RuntimeError("We were reported to fetch it alright but now can't get its location.  Check logic")
+            except Exception as exc:
+                # from celery.contrib import rdb
+                # rdb.set_trace()
+                from datalad.dochelpers import exc_str
+                exc_ = exc_str(exc)
+                self.debug("Failed to fetch {akey} containing {key}: {exc_}".format(**locals()))
+                continue
 
-        akey_path = opj(self.repo.path, akey_fpath)
-        assert exists(akey_path), "Key file %s is not present" % akey_path
-
-        # Extract that bloody file from the bloody archive
-        # TODO: implement/use caching, for now a simple one
-        #  actually patool doesn't support extraction of a single file
-        #  https://github.com/wummel/patool/issues/20
-        # so
-        pwd = getpwd()
-        lgr.debug("Getting file {afile} from {akey_path} while PWD={pwd}".format(**locals()))
-        apath = self.cache[akey_path].get_extracted_file(afile)
-        link_file_load(apath, path)
-        self.send('TRANSFER-SUCCESS', cmd, key)
+        self.error("Failed to fetch any archive containing {key}. Tried: {akeys}".format(**locals()))
 
 
 from .main import main as super_main

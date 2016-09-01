@@ -10,16 +10,17 @@
 
 __docformat__ = 'restructuredtext'
 
+import logging
+lgr = logging.getLogger('datalad.cmdline')
+
+lgr.log(5, "Importing cmdline.main")
 
 import argparse
-import logging
 import sys
-import os
 import textwrap
 from importlib import import_module
 
 import datalad
-from datalad.log import lgr
 
 from datalad.cmdline import helpers
 from datalad.support.exceptions import InsufficientArgumentsError
@@ -51,9 +52,16 @@ THE SOFTWARE.
 """
 
 
+# TODO:  OPT look into making setup_parser smarter to become faster
+# Now it seems to take up to 200ms to do all the parser setup
+# even though it might not be necessary to know about all the commands etc.
+# I wondered if it could somehow decide on what commands to worry about etc
+# by going through sys.args first
 def setup_parser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         return_subparsers=False):
+
+    lgr.log(5, "Starting to setup_parser")
     # delay since it can be a heavy import
     from ..interface.base import dedent_docstring, get_interface_groups, \
         get_cmdline_command_name, alter_interface_docs_for_cmdline
@@ -81,7 +89,10 @@ def setup_parser(
     if __debug__:
         parser.add_argument(
             '--dbg', action='store_true', dest='common_debug',
-            help="do not catch exceptions and show exception traceback")
+            help="enter Python debugger when uncaught exception happens")
+        parser.add_argument(
+            '--idbg', action='store_true', dest='common_idebug',
+            help="enter IPython debugger when uncaught exception happens")
     parser.add_argument(
         '-C', action='append', dest='change_path', metavar='PATH',
         help="""run as if datalad was started in <path> instead
@@ -118,6 +129,7 @@ def setup_parser(
 
         for _intfspec in _interfaces:
             # turn the interface spec into an instance
+            lgr.log(5, "Importing module %s " % _intfspec[0])
             _mod = import_module(_intfspec[0], package='datalad')
             _intf = getattr(_mod, _intfspec[1])
             cmd_name = get_cmdline_command_name(_intfspec)
@@ -186,6 +198,7 @@ def setup_parser(
     datalad <command> --help"""),
                          75, initial_indent='', subsequent_indent=''))
     parts['datalad'] = parser
+    lgr.log(5, "Finished setup_parser")
     if return_subparsers:
         return parts
     else:
@@ -203,6 +216,7 @@ def setup_parser(
 
 
 def main(args=None):
+    lgr.log(5, "Starting main(%r)", args)
     # PYTHON_ARGCOMPLETE_OK
     parser = setup_parser()
     try:
@@ -225,9 +239,9 @@ def main(args=None):
         args_ = strip_arg_from_argv(args or sys.argv, cmdlineargs.pbs_runner, pbs_runner_opt[1])
         # run the function associated with the selected command
         run_via_pbs(args_, cmdlineargs.pbs_runner)
-    elif cmdlineargs.common_debug:
+    elif cmdlineargs.common_debug or cmdlineargs.common_idebug:
         # so we could see/stop clearly at the point of failure
-        setup_exceptionhook()
+        setup_exceptionhook(ipython=cmdlineargs.common_idebug)
         ret = cmdlineargs.func(cmdlineargs)
     else:
         # otherwise - guard and only log the summary. Postmortem is not
@@ -243,4 +257,6 @@ def main(args=None):
             lgr.error('%s (%s)' % (exc_str(exc), exc.__class__.__name__))
             sys.exit(1)
     if hasattr(cmdlineargs, 'result_renderer'):
-        cmdlineargs.result_renderer(ret)
+        cmdlineargs.result_renderer(ret, cmdlineargs)
+
+lgr.log(5, "Done importing cmdline.main")

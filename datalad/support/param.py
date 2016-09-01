@@ -12,6 +12,9 @@ __docformat__ = 'restructuredtext'
 
 import re
 import textwrap
+import argparse
+from inspect import getargspec
+
 from .constraints import expand_contraint_spec
 
 _whitespace_re = re.compile('\n\s+|^\s+')
@@ -20,6 +23,11 @@ _whitespace_re = re.compile('\n\s+|^\s+')
 class Parameter(object):
     """This class shall serve as a representation of a parameter.
     """
+
+    # Known keyword arguments which we want to allow to pass over into
+    # argparser.add_argument . Mentioned explicitly, since otherwise
+    # are not verified while working in Python-only API
+    _KNOWN_ARGS = getargspec(argparse.Action.__init__)[0] + ['action']
 
     def __init__(self, constraints=None, doc=None, args=None, **kwargs):
         """Add contraints (validator) specifications and a docstring for
@@ -57,12 +65,20 @@ class Parameter(object):
         >>> C = Parameter(
         ...         AltConstraints(
         ...             Constraints(EnsureFloat(),
-        ...                         EnsureRange(min=7.0,max=44.0)),
+        ...                         EnsureRange(min=7.0, max=44.0)),
         ...             None))
         """
         self.constraints = expand_contraint_spec(constraints)
         self._doc = doc
         self.cmd_args = args
+
+        # Verify that no mistyped kwargs present
+        unknown_args = set(kwargs).difference(self._KNOWN_ARGS)
+        if unknown_args:
+            raise ValueError(
+                "Detected unknown argument(s) for the Parameter: %s.  Known are: %s"
+                % (', '.join(unknown_args), ', '.join(self._KNOWN_ARGS))
+            )
         self.cmd_kwargs = kwargs
 
     def get_autodoc(self, name, indent="  ", width=70, default=None, has_default=False):

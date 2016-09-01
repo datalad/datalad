@@ -16,6 +16,7 @@ from ..support.gitrepo import GitRepo
 from ..support.annexrepo import AnnexRepo
 from ..cmd import Runner
 from ..support.network import get_local_file_url
+from ..support.external_versions import external_versions
 from ..utils import swallow_outputs
 from ..utils import swallow_logs
 
@@ -97,8 +98,8 @@ class BasicAnnexTestRepo(TestRepo):
 
     def create_info_file(self):
         runner = Runner()
-        annex_version = runner.run("git annex version")[0].split()[2]
-        git_version = runner.run("git --version")[0].split()[2]
+        annex_version = external_versions['cmd:annex']
+        git_version = external_versions['cmd:git']
         self.create_file('INFO.txt',
                          "git: %s\n"
                          "annex: %s\n"
@@ -120,7 +121,7 @@ class BasicGitTestRepo(TestRepo):
 
     def create_info_file(self):
         runner = Runner()
-        git_version = runner.run("git --version")[0].split()[2]
+        git_version = external_versions['cmd:git']
         self.create_file('INFO.txt',
                          "git: %s\n"
                          "datalad: %s\n"
@@ -139,12 +140,12 @@ class SubmoduleDataset(BasicAnnexTestRepo):
         from datalad.cmd import Runner
         runner = Runner()
         kw = dict(cwd=self.path, expect_stderr=True)
-        runner.run(['git', 'submodule', 'add', annex.url, 'sub1'], **kw)
-        runner.run(['git', 'submodule', 'add', annex.url, 'sub2'], **kw)
-        runner.run(['git', 'commit', '-m', 'Added sub1 and sub2.'], **kw)
+        runner.run(['git', 'submodule', 'add', annex.url, 'subm 1'], **kw)
+        runner.run(['git', 'submodule', 'add', annex.url, 'subm 2'], **kw)
+        runner.run(['git', 'commit', '-m', 'Added subm 1 and subm 2.'], **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'], **kw)
         # init annex in subdatasets
-        for s in ('sub1', 'sub2'):
+        for s in ('subm 1', 'subm 2'):
             runner.run(['git', 'annex', 'init'],
                        cwd=opj(self.path, s), expect_stderr=True)
 
@@ -158,18 +159,18 @@ class NestedDataset(BasicAnnexTestRepo):
         from datalad.cmd import Runner
         runner = Runner()
         kw = dict(expect_stderr=True)
-        runner.run(['git', 'submodule', 'add', ds.url, 'subdataset'],
+        runner.run(['git', 'submodule', 'add', ds.url, 'sub dataset1'],
                    cwd=self.path, **kw)
-        runner.run(['git', 'submodule', 'add', ds.url, 'subsubdataset'],
-                   cwd=opj(self.path, 'subdataset'), **kw)
-        runner.run(['git', 'commit', '-m', 'Added subdataset.'],
-                   cwd=opj(self.path, 'subdataset'), **kw)
+        runner.run(['git', 'submodule', 'add', ds.url, 'sub sub dataset1'],
+                   cwd=opj(self.path, 'sub dataset1'), **kw)
+        runner.run(['git', 'commit', '-m', 'Added sub dataset.'],
+                   cwd=opj(self.path, 'sub dataset1'), **kw)
         runner.run(['git', 'commit', '-a', '-m', 'Added subdatasets.'],
                    cwd=self.path, **kw)
         runner.run(['git', 'submodule', 'update', '--init', '--recursive'],
                    cwd=self.path, **kw)
         # init all annexes
-        for s in ('', 'subdataset', opj('subdataset', 'subsubdataset')):
+        for s in ('', 'sub dataset1', opj('sub dataset1', 'sub sub dataset1')):
             runner.run(['git', 'annex', 'init'],
                        cwd=opj(self.path, s), expect_stderr=True)
 
@@ -181,7 +182,7 @@ class InnerSubmodule(object):
 
     @property
     def path(self):
-        return opj(self._ds.path, 'subdataset', 'sub1')
+        return opj(self._ds.path, 'sub dataset1', 'subm 1')
 
     @property
     def url(self):

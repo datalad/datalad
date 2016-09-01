@@ -57,6 +57,27 @@ def test_get_versions():
                  od([(None, {'un': 'un'}), ('1', {'d1/f': ('d1/f1', None)}), ('2', {'d1/f': 'd1/f2', 'd2/f': 'd2/f2'})]))
 
 
+def test_get_versions_openfmri_dropped_models():
+    # discovered while working with ds000017 that models were dropped completely from
+    # extraction... it seems we were missing use of always_versioned
+    staged = ['.datalad/crawl/statuses/incoming.json', '.gitattributes', 'README.txt', 'changelog.txt',
+              'ds017A_R1.1.0_raw.tgz',
+              'ds017A_models.tgz', 'ds017A_raw.tgz']
+    versions = get_versions(
+        staged, regex='_R(?P<version>\d+[\.\d]*)(?=[\._])',
+        always_versioned='ds0.*',
+        unversioned='default', default='1.0.0')
+    target_versions = od([
+        (None, {'changelog.txt': 'changelog.txt',
+                '.datalad/crawl/statuses/incoming.json': '.datalad/crawl/statuses/incoming.json',
+                '.gitattributes': '.gitattributes',
+                'README.txt': 'README.txt'}),
+        ('1.0.0', {'ds017A_raw.tgz': 'ds017A_raw.tgz',
+                   'ds017A_models.tgz': 'ds017A_models.tgz'}),
+        ('1.1.0', {'ds017A_raw.tgz': 'ds017A_R1.1.0_raw.tgz'})])
+    assert_equal(versions, target_versions)
+
+
 def test_get_versions_default_version():
     # by default we raise exception if conflict was detected
     assert_raises(ValueError, get_versions, ['f1', 'f'], '\d+')

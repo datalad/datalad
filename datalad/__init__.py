@@ -9,9 +9,6 @@
 """DataLad aims to expose (scientific) data available online as a unified data
 distribution with the convenience of git-annex repositories as a backend."""
 
-import atexit
-
-from .version import __version__
 from .log import lgr
 
 # Other imports are interspersed with lgr.debug to ease troubleshooting startup
@@ -23,7 +20,12 @@ cfg = ConfigManager()
 lgr.log(5, "Instantiating ssh manager")
 from .support.sshconnector import SSHManager
 ssh_manager = SSHManager()
-atexit.register(ssh_manager.close)
+
+import atexit
+atexit.register(ssh_manager.close, allow_fail=False)
+atexit.register(lgr.log, 5, "Exiting")
+
+from .version import __version__
 
 
 def test(package='datalad', **kwargs):
@@ -44,6 +46,11 @@ test.__test__ = False
 # Following fixtures are necessary at the top level __init__ for fixtures which
 # would cover all **/tests and not just datalad/tests/
 
+# To store settings which setup_package changes and teardown_package should return
+_test_states = {
+    'loglevel': None,
+    'DATALAD_LOGLEVEL': None,
+}
 
 def setup_package():
     import os
@@ -62,11 +69,33 @@ def setup_package():
             lgr.debug("Removing %s from the environment since it is empty", ev)
             os.environ.pop(ev)
 
+    DATALAD_LOGLEVEL = os.environ.get('DATALAD_LOGLEVEL', None)
+    if DATALAD_LOGLEVEL is None:
+        # very very silent.  Tests introspecting logs should use
+        # swallow_logs(new_level=...)
+        _test_states['loglevel'] = lgr.getEffectiveLevel()
+        lgr.setLevel(100)
+
+        # And we should also set it within environ so underlying commands also stay silent
+        _test_states['DATALAD_LOGLEVEL'] = DATALAD_LOGLEVEL
+        os.environ['DATALAD_LOGLEVEL'] = '100'
+    else:
+        # We are not overriding them, since explicitly were asked to have some log level
+        _test_states['loglevel'] = None
+
 
 def teardown_package():
     import os
     if os.environ.get('DATALAD_TESTS_NOTEARDOWN'):
         return
+
+    if _test_states['loglevel'] is not None:
+        lgr.setLevel(_test_states['loglevel'])
+        if _test_states['DATALAD_LOGLEVEL'] is None:
+            os.environ.pop('DATALAD_LOGLEVEL')
+        else:
+            os.environ['DATALAD_LOGLEVEL'] = _test_states['DATALAD_LOGLEVEL']
+
     from datalad.tests import _TEMP_PATHS_GENERATED
     from datalad.tests.utils import rmtemp
     if len(_TEMP_PATHS_GENERATED):

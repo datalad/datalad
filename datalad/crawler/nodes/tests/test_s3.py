@@ -8,7 +8,11 @@
 # ## ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ### ##
 # now with some recursive structure of directories
 
+import logging
 from ..s3 import crawl_s3
+from ..s3 import _strip_prefix
+from ..s3 import get_key_url
+
 from ..misc import switch
 from ..annex import Annexificator
 from ...pipeline import run_pipeline
@@ -74,7 +78,7 @@ def test_crawl_s3(path):
 
 
 @skip_if_no_network
-@use_cassette('test_crawl_s3')
+@use_cassette('test_crawl_s3_commit_versions')
 @with_tempfile
 def test_crawl_s3_commit_versions(path):
     annex = _annex(path)
@@ -91,7 +95,7 @@ def test_crawl_s3_commit_versions(path):
     ]
 
     with externals_use_cassette('test_crawl_s3-pipeline1'):
-        with swallow_logs() as cml:
+        with swallow_logs(new_level=logging.WARN) as cml:
             out = run_pipeline(pipeline)
             assert_in("There is already a tag %s" % target_version, cml.out)
     # things are committed and thus stats are empty
@@ -138,7 +142,7 @@ def test_crawl_s3_commit_versions_one_at_a_time(path):
     ]
 
     with externals_use_cassette('test_crawl_s3-pipeline1'):
-        with swallow_logs() as cml:
+        with swallow_logs(new_level=logging.WARN) as cml:
             out = run_pipeline(pipeline)
             assert_not_in("There is already a tag %s" % target_version, cml.out)
     # things are committed and thus stats are empty
@@ -151,7 +155,7 @@ def test_crawl_s3_commit_versions_one_at_a_time(path):
     # and there should be 7 more, every time changing the total stats
     for t in range(1, 8):
         with externals_use_cassette('test_crawl_s3-pipeline1'):
-            with swallow_logs() as cml:
+            with swallow_logs(new_level=logging.WARN) as cml:
                 out = run_pipeline(pipeline)
                 assert_in("There is already a tag %s" % target_version, cml.out)
         total_stats_ = out[0]['datalad_stats'].get_total()
@@ -179,7 +183,7 @@ def test_crawl_s3_file_to_directory(path):
 
     # with auto_finalize (default), Annexificator will finalize whenever it runs into a conflict
     pipeline = [
-        crawl_s3('datalad-test1-dirs-versioned', repo=annex.repo),
+        crawl_s3('datalad-test1-dirs-versioned', repo=annex.repo, recursive=True),
     #    annex
         switch('datalad_action',
                {
@@ -199,3 +203,34 @@ def test_crawl_s3_file_to_directory(path):
     eq_(total_stats,
         # Deletions come as 'files' as well atm
         ActivityStats(files=3, downloaded=3, overwritten=2, urls=3, add_annex=3, downloaded_size=12, versions=['0.0.20160303']))
+
+
+def test_strip_prefix():
+    eq_(_strip_prefix('', ''), '')
+    eq_(_strip_prefix('abab', 'ab'), 'ab')
+    eq_(_strip_prefix('cabab', 'ab'), 'cabab')
+    eq_(_strip_prefix('', 'ab'), '')
+    eq_(_strip_prefix('ab', 'ab'), '')
+
+
+def test_crawl_s3_prefix():
+    # verify correct handling of prefix while defining the node
+    node = crawl_s3('datalad-test0-versioned')
+    eq_(node.prefix, None)
+
+    with swallow_logs(new_level=logging.WARN) as cml:
+        node = crawl_s3('datalad-test0-versioned', prefix="dir")
+        assert_in('adding /', cml.out)
+    eq_(node.prefix, 'dir/')
+
+
+def test_get_key_url():
+    # Just to provide necessary structure
+    class e:
+        name = 'e'
+        version_id = '123'
+        class bucket:
+            name = "bucket"
+
+    eq_(get_key_url(e), 'http://bucket.s3.amazonaws.com/e?versionId=123')
+    eq_(get_key_url(e, versioned=False), 'http://bucket.s3.amazonaws.com/e')

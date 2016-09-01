@@ -73,9 +73,9 @@ class Get(Interface):
     @staticmethod
     @datasetmethod(name='add')
     def __call__(
-            dataset=None,
             path=None,
             source=None,
+            dataset=None,
             recursive=False,
             recursion_limit=None,
             git_opts=None,

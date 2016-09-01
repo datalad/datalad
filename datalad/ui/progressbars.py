@@ -86,7 +86,8 @@ try:
             self._pbar.start()
 
         def finish(self):
-            self._pbar.finish()
+            if self._pbar:
+                self._pbar.finish()
             super(progressbarProgressBar, self).finish()
 
     progressbars['progressbar'] = progressbarProgressBar
@@ -122,9 +123,17 @@ try:
             self._create()
 
         def finish(self):
-            self._pbar.close()
-            self._pbar = None
-            super(tqdmProgressBar, self).finish()
+            # be tollerant to bugs in those
+            try:
+                if self._pbar is not None:
+                    self._pbar.close()
+            finally:
+                self._pbar = None
+            try:
+                super(tqdmProgressBar, self).finish()
+            except Exception as exc:  # pragma: no cover
+                #lgr.debug("Finishing tqdmProgresBar thrown %s", str_exc(exc))
+                pass
 
     progressbars['tqdm'] = tqdmProgressBar
 except ImportError:  # pragma: no cover

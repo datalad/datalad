@@ -9,21 +9,17 @@
 import platform
 
 from glob import glob
-from os.path import sep as pathsep, join as opj, dirname
+from os.path import sep as pathsep
 
 from setuptools import setup, find_packages
 
 # manpage build imports
 from distutils.command.build_py import build_py
 from setup_support import BuildManPage, BuildRSTExamplesFromScripts
+from setup_support import get_version
 
-# This might entail lots of imports which might not yet be available
-# so let's do ad-hoc parsing of the version.py
-#import datalad.version
-with open(opj(dirname(__file__), 'datalad', 'version.py')) as f:
-    version_lines = list(filter(lambda x: x.startswith('__version__'), f))
-assert(len(version_lines) == 1)
-version = version_lines[0].split('=')[1].strip(" '\"\t\n")
+# datalad version to be installed
+version = get_version()
 
 # Only recentish versions of find_packages support include
 # datalad_pkgs = find_packages('.', include=['datalad*'])
@@ -48,6 +44,7 @@ requires = {
     'core': [
         'appdirs',
         'GitPython>=2.0.3',
+        'iso8601',
         'humanize',
         'mock',  # mock is also used for auto.py, not only for testing
         'patool>=1.7',
@@ -58,6 +55,9 @@ requires = {
         'msgpack-python',
         'requests>=1.2',
     ] + keyring_requires,
+    'downloaders-extra': [
+       'requests_ftp',
+    ],
     'crawl': [
         'scrapy>=1.1.0rc3',  # versioning is primarily for python3 support
     ],
@@ -66,7 +66,6 @@ requires = {
         'httpretty>=0.8.14',
         'mock',
         'nose>=1.3.4',
-        'testtools',
         'vcrpy',
     ]
 }
