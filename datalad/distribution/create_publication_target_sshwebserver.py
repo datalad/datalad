@@ -246,17 +246,22 @@ class CreatePublicationTargetSSHWebserver(Interface):
                             "Target directory %s already exists." % path)
                     elif existing == 'skip':
                         continue
-                    elif existing == 'replace' or existing == 'reconfigure':
+                    elif existing == 'replace':
+                        # TODO REMOVE IT!
+                        raise NotImplementedError("rm it!")
+                        path_exists = False  # if we succeeded removing it
+                    elif existing == 'reconfigure':
                         pass
                     else:
                         raise ValueError("Do not know how to hand existing=%s" % repr(existing))
 
-                try:
-                    ssh(["mkdir", "-p", path])
-                except CommandError as e:
-                    lgr.error("Remotely creating target directory failed at "
-                              "%s.\nError: %s" % (path, exc_str(e)))
-                    continue
+                if not path_exists:
+                    try:
+                        ssh(["mkdir", "-p", path])
+                    except CommandError as e:
+                        lgr.error("Remotely creating target directory failed at "
+                                  "%s.\nError: %s" % (path, exc_str(e)))
+                        continue
 
             # don't (re-)initialize dataset if existing == reconfigure
             if existing != 'reconfigure':
