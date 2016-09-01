@@ -91,7 +91,7 @@ def test_basic_metadata(path):
     sibling = Dataset(opj(path, 'sibling'))
     sibling.install(source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling)
-    assert_equal(sibling_meta[0]['dcterms:isVersionOf'],
+    assert_equal(sibling_meta[0]['prov:wasDerivedFrom'],
                  {'@id': ds.id})
     # origin should learn about the clone
     sibling.repo.push(remote='origin', refspec='git-annex')
@@ -152,7 +152,7 @@ def test_aggregation(path):
 
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
-    assert_equal(clonemeta[0]['dcterms:isVersionOf']['@id'],
+    assert_equal(clonemeta[0]['prov:wasDerivedFrom']['@id'],
                  ds.id)
     # all but the implicit is identical
     assert_equal(clonemeta[1:], meta[1:])

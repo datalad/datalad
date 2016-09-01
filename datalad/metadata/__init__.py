@@ -99,7 +99,7 @@ def get_implicit_metadata(ds, ds_identifier=None):
             origin_uuid = ds.config.get_value(
                 'datalad.annex', 'origin', default='')
             if origin_uuid and ds_uuid != origin_uuid:
-                meta['dcterms:isVersionOf'] = {'@id': origin_uuid}
+                meta['prov:wasDerivedFrom'] = {'@id': origin_uuid}
 
         # get all other annex ids, and filter out this one, origin and
         # non-specific remotes
@@ -119,8 +119,7 @@ def get_implicit_metadata(ds, ds_identifier=None):
             # filter out special ones
             if not item.startswith('00000000-0000-0000-0000-0000000000')
             # and the present one too
-            and not item == ds_uuid
-            and not item == origin_uuid]
+            and not item == ds_uuid]
         if len(sibling_uuids):
             version_meta = [{'@id': sibling} for sibling in sibling_uuids]
             if len(version_meta) == 1:
@@ -153,10 +152,10 @@ def _get_version_ids_from_implicit_meta(meta):
     hv = meta.get('dcterms:hasVersion', [])
     if isinstance(hv, dict):
         hv = [hv]
-    versions = [v['@id'] for v in hv if '@id' in v]
-    iv = meta.get('dcterms:isVersionOf', {})
+    versions = set([v['@id'] for v in hv if '@id' in v])
+    iv = meta.get('prov:wasDerivedFrom', {})
     if '@id' in iv:
-        versions.append(iv['@id'])
+        versions = versions.union([iv['@id']])
     return versions
 
 
