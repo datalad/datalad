@@ -15,7 +15,7 @@ lgr = logging.getLogger('datalad.dataset')
 lgr.log(5, "Importing dataset")
 
 import os
-from os.path import abspath, join as opj, normpath
+from os.path import abspath, join as opj, normpath, realpath, relpath
 from six import string_types, PY2
 from functools import wraps
 
@@ -293,7 +293,7 @@ class Dataset(object):
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
         from .install import _with_sep
-        if not path.startswith(_with_sep(self.path)):
+        if not realpath(path).startswith(_with_sep(realpath(self.path))):
             raise ValueError("path %s outside dataset %s" % (path, self))
 
         subds = Dataset(path)
@@ -387,6 +387,11 @@ class Dataset(object):
         if sds_path is None:
             return None
         else:
+            if realpath(self.path) != self.path:
+                # we had symlinks in the path but sds_path would have not
+                # so let's get "symlinked" version of the superdataset path
+                sds_relpath = relpath(sds_path, realpath(self.path))
+                sds_path = normpath(opj(self.path, sds_relpath))
             return Dataset(sds_path)
 
 
