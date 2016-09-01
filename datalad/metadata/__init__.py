@@ -97,7 +97,7 @@ def get_implicit_metadata(ds, ds_identifier=None):
         origin_uuid = ''
         if ds.config:
             origin_uuid = ds.config.get_value(
-                'annex', 'origin', default='')
+                'datalad.annex', 'origin', default='')
             if origin_uuid and ds_uuid != origin_uuid:
                 meta['dcterms:isVersionOf'] = {'@id': origin_uuid}
 

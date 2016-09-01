@@ -114,7 +114,7 @@ def test_create(path):
         ds.id)
     assert_equal(
         ds.config.get_value('datalad.metadata', 'nativetype'),
-        'bim bam bum')
+        ('bim', 'bam', 'bum'))
 
 
 @with_tempfile

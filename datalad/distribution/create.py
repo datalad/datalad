@@ -219,6 +219,12 @@ class Create(Interface):
                 ds.config.unset(id_var, where='dataset')
             ds.config.add(id_var, ds.id, where='dataset')
 
+            if native_metadata_type is not None:
+                if not isinstance(native_metadata_type, list):
+                    native_metadata_type = [native_metadata_type]
+                for nt in native_metadata_type:
+                    ds.config.add('datalad.metadata.nativetype', nt)
+
             # save everthing
             ds.repo.add('.datalad', git=True)
             vcs.commit(msg="[DATALAD] initial commit",
