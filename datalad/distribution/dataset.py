@@ -35,6 +35,7 @@ def _with_sep(path):
     """Little helper to guarantee that path ends with /"""
     return path + sep if not path.endswith(sep) else path
 
+
 # TODO: use the same piece for resolving paths against Git/AnnexRepo instances
 #       (see normalize_path)
 def resolve_path(path, ds=None):
