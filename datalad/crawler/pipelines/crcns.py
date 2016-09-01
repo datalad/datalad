@@ -140,7 +140,7 @@ def pipeline(dataset, dataset_category, versioned_urls=False, tarballs=True,
         ],
         annex.switch_branch('incoming-processed'),
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
-            annex.merge_branch('incoming', strategy='theirs', commit=False, skip_no_changes=False),
+            annex.merge_branch('incoming', strategy='theirs', commit=False),  #, skip_no_changes=False),
             [   # Pipeline to augment content of the incoming and commit it to master
                 find_files("\.(zip|tgz|tar(\..+)?)$", fail_if_none=tarballs),  # So we fail if none found -- there must be some! ;)),
                 annex.add_archive_content(
