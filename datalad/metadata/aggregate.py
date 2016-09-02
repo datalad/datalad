@@ -12,7 +12,7 @@
 __docformat__ = 'restructuredtext'
 
 import os
-from os.path import join as opj, exists
+from os.path import join as opj, exists, relpath
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_limit, recursion_flag
 from datalad.interface.common_opts import allow_dirty
@@ -64,7 +64,7 @@ class AggregateMetaData(Interface):
     @staticmethod
     @datasetmethod(name='aggregate_metadata')
     def __call__(dataset, guess_native_type=False, save=False, recursive=False,
-            recursion_limit=None, allow_dirty=False):
+                 recursion_limit=None, allow_dirty=False):
         dataset = require_dataset(
             dataset, check_installed=True, purpose='meta data aggregation')
 
@@ -72,30 +72,40 @@ class AggregateMetaData(Interface):
         # because we might also modify them
         if save and \
             not allow_dirty and \
-            dataset.repo.repo.is_dirty(index=True, working_tree=False, submodules=True):
+                dataset.repo.repo.is_dirty(
+                    index=True,
+                    working_tree=False,
+                    submodules=True):
             raise RuntimeError(
                 "not aggregating meta data in {}, saving requested, but unsaved changes are already present".format(
                     dataset))
 
-        if recursive:
-            # recursive, depth first
-            if recursion_limit is None or recursion_limit:
-                for subds_path in dataset.get_subdatasets(recursive=False):
-                    subds = Dataset(opj(dataset.path, subds_path))
-                    if subds.is_installed():
-                        AggregateMetaData.__call__(
-                            subds,
-                            guess_native_type=guess_native_type,
-                            save=save,
-                            recursive=recursive,
-                            recursion_limit=None if recursion_limit is None else recursion_limit - 1,
-                            allow_dirty=allow_dirty
-                        )
-                        # stage potential changes in this submodule
-                        dataset.repo.add(subds_path, git=True)
+        # use one set of subdataset instances to ensure consistent IDs even
+        # when none is configured
+        # we only want immediate subdatasets, higher depths will come via
+        # recursion
+        subdss = [Dataset(opj(dataset.path, subds_path))
+                  for subds_path in dataset.get_subdatasets(
+                      recursive=False)]
+        # anything below only works for installed subdatasets
+        subdss = [d for d in subdss if d.is_installed()]
+
+        # recursive, depth first
+        if recursive and (recursion_limit is None or recursion_limit):
+            for subds in subdss:
+                AggregateMetaData.__call__(
+                    subds,
+                    guess_native_type=guess_native_type,
+                    save=save,
+                    recursive=recursive,
+                    recursion_limit=None if recursion_limit is None else recursion_limit - 1,
+                    allow_dirty=allow_dirty
+                )
+                # stage potential changes in this submodule
+                dataset.repo.add(relpath(subds.path, dataset.path),
+                                 git=True)
 
         lgr.info('aggregating meta data for {}'.format(dataset))
-
         # root path
         metapath = opj(dataset.path, metadata_basepath)
 
@@ -112,18 +122,14 @@ class AggregateMetaData(Interface):
             # avoid practically empty files
             _store_json(metapath, native_metadata)
 
-        # we only want immediate subdatasets, higher depths will come via
-        # recursion
-        for subds_path in dataset.get_subdatasets(recursive=False):
-            subds = Dataset(opj(dataset.path, subds_path))
-            if not subds.is_installed():
-                lgr.info('ignoring subdataset {}, not installed'.format(subds))
-                continue
+        for subds in subdss:
             subds_meta = get_metadata(
                 subds, guess_type=guess_native_type, ignore_subdatasets=False,
                 ignore_cache=False)
             subds_meta[0]['dcterms:isPartOf'] = dataset.id
-            _store_json(opj(metapath, subds_path), subds_meta)
+            _store_json(
+                opj(metapath, relpath(subds.path, dataset.path)),
+                subds_meta)
         if save:
             dataset.repo.add(metapath, git=True)
             if dataset.repo.repo.is_dirty(
