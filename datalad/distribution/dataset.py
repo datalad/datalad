@@ -11,10 +11,17 @@
 
 import logging
 
-import os
-from os.path import abspath, join as opj, commonprefix, sep, normpath
-from six import string_types, PY2
+from os.path import abspath
+from os.path import join as opj
+from os.path import normpath
+from os.path import realpath
+from os.path import relpath
+from os.path import commonprefix
+from os.path import sep
+from six import string_types
+from six import PY2
 from functools import wraps
+import uuid
 
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo
@@ -25,6 +32,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import getpwd
 from datalad.support.exceptions import InsufficientArgumentsError
 from datalad.dochelpers import exc_str
+from datalad.support.dsconfig import ConfigManager
 
 lgr = logging.getLogger('datalad.dataset')
 
@@ -63,12 +71,13 @@ def resolve_path(path, ds=None):
 
 
 class Dataset(object):
-    __slots__ = ['_path', '_repo', '_id']
+    __slots__ = ['_path', '_repo', '_id', '_cfg']
 
     def __init__(self, path):
         self._path = abspath(path)
         self._repo = None
         self._id = None
+        self._cfg = None
 
     def __repr__(self):
         return "<Dataset path=%s>" % self.path
@@ -109,43 +118,49 @@ class Dataset(object):
                             pass
                 if self._repo is None:
                     lgr.info("Failed to detect a valid repo at %s" % self.path)
-                else:
-                    # reset ID, because we now have a repo attached
-                    self._id = None
+
         elif not isinstance(self._repo, AnnexRepo):
             # repo was initially set to be self._repo but might become AnnexRepo
             # at a later moment, so check if it didn't happen
             if 'git-annex' in self._repo.get_branches():
                 # we acquired git-annex branch
                 self._repo = AnnexRepo(self._repo.path, create=False)
-                # reset ID, because we now have an annex attached
-                self._id = None
         return self._repo
 
     @property
     def id(self):
-        """Identifier of the dataset
+        """Identifier of the dataset.
+
+        This identifier is supposed to be unique across datasets, but identical
+        for different versions of the same dataset (that have all been derived
+        from the same original dataset repository).
 
         Returns
         -------
         str
-          This is either a UUID of the dataset's annex, or the SHA sum
-          of the current commit of the Git repository (if there is no annex),
-          or string composed from the path of the dataset. Any non-UUID ID
-          string is prefixed with '_:'
+          This is either a stored UUID, or if there is none: the UUID of the
+          dataset's annex, or a new generated UUID.
         """
         if self._id is None:
-            if self.repo:
-                if hasattr(self.repo, 'uuid'):
-                    self._id = self.repo.uuid
-                if not self._id:
-                    # no annex
-                    self._id = '_:{}'.format(self.repo.get_hexsha())
-            else:
-                # not even a VCS
-                self._id = '_:{}'.format(self.path.replace(os.sep, '_'))
-
+            # if we have one on record, stick to it!
+            self._id = self.config.get('datalad.dataset.id', None)
+            if self._id is None:
+                # fall back on self-made ID
+                self._id = uuid.uuid1().urn.split(':')[-1]
         return self._id
+
+    @property
+    def config(self):
+        """Get an instance of the parser for the persistent dataset configuration.
+
+        Returns
+        -------
+        ConfigManager
+        """
+        if self._cfg is None:
+            # associate with this dataset and read the entire config hierarchy
+            self._cfg = ConfigManager(dataset=self, dataset_only=False)
+        return self._cfg
 
     def register_sibling(self, name, url, publish_url=None, verify=None):
         """Register the location of a sibling dataset under a given name.
@@ -310,7 +325,7 @@ class Dataset(object):
 
         # get absolute path (considering explicit vs relative):
         path = resolve_path(path, self)
-        if not path.startswith(_with_sep(self.path)):
+        if not realpath(path).startswith(_with_sep(realpath(self.path))):
             raise ValueError("path %s outside dataset %s" % (path, self))
 
         subds = Dataset(path)
@@ -405,6 +420,11 @@ class Dataset(object):
         if sds_path is None:
             return None
         else:
+            if realpath(self.path) != self.path:
+                # we had symlinks in the path but sds_path would have not
+                # so let's get "symlinked" version of the superdataset path
+                sds_relpath = relpath(sds_path, realpath(self.path))
+                sds_path = normpath(opj(self.path, sds_relpath))
             return Dataset(sds_path)
 
     def get_containing_subdataset(self, path, recursion_limit=None):

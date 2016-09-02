@@ -261,7 +261,7 @@ class Interface(object):
                 help += '.'
             if param.constraints is not None:
                 parser_kwargs['type'] = param.constraints
-                # include value contraint description and default
+                # include value constraint description and default
                 # into the help string
                 cdoc = alter_interface_docs_for_cmdline(
                     param.constraints.long_description())

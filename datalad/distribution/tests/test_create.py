@@ -84,6 +84,9 @@ def test_create(path):
     cmd = ['git-annex', 'info']
     cmlout = runner.run(cmd, cwd=path)
     assert_in('funny [here]', cmlout[0])
+    # check datset ID
+    eq_(ds.config.get_value('datalad.dataset', 'id'),
+        ds.id)
 
 
 @with_tempfile
