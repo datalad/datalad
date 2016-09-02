@@ -538,7 +538,7 @@ class GitRepo(object):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True, _datalad_msg=False):
+    def add(self, files, commit=False, msg=None, git=True, git_options=None, _datalad_msg=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -554,6 +554,9 @@ class GitRepo(object):
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
 
         # needs to be True - see docstring:
         assert(git)
@@ -593,6 +596,12 @@ class GitRepo(object):
             if msg is None:
                 msg = self._get_added_files_commit_msg(files)
             self.commit(msg=msg, _datalad_msg=_datalad_msg)
+
+        # Make sure return value from GitRepo is consistent with AnnexRepo
+        # currently simulating similar return value, assuming success
+        # for all files:
+        # TODO: Make return values consistent across both *Repo classes!
+        return [{u'file': f, u'success': True} for f in files]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):

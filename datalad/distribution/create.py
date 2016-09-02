@@ -166,6 +166,7 @@ class Create(Interface):
             if sds is not None:
                 return sds.create_subdataset(
                     ds.path,
+                    force=force,
                     name=name,
                     description=description,
                     no_annex=no_annex,
@@ -218,12 +219,22 @@ class Create(Interface):
             ds.config.add('datalad.annex.origin', vcs.uuid, where='dataset')
             ds.repo.add('.datalad', git=True)
 
+        # record the ID of this repo for the afterlife
+        # to be able to track siblings and children
+        id_var = 'datalad.dataset.id'
+        if id_var in ds.config:
+            # make sure we reset this variable completely, in case of a re-create
+            ds.config.unset(id_var, where='dataset')
+        ds.config.add(id_var, ds.id, where='dataset')
+
+        # save everthing
+        ds.repo.add('.datalad', git=True)
+
         if not no_commit:
             vcs.commit(msg="Initial commit",
                        options=to_options(allow_empty=True),
                        _datalad_msg=True)
-        # reset ID, we have a VCS now
-        ds._id = None
+
         return ds
 
     @staticmethod
