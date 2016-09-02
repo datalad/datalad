@@ -11,6 +11,8 @@
 """
 
 import logging
+from os import curdir
+from os.path import isdir
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import recursion_flag
@@ -31,6 +33,7 @@ from .dataset import datasetmethod
 from .dataset import Dataset
 from .dataset import resolve_path
 from .dataset import require_dataset
+from .dataset import _with_sep
 from .install import _get_git_url_from_source
 
 
@@ -148,7 +151,6 @@ class Add(Interface):
 
         # resolve path(s):
         # TODO: RF: resolve_path => datalad.utils => more general (repos => normalize paths)
-        # TODO: expandpath?
         resolved_paths = []
         if path:
             resolved_paths = [resolve_path(p, dataset) for p in path]
@@ -163,6 +165,8 @@ class Add(Interface):
 
         # find (sub-)datasets to add things to (and fail on invalid paths):
         if recursive:
+
+            # 1. Find the (sub-)datasets containing the given path(s):
             # Note, that `get_containing_subdataset` raises if `p` is
             # outside `dataset`, but it returns `dataset`, if `p` is inside
             # a subdataset not included by `recursion_limit`. In the latter
@@ -172,6 +176,23 @@ class Add(Interface):
             # matter if actually required.
             resolved_datasets = [dataset.get_containing_subdataset(
                 p, recursion_limit=recursion_limit) for p in resolved_paths]
+
+            # 2. Find implicit subdatasets to call add on:
+            # If there are directories in resolved_paths (Note,
+            # that this includes '.' and '..'), check for subdatasets
+            # beneath them. These should be called recursively with '.'.
+            # Therefore add the subdatasets to resolved_datasets and
+            # corresponding '.' to resolved_paths, in order to generate the
+            # correct call.
+            for p in resolved_paths:
+                if isdir(p):
+                    for subds_path in \
+                      dataset.get_subdatasets(absolute=True, recursive=True,
+                                              recursion_limit=recursion_limit):
+                        if subds_path.startswith(_with_sep(p)):
+                            resolved_datasets.append(Dataset(subds_path))
+                            resolved_paths.append(curdir)
+
         else:
             # if not recursive, try to add everything to dataset itself:
             resolved_datasets = [dataset for i in range(len(resolved_paths))]
@@ -267,7 +288,7 @@ class Add(Interface):
         return return_values
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         from os import linesep
         if res is None:
@@ -275,7 +296,7 @@ class Add(Interface):
         if not isinstance(res, list):
             res = [res]
         if not len(res):
-            ui.message("Nothing was installed")
+            ui.message("Nothing was added")
             return
 
         msg = linesep.join([

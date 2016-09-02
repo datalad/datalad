@@ -201,10 +201,18 @@ class Create(Interface):
                                 annex_opts=annex_opts,
                                 annex_init_opts=annex_init_opts)
 
-            vcs.commit(msg="datalad initial commit",
+            # record the ID of this repo for the afterlife
+            # to be able to track siblings and children
+            id_var = 'datalad.dataset.id'
+            if id_var in ds.config:
+                # make sure we reset this variable completely, in case of a re-create
+                ds.config.unset(id_var, where='dataset')
+            ds.config.add(id_var, ds.id, where='dataset')
+
+           # save everthing
+            ds.repo.add('.datalad', git=True)
+            vcs.commit(msg="[DATALAD] initial commit",
                        options=to_options(allow_empty=True))
-            # reset ID, we have a VCS now
-            ds._id = None
             return ds
 
     @staticmethod

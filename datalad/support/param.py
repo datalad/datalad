@@ -15,7 +15,7 @@ import textwrap
 import argparse
 from inspect import getargspec
 
-from .constraints import expand_contraint_spec
+from .constraints import expand_constraint_spec
 
 _whitespace_re = re.compile('\n\s+|^\s+')
 
@@ -30,7 +30,7 @@ class Parameter(object):
     _KNOWN_ARGS = getargspec(argparse.Action.__init__)[0] + ['action']
 
     def __init__(self, constraints=None, doc=None, args=None, **kwargs):
-        """Add contraints (validator) specifications and a docstring for
+        """Add constraints (validator) specifications and a docstring for
         a parameter.
 
         Parameters
@@ -68,7 +68,7 @@ class Parameter(object):
         ...                         EnsureRange(min=7.0, max=44.0)),
         ...             None))
         """
-        self.constraints = expand_contraint_spec(constraints)
+        self.constraints = expand_constraint_spec(constraints)
         self._doc = doc
         self.cmd_args = args
 
