@@ -419,7 +419,7 @@ class AnnexRepo(GitRepo):
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
-            msg=None, git_options=None, annex_options=None):
+            msg=None, git_options=None, annex_options=None, _datalad_msg=False):
         """Add file(s) to the repository.
 
         Parameters
@@ -487,7 +487,7 @@ class AnnexRepo(GitRepo):
                     raise ValueError("Unexpected return type: %s" %
                                      type(return_list))
                 msg = self._get_added_files_commit_msg(file_list)
-            self.commit(msg)  # TODO: For consisteny: Also json return value (success)?
+            self.commit(msg, _datalad_msg=_datalad_msg)  # TODO: For consisteny: Also json return value (success)?
         return return_list
 
     def proxy(self, git_cmd, **kwargs):
@@ -1076,7 +1076,7 @@ class AnnexRepo(GitRepo):
         self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    def commit(self, msg=None, options=None):
+    def commit(self, msg=None, options=None, _datalad_msg=False):
         """
 
         Parameters
@@ -1087,6 +1087,8 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()
         if self.is_direct_mode():
+            if _datalad_msg:
+                msg = self._get_prefixed_commit_msg(msg)
             if not msg:
                 if options:
                     if "--allow-empty-message" not in options:
@@ -1097,7 +1099,7 @@ class AnnexRepo(GitRepo):
             self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
                        (options if options else []), expect_stderr=True)
         else:
-            super(AnnexRepo, self).commit(msg, options)
+            super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):

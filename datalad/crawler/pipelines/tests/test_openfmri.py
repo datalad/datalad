@@ -297,6 +297,7 @@ def test_openfmri_pipeline1(ind, topurl, outd, clonedir):
     ok_file_under_git(t1w_fpath, annexed=True)
 
     target_files = {
+        './.datalad/config',
         './.datalad/crawl/crawl.cfg',
         # no more!
         # './.datalad/config.ttl', './.datalad/datalad.ttl',

@@ -41,7 +41,7 @@ from ...tests.utils import put_file_under_git
 
 from ...downloaders.providers import Providers
 from ...distribution.dataset import Dataset
-from ...api import install
+from ...api import create
 from ...support.configparserinc import SafeConfigParserWithIncludes
 from ...support.gitrepo import GitRepo, _normalize_path
 from ...support.annexrepo import AnnexRepo
@@ -125,7 +125,9 @@ class initiate_dataset(object):
 
     def _initiate_dataset(self, path, name):
         lgr.info("Initiating dataset %s" % name)
+
         if self.branch is not None:
+            raise NotImplementedError("Disabled for now")
             # because all the 'create' magic is stuffed into the constructor ATM
             # we need first to initiate a git repository
             git_repo = GitRepo(path, create=True)
@@ -133,17 +135,32 @@ class initiate_dataset(object):
             git_repo.checkout(self.branch, options=["--orphan"])
             # TODO: RF whenevever create becomes a dedicated factory/method
             # and/or branch becomes an option for the "creator"
+
         backend = self.backend or cfg.get('crawl', 'default backend', default='MD5E')
-        repo = AnnexRepo(
-            path,
-            direct=cfg.getboolean('crawl', 'init direct', default=False),
-            #  name=name,
-            backend=backend,
-            create=True)
-        # TODO: centralize
+        direct = cfg.getboolean('crawl', 'init direct', default=False)
+
+        if direct:
+            raise NotImplementedError("Disabled for now to init direct mode ones")
+
+        ds = create(
+                path=path,
+                force=False,
+                add_to_super='auto',
+                name=name,  # XXX may be not needed
+                # no_annex=False,  # TODO: add as an arg
+                no_commit=bool(backend),
+                # annex_version=None,
+                annex_backend=backend,
+                #git_opts=None,
+                #annex_opts=None,
+                #annex_init_opts=None
+        )
+
+        # create/AnnexRepo specification of backend does it non-persistently in .git/config
         if backend:
             put_file_under_git(path, '.gitattributes', '* annex.backend=%s' % backend, annexed=False)
-        return repo
+
+        return ds
 
     def _save_crawl_config(self, dataset_path, data):
         kwargs = self.template_kwargs or {}
@@ -823,6 +840,7 @@ class Annexificator(object):
             # we need to provide some commit msg, could may be deduced from current status
             # TODO
             msg = "a commit"
+        msg = GitRepo._get_prefixed_commit_msg(msg)
         if msg is not None:
             options = options + ["-m", msg]
         self._precommit()  # so that all batched annexes stop
@@ -1254,21 +1272,5 @@ class Annexificator(object):
     def initiate_dataset(self, *args, **kwargs):
         """Thin proxy to initiate_dataset node which initiates dataset as a subdataset to current annexificator
         """
-
-        def _initiate_dataset(data):
-            # TODO: actually ATM is not that thin and forces to us to use Annexificator
-            # which forces meta-dataset to become an annex, not pure git repo...
-            for data_ in initiate_dataset(*args, **kwargs)(data):
-                # Also "register" as a sub-dataset if not yet registered
-                ds = Dataset(self.repo.path)
-                # TODO:  rename dataset_  into dataset_
-                if data['dataset_name'] not in ds.get_subdatasets():
-                    out = install(
-                        dataset=ds,
-                        path=data_['dataset_path'],
-                        source=data_['dataset_path'],
-                    )
-                    # TODO: reconsider adding smth to data_ to be yielded"
-                yield data_
-
-        return _initiate_dataset
+        # now we can just refer to initiate_dataset which uses create
+        return initiate_dataset(*args, **kwargs)
