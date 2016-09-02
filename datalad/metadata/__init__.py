@@ -83,48 +83,47 @@ def get_implicit_metadata(ds, ds_identifier=None):
 
     meta = _get_base_dataset_metadata(ds_identifier)
 
-    if ds.is_installed():
-        meta['location'] = os.curdir
+    if not ds.repo:
+        # everything else comes from a repo
+        return meta
+
+    # shortcut
+    repo = ds.repo.repo
+    if repo.head.reference.is_valid():
+        meta['dcterms:modified'] = repo.head.commit.authored_datetime.isoformat()
+        # maybe use something like git-describe instead -- but tag-references
+        # might changes...
+        meta['version'] = repo.head.commit.hexsha
 
     # look for known remote annexes, doesn't need configured
     # remote to be meaningful
     # need annex repo instance
     # TODO refactor to use ds.uuid when #701 is addressed
-    if ds.repo and hasattr(ds.repo, 'repo_info'):
-        ds_uuid = ds.repo.repo.config_reader().get_value(
-            'annex', 'uuid', default='')
-        # retrieve possibly stored origin uuid and list in meta data
-        origin_uuid = ''
-        if ds.config:
-            origin_uuid = ds.config.get_value(
-                'datalad.annex', 'origin', default='')
-            if origin_uuid and ds_uuid != origin_uuid:
-                meta['prov:wasDerivedFrom'] = {'@id': origin_uuid}
-
+    if hasattr(ds.repo, 'repo_info'):
         # get all other annex ids, and filter out this one, origin and
         # non-specific remotes
         with swallow_logs():
             # swallow logs, because git annex complains about every remote
             # for which no UUID is configured -- many special remotes...
             repo_info = ds.repo.repo_info()
-        sibling_uuids = [
-            # flatten list
-            item for repolist in
-            # extract uuids of all listed repos
-            [[r['uuid'] for r in repo_info[i] if 'uuid' in r]
-                # loop over trusted, semi and untrusted
-                for i in repo_info
-                if i.endswith('trusted repositories')]
-            for item in repolist
-            # filter out special ones
-            if not item.startswith('00000000-0000-0000-0000-0000000000')
-            # and the present one too
-            and not item == ds_uuid]
-        if len(sibling_uuids):
-            version_meta = [{'@id': sibling} for sibling in sibling_uuids]
-            if len(version_meta) == 1:
-                version_meta = version_meta[0]
-            meta['dcterms:hasVersion'] = version_meta
+        annex_meta = []
+        for src in ('trusted repositories',
+                    'semitrusted repositories',
+                    'untrusted repositories'):
+            for anx in repo_info.get(src, []):
+                anxid = anx.get('uuid', '00000000-0000-0000-0000-0000000000')
+                if anxid.startswith('00000000-0000-0000-0000-000000000'):
+                    # ignore special
+                    continue
+                anx_meta = {'@id': anxid}
+                if 'description' in anx:
+                    anx_meta['description'] = anx['description']
+                # XXX maybe report which one is local? Available in anx['here']
+                # XXX maybe report the type of annex remote?
+                annex_meta.append(anx_meta)
+            if len(annex_meta) == 1:
+                annex_meta = annex_meta[0]
+            meta['availableFrom'] = annex_meta
 
     ## metadata on all subdataset
     subdss = []
@@ -186,7 +185,8 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
         has_part = [has_part]
     has_part = {hp['location']: hp for hp in has_part}
 
-    ds_versions = _get_version_ids_from_implicit_meta(implicit_meta)
+    # XXX this logic is flawed
+    #ds_versions = _get_version_ids_from_implicit_meta(implicit_meta)
     meta.append(implicit_meta)
 
     # from cache?
