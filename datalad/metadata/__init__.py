@@ -144,17 +144,25 @@ def _get_implicit_metadata(ds, ds_identifier=None, subdatasets=None):
     return meta
 
 
-def _get_version_ids_from_implicit_meta(meta):
-    # figure out all other version of this dataset: origin or siblings
-    # build a flat list of UUIDs
-    hv = meta.get('dcterms:hasVersion', [])
-    if isinstance(hv, dict):
-        hv = [hv]
-    versions = set([v['@id'] for v in hv if '@id' in v])
-    iv = meta.get('prov:wasDerivedFrom', {})
-    if '@id' in iv:
-        versions = versions.union([iv['@id']])
-    return versions
+def _simplify_meta_data_structure(meta):
+    # get a list of terms from any possible source
+    if isinstance(meta, list) and len(meta) == 1:
+        # simplify structure
+        meta = meta[0]
+    if isinstance(meta, dict) \
+            and sorted(meta.keys()) == ['@context', '@graph'] \
+            and meta.get('@context') == 'http://schema.org/':
+        meta = meta['@graph']
+    elif isinstance(meta, dict):
+        meta = [meta]
+    elif isinstance(meta, list):
+        # list this possibility explicitely to get 'else' to indicate that
+        # we hit something unforseen
+        pass
+    else:
+        raise NotImplementedError(
+            'got some unforseens meta data structure')
+    return meta
 
 
 # XXX might become its own command
@@ -202,66 +210,63 @@ def get_metadata(ds, guess_type=False, ignore_subdatasets=False,
             meta.extend(cached_meta)
         else:
             meta.append(cached_meta)
-    # for any subdataset that is actually registered (avoiding stale copies)
-    if not ignore_subdatasets:
-        for subds in subdss:
-            subds_path = relpath(subds.path, ds.path)
-            if ignore_cache and subds.is_installed():
-                meta.extend(
-                    get_metadata(subds, guess_type=guess_type,
-                                 ignore_subdatasets=False,
-                                 ignore_cache=True))
-            else:
-                subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
-                if exists(subds_meta_fname):
-                    subds_meta = jsonload(subds_meta_fname)
-                    # we cannot simply append, or we get weired nested graphs
-                    # proper way would be to expand the JSON-LD, extend the list and
-                    # compact/flatten at the end. However assuming a single context
-                    # we can cheat.
-                    # get a list of terms from any possible source
-                    if isinstance(subds_meta, list) and len(subds_meta) == 1:
-                        # simplify structure
-                        subds_meta = subds_meta[0]
-                    if isinstance(subds_meta, dict) \
-                            and sorted(subds_meta.keys()) == ['@context', '@graph'] \
-                            and subds_meta.get('@context') == 'http://schema.org/':
-                        subds_meta = subds_meta['@graph']
-                    elif isinstance(subds_meta, dict):
-                        subds_meta = [subds_meta]
-                    elif isinstance(subds_meta, list):
-                        # list this possibility explicitely to get 'else' to indicate that
-                        # we hit something unforseen
-                        pass
-                    else:
-                        raise NotImplementedError(
-                            'got some unforseens meta data structure')
-                    # make sure we have a meaningful @id for any subdataset in hasPart,
-                    # regardless of whether it is installed or not. This is needed to
-                    # be able to connect super and subdatasets in the graph of a new clone
-                    # we a new UUID
-                    if not '@id' in has_part[subds_path]:
-                        # this must be an uninstalled subdataset
-                        # look for a meta data set that knows about being part
-                        # of this dataset, so we can use its @id
-                        for md in subds_meta:
-                            cand_id = md.get('dcterms:isPartOf', None)
-                            if cand_id == ds_identifier and '@id' in md:
-                                has_part[subds_path]['@id'] = md['@id']
-                                break
 
-                    # hand over subdataset meta data
-                    meta.extend(subds_meta)
-                else:
-                    lgr.info(
-                        'no cached meta data for subdataset at {}, ignoring'.format(
-                            subds_path))
-        # reassign modified 'hasPart; term
-        parts = list(has_part.values())
-        if len(parts) == 1:
-            parts = parts[0]
-        if len(parts):
-            implicit_meta['dcterms:hasPart'] = parts
+    if ignore_subdatasets:
+        # all done now
+        return meta
+
+    # for any subdataset that is actually registered (avoiding stale copies)
+    for subds in subdss:
+        subds_path = relpath(subds.path, ds.path)
+        if ignore_cache and subds.is_installed():
+            # simply pull meta data from actual subdataset and go to next part
+            meta.extend(
+                get_metadata(subds, guess_type=guess_type,
+                             ignore_subdatasets=False,
+                             ignore_cache=True))
+            continue
+
+        # we need to look for any aggregated meta data
+        subds_meta_fname = opj(meta_path, subds_path, metadata_filename)
+        if not exists(subds_meta_fname):
+            # nothing -> skip
+            lgr.info(
+                'no cached meta data for subdataset at {}, ignoring'.format(
+                    subds_path))
+            continue
+
+        # load aggregated meta data
+        subds_meta = jsonload(subds_meta_fname)
+        # we cannot simply append, or we get weired nested graphs
+        # proper way would be to expand the JSON-LD, extend the list and
+        # compact/flatten at the end. However assuming a single context
+        # we can cheat.
+        subds_meta = _simplify_meta_data_structure(subds_meta)
+
+        # make sure we have a meaningful @id for any subdataset in hasPart,
+        # regardless of whether it is installed or not. This is needed to
+        # be able to connect super and subdatasets in the graph of a new clone
+        # we a new UUID
+        if not subds.is_installed():
+            # the ID for this one is not identical to the one referenced
+            # in the aggregated meta -> sift through all meta data sets
+            # look for a meta data set that knows about being part
+            # of this dataset, so we can use its @id
+            for md in subds_meta:
+                cand_id = md.get('dcterms:isPartOf', None)
+                if cand_id == ds_identifier and '@id' in md:
+                    has_part[subds_path]['@id'] = md['@id']
+                    break
+
+        # hand over subdataset meta data
+        meta.extend(subds_meta)
+
+    # reassign modified 'hasPart; term
+    parts = list(has_part.values())
+    if len(parts) == 1:
+        parts = parts[0]
+    if len(parts):
+        implicit_meta['dcterms:hasPart'] = parts
 
     return meta
 

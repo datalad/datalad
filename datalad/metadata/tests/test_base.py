@@ -85,19 +85,19 @@ def test_basic_metadata(path):
     meta = get_metadata(ds)
     assert_equal(
         sorted(meta[0].keys()),
-        ['@context', '@id', 'location', 'type'])
+        ['@context', '@id', 'availableFrom', 'dcterms:modified', 'type',
+         'version'])
     assert_equal(meta[0]['type'], 'Dataset')
     # clone and get relationship info in metadata
     sibling = Dataset(opj(path, 'sibling'))
     sibling.install(source=opj(path, 'origin'))
     sibling_meta = get_metadata(sibling)
-    assert_equal(sibling_meta[0]['prov:wasDerivedFrom'],
-                 {'@id': ds.id})
+    assert_equal(sibling_meta[0]['@id'], ds.id)
     # origin should learn about the clone
     sibling.repo.push(remote='origin', refspec='git-annex')
     meta = get_metadata(ds)
-    assert_equal(meta[0]['dcterms:hasVersion'],
-                 {'@id': sibling.id})
+    assert_equal([m['@id'] for m in meta[0]['availableFrom']],
+                 [m['@id'] for m in sibling_meta[0]['availableFrom']])
     # with subdataset
     sub = Dataset(opj(path, 'origin', 'sub'))
     sub.create(add_to_super=True, force=True)
@@ -137,6 +137,9 @@ def test_aggregation(path):
             assert_true(sum([s.get('name', None) == name.decode('utf-8') for s in meta]))
         else:
             assert_true(sum([s.get('name', None) == name for s in meta]))
+    assert_equal(
+        meta[0]['dcterms:hasPart']['@id'],
+        subds.id)
 
     # save the toplevel dataset only (see below)
     ds.save('with aggregated meta data', auto_add_changes=True)
@@ -144,6 +147,8 @@ def test_aggregation(path):
     # now clone the beast to simulate a new user installing an empty dataset
     clone = Dataset(opj(path, 'clone'))
     clone.install(source=ds.path)
+    # ID mechanism works
+    assert_equal(ds.id, clone.id)
 
     # get fresh meta data, the implicit one for the top-most datasets should
     # differ, but the rest not
@@ -152,8 +157,8 @@ def test_aggregation(path):
 
     # make sure the implicit md for the topmost come first
     assert_equal(clonemeta[0]['@id'], clone.id)
-    assert_equal(clonemeta[0]['prov:wasDerivedFrom']['@id'],
-                 ds.id)
+    assert_equal(clonemeta[0]['@id'], ds.id)
+    assert_equal(clonemeta[0]['version'], ds.repo.get_hexsha())
     # all but the implicit is identical
     assert_equal(clonemeta[1:], meta[1:])
     # the implicit md of the clone should list a dataset ID for its subds,
