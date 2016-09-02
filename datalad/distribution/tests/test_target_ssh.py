@@ -176,7 +176,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         remote_name = 'remote-' + str(flat)
         create_publication_target_sshwebserver(target=remote_name,
                                                dataset=source,
-                                               sshurl="ssh://localhost",
+                                               sshurl="ssh://localhost" + target_path_,
                                                target_dir=target_dir_tpl,
                                                recursive=True)
 
@@ -191,5 +191,7 @@ def test_target_ssh_recursive(origin, src_path, target_path):
         for repo in [source.repo, sub1.repo, sub2.repo]:
             assert_not_in("local_target", repo.get_remotes())
 
+        if flat:
+            raise SkipTest('TODO: Make it work for flat datasets, it currently breaks')
         # now, push should work:
-        #publish(dataset=source, to=remote_name)
+        publish(dataset=source, to=remote_name)
