@@ -101,6 +101,7 @@ def test_nested_with_tempfile_parametrized_surrounded():
 @with_tempfile(content="testtest")
 def test_with_tempfile_content(f):
     ok_file_has_content(f, "testtest")
+    ok_file_has_content(f, "test*", re_=True)
 
 
 def test_with_tempfile_content_raises_on_mkdir():
