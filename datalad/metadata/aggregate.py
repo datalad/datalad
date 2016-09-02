@@ -84,7 +84,7 @@ class AggregateMetaData(Interface):
                     subds = Dataset(opj(dataset.path, subds_path))
                     if subds.is_installed():
                         AggregateMetaData.__call__(
-                            Dataset(opj(dataset.path, subds_path)),
+                            subds,
                             guess_native_type=guess_native_type,
                             save=save,
                             recursive=recursive,
