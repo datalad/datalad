@@ -684,9 +684,12 @@ def _ls_s3(loc, fast=False, recursive=False, all=False, config_file=None, list_c
     from boto.exception import S3ResponseError
     from ..support.configparserinc import SafeConfigParser  # provides PY2,3 imports
 
-    bucket_name, prefix = bucket_prefix.split('/', 1)
+    if '/' in bucket_prefix:
+        bucket_name, prefix = bucket_prefix.split('/', 1)
+    else:
+        bucket_name, prefix = bucket_prefix, None
 
-    if '?' in prefix:
+    if prefix and '?' in prefix:
         ui.message("We do not care about URL options ATM, they get stripped")
         prefix = prefix[:prefix.index('?')]
 

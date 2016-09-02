@@ -15,20 +15,22 @@ __docformat__ = 'restructuredtext'
 import logging
 import os
 from os.path import join as opj, abspath, relpath, pardir, isabs, isdir, \
-    exists, islink, sep, realpath
+    exists, lexists, islink, sep, realpath
 
 from six.moves.urllib.parse import quote as urlquote
 
+from datalad.dochelpers import exc_str
 from datalad.cmd import CommandError
 from datalad.cmd import Runner
 from datalad.distribution.dataset import Dataset, datasetmethod, \
     resolve_path, EnsureDataset
 from datalad.interface.base import Interface
-from datalad.support.annexrepo import AnnexRepo, FileInGitError, \
-    FileNotInAnnexError
+from datalad.support.annexrepo import AnnexRepo, FileInGitError
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureChoice, \
     EnsureBool
 from datalad.support.exceptions import InsufficientArgumentsError
+from datalad.support.exceptions import FileNotInAnnexError
+from datalad.support.exceptions import FileNotInRepositoryError
 from datalad.support.gitrepo import GitRepo, GitCommandError
 from datalad.support.param import Parameter
 from datalad.utils import expandpath, knows_annex, assure_dir, \
@@ -41,20 +43,27 @@ from datalad.utils import rmtree
 lgr = logging.getLogger('datalad.distribution.install')
 
 
-def _with_sep(path):
-    """Little helper to guarantee that path ends with /"""
-    return path + sep if not path.endswith(sep) else path
-
-
 def _get_git_url_from_source(source):
     """Return URL for cloning associated with a source specification
 
     For now just resolves DataLadRIs
     """
-    source_ri = RI(source)
+    # TODO: Probably RF this into RI.as_git_url(), that would be overridden
+    # by subclasses or sth. like that
+
+    if source is None:  # TODO: why does this even happen?
+        lgr.warning("received 'None' as 'source'.")
+        return source
+
+    if not isinstance(source, RI):
+        source_ri = RI(source)
+    else:
+        source_ri = source
     if isinstance(source_ri, DataLadRI):
         # we have got our DataLadRI as the source, so expand it
         source = source_ri.as_git_url()
+    else:
+        source = str(source_ri)
     return source
 
 
@@ -214,33 +223,6 @@ def _fixup_submodule_dotgit_setup(ds, relativepath):
     assert(src_dotgit == '.git')
 
 
-def get_containing_subdataset(ds, path):
-    """Given a base dataset and a relative path get containing subdataset
-
-    Parameters
-    ----------
-    ds : Dataset
-      Reference or base dataset
-    path : str
-      Path relative to the reference dataset
-
-    Returns
-    -------
-    Dataset
-    """
-
-    if is_explicit_path(path) and not path.startswith(ds.path):
-        # TODO: - move to dataset class
-        #       - have dedicated exception
-        raise ValueError("path {0} not in dataset {1}.".format(path, ds))
-
-    for subds in ds.get_subdatasets():
-        common = os.path.commonprefix((_with_sep(subds), _with_sep(path)))
-        if common.endswith(sep) and common == _with_sep(subds):
-            return Dataset(path=opj(ds.path, common))
-    return ds
-
-
 # TODO: check whether the following is done already:
 # install of existing submodule; recursive call; source should not be None!
 
@@ -318,15 +300,19 @@ class Install(Interface):
 
         # resolve the target location (if local) against the provided dataset
         if path is not None:
-            # Should work out just fine for regular paths, so no additional
-            # conditioning is necessary
-            path_ri = RI(path)
-            try:
-                # Wouldn't work for SSHRI ATM, see TODO within SSHRI
-                path = resolve_path(path_ri.localpath, ds)
-            except ValueError:
-                # URL doesn't point to a local something
-                pass
+            if isinstance(path, Dataset):
+                # just because it is a mess ATM and Germans will fix it all up to a candy
+                path = path.path
+            else:
+                # Should work out just fine for regular paths, so no additional
+                # conditioning is necessary
+                path_ri = RI(path)
+                try:
+                    # Wouldn't work for SSHRI ATM, see TODO within SSHRI
+                    path = resolve_path(path_ri.localpath, ds)
+                except ValueError:
+                    # URL doesn't point to a local something
+                    pass
 
         # any `path` argument that point to something local now resolved and
         # is no longer a URL
@@ -435,7 +421,7 @@ class Install(Interface):
         # install something into the dataset
 
         # needed by the logic below
-        assert(isabs(path))
+       # assert(isabs(path))  # Gergana swears this piece of code is not that important
 
         # express the destination path relative to the root of this dataset
         relativepath = relpath(path, start=ds.path)
@@ -451,33 +437,31 @@ class Install(Interface):
         # FLOW GUIDE
         #
         # at this point we know nothing about the
-        # installation targether
+        # installation target
         ###################################################
+        #import pdb;
+        #pdb.set_trace()
         try:
             # it is simplest to let annex tell us what we are dealing with
-            lgr.debug("Trying to fetch file %s using annex", relativepath)
-            if not isinstance(vcs, AnnexRepo):
-                assert(isinstance(vcs, GitRepo))
-                # FLOW GUIDE
-                # this is not an annex repo, but we raise exceptions
-                # to be able to treat them alike in the special case handling
-                # below
-                if not exists(path):
-                    raise IOError("path doesn't exist yet, might need special handling")
-                elif relativepath in vcs.get_indexed_files():
-                    # relativepath is in git
-                    raise FileInGitError("We need to handle it as known to git")
-                else:
-                    raise FileNotInAnnexError("We don't have yet annex repo here")
-            if vcs.get_file_key(relativepath):
-                # FLOW GUIDE EXIT POINT
-                # this is an annex'ed file -> get it
-                # TODO implement `copy --from` using `source`
-                # TODO fail if `source` is something strange
-                vcs.get(relativepath)
-                # return the absolute path to the installed file
-                return path
+            lgr.debug("Checking %r for belonging to git or annex", relativepath)
+            try:
+                if isinstance(vcs, AnnexRepo) and lexists(path) and vcs.get_file_key(relativepath):
+                    lgr.debug("Trying to 'get' file %s using annex", relativepath)
+                    # FLOW GUIDE
+                    # this is an annex'ed file -> get it
+                    # TODO implement `copy --from` using `source`
+                    # TODO fail if `source` is something strange
+                    vcs.get(relativepath)
+                    # return the absolute path to the installed file
+                    return path
+            except FileNotInAnnexError as exc:
+                lgr.debug("File is not under annex, let's see if under git at all")
 
+            if relativepath in vcs.get_indexed_files():
+                # relativepath is in git
+                raise FileInGitError("We need to handle it as known to git")
+            else:
+                raise FileNotInRepositoryError("Not in repository at all")
         except FileInGitError:
             ###################################################
             # FLOW GUIDE
@@ -512,7 +496,7 @@ class Install(Interface):
                 ds, submodule.path, submodule.url, recursive=recursive)
             return subds
 
-        except FileNotInAnnexError:
+        except FileNotInRepositoryError:
             ###################################################
             # FLOW GUIDE
             #
@@ -521,12 +505,18 @@ class Install(Interface):
             # - an untracked file in this dataset
             # - an entire untracked/unknown existing subdataset
             ###################################################
+            lgr.log(5, "FileNotInRepositoryError logic")
             lgr.log(5, "FileNotInAnnexError logic")
-            subds = get_containing_subdataset(ds, relativepath)
+            subds = ds.get_containing_subdataset(relativepath)
             if ds.path != subds.path:
                 # FLOW GUIDE EXIT POINT
                 # target path belongs to a known subdataset, hand
                 # installation over to it
+                # But first make sure subds is installed
+                ds.install(
+                    subds,
+                    recursive=recursive,
+                    add_data_to_git=add_data_to_git)
                 return subds.install(
                     path=relpath(path, start=subds.path),
                     source=source,
@@ -554,10 +544,14 @@ class Install(Interface):
 
             # few sanity checks
             if source and abspath(source) != path:
-                raise ValueError(
-                    "installation target already exists, but `source` points to "
-                    "another location (target: '{0}', source: '{0}'".format(
-                        source, path))
+                if exists(path):
+                    raise ValueError(
+                        "installation target already exists, but `source` points to "
+                        "another location (source: '{0}', target: '{1}'".format(
+                            source, path))
+                # install a submodule from that source
+                return _install_subds_from_flexible_source(
+                     ds, relativepath, source, recursive=recursive)
 
             if not add_data_to_git and not (isinstance(vcs, AnnexRepo)):
                 raise RuntimeError(
@@ -582,7 +576,7 @@ class Install(Interface):
             else:
                 return None
 
-        except IOError:
+        except IOError as exc:
             ###################################################
             # FLOW GUIDE
             #
@@ -592,7 +586,7 @@ class Install(Interface):
             # - an entire untracked/unknown existing subdataset
             # - non-existing content that should be installed from `source`
             ###################################################
-            lgr.log(5, "IOError logic")
+            lgr.log(5, "IOError logic: %s", exc_str(exc))
             # we can end up here in two cases ATM
             if (exists(path) or islink(path)) or source is None:
                 # FLOW GUIDE
@@ -602,7 +596,7 @@ class Install(Interface):
                 # - target doesn't exist, but no source is given, so
                 #   it could be a handle that is actually contained in
                 #   a not yet installed subdataset
-                subds = get_containing_subdataset(ds, relativepath)
+                subds = ds.get_containing_subdataset(relativepath)
                 if ds.path != subds.path:
                     # FLOW GUIDE
                     # target path belongs to a subdataset, hand installation
@@ -685,7 +679,7 @@ class Install(Interface):
         return vcs
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
             res = []

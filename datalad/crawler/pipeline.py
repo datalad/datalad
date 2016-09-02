@@ -61,6 +61,7 @@ from ..dochelpers import exc_str
 from ..support.gitrepo import GitRepo
 from ..support.network import parse_url_opts
 from ..support.stats import ActivityStats
+from ..support.exceptions import PipelineNotSpecifiedError
 from ..support.configparserinc import SafeConfigParserWithIncludes
 
 from logging import getLogger
@@ -349,7 +350,8 @@ def initiate_pipeline_config(template, template_func=None, template_kwargs=None,
         repo = GitRepo(path)
         repo.add(crawl_config_repo_path)
         if repo.dirty:
-            repo.commit("Initialized crawling configuration to use template %s" % template)
+            repo.commit("Initialized crawling configuration to use template %s" % template,
+                        _datalad_msg=True)
         else:
             lgr.debug("Repository is not dirty -- not committing")
 
@@ -460,9 +462,9 @@ def load_pipeline_from_template(name, func=None, args=None, kwargs=None, return_
 
     if filename:
         if not exists(filename):
-            raise IOError("Pipeline file %s is N/A" % filename)
+            raise PipelineNotSpecifiedError("Pipeline file %s is N/A" % filename)
     else:
-        raise ValueError("could not find pipeline for %s" % name)
+        raise PipelineNotSpecifiedError("could not find pipeline for %s" % name)
 
     return load_pipeline_from_module(filename, func=func, args=args, kwargs=kwargs, return_only=return_only)
 
@@ -503,7 +505,7 @@ def load_pipeline_from_config(path):
         opts = cfg_.options(sec)
         # must have template
         if 'template' not in opts:
-            raise IOError("%s lacks %r field within %s section" % (path, '_template', sec))
+            raise PipelineNotSpecifiedError("%s lacks %r field within %s section" % (path, 'template', sec))
         template = cfg_.get(sec, 'template')
         # parse template spec
         template_name, url_opts = parse_url_opts(template)

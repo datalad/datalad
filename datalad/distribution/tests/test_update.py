@@ -13,7 +13,6 @@ import os
 from os.path import join as opj, abspath, basename
 from ..dataset import Dataset
 from datalad.api import update, install
-from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo

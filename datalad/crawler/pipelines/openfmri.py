@@ -19,6 +19,7 @@ from ..nodes.misc import sub
 from ..nodes.misc import switch
 from ..nodes.misc import func_to_node
 from ..nodes.misc import find_files
+from ..nodes.misc import debug
 from ..nodes.annex import Annexificator
 from ...support.s3 import get_versioned_url
 from ...utils import updated
@@ -66,7 +67,7 @@ def extract_readme(data):
            }
 
 
-def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
+def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1, prefix=''):
     """Pipeline to crawl/annex an openfmri dataset
 
     Parameters
@@ -78,6 +79,9 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
       original data resides elsewhere, set to False
     topurl: str, optional
       Top level URL to the datasets.
+    prefix: str, optional
+      Prefix regular expression in urls to identifying subgroup of data to be fetched in the dataset
+      (e.g. in case of ds000017 there is A and B)
     """
     skip_no_changes = True    # to redo incoming-processed, would finish dirty in incoming-processed
                               # when commit would fail since nothing to commit
@@ -105,11 +109,11 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
     # common kwargs which would later would be tuned up
     def add_archive_content(**kw):
         return annex.add_archive_content(
-            existing = 'archive-suffix',
-            strip_leading_dirs = bool(leading_dirs_depth),
-            leading_dirs_depth = leading_dirs_depth,
-            delete = True,
-            exclude = ['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
+            existing='archive-suffix',
+            strip_leading_dirs=bool(leading_dirs_depth),
+            leading_dirs_depth=leading_dirs_depth,
+            delete=True,
+            exclude=['(^|%s)\._' % os.path.sep],  # some files like '._whatever'
             **kw
         # overwrite=True,
         # TODO: we might need a safeguard for cases when multiple subdirectories within a single tarball
@@ -120,8 +124,8 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
         [   # nested pipeline so we could quit it earlier happen we decided that nothing todo in it
             # but then we would still return to 'master' branch
             crawl_url(dataset_url),
-            [  # changelog
-               a_href_match(".*release_history.txt"),  # , limit=1
+            [  # changelog XXX there might be multiple, e.g. in case of ds000017
+               a_href_match(".*%srelease_history.txt" % prefix),  # , limit=1
                assign({'filename': 'changelog.txt'}),
                annex,
             ],
@@ -132,7 +136,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
                annex,
             ],
             [  # and collect all URLs pointing to tarballs
-                a_href_match('.*/.*\.(tgz|tar.*|zip)', min_count=1),
+                a_href_match('.*/%s.*\.(tgz|tar.*|zip)' % prefix, min_count=1),
                 # Since all content of openfmri is anyways available openly, no need atm
                 # to use https which complicates proxying etc. Thus replace for AWS urls
                 # to openfmri S3 from https to http
@@ -148,19 +152,27 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
                 annex,
             ],
             # TODO: describe_dataset
-            # Now some true magic -- possibly multiple commits, 1 per each detected new version!
-            annex.commit_versions('_R(?P<version>\d+[\.\d]*)(?=[\._])', unversioned='default', default='1.0.0'),
+            # Now some true magic -- possibly multiple commits, 1 per each detected **new** version!
+            # this one doesn't go through all files, but only through the freshly staged!
+            annex.commit_versions(
+                '_R(?P<version>\d+[\.\d]*)(?=[\._])',
+                always_versioned='ds\d\d+.*',
+                unversioned='default',
+                default='1.0.0'),
         ],
         annex.remove_obsolete(),  # should be called while still within incoming but only once
         # TODO: since it is a very common pattern -- consider absorbing into e.g. add_archive_content?
         [   # nested pipeline so we could skip it entirely if nothing new to be merged
             {'loop': not skip_no_changes},  # loop for multiple versions merges
             annex.switch_branch('incoming-processed'),
-            annex.merge_branch('incoming', one_commit_at_a_time=True, strategy='theirs', commit=False,
+            annex.merge_branch('incoming',
+                               one_commit_at_a_time=True, strategy='theirs', commit=False,
                                skip_no_changes=skip_no_changes
                                ),
             # still we would have all the versions present -- we need to restrict only to the current one!
-            annex.remove_other_versions('incoming', remove_unversioned=True, exclude='(README|changelog).*'),
+            annex.remove_other_versions('incoming',
+                                        remove_unversioned=True,
+                                        exclude='(README|changelog).*'),
             [   # Pipeline to augment content of the incoming and commit it to master
                 # There might be archives within archives, so we need to loop
                 {'loop': True},
@@ -174,7 +186,7 @@ def pipeline(dataset, versioned_urls=True, topurl=TOPURL, leading_dirs_depth=1):
                 ),
             ],
             annex.switch_branch('master'),
-            annex.merge_branch('incoming-processed', commit=True),
+            annex.merge_branch('incoming-processed', commit=True, allow_unrelated=True),
             annex.finalize(tag=True),
         ],
         annex.switch_branch('master'),

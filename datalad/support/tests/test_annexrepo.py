@@ -1114,3 +1114,37 @@ def test_is_available(batch, direct, p):
     assert is_available(key, key=True) is False
     assert is_available(fname) is False
     assert is_available(fname, remote='web') is False
+
+
+@with_tempfile(mkdir=True)
+def test_annex_add_no_dotfiles(path):
+    ar = AnnexRepo(path, create=True)
+    print(ar.path)
+    assert_true(os.path.exists(ar.path))
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    os.makedirs(opj(ar.path, '.datalad'))
+    # we don't care about empty directories
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    with open(opj(ar.path, '.datalad', 'somefile'), 'w') as f:
+        f.write('some content')
+    # make sure the repo is considered dirty now
+    assert_true(ar.repo.is_dirty(
+        index=False, working_tree=False, untracked_files=True, submodules=False))
+    # no file is being added, as dotfiles/directories are ignored by default
+    ar.add('.', git=False)
+    # double check, still dirty
+    assert_true(ar.repo.is_dirty(
+        index=False, working_tree=False, untracked_files=True, submodules=False))
+    # now add to git, and it should work
+    ar.add('.', git=True)
+    # all in index
+    assert_false(ar.repo.is_dirty(
+        index=False, working_tree=True, untracked_files=True, submodules=True))
+    ar.commit(msg="some")
+    # all committed
+    assert_false(ar.repo.is_dirty(
+        index=True, working_tree=True, untracked_files=True, submodules=True))
+    # not known to annex
+    assert_false(ar.is_under_annex(opj(ar.path, '.datalad', 'somefile')))

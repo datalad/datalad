@@ -47,6 +47,7 @@ from datalad.utils import swallow_logs
 from datalad.utils import updated
 
 # imports from same module:
+from .external_versions import external_versions
 from .exceptions import CommandError
 from .exceptions import FileNotInRepositoryError
 from .network import is_ssh
@@ -537,7 +538,7 @@ class GitRepo(object):
         return msg + '\n\nFiles:\n' + '\n'.join(files)
 
     @normalize_paths
-    def add(self, files, commit=False, msg=None, git=True):
+    def add(self, files, commit=False, msg=None, git=True, git_options=None, _datalad_msg=False):
         """Adds file(s) to the repository.
 
         Parameters
@@ -553,6 +554,9 @@ class GitRepo(object):
           somewhat ugly construction to be compatible with AnnexRepo.add();
           has to be always true.
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
 
         # needs to be True - see docstring:
         assert(git)
@@ -591,7 +595,13 @@ class GitRepo(object):
         if commit:
             if msg is None:
                 msg = self._get_added_files_commit_msg(files)
-            self.commit(msg=msg)
+            self.commit(msg=msg, _datalad_msg=_datalad_msg)
+
+        # Make sure return value from GitRepo is consistent with AnnexRepo
+        # currently simulating similar return value, assuming success
+        # for all files:
+        # TODO: Make return values consistent across both *Repo classes!
+        return [{u'file': f, u'success': True} for f in files]
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, **kwargs):
@@ -640,7 +650,12 @@ class GitRepo(object):
         # flush possibly cached in GitPython changes to index:
         self.repo.index.write()
 
-    def commit(self, msg=None, options=None):
+    @staticmethod
+    def _get_prefixed_commit_msg(msg):
+        DATALAD_PREFIX = "[DATALAD]"
+        return DATALAD_PREFIX if not msg else "%s %s" % (DATALAD_PREFIX, msg)
+
+    def commit(self, msg=None, options=None, _datalad_msg=False):
         """Commit changes to git.
 
         Parameters
@@ -649,7 +664,13 @@ class GitRepo(object):
           commit-message
         options: list of str
           cmdline options for git-commit
+        _datalad_msg: bool, optional
+          To signal that commit is automated commit by datalad, so
+          it would carry the [DATALAD] prefix
         """
+
+        if _datalad_msg:
+            msg = self._get_prefixed_commit_msg(msg)
 
         if not msg:
             if options:
@@ -1241,9 +1262,11 @@ class GitRepo(object):
 
     # TODO: Before implementing annex merge, find usages and check for a needed
     # change to call super().merge
-    def merge(self, name, options=[], msg=None, **kwargs):
+    def merge(self, name, options=[], msg=None, allow_unrelated=False, **kwargs):
         if msg:
             options = options + ["-m", msg]
+        if allow_unrelated and external_versions['cmd:git'] >= '2.9':
+            options += ['--allow-unrelated-histories']
         self._git_custom_command(
             '', ['git', 'merge'] + options + [name],
             **kwargs
@@ -1276,12 +1299,15 @@ class GitRepo(object):
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
 
-    def get_submodules(self):
+    def get_submodules(self, sorted_=True):
         """Return a list of git.Submodule instances for all submodules"""
         # check whether we have anything in the repo. if not go home early
         if not self.repo.head.is_valid():
             return []
-        return self.repo.submodules
+        submodules = self.repo.submodules
+        if sorted_:
+            submodules = sorted(submodules, key=lambda x: x.path)
+        return submodules
 
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.

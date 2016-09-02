@@ -305,8 +305,10 @@ class Providers(object):
         if scheme not in self._default_providers:
             lgr.debug("Initializing default provider for %s" % scheme)
             self._default_providers[scheme] = Provider(name="", url_res=["%s://.*" % scheme])
-        lgr.debug("No dedicated provider, returning default one for %s" % scheme)
-        return self._default_providers[scheme]
+        provider = self._default_providers[scheme]
+        lgr.debug("No dedicated provider, returning default one for %s: %s",
+                  scheme, provider)
+        return provider
 
     # TODO: avoid duplication somehow ;)
     # Sugarings to get easier access to downloaders

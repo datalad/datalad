@@ -497,7 +497,7 @@ def get_tempfile_kwargs(tkwargs={}, prefix="", wrapped=None):
 
     # TODO: don't remember why I had this one originally
     # if len(targs)<2 and \
-    if not 'prefix' in tkwargs_:
+    if 'prefix' not in tkwargs_:
         tkwargs_['prefix'] = '_'.join(
             ['datalad_temp'] +
             ([prefix] if prefix else []) +

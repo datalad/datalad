@@ -8,6 +8,9 @@ cache:
 matrix:
   include:
   - python: 2.7
+    env:
+    - secure: "k2rHdTBjUU3pUUASqfRr7kHaaSmNKLLAR2f66A0fFSulih4CXxwLrR3g8/HP9m+jMve8mAYEiPSI7dT7cCm3WMA/piyLh2wKCGgzDD9oLjtvPAioR8dgLpzbgjxV/Vq6fwwPMlvbqqa+MmAImnAoSufEmI7zVQHCq11Hd5nd6Es="
+    - secure: "Az7Pzo5pSdAFTTX6XXzE4VUS3wnlIe1vi/+bfHBzDjxstDvZVkPjPzaIs6v/BLod43AYBl1v9dyJR4qnBnaVrUDLB3tC0emLhJ2qnw+8GKHSSImCwIOeZzg9QpXeVQovZUqQVQ3fg3KIWCIzhmJ59EbMQcI4krNDxk4WcXmyVfk="
   # no loop dev support on travis yet :-/ https://github.com/travis-ci/travis-ci/issues/2700
   #- python: 2.7
   #  env:
@@ -37,6 +40,13 @@ matrix:
   - python: 2.7
     env:
     - PYTHONPATH=$PWD/tools/testing/bad_internals/_scrapy/
+  - python: 2.7
+    # To make sure that operates correctly whenever dataset directories have symlinks
+    # in their path.
+    env:
+    # Eventually we will get there, but atm causes a good number of failures
+    # - TMPDIR="/tmp/sym ссылка"
+    - TMPDIR="/tmp/sym link"
   - python: 3.3
   - python: 3.4
   # Those aren't yet ready since lxml Ibelieve fails to install
@@ -78,6 +88,8 @@ install:
   # Install sphinx to build/test documentation.  Doesn't take a while, so doing in all envs
   - pip install sphinx
   - pip install sphinx_rtd_theme
+  # TMPDIR
+  - if [ ! -z "$TMPDIR" ]; then echo "Symlinking $TMPDIR"; ln -s /tmp "$TMPDIR"; fi
 
 script:
   - if [ ! -z "$DATALAD_TESTS_NONETWORK" ]; then sudo route add -net 0.0.0.0 netmask 0.0.0.0 dev lo; fi

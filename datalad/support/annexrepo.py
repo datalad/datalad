@@ -66,7 +66,7 @@ class AnnexRepo(GitRepo):
     accepted either way.
     """
 
-    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode']
+    __slots__ = GitRepo.__slots__ + ['always_commit', '_batched', '_direct_mode', '_uuid']
 
     # Web remote has a hard-coded UUID we might (ab)use
     WEB_UUID = "00000000-0000-0000-0000-000000000001"
@@ -117,6 +117,9 @@ class AnnexRepo(GitRepo):
           short description that humans can use to identify the
           repository/location, e.g. "Precious data on my laptop"
         """
+
+        # initialize
+        self._uuid = None
 
         if git_opts or annex_opts or annex_init_opts:
             lgr.warning("TODO: options passed to git, git-annex and/or "
@@ -416,7 +419,7 @@ class AnnexRepo(GitRepo):
 
     @normalize_paths
     def add(self, files, git=False, backend=None, options=None, commit=False,
-            msg=None):
+            msg=None, git_options=None, annex_options=None, _datalad_msg=False):
         """Add file(s) to the repository.
 
         Parameters
@@ -438,6 +441,12 @@ class AnnexRepo(GitRepo):
         list of dict
         """
 
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
+
+        if annex_options:
+            lgr.warning("annex_options not yet implemented. Ignored.")
+
         options = options[:] if options else []
 
         # Note: As long as we support direct mode, one should not call
@@ -446,21 +455,25 @@ class AnnexRepo(GitRepo):
         if git:
             # add to git instead of annex
             if self.is_direct_mode():
-                cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
-                           files
-                self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
+                self.proxy(['git', 'add'] + options + files)
+
+                # Note/TODO:
+                # There was a reason to use the following instead of self.proxy:
+                #cmd_list = ['git', '-c', 'core.bare=false', 'add'] + options + \
+                #           files
+                #self.cmd_call_wrapper.run(cmd_list, expect_stderr=True)
+
+                # currently simulating return value, assuming success
+                # for all files:
+                return_list = [{u'file': f, u'success': True} for f in files]
                 # TODO: use options with git_add instead!
             else:
-                super(AnnexRepo, self).add(files)
-
-            # TODO: Make sure return value from GitRepo is consistent
-            # currently simulating return value, assuming success
-            # for all files:
-            return_list = [{u'file': f, u'success': True} for f in files]
+                return_list = super(AnnexRepo, self).add(files)
 
         else:
             return_list = list(self._run_annex_command_json(
-                'add', args=options + files, backend=backend))
+                'add', args=options + files, backend=backend, expect_fail=True,
+                expect_stderr=True))
 
         if commit:
             if msg is None:
@@ -474,7 +487,7 @@ class AnnexRepo(GitRepo):
                     raise ValueError("Unexpected return type: %s" %
                                      type(return_list))
                 msg = self._get_added_files_commit_msg(file_list)
-            self.commit(msg)  # TODO: For consisteny: Also json return value (success)?
+            self.commit(msg, _datalad_msg=_datalad_msg)  # TODO: For consisteny: Also json return value (success)?
         return return_list
 
     def proxy(self, git_cmd, **kwargs):
@@ -683,7 +696,7 @@ class AnnexRepo(GitRepo):
 
     @normalize_path
     def add_url_to_file(self, file_, url, options=None, backend=None,
-                        batch=False):
+                        batch=False, git_options=None, annex_options=None):
         """Add file from url to the annex.
 
         Downloads `file` from `url` and add it to the annex.
@@ -709,6 +722,13 @@ class AnnexRepo(GitRepo):
           In batch mode only ATM returns dict representation of json output returned
           by annex
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
+
+        if annex_options:
+            lgr.warning("annex_options not yet implemented. Ignored.")
+
         options = options[:] if options else []
         git_options = []
         #if file_ == 'about.txt':
@@ -751,12 +771,13 @@ class AnnexRepo(GitRepo):
                         % str(out_json))
             return out_json
 
-    def add_urls(self, urls, options=None, backend=None, cwd=None):
+    def add_urls(self, urls, options=None, backend=None, cwd=None,
+                 git_options=None, annex_options=None):
         """Downloads each url to its own file, which is added to the annex.
 
         Parameters
         ----------
-        urls: list
+        urls: list of str
 
         options: list, optional
             options to the annex command
@@ -764,6 +785,13 @@ class AnnexRepo(GitRepo):
         cwd: string, optional
             working directory from within which to invoke git-annex
         """
+
+        if git_options:
+            lgr.warning("git_options not yet implemented. Ignored.")
+
+        if annex_options:
+            lgr.warning("annex_options not yet implemented. Ignored.")
+
         options = options[:] if options else []
 
         self._run_annex_command('addurl', annex_options=options + urls,
@@ -771,6 +799,11 @@ class AnnexRepo(GitRepo):
                                 log_stderr=False, cwd=cwd)
         # Don't capture stderr, since download progress provided by wget uses
         # stderr.
+
+        # currently simulating similar return value, assuming success
+        # for all files:
+        # TODO: Make return values consistent across both *Repo classes!
+        return [{u'file': f, u'success': True} for f in urls]
 
     @normalize_path
     def rm_url(self, file_, url):
@@ -1043,7 +1076,7 @@ class AnnexRepo(GitRepo):
         self._batched.close()
         super(AnnexRepo, self).precommit()
 
-    def commit(self, msg=None, options=None):
+    def commit(self, msg=None, options=None, _datalad_msg=False):
         """
 
         Parameters
@@ -1054,6 +1087,8 @@ class AnnexRepo(GitRepo):
         """
         self.precommit()
         if self.is_direct_mode():
+            if _datalad_msg:
+                msg = self._get_prefixed_commit_msg(msg)
             if not msg:
                 if options:
                     if "--allow-empty-message" not in options:
@@ -1064,7 +1099,7 @@ class AnnexRepo(GitRepo):
             self.proxy(['git', 'commit'] + (['-m', msg] if msg else []) +
                        (options if options else []), expect_stderr=True)
         else:
-            super(AnnexRepo, self).commit(msg, options)
+            super(AnnexRepo, self).commit(msg, options, _datalad_msg=_datalad_msg)
 
     @normalize_paths(match_return_type=False)
     def remove(self, files, force=False, **kwargs):
@@ -1336,6 +1371,24 @@ class AnnexRepo(GitRepo):
         return [line.split()[1] for line in std_out.splitlines()
                 if line.startswith('copy ') and line.endswith('ok')]
 
+    @property
+    def uuid(self):
+        """Annex UUID
+
+        Returns
+        -------
+        str
+          Returns a the annex UUID, if there is any, or `None` otherwise.
+        """
+        if not self._uuid:
+            if not self.repo:
+                return None
+            repocfg = self.repo.config_reader()
+            self._uuid = repocfg.get_value('annex', 'uuid', default='')
+            if not self._uuid:
+                self._uuid = None
+        return self._uuid
+
 
 # TODO: Why was this commented out?
 # @auto_repr
@@ -1515,5 +1568,3 @@ class BatchedAnnex(object):
             process.wait()
             self._process = None
             lgr.debug("Process %s has finished", process)
-
-

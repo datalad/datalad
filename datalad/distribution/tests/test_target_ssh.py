@@ -17,7 +17,6 @@ from git.exc import GitCommandError
 
 from ..dataset import Dataset
 from datalad.api import publish, install, create_publication_target_sshwebserver
-from datalad.distribution.install import get_containing_subdataset
 from datalad.utils import chpwd
 from datalad.support.gitrepo import GitRepo
 from datalad.support.annexrepo import AnnexRepo

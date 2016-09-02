@@ -57,7 +57,7 @@ from .utils import skip_if_no_module
 
 def test_get_func_kwargs_doc():
     from datalad.crawler.pipelines.openfmri import pipeline
-    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth']
+    output = ['dataset', 'versioned_urls', 'topurl', 'leading_dirs_depth', 'prefix']
     eq_(get_func_kwargs_doc(pipeline), output)
 
 

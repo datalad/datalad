@@ -14,6 +14,7 @@ import logging
 
 from os import listdir
 from os.path import isdir
+from os.path import realpath
 
 from datalad.interface.base import Interface
 from datalad.interface.common_opts import git_opts
@@ -99,6 +100,10 @@ class Create(Interface):
             doc="""if set, a plain Git repository will be created without any
             annex""",
             action='store_true'),
+        no_commit=Parameter(
+            args=("--no-commit",),
+            doc="""if set, do not commit automatically""",
+            action='store_true'),
         annex_version=Parameter(
             args=("--annex-version",),
             doc="""select a particular annex repository version. The
@@ -130,12 +135,15 @@ class Create(Interface):
             add_to_super=False,
             name=None,
             no_annex=False,
+            no_commit=False,
             annex_version=None,
             annex_backend='MD5E',
             git_opts=None,
             annex_opts=None,
             annex_init_opts=None):
 
+        if not isinstance(force, bool):
+            raise ValueError("force should be bool, got %r.  Did you mean to provide a 'path'?" % force)
         if path:
             if isinstance(path, Dataset):
                 ds = path
@@ -157,56 +165,83 @@ class Create(Interface):
 
         if add_to_super:
             sds = ds.get_superdataset()
-            if sds is None:
-                raise ValueError("No super dataset found for dataset %s" % ds)
 
-            return sds.create_subdataset(
-                ds.path,
-                name=name,
-                description=description,
-                no_annex=no_annex,
-                annex_version=annex_version,
-                annex_backend=annex_backend,
-                git_opts=git_opts,
-                annex_opts=annex_opts,
-                annex_init_opts=annex_init_opts)
-
-        else:
-            if no_annex:
-                if description:
-                    raise ValueError("Incompatible arguments: cannot specify "
-                                     "description for annex repo and declaring "
-                                     "no annex repo.")
-                if annex_opts:
-                    raise ValueError("Incompatible arguments: cannot specify "
-                                     "options for annex and declaring no "
-                                     "annex repo.")
-                if annex_init_opts:
-                    raise ValueError("Incompatible arguments: cannot specify "
-                                     "options for annex init and declaring no "
-                                     "annex repo.")
-
-                lgr.info("Creating a new git repo at %s", ds.path)
-                vcs = GitRepo(ds.path, url=None, create=True,
-                              git_opts=git_opts)
+            if sds is not None:
+                return sds.create_subdataset(
+                    ds.path,
+                    force=force,
+                    name=name,
+                    description=description,
+                    no_annex=no_annex,
+                    annex_version=annex_version,
+                    annex_backend=annex_backend,
+                    git_opts=git_opts,
+                    annex_opts=annex_opts,
+                    annex_init_opts=annex_init_opts)
             else:
-                # always come with annex when created from scratch
-                lgr.info("Creating a new annex repo at %s", ds.path)
-                vcs = AnnexRepo(ds.path, url=None, create=True,
-                                backend=annex_backend,
-                                version=annex_version,
-                                description=description,
-                                git_opts=git_opts,
-                                annex_opts=annex_opts,
-                                annex_init_opts=annex_init_opts)
+                if isinstance(add_to_super, bool):
+                    raise ValueError("No super dataset found for dataset %s" % ds)
+                elif add_to_super == 'auto':
+                    pass  # we are cool to just make it happen without add_to_super
+                else:
+                    raise ValueError("Do not know how to handle add_to_super=%s"
+                                     % repr(add_to_super))
 
-            vcs.commit(msg="datalad initial commit",
-                       options=to_options(allow_empty=True))
-            
-            return ds
+        if no_annex:
+            if description:
+                raise ValueError("Incompatible arguments: cannot specify "
+                                 "description for annex repo and declaring "
+                                 "no annex repo.")
+            if annex_opts:
+                raise ValueError("Incompatible arguments: cannot specify "
+                                 "options for annex and declaring no "
+                                 "annex repo.")
+            if annex_init_opts:
+                raise ValueError("Incompatible arguments: cannot specify "
+                                 "options for annex init and declaring no "
+                                 "annex repo.")
+
+            lgr.info("Creating a new git repo at %s", ds.path)
+            vcs = GitRepo(ds.path, url=None, create=True,
+                          git_opts=git_opts)
+        else:
+            # always come with annex when created from scratch
+            lgr.info("Creating a new annex repo at %s", ds.path)
+            vcs = AnnexRepo(ds.path, url=None, create=True,
+                            backend=annex_backend,
+                            version=annex_version,
+                            description=description,
+                            git_opts=git_opts,
+                            annex_opts=annex_opts,
+                            annex_init_opts=annex_init_opts)
+            # record the annex uuid of this repo for this afterlife
+            # to be able to track siblings and children
+            if 'datalad.annex.origin' in ds.config:
+                # make sure we reset this variable completely, in case of a re-create
+                ds.config.unset('datalad.annex.origin', where='dataset')
+            ds.config.add('datalad.annex.origin', vcs.uuid, where='dataset')
+            ds.repo.add('.datalad', git=True)
+
+        # record the ID of this repo for the afterlife
+        # to be able to track siblings and children
+        id_var = 'datalad.dataset.id'
+        if id_var in ds.config:
+            # make sure we reset this variable completely, in case of a re-create
+            ds.config.unset(id_var, where='dataset')
+        ds.config.add(id_var, ds.id, where='dataset')
+
+        # save everthing
+        ds.repo.add('.datalad', git=True)
+
+        if not no_commit:
+            vcs.commit(msg="Initial commit",
+                       options=to_options(allow_empty=True),
+                       _datalad_msg=True)
+
+        return ds
 
     @staticmethod
-    def result_renderer_cmdline(res):
+    def result_renderer_cmdline(res, args):
         from datalad.ui import ui
         if res is None:
             ui.message("Nothing was created")

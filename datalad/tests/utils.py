@@ -114,7 +114,7 @@ def create_tree(path, tree, archives_leading_dir=True):
     for name, load in tree:
         full_name = opj(path, name)
         if isinstance(load, (tuple, list, dict)):
-            if name.endswith('.tar.gz') or name.endswith('.tar'):
+            if name.endswith('.tar.gz') or name.endswith('.tar') or name.endswith('.zip'):
                 create_tree_archive(path, name, load, archives_leading_dir=archives_leading_dir)
             else:
                 create_tree(full_name, load, archives_leading_dir=archives_leading_dir)
@@ -155,7 +155,10 @@ def ok_clean_git_annex_proxy(path):
     finally:
         chpwd(cwd)
 
-    assert_in("nothing to commit, working directory clean", out[0], "git-status output via proxy not plausible: %s" % out[0])
+    assert_in(
+        "nothing to commit", out[0],
+        msg="git-status output via proxy not plausible: %s" % out[0]
+    )
 
 
 def ok_clean_git(path, annex=True, untracked=[]):
@@ -215,9 +218,9 @@ def put_file_under_git(path, filename=None, content=None, annexed=False):
     if annexed:
         if not isinstance(repo, AnnexRepo):
             repo = AnnexRepo(repo.path)
-        repo.add(file_repo_path, commit=True)
+        repo.add(file_repo_path, commit=True, _datalad_msg=True)
     else:
-        repo.add(file_repo_path, git=True)
+        repo.add(file_repo_path, git=True, _datalad_msg=True)
     ok_file_under_git(repo.path, file_repo_path, annexed)
     return repo
 
@@ -344,11 +347,15 @@ def ok_exists(path):
     assert exists(path), 'path %s does not exist' % path
 
 
-def ok_file_has_content(path, content, re_=False, **kwargs):
+def ok_file_has_content(path, content, strip=False, re_=False, **kwargs):
     """Verify that file exists and has expected content"""
     ok_exists(path)
     with open(path, 'r') as f:
         content_ = f.read()
+
+        if strip:
+            content_ = content_.strip()
+
         if re_:
             assert_re_in(content, content_, **kwargs)
         else:
@@ -358,6 +365,7 @@ def ok_file_has_content(path, content, re_=False, **kwargs):
 #
 # Decorators
 #
+
 
 @optional_args
 def with_tree(t, tree=None, archives_leading_dir=True, delete=True, **tkwargs):
@@ -832,15 +840,17 @@ def run_under_dir(func, newdir='.'):
     return newfunc
 
 
-def assert_re_in(regex, c, flags=0):
+def assert_re_in(regex, c, flags=0, match=True, msg=None):
     """Assert that container (list, str, etc) contains entry matching the regex
     """
     if not isinstance(c, (list, tuple)):
         c = [c]
     for e in c:
-        if re.match(regex, e, flags=flags):
+        if (re.match if match else re.search)(regex, e, flags=flags):
             return
-    raise AssertionError("Not a single entry matched %r in %r" % (regex, c))
+    raise AssertionError(
+        msg or "Not a single entry matched %r in %r" % (regex, c)
+    )
 
 
 def ignore_nose_capturing_stdout(func):
