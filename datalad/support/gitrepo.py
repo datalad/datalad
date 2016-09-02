@@ -1299,12 +1299,15 @@ class GitRepo(object):
             cmd_options += ['--auto']
         self._git_custom_command('', cmd_options)
 
-    def get_submodules(self):
+    def get_submodules(self, sorted_=True):
         """Return a list of git.Submodule instances for all submodules"""
         # check whether we have anything in the repo. if not go home early
         if not self.repo.head.is_valid():
             return []
-        return self.repo.submodules
+        submodules = self.repo.submodules
+        if sorted_:
+            submodules = sorted(submodules, key=lambda x: x.path)
+        return submodules
 
     def add_submodule(self, path, name=None, url=None, branch=None):
         """Add a new submodule to the repository.

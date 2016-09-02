@@ -355,7 +355,6 @@ class Dataset(object):
         # TODO: clean that part and move it in here (Dataset)
         #       or call install to add the thing inplace
         from .install import _install_subds_inplace
-        from os.path import relpath
         return _install_subds_inplace(ds=self, path=subds.path,
                                       relativepath=relpath(subds.path, self.path),
                                       name=name)
@@ -452,7 +451,6 @@ class Dataset(object):
             if not path.startswith(self.path):
                 # TODO: - have dedicated exception
                 raise ValueError("path {0} not in dataset {1}.".format(path, self))
-            from os.path import relpath
             path = relpath(path, self.path)
 
         for subds in self.get_subdatasets(recursive=True,

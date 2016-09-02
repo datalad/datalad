@@ -195,7 +195,8 @@ def test_subdatasets(path):
     ds.install(path='test')
     assert_true(ds.is_installed())
     ds.save("Hello!", version_tag=1)
-    # add a subdataset
+
+    # add itself as a subdataset (crazy, isn't it?)
     subds = ds.install('subds', source=path)
     assert_true(subds.is_installed())
     subdss = ds.get_subdatasets()
@@ -238,23 +239,25 @@ def test_get_containing_subdataset(path):
 
 @with_tempfile(mkdir=True)
 def test_require_dataset(path):
-    # in this folder by default
-    assert_equal(
-        require_dataset(None).path,
-        abspath(os.path.curdir))
     with chpwd(path):
         assert_raises(
             InsufficientArgumentsError,
             require_dataset,
             None)
-    assert_equal(
-        require_dataset('some', check_installed=False).path,
-        abspath('some'))
-    assert_raises(
-        ValueError,
-        require_dataset,
-        'some',
-        check_installed=True)
+        create('.')
+        # in this folder by default
+        assert_equal(
+            require_dataset(None).path,
+            path)
+
+        assert_equal(
+            require_dataset('some', check_installed=False).path,
+            abspath('some'))
+        assert_raises(
+            ValueError,
+            require_dataset,
+            'some',
+            check_installed=True)
 
 
 @with_tempfile(mkdir=True)
