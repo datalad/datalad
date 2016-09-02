@@ -25,7 +25,7 @@ from datalad.support.param import Parameter
 from datalad.support.constraints import EnsureStr, EnsureNone, EnsureBool
 from datalad.distribution.dataset import Dataset, EnsureDataset, \
     datasetmethod, resolve_path
-from datalad.distribution.install import get_containing_subdataset, get_git_dir
+from datalad.distribution.install import get_git_dir
 from datalad.interface.base import Interface
 from datalad.utils import assure_dir, on_windows
 
@@ -352,7 +352,7 @@ class Uninstall(Interface):
                 return [relativepath]
 
         elif _untracked_or_within_submodule:
-            subds = get_containing_subdataset(ds, relativepath)
+            subds = ds.get_containing_subdataset(relativepath)
             if ds.path != subds.path:
                 # target path belongs to a subdataset, hand uninstallation
                 # over to it
